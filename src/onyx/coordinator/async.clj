@@ -18,8 +18,8 @@
 
 (def completion-ch (chan 1000))
 
-(defn mark-peer-birth [log sync peer]
-  (extensions/await-death sync dead-peer-ch)
+(defn mark-peer-birth [log sync peer death-cb]
+  (extensions/await-death sync death-cb)
   (extensions/mark-peer-born log peer))
 
 (defn mark-peer-death [log peer]
@@ -36,12 +36,12 @@
   (extensions/delete sync task)
   (extensions/evict log task))
 
-(defn offer-task [log sync]
+(defn offer-task [log sync ack-cb complete-cb]
   (when (extensions/next-task log)
     (extensions/create-ack-node sync)
     (extensions/create-completion-node sync)
-    (extensions/await-ack sync ack-ch)
-    (extensions/await-completion sync completion-ch)
+    (extensions/await-ack sync ack-cb)
+    (extensions/await-completion sync complete-cb)
     (extensions/mark-offered log)
     (extensions/write-payload sync)))
 
@@ -53,7 +53,7 @@
 (defn born-peer-ch-loop [log sync]
   (loop []
     (let [peer (<!! born-peer-ch)]
-      (mark-peer-birth log sync peer)
+      (mark-peer-birth log sync peer #(>!! dead-peer-ch %))
       (>!! offer-ch peer)
       (recur))))
 
@@ -87,7 +87,9 @@
 (defn offer-ch-loop [log sync]
   (loop []
     (let [event (<!! offer-ch)]
-      (when (offer-task log sync)
+      (when (offer-task log sync
+                        #(>!! ack-ch %)
+                        #(>!! completion-ch %))
         (thread (<!! (timeout eviction-delay))
                 (>!! evict-ch nil)))
       (recur))))
