@@ -19,7 +19,7 @@
 (def completion-ch (chan 1000))
 
 (defn mark-peer-birth [log sync peer death-cb]
-  (extensions/await-death sync death-cb)
+  (extensions/on-change sync death-cb)
   (extensions/mark-peer-born log peer))
 
 (defn mark-peer-death [log peer]
@@ -38,12 +38,12 @@
 
 (defn offer-task [log sync ack-cb complete-cb]
   (when (extensions/next-task log)
-    (extensions/create-ack-node sync)
-    (extensions/create-completion-node sync)
-    (extensions/await-ack sync ack-cb)
-    (extensions/await-completion sync complete-cb)
+    (extensions/create sync)
+    (extensions/create sync)
+    (extensions/on-change sync ack-cb)
+    (extensions/on-change sync complete-cb)
     (extensions/mark-offered log)
-    (extensions/write-payload sync)))
+    (extensions/write sync)))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)

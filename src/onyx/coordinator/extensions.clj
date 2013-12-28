@@ -16,19 +16,15 @@
 
 (defmulti next-task (fn [log] log))
 
+(defmulti create (fn [sync] sync))
+
 (defmulti delete (fn [sync task] sync))
 
-(defmulti create-ack-node (fn [sync] sync))
+(defmulti write (fn [sync] sync))
 
-(defmulti create-completion-node (fn [sync] sync))
+(defmulti read (fn [sync node] sync))
 
-(defmulti await-ack (fn [sync node] sync))
-
-(defmulti await-completion (fn [sync node] sync))
-
-(defmulti await-death (fn [sync peer] sync))
-
-(defmulti write-payload (fn [sync] sync))
+(defmulti on-change (fn [sync node cb] sync))
 
 (defmulti cap-queue (fn [queue task] queue))
 
