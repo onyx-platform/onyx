@@ -16,7 +16,7 @@
 
 (defmulti next-task (fn [log] log))
 
-(defmulti create (fn [sync] sync))
+(defmulti create (fn [sync bucket] [sync bucket]))
 
 (defmulti delete (fn [sync task] sync))
 
