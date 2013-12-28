@@ -18,13 +18,13 @@
 
 (defmulti create (fn [sync bucket] [sync bucket]))
 
-(defmulti delete (fn [sync task] sync))
+(defmulti delete (fn [sync place] sync))
 
-(defmulti write (fn [sync] sync))
+(defmulti write (fn [sync place contents] sync))
 
-(defmulti read (fn [sync node] sync))
+(defmulti read (fn [sync place] sync))
 
-(defmulti on-change (fn [sync node cb] sync))
+(defmulti on-change (fn [sync place cb] sync))
 
 (defmulti cap-queue (fn [queue task] queue))
 
