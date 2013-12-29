@@ -142,7 +142,7 @@
   (tap ack-mult ack-ch-tail)
   (tap completion-mult completion-ch-tail)
 
-  (thread (try (born-peer-ch-loop log sync) (catch Exception e (prn e) (.printStackTrace e))))
+  (thread (born-peer-ch-loop log sync))
   (thread (dead-peer-ch-loop log))
   (thread (planning-ch-loop))
   (thread (ack-ch-loop log))
