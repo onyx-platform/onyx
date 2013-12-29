@@ -50,9 +50,9 @@
 
 (def completion-mult (mult completion-ch-head))
 
-(defn mark-peer-birth [log sync peer death-cb]
-  (extensions/on-change sync death-cb)
-  (extensions/mark-peer-born log peer))
+(defn mark-peer-birth [log sync place death-cb]
+  (extensions/on-change sync place death-cb)
+  (extensions/mark-peer-born log place))
 
 (defn mark-peer-death [log peer]
   (extensions/mark-peer-dead log peer))
@@ -84,41 +84,41 @@
 
 (defn born-peer-ch-loop [log sync]
   (loop []
-    (let [place (<!! born-peer-ch-head)]
+    (let [place (<!! born-peer-ch-tail)]
       (mark-peer-birth log sync place #(>!! dead-peer-ch-head %))
       (>!! offer-ch-head place)
       (recur))))
 
 (defn dead-peer-ch-loop [log]
   (loop []
-    (let [peer (<!! dead-peer-ch-head)]
+    (let [peer (<!! dead-peer-ch-tail)]
       (mark-peer-death log peer)
       (>!! evict-ch-head peer)
       (recur))))
 
 (defn planning-ch-loop [log]
   (loop []
-    (let [job (<!! planning-ch-head)]
+    (let [job (<!! planning-ch-tail)]
       (plan-job log job)
-      (<!! offer-ch-head job)
+      (>!! offer-ch-head job)
       (recur))))
 
 (defn ack-ch-loop [log]
   (loop []
-    (let [task (<!! ack-ch-head)]
+    (let [task (<!! ack-ch-tail)]
       (acknowledge-task log task)
       (recur))))
 
 (defn evict-ch-loop [log sync]
   (loop []
-    (let [task (<!! evict-ch-head)]
+    (let [task (<!! evict-ch-tail)]
       (evict-task log sync task)
       (>!! offer-ch-head task)
       (recur))))
 
 (defn offer-ch-loop [log sync]
   (loop []
-    (let [event (<!! offer-ch-head)]
+    (let [event (<!! offer-ch-tail)]
       (when (offer-task log sync
                         #(>!! ack-ch-head %)
                         #(>!! completion-ch-head %))
@@ -128,29 +128,27 @@
 
 (defn completion-ch-loop [log sync queue]
   (loop []
-    (let [task (<!! completion-ch-head)]
+    (let [task (<!! completion-ch-tail)]
       (complete-task log sync queue task)
       (>!! offer-ch-head task)
       (recur))))
 
-(def start-async!
-  (memoize
-   (fn [log sync queue]
-     (tap planning-mult planning-ch-tail)
-     (tap born-peer-mult born-peer-ch-tail)
-     (tap dead-peer-mult dead-peer-ch-tail)
-     (tap evict-mult evict-ch-tail)
-     (tap offer-mult offer-ch-tail)
-     (tap ack-mult ack-ch-tail)
-     (tap completion-mult completion-ch-tail)
+(defn start-async! [log sync queue]
+  (tap planning-mult planning-ch-tail)
+  (tap born-peer-mult born-peer-ch-tail)
+  (tap dead-peer-mult dead-peer-ch-tail)
+  (tap evict-mult evict-ch-tail)
+  (tap offer-mult offer-ch-tail)
+  (tap ack-mult ack-ch-tail)
+  (tap completion-mult completion-ch-tail)
 
-     (thread (born-peer-ch-loop log sync))
-     (thread (dead-peer-ch-loop log))
-     (thread (planning-ch-loop))
-     (thread (ack-ch-loop log))
-     (thread (evict-ch-loop log sync))
-     (thread (offer-ch-loop log sync))
-     (thread (completion-ch-loop log sync queue)))))
+  (thread (try (born-peer-ch-loop log sync) (catch Exception e (prn e) (.printStackTrace e))))
+  (thread (dead-peer-ch-loop log))
+  (thread (planning-ch-loop))
+  (thread (ack-ch-loop log))
+  (thread (evict-ch-loop log sync))
+  (thread (offer-ch-loop log sync))
+  (thread (completion-ch-loop log sync queue)))
 
 (start-async! :datomic :zookeeper :hornetq)
 
