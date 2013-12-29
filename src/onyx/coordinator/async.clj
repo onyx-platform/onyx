@@ -1,24 +1,54 @@
 (ns onyx.coordinator.async
-  (:require [clojure.core.async :refer [chan thread timeout >!! <!!]]
+  (:require [clojure.core.async :refer [chan thread mult tap timeout >!! <!!]]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic]
             [onyx.coordinator.sync.zookeeper]))
 
 (def eviction-delay 5000)
 
-(def planning-ch (chan 1000))
+(def ch-capacity 1000)
 
-(def born-peer-ch (chan 1000))
+(def planning-ch-head (chan ch-capacity))
 
-(def dead-peer-ch (chan 1000))
+(def born-peer-ch-head (chan ch-capacity))
 
-(def evict-ch (chan 1000))
+(def dead-peer-ch-head (chan ch-capacity))
 
-(def offer-ch (chan 1000))
+(def evict-ch-head (chan ch-capacity))
 
-(def ack-ch (chan 1000))
+(def offer-ch-head (chan ch-capacity))
 
-(def completion-ch (chan 1000))
+(def ack-ch-head (chan ch-capacity))
+
+(def completion-ch-head (chan ch-capacity))
+
+(def planning-ch-tail (chan ch-capacity))
+
+(def born-peer-ch-tail (chan ch-capacity))
+
+(def dead-peer-ch-tail (chan ch-capacity))
+
+(def evict-ch-tail (chan ch-capacity))
+
+(def offer-ch-tail (chan ch-capacity))
+
+(def ack-ch-tail (chan ch-capacity))
+
+(def completion-ch-tail (chan ch-capacity))
+
+(def planning-mult (mult planning-ch-head))
+
+(def born-peer-mult (mult born-peer-ch-head))
+
+(def dead-peer-mult (mult dead-peer-ch-head))
+
+(def evict-mult (mult evict-ch-head))
+
+(def offer-mult (mult offer-ch-head))
+
+(def ack-mult (mult ack-ch-head))
+
+(def completion-mult (mult completion-ch-head))
 
 (defn mark-peer-birth [log sync peer death-cb]
   (extensions/on-change sync death-cb)
@@ -54,58 +84,66 @@
 
 (defn born-peer-ch-loop [log sync]
   (loop []
-    (let [place (<!! born-peer-ch)]
-      (mark-peer-birth log sync place #(>!! dead-peer-ch %))
-      (>!! offer-ch place)
+    (let [place (<!! born-peer-ch-head)]
+      (mark-peer-birth log sync place #(>!! dead-peer-ch-head %))
+      (>!! offer-ch-head place)
       (recur))))
 
 (defn dead-peer-ch-loop [log]
   (loop []
-    (let [peer (<!! dead-peer-ch)]
+    (let [peer (<!! dead-peer-ch-head)]
       (mark-peer-death log peer)
-      (>!! evict-ch peer)
+      (>!! evict-ch-head peer)
       (recur))))
 
 (defn planning-ch-loop [log]
   (loop []
-    (let [job (<!! planning-ch)]
+    (let [job (<!! planning-ch-head)]
       (plan-job log job)
-      (<!! offer-ch job)
+      (<!! offer-ch-head job)
       (recur))))
 
 (defn ack-ch-loop [log]
   (loop []
-    (let [task (<!! ack-ch)]
+    (let [task (<!! ack-ch-head)]
       (acknowledge-task log task)
       (recur))))
 
 (defn evict-ch-loop [log sync]
   (loop []
-    (let [task (<!! evict-ch)]
+    (let [task (<!! evict-ch-head)]
       (evict-task log sync task)
-      (>!! offer-ch task)
+      (>!! offer-ch-head task)
       (recur))))
 
 (defn offer-ch-loop [log sync]
   (loop []
-    (let [event (<!! offer-ch)]
+    (let [event (<!! offer-ch-head)]
       (when (offer-task log sync
-                        #(>!! ack-ch %)
-                        #(>!! completion-ch %))
+                        #(>!! ack-ch-head %)
+                        #(>!! completion-ch-head %))
         (thread (<!! (timeout eviction-delay))
-                (>!! evict-ch nil)))
+                (>!! evict-ch-head nil)))
       (recur))))
 
 (defn completion-ch-loop [log sync queue]
   (loop []
-    (let [task (<!! completion-ch)]
+    (let [task (<!! completion-ch-head)]
       (complete-task log sync queue task)
-      (>!! offer-ch task)
+      (>!! offer-ch-head task)
       (recur))))
 
 (def start-async!
   (memoize
    (fn [log sync queue]
+     (tap planning-mult planning-ch-tail)
+     (tap born-peer-mult born-peer-ch-tail)
+     (tap dead-peer-mult dead-peer-ch-tail)
+     (tap evict-mult evict-ch-tail)
+     (tap offer-mult offer-ch-tail)
+     (tap ack-mult ack-ch-tail)
+     (tap completion-mult completion-ch-tail)
+
      (thread (born-peer-ch-loop log sync))
      (thread (dead-peer-ch-loop log))
      (thread (planning-ch-loop))
