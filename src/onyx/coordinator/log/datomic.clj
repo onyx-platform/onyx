@@ -1,7 +1,7 @@
 (ns onyx.coordinator.log.datomic
-  (:require [datomic.api :as d]
-            [onyx.coordinator.extensions :as extensions]
-            [onyx.util :as u]))
+  (:require [onyx.coordinator.extensions :as extensions]
+            [onyx.util :as u]
+            [datomic.api :as d]))
 
 (defn log-schema []
   (let [resource (clojure.java.io/resource "datomic-schema.edn")]

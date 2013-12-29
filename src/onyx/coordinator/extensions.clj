@@ -20,9 +20,9 @@
 
 (defmulti delete (fn [sync place] sync))
 
-(defmulti write (fn [sync place contents] sync))
+(defmulti write-place (fn [sync place contents] sync))
 
-(defmulti read (fn [sync place] sync))
+(defmulti read-place (fn [sync place] sync))
 
 (defmulti on-change (fn [sync place cb] sync))
 

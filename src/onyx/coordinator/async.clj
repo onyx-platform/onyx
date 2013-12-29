@@ -1,6 +1,8 @@
 (ns onyx.coordinator.async
   (:require [clojure.core.async :refer [chan thread timeout >!! <!!]]
-            [onyx.coordinator.extensions :as extensions]))
+            [onyx.coordinator.extensions :as extensions]
+            [onyx.coordinator.log.datomic]
+            [onyx.coordinator.sync.zookeeper]))
 
 (def eviction-delay 5000)
 
@@ -43,7 +45,7 @@
     (extensions/on-change sync ack-cb)
     (extensions/on-change sync complete-cb)
     (extensions/mark-offered log)
-    (extensions/write sync)))
+    (extensions/write-place sync)))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)
@@ -52,9 +54,9 @@
 
 (defn born-peer-ch-loop [log sync]
   (loop []
-    (let [peer (<!! born-peer-ch)]
-      (mark-peer-birth log sync peer #(>!! dead-peer-ch %))
-      (>!! offer-ch peer)
+    (let [place (<!! born-peer-ch)]
+      (mark-peer-birth log sync place #(>!! dead-peer-ch %))
+      (>!! offer-ch place)
       (recur))))
 
 (defn dead-peer-ch-loop [log]
@@ -101,12 +103,16 @@
       (>!! offer-ch task)
       (recur))))
 
-(defn ch-graph [log sync queue]
-  (thread (born-peer-ch-loop log sync))
-  (thread (dead-peer-ch-loop log))
-  (thread (planning-ch-loop))
-  (thread (ack-ch-loop log))
-  (thread (evict-ch-loop log sync))
-  (thread (offer-ch-loop log sync))
-  (thread (completion-ch-loop log sync queue)))
+(def start-async!
+  (memoize
+   (fn [log sync queue]
+     (thread (born-peer-ch-loop log sync))
+     (thread (dead-peer-ch-loop log))
+     (thread (planning-ch-loop))
+     (thread (ack-ch-loop log))
+     (thread (evict-ch-loop log sync))
+     (thread (offer-ch-loop log sync))
+     (thread (completion-ch-loop log sync queue)))))
+
+(start-async! :datomic :zookeeper :hornetq)
 
