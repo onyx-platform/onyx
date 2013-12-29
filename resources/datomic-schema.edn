@@ -6,7 +6,7 @@
   :db/ident :peer/place
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
-  :db/unique :db.unique/identity
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}
  
  {:db/id #db/id [:db.part/db]

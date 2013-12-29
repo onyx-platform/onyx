@@ -1,6 +1,7 @@
 (ns onyx.coordinator.log.datomic
   (:require [datomic.api :as d]
-            [onyx.coordinator.extensions :as extensions]))
+            [onyx.coordinator.extensions :as extensions]
+            [onyx.util :as u]))
 
 (defn log-schema []
   (let [resource (clojure.java.io/resource "datomic-schema.edn")]
@@ -16,11 +17,20 @@
       @(d/transact conn schema))
     conn))
 
+(def datomic-conn
+  (delay (start-datomic! (:datomic-uri (u/config)) (log-schema))))
+
 (defmethod extensions/mark-peer-born :datomic
-  [log peer])
+  [log place]
+  (let [tx-data [{:db/id (d/tempid :onyx/log)
+                  :peer/place place}]]
+    @(d/transact @datomic-conn tx-data)))
 
 (defmethod extensions/mark-peer-dead :datomic
-  [log peer])
+  [log place]
+  (let [query '[:find ?e :in $ ?place :where [?e :peer/place ?place]]
+        entity-id (ffirst (d/q query (d/db @datomic-conn) place))]
+    @(d/transact @datomic-conn [[:db.fn/retractEntity entity-id]])))
 
 (defmethod extensions/mark-offered :datomic
   [log])

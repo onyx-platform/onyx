@@ -1,3 +1,4 @@
-{:zk/host "127.0.0.1"
+{:datomic-uri "datomic:mem://log"
+ :zk/host "127.0.0.1"
  :zk/port 2181}
 

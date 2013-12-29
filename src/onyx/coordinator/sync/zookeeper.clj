@@ -1,6 +1,7 @@
 (ns onyx.coordinator.sync.zookeeper
   (:require [zookeeper :as zk]
-            [onyx.coordinator.extensions :as extensions])
+            [onyx.coordinator.extensions :as extensions]
+            [onyx.util :as u])
   (:import [java.util UUID]))
 
 (defn serialize-edn [x]
@@ -10,8 +11,7 @@
   (read-string (String. x "UTF-8")))
 
 (defn zk-addr []
-  (let [resource (clojure.java.io/resource "config.edn")
-        config (read-string (slurp resource))]
+  (let [config (u/config)]
     (str (:zk/host config) ":" (:zk/port config))))
 
 (def client (memoize (fn [] (zk/connect (zk-addr)))))

@@ -1,8 +1,8 @@
 (ns onyx.coordinator.extensions)
 
-(defmulti mark-peer-born (fn [log peer] log))
+(defmulti mark-peer-born (fn [log place] log))
 
-(defmulti mark-peer-dead (fn [log peer] log))
+(defmulti mark-peer-dead (fn [log place] log))
 
 (defmulti mark-offered (fn [log] log))
 
