@@ -97,7 +97,6 @@
   component/Lifecycle
 
   (start [component]
-    (println "Starting the coordinator")
     (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
@@ -156,8 +155,6 @@
         :completion-mult completion-mult)))
 
   (stop [component]
-    (println "Stopping the coordinator")
-
     (clojure.core.async/close! (:planning-ch-head component))
     (clojure.core.async/close! (:born-peer-ch-head component))
     (clojure.core.async/close! (:dead-peer-ch-head component))
