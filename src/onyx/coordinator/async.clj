@@ -162,7 +162,7 @@
     (clojure.core.async/close! (:offer-ch-head component))
     (clojure.core.async/close! (:ack-ch-head component))
     (clojure.core.async/close! (:completion-ch-head component))
-    
+
     component))
 
 (defn coordinator [log sync queue]
