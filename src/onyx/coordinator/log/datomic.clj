@@ -22,6 +22,7 @@
   component/Lifecycle
 
   (start [component]
+    (prn "Datomic up")
     (let [conn (start-datomic! uri schema)]
       (assoc component :conn conn)))
 
@@ -29,6 +30,9 @@
     (d/delete-database uri)
     (d/shutdown false)
     component))
+
+(defn datomic [uri schema]
+  (map->Datomic {:uri uri :schema schema}))
 
 (defmethod extensions/mark-peer-born Datomic
   [log place]

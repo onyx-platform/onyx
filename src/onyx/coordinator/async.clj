@@ -168,19 +168,3 @@
 (defn coordinator [log sync queue]
   (map->Coordinator {:log log :sync sync :queue queue}))
 
-(def components [:coordinator])
-
-(defrecord OnyxSystem [log sync queue]
-  component/Lifecycle
-  (start [this]
-    (component/start-system this components))
-  (stop [this]
-    (component/stop-system this components)))
-
-(defn onyx-system [{:keys [log sync queue]}]
-  (map->OnyxSystem
-   {:coordinator (Coordinator. log sync queue)
-    :log log
-    :sync sync
-    :queue queue}))
-
