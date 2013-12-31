@@ -1,5 +1,6 @@
 (ns onyx.coordinator.log.datomic
-  (:require [onyx.coordinator.extensions :as extensions]
+  (:require [com.stuartsierra.component :as component]
+            [onyx.coordinator.extensions :as extensions]
             [onyx.util :as u]
             [datomic.api :as d]))
 
@@ -17,36 +18,45 @@
       @(d/transact conn schema))
     conn))
 
-(def datomic-conn
-  (delay (start-datomic! (:datomic-uri (u/config)) (log-schema))))
+(defrecord Datomic [uri schema]
+  component/Lifecycle
 
-(defmethod extensions/mark-peer-born :datomic
+  (start [component]
+    (let [conn (start-datomic! uri schema)]
+      (assoc component :conn conn)))
+
+  (stop [component]
+    (d/delete-database uri)
+    (d/shutdown false)
+    component))
+
+(defmethod extensions/mark-peer-born Datomic
   [log place]
   (let [tx-data [{:db/id (d/tempid :onyx/log)
                   :peer/place place}]]
-    @(d/transact @datomic-conn tx-data)))
+    @(d/transact (:conn log) tx-data)))
 
-(defmethod extensions/mark-peer-dead :datomic
+(defmethod extensions/mark-peer-dead Datomic
   [log place]
   (let [query '[:find ?e :in $ ?place :where [?e :peer/place ?place]]
-        entity-id (ffirst (d/q query (d/db @datomic-conn) place))]
-    @(d/transact @datomic-conn [[:db.fn/retractEntity entity-id]])))
+        entity-id (ffirst (d/q query (d/db (:conn log)) place))]
+    @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
 
-(defmethod extensions/mark-offered :datomic
+(defmethod extensions/mark-offered Datomic
   [log])
 
-(defmethod extensions/plan-job :datomic
+(defmethod extensions/plan-job Datomic
   [log job])
 
-(defmethod extensions/ack :datomic
+(defmethod extensions/ack Datomic
   [log task])
 
-(defmethod extensions/evict :datomic
+(defmethod extensions/evict Datomic
   [log task])
 
-(defmethod extensions/complete :datomic
+(defmethod extensions/complete Datomic
   [log task])
 
-(defmethod extensions/next-task :datomic
+(defmethod extensions/next-task Datomic
   [log])
 

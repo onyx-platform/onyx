@@ -27,8 +27,7 @@
       (let [query '[:find ?p :where [?e :peer/place ?p]]
             result (d/q query (d/db @datomic/datomic-conn))]
         (is (= (count result) 1))
-        (is (= (ffirst result) peer))
-        (close! offer-ch-spy)))))
+        (is (= (ffirst result) peer))))))
 
 (deftest peer-joins-and-dies
   (with-redefs [datomic/datomic-conn (delay (sandbox-db))]
