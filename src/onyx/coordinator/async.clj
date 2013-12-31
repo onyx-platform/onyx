@@ -1,6 +1,7 @@
 (ns onyx.coordinator.async
   (:require [clojure.core.async :refer [chan thread mult tap timeout >!! <!!]]
             [com.stuartsierra.component :as component]
+            [dire.core :as dire]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic]
             [onyx.coordinator.sync.zookeeper]))
@@ -92,6 +93,34 @@
       (complete-task log sync queue task)
       (>!! offer-head task)
       (recur))))
+
+(dire/with-handler! #'born-peer-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'dead-peer-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'planning-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'ack-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'evict-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'offer-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'completion-ch-loop
+  java.lang.Exception
+  (fn [e & _] (.printStackTrace e)))
 
 (defrecord Coordinator [log sync queue]
   component/Lifecycle
