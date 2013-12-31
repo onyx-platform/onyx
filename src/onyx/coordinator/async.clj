@@ -43,7 +43,7 @@
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
   (loop []
     (when-let [place (<!! born-tail)]
-      (mark-peer-birth log sync place #(>!! dead-head place))
+      (mark-peer-birth log sync place (fn [_] (>!! dead-head place)))
       (>!! offer-head place)
       (recur))))
 

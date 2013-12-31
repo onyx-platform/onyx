@@ -35,9 +35,9 @@
     (let [peer (extensions/create :zookeeper :peer)
           offer-ch-spy (chan 1)
           evict-ch-spy (chan 1)]
-      (tap async/offer-mult offer-ch-spy)
-      (tap async/evict-mult evict-ch-spy)
-      (>!! async/born-peer-ch-head peer)
+      (tap (:offer-mult coordinator) offer-ch-spy)
+      (tap (:evict-mult coordinator) evict-ch-spy)
+      (>!! (:born-peer-ch-head coordinator) peer)
       (<!! offer-ch-spy)
       (extensions/delete :zookeeper peer)
       (<!! evict-ch-spy)
