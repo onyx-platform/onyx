@@ -1,30 +1,30 @@
 (ns onyx.coordinator.extensions)
 
-(defmulti mark-peer-born (fn [log place] log))
+(defmulti mark-peer-born (fn [log place] (type log)))
 
-(defmulti mark-peer-dead (fn [log place] log))
+(defmulti mark-peer-dead (fn [log place] (type log)))
 
-(defmulti mark-offered (fn [log] log))
+(defmulti mark-offered (fn [log] (type log)))
 
-(defmulti plan-job (fn [log job] log))
+(defmulti plan-job (fn [log job] (type log)))
 
-(defmulti ack (fn [log task] log))
+(defmulti ack (fn [log task] (type log)))
 
-(defmulti evict (fn [log task] log))
+(defmulti evict (fn [log task] (type log)))
 
-(defmulti complete (fn [log task] log))
+(defmulti complete (fn [log task] (type log)))
 
-(defmulti next-task (fn [log] log))
+(defmulti next-task (fn [log] (type log)))
 
-(defmulti create (fn [sync bucket] [sync bucket]))
+(defmulti create (fn [sync bucket] [(type sync) bucket]))
 
-(defmulti delete (fn [sync place] sync))
+(defmulti delete (fn [sync place] (type sync)))
 
-(defmulti write-place (fn [sync place contents] sync))
+(defmulti write-place (fn [sync place contents] (type sync)))
 
-(defmulti read-place (fn [sync place] sync))
+(defmulti read-place (fn [sync place] (type sync)))
 
-(defmulti on-change (fn [sync place cb] sync))
+(defmulti on-change (fn [sync place cb] (type sync)))
 
 (defmulti cap-queue (fn [queue task] queue))
 

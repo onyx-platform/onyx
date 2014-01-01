@@ -1,8 +1,31 @@
 (ns onyx.coordinator.sync.zookeeper
-  (:require [onyx.coordinator.extensions :as extensions]
+  (:require [com.stuartsierra.component :as component]
+            [onyx.coordinator.extensions :as extensions]
             [onyx.util :as u]
             [zookeeper :as zk])
   (:import [java.util UUID]))
+
+(defrecord ZooKeeper [addr]
+  component/Lifecycle
+
+  (start [component]
+    (prn "Starting ZooKeeper")
+    (let [conn (zk/connect addr)]
+      (zk/create conn "/onyx" :persistent? true)
+      (zk/create conn "/onyx/peers" :persistent? true)
+      (zk/create conn "/onyx/payloads"  :persistent? true)
+      (zk/create conn "/onyx/acks" :persistent? true)
+      (zk/create conn "/onyx/completions" :persistent? true)
+      (zk/create conn "/onyx/status"  :persistent? true)
+      (assoc component :conn conn)))
+
+  (stop [component]
+    (prn "Stopping ZooKeeper")
+    (zk/close (:conn component))
+    component))
+
+(defn zookeeper [addr]
+  (map->ZooKeeper {:addr addr}))
 
 (defn serialize-edn [x]
   (.getBytes (pr-str x)))
@@ -14,56 +37,47 @@
   (let [config (u/config)]
     (str (:zk/host config) ":" (:zk/port config))))
 
-(def client (delay (let [c (zk/connect (zk-addr))]
-                     (zk/create c "/onyx" :persistent? true)
-                     (zk/create c "/onyx/peers" :persistent? true)
-                     (zk/create c "/onyx/payloads"  :persistent? true)
-                     (zk/create c "/onyx/acks" :persistent? true)
-                     (zk/create c "/onyx/completions" :persistent? true)
-                     (zk/create c "/onyx/status"  :persistent? true)
-                     c)))
-
-(defmethod extensions/create [:zookeeper :peer]
-  [_ _]
+(defmethod extensions/create [ZooKeeper :peer]
+  [sync _]
   (let [place (str "/onyx/peers/" (UUID/randomUUID))]
-    (zk/create @client place :ephemeral? true)
+    (zk/create (:conn sync) place :ephemeral? true)
     place))
 
-(defmethod extensions/create [:zookeeper :payload]
-  [_ _]
+(defmethod extensions/create [ZooKeeper :payload]
+  [sync _]
   (let [place (str "/onyx/payloads/" (UUID/randomUUID))]
-    (zk/create @client place :persistent? true)
+    (zk/create (:conn sync) place :persistent? true)
     place))
 
-(defmethod extensions/create [:zookeeper :ack]
-  [_ _]
+(defmethod extensions/create [ZooKeeper :ack]
+  [sync _]
   (let [place (str "/onyx/acks/" (UUID/randomUUID))]
-    (zk/create @client place :persistent? true)
+    (zk/create (:conn sync) place :persistent? true)
     place))
 
-(defmethod extensions/create [:zookeeper :completion]
-  [_ _]
+(defmethod extensions/create [ZooKeeper :completion]
+  [sync _]
   (let [place (str "/onyx/completions/" (UUID/randomUUID))]
-    (zk/create @client place :persistent? true)
+    (zk/create (:conn sync) place :persistent? true)
     place))
 
-(defmethod extensions/create [:zookeeper :status]
-  [_ _]
+(defmethod extensions/create [ZooKeeper :status]
+  [sync _]
   (let [place (str "/onyx/status/" (UUID/randomUUID))]
-    (zk/create @client place :persistent? true)
+    (zk/create (:conn sync) place :persistent? true)
     place))
 
-(defmethod extensions/delete :zookeeper
-  [_ place] (zk/delete @client place))
+(defmethod extensions/delete ZooKeeper
+  [sync place] (zk/delete (:conn sync) place))
 
-(defmethod extensions/write-place :zookeeper
-  [_ place contents]
-  (let [version (:version (zk/exists @client place))]
-    (zk/set-data @client place (serialize-edn contents) version)))
+(defmethod extensions/write-place ZooKeeper
+  [sync place contents]
+  (let [version (:version (zk/exists (:conn sync) place))]
+    (zk/set-data (:conn sync) place (serialize-edn contents) version)))
 
-(defmethod extensions/read-place :zookeeper
-  [_ place] (deserialize-edn (zk/data @client place)))
+(defmethod extensions/read-place ZooKeeper
+  [sync place] (deserialize-edn (zk/data (:conn sync) place)))
 
-(defmethod extensions/on-change :zookeeper
-  [_ place cb] (zk/exists @client place :watcher cb))
+(defmethod extensions/on-change ZooKeeper
+  [sync place cb] (zk/exists (:conn sync) place :watcher cb))
 

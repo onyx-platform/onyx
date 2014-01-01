@@ -22,11 +22,12 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Datomic up")
+    (prn "Starting Datomic")
     (let [conn (start-datomic! uri schema)]
       (assoc component :conn conn)))
 
   (stop [component]
+    (prn "Starting Datomic")
     (d/delete-database uri)
     (d/shutdown false)
     component))
