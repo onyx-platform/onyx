@@ -122,12 +122,16 @@
   java.lang.Exception
   (fn [e & _] (.printStackTrace e)))
 
-(defrecord Coordinator [log sync queue]
+(defrecord Coordinator []
   component/Lifecycle
 
   (start [component]
     (prn "Starting Coordinator")
-    (let [planning-ch-head (chan ch-capacity)
+    (let [log (:log component)
+          sync (:sync component)
+          queue (:queue component)
+
+          planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
           evict-ch-head (chan ch-capacity)
@@ -196,6 +200,6 @@
 
     component))
 
-(defn coordinator [log sync queue]
-  (map->Coordinator {:log log :sync sync :queue queue}))
+(defn coordinator []
+  (map->Coordinator {}))
 

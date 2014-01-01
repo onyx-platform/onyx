@@ -27,7 +27,7 @@
       (assoc component :conn conn)))
 
   (stop [component]
-    (prn "Starting Datomic")
+    (prn "Stopping Datomic")
     (d/delete-database uri)
     (d/shutdown false)
     component))

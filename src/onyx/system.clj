@@ -13,14 +13,12 @@
   (stop [this]
     (component/stop-system this components)))
 
-(defn onyx-system [{:keys [sync queue]}]
-  (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))
-        log (datomic datomic-uri (log-schema))
-        sync (zookeeper (zk-addr))
-        coordinator (coordinator log sync queue)]
+(defn onyx-system [{:keys [queue]}]
+  (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))]
     (map->OnyxSystem
-     {:coordinator coordinator
-      :log log
-      :sync sync
-      :queue queue})))
+     {:log (datomic datomic-uri (log-schema))
+      :sync (zookeeper (zk-addr))
+      :queue queue
+      :coordinator (component/using (coordinator)
+                                    [:log :sync :queue])})))
 
