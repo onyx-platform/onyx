@@ -48,6 +48,5 @@
               result (d/q query (d/db (:conn log)))]
           (is (zero? (count result))))))))
 
-(doseq [_ (range 1000)]
-  (run-tests 'onyx.coordinator.simulation-test))
+(run-tests 'onyx.coordinator.simulation-test)
 
