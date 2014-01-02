@@ -18,6 +18,7 @@
   (extensions/mark-peer-dead log peer))
 
 (defn plan-job [log job]
+;  (let [phases (planning/phase-discovery job)])
   (extensions/plan-job log job))
 
 (defn acknowledge-task [log task]
