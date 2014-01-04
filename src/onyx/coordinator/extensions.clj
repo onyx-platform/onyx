@@ -29,6 +29,6 @@
 (defmulti cap-queue (fn [queue task] queue))
 
 (defmulti create-io-task
-  (fn [element parent]
+  (fn [element parent children]
     (select-keys element [:onyx/direction :onyx/type :onyx/medium])))
 

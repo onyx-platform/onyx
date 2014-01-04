@@ -14,13 +14,14 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn egress-queues-to-children [task-names]
-  (map
-   (fn [x]
-     (if (= :queue (:onyx/type x))
-       (:ingress-queue (extensions/create-io-task x nil))
-       (str (UUID/randomUUID))))
-   task-names))
+(defn egress-queues-to-children [elements]
+  (into {}
+   (map
+    (fn [x]
+      (if (= :queue (:onyx/type x))
+        {(:onyx/name x) (:ingress-queue (extensions/create-io-task x nil nil))}
+        {(:onyx/name x) (str (UUID/randomUUID))}))
+    elements)))
 
 (defmulti create-task
   (fn [catalog task-name parent children-names]
@@ -28,16 +29,17 @@
 
 (defmethod create-task :queue
   [catalog task-name parent children-names]
-  (let [element (find-task catalog task-name)]
-    (extensions/create-io-task element parent)))
+  (let [element (find-task catalog task-name)
+        children (map (partial find-task catalog) children-names)]
+    (extensions/create-io-task element parent children)))
 
 (defmethod create-task :transformer
   [catalog task-name parent children-names]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
     {:name (:onyx/name element)
-     :ingress-queue (:egress-queue parent)
-     :egress-queue (egress-queues-to-children children)}))
+     :ingress-queue (get (:egress-queues parent) task-name)
+     :egress-queues (egress-queues-to-children children)}))
 
 (defn children [tree]
   (if (map? tree)
