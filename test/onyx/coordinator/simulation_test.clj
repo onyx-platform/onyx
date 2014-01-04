@@ -48,5 +48,27 @@
               result (d/q query (d/db (:conn log)))]
           (is (zero? (count result))))))))
 
+(deftest plan-one-job-no-peers
+  (with-system
+    (fn [coordinator sync log]
+      (let [catalog [{:onyx/name :in
+                      :onyx/direction :input
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "in-queue"}
+                     {:onyx/name :inc
+                      :onyx/type :transformer}
+                     {:onyx/name :out
+                      :onyx/direction :output
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "out-queue"}]
+            workflow {:in {:inc :out}}
+            offer-ch-spy (chan 1)]
+        (tap (:offer-mult coordinator) offer-ch-spy)
+        (>!! (:planning-ch-head coordinator)
+             {:catalog catalog :workflow workflow})
+        (<!! offer-ch-spy)))))
+
 (run-tests 'onyx.coordinator.simulation-test)
 

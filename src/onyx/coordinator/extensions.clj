@@ -6,7 +6,7 @@
 
 (defmulti mark-offered (fn [log] (type log)))
 
-(defmulti plan-job (fn [log job] (type log)))
+(defmulti plan-job (fn [log tasks] (type log)))
 
 (defmulti ack (fn [log task] (type log)))
 

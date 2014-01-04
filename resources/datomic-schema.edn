@@ -41,7 +41,7 @@
 
  {:db/id #db/id [:db.part/db]
   :db/ident :task/phase
-  :db/valueType :db.type/int
+  :db/valueType :db.type/long
   :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}
 

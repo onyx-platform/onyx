@@ -17,8 +17,8 @@
   (extensions/mark-peer-dead log peer))
 
 (defn plan-job [log job]
-  (let [task (planning/discover-tasks (:catalog job) (:workflow job))]
-    (extensions/plan-job log job)))
+  (let [tasks (planning/discover-tasks (:catalog job) (:workflow job))]
+    (extensions/plan-job log tasks)))
 
 (defn acknowledge-task [log task]
   (extensions/ack log task))

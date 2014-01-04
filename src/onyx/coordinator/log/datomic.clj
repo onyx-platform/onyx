@@ -51,7 +51,7 @@
   [log])
 
 (defmethod extensions/plan-job Datomic
-  [log job])
+  [log tasks])
 
 (defmethod extensions/ack Datomic
   [log task])
