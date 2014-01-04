@@ -2,7 +2,8 @@
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.async :refer [coordinator]]
             [onyx.coordinator.log.datomic :refer [datomic log-schema]]
-            [onyx.coordinator.sync.zookeeper :refer [zookeeper zk-addr]]))
+            [onyx.coordinator.sync.zookeeper :refer [zookeeper zk-addr]]
+            [onyx.coordinator.queue.hornetq]))
 
 (def components [:log :sync :coordinator])
 
