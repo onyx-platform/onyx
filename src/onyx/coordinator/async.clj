@@ -3,8 +3,7 @@
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [onyx.coordinator.extensions :as extensions]
-            [onyx.coordinator.log.datomic]
-            [onyx.coordinator.sync.zookeeper]))
+            [onyx.coordinator.planning :as planning]))
 
 (def eviction-delay 5000)
 
@@ -18,8 +17,8 @@
   (extensions/mark-peer-dead log peer))
 
 (defn plan-job [log job]
-;  (let [phases (planning/phase-discovery job)])
-  (extensions/plan-job log job))
+  (let [task (planning/discover-tasks (:catalog job) (:workflow job))]
+    (extensions/plan-job log job)))
 
 (defn acknowledge-task [log task]
   (extensions/ack log task))
