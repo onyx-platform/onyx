@@ -28,10 +28,11 @@
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
 
-        (let [query '[:find ?p :where [?e :peer/place ?p]]
-              result (d/q query (d/db (:conn log)))]
-          (is (= (count result) 1))
-          (is (= (ffirst result) peer)))))))
+        (testing "There is one peer"
+            (let [query '[:find ?p :where [?e :peer/place ?p]]
+                  result (d/q query (d/db (:conn log)))]
+              (is (= (count result) 1))
+              (is (= (ffirst result) peer))))))))
 
 (deftest peer-joins-and-dies
   (with-system
@@ -46,9 +47,10 @@
         (extensions/delete sync peer)
         (<!! evict-ch-spy)
 
-        (let [query '[:find ?p :where [?e :peer/place ?p]]
-              result (d/q query (d/db (:conn log)))]
-          (is (zero? (count result))))))))
+        (testing "There are no peers"
+            (let [query '[:find ?p :where [?e :peer/place ?p]]
+                  result (d/q query (d/db (:conn log)))]
+              (is (zero? (count result)))))))))
 
 (deftest plan-one-job-no-peers
   (with-system
@@ -73,22 +75,55 @@
 
         (let [job-id (<!! offer-ch-spy)
               db (d/db (:conn log))]
-          (let [query '[:find ?j :in $ ?id :where [?j :job/id ?id]]
-                result (d/q query db job-id)]
-            (is (= (count result) 1)))
 
-          (let [query '[:find ?t :where [?t :task/name]]
+          (testing "There is one job"
+              (let [query '[:find ?j :in $ ?id :where [?j :job/id ?id]]
+                    result (d/q query db job-id)]
+                (is (= (count result) 1))))
+
+          (testing "There are three tasks")
+          (let [query '[:find ?n :where [?t :task/name ?n]]
                 result (d/q query db)]
-            (is #{:in :inc :out}))
+            (is (= result #{[:in] [:inc] [:out]})))
 
+          (testing ":in's ingress queue is preset"
+            (let [query '[:find ?qs :where
+                          [?t :task/name :in]
+                          [?t :task/ingress-queues ?qs]]
+                  result (d/q query db)]
+              (is (= result #{["in-queue"]}))))
+
+          (testing ":out's ingress queue is preset"
+            (let [query '[:find ?qs :where
+                          [?t :task/name :out]
+                          [?t :task/ingress-queues ?qs]]
+                  result (d/q query db)]
+              (is (= result #{["out-queue"]}))))
+
+          (testing ":out has no egress queue"
+            (let [query '[:find ?qs :where
+                          [?t :task/name :out]
+                          [?t :task/egress-queues ?qs]]
+                  result (d/q query db)]
+              (is (empty? result))))
+
+          (testing ":inc's ingress queue is :in's egress queue")
           (let [in-query '[:find ?qs :where
                            [?t :task/name :in]
                            [?t :task/egress-queues ?qs]]
                 inc-query '[:find ?qs :where
                             [?t :task/name :inc]
                             [?t :task/ingress-queues ?qs]]]
-            (contains? (into #{} (first (d/q in-query db)))
-                       (into #{} (first (d/q inc-query db))))))))))
+            (is (= (d/q in-query db) (d/q inc-query db))))
+
+          (testing ":out's ingess queue is :inc's egress queue"
+            (let [inc-query '[:find ?qs :where
+                              [?t :task/name :inc]
+                              [?t :task/egress-queues ?qs]]
+                  out-query '[:find ?qs :where
+                              [?t :task/name :out]
+                              [?t :task/ingress-queues ?qs]]]
+              (is (= (d/q inc-query db) (d/q out-query db))))))))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 
