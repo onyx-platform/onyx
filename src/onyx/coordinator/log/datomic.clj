@@ -50,8 +50,27 @@
 (defmethod extensions/mark-offered Datomic
   [log])
 
+(defn create-job-datom [catalog workflow tasks]
+  {:db/id (d/tempid :onyx/log)
+   :job/id (d/squuid)
+   :job/catalog (pr-str catalog)
+   :job/workflow (pr-str workflow)
+   :job/task tasks})
+
+(defn create-task-datom [task]
+  {:db/id (d/tempid :onyx/log)
+   :task/name (:name task)
+   :task/phase (:phase task)
+   :task/complete? false
+   :task/ingress-queues (:ingress-queues task)
+   :task/egress-queues (or (vals (:egress-queues task)) [])})
+
 (defmethod extensions/plan-job Datomic
-  [log tasks])
+  [log catalog workflow tasks]
+  (let [task-datoms (map create-task-datom tasks)
+        job-datom (create-job-datom catalog workflow task-datoms)]
+    @(d/transact (:conn log) [job-datom])
+    (:job/id job-datom)))
 
 (defmethod extensions/ack Datomic
   [log task])

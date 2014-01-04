@@ -6,7 +6,7 @@
 
 (defmulti mark-offered (fn [log] (type log)))
 
-(defmulti plan-job (fn [log tasks] (type log)))
+(defmulti plan-job (fn [log catalog workflow tasks] (type log)))
 
 (defmulti ack (fn [log task] (type log)))
 
@@ -29,6 +29,6 @@
 (defmulti cap-queue (fn [queue task] queue))
 
 (defmulti create-io-task
-  (fn [element parent children]
+  (fn [element parent children phase]
     (select-keys element [:onyx/direction :onyx/type :onyx/medium])))
 

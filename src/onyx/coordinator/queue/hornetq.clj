@@ -6,17 +6,19 @@
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [element parent children]
+  [element parent children phase]
   {:name (:onyx/name element)
-   :ingress-queue (:hornetq/queue-name element)
-   :egress-queues (planning/egress-queues-to-children children)})
+   :ingress-queues (:hornetq/queue-name element)
+   :egress-queues (planning/egress-queues-to-children children)
+   :phase phase})
 
 (defmethod extensions/create-io-task
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [element parent children]
+  [element parent children phase]
   {:name (:onyx/name element)
-   :ingress-queue (:hornetq/queue-name element)
-   :egress-queues nil})
+   :ingress-queues (:hornetq/queue-name element)
+   :egress-queues {}
+   :phase phase})
 

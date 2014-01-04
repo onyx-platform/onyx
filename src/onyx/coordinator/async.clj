@@ -16,9 +16,9 @@
 (defn mark-peer-death [log peer]
   (extensions/mark-peer-dead log peer))
 
-(defn plan-job [log job]
-  (let [tasks (planning/discover-tasks (:catalog job) (:workflow job))]
-    (extensions/plan-job log tasks)))
+(defn plan-job [log {:keys [catalog workflow]}]
+  (let [tasks (planning/discover-tasks catalog workflow)]
+    (extensions/plan-job log catalog workflow tasks)))
 
 (defn acknowledge-task [log task]
   (extensions/ack log task))
@@ -58,9 +58,9 @@
 (defn planning-ch-loop [log planning-tail offer-head]
   (loop []
     (when-let [job (<!! planning-tail)]
-      (plan-job log job)
-      (>!! offer-head job)
-      (recur))))
+      (let [job-id (plan-job log job)]
+        (>!! offer-head job-id)
+        (recur)))))
 
 (defn ack-ch-loop [log ack-tail]
   (loop []

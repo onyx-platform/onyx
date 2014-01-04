@@ -27,6 +27,7 @@
         (tap (:offer-mult coordinator) offer-ch-spy)
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
+
         (let [query '[:find ?p :where [?e :peer/place ?p]]
               result (d/q query (d/db (:conn log)))]
           (is (= (count result) 1))
@@ -44,6 +45,7 @@
         (<!! offer-ch-spy)
         (extensions/delete sync peer)
         (<!! evict-ch-spy)
+
         (let [query '[:find ?p :where [?e :peer/place ?p]]
               result (d/q query (d/db (:conn log)))]
           (is (zero? (count result))))))))
@@ -68,7 +70,25 @@
         (tap (:offer-mult coordinator) offer-ch-spy)
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
-        (<!! offer-ch-spy)))))
+
+        (let [job-id (<!! offer-ch-spy)
+              db (d/db (:conn log))]
+          (let [query '[:find ?j :in $ ?id :where [?j :job/id ?id]]
+                result (d/q query db job-id)]
+            (is (= (count result) 1)))
+
+          (let [query '[:find ?t :where [?t :task/name]]
+                result (d/q query db)]
+            (is #{:in :inc :out}))
+
+          (let [in-query '[:find ?qs :where
+                           [?t :task/name :in]
+                           [?t :task/egress-queues ?qs]]
+                inc-query '[:find ?qs :where
+                            [?t :task/name :inc]
+                            [?t :task/ingress-queues ?qs]]]
+            (contains? (into #{} (first (d/q in-query db)))
+                       (into #{} (first (d/q inc-query db))))))))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 

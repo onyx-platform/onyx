@@ -16,7 +16,13 @@
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
-  :db/ident :job/schema
+  :db/ident :job/id
+  :db/valueType :db.type/uuid
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :job/catalog
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}
@@ -52,13 +58,13 @@
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
-  :db/ident :task/ingress-queue
+  :db/ident :task/ingress-queues
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/many
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
-  :db/ident :task/egress-queue
+  :db/ident :task/egress-queues
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/many
   :db.install/_attribute :db.part/db}]
