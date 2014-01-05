@@ -10,8 +10,8 @@
   :db.install/_attribute :db.part/db}
  
  {:db/id #db/id [:db.part/db]
-  :db/ident :peer/status
-  :db/valueType :db.type/keyword
+  :db/ident :peer/task
+  :db/valueType :db.type/ref
   :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}
 

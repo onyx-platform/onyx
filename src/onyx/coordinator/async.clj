@@ -28,13 +28,13 @@
   (extensions/evict log task))
 
 (defn offer-task [log sync ack-cb complete-cb]
-  (when (extensions/next-task log)
-    (extensions/create sync)
-    (extensions/create sync)
-    (extensions/on-change sync ack-cb)
-    (extensions/on-change sync complete-cb)
-    (extensions/mark-offered log)
-    (extensions/write-place sync)))
+  (when-let [task (extensions/next-task log)]
+    #_(extensions/create sync)
+    #_(extensions/create sync)
+    #_(extensions/on-change sync ack-cb)
+    #_(extensions/on-change sync complete-cb)
+    #_(extensions/mark-offered log)
+    #_(extensions/write-place sync)))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)

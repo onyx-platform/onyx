@@ -16,8 +16,10 @@
         coordinator (:coordinator components)
         sync (:sync components)
         log (:log components)]
-    (f coordinator sync log)
-    (alter-var-root #'system component/stop)))
+    (try
+      (f coordinator sync log)
+      (finally
+       (alter-var-root #'system component/stop)))))
 
 (deftest new-peer
   (with-system
@@ -124,6 +126,34 @@
                               [?t :task/name :out]
                               [?t :task/ingress-queues ?qs]]]
               (is (= (d/q inc-query db) (d/q out-query db))))))))))
+
+(deftest plan-one-job-one-peer
+  (with-system
+    (fn [coordinator sync log]
+      (let [peer (extensions/create sync :peer)
+            offer-ch-spy (chan 1)
+            catalog [{:onyx/name :in
+                      :onyx/direction :input
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :onyx/consumption :concurrent
+                      :hornetq/queue-name "in-queue"}
+                     {:onyx/name :inc
+                      :onyx/type :transformer
+                      :onyx/consumption :sequential}
+                     {:onyx/name :out
+                      :onyx/direction :output
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :onyx/consumption :concurrent
+                      :hornetq/queue-name "out-queue"}]
+            workflow {:in {:inc :out}}]
+        (tap (:offer-mult coordinator) offer-ch-spy)
+        (>!! (:born-peer-ch-head coordinator) peer)
+        (>!! (:planning-ch-head coordinator)
+             {:catalog catalog :workflow workflow})
+        (<!! offer-ch-spy)
+        (let [db (d/db (:conn log))])))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 

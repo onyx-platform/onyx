@@ -81,6 +81,25 @@
 (defmethod extensions/complete Datomic
   [log task])
 
+(defn find-incomplete-tasks [db]
+  (let [query '[:find ?task :where [?task :task/complete? false]]]
+    (d/q query db)))
+
+(defn sort-tasks-by-phase [db tasks]
+  (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
+
+(defn find-active-task-ids [db tasks]
+  (let [query '[:find ?task :in $ ?task :where [?peer :peer/task ?task]]]
+    (into #{} (mapcat #(first (d/q query db (:db/id %))) tasks))))
+
+(defn next-essential-task [db]
+  (let [incomplete-tasks (find-incomplete-tasks db)
+        sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
+        active-tasks (find-active-task-ids db sorted-tasks)]
+    (first (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks))))
+
 (defmethod extensions/next-task Datomic
-  [log])
+  [log]
+  (let [db (d/db (:conn log))]
+    (next-essential-task db)))
 
