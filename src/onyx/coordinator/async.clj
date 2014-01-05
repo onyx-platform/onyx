@@ -33,15 +33,13 @@
       (let [payload-node (extensions/create sync :payload)
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
-            status-node (extensions/create sync :status)]
+            status-node (extensions/create sync :status)
+            nodes {:payload payload-node :ack ack-node
+                   :completion complete-node :status status-node}]
         (extensions/on-change sync payload-node ack-cb)
         (extensions/on-change sync ack-node complete-cb)
-        (extensions/mark-offered log task peer
-                                 {:payload payload-node
-                                  :ack ack-node
-                                  :completion complete-node
-                                  :status status-node})
-        #_(extensions/write-place sync)))))
+        (extensions/mark-offered log task peer nodes)
+        (extensions/write-place sync payload-node {:task task :nodes nodes})))))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)
