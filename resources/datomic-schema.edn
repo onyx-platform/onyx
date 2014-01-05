@@ -1,13 +1,6 @@
 [{:db/id #db/id [:db.part/db]
   :db/ident :onyx/log
   :db.install/_partition :db.part/db}
- 
- {:db/id #db/id [:db.part/db]
-  :db/ident :peer/place
-  :db/valueType :db.type/string
-  :db/cardinality :db.cardinality/one
-  :db/unique :db.unique/value
-  :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :peer/status
@@ -74,5 +67,35 @@
   :db/ident :task/egress-queues
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/many
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :node/peer
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :node/payload
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :node/ack
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :node/status
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
+  :db/ident :node/completion
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}]
 

@@ -9,7 +9,7 @@
     (read-string (slurp resource))))
 
 (defn schema-set? [conn]
-  (seq (d/q '[:find ?e :where [?e :db/ident :peer/place]] (d/db conn))))
+  (seq (d/q '[:find ?e :where [?e :db/ident :node/peer]] (d/db conn))))
 
 (defn start-datomic! [uri schema]
   (d/create-database uri)
@@ -71,12 +71,12 @@
   [log place]
   (let [tx-data [{:db/id (d/tempid :onyx/log)
                   :peer/status :idle
-                  :peer/place place}]]
+                  :node/peer place}]]
     @(d/transact (:conn log) tx-data)))
 
 (defmethod extensions/mark-peer-dead Datomic
   [log place]
-  (let [query '[:find ?e :in $ ?place :where [?e :peer/place ?place]]
+  (let [query '[:find ?e :in $ ?place :where [?e :node/peer ?place]]
         entity-id (ffirst (d/q query (d/db (:conn log)) place))]
     @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
 
@@ -102,7 +102,9 @@
   [log task peer nodes]
   (let [tx [{:db/id (:db/id peer)
              :peer/status :acking
-             :peer/task (:db/id task)}]]
+             :peer/task (:db/id task)}
+            {:db/id (:db/id task)
+             }]]
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic

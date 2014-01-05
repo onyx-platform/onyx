@@ -31,7 +31,7 @@
         (<!! offer-ch-spy)
 
         (testing "There is one peer"
-            (let [query '[:find ?p :where [?e :peer/place ?p]]
+            (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
               (is (= (count result) 1))
               (is (= (ffirst result) peer))))))))
@@ -50,7 +50,7 @@
         (<!! evict-ch-spy)
 
         (testing "There are no peers"
-            (let [query '[:find ?p :where [?e :peer/place ?p]]
+            (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
               (is (zero? (count result)))))))))
 
@@ -153,7 +153,7 @@
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
         (<!! offer-ch-spy)
-        (let [db (d/db (:conn log))])))))
+        (<!! (clojure.core.async/timeout 500))))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 
