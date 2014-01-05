@@ -102,9 +102,11 @@
   [log task peer nodes]
   (let [tx [{:db/id (:db/id peer)
              :peer/status :acking
-             :peer/task (:db/id task)}
-            {:db/id (:db/id task)
-             }]]
+             :peer/task (:db/id task)
+             :node/payload (:payload nodes)
+             :node/ack (:ack nodes)
+             :node/status (:status nodes)
+             :node/completion (:completion nodes)}]]
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic
