@@ -29,12 +29,12 @@
 
 (defn offer-task [log sync ack-cb complete-cb]
   (when-let [task (extensions/next-task log)]
-    #_(extensions/create sync)
-    #_(extensions/create sync)
-    #_(extensions/on-change sync ack-cb)
-    #_(extensions/on-change sync complete-cb)
-    #_(extensions/mark-offered log)
-    #_(extensions/write-place sync)))
+    (let [payload-node (extensions/create sync :payload)
+          ack-node (extensions/create sync :ack)]
+      (extensions/on-change sync payload-node ack-cb)
+      (extensions/on-change sync ack-node complete-cb)
+      (extensions/mark-offered log)
+      #_(extensions/write-place sync))))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)

@@ -35,21 +35,6 @@
 (defn datomic [uri schema]
   (map->Datomic {:uri uri :schema schema}))
 
-(defmethod extensions/mark-peer-born Datomic
-  [log place]
-  (let [tx-data [{:db/id (d/tempid :onyx/log)
-                  :peer/place place}]]
-    @(d/transact (:conn log) tx-data)))
-
-(defmethod extensions/mark-peer-dead Datomic
-  [log place]
-  (let [query '[:find ?e :in $ ?place :where [?e :peer/place ?place]]
-        entity-id (ffirst (d/q query (d/db (:conn log)) place))]
-    @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
-
-(defmethod extensions/mark-offered Datomic
-  [log])
-
 (defn create-job-datom [catalog workflow tasks]
   {:db/id (d/tempid :onyx/log)
    :job/id (d/squuid)
@@ -65,12 +50,49 @@
    :task/ingress-queues (:ingress-queues task)
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
+(defn find-incomplete-tasks [db]
+  (let [query '[:find ?task :where [?task :task/complete? false]]]
+    (d/q query db)))
+
+(defn find-active-task-ids [db tasks]
+  (let [query '[:find ?task :in $ ?task :where [?peer :peer/task ?task]]]
+    (into #{} (mapcat #(first (d/q query db (:db/id %))) tasks))))
+
+(defn sort-tasks-by-phase [db tasks]
+  (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
+
+(defn next-essential-task [db]
+  (let [incomplete-tasks (find-incomplete-tasks db)
+        sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
+        active-tasks (find-active-task-ids db sorted-tasks)]
+    (first (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks))))
+
+(defmethod extensions/mark-peer-born Datomic
+  [log place]
+  (let [tx-data [{:db/id (d/tempid :onyx/log)
+                  :peer/place place}]]
+    @(d/transact (:conn log) tx-data)))
+
+(defmethod extensions/mark-peer-dead Datomic
+  [log place]
+  (let [query '[:find ?e :in $ ?place :where [?e :peer/place ?place]]
+        entity-id (ffirst (d/q query (d/db (:conn log)) place))]
+    @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
+
 (defmethod extensions/plan-job Datomic
   [log catalog workflow tasks]
   (let [task-datoms (map create-task-datom tasks)
         job-datom (create-job-datom catalog workflow task-datoms)]
     @(d/transact (:conn log) [job-datom])
     (:job/id job-datom)))
+
+(defmethod extensions/next-task Datomic
+  [log]
+  (let [db (d/db (:conn log))]
+    (next-essential-task db)))
+
+(defmethod extensions/mark-offered Datomic
+  [log])
 
 (defmethod extensions/ack Datomic
   [log task])
@@ -80,26 +102,4 @@
 
 (defmethod extensions/complete Datomic
   [log task])
-
-(defn find-incomplete-tasks [db]
-  (let [query '[:find ?task :where [?task :task/complete? false]]]
-    (d/q query db)))
-
-(defn sort-tasks-by-phase [db tasks]
-  (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
-
-(defn find-active-task-ids [db tasks]
-  (let [query '[:find ?task :in $ ?task :where [?peer :peer/task ?task]]]
-    (into #{} (mapcat #(first (d/q query db (:db/id %))) tasks))))
-
-(defn next-essential-task [db]
-  (let [incomplete-tasks (find-incomplete-tasks db)
-        sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
-        active-tasks (find-active-task-ids db sorted-tasks)]
-    (first (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks))))
-
-(defmethod extensions/next-task Datomic
-  [log]
-  (let [db (d/db (:conn log))]
-    (next-essential-task db)))
 
