@@ -95,19 +95,25 @@
 (defmethod extensions/idle-peer Datomic
   [log]
   (let [db (d/db (:conn log))
-        peers (d/q '[:find ?peer :where [?peer :peer/status :idle]] db)]
-    (d/entity db (ffirst peers))))
+        peers (d/q '[:find ?place :where
+                     [?peer :peer/status :idle]
+                     [?peer :node/peer ?place]] db)]
+    (ffirst peers)))
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
-  (let [tx [{:db/id (:db/id peer)
-             :peer/status :acking
-             :peer/task (:db/id task)
-             :node/payload (:payload nodes)
-             :node/ack (:ack nodes)
-             :node/status (:status nodes)
-             :node/completion (:completion nodes)}]]
-    @(d/transact (:conn log) tx)))
+  (let [peer-id (ffirst (d/q '[:find ?p :in $ ?place :where
+                               [?p :node/peer ?place]]
+                             (d/db (:conn log))
+                             peer))]
+    (let [tx [{:db/id peer-id
+               :peer/status :acking
+               :peer/task (:db/id task)
+               :node/payload (:payload nodes)
+               :node/ack (:ack nodes)
+               :node/status (:status nodes)
+               :node/completion (:completion nodes)}]]
+      @(d/transact (:conn log) tx))))
 
 (defmethod extensions/ack Datomic
   [log task])

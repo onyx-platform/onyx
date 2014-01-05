@@ -30,7 +30,7 @@
 (defn offer-task [log sync ack-cb complete-cb]
   (when-let [task (extensions/next-task log)]
     (when-let [peer (extensions/idle-peer log)]
-      (let [payload-node (extensions/create sync :payload)
+      (let [payload-node (extensions/read-place sync peer)
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
             status-node (extensions/create sync :status)

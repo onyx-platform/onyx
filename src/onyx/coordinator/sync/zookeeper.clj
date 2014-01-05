@@ -76,7 +76,8 @@
     (zk/set-data (:conn sync) place (serialize-edn contents) version)))
 
 (defmethod extensions/read-place ZooKeeper
-  [sync place] (deserialize-edn (zk/data (:conn sync) place)))
+  [sync place]
+  (deserialize-edn (:data (zk/data (:conn sync) place))))
 
 (defmethod extensions/on-change ZooKeeper
   [sync place cb] (zk/exists (:conn sync) place :watcher cb))

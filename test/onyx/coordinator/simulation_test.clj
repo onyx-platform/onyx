@@ -130,8 +130,9 @@
 (deftest plan-one-job-one-peer
   (with-system
     (fn [coordinator sync log]
-      (let [peer (extensions/create sync :peer)
-            offer-ch-spy (chan 1)
+      (let [peer-node (extensions/create sync :peer)
+            payload-node (extensions/create sync :payload)
+            sync-spy (chan)
             catalog [{:onyx/name :in
                       :onyx/direction :input
                       :onyx/type :queue
@@ -148,12 +149,15 @@
                       :onyx/consumption :concurrent
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
-        (tap (:offer-mult coordinator) offer-ch-spy)
-        (>!! (:born-peer-ch-head coordinator) peer)
+        (extensions/write-place sync peer-node payload-node)
+        (extensions/on-change sync payload-node #(>!! sync-spy %))
+        (>!! (:born-peer-ch-head coordinator) peer-node)
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
-        (<!! offer-ch-spy)
-        (<!! (clojure.core.async/timeout 500))))))
+
+        (testing "The payload node is populated"
+          (let [event (<!! sync-spy)]
+            (is (= (:path event) payload-node))))))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 
