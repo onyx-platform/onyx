@@ -153,8 +153,7 @@
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
         (<!! offer-ch-spy)
-        (let [db (d/db (:conn log))]
-          (<!! (clojure.core.async/timeout 1000)))))))
+        (let [db (d/db (:conn log))])))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 

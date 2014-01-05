@@ -29,12 +29,19 @@
 
 (defn offer-task [log sync ack-cb complete-cb]
   (when-let [task (extensions/next-task log)]
-    (let [payload-node (extensions/create sync :payload)
-          ack-node (extensions/create sync :ack)]
-      (extensions/on-change sync payload-node ack-cb)
-      (extensions/on-change sync ack-node complete-cb)
-      (extensions/mark-offered log)
-      #_(extensions/write-place sync))))
+    (when-let [peer (extensions/idle-peer log)]
+      (let [payload-node (extensions/create sync :payload)
+            ack-node (extensions/create sync :ack)
+            complete-node (extensions/create sync :completion)
+            status-node (extensions/create sync :status)]
+        (extensions/on-change sync payload-node ack-cb)
+        (extensions/on-change sync ack-node complete-cb)
+        (extensions/mark-offered log task peer
+                                 {:payload payload-node
+                                  :ack ack-node
+                                  :completion complete-node
+                                  :status status-node})
+        #_(extensions/write-place sync)))))
 
 (defn complete-task [log sync queue task]
   (extensions/delete sync task)
@@ -117,6 +124,10 @@
 (dire/with-handler! #'offer-ch-loop
   java.lang.Exception
   (fn [e & _] (.printStackTrace e)))
+
+(dire/with-handler! #'offer-ch-loop
+  org.apache.zookeeper.KeeperException$ConnectionLossException
+  (fn [e & _] (prn "Nodes offline")))
 
 (dire/with-handler! #'completion-ch-loop
   java.lang.Exception

@@ -70,6 +70,7 @@
 (defmethod extensions/mark-peer-born Datomic
   [log place]
   (let [tx-data [{:db/id (d/tempid :onyx/log)
+                  :peer/status :idle
                   :peer/place place}]]
     @(d/transact (:conn log) tx-data)))
 
@@ -91,8 +92,18 @@
   (let [db (d/db (:conn log))]
     (next-essential-task db)))
 
+(defmethod extensions/idle-peer Datomic
+  [log]
+  (let [db (d/db (:conn log))
+        peers (d/q '[:find ?peer :where [?peer :peer/status :idle]] db)]
+    (d/entity db (ffirst peers))))
+
 (defmethod extensions/mark-offered Datomic
-  [log])
+  [log task peer nodes]
+  (let [tx [{:db/id (:db/id peer)
+             :peer/status :acking
+             :peer/task (:db/id task)}]]
+    @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic
   [log task])

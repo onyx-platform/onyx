@@ -4,7 +4,7 @@
 
 (defmulti mark-peer-dead (fn [log place] (type log)))
 
-(defmulti mark-offered (fn [log] (type log)))
+(defmulti mark-offered (fn [log task peer nodes] (type log)))
 
 (defmulti plan-job (fn [log catalog workflow tasks] (type log)))
 
@@ -15,6 +15,8 @@
 (defmulti complete (fn [log task] (type log)))
 
 (defmulti next-task (fn [log] (type log)))
+
+(defmulti idle-peer (fn [log] (type log)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
 
