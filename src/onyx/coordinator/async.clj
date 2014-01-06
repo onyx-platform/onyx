@@ -168,14 +168,6 @@
       (tap ack-mult ack-ch-tail)
       (tap completion-mult completion-ch-tail)
 
-      (thread (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
-      (thread (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head))
-      (thread (planning-ch-loop log planning-ch-tail offer-ch-head))
-      (thread (ack-ch-loop log ack-ch-tail))
-      (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head))
-      (thread (offer-ch-loop log sync offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
-      (thread (completion-ch-loop log sync queue completion-ch-tail offer-ch-head))
-
       (assoc component
         :planning-ch-head planning-ch-head
         :born-peer-ch-head born-peer-ch-head
@@ -191,17 +183,34 @@
         :evict-mult evict-mult
         :offer-mult offer-mult
         :ack-mult ack-mult
-        :completion-mult completion-mult)))
+        :completion-mult completion-mult
+
+        :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
+        :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head))
+        :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
+        :ack-thread (future (ack-ch-loop log ack-ch-tail))
+        :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))
+        :offer-thread (future (offer-ch-loop log sync offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
+        :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head)))))
 
   (stop [component]
     (prn "Stopping Coordinator")
-    (clojure.core.async/close! (:planning-ch-head component))
+    
     (clojure.core.async/close! (:born-peer-ch-head component))
     (clojure.core.async/close! (:dead-peer-ch-head component))
+    (clojure.core.async/close! (:planning-ch-head component))
     (clojure.core.async/close! (:evict-ch-head component))
     (clojure.core.async/close! (:offer-ch-head component))
     (clojure.core.async/close! (:ack-ch-head component))
     (clojure.core.async/close! (:completion-ch-head component))
+
+    (future-cancel (:born-peer-thread component))
+    (future-cancel (:dead-peer-thread component))
+    (future-cancel (:planning-thread component))
+    (future-cancel (:evict-thread component))
+    (future-cancel (:offer-thread component))
+    (future-cancel (:ack-thread component))
+    (future-cancel (:completion-thread component))
 
     component))
 
