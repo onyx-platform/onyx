@@ -123,10 +123,6 @@
   java.lang.Exception
   (fn [e & _] (.printStackTrace e)))
 
-(dire/with-handler! #'offer-ch-loop
-  org.apache.zookeeper.KeeperException$ConnectionLossException
-  (fn [e & _] (prn "Nodes offline")))
-
 (dire/with-handler! #'completion-ch-loop
   java.lang.Exception
   (fn [e & _] (.printStackTrace e)))

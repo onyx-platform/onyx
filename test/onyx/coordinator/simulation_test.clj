@@ -9,9 +9,8 @@
             [onyx.system :as s]
             [onyx.util :as u]))
 
-(def system (s/onyx-system {:sync :zookeeper :queue :hornetq}))
-
 (defn with-system [f]
+  (def system (s/onyx-system {:sync :zookeeper :queue :hornetq}))
   (let [components (alter-var-root #'system component/start)
         coordinator (:coordinator components)
         sync (:sync components)
