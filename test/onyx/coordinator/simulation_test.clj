@@ -133,6 +133,8 @@
             payload-node (extensions/create sync :payload)
             sync-spy (chan)
             ack-ch-spy (chan)
+            offer-ch-spy (chan)
+            completion-ch-spy (chan)
             catalog [{:onyx/name :in
                       :onyx/direction :input
                       :onyx/type :queue
@@ -151,6 +153,8 @@
             workflow {:in {:inc :out}}]
 
         (tap (:ack-mult coordinator) ack-ch-spy)
+        (tap (:offer-mult coordinator) offer-ch-spy)
+        (tap (:completion-mult coordinator) completion-ch-spy)
 
         (extensions/write-place sync peer-node payload-node)
         (extensions/on-change sync payload-node #(>!! sync-spy %))
@@ -164,23 +168,48 @@
             (is (= (:path event) payload-node))))
 
         (let [db (d/db (:conn log))]
-
           (testing "It receives the :in task"
             (let [task (:task (extensions/read-place sync payload-node))
                   query '[:find ?task :where [?task :task/name :in]]]
               (is (= (:db/id task) (ffirst (d/q query db))))))
 
+          (testing "The peer is marked as :acking the task"
+            (let [query '[:find ?task :where
+                          [?peer :peer/status :acking]
+                          [?peer :peer/task ?task]
+                          [?task :task/name :in]]]
+              (is (= (count (d/q query db)) 1))))
+
           (testing "The payload node contains the other node paths"
             (let [nodes (:nodes (extensions/read-place sync payload-node))]
               (is (= (clojure.set/difference (into #{} (keys nodes))
                                              #{:payload :ack :completion :status})
-                     #{}))))
+                     #{})))))
 
-          (testing "Touching the ack node triggers the callback"
-            (let [nodes (:nodes (extensions/read-place sync payload-node))]
-              (extensions/touch-place sync (:ack nodes))
-              (let [event (<!! ack-ch-spy)]
-                (= (:path event) (:ack nodes))))))))
+        (testing "Touching the ack node triggers the callback"
+          (let [nodes (:nodes (extensions/read-place sync payload-node))]
+            (extensions/touch-place sync (:ack nodes))
+            (let [event (<!! ack-ch-spy)]
+              (= (:path event) (:ack nodes)))))
+
+        (let [db (d/db (:conn log))]
+          
+          (testing "The peer is marked as :acking"
+            (is (= (count (d/q '[:find ?peer :where
+                                 [?peer :peer/status :acking]
+                                 [?peer :peer/task ?task]
+                                 [?task :task/name :in]]
+                               db))
+                   1))))
+
+        (testing "Touching the completion node triggers the callback"
+          (let [nodes (:nodes (extensions/read-place sync payload-node))]
+            (extensions/touch-place sync (:completion nodes))
+            (let [event (<!! completion-ch-spy)]
+              (= (:path event) (:completion nodes)))))
+
+        ))
+    
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
