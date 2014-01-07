@@ -8,7 +8,7 @@
 
 (defmulti plan-job (fn [log catalog workflow tasks] (type log)))
 
-(defmulti ack (fn [log task] (type log)))
+(defmulti ack (fn [log place] (type log)))
 
 (defmulti evict (fn [log task] (type log)))
 

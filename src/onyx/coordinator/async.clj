@@ -67,8 +67,8 @@
 
 (defn ack-ch-loop [log ack-tail]
   (loop []
-    (when-let [task (<!! ack-tail)]
-      (acknowledge-task log task)
+    (when-let [ack-place (:path (<!! ack-tail))]
+      (acknowledge-task log ack-place)
       (recur))))
 
 (defn evict-ch-loop [log sync evict-tail offer-head]

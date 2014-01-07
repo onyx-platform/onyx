@@ -186,14 +186,8 @@
                                              #{:payload :ack :completion :status})
                      #{})))))
 
-        (testing "Touching the ack node triggers the callback"
-          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-            (extensions/touch-place sync (:ack nodes))
-            (let [event (<!! ack-ch-spy)]
-              (= (:path event) (:ack nodes)))))
 
         (let [db (d/db (:conn log))]
-          
           (testing "The peer is marked as :acking"
             (is (= (count (d/q '[:find ?peer :where
                                  [?peer :peer/status :acking]
@@ -201,6 +195,12 @@
                                  [?task :task/name :in]]
                                db))
                    1))))
+        
+        (testing "Touching the ack node triggers the callback"
+          (let [nodes (:nodes (extensions/read-place sync payload-node))]
+            (extensions/touch-place sync (:ack nodes))
+            (let [event (<!! ack-ch-spy)]
+              (= (:path event) (:ack nodes)))))
 
         (testing "Touching the completion node triggers the callback"
           (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -208,7 +208,18 @@
             (let [event (<!! completion-ch-spy)]
               (= (:path event) (:completion nodes)))))
 
-        ))
+        (let [db (d/db (:conn log))]
+          (testing "The peer was marked as :active before completion"
+            (let [query '[:find ?peer :where [?peer :peer/status :active]]]
+              (prn (d/q query db)))))
+
+        #_(let [_ (<!! offer-ch-spy)
+              db (d/db (:conn log))]
+          (testing "The peer is marked as :idle after the task completes"
+            (is (= (count (d/q '[:find ?peer :where
+                                 [?peer :peer/status :idle]]
+                               db))
+                   1))))))
     
     {:eviction-delay 50000}))
 
