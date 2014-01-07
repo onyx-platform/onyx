@@ -156,7 +156,20 @@
 
         (testing "The payload node is populated"
           (let [event (<!! sync-spy)]
-            (is (= (:path event) payload-node))))))))
+            (is (= (:path event) payload-node))))
+
+        (let [db (d/db (:conn log))]
+
+          (testing "It receives the :in task"
+            (let [task (:task (extensions/read-place sync payload-node))
+                  query '[:find ?task :where [?task :task/name :in]]]
+              (is (= (:db/id task) (ffirst (d/q query db))))))
+
+          (testing "The payload node contains the other node paths"
+            (let [nodes (:nodes (extensions/read-place sync payload-node))]
+              (is (= (clojure.set/difference (into #{} (keys nodes))
+                                             #{:payload :ack :completion :status})
+                     #{})))))))))
 
 (run-tests 'onyx.coordinator.simulation-test)
 
