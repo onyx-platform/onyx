@@ -34,8 +34,8 @@
             status-node (extensions/create sync :status)
             nodes {:payload payload-node :ack ack-node
                    :completion complete-node :status status-node}]
-        (extensions/on-change sync payload-node ack-cb)
-        (extensions/on-change sync ack-node complete-cb)
+        (extensions/on-change sync ack-node ack-cb)
+        (extensions/on-change sync complete-node complete-cb)
         (extensions/mark-offered log task peer nodes)
         (extensions/write-place sync payload-node {:task task :nodes nodes})))))
 
