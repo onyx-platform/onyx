@@ -9,8 +9,8 @@
             [onyx.system :as s]
             [onyx.util :as u]))
 
-(defn with-system [f]
-  (def system (s/onyx-system {:sync :zookeeper :queue :hornetq}))
+(defn with-system [f & opts]
+  (def system (s/onyx-system (apply merge {:sync :zookeeper :queue :hornetq :eviction-delay 5000} opts)))
   (let [components (alter-var-root #'system component/start)
         coordinator (:coordinator components)
         sync (:sync components)
@@ -169,7 +169,8 @@
             (let [nodes (:nodes (extensions/read-place sync payload-node))]
               (is (= (clojure.set/difference (into #{} (keys nodes))
                                              #{:payload :ack :completion :status})
-                     #{})))))))))
+                     #{})))))))
+    {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
 

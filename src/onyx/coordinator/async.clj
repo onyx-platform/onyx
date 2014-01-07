@@ -5,8 +5,6 @@
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.planning :as planning]))
 
-(def eviction-delay 5000)
-
 (def ch-capacity 1000)
 
 (defn mark-peer-birth [log sync place death-cb]
@@ -81,7 +79,7 @@
       (recur))))
 
 (defn offer-ch-loop
-  [log sync offer-tail ack-head complete-head evict-head]
+  [log sync eviction-delay offer-tail ack-head complete-head evict-head]
   (loop []
     (when-let [event (<!! offer-tail)]
       (when (offer-task log sync
@@ -130,13 +128,9 @@
 (defrecord Coordinator []
   component/Lifecycle
 
-  (start [component]
+  (start [{:keys [log sync queue eviction-delay] :as component}]
     (prn "Starting Coordinator")
-    (let [log (:log component)
-          sync (:sync component)
-          queue (:queue component)
-
-          planning-ch-head (chan ch-capacity)
+    (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
           evict-ch-head (chan ch-capacity)
@@ -190,7 +184,7 @@
         :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
         :ack-thread (future (ack-ch-loop log ack-ch-tail))
         :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))
-        :offer-thread (future (offer-ch-loop log sync offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
+        :offer-thread (future (offer-ch-loop log sync eviction-delay offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
         :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head)))))
 
   (stop [component]
@@ -214,6 +208,6 @@
 
     component))
 
-(defn coordinator []
-  (map->Coordinator {}))
+(defn coordinator [eviction-delay]
+  (map->Coordinator {:eviction-delay eviction-delay}))
 
