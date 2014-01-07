@@ -75,6 +75,12 @@
   (let [version (:version (zk/exists (:conn sync) place))]
     (zk/set-data (:conn sync) place (serialize-edn contents) version)))
 
+(defmethod extensions/touch-place ZooKeeper
+  [sync place]
+  (let [contents (zk/data (:conn sync) place)]
+    (zk/set-data (:conn sync) place (:data contents)
+                 (:version (:stat contents)))))
+
 (defmethod extensions/read-place ZooKeeper
   [sync place]
   (deserialize-edn (:data (zk/data (:conn sync) place))))

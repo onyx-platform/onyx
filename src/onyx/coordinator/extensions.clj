@@ -24,6 +24,8 @@
 
 (defmulti write-place (fn [sync place contents] (type sync)))
 
+(defmulti touch-place (fn [sync place] (type sync)))
+
 (defmulti read-place (fn [sync place] (type sync)))
 
 (defmulti on-change (fn [sync place cb] (type sync)))

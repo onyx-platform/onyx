@@ -132,6 +132,7 @@
       (let [peer-node (extensions/create sync :peer)
             payload-node (extensions/create sync :payload)
             sync-spy (chan)
+            ack-ch-spy (chan)
             catalog [{:onyx/name :in
                       :onyx/direction :input
                       :onyx/type :queue
@@ -148,8 +149,12 @@
                       :onyx/consumption :concurrent
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
+
+        (tap (:ack-mult coordinator) ack-ch-spy)
+
         (extensions/write-place sync peer-node payload-node)
         (extensions/on-change sync payload-node #(>!! sync-spy %))
+
         (>!! (:born-peer-ch-head coordinator) peer-node)
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
@@ -169,7 +174,13 @@
             (let [nodes (:nodes (extensions/read-place sync payload-node))]
               (is (= (clojure.set/difference (into #{} (keys nodes))
                                              #{:payload :ack :completion :status})
-                     #{})))))))
+                     #{}))))
+
+          (testing "Touching the ack node triggers the callback"
+            (let [nodes (:nodes (extensions/read-place sync payload-node))]
+              (extensions/touch-place sync (:ack nodes))
+              (let [event (<!! ack-ch-spy)]
+                (= (:path event) (:ack nodes))))))))
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
