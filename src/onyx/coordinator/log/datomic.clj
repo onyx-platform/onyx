@@ -69,16 +69,13 @@
 
 (defmethod extensions/mark-peer-born Datomic
   [log place]
-  (let [tx-data [[:onyx.fn/add-peer (d/tempid :onyx/log) :idle place]]]
-    @(d/transact (:conn log) tx-data)))
+  (let [tx [[:onyx.fn/add-peer (d/tempid :onyx/log) :idle place]]]
+    @(d/transact (:conn log) tx)))
 
 (defmethod extensions/mark-peer-dead Datomic
   [log place]
-  (let [db (d/db (:conn log))
-        query '[:find ?e :in $ ?place :where [?e :node/peer ?place]]
-        result (d/q query db place)
-        entity-id (ffirst result)]
-    @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
+  (let [tx [[:onyx.fn/remove-peer place]]]
+    @(d/transact (:conn log) tx)))
 
 (defmethod extensions/plan-job Datomic
   [log catalog workflow tasks]
