@@ -208,18 +208,10 @@
             (let [event (<!! completion-ch-spy)]
               (= (:path event) (:completion nodes)))))
 
-        (let [db (d/db (:conn log))]
-          (testing "The peer was marked as :active before completion"
-            (let [query '[:find ?peer :where [?peer :peer/status :active]]]
-              (prn (d/q query db)))))
-
         #_(let [_ (<!! offer-ch-spy)
               db (d/db (:conn log))]
           (testing "The peer is marked as :idle after the task completes"
-            (is (= (count (d/q '[:find ?peer :where
-                                 [?peer :peer/status :idle]]
-                               db))
-                   1))))))
+            (prn (into {} (d/entity db (ffirst (d/q '[:find ?peer :where [?peer :peer/status]] db)))))))))
     
     {:eviction-delay 50000}))
 

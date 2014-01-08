@@ -22,3 +22,6 @@
    :egress-queues {}
    :phase phase})
 
+(defmethod extensions/cap-queue :hornetq
+  [queue task])
+

@@ -76,8 +76,10 @@
 
 (defmethod extensions/mark-peer-dead Datomic
   [log place]
-  (let [query '[:find ?e :in $ ?place :where [?e :node/peer ?place]]
-        entity-id (ffirst (d/q query (d/db (:conn log)) place))]
+  (let [db (d/db (:conn log))
+        query '[:find ?e :in $ ?place :where [?e :node/peer ?place]]
+        result (d/q query db place)
+        entity-id (ffirst result)]
     @(d/transact (:conn log) [[:db.fn/retractEntity entity-id]])))
 
 (defmethod extensions/plan-job Datomic
@@ -102,10 +104,10 @@
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
-  (let [peer-id (ffirst (d/q '[:find ?p :in $ ?place :where
-                               [?p :node/peer ?place]]
-                             (d/db (:conn log))
-                             peer))]
+  (let [db (d/db (:conn log))
+        query '[:find ?p :in $ ?place :where [?p :node/peer ?place]]
+        result (d/q query db peer)
+        peer-id (ffirst result)]
     (let [tx [{:db/id peer-id
                :peer/status :acking
                :peer/task (:db/id task)
@@ -129,5 +131,24 @@
   [log task])
 
 (defmethod extensions/complete Datomic
-  [log task])
+  [log complete-place]
+  (let [db (d/db (:conn log))
+        query '[:find ?peer ?task :in $ ?complete-node :where
+                [?peer :peer/task ?task]
+                [?peer :node/completion ?complete-node]]
+        result (d/q query db complete-place)
+        peer-id (ffirst result)
+        task-id (second (first result))
+        tx [{:db/id task-id
+             :task/complete? true}
+            {:db/id peer-id
+             :peer/status :idle}
+;            [:db/retract peer-id :peer/task]
+;            [:db/retract peer-id :node/payload]
+;            [:db/retract peer-id :node/ack]
+;            [:db/retract peer-id :node/status]
+;            [:db/retract peer-id :node/completion]
+            ]]
+    (prn "peer id: " peer-id)
+    @(d/transact (:conn log) tx)))
 

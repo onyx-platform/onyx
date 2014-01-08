@@ -12,7 +12,7 @@
 
 (defmulti evict (fn [log task] (type log)))
 
-(defmulti complete (fn [log task] (type log)))
+(defmulti complete (fn [log complete-place] (type log)))
 
 (defmulti next-task (fn [log] (type log)))
 

@@ -39,10 +39,10 @@
         (extensions/mark-offered log task peer nodes)
         (extensions/write-place sync payload-node {:task task :nodes nodes})))))
 
-(defn complete-task [log sync queue task]
-  (extensions/delete sync task)
-  (extensions/complete log task)
-  (extensions/cap-queue queue task))
+(defn complete-task [log sync queue complete-place]
+  (extensions/complete log complete-place)
+  (extensions/delete sync complete-place)
+  (extensions/cap-queue queue complete-place))
 
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
   (loop []
@@ -92,38 +92,35 @@
 (defn completion-ch-loop
   [log sync queue complete-tail offer-head]
   (loop []
-    (when-let [task (<!! complete-tail)]
-      (complete-task log sync queue task)
-      (>!! offer-head task)
+    (when-let [place (:path (<!! complete-tail))]
+      (complete-task log sync queue place)
+      (>!! offer-head place)
       (recur))))
 
+(defn print-if-not-thread-death [e & _]
+  (if-not (instance? java.lang.InterruptedException e)
+    (.printStackTrace e)))
+
 (dire/with-handler! #'born-peer-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'dead-peer-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'planning-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'ack-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'evict-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'offer-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (dire/with-handler! #'completion-ch-loop
-  java.lang.Exception
-  (fn [e & _] (.printStackTrace e)))
+  java.lang.Exception print-if-not-thread-death)
 
 (defrecord Coordinator []
   component/Lifecycle
