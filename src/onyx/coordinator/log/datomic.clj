@@ -114,12 +114,7 @@
 
 (defmethod extensions/ack Datomic
   [log ack-place]
-  (let [db (d/db (:conn log))
-        query '[:find ?peer :in $ ?ack-node :where
-                [?peer :node/ack ?ack-node]]
-        peer-id (ffirst (d/q query db ack-place))
-        tx [{:db/id peer-id
-             :peer/status :active}]]
+  (let [tx [[:onyx.fn/ack-task ack-place]]]
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/evict Datomic

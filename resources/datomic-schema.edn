@@ -36,6 +36,20 @@
                            [[:db.fn/retractEntity entity-id]]
                            (throw (Exception. "Tried to remove non-existent peer"))))}}
 
+ {:db/id #db/id [:db.part/user]
+  :db/ident :onyx.fn/ack-task
+  :db/fn #db/fn {:lang "clojure"
+                 :params [db ack-node]
+                 :code (let [query '[:find ?peer :in $ ?ack-node :where
+                                     [?peer :node/ack ?ack-node]
+                                     [?peer :peer/task ?task]
+                                     [?peer :peer/status :acking]
+                                     [?task :task/complete? false]]
+                             peer-id (ffirst (d/q query db ack-place))]
+                         (if peer-id
+                           [[:db/add peer-id :peer/status :active]]
+                           (throw (Exception. "Error for peer trying to ack"))))}}
+
  {:db/id #db/id [:db.part/db]
   :db/ident :job/id
   :db/valueType :db.type/uuid
@@ -94,29 +108,34 @@
   :db/ident :node/peer
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :node/payload
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :node/ack
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :node/status
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :node/completion
   :db/valueType :db.type/string
   :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/value
   :db.install/_attribute :db.part/db}]
 
