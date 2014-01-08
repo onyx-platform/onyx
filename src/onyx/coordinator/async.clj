@@ -82,11 +82,9 @@
   [log sync eviction-delay offer-tail ack-head complete-head evict-head]
   (loop []
     (when-let [event (<!! offer-tail)]
-      (when (offer-task log sync
-                        #(>!! ack-head %)
-                        #(>!! complete-head %))
-        (thread (<!! (timeout eviction-delay))
-                (>!! evict-head nil)))
+      (prn (offer-task log sync
+                       #(>!! ack-head %)
+                       #(>!! complete-head %)))
       (recur))))
 
 (defn completion-ch-loop

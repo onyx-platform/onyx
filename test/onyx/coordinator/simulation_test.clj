@@ -206,14 +206,8 @@
           (let [nodes (:nodes (extensions/read-place sync payload-node))]
             (extensions/touch-place sync (:completion nodes))
             (let [event (<!! completion-ch-spy)]
-              (= (:path event) (:completion nodes)))))
-
-        #_(let [_ (<!! offer-ch-spy)
-              db (d/db (:conn log))]
-          (testing "The peer is marked as :idle after the task completes"
-            (prn (into {} (d/entity db (ffirst (d/q '[:find ?peer :where [?peer :peer/status]] db)))))))))
-    
-    {:eviction-delay 50000}))
+              (= (:path event) (:completion nodes)))))))
+    {:eviction-delay 500000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
 

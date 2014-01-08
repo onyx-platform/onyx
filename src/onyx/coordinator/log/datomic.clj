@@ -69,9 +69,7 @@
 
 (defmethod extensions/mark-peer-born Datomic
   [log place]
-  (let [tx-data [{:db/id (d/tempid :onyx/log)
-                  :peer/status :idle
-                  :node/peer place}]]
+  (let [tx-data [[:onyx.fn/add-peer (d/tempid :onyx/log) :idle place]]]
     @(d/transact (:conn log) tx-data)))
 
 (defmethod extensions/mark-peer-dead Datomic
@@ -143,12 +141,11 @@
              :task/complete? true}
             {:db/id peer-id
              :peer/status :idle}
-;            [:db/retract peer-id :peer/task]
-;            [:db/retract peer-id :node/payload]
-;            [:db/retract peer-id :node/ack]
-;            [:db/retract peer-id :node/status]
-;            [:db/retract peer-id :node/completion]
+;;;            [:db/retract peer-id :peer/task]
+;;;            [:db/retract peer-id :node/payload]
+;;;            [:db/retract peer-id :node/ack]
+;;;            [:db/retract peer-id :node/status]
+;;;            [:db/retract peer-id :node/completion]
             ]]
-    (prn "peer id: " peer-id)
     @(d/transact (:conn log) tx)))
 

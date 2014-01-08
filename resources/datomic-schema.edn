@@ -15,6 +15,17 @@
   :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}
 
+ {:db/id #db/id [:db.part/user]
+  :db/ident :onyx.fn/add-peer
+  :db/fn #db/fn {:lang "clojure"
+                 :params [db db-id status node-peer]
+                 :code (if-not (ffirst (q '[:find ?peer :in $ ?node :where
+                                            [?peer :node/peer ?node]]
+                                          db node-peer))
+                         [[:db/add db-id :peer/status status]
+                          [:db/add db-id :node/peer node-peer]]
+                         (throw (Exception. "Duplicate peer")))}}
+
  {:db/id #db/id [:db.part/db]
   :db/ident :job/id
   :db/valueType :db.type/uuid
