@@ -42,8 +42,8 @@
                  :params [db ack-node]
                  :code (let [query '[:find ?peer :in $ ?ack-node :where
                                      [?peer :node/ack ?ack-node]
-                                     [?peer :peer/task ?task]
                                      [?peer :peer/status :acking]
+                                     [?peer :peer/task ?task]
                                      [?task :task/complete? false]]
                              peer-id (ffirst (d/q query db ack-place))]
                          (if peer-id
