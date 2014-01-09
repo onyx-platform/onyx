@@ -24,7 +24,7 @@
                                           db peer-node))
                          [[:db/add eid :peer/status status]
                           [:db/add eid :node/peer peer-node]]
-                         (throw (Exception. "Duplicate peer")))}}
+                         (throw (ex-info "Duplicate peer" {})))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/remove-peer
@@ -34,7 +34,7 @@
                              entity-id (ffirst (q query db peer-node))]
                          (if entity-id
                            [[:db.fn/retractEntity entity-id]]
-                           (throw (Exception. "Tried to remove non-existent peer"))))}}
+                           (throw (ex-info "Tried to remove non-existent peer" {}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/ack-task
@@ -48,7 +48,7 @@
                              peer-id (ffirst (d/q query db ack-place))]
                          (if peer-id
                            [[:db/add peer-id :peer/status :active]]
-                           (throw (Exception. "Error for peer trying to ack"))))}}
+                           (throw (ex-info "Error for peer trying to ack" {}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/offer-task
@@ -72,7 +72,7 @@
                              :node/ack (:ack nodes)
                              :node/status (:status nodes)
                              :node/completion (:completion nodes)}]
-                           (throw (Exception. "Error trying to offer to peer"))))}}
+                           (throw (ex-info "Error trying to offer to peer" {}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/complete-task
@@ -97,7 +97,7 @@
                                  [:db/retract peer :node/completion]]]
                          (if (and peer task)
                            tx
-                           (throw (Exception. "Error for peer trying to complete task"))))}}
+                           (throw (ex-info "Error for peer trying to complete task" {}))))}}
 
  {:db/id #db/id [:db.part/db]
   :db/ident :job/id
