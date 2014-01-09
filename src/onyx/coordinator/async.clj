@@ -173,6 +173,11 @@
         (fn [e log sync place death-cb]
           (>!! failure-ch-head {:ch :peer-birth :e e})))
 
+      (dire/with-handler! #'mark-peer-death
+        java.util.concurrent.ExecutionException
+        (fn [e log peer]
+          (>!! failure-ch-head {:ch :peer-death :e e})))
+
       (assoc component
         :planning-ch-head planning-ch-head
         :born-peer-ch-head born-peer-ch-head

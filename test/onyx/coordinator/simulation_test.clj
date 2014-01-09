@@ -49,9 +49,13 @@
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
             offer-ch-spy (chan 1)
-            evict-ch-spy (chan 1)]
+            evict-ch-spy (chan 1)
+            failure-ch-spy (chan 1)]
+        
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:evict-mult coordinator) evict-ch-spy)
+        (tap (:failure-mult coordinator) failure-ch-spy)
+        
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
         (extensions/delete sync peer)
@@ -60,7 +64,12 @@
         (testing "There are no peers"
             (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
-              (is (zero? (count result)))))))))
+              (is (zero? (count result)))))
+
+        (testing "Attempts to delete a non-existent peer fails"
+          (>!! (:dead-peer-ch-head coordinator) peer)
+          (let [failure (<!! failure-ch-spy)]
+            (is (= (:ch failure) :peer-death))))))))
 
 (deftest plan-one-job-no-peers
   (with-system
