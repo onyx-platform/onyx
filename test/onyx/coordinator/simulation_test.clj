@@ -186,7 +186,6 @@
                                              #{:payload :ack :completion :status})
                      #{})))))
 
-
         (let [db (d/db (:conn log))]
           (testing "The peer is marked as :acking"
             (is (= (count (d/q '[:find ?peer :where

@@ -99,18 +99,8 @@
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
-  (let [db (d/db (:conn log))
-        query '[:find ?p :in $ ?place :where [?p :node/peer ?place]]
-        result (d/q query db peer)
-        peer-id (ffirst result)]
-    (let [tx [{:db/id peer-id
-               :peer/status :acking
-               :peer/task (:db/id task)
-               :node/payload (:payload nodes)
-               :node/ack (:ack nodes)
-               :node/status (:status nodes)
-               :node/completion (:completion nodes)}]]
-      @(d/transact (:conn log) tx))))
+  (let [tx [[:onyx.fn/offer-task task peer nodes]]]
+    @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic
   [log ack-place]
@@ -122,22 +112,6 @@
 
 (defmethod extensions/complete Datomic
   [log complete-place]
-  (let [db (d/db (:conn log))
-        query '[:find ?peer ?task :in $ ?complete-node :where
-                [?peer :peer/task ?task]
-                [?peer :node/completion ?complete-node]]
-        result (d/q query db complete-place)
-        peer-id (ffirst result)
-        task-id (second (first result))
-        tx [{:db/id task-id
-             :task/complete? true}
-            {:db/id peer-id
-             :peer/status :idle}
-;;;            [:db/retract peer-id :peer/task]
-;;;            [:db/retract peer-id :node/payload]
-;;;            [:db/retract peer-id :node/ack]
-;;;            [:db/retract peer-id :node/status]
-;;;            [:db/retract peer-id :node/completion]
-            ]]
+  (let [tx [[:onyx.fn/complete-task complete-place]]]    
     @(d/transact (:conn log) tx)))
 

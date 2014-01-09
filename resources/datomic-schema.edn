@@ -50,6 +50,55 @@
                            [[:db/add peer-id :peer/status :active]]
                            (throw (Exception. "Error for peer trying to ack"))))}}
 
+ {:db/id #db/id [:db.part/user]
+  :db/ident :onyx.fn/offer-task
+  :db/fn #db/fn {:lang "clojure"
+                 :params [db task peer-place nodes]
+                 :code (let [peer-query '[:find ?p :in $ ?place ?task :where
+                                          [?p :node/peer ?place]
+                                          [?p :peer/status :idle]
+                                          [?task :task/complete? false]]
+                             task-query '[:find ?peer :in $ ?task :where
+                                          [?p :peer/task ?task]]
+                             peer-result (d/q peer-query db peer-place task)
+                             task-result (q/q task-query db task)
+                             peer-datom (ffirst peer-result)
+                             task-datom (ffiirst task-result) ]
+                         (if (and peer-datom (not task-datom))
+                           [{:db/id peer-datom
+                             :peer/status :acking
+                             :peer/task (:db/id task)
+                             :node/payload (:payload nodes)
+                             :node/ack (:ack nodes)
+                             :node/status (:status nodes)
+                             :node/completion (:completion nodes)}]
+                           (throw (Exception. "Error trying to offer to peer"))))}}
+
+ {:db/id #db/id [:db.part/user]
+  :db/ident :onyx.fn/complete-task
+  :db/fn #db/fn {:lang "clojure"
+                 :params [db complete-place]
+                 :code (let [query '[:find ?peer ?task :in $ ?complete-node :where
+                                     [?peer :peer/status :active]
+                                     [?peer :peer/task ?task]
+                                     [?peer :node/completion ?complete-node]
+                                     [?task :task/complete? false]]
+                             result (d/q query db complete-place)
+                             peer (ffirst result)
+                             task (second (first result))
+                             tx [{:db/id task
+                                  :task/complete? true}
+                                 {:db/id peer
+                                  :peer/status :idle}
+                                 [:db/retract peer :peer/task]
+                                 [:db/retract peer :node/payload]
+                                 [:db/retract peer :node/ack]
+                                 [:db/retract peer :node/status]
+                                 [:db/retract peer :node/completion]]]
+                         (if (and peer task)
+                           tx
+                           (throw (Exception. "Error for peer trying to complete task"))))}}
+
  {:db/id #db/id [:db.part/db]
   :db/ident :job/id
   :db/valueType :db.type/uuid
