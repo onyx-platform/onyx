@@ -24,8 +24,12 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
-            offer-ch-spy (chan 1)]
+            offer-ch-spy (chan 1)
+            failure-ch-spy (chan 1)]
+        
         (tap (:offer-mult coordinator) offer-ch-spy)
+        (tap (:failure-mult coordinator) failure-ch-spy)
+        
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
 
@@ -33,7 +37,12 @@
             (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
               (is (= (count result) 1))
-              (is (= (ffirst result) peer))))))))
+              (is (= (ffirst result) peer))))
+
+        (testing "Adding a duplicate peer fails"
+          (>!! (:born-peer-ch-head coordinator) peer)
+          (let [failure (<!! failure-ch-spy)]
+            (is (= (:ch failure) :peer-birth))))))))
 
 (deftest peer-joins-and-dies
   (with-system

@@ -1,5 +1,5 @@
 (ns onyx.coordinator.async
-  (:require [clojure.core.async :refer [chan thread mult tap timeout >!! <!!]]
+  (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [onyx.coordinator.extensions :as extensions]
@@ -95,6 +95,13 @@
       (>!! offer-head place)
       (recur))))
 
+(defn failure-ch-loop [failure-tail]
+  (loop []
+    (when-let [failure (<!! failure-tail)]
+      (prn "Failed: " (:ch failure))
+      (prn "Details: " (:e failure))
+      (recur))))
+
 (defn print-if-not-thread-death [e & _]
   (if-not (instance? java.lang.InterruptedException e)
     (.printStackTrace e)))
@@ -132,6 +139,7 @@
           offer-ch-head (chan ch-capacity)
           ack-ch-head (chan ch-capacity)
           completion-ch-head (chan ch-capacity)
+          failure-ch-head (chan ch-capacity)
 
           planning-ch-tail (chan ch-capacity)
           born-peer-ch-tail (chan ch-capacity)
@@ -140,6 +148,7 @@
           offer-ch-tail (chan ch-capacity)
           ack-ch-tail (chan ch-capacity)
           completion-ch-tail (chan ch-capacity)
+          failure-ch-tail (chan ch-capacity)
 
           planning-mult (mult planning-ch-head)
           born-peer-mult (mult born-peer-ch-head)
@@ -147,7 +156,8 @@
           evict-mult (mult evict-ch-head)
           offer-mult (mult offer-ch-head)
           ack-mult (mult ack-ch-head)
-          completion-mult (mult completion-ch-head)]
+          completion-mult (mult completion-ch-head)
+          failure-mult (mult failure-ch-head)]
       
       (tap planning-mult planning-ch-tail)
       (tap born-peer-mult born-peer-ch-tail)
@@ -156,6 +166,12 @@
       (tap offer-mult offer-ch-tail)
       (tap ack-mult ack-ch-tail)
       (tap completion-mult completion-ch-tail)
+      (tap failure-mult failure-ch-tail)
+
+      (dire/with-handler! #'mark-peer-birth
+        java.util.concurrent.ExecutionException
+        (fn [e log sync place death-cb]
+          (>!! failure-ch-head {:ch :peer-birth :e e})))
 
       (assoc component
         :planning-ch-head planning-ch-head
@@ -165,6 +181,7 @@
         :offer-ch-head offer-ch-head
         :ack-ch-head ack-ch-head
         :completion-ch-head completion-ch-head
+        :failure-ch-head failure-ch-head
 
         :planning-mult planning-mult
         :born-peer-mult born-peer-mult
@@ -173,6 +190,7 @@
         :offer-mult offer-mult
         :ack-mult ack-mult
         :completion-mult completion-mult
+        :failure-mult failure-mult
 
         :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head))
@@ -180,18 +198,20 @@
         :ack-thread (future (ack-ch-loop log ack-ch-tail))
         :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))
         :offer-thread (future (offer-ch-loop log sync eviction-delay offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
-        :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head)))))
+        :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head))
+        :failure-thread (future (failure-ch-loop failure-ch-tail)))))
 
   (stop [component]
     (prn "Stopping Coordinator")
     
-    (clojure.core.async/close! (:born-peer-ch-head component))
-    (clojure.core.async/close! (:dead-peer-ch-head component))
-    (clojure.core.async/close! (:planning-ch-head component))
-    (clojure.core.async/close! (:evict-ch-head component))
-    (clojure.core.async/close! (:offer-ch-head component))
-    (clojure.core.async/close! (:ack-ch-head component))
-    (clojure.core.async/close! (:completion-ch-head component))
+    (close! (:born-peer-ch-head component))
+    (close! (:dead-peer-ch-head component))
+    (close! (:planning-ch-head component))
+    (close! (:evict-ch-head component))
+    (close! (:offer-ch-head component))
+    (close! (:ack-ch-head component))
+    (close! (:completion-ch-head component))
+    (close! (:failure-ch-head component))
 
     (future-cancel (:born-peer-thread component))
     (future-cancel (:dead-peer-thread component))
@@ -200,6 +220,7 @@
     (future-cancel (:offer-thread component))
     (future-cancel (:ack-thread component))
     (future-cancel (:completion-thread component))
+    (future-cancel (:failure-thread component))
 
     component))
 
