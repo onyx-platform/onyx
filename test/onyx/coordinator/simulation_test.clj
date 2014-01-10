@@ -94,9 +94,25 @@
             (is (= (:ch failure) :peer-death))))
 
         (testing "Acking a non-existent node fails"
-          (>!! (:ack-ch-head coordinator) (str (java.util.UUID/randomUUID)))
+          (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
           (let [failure (<!! failure-ch-spy)]
-            (is (= (:ch failure) :ack))))))))
+            (is (= (:ch failure) :ack))))
+
+        (testing "Acking a completed task fails"
+          (let [peer-id (d/tempid :onyx/log)
+                task-id (d/tempid :onyx/log)
+                node-path (str (java.util.UUID/randomUUID))
+                tx [{:db/id peer-id
+                     :peer/status :acking
+                     :node/ack node-path
+                     :peer/task {:db/id task-id
+                                 :task/complete? true}}]]
+            @(d/transact (:conn log) tx)
+            
+            (>!! (:ack-ch-head coordinator) {:path node-path})
+            (let [failure (<!! failure-ch-spy)]
+              (<!! failure-ch-spy)
+              (is (= (:ch failure) :ack)))))))))
 
 (deftest plan-one-job-no-peers
   (with-system
