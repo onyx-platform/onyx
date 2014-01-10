@@ -37,12 +37,7 @@
             (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
               (is (= (count result) 1))
-              (is (= (ffirst result) peer))))
-
-        (testing "Adding a duplicate peer fails"
-          (>!! (:born-peer-ch-head coordinator) peer)
-          (let [failure (<!! failure-ch-spy)]
-            (is (= (:ch failure) :peer-birth))))))))
+              (is (= (ffirst result) peer))))))))
 
 (deftest peer-joins-and-dies
   (with-system
@@ -64,8 +59,34 @@
         (testing "There are no peers"
             (let [query '[:find ?p :where [?e :node/peer ?p]]
                   result (d/q query (d/db (:conn log)))]
-              (is (zero? (count result)))))
+              (is (zero? (count result)))))))))
 
+(deftest error-cases
+  (with-system
+    (fn [coordinator sync log]
+      (let [peer (extensions/create sync :peer)
+            offer-ch-spy (chan 1)
+            evict-ch-spy (chan 1)
+            failure-ch-spy (chan 1)]
+        
+        (tap (:offer-mult coordinator) offer-ch-spy)
+        (tap (:evict-mult coordinator) evict-ch-spy)
+        (tap (:failure-mult coordinator) failure-ch-spy)
+        
+        (>!! (:born-peer-ch-head coordinator) peer)
+        (<!! offer-ch-spy)
+
+        (testing "Adding a duplicate peer fails"
+          (>!! (:born-peer-ch-head coordinator) peer)
+          (let [failure (<!! failure-ch-spy)]
+            (is (= (:ch failure) :peer-birth))))
+
+        (>!! (:dead-peer-ch-head coordinator) peer)
+        (<!! evict-ch-spy)
+
+        (>!! (:dead-peer-ch-head coordinator) peer)
+        (<!! evict-ch-spy)
+        
         (testing "Attempts to delete a non-existent peer fails"
           (>!! (:dead-peer-ch-head coordinator) peer)
           (let [failure (<!! failure-ch-spy)]
