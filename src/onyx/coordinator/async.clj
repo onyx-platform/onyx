@@ -178,6 +178,11 @@
         (fn [e log peer]
           (>!! failure-ch-head {:ch :peer-death :e e})))
 
+      (dire/with-handler! #'acknowledge-task
+        java.util.concurrent.ExecutionException
+        (fn [e log task]
+          (>!! failure-ch-head {:ch :ack :e e})))
+
       (assoc component
         :planning-ch-head planning-ch-head
         :born-peer-ch-head born-peer-ch-head

@@ -66,10 +66,12 @@
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
             offer-ch-spy (chan 1)
+            ack-ch-spy (chan 1)
             evict-ch-spy (chan 1)
             failure-ch-spy (chan 1)]
         
         (tap (:offer-mult coordinator) offer-ch-spy)
+        (tap (:ack-mult coordinator) ack-ch-spy)
         (tap (:evict-mult coordinator) evict-ch-spy)
         (tap (:failure-mult coordinator) failure-ch-spy)
         
@@ -88,9 +90,13 @@
         (<!! evict-ch-spy)
         
         (testing "Attempts to delete a non-existent peer fails"
-          (>!! (:dead-peer-ch-head coordinator) peer)
           (let [failure (<!! failure-ch-spy)]
-            (is (= (:ch failure) :peer-death))))))))
+            (is (= (:ch failure) :peer-death))))
+
+        (testing "Acking a non-existent node fails"
+          (>!! (:ack-ch-head coordinator) (str (java.util.UUID/randomUUID)))
+          (let [failure (<!! failure-ch-spy)]
+            (is (= (:ch failure) :ack))))))))
 
 (deftest plan-one-job-no-peers
   (with-system

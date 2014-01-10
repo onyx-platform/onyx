@@ -45,7 +45,7 @@
                                      [?peer :peer/status :acking]
                                      [?peer :peer/task ?task]
                                      [?task :task/complete? false]]
-                             peer-id (ffirst (d/q query db ack-place))]
+                             peer-id (ffirst (d/q query db ack-node))]
                          (if peer-id
                            [[:db/add peer-id :peer/status :active]]
                            (throw (ex-info "Error for peer trying to ack" {}))))}}
