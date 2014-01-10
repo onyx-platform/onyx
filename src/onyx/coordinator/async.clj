@@ -26,8 +26,8 @@
   (extensions/evict log task))
 
 (defn offer-task [log sync ack-cb complete-cb]
-  (when-let [task (extensions/next-task log)]
-    (when-let [peer (extensions/idle-peer log)]
+  (if-let [task (extensions/next-task log)]
+    (if-let [peer (extensions/idle-peer log)]
       (let [payload-node (extensions/read-place sync peer)
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
@@ -37,7 +37,9 @@
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
         (extensions/mark-offered log task peer nodes)
-        (extensions/write-place sync payload-node {:task task :nodes nodes})))))
+        (extensions/write-place sync payload-node {:task task :nodes nodes}))
+      false)
+    false))
 
 (defn complete-task [log sync queue complete-place]
   (extensions/complete log complete-place)
@@ -54,8 +56,8 @@
 (defn dead-peer-ch-loop [log dead-tail evict-head]
   (loop []
     (when-let [peer (<!! dead-tail)]
-      (mark-peer-death log peer)
-      (>!! evict-head peer)
+      (when (mark-peer-death log peer)
+        (>!! evict-head peer))
       (recur))))
 
 (defn planning-ch-loop [log planning-tail offer-head]
@@ -73,9 +75,9 @@
 
 (defn evict-ch-loop [log sync evict-tail offer-head]
   (loop []
-    (when-let [task (<!! evict-tail)]
-      (evict-task log sync task)
-      (>!! offer-head task)
+    (when-let [peer (<!! evict-tail)]
+      (evict-task log sync peer)
+      ;;(>!! offer-head peer)
       (recur))))
 
 (defn offer-ch-loop
@@ -171,17 +173,32 @@
       (dire/with-handler! #'mark-peer-birth
         java.util.concurrent.ExecutionException
         (fn [e log sync place death-cb]
-          (>!! failure-ch-head {:ch :peer-birth :e e})))
+          (>!! failure-ch-head {:ch :peer-birth :e e})
+          false))
 
       (dire/with-handler! #'mark-peer-death
         java.util.concurrent.ExecutionException
         (fn [e log peer]
-          (>!! failure-ch-head {:ch :peer-death :e e})))
+          (>!! failure-ch-head {:ch :peer-death :e e})
+          false))
 
       (dire/with-handler! #'acknowledge-task
         java.util.concurrent.ExecutionException
         (fn [e log task]
-          (>!! failure-ch-head {:ch :ack :e e})))
+          (>!! failure-ch-head {:ch :ack :e e})
+          false))
+
+      (dire/with-handler! #'offer-task
+        java.util.concurrent.ExecutionException
+        (fn [e log sync ack-cb complete-cb]
+          (>!! failure-ch-head {:ch :offer :e e})
+          false))
+
+      (dire/with-handler! #'complete-task
+        java.util.concurrent.ExecutionException
+        (fn [e log sync queue complete-place]
+          (>!! failure-ch-head {:ch :complete :e e})
+          false))
 
       (assoc component
         :planning-ch-head planning-ch-head

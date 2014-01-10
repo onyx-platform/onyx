@@ -86,5 +86,6 @@
   (deserialize-edn (:data (zk/data (:conn sync) place))))
 
 (defmethod extensions/on-change ZooKeeper
-  [sync place cb] (zk/exists (:conn sync) place :watcher cb))
+  [sync place cb]
+  (zk/exists (:conn sync) place :watcher cb))
 

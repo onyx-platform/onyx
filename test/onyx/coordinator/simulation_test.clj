@@ -74,7 +74,7 @@
         (tap (:ack-mult coordinator) ack-ch-spy)
         (tap (:evict-mult coordinator) evict-ch-spy)
         (tap (:failure-mult coordinator) failure-ch-spy)
-        
+
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
 
@@ -83,15 +83,17 @@
           (let [failure (<!! failure-ch-spy)]
             (is (= (:ch failure) :peer-birth))))
 
-        (>!! (:dead-peer-ch-head coordinator) peer)
-        (<!! evict-ch-spy)
-
-        (>!! (:dead-peer-ch-head coordinator) peer)
-        (<!! evict-ch-spy)
-        
         (testing "Attempts to delete a non-existent peer fails"
-          (let [failure (<!! failure-ch-spy)]
-            (is (= (:ch failure) :peer-death))))
+          (extensions/delete sync peer)
+
+          (testing "A failure is raised for the second callback"
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :peer-death))))
+          
+          (testing "A failure is raised for the second delete"
+            (>!! (:dead-peer-ch-head coordinator) peer)
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :peer-death)))))
 
         (testing "Acking a non-existent node fails"
           (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
@@ -108,11 +110,25 @@
                      :peer/task {:db/id task-id
                                  :task/complete? true}}]]
             @(d/transact (:conn log) tx)
-            
+         
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (<!! failure-ch-spy)
               (is (= (:ch failure) :ack)))))))))
+
+#_(testing "Acking with a peer who's state isnt :acking fails"
+       (let [peer-id (d/tempid :onyx/log)
+             task-id (d/tempid :onyx/log)
+             node-path (str (java.util.UUID/randomUUID))
+             tx [{:db/id peer-id
+                  :peer/status :acking
+                  :node/ack node-path
+                  :peer/task {:db/id task-id
+                              :task/complete? false}}]]
+         @(d/transact (:conn log) tx)
+         
+         (>!! (:ack-ch-head coordinator) {:path node-path})
+         (let [failure (<!! failure-ch-spy)]
+           (is (= (:ch failure) :ack)))))
 
 (deftest plan-one-job-no-peers
   (with-system
