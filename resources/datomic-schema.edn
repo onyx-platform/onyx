@@ -57,7 +57,7 @@
                                      [?peer :peer/status :acking]
                                      [?peer :peer/task ?task]
                                      [?task :task/complete? false]]
-                             peer-id (ffirst (d/q query db ack-node))]
+                             peer-id (ffirst (q query db ack-node))]
                          (if peer-id
                            [[:db/add peer-id :peer/status :active]]
                            (throw (ex-info "Error for peer trying to ack" {}))))}}
@@ -71,15 +71,15 @@
                                           [?p :peer/status :idle]
                                           [?task :task/complete? false]]
                              task-query '[:find ?peer :in $ ?task :where
-                                          [?p :peer/task ?task]]
-                             peer-result (d/q peer-query db peer-place task)
-                             task-result (q/q task-query db task)
+                                          [?peer :peer/task ?task]]
+                             peer-result (q peer-query db peer-place task)
+                             task-result (q task-query db task)
                              peer-datom (ffirst peer-result)
                              task-datom (ffirst task-result)]
                          (if (and peer-datom (not task-datom))
                            [{:db/id peer-datom
                              :peer/status :acking
-                             :peer/task (:db/id task)
+                             :peer/task task
                              :node/payload (:payload nodes)
                              :node/ack (:ack nodes)
                              :node/status (:status nodes)
@@ -95,7 +95,7 @@
                                      [?peer :peer/task ?task]
                                      [?peer :node/completion ?complete-node]
                                      [?task :task/complete? false]]
-                             result (d/q query db complete-place)
+                             result (q query db complete-place)
                              peer (ffirst result)
                              task (second (first result))
                              tx [{:db/id task

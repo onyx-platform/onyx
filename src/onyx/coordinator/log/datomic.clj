@@ -99,7 +99,7 @@
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
-  (let [tx [[:onyx.fn/offer-task task peer nodes]]]
+  (let [tx [[:onyx.fn/offer-task (:db/id task) peer nodes]]]
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic

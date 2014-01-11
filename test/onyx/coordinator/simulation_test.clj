@@ -210,10 +210,10 @@
     (fn [coordinator sync log]
       (let [peer-node (extensions/create sync :peer)
             payload-node (extensions/create sync :payload)
-            sync-spy (chan)
-            ack-ch-spy (chan)
-            offer-ch-spy (chan)
-            completion-ch-spy (chan)
+            sync-spy (chan 1)
+            ack-ch-spy (chan 1)
+            offer-ch-spy (chan 1)
+            completion-ch-spy (chan 1)
             catalog [{:onyx/name :in
                       :onyx/direction :input
                       :onyx/type :queue
