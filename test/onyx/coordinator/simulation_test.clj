@@ -66,7 +66,7 @@
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
             offer-ch-spy (chan 1)
-            ack-ch-spy (chan 1)
+            ack-ch-spy (chan 3)
             evict-ch-spy (chan 1)
             failure-ch-spy (chan 1)]
         
@@ -113,22 +113,22 @@
          
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :ack)))))))))
+              (is (= (:ch failure) :ack)))))
 
-#_(testing "Acking with a peer who's state isnt :acking fails"
-       (let [peer-id (d/tempid :onyx/log)
-             task-id (d/tempid :onyx/log)
-             node-path (str (java.util.UUID/randomUUID))
-             tx [{:db/id peer-id
-                  :peer/status :acking
-                  :node/ack node-path
-                  :peer/task {:db/id task-id
-                              :task/complete? false}}]]
-         @(d/transact (:conn log) tx)
+        (testing "Acking with a peer who's state isnt :acking fails"
+          (let [peer-id (d/tempid :onyx/log)
+                task-id (d/tempid :onyx/log)
+                node-path (str (java.util.UUID/randomUUID))
+                tx [{:db/id peer-id
+                     :peer/status :idle
+                     :node/ack node-path
+                     :peer/task {:db/id task-id
+                                 :task/complete? false}}]]
+            @(d/transact (:conn log) tx)
          
-         (>!! (:ack-ch-head coordinator) {:path node-path})
-         (let [failure (<!! failure-ch-spy)]
-           (is (= (:ch failure) :ack)))))
+            (>!! (:ack-ch-head coordinator) {:path node-path})
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :ack)))))))))
 
 (deftest plan-one-job-no-peers
   (with-system
