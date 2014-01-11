@@ -108,7 +108,7 @@
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/evict Datomic
-  [log task])
+  [log task] true)
 
 (defmethod extensions/complete Datomic
   [log complete-place]

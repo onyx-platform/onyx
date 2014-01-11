@@ -78,17 +78,19 @@
 (defn evict-ch-loop [log sync evict-tail offer-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
-      (evict-task log sync peer)
-      ;;(>!! offer-head peer)
+      (when (evict-task log sync peer)
+        (>!! offer-head peer))
       (recur))))
 
 (defn offer-ch-loop
   [log sync eviction-delay offer-tail ack-head complete-head evict-head]
   (loop []
     (when-let [event (<!! offer-tail)]
-      (offer-task log sync
-                  #(>!! ack-head %)
-                  #(>!! complete-head %))
+      (when-let [peer (offer-task log sync
+                                  #(>!! ack-head %)
+                                  #(>!! complete-head %))]
+        (thread (<!! (timeout eviction-delay))
+                (>!! evict-head peer)))
       (recur))))
 
 (defn completion-ch-loop
