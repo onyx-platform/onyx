@@ -283,5 +283,12 @@
               (= (:path event) (:completion nodes)))))))
     {:eviction-delay 500000}))
 
+#_(let [next-payload-node (extensions/create sync :payload)]
+  (extensions/write-place sync peer-node next-payload-node)
+  (extensions/on-change sync next-payload-node #(>!! sync-spy %))
+  #_(testing "The payload node is populated"
+      (let [event (<!! sync-spy)]
+        (is (= (:path event) next-payload-node)))))
+
 (run-tests 'onyx.coordinator.simulation-test)
 

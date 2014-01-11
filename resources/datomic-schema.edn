@@ -95,18 +95,24 @@
                                      [?peer :peer/task ?task]
                                      [?peer :node/completion ?complete-node]
                                      [?task :task/complete? false]]
+                             node-query '[:find ?payload ?ack ?status ?completion :in $ ?peer :where
+                                          [?peer :node/payload ?payload]
+                                          [?peer :node/ack ?ack]
+                                          [?peer :node/status ?status]
+                                          [?peer :node/completion ?completion]]
                              result (q query db complete-place)
                              peer (ffirst result)
                              task (second (first result))
+                             [payload ack status completion] (first (q node-query db peer))
                              tx [{:db/id task
                                   :task/complete? true}
                                  {:db/id peer
                                   :peer/status :idle}
-                                 [:db/retract peer :peer/task]
-                                 [:db/retract peer :node/payload]
-                                 [:db/retract peer :node/ack]
-                                 [:db/retract peer :node/status]
-                                 [:db/retract peer :node/completion]]]
+                                 [:db/retract peer :peer/task task]
+                                 [:db/retract peer :node/payload payload]
+                                 [:db/retract peer :node/ack ack]
+                                 [:db/retract peer :node/status status]
+                                 [:db/retract peer :node/completion completion]]]
                          (if (and peer task)
                            tx
                            (throw (ex-info "Error for peer trying to complete task" {}))))}}
