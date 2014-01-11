@@ -44,9 +44,10 @@
     false))
 
 (defn complete-task [log sync queue complete-place]
-  (if (extensions/complete log complete-place)
+  (if-let [result (extensions/complete log complete-place)]
     (do (extensions/delete sync complete-place)
-        (extensions/cap-queue queue complete-place))
+        (extensions/cap-queue queue complete-place)
+        result)
     false))
 
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
@@ -98,8 +99,8 @@
   [log sync queue complete-tail offer-head]
   (loop []
     (when-let [place (:path (<!! complete-tail))]
-      (when (complete-task log sync queue place)
-        (>!! offer-head place))
+      (when-let [result (complete-task log sync queue place)]
+        (>!! offer-head result))
       (recur))))
 
 (defn failure-ch-loop [failure-tail]

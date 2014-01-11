@@ -115,5 +115,5 @@
 (defmethod extensions/complete Datomic
   [log complete-place]
   (let [tx [[:onyx.fn/complete-task complete-place]]]
-    @(d/transact (:conn log) tx)))
+    (:tx (first (:tx-data @(d/transact (:conn log) tx))))))
 

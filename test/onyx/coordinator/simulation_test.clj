@@ -132,8 +132,8 @@
          
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :ack))))))))
-  {:eviction-delay 500000})
+              (is (= (:ch failure) :ack)))))))
+    {:eviction-delay 500000}))
 
 (deftest plan-one-job-no-peers
   (with-system
@@ -247,6 +247,10 @@
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
 
+        (testing "The offer channel sees the birth and planning"
+          (<!! offer-ch-spy)
+          (<!! offer-ch-spy))
+
         (testing "The payload node is populated"
           (let [event (<!! sync-spy)]
             (is (= (:path event) payload-node))))
@@ -280,7 +284,21 @@
           (let [nodes (:nodes (extensions/read-place sync payload-node))]
             (extensions/touch-place sync (:completion nodes))
             (let [event (<!! completion-ch-spy)]
-              (= (:path event) (:completion nodes)))))))
+              (= (:path event) (:completion nodes)))))
+
+        (testing "The offer channel receives the tx id of the completion"
+          (let [tx-id (<!! offer-ch-spy)
+                db (d/as-of (d/db (:conn log)) tx-id)]
+
+            (testing "The peer's nodes have been stripped"
+              (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
+                            [?p :node/peer ?peer-node]
+                            [?p :node/payload ?payload]
+                            [?p :node/ack ?ack]
+                            [?p :node/status ?status]
+                            [?p :node/completion ?completion]]
+                    result (d/q query db peer-node)]
+                (is (empty? result))))))))
     {:eviction-delay 500000}))
 
 #_(let [next-payload-node (extensions/create sync :payload)]
