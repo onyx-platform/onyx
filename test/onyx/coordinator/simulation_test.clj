@@ -282,7 +282,7 @@
 
         (let [next-payload-node (extensions/create sync :payload)]
           (extensions/write-place sync peer-node next-payload-node)
-;          (extensions/on-change sync next-payload-node #(>!! sync-spy %))
+          (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
           (testing "Touching the completion node triggers the callback"
             (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -303,8 +303,8 @@
                               [?p :node/completion ?completion]]
                       result (d/q query db peer-node)]
                   (is (empty? result))))))
-
-          #_(testing "The payload node is populated"
+          
+          (testing "The payload node is populated"
             (let [event (<!! sync-spy)]
               (is (= (:path event) next-payload-node)))))))
     {:eviction-delay 500000}))
