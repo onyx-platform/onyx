@@ -214,7 +214,7 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer-node (extensions/create sync :peer)
-            payload-node (extensions/create sync :payload)
+            in-payload-node (extensions/create sync :payload)
             sync-spy (chan 1)
             ack-ch-spy (chan 1)
             offer-ch-spy (chan 1)
@@ -240,8 +240,8 @@
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:completion-mult coordinator) completion-ch-spy)
 
-        (extensions/write-place sync peer-node payload-node)
-        (extensions/on-change sync payload-node #(>!! sync-spy %))
+        (extensions/write-place sync peer-node in-payload-node)
+        (extensions/on-change sync in-payload-node #(>!! sync-spy %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node)
         (>!! (:planning-ch-head coordinator)
@@ -253,11 +253,11 @@
 
         (testing "The payload node is populated"
           (let [event (<!! sync-spy)]
-            (is (= (:path event) payload-node))))
+            (is (= (:path event) in-payload-node))))
 
         (let [db (d/db (:conn log))]
           (testing "It receives the :in task"
-            (let [task (:task (extensions/read-place sync payload-node))
+            (let [task (:task (extensions/read-place sync in-payload-node))
                   query '[:find ?task :where [?task :task/name :in]]]
               (is (= (:db/id task) (ffirst (d/q query db))))))
 
@@ -269,13 +269,13 @@
               (is (= (count (d/q query db)) 1))))
 
           (testing "The payload node contains the other node paths"
-            (let [nodes (:nodes (extensions/read-place sync payload-node))]
+            (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
               (is (= (clojure.set/difference (into #{} (keys nodes))
                                              #{:payload :ack :completion :status})
                      #{})))))
 
         (testing "Touching the ack node triggers the callback"
-          (let [nodes (:nodes (extensions/read-place sync payload-node))]
+          (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
             (extensions/touch-place sync (:ack nodes))
             (let [event (<!! ack-ch-spy)]
               (= (:path event) (:ack nodes)))))
@@ -285,7 +285,7 @@
           (extensions/on-change sync inc-payload-node #(>!! sync-spy %))
 
           (testing "Touching the completion node triggers the callback"
-            (let [nodes (:nodes (extensions/read-place sync payload-node))]
+            (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
               (extensions/touch-place sync (:completion nodes))
               (let [event (<!! completion-ch-spy)]
                 (= (:path event) (:completion nodes)))))
