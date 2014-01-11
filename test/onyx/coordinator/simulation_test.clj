@@ -85,6 +85,7 @@
 
         (testing "Attempts to delete a non-existent peer fails"
           (extensions/delete sync peer)
+          (<!! evict-ch-spy)
 
           (testing "A failure is raised for the second callback"
             (let [failure (<!! failure-ch-spy)]
@@ -93,7 +94,10 @@
           (testing "A failure is raised for the second delete"
             (>!! (:dead-peer-ch-head coordinator) peer)
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :peer-death)))))
+              (is (= (:ch failure) :peer-death)))
+
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :evict)))))
 
         (testing "Acking a non-existent node fails"
           (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
@@ -128,7 +132,8 @@
          
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :ack)))))))))
+              (is (= (:ch failure) :ack))))))))
+  {:eviction-delay 500000})
 
 (deftest plan-one-job-no-peers
   (with-system
