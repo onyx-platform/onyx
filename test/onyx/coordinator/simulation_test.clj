@@ -147,7 +147,9 @@
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}
             offer-ch-spy (chan 1)]
+        
         (tap (:offer-mult coordinator) offer-ch-spy)
+        
         (>!! (:planning-ch-head coordinator)
              {:catalog catalog :workflow workflow})
 
@@ -155,14 +157,14 @@
               db (d/db (:conn log))]
 
           (testing "There is one job"
-              (let [query '[:find ?j :in $ ?id :where [?j :job/id ?id]]
-                    result (d/q query db job-id)]
-                (is (= (count result) 1))))
+            (let [query '[:find ?j :in $ ?id :where [?j :job/id ?id]]
+                  result (d/q query db job-id)]
+              (is (= (count result) 1))))
 
-          (testing "There are three tasks")
-          (let [query '[:find ?n :where [?t :task/name ?n]]
-                result (d/q query db)]
-            (is (= result #{[:in] [:inc] [:out]})))
+          (testing "There are three tasks"
+            (let [query '[:find ?n :where [?t :task/name ?n]]
+                  result (d/q query db)]
+              (is (= result #{[:in] [:inc] [:out]}))))
 
           (testing ":in's ingress queue is preset"
             (let [query '[:find ?qs :where
@@ -185,14 +187,14 @@
                   result (d/q query db)]
               (is (empty? result))))
 
-          (testing ":inc's ingress queue is :in's egress queue")
-          (let [in-query '[:find ?qs :where
-                           [?t :task/name :in]
-                           [?t :task/egress-queues ?qs]]
-                inc-query '[:find ?qs :where
-                            [?t :task/name :inc]
-                            [?t :task/ingress-queues ?qs]]]
-            (is (= (d/q in-query db) (d/q inc-query db))))
+          (testing ":inc's ingress queue is :in's egress queue"
+            (let [in-query '[:find ?qs :where
+                             [?t :task/name :in]
+                             [?t :task/egress-queues ?qs]]
+                  inc-query '[:find ?qs :where
+                              [?t :task/name :inc]
+                              [?t :task/ingress-queues ?qs]]]
+              (is (= (d/q in-query db) (d/q inc-query db)))))
 
           (testing ":out's ingess queue is :inc's egress queue"
             (let [inc-query '[:find ?qs :where
