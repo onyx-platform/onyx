@@ -280,9 +280,9 @@
             (let [event (<!! ack-ch-spy)]
               (= (:path event) (:ack nodes)))))
 
-        (let [next-payload-node (extensions/create sync :payload)]
-          (extensions/write-place sync peer-node next-payload-node)
-          (extensions/on-change sync next-payload-node #(>!! sync-spy %))
+        (let [inc-payload-node (extensions/create sync :payload)]
+          (extensions/write-place sync peer-node inc-payload-node)
+          (extensions/on-change sync inc-payload-node #(>!! sync-spy %))
 
           (testing "Touching the completion node triggers the callback"
             (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -306,7 +306,13 @@
           
           (testing "The payload node is populated"
             (let [event (<!! sync-spy)]
-              (is (= (:path event) next-payload-node)))))))
+              (is (= (:path event) inc-payload-node))))
+
+          (let [db (d/db (:conn log))]
+            (testing "It receives the :inc task"
+              (let [task (:task (extensions/read-place sync inc-payload-node))
+                    query '[:find ?task :where [?task :task/name :inc]]]
+                (is (= (:db/id task) (ffirst (d/q query db))))))))))
     {:eviction-delay 500000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
