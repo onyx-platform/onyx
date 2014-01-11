@@ -8,7 +8,7 @@
 (def ch-capacity 1000)
 
 (defn mark-peer-birth [log sync place death-cb]
-  (extensions/on-change sync place death-cb)
+  (extensions/on-delete sync place death-cb)
   (extensions/mark-peer-born log place))
 
 (defn mark-peer-death [log peer]
