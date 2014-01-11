@@ -270,15 +270,6 @@
                                              #{:payload :ack :completion :status})
                      #{})))))
 
-        (let [db (d/db (:conn log))]
-          (testing "The peer is marked as :acking"
-            (is (= (count (d/q '[:find ?peer :where
-                                 [?peer :peer/status :acking]
-                                 [?peer :peer/task ?task]
-                                 [?task :task/name :in]]
-                               db))
-                   1))))
-        
         (testing "Touching the ack node triggers the callback"
           (let [nodes (:nodes (extensions/read-place sync payload-node))]
             (extensions/touch-place sync (:ack nodes))
