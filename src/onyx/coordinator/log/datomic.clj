@@ -108,7 +108,9 @@
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/evict Datomic
-  [log task] true)
+  [log peer]
+  (let [tx [[:onyx.fn/evict-peer peer]]]
+    @(d/transact (:conn log) tx)))
 
 (defmethod extensions/complete Datomic
   [log complete-place]

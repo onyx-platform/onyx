@@ -10,7 +10,7 @@
 
 (defmulti ack (fn [log place] (type log)))
 
-(defmulti evict (fn [log task] (type log)))
+(defmulti evict (fn [log peer] (type log)))
 
 (defmulti complete (fn [log complete-place] (type log)))
 

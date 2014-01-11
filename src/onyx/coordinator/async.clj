@@ -37,7 +37,8 @@
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
         (if (extensions/mark-offered log task peer nodes)
-          (extensions/write-place sync payload-node {:task task :nodes nodes})
+          (do (extensions/write-place sync payload-node {:task task :nodes nodes})
+              peer)
           false))
       false)
     false))
@@ -202,6 +203,12 @@
         java.util.concurrent.ExecutionException
         (fn [e log sync queue complete-place]
           (>!! failure-ch-head {:ch :complete :e e})
+          false))
+
+      (dire/with-handler! #'evict-task
+        java.util.concurrent.ExecutionException
+        (fn [e log sync task]
+          (>!! failure-ch-head {:ch :evict :e e})
           false))
 
       (assoc component
