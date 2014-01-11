@@ -23,5 +23,5 @@
    :phase phase})
 
 (defmethod extensions/cap-queue :hornetq
-  [queue task])
+  [queue task] true)
 

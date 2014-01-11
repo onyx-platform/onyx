@@ -62,7 +62,7 @@
                              peer-result (d/q peer-query db peer-place task)
                              task-result (q/q task-query db task)
                              peer-datom (ffirst peer-result)
-                             task-datom (ffiirst task-result) ]
+                             task-datom (ffirst task-result)]
                          (if (and peer-datom (not task-datom))
                            [{:db/id peer-datom
                              :peer/status :acking

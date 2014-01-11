@@ -36,21 +36,23 @@
                    :completion complete-node :status status-node}]
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
-        (extensions/mark-offered log task peer nodes)
-        (extensions/write-place sync payload-node {:task task :nodes nodes}))
+        (if (extensions/mark-offered log task peer nodes)
+          (extensions/write-place sync payload-node {:task task :nodes nodes})
+          false))
       false)
     false))
 
 (defn complete-task [log sync queue complete-place]
-  (extensions/complete log complete-place)
-  (extensions/delete sync complete-place)
-  (extensions/cap-queue queue complete-place))
+  (if (extensions/complete log complete-place)
+    (do (extensions/delete sync complete-place)
+        (extensions/cap-queue queue complete-place))
+    false))
 
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
   (loop []
     (when-let [place (<!! born-tail)]
-      (mark-peer-birth log sync place (fn [_] (>!! dead-head place)))
-      (>!! offer-head place)
+      (when (mark-peer-birth log sync place (fn [_] (>!! dead-head place)))
+        (>!! offer-head place))
       (recur))))
 
 (defn dead-peer-ch-loop [log dead-tail evict-head]
@@ -93,8 +95,8 @@
   [log sync queue complete-tail offer-head]
   (loop []
     (when-let [place (:path (<!! complete-tail))]
-      (complete-task log sync queue place)
-      (>!! offer-head place)
+      (when (complete-task log sync queue place)
+        (>!! offer-head place))
       (recur))))
 
 (defn failure-ch-loop [failure-tail]
