@@ -210,17 +210,77 @@
                               [?t :task/ingress-queues ?qs]]]
               (is (= (d/q inc-query db) (d/q out-query db))))))))))
 
+(defn test-task-life-cycle
+  [{:keys [log sync sync-spy ack-ch-spy completion-ch-spy offer-ch-spy
+           peer-node payload-node next-payload-node task-name]}]
+  (testing "The payload node is populated"
+    (let [event (<!! sync-spy)]
+      (is (= (:path event) payload-node))))
+
+  (let [db (d/db (:conn log))]
+    (testing "It receives the task"
+      (let [task (:task (extensions/read-place sync payload-node))
+            query '[:find ?task :in $ ?t-name :where [?task :task/name ?t-name]]]
+        (is (= (:db/id task) (ffirst (d/q query db task-name))))))
+
+    (testing "The peer is marked as :acking the task"
+      (let [query '[:find ?task :in $ ?t-name :where
+                    [?peer :peer/status :acking]
+                    [?peer :peer/task ?task]
+                    [?task :task/name ?t-name]]]
+        (is (= (count (d/q query db task-name)) 1))))
+
+    (testing "The payload node contains the other node paths"
+      (let [nodes (:nodes (extensions/read-place sync payload-node))]
+        (is (empty?
+             (clojure.set/difference (into #{} (keys nodes))
+                                     #{:payload :ack :completion :status})))))
+    
+    (testing "Touching the ack node triggers the callback"
+      (let [nodes (:nodes (extensions/read-place sync payload-node))]
+        (extensions/touch-place sync (:ack nodes))
+        (let [event (<!! ack-ch-spy)]
+          (= (:path event) (:ack nodes)))))
+
+    (extensions/write-place sync peer-node next-payload-node)
+    (extensions/on-change sync next-payload-node #(>!! sync-spy %))
+
+    (testing "Touching the completion node triggers the callback"
+      (let [nodes (:nodes (extensions/read-place sync payload-node))]
+        (extensions/touch-place sync (:completion nodes))
+        (let [event (<!! completion-ch-spy)]
+          (= (:path event) (:completion nodes)))))
+
+    (testing "The offer channel receives the tx id of the completion"
+      (let [tx-id (<!! offer-ch-spy)
+            db (d/as-of (d/db (:conn log)) tx-id)]
+
+        (testing "The peer's nodes have been stripped"
+          (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
+                        [?p :peer/status :idle]
+                        [?p :node/peer ?peer-node]
+                        [?p :node/payload ?payload]
+                        [?p :node/ack ?ack]
+                        [?p :node/status ?status]
+                        [?p :node/completion ?completion]]
+                result (d/q query db peer-node)]
+            (is (empty? result))))))))
+
 (deftest plan-one-job-one-peer
   (with-system
     (fn [coordinator sync log]
       (let [peer-node (extensions/create sync :peer)
+            
             in-payload-node (extensions/create sync :payload)
             inc-payload-node (extensions/create sync :payload)
             out-payload-node (extensions/create sync :payload)
+            future-payload-node (extensions/create sync :payload)
+            
             sync-spy (chan 1)
             ack-ch-spy (chan 1)
             offer-ch-spy (chan 1)
             completion-ch-spy (chan 1)
+            
             catalog [{:onyx/name :in
                       :onyx/direction :input
                       :onyx/type :queue
@@ -253,161 +313,30 @@
           (<!! offer-ch-spy)
           (<!! offer-ch-spy))
 
-        (testing "The payload node is populated"
-          (let [event (<!! sync-spy)]
-            (is (= (:path event) in-payload-node))))
+        (let [base-cycle {:log log
+                          :sync sync
+                          :sync-spy sync-spy
+                          :ack-ch-spy ack-ch-spy
+                          :offer-ch-spy offer-ch-spy
+                          :completion-ch-spy completion-ch-spy
+                          :peer-node peer-node}]
+          (test-task-life-cycle
+           (assoc base-cycle
+             :task-name :in
+             :payload-node in-payload-node
+             :next-payload-node inc-payload-node))
 
-        (let [db (d/db (:conn log))]
-          (testing "It receives the :in task"
-            (let [task (:task (extensions/read-place sync in-payload-node))
-                  query '[:find ?task :where [?task :task/name :in]]]
-              (is (= (:db/id task) (ffirst (d/q query db))))))
+          (test-task-life-cycle
+           (assoc base-cycle
+             :task-name :inc
+             :payload-node inc-payload-node
+             :next-payload-node out-payload-node))
 
-          (testing "The peer is marked as :acking the task"
-            (let [query '[:find ?task :where
-                          [?peer :peer/status :acking]
-                          [?peer :peer/task ?task]
-                          [?task :task/name :in]]]
-              (is (= (count (d/q query db)) 1))))
-
-          (testing "The payload node contains the other node paths"
-            (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
-              (is (= (clojure.set/difference (into #{} (keys nodes))
-                                             #{:payload :ack :completion :status})
-                     #{})))))
-
-        (testing "Touching the ack node triggers the callback"
-          (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
-            (extensions/touch-place sync (:ack nodes))
-            (let [event (<!! ack-ch-spy)]
-              (= (:path event) (:ack nodes)))))
-
-        (extensions/write-place sync peer-node inc-payload-node)
-        (extensions/on-change sync inc-payload-node #(>!! sync-spy %))
-
-        (testing "Touching the completion node triggers the callback"
-          (let [nodes (:nodes (extensions/read-place sync in-payload-node))]
-            (extensions/touch-place sync (:completion nodes))
-            (let [event (<!! completion-ch-spy)]
-              (= (:path event) (:completion nodes)))))
-
-        (testing "The offer channel receives the tx id of the completion"
-          (let [tx-id (<!! offer-ch-spy)
-                db (d/as-of (d/db (:conn log)) tx-id)]
-
-            (testing "The peer's nodes have been stripped"
-              (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
-                            [?p :peer/status :idle]
-                            [?p :node/peer ?peer-node]
-                            [?p :node/payload ?payload]
-                            [?p :node/ack ?ack]
-                            [?p :node/status ?status]
-                            [?p :node/completion ?completion]]
-                    result (d/q query db peer-node)]
-                (is (empty? result))))))
-        
-        (testing "The payload node is populated"
-          (let [event (<!! sync-spy)]
-            (is (= (:path event) inc-payload-node))))
-
-        (let [db (d/db (:conn log))]
-          (testing "It receives the :inc task"
-            (let [task (:task (extensions/read-place sync inc-payload-node))
-                  query '[:find ?task :where [?task :task/name :inc]]]
-              (is (= (:db/id task) (ffirst (d/q query db))))))
-
-          (testing "The peer is marked as :acking the task"
-            (let [query '[:find ?task :where
-                          [?peer :peer/status :acking]
-                          [?peer :peer/task ?task]
-                          [?task :task/name :inc]]]
-              (is (= (count (d/q query db)) 1))))
-
-          (testing "The payload node contains the other node paths"
-            (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
-              (is (= (clojure.set/difference (into #{} (keys nodes))
-                                             #{:payload :ack :completion :status})
-                     #{}))))
-
-          (testing "Touching the ack node triggers the callback"
-            (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
-              (extensions/touch-place sync (:ack nodes))
-              (let [event (<!! ack-ch-spy)]
-                (= (:path event) (:ack nodes)))))
-
-          (extensions/write-place sync peer-node out-payload-node)
-          (extensions/on-change sync out-payload-node #(>!! sync-spy %))
-
-          (testing "Touching the completion node triggers the callback"
-            (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
-              (extensions/touch-place sync (:completion nodes))
-              (let [event (<!! completion-ch-spy)]
-                (= (:path event) (:completion nodes)))))
-
-          (testing "The offer channel receives the tx id of the completion"
-            (let [tx-id (<!! offer-ch-spy)
-                  db (d/as-of (d/db (:conn log)) tx-id)]
-
-              (testing "The peer's nodes have been stripped"
-                (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
-                              [?p :peer/status :idle]
-                              [?p :node/peer ?peer-node]
-                              [?p :node/payload ?payload]
-                              [?p :node/ack ?ack]
-                              [?p :node/status ?status]
-                              [?p :node/completion ?completion]]
-                      result (d/q query db peer-node)]
-                  (is (empty? result))))))
-          
-          (testing "The payload node is populated"
-            (let [event (<!! sync-spy)]
-              (is (= (:path event) out-payload-node))))
-
-          (let [db (d/db (:conn log))]
-            (testing "It receives the :out task"
-              (let [task (:task (extensions/read-place sync out-payload-node))
-                    query '[:find ?task :where [?task :task/name :out]]]
-                (is (= (:db/id task) (ffirst (d/q query db))))))
-
-            (testing "The peer is marked as :acking the task"
-              (let [query '[:find ?task :where
-                            [?peer :peer/status :acking]
-                            [?peer :peer/task ?task]
-                            [?task :task/name :out]]]
-                (is (= (count (d/q query db)) 1))))
-
-            (testing "The payload node contains the other node paths"
-              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
-                (is (= (clojure.set/difference (into #{} (keys nodes))
-                                               #{:payload :ack :completion :status})
-                       #{}))))
-
-            (testing "Touching the ack node triggers the callback"
-              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
-                (extensions/touch-place sync (:ack nodes))
-                (let [event (<!! ack-ch-spy)]
-                  (= (:path event) (:ack nodes)))))
-
-            (testing "Touching the completion node triggers the callback"
-              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
-                (extensions/touch-place sync (:completion nodes))
-                (let [event (<!! completion-ch-spy)]
-                  (= (:path event) (:completion nodes)))))
-
-            (testing "The offer channel receives the tx id of the completion"
-              (let [tx-id (<!! offer-ch-spy)
-                    db (d/as-of (d/db (:conn log)) tx-id)]
-
-                (testing "The peer's nodes have been stripped"
-                  (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
-                                [?p :peer/status :idle]
-                                [?p :node/peer ?peer-node]
-                                [?p :node/payload ?payload]
-                                [?p :node/ack ?ack]
-                                [?p :node/status ?status]
-                                [?p :node/completion ?completion]]
-                        result (d/q query db peer-node)]
-                    (is (empty? result))))))))))
+          (test-task-life-cycle
+           (assoc base-cycle
+             :task-name :out
+             :payload-node out-payload-node
+             :next-payload-node future-payload-node)))))
     {:eviction-delay 500000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
