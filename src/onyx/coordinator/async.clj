@@ -21,9 +21,11 @@
 (defn acknowledge-task [log task]
   (extensions/ack log task))
 
-(defn evict-task [log sync task]
-  (extensions/delete sync task)
-  (extensions/evict log task))
+(defn evict-peer [log sync peer]
+  (if-let [status-node (:node/status (extensions/nodes log peer))]
+    (do (extensions/delete sync status-node)
+        (extensions/evict log peer))
+    false))
 
 (defn offer-task [log sync ack-cb complete-cb]
   (if-let [task (extensions/next-task log)]
@@ -80,7 +82,7 @@
 (defn evict-ch-loop [log sync evict-tail offer-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
-      (when (evict-task log sync peer)
+      (when (evict-peer log sync peer)
         (>!! offer-head peer))
       (recur))))
 
@@ -206,7 +208,7 @@
           (>!! failure-ch-head {:ch :complete :e e})
           false))
 
-      (dire/with-handler! #'evict-task
+      (dire/with-handler! #'evict-peer
         java.util.concurrent.ExecutionException
         (fn [e log sync task]
           (>!! failure-ch-head {:ch :evict :e e})

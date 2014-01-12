@@ -16,6 +16,8 @@
 
 (defmulti next-task (fn [log] (type log)))
 
+(defmulti nodes (fn [log peer] (type log)))
+
 (defmulti idle-peer (fn [log] (type log)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))

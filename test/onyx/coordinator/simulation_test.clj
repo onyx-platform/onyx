@@ -94,10 +94,7 @@
           (testing "A failure is raised for the second delete"
             (>!! (:dead-peer-ch-head coordinator) peer)
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :peer-death)))
-
-            (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :evict)))))
+              (is (= (:ch failure) :peer-death)))))
 
         (testing "Acking a non-existent node fails"
           (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
@@ -132,8 +129,18 @@
             
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :ack)))))))
-    {:eviction-delay 500000}))
+              (is (= (:ch failure) :ack)))))
+
+        (testing "Completing a task that's already been completed fails")
+
+        (testing "Completing a task from an idle peer fails")
+
+        (testing "Completing a task that doesn't exist fails")
+
+        (testing "Evicting a peer that doesn't have a task fails")
+
+        (testing "Offer task cases")))
+    {:eviction-delay 0}))
 
 (deftest plan-one-job-no-peers
   (with-system
@@ -338,6 +345,62 @@
              :payload-node out-payload-node
              :next-payload-node future-payload-node)))))
     {:eviction-delay 500000}))
+
+(deftest evict-one-peer
+  (with-system
+    (fn [coordinator sync log]
+      (let [catalog [{:onyx/name :in
+                      :onyx/direction :input
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "in-queue"}
+                     {:onyx/name :inc
+                      :onyx/type :transformer}
+                     {:onyx/name :out
+                      :onyx/direction :output
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "out-queue"}]
+            workflow {:in {:inc :out}}
+
+            peer-node (extensions/create sync :peer)
+            payload-node (extensions/create sync :payload)
+            
+            sync-spy (chan 1)
+            offer-ch-spy (chan 3)]
+        
+        (tap (:offer-mult coordinator) offer-ch-spy)
+
+        (extensions/write-place sync peer-node payload-node)
+        (extensions/on-change sync payload-node #(>!! sync-spy %))
+
+        (>!! (:born-peer-ch-head coordinator) peer-node)
+        (<!! offer-ch-spy)
+        (>!! (:planning-ch-head coordinator)
+             {:catalog catalog :workflow workflow})
+        (<!! offer-ch-spy)
+        (<!! sync-spy)
+
+        ;; Instant eviction.
+
+        (<!! offer-ch-spy)
+
+        (testing "The peer gets deleted after eviction"
+          (let [db (d/db (:conn log))
+                query '[:find ?p :in $ ?peer-node :where
+                        [?p :node/peer ?peer-node]]]
+            (is (zero? (count (d/q query db peer-node))))))
+
+        (testing "The status node gets deleted on sync storage"
+          (let [db (d/history (d/db (:conn log)))
+                query '[:find ?status :in $ ?peer-node :where
+                        [?p :node/peer ?peer-node]
+                        [?p :node/status ?status]]
+                status-node (ffirst (d/q query db peer-node))]
+            (is (thrown?
+                 Exception
+                 (extensions/read-place sync status-node)))))))
+    {:eviction-delay 0}))
 
 (run-tests 'onyx.coordinator.simulation-test)
 
