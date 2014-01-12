@@ -65,14 +65,16 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
-            offer-ch-spy (chan 1)
-            ack-ch-spy (chan 3)
-            evict-ch-spy (chan 1)
-            failure-ch-spy (chan 1)]
+            offer-ch-spy (chan 5)
+            ack-ch-spy (chan 5)
+            evict-ch-spy (chan 5)
+            completion-ch-spy (chan 5)
+            failure-ch-spy (chan 10)]
         
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:ack-mult coordinator) ack-ch-spy)
         (tap (:evict-mult coordinator) evict-ch-spy)
+        (tap (:completion-mult coordinator) completion-ch-spy)
         (tap (:failure-mult coordinator) failure-ch-spy)
 
         (>!! (:born-peer-ch-head coordinator) peer)
@@ -131,11 +133,46 @@
             (let [failure (<!! failure-ch-spy)]
               (is (= (:ch failure) :ack)))))
 
-        (testing "Completing a task that's already been completed fails")
+        (testing "Completing a task that doesn't exist fails"
+          (>!! (:completion-ch-head coordinator) {:path "dead path"})
+          (let [failure (<!! failure-ch-spy)]
+            (is (= (:ch failure) :complete))))
+        
+        (testing "Completing a task that's already been completed fails"
+          (let [peer-id (d/tempid :onyx/log)
+                task-id (d/tempid :onyx/log)
+                node-path (str (java.util.UUID/randomUUID))
+                tx [{:db/id peer-id
+                     :peer/status :active
+                     :node/completion node-path
+                     :node/payload (str (java.util.UUID/randomUUID))
+                     :node/ack (str (java.util.UUID/randomUUID))
+                     :node/status (str (java.util.UUID/randomUUID))
+                     :peer/task {:db/id task-id
+                                 :task/complete? true}}]]
+            @(d/transact (:conn log) tx)
+            
+            (>!! (:completion-ch-head coordinator) {:path node-path})
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :complete)))))
 
-        (testing "Completing a task from an idle peer fails")
-
-        (testing "Completing a task that doesn't exist fails")
+        (testing "Completing a task from an idle peer fails"
+          (let [peer-id (d/tempid :onyx/log)
+                task-id (d/tempid :onyx/log)
+                node-path (str (java.util.UUID/randomUUID))
+                tx [{:db/id peer-id
+                     :peer/status :idle
+                     :node/completion node-path
+                     :node/payload (str (java.util.UUID/randomUUID))
+                     :node/ack (str (java.util.UUID/randomUUID))
+                     :node/status (str (java.util.UUID/randomUUID))
+                     :peer/task {:db/id task-id
+                                 :task/complete? false}}]]
+            @(d/transact (:conn log) tx)
+            
+            (>!! (:completion-ch-head coordinator) {:path node-path})
+            (let [failure (<!! failure-ch-spy)]
+              (is (= (:ch failure) :complete)))))
 
         (testing "Evicting a peer that doesn't have a task fails")
 
