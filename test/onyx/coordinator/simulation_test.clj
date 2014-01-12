@@ -34,10 +34,10 @@
         (<!! offer-ch-spy)
 
         (testing "There is one peer"
-            (let [query '[:find ?p :where [?e :node/peer ?p]]
-                  result (d/q query (d/db (:conn log)))]
-              (is (= (count result) 1))
-              (is (= (ffirst result) peer))))))))
+          (let [query '[:find ?p :where [?e :node/peer ?p]]
+                result (d/q query (d/db (:conn log)))]
+            (is (= (count result) 1))
+            (is (= (ffirst result) peer))))))))
 
 (deftest peer-joins-and-dies
   (with-system
@@ -57,9 +57,9 @@
         (<!! evict-ch-spy)
 
         (testing "There are no peers"
-            (let [query '[:find ?p :where [?e :node/peer ?p]]
-                  result (d/q query (d/db (:conn log)))]
-              (is (zero? (count result)))))))))
+          (let [query '[:find ?p :where [?e :node/peer ?p]]
+                result (d/q query (d/db (:conn log)))]
+            (is (zero? (count result)))))))))
 
 (deftest error-cases
   (with-system
@@ -114,7 +114,7 @@
                      :peer/task {:db/id task-id
                                  :task/complete? true}}]]
             @(d/transact (:conn log) tx)
-         
+            
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
               (is (= (:ch failure) :ack)))))
@@ -129,7 +129,7 @@
                      :peer/task {:db/id task-id
                                  :task/complete? false}}]]
             @(d/transact (:conn log) tx)
-         
+            
             (>!! (:ack-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
               (is (= (:ch failure) :ack)))))))
@@ -216,6 +216,7 @@
       (let [peer-node (extensions/create sync :peer)
             in-payload-node (extensions/create sync :payload)
             inc-payload-node (extensions/create sync :payload)
+            out-payload-node (extensions/create sync :payload)
             sync-spy (chan 1)
             ack-ch-spy (chan 1)
             offer-ch-spy (chan 1)
@@ -326,7 +327,87 @@
             (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
               (is (= (clojure.set/difference (into #{} (keys nodes))
                                              #{:payload :ack :completion :status})
-                     #{})))))))
+                     #{}))))
+
+          (testing "Touching the ack node triggers the callback"
+            (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
+              (extensions/touch-place sync (:ack nodes))
+              (let [event (<!! ack-ch-spy)]
+                (= (:path event) (:ack nodes)))))
+
+          (extensions/write-place sync peer-node out-payload-node)
+          (extensions/on-change sync out-payload-node #(>!! sync-spy %))
+
+          (testing "Touching the completion node triggers the callback"
+            (let [nodes (:nodes (extensions/read-place sync inc-payload-node))]
+              (extensions/touch-place sync (:completion nodes))
+              (let [event (<!! completion-ch-spy)]
+                (= (:path event) (:completion nodes)))))
+
+          (testing "The offer channel receives the tx id of the completion"
+            (let [tx-id (<!! offer-ch-spy)
+                  db (d/as-of (d/db (:conn log)) tx-id)]
+
+              (testing "The peer's nodes have been stripped"
+                (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
+                              [?p :peer/status :idle]
+                              [?p :node/peer ?peer-node]
+                              [?p :node/payload ?payload]
+                              [?p :node/ack ?ack]
+                              [?p :node/status ?status]
+                              [?p :node/completion ?completion]]
+                      result (d/q query db peer-node)]
+                  (is (empty? result))))))
+          
+          (testing "The payload node is populated"
+            (let [event (<!! sync-spy)]
+              (is (= (:path event) out-payload-node))))
+
+          (let [db (d/db (:conn log))]
+            (testing "It receives the :out task"
+              (let [task (:task (extensions/read-place sync out-payload-node))
+                    query '[:find ?task :where [?task :task/name :out]]]
+                (is (= (:db/id task) (ffirst (d/q query db))))))
+
+            (testing "The peer is marked as :acking the task"
+              (let [query '[:find ?task :where
+                            [?peer :peer/status :acking]
+                            [?peer :peer/task ?task]
+                            [?task :task/name :out]]]
+                (is (= (count (d/q query db)) 1))))
+
+            (testing "The payload node contains the other node paths"
+              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
+                (is (= (clojure.set/difference (into #{} (keys nodes))
+                                               #{:payload :ack :completion :status})
+                       #{}))))
+
+            (testing "Touching the ack node triggers the callback"
+              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
+                (extensions/touch-place sync (:ack nodes))
+                (let [event (<!! ack-ch-spy)]
+                  (= (:path event) (:ack nodes)))))
+
+            (testing "Touching the completion node triggers the callback"
+              (let [nodes (:nodes (extensions/read-place sync out-payload-node))]
+                (extensions/touch-place sync (:completion nodes))
+                (let [event (<!! completion-ch-spy)]
+                  (= (:path event) (:completion nodes)))))
+
+            (testing "The offer channel receives the tx id of the completion"
+              (let [tx-id (<!! offer-ch-spy)
+                    db (d/as-of (d/db (:conn log)) tx-id)]
+
+                (testing "The peer's nodes have been stripped"
+                  (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
+                                [?p :peer/status :idle]
+                                [?p :node/peer ?peer-node]
+                                [?p :node/payload ?payload]
+                                [?p :node/ack ?ack]
+                                [?p :node/status ?status]
+                                [?p :node/completion ?completion]]
+                        result (d/q query db peer-node)]
+                    (is (empty? result))))))))))
     {:eviction-delay 500000}))
 
 (run-tests 'onyx.coordinator.simulation-test)
