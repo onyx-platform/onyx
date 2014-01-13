@@ -1,4 +1,4 @@
-(ns onyx.coordinator.simulation-test
+(ns onyx.coordinator.single-peer-test
   (:require [clojure.test :refer :all]
             [clojure.core.async :refer [chan tap >!! <!!]]
             [com.stuartsierra.component :as component]
