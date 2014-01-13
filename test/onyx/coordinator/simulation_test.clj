@@ -174,10 +174,8 @@
             (let [failure (<!! failure-ch-spy)]
               (is (= (:ch failure) :complete)))))
 
-        (testing "Evicting a peer that doesn't have a task fails")
-
         (testing "Offer task cases")))
-    {:eviction-delay 0}))
+    {:eviction-delay 50000}))
 
 (deftest plan-one-job-no-peers
   (with-system
