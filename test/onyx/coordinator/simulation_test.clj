@@ -172,9 +172,7 @@
             
             (>!! (:completion-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
-              (is (= (:ch failure) :complete)))))
-
-        (testing "Offer task cases")))
+              (is (= (:ch failure) :complete)))))))
     {:eviction-delay 50000}))
 
 (deftest plan-one-job-no-peers
