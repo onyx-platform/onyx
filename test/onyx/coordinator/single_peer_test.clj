@@ -7,18 +7,7 @@
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
             [onyx.system :as s]
-            [onyx.util :as u]))
-
-(defn with-system [f & opts]
-  (def system (s/onyx-system (apply merge {:sync :zookeeper :queue :hornetq :eviction-delay 5000} opts)))
-  (let [components (alter-var-root #'system component/start)
-        coordinator (:coordinator components)
-        sync (:sync components)
-        log (:log components)]
-    (try
-      (f coordinator sync log)
-      (finally
-       (alter-var-root #'system component/stop)))))
+            [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (deftest new-peer
   (with-system
@@ -435,5 +424,6 @@
                  (extensions/read-place sync status-node)))))))
     {:eviction-delay 0}))
 
-(run-tests 'onyx.coordinator.simulation-test)
+;;(run-tests 'onyx.coordinator.simulation-test)
+
 
