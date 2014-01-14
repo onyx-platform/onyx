@@ -23,6 +23,7 @@
             sync-spy-b (chan 1)
             ack-ch-spy (chan 2)
             offer-ch-spy (chan 1)
+            status-spy (chan 2)
             
             catalog [{:onyx/name :in
                       :onyx/direction :input
@@ -68,11 +69,17 @@
             (is (not (nil? payload-b)))
             (is (not= payload-a payload-b))
 
+            (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
+            (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
+
             (extensions/touch-place sync (:ack (:nodes payload-a)))
             (extensions/touch-place sync (:ack (:nodes payload-b)))
 
             (<!! ack-ch-spy)
-            (<!! ack-ch-spy)))))
+            (<!! ack-ch-spy)
+
+            (<!! status-spy)
+            (<!! status-spy)))))
     
     {:eviction-delay 50000}))
 

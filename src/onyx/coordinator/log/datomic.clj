@@ -89,14 +89,26 @@
   (let [db (d/db (:conn log))]
     (next-essential-task db)))
 
+(defn select-nodes [ent]
+  (select-keys ent [:node/peer :node/payload :node/ack
+                    :node/status :node/completion]))
+
 (defmethod extensions/nodes Datomic
   [log peer]
   (let [db (d/db (:conn log))
         query '[:find ?p :in $ ?peer :where [?p :node/peer ?peer]]
         result (ffirst (d/q query db peer))
         ent (into {} (d/entity db result))]
-    (select-keys ent [:node/peer :node/payload :node/ack
-                      :node/status :node/completion])))
+    (select-nodes ent)))
+
+(defmethod extensions/node-basis Datomic
+  [log basis node]
+  (let [db (d/db (:conn log))
+        query '[:find ?peer :in $ ?node-basis ?node-place :where
+                [?peer ?node-basis ?node-place]]
+        result (ffirst (d/q query db basis node))
+        ent (into {} (d/entity db result))]
+    (select-nodes ent)))
 
 (defmethod extensions/idle-peers Datomic
   [log]

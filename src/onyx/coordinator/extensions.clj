@@ -18,6 +18,8 @@
 
 (defmulti nodes (fn [log peer] (type log)))
 
+(defmulti node-basis (fn [log basis node] (type log)))
+
 (defmulti idle-peers (fn [log] (type log)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))

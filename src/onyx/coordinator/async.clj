@@ -18,8 +18,10 @@
   (let [tasks (planning/discover-tasks catalog workflow)]
     (extensions/plan-job log catalog workflow tasks)))
 
-(defn acknowledge-task [log task]
-  (extensions/ack log task))
+(defn acknowledge-task [log sync ack-place]
+  (let [nodes (extensions/node-basis log :node/ack ack-place)]
+    (extensions/ack log ack-place)
+    (extensions/touch-place sync (:node/status nodes))))
 
 (defn evict-peer [log sync peer]
   (if-let [status-node (:node/status (extensions/nodes log peer))]
@@ -73,10 +75,10 @@
         (>!! offer-head job-id)
         (recur)))))
 
-(defn ack-ch-loop [log ack-tail]
+(defn ack-ch-loop [log sync ack-tail]
   (loop []
     (when-let [ack-place (:path (<!! ack-tail))]
-      (acknowledge-task log ack-place)
+      (acknowledge-task log sync ack-place)
       (recur))))
 
 (defn evict-ch-loop [log sync evict-tail offer-head]
@@ -236,7 +238,7 @@
         :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head))
         :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
-        :ack-thread (future (ack-ch-loop log ack-ch-tail))
+        :ack-thread (future (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))
         :offer-thread (future (offer-ch-loop log sync eviction-delay offer-ch-tail ack-ch-head completion-ch-head evict-ch-head))
         :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head))
