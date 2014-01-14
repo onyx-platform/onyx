@@ -21,6 +21,7 @@
 
             sync-spy-a (chan 1)
             sync-spy-b (chan 1)
+            ack-ch-spy (chan 2)
             offer-ch-spy (chan 1)
             
             catalog [{:onyx/name :in
@@ -40,6 +41,7 @@
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
 
+        (tap (:ack-mult coordinator) ack-ch-spy)
         (tap (:offer-mult coordinator) offer-ch-spy)
 
         (extensions/write-place sync peer-node-a payload-node-a)
@@ -64,7 +66,14 @@
                 payload-b (extensions/read-place sync payload-node-b)]
             (is (not (nil? payload-a)))
             (is (not (nil? payload-b)))
-            (is (not= payload-a payload-b))))))
+            (is (not= payload-a payload-b))
+
+            (extensions/touch-place sync (:ack (:nodes payload-a)))
+            (extensions/touch-place sync (:ack (:nodes payload-b)))
+
+            (<!! ack-ch-spy)
+            (<!! ack-ch-spy)))))
+    
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.multi-peer-test)
