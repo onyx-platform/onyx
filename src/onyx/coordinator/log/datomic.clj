@@ -65,7 +65,7 @@
   (let [incomplete-tasks (find-incomplete-tasks db)
         sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
         active-tasks (find-active-task-ids db sorted-tasks)]
-    (first (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks))))
+    (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks)))
 
 (defmethod extensions/mark-peer-born Datomic
   [log place]
@@ -84,7 +84,7 @@
     @(d/transact (:conn log) [job-datom])
     (:job/id job-datom)))
 
-(defmethod extensions/next-task Datomic
+(defmethod extensions/next-tasks Datomic
   [log]
   (let [db (d/db (:conn log))]
     (next-essential-task db)))
@@ -98,13 +98,13 @@
     (select-keys ent [:node/peer :node/payload :node/ack
                       :node/status :node/completion])))
 
-(defmethod extensions/idle-peer Datomic
+(defmethod extensions/idle-peers Datomic
   [log]
   (let [db (d/db (:conn log))
         peers (d/q '[:find ?place :where
                      [?peer :peer/status :idle]
                      [?peer :node/peer ?place]] db)]
-    (ffirst peers)))
+    (map first peers)))
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]

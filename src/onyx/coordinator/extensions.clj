@@ -14,11 +14,11 @@
 
 (defmulti complete (fn [log complete-place] (type log)))
 
-(defmulti next-task (fn [log] (type log)))
+(defmulti next-tasks (fn [log] (type log)))
 
 (defmulti nodes (fn [log peer] (type log)))
 
-(defmulti idle-peer (fn [log] (type log)))
+(defmulti idle-peers (fn [log] (type log)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
 

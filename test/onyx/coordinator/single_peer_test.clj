@@ -335,8 +335,7 @@
         (extensions/on-change sync in-payload-node #(>!! sync-spy %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node)
-        (>!! (:planning-ch-head coordinator)
-             {:catalog catalog :workflow workflow})
+        (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
 
         (testing "The offer channel sees the birth and planning"
           (<!! offer-ch-spy)
@@ -424,6 +423,6 @@
                  (extensions/read-place sync status-node)))))))
     {:eviction-delay 0}))
 
-;;(run-tests 'onyx.coordinator.simulation-test)
+(run-tests 'onyx.coordinator.single-peer-test)
 
 

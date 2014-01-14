@@ -27,9 +27,10 @@
         (extensions/evict log peer))
     false))
 
-(defn offer-task [log sync ack-cb complete-cb]
-  (if-let [task (extensions/next-task log)]
-    (if-let [peer (extensions/idle-peer log)]
+(defn offer-task [log sync ack-cb complete-cb evict-cb]
+  (loop [[task :as tasks] (extensions/next-tasks log)
+         [peer :as peers] (extensions/idle-peers log)]
+    (when (and (seq tasks) (seq peers))
       (let [payload-node (extensions/read-place sync peer)
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
@@ -40,10 +41,9 @@
         (extensions/on-change sync complete-node complete-cb)
         (if (extensions/mark-offered log task peer nodes)
           (do (extensions/write-place sync payload-node {:task task :nodes nodes})
-              peer)
-          false))
-      false)
-    false))
+              (evict-cb peer)
+              (recur (rest tasks) (rest peers)))
+          (recur tasks (rest peers)))))))
 
 (defn complete-task [log sync queue complete-place]
   (if-let [result (extensions/complete log complete-place)]
@@ -92,9 +92,9 @@
     (when-let [event (<!! offer-tail)]
       (when-let [peer (offer-task log sync
                                   #(>!! ack-head %)
-                                  #(>!! complete-head %))]
-        (thread (<!! (timeout eviction-delay))
-                (>!! evict-head peer)))
+                                  #(>!! complete-head %)
+                                  #(thread (<!! (timeout eviction-delay))
+                                           (>!! evict-head %)))])
       (recur))))
 
 (defn completion-ch-loop
