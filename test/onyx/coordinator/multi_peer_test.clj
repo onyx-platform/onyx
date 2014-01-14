@@ -59,11 +59,12 @@
         (<!! sync-spy-a)
         (<!! sync-spy-b)
 
-        (let [payload-a (extensions/read-place sync payload-node-a)
-              payload-b (extensions/read-place sync payload-node-b)]
-          (is (not (nil? payload-a)))
-          (is (not (nil? payload-b)))
-          (is (not= payload-a payload-b)))))
+        (testing "Both payloads are received"
+          (let [payload-a (extensions/read-place sync payload-node-a)
+                payload-b (extensions/read-place sync payload-node-b)]
+            (is (not (nil? payload-a)))
+            (is (not (nil? payload-b)))
+            (is (not= payload-a payload-b))))))
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.multi-peer-test)
