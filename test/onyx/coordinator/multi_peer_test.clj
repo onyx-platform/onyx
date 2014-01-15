@@ -79,7 +79,12 @@
             (<!! ack-ch-spy)
 
             (<!! status-spy)
-            (<!! status-spy)))))
+            (<!! status-spy)
+
+            (extensions/touch-place sync (:completion (:nodes payload-a)))
+            (extensions/touch-place sync (:completion (:nodes payload-b)))
+            
+            ))))
     
     {:eviction-delay 50000}))
 

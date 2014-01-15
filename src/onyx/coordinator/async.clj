@@ -194,7 +194,7 @@
 
       (dire/with-handler! #'acknowledge-task
         java.util.concurrent.ExecutionException
-        (fn [e log task]
+        (fn [e log sync task]
           (>!! failure-ch-head {:ch :ack :e e})
           false))
 
