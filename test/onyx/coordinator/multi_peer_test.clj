@@ -32,7 +32,7 @@
                       :onyx/direction :input
                       :onyx/type :queue
                       :onyx/medium :hornetq
-                      :onyx/consumption :concurrent
+                      :onyx/consumption :sequential
                       :hornetq/queue-name "in-queue"}
                      {:onyx/name :inc
                       :onyx/type :transformer
@@ -41,7 +41,7 @@
                       :onyx/direction :output
                       :onyx/type :queue
                       :onyx/medium :hornetq
-                      :onyx/consumption :concurrent
+                      :onyx/consumption :sequential
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
 
@@ -121,6 +121,37 @@
                               [?peer :peer/status :idle]]
                       result (ffirst (d/q query db))]
                   (is (= result 2)))))))))
+    
+    {:eviction-delay 50000}))
+
+(deftest plan-one-job-four-peers
+  (with-system
+    (fn [coordinator sync log]
+      (let [n 4
+            peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
+            payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
+            sync-spies (take n (repeatedly (fn [] (chan 1))))
+
+            catalog [{:onyx/name :in
+                      :onyx/direction :input
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :onyx/consumption :sequential
+                      :hornetq/queue-name "in-queue"}
+                     {:onyx/name :inc
+                      :onyx/type :transformer
+                      :onyx/consumption :sequential}
+                     {:onyx/name :out
+                      :onyx/direction :output
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :onyx/consumption :sequential
+                      :hornetq/queue-name "out-queue"}]
+            workflow {:in {:inc :out}}]
+
+        (doseq [[peer payload sync-spy] (map vector peers payloads sync-spies)]
+          (extensions/write-place sync peer payload)
+          (extensions/on-change sync payload #(>!! sync-spy %)))))
     
     {:eviction-delay 50000}))
 

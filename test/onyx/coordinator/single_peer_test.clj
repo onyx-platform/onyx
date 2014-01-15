@@ -314,7 +314,7 @@
                       :onyx/direction :input
                       :onyx/type :queue
                       :onyx/medium :hornetq
-                      :onyx/consumption :concurrent
+                      :onyx/consumption :sequential
                       :hornetq/queue-name "in-queue"}
                      {:onyx/name :inc
                       :onyx/type :transformer
@@ -323,7 +323,7 @@
                       :onyx/direction :output
                       :onyx/type :queue
                       :onyx/medium :hornetq
-                      :onyx/consumption :concurrent
+                      :onyx/consumption :sequential
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
 
