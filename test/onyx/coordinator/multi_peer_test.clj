@@ -131,6 +131,10 @@
             peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
             payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
             sync-spies (take n (repeatedly (fn [] (chan 1))))
+            
+            status-spy (chan (* n 5))
+            offer-ch-spy (chan (* n 5))
+            ack-ch-spy (chan (* n 5))
 
             catalog [{:onyx/name :in
                       :onyx/direction :input
@@ -149,10 +153,74 @@
                       :hornetq/queue-name "out-queue"}]
             workflow {:in {:inc :out}}]
 
+        (tap (:offer-mult coordinator) offer-ch-spy)
+        (tap (:ack-mult coordinator) ack-ch-spy)
+        
         (doseq [[peer payload sync-spy] (map vector peers payloads sync-spies)]
           (extensions/write-place sync peer payload)
-          (extensions/on-change sync payload #(>!! sync-spy %)))))
-    
+          (extensions/on-change sync payload #(>!! sync-spy %)))
+
+        (doseq [peer peers]
+          (>!! (:born-peer-ch-head coordinator) peer))
+
+        (doseq [_ (range n)]
+          (<!! offer-ch-spy))
+
+
+        (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+        (<!! offer-ch-spy)
+
+        (alts!! sync-spies)
+        (alts!! sync-spies)
+        (alts!! sync-spies)
+
+        (let [db (d/db (:conn log))]
+          
+          (testing "Three peers are :acking"
+            (let [query '[:find (count ?peer) :where
+                          [?peer :peer/status :acking]]
+                  result (ffirst (d/q query db))]
+              (is (= result 3))))
+
+          (testing "One peer is idle"
+            (let [query '[:find (count ?peer) :where
+                          [?peer :peer/status :idle]]
+                  result (ffirst (d/q query db))]
+              (is (= result 1))))
+
+          (let [query '[:find ?node :where
+                        [?peer :peer/status :acking]
+                        [?peer :node/payload ?node]]
+                payload-nodes (map first (d/q query db))]
+            
+            (doseq [payload-node payload-nodes]
+              (let [payload (extensions/read-place sync payload-node)]
+                (extensions/on-change sync (:status (:nodes payload)) #(>!! status-spy %))
+                (extensions/touch-place sync (:ack (:nodes payload)))))
+
+            (doseq [_ (range 3)]
+              (<!! ack-ch-spy)
+              (<!! status-spy))
+
+            (doseq [payload-node payload-nodes]
+              (let [payload (extensions/read-place sync payload-node)]
+                (extensions/touch-place sync (:completion (:nodes payload)))
+                (<!! offer-ch-spy)))))
+
+        (let [db (d/db (:conn log))]
+          
+          (testing "Four peers are :idle"
+            (let [query '[:find (count ?peer) :where
+                          [?peer :peer/status :idle]]
+                  result (ffirst (d/q query db))]
+              (is (= result 4))))
+
+          (testing "All three tasks are complete"
+            (let [query '[:find (count ?task) :where
+                          [?task :task/complete? true]]
+                  result (ffirst (d/q query db))]
+              (is (= result 3)))))))
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.multi-peer-test)
+
