@@ -108,12 +108,19 @@
               (extensions/touch-place sync (:completion nodes))
               (<!! offer-ch-spy))
 
-            (testing "All tasks are complete"
-              (let [db (d/db (:conn log))
-                    query '[:find (count ?task) :where
-                            [?task :task/complete? true]]
-                    result (ffirst (d/q query db))]
-                (is (= result 3))))))))
+            (let [db (d/db (:conn log))]
+              
+              (testing "All tasks are complete"
+                (let [query '[:find (count ?task) :where
+                              [?task :task/complete? true]]
+                      result (ffirst (d/q query db))]
+                  (is (= result 3))))
+
+              (testing "All peers are idle"
+                (let [query '[:find (count ?peer) :where
+                              [?peer :peer/status :idle]]
+                      result (ffirst (d/q query db))]
+                  (is (= result 2)))))))))
     
     {:eviction-delay 50000}))
 
