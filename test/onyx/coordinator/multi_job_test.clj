@@ -72,14 +72,14 @@
         (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node-a)
-        (>!! (:born-peer-ch-head coordinator) peer-node-b)
-
-        (<!! offer-ch-spy)
         (<!! offer-ch-spy)
 
         (>!! (:planning-ch-head coordinator) {:catalog catalog-a :workflow workflow-a})
-
         (<!! offer-ch-spy)
+        
+        (>!! (:born-peer-ch-head coordinator) peer-node-b)
+        (<!! offer-ch-spy)
+
         (<!! sync-spy-a)
         (<!! sync-spy-b)
 
@@ -114,7 +114,51 @@
           (<!! ack-ch-spy)
 
           (<!! status-spy)
-          (<!! status-spy))))
+          (<!! status-spy)
+
+          (>!! (:planning-ch-head coordinator) {:catalog catalog-b :workflow workflow-b})
+          (<!! offer-ch-spy)
+
+          (extensions/write-place sync peer-node-a payload-node-a-2)
+          (extensions/on-change sync payload-node-a-2 #(>!! sync-spy-a %))
+          (extensions/touch-place sync (:completion (:nodes payload-a))))
+
+        (<!! offer-ch-spy)
+        (<!! sync-spy-a)
+
+        (let [payload-a (extensions/read-place sync payload-node-a-2)]
+          (testing "Payload A is for job B"
+            (let [db (d/db (:conn log))
+                  query '[:find ?job :in $ ?task ?catalog :where
+                          [?job :job/task ?task]
+                          [?job :job/catalog ?catalog]]
+                  result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-b))
+                  jobs (map first result)]
+              (is (= (count jobs) 1))))
+
+          (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
+          (extensions/touch-place sync (:ack (:nodes payload-a)))
+
+          (<!! ack-ch-spy)
+          (<!! status-spy))
+
+        (let [payload-b (extensions/read-place sync payload-node-b-1)]
+          (extensions/write-place sync peer-node-b payload-node-b-2)
+          (extensions/on-change sync payload-node-b-2 #(>!! sync-spy-b %))
+          (extensions/touch-place sync (:completion (:nodes payload-b)))
+
+          (<!! offer-ch-spy)
+          (<!! sync-spy-b))
+
+        (let [payload-b (extensions/read-place sync payload-node-b-2)]
+          (testing "Payload B is for job A"
+            (let [db (d/db (:conn log))
+                  query '[:find ?job :in $ ?task ?catalog :where
+                          [?job :job/task ?task]
+                          [?job :job/catalog ?catalog]]
+                  result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-a))
+                  jobs (map first result)]
+              (is (= (count jobs) 1)))))))
     
     {:eviction-delay 50000}))
 
