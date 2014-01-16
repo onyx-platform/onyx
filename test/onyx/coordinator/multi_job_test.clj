@@ -83,26 +83,25 @@
         (<!! sync-spy-a)
         (<!! sync-spy-b)
 
-        (let [payload-a (extensions/read-place sync payload-node-a-1)
+        (let [db (d/db (:conn log))
+              payload-a (extensions/read-place sync payload-node-a-1)
               payload-b (extensions/read-place sync payload-node-b-1)]
 
-          (let [db (d/db (:conn log))]
-            
-            (testing "Payload A is for job A"
-              (let [query '[:find ?job :in $ ?task ?catalog :where
-                            [?job :job/task ?task]
-                            [?job :job/catalog ?catalog]]
-                    result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-a))
-                    jobs (map first result)]
-                (is (= (count jobs) 1))))
+          (testing "Payload A is for job A"
+            (let [query '[:find ?job :in $ ?task ?catalog :where
+                          [?job :job/task ?task]
+                          [?job :job/catalog ?catalog]]
+                  result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-a))
+                  jobs (map first result)]
+              (is (= (count jobs) 1))))
 
-            (testing "Payload B is for job A"
-              (let [query '[:find ?job :in $ ?task ?catalog :where
-                            [?job :job/task ?task]
-                            [?job :job/catalog ?catalog]]
-                    result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-a))
-                    jobs (map first result)]
-                (is (= (count jobs) 1)))))
+          (testing "Payload B is for job A"
+            (let [query '[:find ?job :in $ ?task ?catalog :where
+                          [?job :job/task ?task]
+                          [?job :job/catalog ?catalog]]
+                  result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-a))
+                  jobs (map first result)]
+              (is (= (count jobs) 1))))
 
           (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
           (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
@@ -158,7 +157,13 @@
                           [?job :job/catalog ?catalog]]
                   result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-a))
                   jobs (map first result)]
-              (is (= (count jobs) 1)))))
+              (is (= (count jobs) 1))))
+          
+          (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
+          (extensions/touch-place sync (:ack (:nodes payload-b)))
+
+          (<!! ack-ch-spy)
+          (<!! status-spy))
 
         (let [payload-a (extensions/read-place sync payload-node-a-2)]
           (extensions/write-place sync peer-node-a payload-node-a-1)
@@ -176,7 +181,58 @@
                           [?job :job/catalog ?catalog]]
                   result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-b))
                   jobs (map first result)]
-              (is (= (count jobs) 1)))))))
+              (is (= (count jobs) 1))))
+
+          (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
+          (extensions/touch-place sync (:ack (:nodes payload-a)))
+
+          (<!! ack-ch-spy)
+          (<!! status-spy))
+
+        (let [payload-b (extensions/read-place sync payload-node-b-2)]
+          (extensions/write-place sync peer-node-b payload-node-b-1)
+          (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
+          (extensions/touch-place sync (:completion (:nodes payload-b)))
+
+          (<!! offer-ch-spy)
+          (<!! sync-spy-b))
+
+        (let [payload-b (extensions/read-place sync payload-node-b-1)]
+          (testing "Payload B is for job B"
+            (let [db (d/db (:conn log))
+                  query '[:find ?job :in $ ?task ?catalog :where
+                          [?job :job/task ?task]
+                          [?job :job/catalog ?catalog]]
+                  result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-b))
+                  jobs (map first result)]
+              (is (= (count jobs) 1))))
+
+          (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
+          (extensions/touch-place sync (:ack (:nodes payload-b)))
+
+          (<!! ack-ch-spy)
+          (<!! status-spy))
+
+        (let [payload-a (extensions/read-place sync payload-node-a-1)
+              payload-b (extensions/read-place sync payload-node-b-1)]
+          (extensions/touch-place sync (:completion (:nodes payload-a)))
+          (extensions/touch-place sync (:completion (:nodes payload-b)))
+
+          (<!! offer-ch-spy)
+          (<!! offer-ch-spy))
+
+        (let [db (d/db (:conn log))]
+          (testing "All tasks are complete"
+            (let [query '[:find (count ?task) :where
+                          [?task :task/complete? true]]
+                  result (ffirst (d/q query db))]
+              (is (= result 6))))
+
+          (testing "All peers are idle"
+            (let [query '[:find (count ?peer) :where
+                          [?peer :peer/status :idle]]
+                  result (ffirst (d/q query db))]
+              (is (= result 2)))))))
     
     {:eviction-delay 50000}))
 
