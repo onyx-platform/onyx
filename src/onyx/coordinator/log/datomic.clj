@@ -50,21 +50,25 @@
    :task/ingress-queues (:ingress-queues task)
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
-(defn find-incomplete-tasks [db]
-  (let [query '[:find ?task :where [?task :task/complete? false]]]
-    (d/q query db)))
+(defn find-incomplete-tasks [db job-id]
+  (let [query '[:find ?task :in $ ?job :where
+                [?job :job/task ?task]
+                [?task :task/complete? false]]]
+    (d/q query db job-id)))
 
-(defn find-active-task-ids [db tasks]
-  (let [query '[:find ?task :in $ ?task :where [?peer :peer/task ?task]]]
-    (into #{} (mapcat #(first (d/q query db (:db/id %))) tasks))))
+(defn find-active-task-ids [db job-id tasks]
+  (let [query '[:find ?task :in $ ?job ?task :where
+                [?job :job/task ?task]
+                [?peer :peer/task ?task]]]
+    (into #{} (mapcat #(first (d/q query db (:db/id %))) job-id tasks))))
 
 (defn sort-tasks-by-phase [db tasks]
   (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
 
-(defn next-essential-task [db]
-  (let [incomplete-tasks (find-incomplete-tasks db)
+(defn next-essential-task [db job-id]
+  (let [incomplete-tasks (find-incomplete-tasks db job-id)
         sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
-        active-tasks (find-active-task-ids db sorted-tasks)]
+        active-tasks (find-active-task-ids db job-id sorted-tasks)]
     (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks)))
 
 (defn all-active-jobs-ids [db]
@@ -87,7 +91,7 @@
 
 (defn job-candidate-seq [job-seq last-offered]
   (->> (cycle job-seq)
-       (drop (.indexOf job-seq last-offered))
+       (drop (inc (.indexOf job-seq last-offered)))
        (take (count job-seq))))
 
 (defmethod extensions/mark-peer-born Datomic
@@ -109,10 +113,11 @@
 
 (defmethod extensions/next-tasks Datomic
   [log]
-  (let [db (d/db (:conn log))]
-    (prn (all-active-jobs-ids db))
-    (prn (last-offered-job db))
-    (next-essential-task db)))
+  (let [db (d/db (:conn log))
+        job-seq (job-candidate-seq (all-active-jobs-ids db)
+                                   (last-offered-job db))
+        candidates (map (partial next-essential-task db) job-seq)]
+    (first (filter identity candidates))))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack
