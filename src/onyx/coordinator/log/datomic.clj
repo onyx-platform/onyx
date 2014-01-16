@@ -68,18 +68,22 @@
     (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks)))
 
 (defn all-active-jobs-ids [db]
-  (let [query '[:find ?job ?tx :where
-                [?job :job/task ?task ?tx]
-                [?task :task/complete? false]]]
-    (map first (sort-by second (d/q query db)))))
+  (->> db
+       (d/q '[:find ?job ?tx :where
+              [?job :job/task ?task ?tx]
+              [?task :task/complete? false]])
+       (sort-by second)
+       (map first)))
 
 (defn last-offered-job [db]
-  (let [query '[:find ?job ?tx :where
-                [?job :job/task ?task ?tx]
-                [?peer :peer/task ?task]
-                [?peer :peer/status :acking]]
-        result (d/q query (d/history db))]
-    (first (last (sort-by second result)))))
+  (->> (d/history db)
+       (d/q '[:find ?job ?tx :where
+              [?job :job/task ?task ?tx]
+              [?peer :peer/task ?task]
+              [?peer :peer/status :acking]])
+       (sort-by second)
+       (last)
+       (first)))
 
 (defn job-candidate-seq [job-seq last-offered]
   (->> (cycle job-seq)
