@@ -67,6 +67,25 @@
         active-tasks (find-active-task-ids db sorted-tasks)]
     (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks)))
 
+(defn all-active-jobs-ids [db]
+  (let [query '[:find ?job ?tx :where
+                [?job :job/task ?task ?tx]
+                [?task :task/complete? false]]]
+    (map first (sort-by second (d/q query db)))))
+
+(defn last-offered-job [db]
+  (let [query '[:find ?job ?tx :where
+                [?job :job/task ?task ?tx]
+                [?peer :peer/task ?task]
+                [?peer :peer/status :acking]]
+        result (d/q query (d/history db))]
+    (first (last (sort-by second result)))))
+
+(defn job-candidate-seq [job-seq last-offered]
+  (->> (cycle job-seq)
+       (drop (.indexOf job-seq last-offered))
+       (take (count job-seq))))
+
 (defmethod extensions/mark-peer-born Datomic
   [log place]
   (let [tx [[:onyx.fn/add-peer (d/tempid :onyx/log) :idle place]]]
@@ -87,6 +106,8 @@
 (defmethod extensions/next-tasks Datomic
   [log]
   (let [db (d/db (:conn log))]
+    (prn (all-active-jobs-ids db))
+    (prn (last-offered-job db))
     (next-essential-task db)))
 
 (defn select-nodes [ent]
