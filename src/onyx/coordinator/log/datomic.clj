@@ -60,7 +60,7 @@
   (let [query '[:find ?task :in $ ?job ?task :where
                 [?job :job/task ?task]
                 [?peer :peer/task ?task]]]
-    (into #{} (mapcat #(first (d/q query db (:db/id %))) job-id tasks))))
+    (into #{} (mapcat #(first (d/q query db job-id (:db/id %))) tasks))))
 
 (defn sort-tasks-by-phase [db tasks]
   (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
@@ -90,9 +90,11 @@
        (first)))
 
 (defn job-candidate-seq [job-seq last-offered]
-  (->> (cycle job-seq)
-       (drop (inc (.indexOf job-seq last-offered)))
-       (take (count job-seq))))
+  (if (nil? last-offered)
+    job-seq
+    (->> (cycle job-seq)
+         (drop (inc (.indexOf job-seq last-offered)))
+         (take (count job-seq)))))
 
 (defmethod extensions/mark-peer-born Datomic
   [log place]
@@ -116,8 +118,8 @@
   (let [db (d/db (:conn log))
         job-seq (job-candidate-seq (all-active-jobs-ids db)
                                    (last-offered-job db))
-        candidates (map (partial next-essential-task db) job-seq)]
-    (first (filter identity candidates))))
+        candidates (mapcat (partial next-essential-task db) job-seq)]
+    (filter identity candidates)))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack
