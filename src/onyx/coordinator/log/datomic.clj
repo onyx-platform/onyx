@@ -144,6 +144,7 @@
                                    (last-offered-job db))
         inactive-candidates (mapcat (partial next-inactive-task db) job-seq)
         active-candidates (mapcat (partial next-active-task db) job-seq)]
+    
     (concat (filter identity inactive-candidates)
             (filter identity active-candidates))))
 
@@ -178,7 +179,8 @@
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
-  (let [tx [[:onyx.fn/offer-task (:db/id task) peer nodes]]]
+  (let [tx [[:onyx.fn/offer-task (:db/id task)
+             (:task/consumption task) peer nodes]]]
     @(d/transact (:conn log) tx)))
 
 (defmethod extensions/ack Datomic

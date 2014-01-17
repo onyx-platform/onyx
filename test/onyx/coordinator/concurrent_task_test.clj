@@ -68,7 +68,7 @@
           (testing "No peers are idle"
             (let [query '[:find (count ?peer) :where
                           [?peer :peer/status :idle]]
-                  result (ffirst (d/q query db))]
+                  result (or (ffirst (d/q query db)) 0)]
               (is (zero? result)))))))
     {:eviction-delay 50000}))
 

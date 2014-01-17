@@ -65,7 +65,7 @@
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/offer-task
   :db/fn #db/fn {:lang "clojure"
-                 :params [db task peer-place nodes]
+                 :params [db task consumption peer-place nodes]
                  :code (let [peer-query '[:find ?p :in $ ?place ?task :where
                                           [?p :node/peer ?place]
                                           [?p :peer/status :idle]
@@ -76,7 +76,10 @@
                              task-result (q task-query db task)
                              peer-datom (ffirst peer-result)
                              task-datom (ffirst task-result)]
-                         (if (and peer-datom (not task-datom))
+                         (if (or (and (= consumption :sequential)
+                                      (and peer-datom (not task-datom)))
+                                 (and (= consumption :concurrent)
+                                      peer-datom))
                            [{:db/id peer-datom
                              :peer/status :acking
                              :peer/task task
