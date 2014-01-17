@@ -144,8 +144,9 @@
                                    (last-offered-job db))
         inactive-candidates (mapcat (partial next-inactive-task db) job-seq)
         active-candidates (mapcat (partial next-active-task db) job-seq)]
-    (or (filter identity inactive-candidates)
-        (filter identity active-candidates))))
+    (or (seq (filter identity inactive-candidates))
+        (seq (filter identity active-candidates))
+        [])))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack
