@@ -69,7 +69,14 @@
             (let [query '[:find (count ?peer) :where
                           [?peer :peer/status :idle]]
                   result (or (ffirst (d/q query db)) 0)]
-              (is (zero? result)))))))
+              (is (zero? result))))
+
+          (testing ":inc has two active peers"
+            (let [query '[:find (count ?peer) :where
+                          [?peer :peer/task ?task]
+                          [?task :task/name :inc]]
+                  result (ffirst (d/q query db))]
+              (is (= result 2)))))))
     {:eviction-delay 50000}))
 
 (run-tests 'onyx.coordinator.concurrent-task-test)
