@@ -10,7 +10,8 @@
   {:name (:onyx/name element)
    :ingress-queues (:hornetq/queue-name element)
    :egress-queues (planning/egress-queues-to-children children)
-   :phase phase})
+   :phase phase
+   :consumption (:onyx/consumption element)})
 
 (defmethod extensions/create-io-task
   {:onyx/type :queue
@@ -20,7 +21,8 @@
   {:name (:onyx/name element)
    :ingress-queues (:hornetq/queue-name element)
    :egress-queues {}
-   :phase phase})
+   :phase phase
+   :consumption (:onyx/consumption element)})
 
 (defmethod extensions/cap-queue :hornetq
   [queue task] true)

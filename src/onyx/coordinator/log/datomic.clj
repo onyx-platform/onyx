@@ -46,6 +46,7 @@
   {:db/id (d/tempid :onyx/log)
    :task/name (:name task)
    :task/phase (:phase task)
+   :task/consumption (:consumption task)
    :task/complete? false
    :task/ingress-queues (:ingress-queues task)
    :task/egress-queues (or (vals (:egress-queues task)) [])})
@@ -56,20 +57,43 @@
                 [?task :task/complete? false]]]
     (d/q query db job-id)))
 
+(defn find-incomplete-concurrent-tasks [db job-id]
+  (let [query '[:find ?task :in $ ?job :where
+                [?job :job/task ?task]
+                [?task :task/consumption :concurrent]
+                [?task :task/complete? false]]]
+    (d/q query db job-id)))
+
 (defn find-active-task-ids [db job-id tasks]
   (let [query '[:find ?task :in $ ?job ?task :where
                 [?job :job/task ?task]
                 [?peer :peer/task ?task]]]
     (into #{} (mapcat #(first (d/q query db job-id (:db/id %))) tasks))))
 
+(defn peer-count [db task]
+  (let [query '[:find (count ?peer) :in $ ?task :where
+                [?peer :peer/task ?task]]]
+    (or (ffirst (d/q query db (:db/id task))) 0)))
+
 (defn sort-tasks-by-phase [db tasks]
   (sort-by :task/phase (map (fn [[t]] (d/entity db t)) tasks)))
 
-(defn next-essential-task [db job-id]
+(defn sort-tasks-by-peer-count [db tasks]
+  (let [task-ents (map (fn [[t]] (d/entity db t)) tasks)
+        task-peer-pair (map #(let [peers (peer-count db %)]
+                               [% peers])
+                            task-ents)]
+    (map first (sort-by second task-peer-pair))))
+
+(defn next-inactive-task [db job-id]
   (let [incomplete-tasks (find-incomplete-tasks db job-id)
         sorted-tasks (sort-tasks-by-phase db incomplete-tasks)
         active-tasks (find-active-task-ids db job-id sorted-tasks)]
     (filter (fn [t] (not (contains? active-tasks (:db/id t)))) sorted-tasks)))
+
+(defn next-active-task [db job-id]
+  (let [incomplete-tasks (find-incomplete-concurrent-tasks db job-id)]
+    (sort-tasks-by-peer-count db incomplete-tasks)))
 
 (defn all-active-jobs-ids [db]
   (->> db
@@ -118,8 +142,10 @@
   (let [db (d/db (:conn log))
         job-seq (job-candidate-seq (all-active-jobs-ids db)
                                    (last-offered-job db))
-        candidates (mapcat (partial next-essential-task db) job-seq)]
-    (filter identity candidates)))
+        inactive-candidates (mapcat (partial next-inactive-task db) job-seq)
+        active-candidates (mapcat (partial next-active-task db) job-seq)]
+    (or (filter identity inactive-candidates)
+        (filter identity active-candidates))))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack

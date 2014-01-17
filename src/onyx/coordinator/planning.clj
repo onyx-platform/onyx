@@ -40,7 +40,8 @@
     {:name (:onyx/name element)
      :ingress-queues (get (:egress-queues parent) task-name)
      :egress-queues (egress-queues-to-children children)
-     :phase phase}))
+     :phase phase
+     :consumption (:onyx/consumption element)}))
 
 (defn children [tree]
   (if (map? tree)

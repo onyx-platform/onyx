@@ -154,6 +154,12 @@
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
+  :db/ident :task/consumption
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
   :db/ident :task/complete?
   :db/valueType :db.type/boolean
   :db/cardinality :db.cardinality/one

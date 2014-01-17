@@ -169,13 +169,16 @@
     (fn [coordinator sync log]
       (let [catalog [{:onyx/name :in
                       :onyx/direction :input
+                      :onyx/consumption :sequential
                       :onyx/type :queue
                       :onyx/medium :hornetq
                       :hornetq/queue-name "in-queue"}
                      {:onyx/name :inc
-                      :onyx/type :transformer}
+                      :onyx/type :transformer
+                      :onyx/consumption :sequential}
                      {:onyx/name :out
                       :onyx/direction :output
+                      :onyx/consumption :sequential
                       :onyx/type :queue
                       :onyx/medium :hornetq
                       :hornetq/queue-name "out-queue"}]
@@ -372,13 +375,16 @@
     (fn [coordinator sync log]
       (let [catalog [{:onyx/name :in
                       :onyx/direction :input
+                      :onyx/consumption :sequential
                       :onyx/type :queue
                       :onyx/medium :hornetq
                       :hornetq/queue-name "in-queue"}
                      {:onyx/name :inc
-                      :onyx/type :transformer}
+                      :onyx/type :transformer
+                      :onyx/consumption :sequential}
                      {:onyx/name :out
                       :onyx/direction :output
+                      :onyx/consumption :sequential
                       :onyx/type :queue
                       :onyx/medium :hornetq
                       :hornetq/queue-name "out-queue"}]

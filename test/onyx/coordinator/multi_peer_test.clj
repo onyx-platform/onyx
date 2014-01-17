@@ -9,7 +9,6 @@
             [onyx.system :as s]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
-
 (deftest plan-one-job-two-peers
   (with-system
     (fn [coordinator sync log]
@@ -165,7 +164,6 @@
 
         (doseq [_ (range n)]
           (<!! offer-ch-spy))
-
 
         (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
         (<!! offer-ch-spy)
