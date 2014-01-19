@@ -7,6 +7,7 @@
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.datomic/datomic-free "0.9.4384"]
+                 [com.datomic/simulant "0.1.6"]
                  [zookeeper-clj "0.9.1"]
                  [dire "0.5.1"]])
 
