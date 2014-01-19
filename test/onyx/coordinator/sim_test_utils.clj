@@ -3,7 +3,7 @@
             [onyx.system :as s]))
 
 (defn with-system [f & opts]
-  (def system (s/onyx-system (apply merge {:sync :zookeeper :queue :hornetq :eviction-delay 5000} opts)))
+  (def system (s/onyx-system (apply merge {:sync :zookeeper :queue :hornetq :eviction-delay 4000} opts)))
   (let [components (alter-var-root #'system component/start)
         coordinator (:coordinator components)
         sync (:sync components)
