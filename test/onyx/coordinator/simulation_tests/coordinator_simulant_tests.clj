@@ -42,7 +42,7 @@
 
 (def coordinator (:coordinator components))
 
-(def sync (:sync components))
+(def sync-storage (:sync components))
 
 (def log (:log components))
 
@@ -95,11 +95,11 @@
   (let [model (-> test :model/_tests u/solo)]
     
     (doseq [peer (:test/agents test)]
-      (let [peer-node (extensions/create sync :peer)
-            payload-node (extensions/create sync :payload)
+      (let [peer-node (extensions/create sync-storage :peer)
+            payload-node (extensions/create sync-storage :payload)
             sync-watch (chan 1)]
-        (extensions/write-place sync peer-node payload-node)
-        (extensions/on-change sync payload-node #(>!! sync-watch %))
+        (extensions/write-place sync-storage peer-node payload-node)
+        (extensions/on-change sync-storage payload-node #(>!! sync-watch %))
         (>!! (:born-peer-ch-head coordinator) peer-node)))
     
     (-> @(d/transact sim-conn (sim/construct-basic-sim test sim))

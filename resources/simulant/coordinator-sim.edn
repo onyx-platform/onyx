@@ -10,7 +10,7 @@
  
  :test
  [[{:db/id #db/id [:db.part/db]
-    :db/ident :test.type/batch}
+    :db/ident :test.type/coordinator}
    
    {:db/id #db/id [:db.part/db]
     :db/ident :agent.type/peer}
