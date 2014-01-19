@@ -3,7 +3,7 @@
             [clojure.core.async :refer [chan <!! >!! tap]]
             [com.stuartsierra.component :as component]
             [simulant.sim :as sim]
-            [simulant.util :refer [tx-ent e hours->msec getx]]
+            [simulant.util :refer [tx-ent e hours->msec getx] :as u]
             [datomic.api :as d]
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
@@ -74,7 +74,7 @@
 (defn generate-peer-executions [test peer peers]
   (let [model (-> test :model/_tests first)
         limit (:test/duration test)]
-    (->> (reductions + (repeatedly (constantly 1)))
+    (->> (range 0 limit 5000)
          (take-while (fn [t] (< t limit)))
          (mapcat #(generate-execution test peer peers %)))))
 
@@ -119,7 +119,7 @@
 (def coordinator-test
   (sim/create-test sim-conn coordinator-model
                    {:db/id (d/tempid :test)
-                    :test/duration (hours->msec 4)}))
+                    :test/duration (hours->msec 1)}))
 
 (alter-var-root #'system component/stop)
 
