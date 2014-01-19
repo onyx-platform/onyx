@@ -1,0 +1,20 @@
+{:model
+ [[{:db/id #db/id [:db.part/db]
+    :db/ident :model.type/coordinator}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/peer-count
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}]]
+ 
+ :test
+ [[{:db/id #db/id [:db.part/db]
+    :db/ident :test.type/batch}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/peer}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/execute-task}]]}
+

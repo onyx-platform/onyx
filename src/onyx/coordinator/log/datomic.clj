@@ -4,9 +4,12 @@
             [onyx.util :as u]
             [datomic.api :as d]))
 
-(defn log-schema []
-  (let [resource (clojure.java.io/resource "datomic-schema.edn")]
+(defn load-schema [file]
+  (let [resource (clojure.java.io/resource file)]
     (read-string (slurp resource))))
+
+(defn log-schema []
+  (load-schema "datomic-schema.edn"))
 
 (defn schema-set? [conn]
   (seq (d/q '[:find ?e :where [?e :db/ident :node/peer]] (d/db conn))))
