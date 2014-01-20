@@ -1,6 +1,6 @@
 {:model
  [[{:db/id #db/id [:db.part/db]
-    :db/ident :model.type/coordinator}
+    :db/ident :model.type/stubbed-peer}
    
    {:db/id #db/id [:db.part/db]
     :db/ident :model/peer-count
@@ -10,7 +10,7 @@
  
  :test
  [[{:db/id #db/id [:db.part/db]
-    :db/ident :test.type/coordinator}
+    :db/ident :test.type/stubbed-peer}
 
    {:db/id #db/id [:db.part/db]
     :db/ident :agent.type/single-job-submitter}
