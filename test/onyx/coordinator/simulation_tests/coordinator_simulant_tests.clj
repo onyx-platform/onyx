@@ -48,7 +48,7 @@
   [conn model test]
   (u/require-keys test :db/id :test/duration)
   (-> @(d/transact conn [(assoc test
-                           :test/type :test.type/coordinator
+                           :test/type :test.type/stubbed-peer
                            :model/_tests (e model))])
       (tx-ent (:db/id test))))
 
@@ -81,14 +81,14 @@
    (fn [peer] (generate-peer-executions test peer peers))
    peers))
 
-(defmethod sim/create-test :model.type/coordinator
+(defmethod sim/create-test :model.type/stubbed-peer
   [conn model test]
   (let [test (create-test conn model test)
         peers (create-peers conn test)]
     (u/transact-batch conn (generate-all-executions test peers) 1000)
     (d/entity (d/db conn) (e test))))
 
-(defmethod sim/create-sim :test.type/coordinator
+(defmethod sim/create-sim :test.type/stubbed-peer
   [sim-conn test sim]
   (let [model (-> test :model/_tests u/solo)]
     
@@ -110,7 +110,7 @@
 
 (def coordinator-model-data
   [{:db/id model-id
-    :model/type :model.type/coordinator
+    :model/type :model.type/stubbed-peer
     :model/peer-count 10}])
 
 (def coordinator-model
