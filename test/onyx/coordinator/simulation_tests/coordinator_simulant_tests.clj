@@ -1,6 +1,7 @@
 (ns onyx.coordinator.coordinator-simulant-tests
   (:require [clojure.test :refer :all]
             [clojure.core.async :refer [chan <!! >!! tap]]
+            [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [simulant.sim :as sim]
             [simulant.util :refer [tx-ent e hours->msec getx] :as u]
@@ -57,20 +58,20 @@
         ids (repeatedly (:model/peer-count model) #(d/tempid :test))
         txresult (->> ids
                       (map (fn [id] {:db/id id
-                                    :agent/type :agent.type/peer
+                                    :agent/type :agent.type/stable-peer
                                     :test/_agents (e test)}))
                       (d/transact conn))]
     (u/tx-entids @txresult ids)))
 
 (defn generate-execution [test peer peers at-time]
-  (let [model (-> test :model/_tests first)]
+  (let [model (-> test :model/_tests u/solo)]
     [[{:db/id (d/tempid :test)
        :agent/_actions (e peer)
        :action/atTime at-time
        :action/type :action.type/execute-task}]]))
 
 (defn generate-peer-executions [test peer peers]
-  (let [model (-> test :model/_tests first)
+  (let [model (-> test :model/_tests u/solo)
         limit (:test/duration test)]
     (->> (range 0 limit 5000)
          (take-while (fn [t] (< t limit)))

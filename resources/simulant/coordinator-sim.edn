@@ -6,6 +6,30 @@
     :db/ident :model/peer-count
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-time-to-ack-task
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-task-completion-time
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-peer-failures
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-time-to-peer-recovery
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}]]
  
  :test
