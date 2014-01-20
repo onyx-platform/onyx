@@ -105,6 +105,9 @@
     (-> @(d/transact sim-conn (sim/construct-basic-sim test sim))
         (tx-ent (:db/id sim)))))
 
+(defmethod sim/perform-action :action.type/execute-task
+  [action process])
+
 (def model-id (d/tempid :model))
 
 (def coordinator-model-data
@@ -120,6 +123,33 @@
   (sim/create-test sim-conn coordinator-model
                    {:db/id (d/tempid :test)
                     :test/duration (hours->msec 1)}))
+
+(def coordinator-sim
+  (sim/create-sim sim-conn coordinator-test
+                  {:db/id (d/tempid :sim)
+                   :sim/systemURI (str "datomic:mem://" (d/squuid))
+                   :sim/processCount 10}))
+
+(defn assoc-codebase-tx [entities]
+  (let [codebase (u/gen-codebase)
+        cid (:db/id codebase)]
+    (cons
+     codebase
+     (mapv #(assoc {:db/id (:db/id %)} :source/codebase cid) entities))))
+
+@(d/transact sim-conn (assoc-codebase-tx [coordinator-test coordinator-sim]))
+
+(def action-log (sim/create-action-log sim-conn coordinator-sim))
+
+(def sim-clock (sim/create-fixed-clock sim-conn coordinator-sim {:clock/multiplier 960}))
+
+(def pruns
+  (->> #(sim/run-sim-process sim-uri (:db/id coordinator-sim))
+       (repeatedly (:sim/processCount coordinator-sim))
+       (into [])))
+
+(time
+ (mapv (fn [prun] @(:runner prun)) pruns))
 
 (alter-var-root #'system component/stop)
 
