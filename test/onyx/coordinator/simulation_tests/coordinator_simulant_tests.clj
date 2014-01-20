@@ -30,10 +30,8 @@
 
 (def sim-conn (reset-conn sim-uri))
 
-;; Simulant generic schema
 (load-schema sim-conn "simulant/schema.edn")
 
-;; Simulant schema for coordinator sim
 (load-schema sim-conn "simulant/coordinator-sim.edn")
 
 (def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 500000}))

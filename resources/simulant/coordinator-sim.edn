@@ -11,10 +11,40 @@
  :test
  [[{:db/id #db/id [:db.part/db]
     :db/ident :test.type/coordinator}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/single-job-submitter}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/up-front-job-submitter}
    
    {:db/id #db/id [:db.part/db]
-    :db/ident :agent.type/peer}
+    :db/ident :agent.type/interval-job-submitter}
    
    {:db/id #db/id [:db.part/db]
-    :db/ident :action.type/execute-task}]]}
+    :db/ident :agent.type/burst-job-submitter}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/stable-peer}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/realistic-peer}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/flaky-peer}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/register}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/unregister}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/read-payload}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/ack-task}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/complete-task}]]}
 
