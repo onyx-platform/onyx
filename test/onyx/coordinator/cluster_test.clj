@@ -43,13 +43,17 @@
 
 (def workflow {:in {:inc :out}})
 
-(doseq [_ (range 10)]
-  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
-
-(doseq [_ (range 10)]
-  (<!! offer-spy))
+(def n-jobs 10)
 
 (def n-peers 10)
+
+(def tasks-per-job 3)
+
+(doseq [_ (range n-jobs)]
+  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
+
+(doseq [_ (range n-jobs)]
+  (<!! offer-spy))
 
 (def peers (take n-peers (repeatedly (fn [] (extensions/create sync-storage :peer)))))
 
@@ -82,12 +86,12 @@
 
 (start-peers! peers)
 
-(testing "All 30 tasks complete"
+(testing "All tasks complete"
   (loop []
     (let [db (:db-after (.take tx-queue))
           query '[:find (count ?task) :where [?task :task/complete? true]]
           result (ffirst (d/q query db))]
-      (when-not (= result 30)
+      (when-not (= result (* n-jobs tasks-per-job))
         (recur)))))
 
 (let [db (d/db (:conn log))]
