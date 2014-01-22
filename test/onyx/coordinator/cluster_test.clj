@@ -43,7 +43,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 5)
+(def n-jobs 15)
 
 (def n-peers 10)
 
@@ -111,7 +111,26 @@
           result (map second (d/q query (d/history result-db)))]
       (is (every? (partial = 1) result)))))
 
-(alter-var-root #'system component/stop)
+(deftest peer-liveness
+  (testing "No peers got 0 tasks"
+    (let [query '[:find ?peer :where
+                  [?peer :peer/task]]
+          result (map first (d/q query (d/history result-db)))]
+      (is (= (count result) n-peers)))))
+
+(deftest peer-fairness
+  (testing "All peers got a roughly even number of tasks assigned"
+    (let [query '[:find ?peer (count ?task) :where
+                  [?peer :peer/task ?task]]
+          result (map second (d/q query (d/history result-db)))
+          mean (/ (* n-jobs tasks-per-job) n-peers)
+          confidence 0.5]
+      (is (every?
+           #(and (<= (- mean (* mean confidence)) %)
+                 (>= (+ mean (* mean confidence)) %))
+           result)))))
 
 (run-tests 'onyx.coordinator.cluster-test)
+
+(alter-var-root #'system component/stop)
 
