@@ -18,6 +18,8 @@
 
 (def log (:log components))
 
+(def tx-queue (d/tx-report-queue (:conn log)))
+
 (def offer-spy (chan 1000))
 
 (tap (:offer-mult coordinator) offer-spy)
@@ -64,7 +66,6 @@
 
             (loop [payload-node payload]
               (<! sync-spy)
-              (prn peer)
 
               (let [nodes (:nodes (extensions/read-place sync-storage payload-node))]
                 (extensions/on-change sync-storage (:status nodes) #(go (>! status-spy %)))
@@ -81,15 +82,15 @@
 
 (start-peers! peers)
 
-(testing "It must complete in under 10 seconds"
-  (Thread/sleep 10000))
+(testing "All 30 tasks complete"
+  (loop []
+    (let [db (:db-after (.take tx-queue))
+          query '[:find (count ?task) :where [?task :task/complete? true]]
+          result (ffirst (d/q query db))]
+      (when-not (= result 30)
+        (recur)))))
 
 (let [db (d/db (:conn log))]
-  (testing "All 30 tasks completed"
-    (let [query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (is (= result 30))))
-
   (testing "No tasks are left incomplete"
     (let [query '[:find (count ?task) :where [?task :task/complete? false]]
           result (ffirst (d/q query db))]
