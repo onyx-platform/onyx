@@ -30,6 +30,24 @@
     :db/ident :model/mean-time-to-peer-recovery
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :node/peer
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :node/payload
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :peer/active?
+    :db/valueType :db.type/boolean
+    :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}]]
  
  :test
@@ -62,9 +80,6 @@
    
    {:db/id #db/id [:db.part/db]
     :db/ident :action.type/unregister}
-   
-   {:db/id #db/id [:db.part/db]
-    :db/ident :action.type/read-payload}
 
    {:db/id #db/id [:db.part/db]
     :db/ident :action.type/ack-task}

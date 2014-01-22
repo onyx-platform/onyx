@@ -1,6 +1,6 @@
 (ns onyx.coordinator.coordinator-simulant-tests
   (:require [clojure.test :refer :all]
-            [clojure.core.async :refer [chan <!! >!! tap]]
+            [clojure.core.async :refer [chan <!! >!! <! >! tap go]]
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [simulant.sim :as sim]
@@ -10,9 +10,10 @@
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]))
 
+(defn minutes->msec [m]
+  (long (* m 60 1000)))
+
 (defn reset-conn
-  "Reset connection to a scratch database. Use memory database if no
-   URL passed in."
   ([]
      (reset-conn (str "datomic:mem://" (d/squuid))))
   ([uri]
@@ -45,6 +46,67 @@
 
 (def log (:log components))
 
+(def offer-spy (chan 1000))
+
+(tap (:offer-mult coordinator) offer-spy)
+
+(def catalog
+  [{:onyx/name :in
+    :onyx/direction :input
+    :onyx/consumption :sequential
+    :onyx/type :queue
+    :onyx/medium :hornetq
+    :hornetq/queue-name "in-queue"}
+   {:onyx/name :inc
+    :onyx/type :transformer
+    :onyx/consumption :sequential}
+   {:onyx/name :out
+    :onyx/direction :output
+    :onyx/consumption :sequential
+    :onyx/type :queue
+    :onyx/medium :hornetq
+    :hornetq/queue-name "out-queue"}])
+
+(def workflow {:in {:inc :out}})
+
+(doseq [_ (range 10)]
+  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
+
+(doseq [_ (range 10)]
+  (<!! offer-spy))
+
+(def n-peers 10)
+
+(def peers (take n-peers (repeatedly (fn [] (extensions/create sync-storage :peer)))))
+
+(defn start-peers! [peers]
+  (doseq [peer peers]
+    (go (try
+          (let [payload (extensions/create sync-storage :payload)
+                sync-spy (chan 1)
+                status-spy (chan 1)]
+            (extensions/write-place sync-storage peer payload)
+            (extensions/on-change sync-storage payload #(go (>! sync-spy %)))
+         
+            (>! (:born-peer-ch-head coordinator) peer)
+
+            (loop [payload-node payload]
+              (<! sync-spy)
+              (prn peer)
+
+              (let [nodes (:nodes (extensions/read-place sync-storage payload-node))]
+                (extensions/on-change sync-storage (:status nodes) #(go (>! status-spy %)))
+                (extensions/touch-place sync-storage (:ack nodes))
+                (<! status-spy)
+
+                (let [next-payload (extensions/create sync-storage :payload)]
+                  (extensions/write-place sync-storage peer next-payload)
+                  (extensions/on-change sync-storage next-payload #(go (>! sync-spy %)))
+                  (extensions/touch-place sync-storage (:completion nodes))
+
+                  (recur next-payload)))))
+          (catch Exception e (prn e))))))
+
 (defn create-test
   [conn model test]
   (u/require-keys test :db/id :test/duration)
@@ -63,24 +125,13 @@
                       (d/transact conn))]
     (u/tx-entids @txresult ids)))
 
-(defn generate-execution [test peer peers at-time]
-  (let [model (-> test :model/_tests u/solo)]
-    [[{:db/id (d/tempid :test)
-       :agent/_actions (e peer)
-       :action/atTime at-time
-       :action/type :action.type/execute-task}]]))
-
-(defn generate-peer-executions [test peer peers]
+(defn generate-peer-executions [test peer]
   (let [model (-> test :model/_tests u/solo)
         limit (:test/duration test)]
-    (->> (range 0 limit 5000)
-         (take-while (fn [t] (< t limit)))
-         (mapcat #(generate-execution test peer peers %)))))
+    []))
 
 (defn generate-all-executions [test peers]
-  (mapcat
-   (fn [peer] (generate-peer-executions test peer peers))
-   peers))
+  (mapcat (partial generate-peer-executions test) peers))
 
 (defmethod sim/create-test :model.type/stubbed-peer
   [conn model test]
@@ -92,20 +143,8 @@
 (defmethod sim/create-sim :test.type/stubbed-peer
   [sim-conn test sim]
   (let [model (-> test :model/_tests u/solo)]
-    
-    (doseq [peer (:test/agents test)]
-      (let [peer-node (extensions/create sync-storage :peer)
-            payload-node (extensions/create sync-storage :payload)
-            sync-watch (chan 1)]
-        (extensions/write-place sync-storage peer-node payload-node)
-        (extensions/on-change sync-storage payload-node #(>!! sync-watch %))
-        (>!! (:born-peer-ch-head coordinator) peer-node)))
-    
     (-> @(d/transact sim-conn (sim/construct-basic-sim test sim))
         (tx-ent (:db/id sim)))))
-
-(defmethod sim/perform-action :action.type/execute-task
-  [action process])
 
 (def model-id (d/tempid :model))
 
@@ -129,18 +168,9 @@
                    :sim/systemURI (str "datomic:mem://" (d/squuid))
                    :sim/processCount 10}))
 
-(defn assoc-codebase-tx [entities]
-  (let [codebase (u/gen-codebase)
-        cid (:db/id codebase)]
-    (cons
-     codebase
-     (mapv #(assoc {:db/id (:db/id %)} :source/codebase cid) entities))))
+(def sim-clock (sim/create-fixed-clock sim-conn coordinator-sim {:clock/multiplier 10000}))
 
-@(d/transact sim-conn (assoc-codebase-tx [coordinator-test coordinator-sim]))
-
-(def action-log (sim/create-action-log sim-conn coordinator-sim))
-
-(def sim-clock (sim/create-fixed-clock sim-conn coordinator-sim {:clock/multiplier 960}))
+(start-peers! peers)
 
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id coordinator-sim))
@@ -149,6 +179,20 @@
 
 (time
  (mapv (fn [prun] @(:runner prun)) pruns))
+
+(testing "It must complete in under 10 seconds"
+  (Thread/sleep 10000))
+
+(let [db (d/db (:conn log))]
+  (testing "All 30 tasks completed"
+    (let [query '[:find (count ?task) :where [?task :task/complete? true]]
+          result (ffirst (d/q query db))]
+      (is (= result 30))))
+
+  (testing "No tasks are left incomplete"
+    (let [query '[:find (count ?task) :where [?task :task/complete? false]]
+          result (ffirst (d/q query db))]
+      (is (nil? result)))))
 
 (alter-var-root #'system component/stop)
 
