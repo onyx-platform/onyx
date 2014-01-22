@@ -130,6 +130,15 @@
                  (>= (+ mean (* mean confidence)) %))
            result)))))
 
+#_(deftest concurrency-liveness
+  (testing ">= 25% of all concurrency tasks got > 1 peer at some point"
+    (let [query '[:find ?task (count ?peer) :where
+                  [?task :task/consumption :concurrent]
+                  [?peer :peer/task ?task]]
+          result (map second (d/q query (d/history result-db)))]
+      (is (>= (count (filter (partial < 1) result))
+              (/ (* n-jobs tasks-per-job) 0.25))))))
+
 (run-tests 'onyx.coordinator.cluster-test)
 
 (alter-var-root #'system component/stop)
