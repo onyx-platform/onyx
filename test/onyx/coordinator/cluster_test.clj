@@ -43,7 +43,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 10)
+(def n-jobs 5)
 
 (def n-peers 10)
 
@@ -91,14 +91,27 @@
     (let [db (:db-after (.take tx-queue))
           query '[:find (count ?task) :where [?task :task/complete? true]]
           result (ffirst (d/q query db))]
+      (prn result)
       (when-not (= result (* n-jobs tasks-per-job))
         (recur)))))
 
-(let [db (d/db (:conn log))]
+(def result-db (d/db (:conn log)))
+
+(deftest task-completeness
   (testing "No tasks are left incomplete"
     (let [query '[:find (count ?task) :where [?task :task/complete? false]]
-          result (ffirst (d/q query db))]
+          result (ffirst (d/q query result-db))]
       (is (nil? result)))))
 
+(deftest task-safety
+  (testing "No sequential task ever had more than 1 peer"
+    (let [query '[:find ?task (count ?peer) :where
+                  [?task :task/consumption :sequential]
+                  [?peer :peer/task ?task]]
+          result (map second (d/q query (d/history result-db)))]
+      (is (every? (partial = 1) result)))))
+
 (alter-var-root #'system component/stop)
+
+(run-tests 'onyx.coordinator.cluster-test)
 
