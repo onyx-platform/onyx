@@ -9,6 +9,7 @@
             [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
+
 (defn start-peers! [peers coordinator sync-storage]
   (doseq [peer peers]
     (go (try

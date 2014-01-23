@@ -1,0 +1,35 @@
+{:model
+ [[{:db/id #db/id [:db.part/db]
+    :db/ident :model.type/fixed-cluster}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/n-peers
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-ack-time
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+   
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/mean-completion-time
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}]]
+ 
+ :test
+ [[{:db/id #db/id [:db.part/db]
+    :db/ident :test.type/fixed-cluster}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :agent.type/executer}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/register-peer}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/unregister-peer}]]}
+
