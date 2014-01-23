@@ -156,5 +156,17 @@
     (testing "All peers got a roughly even number of tasks assigned"
       (peer-fairness result-db n-peers n-jobs tasks-per-job))))
 
+(deftest big-cluster-few-jobs
+  (let [n-jobs 10
+        n-peers 200
+        tasks-per-job 3
+        result-db (run-cluster n-jobs n-peers)]
+    
+    (testing "No tasks are left incomplete"
+      (task-completeness result-db))
+
+    (testing "No sequential task ever had more than 1 peer"
+      (task-safety result-db))))
+
 (run-tests 'onyx.coordinator.cluster-test)
 
