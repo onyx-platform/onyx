@@ -6,58 +6,10 @@
             [datomic.api :as d]
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
-            [onyx.coordinator.log.datomic :as datomic]))
+            [onyx.coordinator.log.datomic :as datomic]
+            [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
-(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 500000}))
-
-(def components (alter-var-root #'system component/start))
-
-(def coordinator (:coordinator components))
-
-(def sync-storage (:sync components))
-
-(def log (:log components))
-
-(def tx-queue (d/tx-report-queue (:conn log)))
-
-(def offer-spy (chan 1000))
-
-(tap (:offer-mult coordinator) offer-spy)
-
-(def catalog
-  [{:onyx/name :in
-    :onyx/direction :input
-    :onyx/consumption :sequential
-    :onyx/type :queue
-    :onyx/medium :hornetq
-    :hornetq/queue-name "in-queue"}
-   {:onyx/name :inc
-    :onyx/type :transformer
-    :onyx/consumption :sequential}
-   {:onyx/name :out
-    :onyx/direction :output
-    :onyx/consumption :sequential
-    :onyx/type :queue
-    :onyx/medium :hornetq
-    :hornetq/queue-name "out-queue"}])
-
-(def workflow {:in {:inc :out}})
-
-(def n-jobs 15)
-
-(def n-peers 10)
-
-(def tasks-per-job 3)
-
-(doseq [_ (range n-jobs)]
-  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
-
-(doseq [_ (range n-jobs)]
-  (<!! offer-spy))
-
-(def peers (take n-peers (repeatedly (fn [] (extensions/create sync-storage :peer)))))
-
-(defn start-peers! [peers]
+(defn start-peers! [peers coordinator sync-storage]
   (doseq [peer peers]
     (go (try
           (let [payload (extensions/create sync-storage :payload)
@@ -84,62 +36,107 @@
                   (recur next-payload)))))
           (catch Exception e (prn e))))))
 
-(start-peers! peers)
+(defn run-cluster [n-jobs n-peers]
+  (with-system
+    (fn [coordinator sync-storage log]
+      (let [tx-queue (d/tx-report-queue (:conn log))
+            offer-spy (chan 1000)
 
-(testing "All tasks complete"
-  (loop []
-    (let [db (:db-after (.take tx-queue))
-          query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (prn result)
-      (when-not (= result (* n-jobs tasks-per-job))
-        (recur)))))
+            catalog [{:onyx/name :in
+                      :onyx/direction :input
+                      :onyx/consumption :sequential
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "in-queue"}
+                     {:onyx/name :inc
+                      :onyx/type :transformer
+                      :onyx/consumption :sequential}
+                     {:onyx/name :out
+                      :onyx/direction :output
+                      :onyx/consumption :sequential
+                      :onyx/type :queue
+                      :onyx/medium :hornetq
+                      :hornetq/queue-name "out-queue"}]
+            workflow {:in {:inc :out}}
+            tasks-per-job 3]
 
-(def result-db (d/db (:conn log)))
+        (tap (:offer-mult coordinator) offer-spy)
 
-(deftest task-completeness
-  (testing "No tasks are left incomplete"
-    (let [query '[:find (count ?task) :where [?task :task/complete? false]]
-          result (ffirst (d/q query result-db))]
-      (is (nil? result)))))
+        (doseq [_ (range n-jobs)]
+          (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
 
-(deftest task-safety
-  (testing "No sequential task ever had more than 1 peer"
-    (let [query '[:find ?task (count ?peer) :where
-                  [?task :task/consumption :sequential]
-                  [?peer :peer/task ?task]]
-          result (map second (d/q query (d/history result-db)))]
-      (is (every? (partial = 1) result)))))
+        (doseq [_ (range n-jobs)]
+          (<!! offer-spy))
 
-(deftest peer-liveness
-  (testing "No peers got 0 tasks"
-    (let [query '[:find ?peer :where
-                  [?peer :peer/task]]
-          result (map first (d/q query (d/history result-db)))]
-      (is (= (count result) n-peers)))))
+        (let [peers (take n-peers (repeatedly (fn [] (extensions/create sync-storage :peer))))]
+          (start-peers! peers coordinator sync-storage)
+          (testing "All tasks complete"
+            
+            (loop []
+              (let [db (:db-after (.take tx-queue))
+                    query '[:find (count ?task) :where [?task :task/complete? true]]
+                    result (ffirst (d/q query db))]
+                (prn result)
+                (when-not (= result (* n-jobs tasks-per-job))
+                  (recur)))))
 
-(deftest peer-fairness
-  (testing "All peers got a roughly even number of tasks assigned"
-    (let [query '[:find ?peer (count ?task) :where
-                  [?peer :peer/task ?task]]
-          result (map second (d/q query (d/history result-db)))
-          mean (/ (* n-jobs tasks-per-job) n-peers)
-          confidence 0.5]
-      (is (every?
-           #(and (<= (- mean (* mean confidence)) %)
-                 (>= (+ mean (* mean confidence)) %))
-           result)))))
+          (d/db (:conn log)))))
+    {:eviction-delay 500000}))
 
-#_(deftest concurrency-liveness
-  (testing ">= 25% of all concurrency tasks got > 1 peer at some point"
-    (let [query '[:find ?task (count ?peer) :where
-                  [?task :task/consumption :concurrent]
-                  [?peer :peer/task ?task]]
-          result (map second (d/q query (d/history result-db)))]
-      (is (>= (count (filter (partial < 1) result))
-              (/ (* n-jobs tasks-per-job) 0.25))))))
+(defn task-completeness [result-db]
+  (let [query '[:find (count ?task) :where [?task :task/complete? false]]
+        result (ffirst (d/q query result-db))]
+    (is (nil? result))))
+
+(defn task-safety [result-db]
+  (let [query '[:find ?task (count ?peer) :where
+                [?task :task/consumption :sequential]
+                [?peer :peer/task ?task]]
+        result (map second (d/q query (d/history result-db)))]
+    (is (every? (partial = 1) result))))
+
+(defn peer-liveness [result-db n-peers]
+  (let [query '[:find ?peer :where
+                [?peer :peer/task]]
+        result (map first (d/q query (d/history result-db)))]
+    (is (= (count result) n-peers))))
+
+(defn peer-fairness [result-db n-peers n-jobs tasks-per-job]
+  (let [query '[:find ?peer (count ?task) :where
+                [?peer :peer/task ?task]]
+        result (map second (d/q query (d/history result-db)))
+        mean (/ (* n-jobs tasks-per-job) n-peers)
+        confidence 0.5]
+    (is (every?
+         #(and (<= (- mean (* mean confidence)) %)
+               (>= (+ mean (* mean confidence)) %))
+         result))))
+
+(defn concurrency-liveness [result-db n-jobs tasks-per-job]
+  (let [query '[:find ?task (count ?peer) :where
+                [?task :task/consumption :concurrent]
+                [?peer :peer/task ?task]]
+        result (map second (d/q query (d/history result-db)))]
+    (is (>= (count (filter (partial < 1) result))
+            (/ (* n-jobs tasks-per-job) 0.25)))))
+
+(deftest small-even-cluster
+  (let [n-jobs 15
+        n-peers 10
+        tasks-per-job 3
+        result-db (run-cluster n-jobs n-peers)]
+    
+    (testing "No tasks are left incomplete"
+      (task-completeness result-db))
+
+    (testing "No sequential task ever had more than 1 peer"
+      (task-safety result-db))
+
+    (testing "No peers got 0 tasks"
+      (peer-liveness result-db n-peers))
+
+    (testing "All peers got a roughly even number of tasks assigned"
+      (peer-fairness result-db n-peers n-jobs tasks-per-job))))
 
 (run-tests 'onyx.coordinator.cluster-test)
-
-(alter-var-root #'system component/stop)
 
