@@ -40,7 +40,7 @@
   (with-system
     (fn [coordinator sync-storage log]
       (let [tx-queue (d/tx-report-queue (:conn log))
-            offer-spy (chan 1000)
+            offer-spy (chan 10000)
 
             catalog [{:onyx/name :in
                       :onyx/direction :input
@@ -122,6 +122,24 @@
 
 (deftest small-even-cluster
   (let [n-jobs 15
+        n-peers 10
+        tasks-per-job 3
+        result-db (run-cluster n-jobs n-peers)]
+    
+    (testing "No tasks are left incomplete"
+      (task-completeness result-db))
+
+    (testing "No sequential task ever had more than 1 peer"
+      (task-safety result-db))
+
+    (testing "No peers got 0 tasks"
+      (peer-liveness result-db n-peers))
+
+    (testing "All peers got a roughly even number of tasks assigned"
+      (peer-fairness result-db n-peers n-jobs tasks-per-job))))
+
+(deftest small-cluster-many-jobs
+  (let [n-jobs 150
         n-peers 10
         tasks-per-job 3
         result-db (run-cluster n-jobs n-peers)]

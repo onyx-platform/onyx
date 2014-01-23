@@ -5,7 +5,7 @@
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.planning :as planning]))
 
-(def ch-capacity 1000)
+(def ch-capacity 10000)
 
 (defn mark-peer-birth [log sync place death-cb]
   (extensions/on-delete sync place death-cb)
