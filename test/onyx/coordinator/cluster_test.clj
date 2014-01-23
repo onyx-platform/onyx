@@ -1,6 +1,6 @@
 (ns onyx.coordinator.cluster-test
   (:require [clojure.test :refer :all]
-            [clojure.core.async :refer [chan <!! >!! <! >! tap go]]
+            [clojure.core.async :refer [chan <!! >!! <! >! tap go timeout]]
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
@@ -21,12 +21,14 @@
             (>! (:born-peer-ch-head coordinator) peer)
 
             (loop [payload-node payload]
+              (<! (timeout (rand-nth (range 800))))
               (<! sync-spy)
 
               (let [nodes (:nodes (extensions/read-place sync-storage payload-node))]
                 (extensions/on-change sync-storage (:status nodes) #(go (>! status-spy %)))
                 (extensions/touch-place sync-storage (:ack nodes))
                 (<! status-spy)
+                (<! (timeout (rand-nth (range 1200))))
 
                 (let [next-payload (extensions/create sync-storage :payload)]
                   (extensions/write-place sync-storage peer next-payload)
@@ -169,4 +171,5 @@
       (task-safety result-db))))
 
 (run-tests 'onyx.coordinator.cluster-test)
+
 
