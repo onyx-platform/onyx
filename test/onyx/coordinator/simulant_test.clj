@@ -184,16 +184,22 @@
   (testing "All peers got a roughly even number of tasks assigned"
     (su/peer-fairness result-db n-peers n-jobs tasks-per-job)))
 
+(def insts
+  (->> (-> '[:find ?inst :where
+             [_ :peer/status _ ?tx]
+             [?tx :db/txInstant ?inst]]
+           (d/q (d/history result-db)))
+       (map first)
+       (sort)))
 
-(let [query '[:find ?inst :where
-              [_ :peer/status _ ?tx]
-              [?tx :db/txInstant ?inst]]
-      txs (sort (map first (d/q query (d/history result-db))))]
-  
-  (prn (map (fn [tx]
-              (let [db (d/as-of result-db tx)]
-                [(map first (d/q '[:find (count ?p) :where [?p :peer/status]] db)) tx]))
-            txs)))
+
+(def dt-and-peers  
+  (map (fn [tx]
+         (let [db (d/as-of result-db tx)]
+           (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
+                (map first)
+                (concat [tx]))))
+       insts))
 
 (alter-var-root #'system component/stop)
 
