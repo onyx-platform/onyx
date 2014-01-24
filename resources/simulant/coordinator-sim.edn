@@ -1,6 +1,12 @@
 {:model
  [[{:db/id #db/id [:db.part/db]
     :db/ident :model.type/fixed-cluster}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model.type/linear-cluster}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model.type/sine-cluster}
      
    {:db/id #db/id [:db.part/db]
     :db/ident :model/n-peers
