@@ -9,7 +9,9 @@
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator.sim-test-utils :as su]))
+            [onyx.coordinator.sim-test-utils :as su]
+            [incanter.core :refer [view]]
+            [incanter.charts :refer [line-chart]]))
 
 (def cluster (atom []))
 
@@ -193,13 +195,19 @@
        (sort)))
 
 
-(def dt-and-peers  
+(def dt-and-peers
   (map (fn [tx]
          (let [db (d/as-of result-db tx)]
            (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
                 (map first)
                 (concat [tx]))))
        insts))
+
+(view (line-chart
+       (map first dt-and-peers)
+       (map second dt-and-peers)
+       :x-label "Time"
+       :y-label "Peers"))
 
 (alter-var-root #'system component/stop)
 
