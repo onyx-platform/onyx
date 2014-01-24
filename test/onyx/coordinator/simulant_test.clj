@@ -70,11 +70,11 @@
 
 (def sim-uri (str "datomic:mem://" (d/squuid)))
 
-(def sim-conn (reset-conn sim-uri))
+(def sim-conn (su/reset-conn sim-uri))
 
-(load-schema sim-conn "simulant/schema.edn")
+(su/load-schema sim-conn "simulant/schema.edn")
 
-(load-schema sim-conn "simulant/coordinator-sim.edn")
+(su/load-schema sim-conn "simulant/coordinator-sim.edn")
 
 (def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 500000}))
 
@@ -107,7 +107,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 10)
+(def n-jobs 3)
 
 (def n-peers 10)
 
@@ -171,7 +171,7 @@
 
 (def result-db (d/db (:conn log)))
 
-(deftest test-small-cluster-few-jobs
+#_(deftest test-small-cluster-few-jobs
   (testing "No tasks are left incomplete"
     (su/task-completeness result-db))
 
@@ -183,6 +183,17 @@
 
   (testing "All peers got a roughly even number of tasks assigned"
     (su/peer-fairness result-db n-peers n-jobs tasks-per-job)))
+
+
+(let [query '[:find ?inst :where
+              [_ :peer/status _ ?tx]
+              [?tx :db/txInstant ?inst]]
+      txs (sort (map first (d/q query (d/history result-db))))]
+  
+  (prn (map (fn [tx]
+              (let [db (d/as-of result-db tx)]
+                [(map first (d/q '[:find (count ?p) :where [?p :peer/status]] db)) tx]))
+            txs)))
 
 (alter-var-root #'system component/stop)
 
