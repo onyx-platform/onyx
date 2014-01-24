@@ -9,7 +9,7 @@
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator.sim-test-utils :refer [with-system reset-conn load-schema]]))
+            [onyx.coordinator.sim-test-utils :as su]))
 
 (def cluster (atom []))
 
@@ -80,12 +80,53 @@
 
 (def components (alter-var-root #'system component/start))
 
+(def coordinator (:coordinator components))
+
+(def log (:log components))
+
+(def tx-queue (d/tx-report-queue (:conn log)))
+
+(def offer-spy (chan 10000))
+
+(def catalog
+  [{:onyx/name :in
+    :onyx/direction :input
+    :onyx/consumption :sequential
+    :onyx/type :queue
+    :onyx/medium :hornetq
+    :hornetq/queue-name "in-queue"}
+   {:onyx/name :inc
+    :onyx/type :transformer
+    :onyx/consumption :sequential}
+   {:onyx/name :out
+    :onyx/direction :output
+    :onyx/consumption :sequential
+    :onyx/type :queue
+    :onyx/medium :hornetq
+    :hornetq/queue-name "out-queue"}])
+
+(def workflow {:in {:inc :out}})
+
+(def n-jobs 10)
+
+(def n-peers 10)
+
+(def tasks-per-job 3)
+
+(tap (:offer-mult coordinator) offer-spy)
+
+(doseq [_ (range n-jobs)]
+  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
+
+(doseq [_ (range n-jobs)]
+  (<!! offer-spy))
+
 (def model-id (d/tempid :model))
 
 (def fixed-cluster-model-data
   [{:db/id model-id
     :model/type :model.type/fixed-cluster
-    :model/n-peers 10
+    :model/n-peers n-peers
     :model/mean-ack-time 5000
     :model/mean-completion-time 15000}])
 
@@ -117,10 +158,33 @@
                      (repeatedly (:sim/processCount fixed-cluster-sim))
                      (into []))))
 
+(testing "All tasks complete"
+  (loop []
+    (let [db (:db-after (.take tx-queue))
+          query '[:find (count ?task) :where [?task :task/complete? true]]
+          result (ffirst (d/q query db))]
+      (prn result)
+      (when-not (= result (* n-jobs tasks-per-job))
+        (recur)))))
+
 (def sim-db (d/db sim-conn))
 
-(def result-db (d/db (:conn (:log components))))
+(def result-db (d/db (:conn log)))
 
+(deftest test-small-cluster-few-jobs
+  (testing "No tasks are left incomplete"
+    (su/task-completeness result-db))
+
+  (testing "No sequential task ever had more than 1 peer"
+    (su/task-safety result-db))
+
+  (testing "No peers got 0 tasks"
+    (su/peer-liveness result-db n-peers))
+
+  (testing "All peers got a roughly even number of tasks assigned"
+    (su/peer-fairness result-db n-peers n-jobs tasks-per-job)))
 
 (alter-var-root #'system component/stop)
+
+(run-tests 'onyx.coordinator.simulant-test)
 
