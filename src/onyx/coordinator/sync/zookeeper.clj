@@ -96,7 +96,6 @@
   [sync place cb]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDataChanged)
-              (prn "Node changed " event)
               (cb event)))]
     (zk/exists (:conn sync) place :watcher f)))
 
@@ -104,7 +103,6 @@
   [sync place cb]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
-              (prn "Node deleted " event)
               (cb event)))]
     (zk/exists (:conn sync) place :watcher f)))
 

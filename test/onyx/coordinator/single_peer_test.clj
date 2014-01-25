@@ -13,8 +13,11 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
+            pulse (extensions/create sync :pulse)
             offer-ch-spy (chan 1)
             failure-ch-spy (chan 1)]
+
+        (extensions/write-place sync peer {:pulse pulse})
         
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:failure-mult coordinator) failure-ch-spy)
@@ -32,9 +35,12 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
+            pulse (extensions/create sync :pulse)
             offer-ch-spy (chan 1)
             evict-ch-spy (chan 1)
             failure-ch-spy (chan 1)]
+
+        (extensions/write-place sync peer {:pulse pulse})
         
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:evict-mult coordinator) evict-ch-spy)
@@ -42,7 +48,7 @@
         
         (>!! (:born-peer-ch-head coordinator) peer)
         (<!! offer-ch-spy)
-        (extensions/delete sync peer)
+        (extensions/delete sync pulse)
         (<!! evict-ch-spy)
 
         (testing "There are no peers"
@@ -54,11 +60,14 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer (extensions/create sync :peer)
+            pulse (extensions/create sync :pulse)
             offer-ch-spy (chan 5)
             ack-ch-spy (chan 5)
             evict-ch-spy (chan 5)
             completion-ch-spy (chan 5)
             failure-ch-spy (chan 10)]
+
+        (extensions/write-place sync peer {:pulse pulse})
         
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:ack-mult coordinator) ack-ch-spy)
@@ -75,7 +84,7 @@
             (is (= (:ch failure) :peer-birth))))
 
         (testing "Attempts to delete a non-existent peer fails"
-          (extensions/delete sync peer)
+          (extensions/delete sync pulse)
           (<!! evict-ch-spy)
 
           (testing "A failure is raised for the second callback"
@@ -244,7 +253,7 @@
 
 (defn test-task-life-cycle
   [{:keys [log sync sync-spy ack-ch-spy completion-ch-spy offer-ch-spy
-           peer-node payload-node next-payload-node task-name]}]
+           peer-node payload-node next-payload-node task-name pulse-node]}]
   (testing "The payload node is populated"
     (let [event (<!! sync-spy)]
       (is (= (:path event) payload-node))))
@@ -274,7 +283,7 @@
         (let [event (<!! ack-ch-spy)]
           (= (:path event) (:ack nodes)))))
 
-    (extensions/write-place sync peer-node next-payload-node)
+    (extensions/write-place sync peer-node {:pulse pulse-node :payload next-payload-node})
     (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
     (testing "Touching the completion node triggers the callback"
@@ -302,6 +311,7 @@
   (with-system
     (fn [coordinator sync log]
       (let [peer-node (extensions/create sync :peer)
+            pulse-node (extensions/create sync :pulse)
             
             in-payload-node (extensions/create sync :payload)
             inc-payload-node (extensions/create sync :payload)
@@ -334,7 +344,7 @@
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:completion-mult coordinator) completion-ch-spy)
 
-        (extensions/write-place sync peer-node in-payload-node)
+        (extensions/write-place sync peer-node {:pulse pulse-node :payload in-payload-node})
         (extensions/on-change sync in-payload-node #(>!! sync-spy %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node)
@@ -350,7 +360,8 @@
                           :ack-ch-spy ack-ch-spy
                           :offer-ch-spy offer-ch-spy
                           :completion-ch-spy completion-ch-spy
-                          :peer-node peer-node}]
+                          :peer-node peer-node
+                          :pulse-node pulse-node}]
           (test-task-life-cycle
            (assoc base-cycle
              :task-name :in
@@ -391,6 +402,7 @@
             workflow {:in {:inc :out}}
 
             peer-node (extensions/create sync :peer)
+            pulse-node (extensions/create sync :pulse)
             payload-node (extensions/create sync :payload)
             
             sync-spy (chan 1)
@@ -398,7 +410,7 @@
         
         (tap (:offer-mult coordinator) offer-ch-spy)
 
-        (extensions/write-place sync peer-node payload-node)
+        (extensions/write-place sync peer-node {:pulse pulse-node :payload payload-node})
         (extensions/on-change sync payload-node #(>!! sync-spy %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node)
