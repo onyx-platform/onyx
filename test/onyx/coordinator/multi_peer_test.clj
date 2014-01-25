@@ -15,6 +15,9 @@
       (let [peer-node-a (extensions/create sync :peer)
             peer-node-b (extensions/create sync :peer)
 
+            pulse-node-a (extensions/create sync :pulse)
+            pulse-node-b (extensions/create sync :pulse)
+
             payload-node-a-1 (extensions/create sync :payload)
             payload-node-b-1 (extensions/create sync :payload)
 
@@ -47,10 +50,10 @@
         (tap (:ack-mult coordinator) ack-ch-spy)
         (tap (:offer-mult coordinator) offer-ch-spy)
 
-        (extensions/write-place sync peer-node-a payload-node-a-1)
+        (extensions/write-place sync peer-node-a {:pulse pulse-node-a :payload payload-node-a-1})
         (extensions/on-change sync payload-node-a-1 #(>!! sync-spy-a %))
 
-        (extensions/write-place sync peer-node-b payload-node-b-1)
+        (extensions/write-place sync peer-node-b {:pulse pulse-node-b :payload payload-node-b-1})
         (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
 
         (>!! (:born-peer-ch-head coordinator) peer-node-a)
@@ -84,10 +87,10 @@
             (<!! status-spy)
             (<!! status-spy)
 
-            (extensions/write-place sync peer-node-a payload-node-a-2)
+            (extensions/write-place sync peer-node-a {:pulse pulse-node-a :payload payload-node-a-2})
             (extensions/on-change sync payload-node-a-2 #(>!! sync-spy-a %))
 
-            (extensions/write-place sync peer-node-b payload-node-b-2)
+            (extensions/write-place sync peer-node-b {:pulse pulse-node-b :payload payload-node-b-2})
             (extensions/on-change sync payload-node-b-2 #(>!! sync-spy-b %))
 
             (extensions/touch-place sync (:completion (:nodes payload-a)))
@@ -128,6 +131,7 @@
     (fn [coordinator sync log]
       (let [n 4
             peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
+            pulses (take n (repeatedly (fn [] (extensions/create sync :pulse))))
             payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
             sync-spies (take n (repeatedly (fn [] (chan 1))))
             
@@ -155,8 +159,8 @@
         (tap (:offer-mult coordinator) offer-ch-spy)
         (tap (:ack-mult coordinator) ack-ch-spy)
         
-        (doseq [[peer payload sync-spy] (map vector peers payloads sync-spies)]
-          (extensions/write-place sync peer payload)
+        (doseq [[peer pulse payload sync-spy] (map vector peers pulses payloads sync-spies)]
+          (extensions/write-place sync peer {:pulse pulse :payload payload})
           (extensions/on-change sync payload #(>!! sync-spy %)))
 
         (doseq [peer peers]
