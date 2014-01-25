@@ -13,6 +13,7 @@
     (let [conn (zk/connect addr)]
       (zk/create conn "/onyx" :persistent? true)
       (zk/create conn "/onyx/peers" :persistent? true)
+      (zk/create conn "/onyx/pulse" :persistent? true)
       (zk/create conn "/onyx/payloads"  :persistent? true)
       (zk/create conn "/onyx/acks" :persistent? true)
       (zk/create conn "/onyx/completions" :persistent? true)
@@ -40,6 +41,12 @@
 (defmethod extensions/create [ZooKeeper :peer]
   [sync _]
   (let [place (str "/onyx/peers/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :pulse]
+  [sync _]
+  (let [place (str "/onyx/pulse/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :ephemeral? true)
     place))
 

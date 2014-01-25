@@ -7,13 +7,12 @@
 
 (def ch-capacity 10000)
 
-(defn mark-peer-birth [log sync place death-cb]
-  (prn "$>" place)
-  (extensions/on-delete sync place death-cb)
-  (extensions/mark-peer-born log place))
+(defn mark-peer-birth [log sync peer death-cb]
+  (let [pulse (:pulse (extensions/read-place sync peer))]
+    (extensions/on-delete sync pulse death-cb)
+    (extensions/mark-peer-born log peer)))
 
 (defn mark-peer-death [log peer]
-  (prn "#>" peer)
   (extensions/mark-peer-dead log peer))
 
 (defn plan-job [log {:keys [catalog workflow]}]
@@ -35,7 +34,7 @@
   (loop [[task :as tasks] (extensions/next-tasks log)
          [peer :as peers] (extensions/idle-peers log)]
     (when (and (seq tasks) (seq peers))
-      (let [payload-node (extensions/read-place sync peer)
+      (let [payload-node (:payload (extensions/read-place sync peer))
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
             status-node (extensions/create sync :status)
@@ -58,9 +57,9 @@
 
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
   (loop []
-    (when-let [place (<!! born-tail)]
-      (when (mark-peer-birth log sync place (fn [_] (>!! dead-head place)))
-        (>!! offer-head place))
+    (when-let [peer (<!! born-tail)]
+      (when (mark-peer-birth log sync peer (fn [_] (>!! dead-head peer)))
+        (>!! offer-head peer))
       (recur))))
 
 (defn dead-peer-ch-loop [log dead-tail evict-head]
