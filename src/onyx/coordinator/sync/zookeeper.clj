@@ -87,12 +87,17 @@
 
 (defmethod extensions/on-change ZooKeeper
   [sync place cb]
-  (zk/exists (:conn sync) place :watcher cb))
+  (let [f (fn [event]
+            (when (= (:event-type event) :NodeDataChanged)
+              (prn "Node changed")
+              (cb event)))]
+    (zk/exists (:conn sync) place :watcher f)))
 
 (defmethod extensions/on-delete ZooKeeper
   [sync place cb]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
+              (prn "Node deleted")
               (cb event)))]
     (zk/exists (:conn sync) place :watcher f)))
 

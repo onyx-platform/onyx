@@ -8,10 +8,12 @@
 (def ch-capacity 10000)
 
 (defn mark-peer-birth [log sync place death-cb]
+  (prn "$>" place)
   (extensions/on-delete sync place death-cb)
   (extensions/mark-peer-born log place))
 
 (defn mark-peer-death [log peer]
+  (prn "#>" peer)
   (extensions/mark-peer-dead log peer))
 
 (defn plan-job [log {:keys [catalog workflow]}]

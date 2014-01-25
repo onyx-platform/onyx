@@ -101,7 +101,7 @@
               (extensions/touch-place sync (:completion nodes))
 
               (recur next-payload)))))
-      (catch Exception e (prn e)))))
+      (catch Exception e (prn "Peer: " e)))))
 
 (defn create-peers! [model components cluster]
   (doseq [_ (range (:model/n-peers model))]
