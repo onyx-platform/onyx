@@ -15,6 +15,12 @@
     :db.install/_attribute :db.part/db}
 
    {:db/id #db/id [:db.part/db]
+    :db/ident :model/peek-peers
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
     :db/ident :model/mean-ack-time
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
@@ -29,9 +35,12 @@
  :test
  [[{:db/id #db/id [:db.part/db]
     :db/ident :test.type/fixed-cluster}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :test.type/linear-cluster}
      
    {:db/id #db/id [:db.part/db]
-    :db/ident :agent.type/executer}
+    :db/ident :agent.type/executor}
      
    {:db/id #db/id [:db.part/db]
     :db/ident :action.type/register-peer}
