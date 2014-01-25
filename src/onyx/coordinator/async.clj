@@ -62,11 +62,12 @@
         (>!! offer-head peer))
       (recur))))
 
-(defn dead-peer-ch-loop [log dead-tail evict-head]
+(defn dead-peer-ch-loop [log dead-tail evict-head offer-head]
   (loop []
     (when-let [peer (<!! dead-tail)]
       (when (mark-peer-death log peer)
-        (>!! evict-head peer))
+        (>!! evict-head peer)
+        (>!! offer-head peer))
       (recur))))
 
 (defn planning-ch-loop [log planning-tail offer-head]
@@ -238,7 +239,7 @@
         :failure-mult failure-mult
 
         :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
-        :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head))
+        :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
         :ack-thread (future (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))

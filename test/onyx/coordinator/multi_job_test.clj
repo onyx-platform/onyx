@@ -239,11 +239,11 @@
                   result (ffirst (d/q query db))]
               (is (= result 2)))))
 
-        (extensions/delete sync pulse-node-a)
-        (extensions/delete sync pulse-node-b)
-
-        (<!! offer-ch-spy)
-        ))
+        (testing "Peer death succeeds"
+          (extensions/delete sync pulse-node-a)
+          (extensions/delete sync pulse-node-b)
+          (<!! offer-ch-spy)
+          (<!! offer-ch-spy))))
     
     {:eviction-delay 50000}))
 
