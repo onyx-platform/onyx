@@ -90,10 +90,10 @@
   (let [model (-> test :model/_tests first)
         limit (:test/duration test)
         peers (:model/peek-peers model)
-        births (map (partial create-birth executor)
-                    (range 0 (* peers 1000) 1000))
-        deaths (map (partial create-death executor)
-                    (range (- limit (* peers 1000)) limit 1000))]
+        births (mapcat (partial create-birth executor)
+                       (range 0 (* peers 1000) 1000))
+        deaths (mapcat (partial create-death executor)
+                       (range (- limit (* peers 1000)) limit 1000))]
     (concat births deaths)))
 
 (defmethod sim/create-test :model.type/linear-cluster
@@ -218,6 +218,13 @@
 (def fixed-cluster-sim
   (sim/create-sim sim-conn
                   fixed-cluster-test
+                  {:db/id (d/tempid :sim)
+                   :sim/systemURI (str "datomic:mem://" (d/squuid))
+                   :sim/processCount 1}))
+
+(def linear-cluster-sim
+  (sim/create-sim sim-conn
+                  linear-cluster-test
                   {:db/id (d/tempid :sim)
                    :sim/systemURI (str "datomic:mem://" (d/squuid))
                    :sim/processCount 1}))
