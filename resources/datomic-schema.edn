@@ -46,7 +46,8 @@
                              peer-entity (ffirst (q query db peer))]
                          (if peer-entity
                            [[:db.fn/retractEntity peer-entity]]
-                           (throw (ex-info "Error evicting peer" {}))))}}
+                           (throw (ex-info "Error evicting peer"
+                                           {:peer-entity peer-entity :peer peer}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/ack-task
@@ -60,7 +61,8 @@
                              peer-id (ffirst (q query db ack-node))]
                          (if peer-id
                            [[:db/add peer-id :peer/status :active]]
-                           (throw (ex-info "Error for peer trying to ack" {}))))}}
+                           (throw (ex-info "Error for peer trying to ack"
+                                           {:ack-node ack-node :peer-id peer-id}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/offer-task

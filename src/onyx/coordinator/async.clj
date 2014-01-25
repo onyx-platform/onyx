@@ -112,6 +112,7 @@
     (when-let [failure (<!! failure-tail)]
       (prn "Failed: " (:ch failure))
       (prn "Details: " (:e failure))
+      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]
