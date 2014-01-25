@@ -237,60 +237,64 @@
 
 (sim/create-action-log sim-conn linear-cluster-sim)
 
-(comment
-  (time (mapv (fn [prun] @(:runner prun))
-              (->> #(sim/run-sim-process sim-uri (:db/id fixed-cluster-sim))
-                   (repeatedly (:sim/processCount fixed-cluster-sim))
-                   (into []))))
+(time (mapv (fn [prun] @(:runner prun))
+            (->> #(sim/run-sim-process sim-uri (:db/id linear-cluster-sim))
+                 (repeatedly (:sim/processCount linear-cluster-sim))
+                 (into []))))
 
-  (testing "All tasks complete"
-    (loop []
-      (let [db (:db-after (.take tx-queue))
-            query '[:find (count ?task) :where [?task :task/complete? true]]
-            result (ffirst (d/q query db))]
-        (prn result)
-        (when-not (= result (* n-jobs tasks-per-job))
-          (recur)))))
+(comment "Run the fixed sim"
+         (time (mapv (fn [prun] @(:runner prun))
+                     (->> #(sim/run-sim-process sim-uri (:db/id fixed-cluster-sim))
+                          (repeatedly (:sim/processCount fixed-cluster-sim))
+                          (into [])))))
 
-  (def sim-db (d/db sim-conn))
+(testing "All tasks complete"
+  (loop []
+    (let [db (:db-after (.take tx-queue))
+          query '[:find (count ?task) :where [?task :task/complete? true]]
+          result (ffirst (d/q query db))]
+      (prn result)
+      (when-not (= result (* n-jobs tasks-per-job))
+        (recur)))))
 
-  (def result-db (d/db (:conn log)))
+(def sim-db (d/db sim-conn))
 
-  #_(deftest test-small-cluster-few-jobs
-      (testing "No tasks are left incomplete"
-        (su/task-completeness result-db))
+(def result-db (d/db (:conn log)))
 
-      (testing "No sequential task ever had more than 1 peer"
-        (su/task-safety result-db))
+(deftest test-small-cluster-few-jobs
+  (testing "No tasks are left incomplete"
+    (su/task-completeness result-db))
 
-      (testing "No peers got 0 tasks"
-        (su/peer-liveness result-db n-peers))
+  (testing "No sequential task ever had more than 1 peer"
+    (su/task-safety result-db))
 
-      (testing "All peers got a roughly even number of tasks assigned"
-        (su/peer-fairness result-db n-peers n-jobs tasks-per-job)))
+  (testing "No peers got 0 tasks"
+    (su/peer-liveness result-db n-peers))
 
-  (def insts
-    (->> (-> '[:find ?inst :where
-               [_ :peer/status _ ?tx]
-               [?tx :db/txInstant ?inst]]
-             (d/q (d/history result-db)))
-         (map first)
-         (sort)))
+  (testing "All peers got a roughly even number of tasks assigned"
+    (su/peer-fairness result-db n-peers n-jobs tasks-per-job)))
 
+(def insts
+  (->> (-> '[:find ?inst :where
+             [_ :peer/status _ ?tx]
+             [?tx :db/txInstant ?inst]]
+           (d/q (d/history result-db)))
+       (map first)
+       (sort)))
 
-  (def dt-and-peers
-    (map (fn [tx]
-           (let [db (d/as-of result-db tx)]
-             (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
-                  (map first)
-                  (concat [tx]))))
-         insts))
+(def dt-and-peers
+  (map (fn [tx]
+         (let [db (d/as-of result-db tx)]
+           (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
+                (map first)
+                (concat [tx]))))
+       insts))
 
-  (view (line-chart
-         (map first dt-and-peers)
-         (map second dt-and-peers)
-         :x-label "Time"
-         :y-label "Peers")))
+(view (line-chart
+       (map first dt-and-peers)
+       (map second dt-and-peers)
+       :x-label "Time"
+       :y-label "Peers"))
 
 (alter-var-root #'system component/stop)
 
