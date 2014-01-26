@@ -143,10 +143,11 @@
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
-    (prn "~>" victim)
-    (extensions/delete (:sync components) victim)
-    (future-cancel (get cluster-val victim))
-    (swap! cluster dissoc victim)))
+    (let [pulse (extensions/read-place (:sync components) victim)]
+      (prn "~>" victim)
+      (extensions/delete (:sync components) (:pulse victim))
+      (future-cancel (get cluster-val victim))
+      (swap! cluster dissoc victim))))
 
 (sim-utils/create-peers! linear-cluster-model components cluster)
 
@@ -199,9 +200,6 @@
            (d/q (d/history result-db)))
        (map first)
        (sort)))
-
-(clojure.pprint/pprint
- (map (partial into #{}) (map (partial d/entity result-db) (map first (d/q '[:find ?peer :where [?peer :node/peer]] result-db)))))
 
 (def dt-and-peers
   (map (fn [tx]
