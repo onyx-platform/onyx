@@ -14,17 +14,23 @@
 
 (def cluster (atom {}))
 
-(defn create-birth [executor t]
-  [[{:db/id (d/tempid :test)
-     :agent/_actions (u/e executor)
-     :action/atTime t
-     :action/type :action.type/register-peer}]])
+(defn create-birth [executor t k]
+  (mapcat
+   (constantly
+    [[{:db/id (d/tempid :test)
+       :agent/_actions (u/e executor)
+       :action/atTime t
+       :action/type :action.type/register-sine-peer}]])
+   (range k)))
 
-(defn create-death [executor t]
-  [[{:db/id (d/tempid :test)
-     :agent/_actions (u/e executor)
-     :action/atTime t
-     :action/type :action.type/unregister-peer}]])
+(defn create-death [executor t k]
+  (mapcat
+   (constantly
+    [[{:db/id (d/tempid :test)
+       :agent/_actions (u/e executor)
+       :action/atTime t
+       :action/type :action.type/unregister-sine-peer}]])
+   (range k)))
 
 (defn generate-sine-scaling-data [test executor]
   (let [model (-> test :model/_tests first)
@@ -32,18 +38,16 @@
         length (:model/sine-length model)
         rate (:model/peer-rate model)
         height (:model/peek-peers model)
-        unit (/ Math/PI length)
-        wave (map (fn [x] (int (* height (Math/sin (* unit x))))) (range 0 length rate))
-        deltas (map
-                (fn [[a b]]
-                  (if (and (>= a 0) (>= b 0))
-                    (Math/abs (- b a))
-                    (- b a)))
-                (partition 2 1 wave))]
-    (mapcat (fn [[t delta]] (if (>= t 0)
-                             (doseq [_ (range delta)] (create-birth executor t))
-                             (doseq [_ (range delta)] (create-death executor t))))
-         (map vector (range 0 length rate) deltas))))
+        start (:model/sine-start model)
+        end (+ start length)
+        unit (/ (* 2 Math/PI) length)
+        wave (map (fn [x] (int (* height (Math/sin (* unit x)))))
+                  (range 0 (+ end rate) rate))
+        deltas (map (fn [[a b]] (- b a)) (partition 2 1 wave))]
+    (mapcat (fn [[t delta]] (if (>= delta 0)
+                             (create-birth executor t delta)
+                             (create-death executor t (Math/abs delta))))
+            (map vector (range start end rate) deltas))))
 
 (defn create-sine-cluster-test [conn model test]
   (u/require-keys test :db/id :test/duration)
@@ -128,10 +132,11 @@
 (def sine-cluster-model-data
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
-    :model/n-peers 5
-    :model/peek-peers 50
+    :model/n-peers 25
+    :model/peek-peers 20
     :model/peer-rate 50
-    :model/sine-length 20000
+    :model/sine-length 10000
+    :model/sine-start 4000
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
@@ -139,16 +144,18 @@
   (-> @(d/transact sim-conn sine-cluster-model-data)
       (u/tx-ent sine-model-id)))
 
-(defmethod sim/perform-action :action.type/register-peer
+(defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
+  (prn "up")
   (let [peer (extensions/create (:sync components) :peer)]
     (swap! cluster assoc peer
            (sim-utils/create-peer
             sine-cluster-model
             components peer))))
 
-(defmethod sim/perform-action :action.type/unregister-peer
+(defmethod sim/perform-action :action.type/unregister-sine-peer
   [action process]
+  (prn "down")
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
@@ -187,6 +194,7 @@
           query '[:find (count ?task) :where [?task :task/complete? true]]
           result (ffirst (d/q query db))]
       (prn result)
+      (prn "->>" (d/q '[:find (count ?p) :where [?p :peer/status]] db))
       (when-not (= result (* n-jobs tasks-per-job))
         (recur)))))
 

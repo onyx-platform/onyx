@@ -48,6 +48,12 @@
     :db/ident :model/sine-length
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/sine-start
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}]]
  
  :test
@@ -67,5 +73,17 @@
     :db/ident :action.type/register-peer}
      
    {:db/id #db/id [:db.part/db]
-    :db/ident :action.type/unregister-peer}]]}
+    :db/ident :action.type/unregister-peer}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/register-linear-peer}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/unregister-linear-peer}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/register-sine-peer}
+     
+   {:db/id #db/id [:db.part/db]
+    :db/ident :action.type/unregister-sine-peer}]]}
 

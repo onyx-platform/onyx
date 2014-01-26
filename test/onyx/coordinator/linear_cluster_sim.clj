@@ -18,13 +18,13 @@
   [[{:db/id (d/tempid :test)
      :agent/_actions (u/e executor)
      :action/atTime t
-     :action/type :action.type/register-peer}]])
+     :action/type :action.type/register-linear-peer}]])
 
 (defn create-death [executor t]
   [[{:db/id (d/tempid :test)
      :agent/_actions (u/e executor)
      :action/atTime t
-     :action/type :action.type/unregister-peer}]])
+     :action/type :action.type/unregister-linear-peer}]])
 
 (defn generate-linear-scaling-data [test executor]
   (let [model (-> test :model/_tests first)
@@ -134,7 +134,7 @@
   (-> @(d/transact sim-conn linear-cluster-model-data)
       (u/tx-ent linear-model-id)))
 
-(defmethod sim/perform-action :action.type/register-peer
+(defmethod sim/perform-action :action.type/register-linear-peer
   [action process]
   (let [peer (extensions/create (:sync components) :peer)]
     (swap! cluster assoc peer
@@ -142,7 +142,7 @@
             linear-cluster-model
             components peer))))
 
-(defmethod sim/perform-action :action.type/unregister-peer
+(defmethod sim/perform-action :action.type/unregister-linear-peer
   [action process]
   (let [cluster-val @cluster
         n (count cluster-val)
