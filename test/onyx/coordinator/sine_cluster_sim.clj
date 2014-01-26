@@ -85,7 +85,7 @@
 
 (sim-utils/load-schema sim-conn "simulant/coordinator-sim.edn")
 
-(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 500000}))
+(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 2000}))
 
 (def components (alter-var-root #'system component/start))
 
@@ -137,7 +137,7 @@
     :model/peek-peers 20
     :model/peer-rate 50
     :model/sine-length 20000
-    :model/sine-start 4000
+    :model/sine-start 5000
     :model/sine-reps 8
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
@@ -196,7 +196,7 @@
           query '[:find (count ?task) :where [?task :task/complete? true]]
           result (ffirst (d/q query db))]
       (prn result)
-      (prn "->>" (d/q '[:find (count ?p) :where [?p :peer/status]] db))
+      (prn "Peers ->>" (d/q '[:find (count ?p) :where [?p :peer/status]] db))
       (when-not (= result (* n-jobs tasks-per-job))
         (recur)))))
 
