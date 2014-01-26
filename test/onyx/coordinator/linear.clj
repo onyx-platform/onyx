@@ -103,7 +103,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 9)
+(def n-jobs 40)
 
 (def tasks-per-job 3)
 

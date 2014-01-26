@@ -94,11 +94,11 @@
   [log sync eviction-delay offer-tail ack-head complete-head evict-head]
   (loop []
     (when-let [event (<!! offer-tail)]
-      (when-let [peer (offer-task log sync
-                                  #(>!! ack-head %)
-                                  #(>!! complete-head %)
-                                  #(thread (<!! (timeout eviction-delay))
-                                           (>!! evict-head %)))])
+      (offer-task log sync
+                  #(>!! ack-head %)
+                  #(>!! complete-head %)
+                  #(thread (<!! (timeout eviction-delay))
+                           (>!! evict-head %)))
       (recur))))
 
 (defn completion-ch-loop
@@ -114,33 +114,11 @@
     (when-let [failure (<!! failure-tail)]
       (prn "Failed: " (:ch failure))
       (prn "Details: " (:e failure))
-      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]
   (if-not (instance? java.lang.InterruptedException e)
     (.printStackTrace e)))
-
-(dire/with-handler! #'born-peer-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'dead-peer-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'planning-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'ack-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'evict-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'offer-ch-loop
-  java.lang.Exception print-if-not-thread-death)
-
-(dire/with-handler! #'completion-ch-loop
-  java.lang.Exception print-if-not-thread-death)
 
 (defrecord Coordinator []
   component/Lifecycle
@@ -185,39 +163,60 @@
 
       (dire/with-handler! #'mark-peer-birth
         java.util.concurrent.ExecutionException
-        (fn [e log sync place death-cb]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :peer-birth :e e})
           false))
 
       (dire/with-handler! #'mark-peer-death
         java.util.concurrent.ExecutionException
-        (fn [e log peer]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :peer-death :e e})
           false))
 
       (dire/with-handler! #'acknowledge-task
         java.util.concurrent.ExecutionException
-        (fn [e log sync task]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :ack :e e})
           false))
 
       (dire/with-handler! #'offer-task
         java.util.concurrent.ExecutionException
-        (fn [e log sync ack-cb complete-cb]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :offer :e e})
           false))
 
       (dire/with-handler! #'complete-task
         java.util.concurrent.ExecutionException
-        (fn [e log sync queue complete-place]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :complete :e e})
           false))
 
       (dire/with-handler! #'evict-peer
         java.util.concurrent.ExecutionException
-        (fn [e log sync task]
+        (fn [e & _]
           (>!! failure-ch-head {:ch :evict :e e})
           false))
+
+      (dire/with-handler! #'born-peer-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'dead-peer-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'planning-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'ack-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'evict-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'offer-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'completion-ch-loop
+        java.lang.Exception print-if-not-thread-death)
 
       (assoc component
         :planning-ch-head planning-ch-head

@@ -89,7 +89,9 @@
                              :node/ack (:ack nodes)
                              :node/status (:status nodes)
                              :node/completion (:completion nodes)}]
-                           (throw (ex-info "Error trying to offer to peer" {}))))}}
+                           (throw (ex-info "Error trying to offer to peer"
+                                           {:task task :consumption consumption
+                                            :peer peer-place :nodes nodes :peer-datom peer-datom}))))}}
 
  {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/complete-task
