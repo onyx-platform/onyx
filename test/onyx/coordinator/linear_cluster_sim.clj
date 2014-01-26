@@ -31,10 +31,13 @@
         limit (:test/duration test)
         rate (:model/peer-rate model)
         peers (:model/peek-peers model)
+        gap (:model/silence-gap model)
         births (mapcat (partial create-birth executor)
                        (range 0 (* peers rate) rate))
         deaths (mapcat (partial create-death executor)
-                       (range (- limit (* peers rate)) limit rate))]
+                       (range (+ (* peers rate) gap)
+                              (+ (* (* peers rate) 2) gap)
+                              rate))]
     (concat births deaths)))
 
 (defn create-linear-cluster-test [conn model test]
@@ -121,8 +124,9 @@
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
     :model/n-peers 5
-    :model/peek-peers 10
-    :model/peer-rate 250
+    :model/peek-peers 50
+    :model/peer-rate 50
+    :model/silence-gap 15000
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
