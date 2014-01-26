@@ -122,7 +122,7 @@
     :model/type :model.type/linear-cluster
     :model/n-peers 5
     :model/peek-peers 10
-    :model/peer-rate 200
+    :model/peer-rate 250
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
@@ -154,7 +154,7 @@
   (sim/create-test sim-conn
                    linear-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration 15000}))
+                    :test/duration (u/hours->msec 1)}))
 
 (def linear-cluster-sim
   (sim/create-sim sim-conn
@@ -167,10 +167,10 @@
 
 (sim/create-action-log sim-conn linear-cluster-sim)
 
-(time (mapv (fn [prun] @(:runner prun))
-            (->> #(sim/run-sim-process sim-uri (:db/id linear-cluster-sim))
-                 (repeatedly (:sim/processCount linear-cluster-sim))
-                 (into []))))
+(def pruns
+  (->> #(sim/run-sim-process sim-uri (:db/id linear-cluster-sim))
+       (repeatedly (:sim/processCount linear-cluster-sim))
+       (into [])))
 
 (testing "All tasks complete"
   (loop []
@@ -180,6 +180,8 @@
       (prn result)
       (when-not (= result (* n-jobs tasks-per-job))
         (recur)))))
+
+(doseq [prun pruns] (future-cancel (:runner prun)))
 
 (def sim-db (d/db sim-conn))
 
