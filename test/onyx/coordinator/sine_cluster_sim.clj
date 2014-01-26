@@ -138,7 +138,7 @@
     :model/peer-rate 50
     :model/sine-length 20000
     :model/sine-start 5000
-    :model/sine-reps 8
+    :model/sine-reps 16
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
