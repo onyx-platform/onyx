@@ -54,6 +54,12 @@
     :db/ident :model/sine-start
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/sine-reps
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}]]
  
  :test

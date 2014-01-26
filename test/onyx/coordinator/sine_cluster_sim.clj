@@ -37,10 +37,11 @@
         limit (:test/duration test)
         length (:model/sine-length model)
         rate (:model/peer-rate model)
+        reps (:model/sine-reps model)
         height (:model/peek-peers model)
         start (:model/sine-start model)
         end (+ start length)
-        unit (/ (* 2 Math/PI) length)
+        unit (/ (* reps Math/PI) length)
         wave (map (fn [x] (int (* height (Math/sin (* unit x)))))
                   (range 0 (+ end rate) rate))
         deltas (map (fn [[a b]] (- b a)) (partition 2 1 wave))]
@@ -135,8 +136,9 @@
     :model/n-peers 25
     :model/peek-peers 20
     :model/peer-rate 50
-    :model/sine-length 10000
+    :model/sine-length 20000
     :model/sine-start 4000
+    :model/sine-reps 8
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
