@@ -78,9 +78,10 @@
       (let [coordinator (:coordinator components)
             sync (:sync components)
             payload (extensions/create sync :payload)
+            pulse (extensions/create sync :pulse)
             sync-spy (chan 1)
             status-spy (chan 1)]
-        (extensions/write-place sync peer payload)
+        (extensions/write-place sync peer {:pulse pulse :payload payload})
         (extensions/on-change sync payload #(>!! sync-spy %))
         
         (>!! (:born-peer-ch-head coordinator) peer)
@@ -96,7 +97,7 @@
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
-              (extensions/write-place sync peer next-payload)
+              (extensions/write-place sync peer {:pulse pulse :payload next-payload})
               (extensions/on-change sync next-payload #(>!! sync-spy %))
               (extensions/touch-place sync (:completion nodes))
 
