@@ -14,21 +14,6 @@
 
 (def cluster (atom {}))
 
-(defn create-linear-cluster-test [conn model test]
-  (u/require-keys test :db/id :test/duration)
-  (-> @(d/transact conn [(assoc test
-                           :test/type :test.type/linear-cluster
-                           :model/_tests (u/e model))])
-      (u/tx-ent (:db/id test))))
-
-(defn create-executor [conn test]
-  (let [tid (d/tempid :test)
-        result @(d/transact conn
-                            [{:db/id tid
-                              :agent/type :agent.type/executor
-                              :test/_agents (u/e test)}])]
-    (d/resolve-tempid (d/db conn) (:tempids result) tid)))
-
 (defn create-birth [executor t]
   [[{:db/id (d/tempid :test)
      :agent/_actions (u/e executor)
@@ -44,13 +29,28 @@
 (defn generate-linear-scaling-data [test executor]
   (let [model (-> test :model/_tests first)
         limit (:test/duration test)
+        rate (:model/peer-rate model)
         peers (:model/peek-peers model)
         births (mapcat (partial create-birth executor)
-                       (range 0 (* peers 1000) 1000))
+                       (range 0 (* peers rate) rate))
         deaths (mapcat (partial create-death executor)
-                       (range (- limit (* peers 1000)) limit 1000))]
-    (concat births deaths)
-    []))
+                       (range (- limit (* peers rate)) limit rate))]
+    (concat births deaths)))
+
+(defn create-linear-cluster-test [conn model test]
+  (u/require-keys test :db/id :test/duration)
+  (-> @(d/transact conn [(assoc test
+                           :test/type :test.type/linear-cluster
+                           :model/_tests (u/e model))])
+      (u/tx-ent (:db/id test))))
+
+(defn create-executor [conn test]
+  (let [tid (d/tempid :test)
+        result @(d/transact conn
+                            [{:db/id tid
+                              :agent/type :agent.type/executor
+                              :test/_agents (u/e test)}])]
+    (d/resolve-tempid (d/db conn) (:tempids result) tid)))
 
 (defmethod sim/create-test :model.type/linear-cluster
   [conn model test]
@@ -72,7 +72,7 @@
 
 (sim-utils/load-schema sim-conn "simulant/coordinator-sim.edn")
 
-(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 5000}))
+(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 500000}))
 
 (def components (alter-var-root #'system component/start))
 
@@ -103,7 +103,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 9)
+(def n-jobs 40)
 
 (def tasks-per-job 3)
 
@@ -121,9 +121,10 @@
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
     :model/n-peers 5
-    :model/peek-peers 3
-    :model/mean-ack-time 1
-    :model/mean-completion-time 1}])
+    :model/peek-peers 10
+    :model/peer-rate 200
+    :model/mean-ack-time 250
+    :model/mean-completion-time 500}])
 
 (def linear-cluster-model
   (-> @(d/transact sim-conn linear-cluster-model-data)
@@ -132,20 +133,20 @@
 (defmethod sim/perform-action :action.type/register-peer
   [action process]
   (let [peer (extensions/create (:sync components) :peer)]
-    (prn "up")
-    (comment (swap! cluster assoc peer
-                    (sim-utils/create-peer linear-cluster-model components peer)))))
+    (swap! cluster assoc peer
+           (sim-utils/create-peer
+            linear-cluster-model
+            components peer))))
 
 (defmethod sim/perform-action :action.type/unregister-peer
   [action process]
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
-    (prn "down")
-    ;;    (extensions/delete (:sync components) victim)
-    ;;(future-cancel (get cluster-val victim))
-    ;;(swap! cluster dissoc victim)
-    ))
+    (let [pulse (:pulse (extensions/read-place (:sync components) victim))]
+      (extensions/delete (:sync components) pulse)
+      (future-cancel (get cluster-val victim))
+      (swap! cluster dissoc victim))))
 
 (sim-utils/create-peers! linear-cluster-model components cluster)
 
@@ -153,7 +154,7 @@
   (sim/create-test sim-conn
                    linear-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration 10000}))
+                    :test/duration 15000}))
 
 (def linear-cluster-sim
   (sim/create-sim sim-conn
