@@ -42,6 +42,12 @@
     :db/ident :model/mean-completion-time
     :db/valueType :db.type/long
     :db/cardinality :db.cardinality/one
+    :db.install/_attribute :db.part/db}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :model/sine-length
+    :db/valueType :db.type/long
+    :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}]]
  
  :test
@@ -50,6 +56,9 @@
 
    {:db/id #db/id [:db.part/db]
     :db/ident :test.type/linear-cluster}
+
+   {:db/id #db/id [:db.part/db]
+    :db/ident :test.type/sine-cluster}
      
    {:db/id #db/id [:db.part/db]
     :db/ident :agent.type/executor}
