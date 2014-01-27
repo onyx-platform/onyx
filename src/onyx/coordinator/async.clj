@@ -26,8 +26,8 @@
 
 (defn evict-peer [log sync peer]
   (if-let [status-node (:node/status (extensions/nodes log peer))]
-    (do (extensions/delete sync status-node)
-        (extensions/evict log peer))
+    (do (extensions/evict log peer)
+        (extensions/delete sync status-node))
     false))
 
 (defn offer-task [log sync ack-cb complete-cb evict-cb]
