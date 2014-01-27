@@ -24,17 +24,15 @@
     (extensions/ack log ack-place)
     (extensions/touch-place sync (:node/status nodes))))
 
-(defn evict-peer [log sync {:keys [peer ack status]}]
-  (if (or (nil? ack) (not (extensions/modified? sync ack)))
-    (do (when-not (nil? status)
-          (extensions/delete sync status))
+(defn evict-peer [log sync peer]
+  (if-let [status-node (:node/status (extensions/nodes log peer))]
+    (do (extensions/delete sync status-node)
         (extensions/evict log peer))
     false))
 
 (defn offer-task [log sync ack-cb complete-cb evict-cb]
   (loop [[task :as tasks] (extensions/next-tasks log)
          [peer :as peers] (extensions/idle-peers log)]
-    
     (when (and (seq tasks) (seq peers))
       (let [payload-node (:payload (extensions/read-place sync peer))
             ack-node (extensions/create sync :ack)
@@ -42,13 +40,11 @@
             status-node (extensions/create sync :status)
             nodes {:payload payload-node :ack ack-node
                    :completion complete-node :status status-node}]
-        
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
-
         (if (extensions/mark-offered log task peer nodes)
           (do (extensions/write-place sync payload-node {:task task :nodes nodes})
-              (evict-cb {:peer peer :ack ack-node :status status-node})
+              (evict-cb peer)
               (recur (rest tasks) (rest peers)))
           (recur tasks (rest peers)))))))
 
@@ -70,7 +66,7 @@
   (loop []
     (when-let [peer (<!! dead-tail)]
       (when (mark-peer-death log peer)
-        (>!! evict-head {:peer peer})
+        (>!! evict-head peer)
         (>!! offer-head peer))
       (recur))))
 
@@ -89,9 +85,9 @@
 
 (defn evict-ch-loop [log sync evict-tail offer-head]
   (loop []
-    (when-let [nodes (<!! evict-tail)]
-      (if (evict-peer log sync nodes)
-        (>!! offer-head nodes))
+    (when-let [peer (<!! evict-tail)]
+      (when (evict-peer log sync peer)
+        (>!! offer-head peer))
       (recur))))
 
 (defn offer-ch-loop
@@ -118,7 +114,6 @@
     (when-let [failure (<!! failure-tail)]
       (prn "Failed: " (:ch failure))
       (prn "Details: " (:e failure))
-      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]
@@ -167,37 +162,37 @@
       (tap failure-mult failure-ch-tail)
 
       (dire/with-handler! #'mark-peer-birth
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :peer-birth :e e})
           false))
 
       (dire/with-handler! #'mark-peer-death
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :peer-death :e e})
           false))
 
       (dire/with-handler! #'acknowledge-task
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :ack :e e})
           false))
 
       (dire/with-handler! #'offer-task
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :offer :e e})
           false))
 
       (dire/with-handler! #'complete-task
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :complete :e e})
           false))
 
       (dire/with-handler! #'evict-peer
-        java.lang.Exception
+        java.util.concurrent.ExecutionException
         (fn [e & _]
           (>!! failure-ch-head {:ch :evict :e e})
           false))

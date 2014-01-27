@@ -43,7 +43,7 @@
         end (+ start length)
         unit (/ (* reps Math/PI) length)
         wave (map (fn [x] (int (* height (Math/sin (* unit x)))))
-                  (range 0 (+ length rate) rate))
+                  (range 0 (+ end rate) rate))
         deltas (map (fn [[a b]] (- b a)) (partition 2 1 wave))]
     (mapcat (fn [[t delta]] (if (>= delta 0)
                              (create-birth executor t delta)
@@ -134,11 +134,11 @@
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
     :model/n-peers 25
-    :model/peek-peers 5
-    :model/peer-rate 1000
-    :model/sine-length 10000
+    :model/peek-peers 20
+    :model/peer-rate 50
+    :model/sine-length 20000
     :model/sine-start 5000
-    :model/sine-reps 4
+    :model/sine-reps 16
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 

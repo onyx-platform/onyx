@@ -407,7 +407,7 @@
             
             sync-spy (chan 1)
             offer-ch-spy (chan 3)]
-
+        
         (tap (:offer-mult coordinator) offer-ch-spy)
 
         (extensions/write-place sync peer-node {:pulse pulse-node :payload payload-node})

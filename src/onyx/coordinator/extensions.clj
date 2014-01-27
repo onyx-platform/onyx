@@ -34,9 +34,7 @@
 
 (defmulti on-change (fn [sync place cb] (type sync)))
 
-(defmulti on-delete (fn [sync place cb] (type sync)))
-
-(defmulti modified? (fn [sync place] (type sync)))
+(defmulti on-delete (fn [sync place db] (type sync)))
 
 (defmulti cap-queue (fn [queue task] queue))
 
