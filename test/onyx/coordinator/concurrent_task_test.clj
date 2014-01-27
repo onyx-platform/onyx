@@ -78,7 +78,7 @@
                           [?task :task/name :inc]]
                   result (ffirst (d/q query db))]
               (is (= result 2)))))))
-    {:eviction-delay 50000}))
+    {:revoke-delay 50000}))
 
 (run-tests 'onyx.coordinator.concurrent-task-test)
 

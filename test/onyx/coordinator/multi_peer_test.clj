@@ -124,7 +124,7 @@
                       result (ffirst (d/q query db))]
                   (is (= result 2)))))))))
     
-    {:eviction-delay 50000}))
+    {:revoke-delay 50000}))
 
 (deftest plan-one-job-four-peers
   (with-system
@@ -222,7 +222,7 @@
                           [?task :task/complete? true]]
                   result (ffirst (d/q query db))]
               (is (= result 3)))))))
-    {:eviction-delay 50000}))
+    {:revoke-delay 50000}))
 
 (run-tests 'onyx.coordinator.multi-peer-test)
 

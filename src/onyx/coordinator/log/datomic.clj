@@ -196,6 +196,11 @@
   (let [tx [[:onyx.fn/evict-peer peer]]]
     @(d/transact (:conn log) tx)))
 
+(defmethod extensions/revoke-offer Datomic
+  [log ack-place]
+  (let [tx [[:onyx.fn/revoke-offer ack-place]]]
+    @(d/transact (:conn log) tx)))
+
 (defmethod extensions/complete Datomic
   [log complete-place]
   (let [tx [[:onyx.fn/complete-task complete-place]]]

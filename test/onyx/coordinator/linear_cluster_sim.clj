@@ -75,7 +75,7 @@
 
 (sim-utils/load-schema sim-conn "simulant/coordinator-sim.edn")
 
-(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :eviction-delay 2000}))
+(def system (s/onyx-system {:sync :zookeeper :queue :hornetq :revoke-delay 2000}))
 
 (def components (alter-var-root #'system component/start))
 

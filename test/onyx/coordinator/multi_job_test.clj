@@ -245,7 +245,7 @@
           (<!! offer-ch-spy)
           (<!! offer-ch-spy))))
     
-    {:eviction-delay 50000}))
+    {:revoke-delay 50000}))
 
 (run-tests 'onyx.coordinator.multi-job-test)
 

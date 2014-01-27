@@ -14,12 +14,12 @@
   (stop [this]
     (component/stop-system this components)))
 
-(defn onyx-system [{:keys [queue eviction-delay]}]
+(defn onyx-system [{:keys [queue revoke-delay]}]
   (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))]
     (map->OnyxSystem
      {:log (datomic datomic-uri (log-schema))
       :sync (zookeeper (zk-addr))
       :queue queue
-      :coordinator (component/using (coordinator eviction-delay)
+      :coordinator (component/using (coordinator revoke-delay)
                                     [:log :sync :queue])})))
 

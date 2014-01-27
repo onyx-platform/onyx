@@ -171,7 +171,7 @@
             (>!! (:completion-ch-head coordinator) {:path node-path})
             (let [failure (<!! failure-ch-spy)]
               (is (= (:ch failure) :complete)))))))
-    {:eviction-delay 50000}))
+    {:revoke-delay 50000}))
 
 (deftest plan-one-job-no-peers
   (with-system
@@ -379,7 +379,7 @@
              :task-name :out
              :payload-node out-payload-node
              :next-payload-node future-payload-node)))))
-    {:eviction-delay 500000}))
+    {:revoke-delay 500000}))
 
 (deftest evict-one-peer
   (with-system
@@ -439,7 +439,7 @@
             (is (thrown?
                  Exception
                  (extensions/read-place sync status-node)))))))
-    {:eviction-delay 0}))
+    {:revoke-delay 0}))
 
 (run-tests 'onyx.coordinator.single-peer-test)
 
