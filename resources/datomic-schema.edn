@@ -36,18 +36,6 @@
                            (throw (ex-info "Tried to remove non-existent peer" {}))))}}
 
  {:db/id #db/id [:db.part/user]
-  :db/ident :onyx.fn/evict-peer
-  :db/fn #db/fn {:lang "clojure"
-                 :params [db peer]
-                 :code (let [query '[:find ?peer :in $ ?node :where
-                                     [?peer :node/peer ?node]]
-                             peer-entity (ffirst (q query db peer))]
-                         (if peer-entity
-                           [[:db.fn/retractEntity peer-entity]]
-                           (throw (ex-info "Error evicting peer"
-                                           {:peer-entity peer-entity :peer peer}))))}}
-
- {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/ack-task
   :db/fn #db/fn {:lang "clojure"
                  :params [db ack-node]
@@ -98,10 +86,10 @@
                  :code (let [query '[:find ?peer :in $ ?node :where
                                      [?peer :node/ack ?node]
                                      [?peer :peer/status :acking]]
-                             peer-entity (first (last (q query db peer)))]
+                             peer-entity (first (last (q query db ack-place)))]
                          (if peer-entity
                            [[:db.fn/retractEntity peer-entity]]
-                           (throw (ex-info "Error evicting peer"
+                           (throw (ex-info "Error revoking offer from peer"
                                            {:peer-entity peer-entity :ack ack-place}))))}}
 
  {:db/id #db/id [:db.part/user]

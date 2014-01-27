@@ -420,7 +420,7 @@
         (<!! offer-ch-spy)
         (<!! sync-spy)
 
-        ;; Instant eviction.
+        ;; Instant revoke.
 
         (<!! offer-ch-spy)
 

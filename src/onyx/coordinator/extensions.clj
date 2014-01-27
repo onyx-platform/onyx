@@ -10,8 +10,6 @@
 
 (defmulti ack (fn [log place] (type log)))
 
-(defmulti evict (fn [log peer] (type log)))
-
 (defmulti revoke-offer (fn [log ack-place] (type log)))
 
 (defmulti complete (fn [log complete-place] (type log)))

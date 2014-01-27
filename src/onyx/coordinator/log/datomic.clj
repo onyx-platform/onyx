@@ -191,11 +191,6 @@
   (let [tx [[:onyx.fn/ack-task ack-place]]]
     @(d/transact (:conn log) tx)))
 
-(defmethod extensions/evict Datomic
-  [log peer]
-  (let [tx [[:onyx.fn/evict-peer peer]]]
-    @(d/transact (:conn log) tx)))
-
 (defmethod extensions/revoke-offer Datomic
   [log ack-place]
   (let [tx [[:onyx.fn/revoke-offer ack-place]]]

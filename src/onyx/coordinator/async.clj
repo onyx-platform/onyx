@@ -25,8 +25,6 @@
     (extensions/touch-place sync (:node/status nodes))))
 
 (defn evict-peer [log sync peer]
-  (extensions/evict log peer)
-  ;; to-do: Do I really need this if-let?
   (if-let [status-node (:node/status (extensions/nodes log peer))]
     (extensions/delete sync status-node)))
 
@@ -90,8 +88,8 @@
 (defn evict-ch-loop [log sync evict-tail offer-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
-      (when (evict-peer log sync peer)
-        (>!! offer-head peer))
+      (evict-peer log sync peer)
+      (>!! offer-head peer)
       (recur))))
 
 (defn offer-ch-loop
