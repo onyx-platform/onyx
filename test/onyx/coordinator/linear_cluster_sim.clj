@@ -106,7 +106,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 40)
+(def n-jobs 100)
 
 (def tasks-per-job 3)
 
@@ -125,8 +125,8 @@
     :model/type :model.type/linear-cluster
     :model/n-peers 5
     :model/peek-peers 50
-    :model/peer-rate 50
-    :model/silence-gap 15000
+    :model/peer-rate 200
+    :model/silence-gap 60000
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
 
