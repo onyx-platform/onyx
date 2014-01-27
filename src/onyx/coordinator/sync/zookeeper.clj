@@ -71,11 +71,13 @@
 (defmethod extensions/create [ZooKeeper :status]
   [sync _]
   (let [place (str "/onyx/status/" (UUID/randomUUID))]
+    (prn "Making: " place)
     (zk/create (:conn sync) place :persistent? true)
     place))
 
 (defmethod extensions/delete ZooKeeper
-  [sync place] (zk/delete (:conn sync) place))
+  [sync place]
+  (zk/delete (:conn sync) place))
 
 (defmethod extensions/write-place ZooKeeper
   [sync place contents]
@@ -105,4 +107,8 @@
             (when (= (:event-type event) :NodeDeleted)
               (cb event)))]
     (zk/exists (:conn sync) place :watcher f)))
+
+(defmethod extensions/modified? ZooKeeper
+  [sync place]
+  (= (:version (:stat (zk/data (:conn sync) place))) 1))
 
