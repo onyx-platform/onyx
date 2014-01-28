@@ -14,7 +14,7 @@
 
 (def cluster (atom {}))
 
-(defn create-birth [executor t k]
+(defn create-multi-births [executor t k]
   (mapcat
    (constantly
     [[{:db/id (d/tempid :test)
@@ -23,7 +23,7 @@
        :action/type :action.type/register-sine-peer}]])
    (range k)))
 
-(defn create-death [executor t k]
+(defn create-multi-deaths [executor t k]
   (mapcat
    (constantly
     [[{:db/id (d/tempid :test)
@@ -46,8 +46,8 @@
                   (range 0 (+ end rate) rate))
         deltas (map (fn [[a b]] (- b a)) (partition 2 1 wave))]
     (mapcat (fn [[t delta]] (if (>= delta 0)
-                             (create-birth executor t delta)
-                             (create-death executor t (Math/abs delta))))
+                             (create-multi-births executor t delta)
+                             (create-multi-deaths executor t (Math/abs delta))))
             (map vector (range start end rate) deltas))))
 
 (defn create-sine-cluster-test [conn model test]
@@ -68,8 +68,9 @@
 (defmethod sim/create-test :model.type/sine-cluster
   [conn model test]
   (let [test (create-sine-cluster-test conn model test)
-        executor (create-executor conn test)]
-    (u/transact-batch conn (generate-sine-scaling-data test executor) 1000)
+        executor (create-executor conn test)
+        actions (generate-sine-scaling-data test executor)]
+    (u/transact-batch conn actions 1000)
     (d/entity (d/db conn) (u/e test))))
 
 (defmethod sim/create-sim :test.type/sine-cluster
@@ -136,8 +137,8 @@
     :model/n-peers 25
     :model/peek-peers 20
     :model/peer-rate 50
-    :model/sine-length 20000
-    :model/sine-start 5000
+    :model/sine-length 40000
+    :model/sine-start 2000
     :model/sine-reps 8
     :model/mean-ack-time 250
     :model/mean-completion-time 500}])
@@ -205,13 +206,6 @@
 (def sim-db (d/db sim-conn))
 
 (def result-db (d/db (:conn log)))
-
-(deftest test-small-cluster-few-jobs
-  (testing "No tasks are left incomplete"
-    (sim-utils/task-completeness result-db))
-
-  (testing "No sequential task ever had more than 1 peer"
-    (sim-utils/task-safety result-db)))
 
 (def insts
   (->> (-> '[:find ?inst :where
