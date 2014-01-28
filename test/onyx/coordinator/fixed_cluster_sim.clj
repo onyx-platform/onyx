@@ -1,5 +1,5 @@
 (ns onyx.coordinator.fixed-cluster-sim
-  (:require [clojure.test :refer :all]
+  (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan <!! >!! tap timeout]]
             [com.stuartsierra.component :as component]
             [simulant.sim :as sim]
@@ -8,9 +8,7 @@
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator.sim-test-utils :as sim-utils]
-            [incanter.core :refer [view]]
-            [incanter.charts :refer [line-chart]]))
+            [onyx.coordinator.sim-test-utils :as sim-utils]))
 
 (def cluster (atom {}))
 
@@ -122,47 +120,15 @@
                    (repeatedly (:sim/processCount fixed-cluster-sim))
                    (into [])))))
 
-(testing "All tasks complete"
-  (loop []
-    (let [db (:db-after (.take tx-queue))
-          query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (prn result)
-      (when-not (= result (* n-jobs tasks-per-job))
-        (recur)))))
+(sim-utils/block-until-completion! tx-queue (* n-jobs tasks-per-job))
 
 (def sim-db (d/db sim-conn))
 
 (def result-db (d/db (:conn log)))
 
-(deftest test-small-cluster-few-jobs
-  (testing "No tasks are left incomplete"
-    (sim-utils/task-completeness result-db))
-
-  (testing "No sequential task ever had more than 1 peer"
-    (sim-utils/task-safety result-db)))
-
-(def insts
-  (->> (-> '[:find ?inst :where
-             [_ :peer/status _ ?tx]
-             [?tx :db/txInstant ?inst]]
-           (d/q (d/history result-db)))
-       (map first)
-       (sort)))
-
-(def dt-and-peers
-  (map (fn [tx]
-         (let [db (d/as-of result-db tx)]
-           (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
-                (map first)
-                (concat [tx]))))
-       insts))
-
-(view (line-chart
-       (map first dt-and-peers)
-       (map second dt-and-peers)
-       :x-label "Time"
-       :y-label "Peers"))
+(facts (sim-utils/task-completeness result-db)
+       (sim-utils/task-safety result-db))
 
 (alter-var-root #'system component/stop)
+
 

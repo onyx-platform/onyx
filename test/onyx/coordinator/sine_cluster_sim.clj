@@ -1,5 +1,5 @@
 (ns onyx.coordinator.sine-cluster-sim
-  (:require [clojure.test :refer :all]
+  (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan <!! >!! tap timeout]]
             [com.stuartsierra.component :as component]
             [simulant.sim :as sim]
@@ -8,9 +8,7 @@
             [onyx.system :as s]
             [onyx.coordinator.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator.sim-test-utils :as sim-utils]
-            [incanter.core :refer [view]]
-            [incanter.charts :refer [line-chart]]))
+            [onyx.coordinator.sim-test-utils :as sim-utils]))
 
 (def cluster (atom {}))
 
@@ -149,7 +147,6 @@
 
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
-  (prn "up")
   (let [peer (extensions/create (:sync components) :peer)]
     (swap! cluster assoc peer
            (sim-utils/create-peer
@@ -158,7 +155,6 @@
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
   [action process]
-  (prn "down")
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
@@ -191,15 +187,7 @@
        (repeatedly (:sim/processCount sine-cluster-sim))
        (into [])))
 
-(testing "All tasks complete"
-  (loop []
-    (let [db (:db-after (.take tx-queue))
-          query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (prn result)
-      (prn "Peers ->>" (d/q '[:find (count ?p) :where [?p :peer/status]] db))
-      (when-not (= result (* n-jobs tasks-per-job))
-        (recur)))))
+(sim-utils/block-until-completion! tx-queue (* n-jobs tasks-per-job))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 
@@ -207,27 +195,8 @@
 
 (def result-db (d/db (:conn log)))
 
-(def insts
-  (->> (-> '[:find ?inst :where
-             [_ :peer/status _ ?tx]
-             [?tx :db/txInstant ?inst]]
-           (d/q (d/history result-db)))
-       (map first)
-       (sort)))
-
-(def dt-and-peers
-  (map (fn [tx]
-         (let [db (d/as-of result-db tx)]
-           (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
-                (map first)
-                (concat [tx]))))
-       insts))
-
-(view (line-chart
-       (map first dt-and-peers)
-       (map second dt-and-peers)
-       :x-label "Time"
-       :y-label "Peers"))
+(facts (sim-utils/task-completeness result-db)
+       (sim-utils/task-safety result-db))
 
 (alter-var-root #'system component/stop)
 

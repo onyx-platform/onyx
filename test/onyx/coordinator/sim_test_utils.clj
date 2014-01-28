@@ -1,9 +1,11 @@
 (ns onyx.coordinator.sim-test-utils
-  (:require [clojure.test :refer [is]]
+  (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan <!! >!! timeout]]
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
+            [incanter.core :refer [view]]
+            [incanter.charts :refer [line-chart]]
             [onyx.coordinator.extensions :as extensions]
             [onyx.system :as s]))
 
@@ -38,20 +40,26 @@
 (defn task-completeness [result-db]
   (let [query '[:find (count ?task) :where [?task :task/complete? false]]
         result (ffirst (d/q query result-db))]
-    (is (nil? result))))
+    
+    (fact "All tasks were completed"
+          result => nil?)))
 
-(defn task-safety [result-db]
+(defn sequential-safety [result-db]
   (let [query '[:find ?task (count ?peer) :where
                 [?task :task/consumption :sequential]
                 [?peer :peer/task ?task]]
         result (map second (d/q query (d/history result-db)))]
-    (is (every? (partial = 1) result))))
+    
+    (fact "No sequential tasks ever had more than one peer at a time" 
+          (every? (partial = 1) result) => true)))
 
 (defn peer-liveness [result-db n-peers]
   (let [query '[:find ?peer :where
                 [?peer :peer/task]]
         result (map first (d/q query (d/history result-db)))]
-    (is (= (count result) n-peers))))
+    
+    (fact "All peers got at least one task"
+          (count result) => n-peers)))
 
 (defn peer-fairness [result-db n-peers n-jobs tasks-per-job]
   (let [query '[:find ?peer (count ?task) :where
@@ -59,18 +67,23 @@
         result (map second (d/q query (d/history result-db)))
         mean (/ (* n-jobs tasks-per-job) n-peers)
         confidence 0.5]
-    (is (every?
-         #(and (<= (- mean (* mean confidence)) %)
-               (>= (+ mean (* mean confidence)) %))
-         result))))
+    
+    (fact "All peers got within 50% of the average number of tasks"
+          (every?
+           #(and (<= (- mean (* mean confidence)) %)
+                 (>= (+ mean (* mean confidence)) %))
+           result)) => true))
 
 (defn concurrency-liveness [result-db n-jobs tasks-per-job]
   (let [query '[:find ?task (count ?peer) :where
                 [?task :task/consumption :concurrent]
                 [?peer :peer/task ?task]]
         result (map second (d/q query (d/history result-db)))]
-    (is (>= (count (filter (partial < 1) result))
-            (/ (* n-jobs tasks-per-job) 0.25)))))
+    
+    (fact "No peer got more than 25% of all tasks"
+          (>= (count (filter (partial < 1) result))
+              (/ (* n-jobs tasks-per-job) 0.25))
+          => true)))
 
 (defn create-peer [model components peer]
   (future
@@ -108,4 +121,33 @@
   (doseq [_ (range (:model/n-peers model))]
     (let [peer (extensions/create (:sync components) :peer)]
       (swap! cluster assoc peer (create-peer model components peer)))))
+
+(defn block-until-completion! [tx-queue total-tasks]
+  (loop []
+    (let [db (:db-after (.take tx-queue))
+          query '[:find (count ?task) :where [?task :task/complete? true]]
+          result (ffirst (d/q query db))]
+      (prn result)
+      (when-not (= result total-tasks)
+        (recur)))))
+
+(defn view-peer-chart! [result-db]
+  (let [insts (->> (-> '[:find ?inst :where
+                         [_ :peer/status _ ?tx]
+                         [?tx :db/txInstant ?inst]]
+                       (d/q (d/history result-db)))
+                   (map first)
+                   (sort))
+        dt-and-peers
+        (map (fn [tx]
+               (let [db (d/as-of result-db tx)]
+                 (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
+                      (map first)
+                      (concat [tx]))))
+             insts)]
+    (view (line-chart
+           (map first dt-and-peers)
+           (map second dt-and-peers)
+           :x-label "Time"
+           :y-label "Peers"))))
 

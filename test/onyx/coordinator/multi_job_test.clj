@@ -187,7 +187,7 @@
                               [?job :job/catalog ?catalog]]
                       result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-b))
                       jobs (map first result)]
-                  (is (= (count jobs) 1))))
+                  (fact (count jobs) => 1)))
 
          (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
          (extensions/touch-place sync (:ack (:nodes payload-a)))
@@ -247,6 +247,4 @@
               (<!! offer-ch-spy))))
    
    {:revoke-delay 50000}))
-
-(run-tests 'onyx.coordinator.multi-job-test)
 
