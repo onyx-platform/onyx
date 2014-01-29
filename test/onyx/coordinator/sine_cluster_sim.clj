@@ -198,7 +198,5 @@
 (facts (sim-utils/task-completeness result-db)
        (sim-utils/sequential-safety result-db))
 
-
-
-;;; (alter-var-root #'system component/stop)
+(alter-var-root #'system component/stop)
 

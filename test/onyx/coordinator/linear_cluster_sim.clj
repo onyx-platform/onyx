@@ -183,7 +183,7 @@
 (def result-db (d/db (:conn log)))
 
 (facts (sim-utils/task-completeness result-db)
-       (sim-utils/task-safety result-db))
+       (sim-utils/sequential-safety result-db))
 
 (alter-var-root #'system component/stop)
 
