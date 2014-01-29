@@ -105,7 +105,7 @@
     :hornetq/queue-name "in-queue"}
    {:onyx/name :inc
     :onyx/type :transformer
-    :onyx/consumption :sequential}
+    :onyx/consumption :concurrent}
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :sequential
@@ -132,7 +132,7 @@
 (def sine-cluster-model-data
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
-    :model/n-peers 25
+    :model/n-peers 100
     :model/peek-peers 20
     :model/peer-rate 50
     :model/sine-length 40000
@@ -196,7 +196,9 @@
 (def result-db (d/db (:conn log)))
 
 (facts (sim-utils/task-completeness result-db)
-       (sim-utils/task-safety result-db))
+       (sim-utils/sequential-safety result-db))
 
-(alter-var-root #'system component/stop)
+
+
+;;; (alter-var-root #'system component/stop)
 

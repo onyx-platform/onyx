@@ -68,9 +68,9 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 3)
+(def n-jobs 10)
 
-(def n-peers 10)
+(def n-peers 5)
 
 (def tasks-per-job 3)
 
@@ -127,7 +127,9 @@
 (def result-db (d/db (:conn log)))
 
 (facts (sim-utils/task-completeness result-db)
-       (sim-utils/task-safety result-db))
+       (sim-utils/sequential-safety result-db)
+       (sim-utils/peer-fairness result-db n-peers n-jobs tasks-per-job)
+       (sim-utils/peer-liveness result-db n-peers))
 
 (alter-var-root #'system component/stop)
 

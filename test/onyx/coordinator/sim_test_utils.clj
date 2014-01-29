@@ -37,6 +37,28 @@
       (doseq [tx v]
         (d/transact conn tx)))))
 
+(defn entity-txs [db ent]
+  (map #(nth % 3)
+       (d/q
+        '[:find ?e ?a ?v ?tx ?added
+          :in $ ?e
+          :where
+          [?e ?a ?v ?tx ?added]]
+        (datomic.api/history db)
+        ent)))
+
+(defn sequential-task-ids [db]
+  (->> (d/history db)
+       (d/q '[:find ?task :where [?task :task/consumption :sequential]])
+       (map first)
+       (into #{})))
+
+(defn concurrent-task-ids [db]
+  (->> (d/history db)
+       (d/q '[:find ?task :where [?task :task/consumption :concurrent]])
+       (map first)
+       (into #{})))
+
 (defn task-completeness [result-db]
   (let [query '[:find (count ?task) :where [?task :task/complete? false]]
         result (ffirst (d/q query result-db))]
@@ -45,10 +67,15 @@
           result => nil?)))
 
 (defn sequential-safety [result-db]
-  (let [query '[:find ?task (count ?peer) :where
-                [?task :task/consumption :sequential]
-                [?peer :peer/task ?task]]
-        result (map second (d/q query (d/history result-db)))]
+  (let [task-ids (sequential-task-ids result-db)
+        task-txs (mapcat (partial entity-txs result-db) task-ids)
+        result (mapcat
+                #(let [db (d/as-of result-db %)
+                       query '[:find ?task (count ?peer) :where
+                               [?task :task/consumption :sequential]
+                               [?peer :peer/task ?task]]]
+                   (map second (d/q query db)))
+                task-txs)]
     
     (fact "No sequential tasks ever had more than one peer at a time" 
           (every? (partial = 1) result) => true)))
@@ -66,24 +93,13 @@
                 [?peer :peer/task ?task]]
         result (map second (d/q query (d/history result-db)))
         mean (/ (* n-jobs tasks-per-job) n-peers)
-        confidence 0.5]
+        confidence 0.75]
     
-    (fact "All peers got within 50% of the average number of tasks"
+    (fact "All peers got within 75% of the average number of tasks"
           (every?
            #(and (<= (- mean (* mean confidence)) %)
                  (>= (+ mean (* mean confidence)) %))
            result)) => true))
-
-(defn concurrency-liveness [result-db n-jobs tasks-per-job]
-  (let [query '[:find ?task (count ?peer) :where
-                [?task :task/consumption :concurrent]
-                [?peer :peer/task ?task]]
-        result (map second (d/q query (d/history result-db)))]
-    
-    (fact "No peer got more than 25% of all tasks"
-          (>= (count (filter (partial < 1) result))
-              (/ (* n-jobs tasks-per-job) 0.25))
-          => true)))
 
 (defn create-peer [model components peer]
   (future
@@ -124,7 +140,8 @@
 
 (defn block-until-completion! [tx-queue total-tasks]
   (loop []
-    (let [db (:db-after (.take tx-queue))
+    (let [tx (.take tx-queue)
+          db (:db-after tx)
           query '[:find (count ?task) :where [?task :task/complete? true]]
           result (ffirst (d/q query db))]
       (prn result)
