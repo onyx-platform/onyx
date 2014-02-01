@@ -84,7 +84,7 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}
            offer-ch-spy (chan 1)]
-             
+
        (tap (:offer-mult coordinator) offer-ch-spy)
              
        (>!! (:planning-ch-head coordinator)
@@ -108,18 +108,6 @@
                               [?t :task/ingress-queues ?qs]]]
                   (fact (d/q query db) => #{["in-queue"]})))
 
-         (facts ":out's ingress queue is preset"
-                (let [query '[:find ?qs :where
-                              [?t :task/name :out]
-                              [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q query db) => #{["out-queue"]})))
-
-         (facts ":out has no egress queue"
-                (let [query '[:find ?qs :where
-                              [?t :task/name :out]
-                              [?t :task/egress-queues ?qs]]]
-                  (fact (d/q query db) => empty?)))
-
          (facts ":inc's ingress queue is :in's egress queue"
                 (let [in-query '[:find ?qs :where
                                  [?t :task/name :in]
@@ -136,7 +124,13 @@
                       out-query '[:find ?qs :where
                                   [?t :task/name :out]
                                   [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q inc-query db) => (d/q out-query db)))))))))
+                  (fact (d/q inc-query db) => (d/q out-query db))))
+
+         (facts ":out's egress queue is preset"
+                (let [query '[:find ?qs :where
+                              [?t :task/name :out]
+                              [?t :task/egress-queues ?qs]]]
+                  (fact (d/q query db) => #{["out-queue"]}))))))))
 
 (defn test-task-life-cycle
   [{:keys [log sync sync-spy ack-ch-spy completion-ch-spy offer-ch-spy

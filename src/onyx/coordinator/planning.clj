@@ -15,13 +15,7 @@
     (only matches)))
 
 (defn egress-queues-to-children [elements]
-  (into {}
-   (map
-    (fn [x]
-      (if (= :queue (:onyx/type x))
-        {(:onyx/name x) (:ingress-queues (extensions/create-io-task x nil nil nil))}
-        {(:onyx/name x) (str (UUID/randomUUID))}))
-    elements)))
+  (into {} (map #(hash-map (:onyx/name %) (str (UUID/randomUUID))) elements)))
 
 (defmulti create-task
   (fn [catalog task-name parent children-names phase]
