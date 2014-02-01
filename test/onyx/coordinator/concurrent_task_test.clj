@@ -16,6 +16,7 @@
      (let [n 4
            peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
            pulses (take n (repeatedly (fn [] (extensions/create sync :pulse))))
+           shutdowns (take n (repeatedly (fn [] (extensions/create sync :shutdown))))
            payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
            sync-spies (take n (repeatedly (fn [] (chan 1))))
            
@@ -43,8 +44,11 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
        
-       (doseq [[peer pulse payload sync-spy] (map vector peers pulses payloads sync-spies)]
-         (extensions/write-place sync peer {:pulse pulse :payload payload})
+       (doseq [[peer pulse shutdown payload sync-spy]
+               (map vector peers pulses shutdowns payloads sync-spies)]
+         (extensions/write-place sync peer {:pulse pulse
+                                            :shutdown shutdown
+                                            :payload payload})
          (extensions/on-change sync payload #(>!! sync-spy %)))
 
        (doseq [peer peers]

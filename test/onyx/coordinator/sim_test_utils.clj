@@ -108,9 +108,12 @@
             sync (:sync components)
             payload (extensions/create sync :payload)
             pulse (extensions/create sync :pulse)
+            shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
-        (extensions/write-place sync peer {:pulse pulse :payload payload})
+        (extensions/write-place sync peer {:pulse pulse
+                                           :shutdown shutdown
+                                           :payload payload})
         (extensions/on-change sync payload #(>!! sync-spy %))
         
         (>!! (:born-peer-ch-head coordinator) peer)

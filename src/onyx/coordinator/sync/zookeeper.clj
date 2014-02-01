@@ -18,6 +18,7 @@
       (zk/create conn "/onyx/acks" :persistent? true)
       (zk/create conn "/onyx/completions" :persistent? true)
       (zk/create conn "/onyx/status"  :persistent? true)
+      (zk/create conn "/onyx/shutdown" :persistent? true)
       (assoc component :conn conn)))
 
   (stop [component]
@@ -71,6 +72,12 @@
 (defmethod extensions/create [ZooKeeper :status]
   [sync _]
   (let [place (str "/onyx/status/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :shutdown]
+  [sync _]
+  (let [place (str "/onyx/shutdown/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :persistent? true)
     place))
 

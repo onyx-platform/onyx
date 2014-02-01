@@ -57,6 +57,10 @@
         result)
     false))
 
+(defn shutdown-peer [sync peer]
+  (let [shutdown (:shutdown (extensions/read-place sync peer))]
+    (extensions/delete sync shutdown)))
+
 (defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
   (loop []
     (when-let [peer (<!! born-tail)]
@@ -85,10 +89,11 @@
       (acknowledge-task log sync ack-place)
       (recur))))
 
-(defn evict-ch-loop [log sync evict-tail offer-head]
+(defn evict-ch-loop [log sync evict-tail offer-head shutdown-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
       (evict-peer log sync peer)
+      (>!! shutdown-head peer)
       (>!! offer-head peer)
       (recur))))
 
@@ -118,6 +123,12 @@
         (>!! offer-head result))
       (recur))))
 
+(defn shutdown-ch-loop [sync shutdown-tail]
+  (loop []
+    (when-let [peer (<!! shutdown-tail)]
+      (shutdown-peer sync peer)
+      (recur))))
+
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
@@ -143,6 +154,7 @@
           ack-ch-head (chan ch-capacity)
           completion-ch-head (chan ch-capacity)
           failure-ch-head (chan ch-capacity)
+          shutdown-ch-head (chan ch-capacity)
 
           planning-ch-tail (chan ch-capacity)
           born-peer-ch-tail (chan ch-capacity)
@@ -153,6 +165,7 @@
           ack-ch-tail (chan ch-capacity)
           completion-ch-tail (chan ch-capacity)
           failure-ch-tail (chan ch-capacity)
+          shutdown-ch-tail (chan ch-capacity)
 
           planning-mult (mult planning-ch-head)
           born-peer-mult (mult born-peer-ch-head)
@@ -162,7 +175,8 @@
           offer-revoke-mult (mult offer-revoke-ch-head)
           ack-mult (mult ack-ch-head)
           completion-mult (mult completion-ch-head)
-          failure-mult (mult failure-ch-head)]
+          failure-mult (mult failure-ch-head)
+          shutdown-mult (mult shutdown-ch-head)]
       
       (tap planning-mult planning-ch-tail)
       (tap born-peer-mult born-peer-ch-tail)
@@ -173,6 +187,7 @@
       (tap ack-mult ack-ch-tail)
       (tap completion-mult completion-ch-tail)
       (tap failure-mult failure-ch-tail)
+      (tap shutdown-mult shutdown-ch-tail)
 
       (dire/with-handler! #'mark-peer-birth
         java.lang.Exception
@@ -216,6 +231,12 @@
           (>!! failure-ch-head {:ch :evict :e e})
           false))
 
+      (dire/with-handler! #'shutdown-peer
+        java.lang.Exception
+        (fn [e & _]
+          (>!! failure-ch-head {:ch :shutdown :e e})
+          false))
+
       (dire/with-handler! #'born-peer-ch-loop
         java.lang.Exception print-if-not-thread-death)
 
@@ -240,6 +261,9 @@
       (dire/with-handler! #'completion-ch-loop
         java.lang.Exception print-if-not-thread-death)
 
+      (dire/with-handler! #'shutdown-ch-loop
+        java.lang.Exception print-if-not-thread-death)
+
       (assoc component
         :planning-ch-head planning-ch-head
         :born-peer-ch-head born-peer-ch-head
@@ -250,6 +274,7 @@
         :ack-ch-head ack-ch-head
         :completion-ch-head completion-ch-head
         :failure-ch-head failure-ch-head
+        :shutdown-ch-head shutdown-ch-head
 
         :planning-mult planning-mult
         :born-peer-mult born-peer-mult
@@ -260,16 +285,18 @@
         :ack-mult ack-mult
         :completion-mult completion-mult
         :failure-mult failure-mult
+        :shutdown-mult shutdown-mult
 
         :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
         :ack-thread (future (ack-ch-loop log sync ack-ch-tail))
-        :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head))
+        :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-thread (future (offer-ch-loop log sync revoke-delay offer-ch-tail ack-ch-head completion-ch-head offer-revoke-ch-head))
         :offer-revoke-thread (future (offer-revoke-ch-loop log sync offer-revoke-ch-tail evict-ch-head))
         :completion-thread (future (completion-ch-loop log sync queue completion-ch-tail offer-ch-head))
-        :failure-thread (future (failure-ch-loop failure-ch-tail)))))
+        :failure-thread (future (failure-ch-loop failure-ch-tail))
+        :shutdown-thread (future (shutdown-ch-loop sync shutdown-ch-tail)))))
 
   (stop [component]
     (prn "Stopping Coordinator")
@@ -283,6 +310,7 @@
     (close! (:ack-ch-head component))
     (close! (:completion-ch-head component))
     (close! (:failure-ch-head component))
+    (close! (:shutdown-ch-head component))
 
     (future-cancel (:born-peer-thread component))
     (future-cancel (:dead-peer-thread component))
@@ -293,6 +321,7 @@
     (future-cancel (:ack-thread component))
     (future-cancel (:completion-thread component))
     (future-cancel (:failure-thread component))
+    (future-cancel (:shutdown-thread component))
 
     component))
 

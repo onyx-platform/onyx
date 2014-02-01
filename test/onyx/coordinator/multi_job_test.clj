@@ -19,6 +19,9 @@
            pulse-node-a (extensions/create sync :pulse)
            pulse-node-b (extensions/create sync :pulse)
 
+           shutdown-node-a (extensions/create sync :shutdown)
+           shutdown-node-b (extensions/create sync :shutdown)
+
            payload-node-a-1 (extensions/create sync :payload)
            payload-node-b-1 (extensions/create sync :payload)
 
@@ -70,11 +73,13 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
 
        (extensions/write-place sync peer-node-a {:payload payload-node-a-1
-                                                 :pulse pulse-node-a})
+                                                 :pulse pulse-node-a
+                                                 :shutdown shutdown-node-a})
        (extensions/on-change sync payload-node-a-1 #(>!! sync-spy-a %))
 
        (extensions/write-place sync peer-node-b {:payload payload-node-b-1
-                                                 :pulse pulse-node-b})
+                                                 :pulse pulse-node-b
+                                                 :shutdown shutdown-node-b})
        (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
 
        (>!! (:born-peer-ch-head coordinator) peer-node-a)
@@ -124,7 +129,9 @@
          (>!! (:planning-ch-head coordinator) {:catalog catalog-b :workflow workflow-b})
          (<!! offer-ch-spy)
 
-         (extensions/write-place sync peer-node-a {:pulse pulse-node-a :payload payload-node-a-2})
+         (extensions/write-place sync peer-node-a {:pulse pulse-node-a
+                                                   :payload payload-node-a-2
+                                                   :shutdown shutdown-node-a})
          (extensions/on-change sync payload-node-a-2 #(>!! sync-spy-a %))
          (extensions/touch-place sync (:completion (:nodes payload-a))))
 
@@ -148,7 +155,9 @@
          (<!! status-spy))
 
        (let [payload-b (extensions/read-place sync payload-node-b-1)]
-         (extensions/write-place sync peer-node-b {:pulse pulse-node-b :payload payload-node-b-2})
+         (extensions/write-place sync peer-node-b {:pulse pulse-node-b
+                                                   :payload payload-node-b-2
+                                                   :shutdown shutdown-node-b})
          (extensions/on-change sync payload-node-b-2 #(>!! sync-spy-b %))
          (extensions/touch-place sync (:completion (:nodes payload-b)))
 
@@ -172,7 +181,9 @@
          (<!! status-spy))
 
        (let [payload-a (extensions/read-place sync payload-node-a-2)]
-         (extensions/write-place sync peer-node-a {:pulse pulse-node-a :payload payload-node-a-1})
+         (extensions/write-place sync peer-node-a {:pulse pulse-node-a
+                                                   :shutdown shutdown-node-a
+                                                   :payload payload-node-a-1})
          (extensions/on-change sync payload-node-a-1 #(>!! sync-spy-a %))
          (extensions/touch-place sync (:completion (:nodes payload-a)))
 
@@ -196,7 +207,9 @@
          (<!! status-spy))
 
        (let [payload-b (extensions/read-place sync payload-node-b-2)]
-         (extensions/write-place sync peer-node-b {:pulse pulse-node-b :payload payload-node-b-1})
+         (extensions/write-place sync peer-node-b {:pulse pulse-node-b
+                                                   :shutdown shutdown-node-b
+                                                   :payload payload-node-b-1})
          (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
          (extensions/touch-place sync (:completion (:nodes payload-b)))
 

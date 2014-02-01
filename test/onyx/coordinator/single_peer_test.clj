@@ -15,10 +15,11 @@
    (fn [coordinator sync log]
      (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:pulse pulse})
+       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
@@ -38,20 +39,24 @@
    (fn [coordinator sync log]
      (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
            evict-ch-spy (chan 1)
+           shutdown-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:pulse pulse})
+       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:evict-mult coordinator) evict-ch-spy)
+       (tap (:shutdown-mult coordinator) shutdown-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
              
        (>!! (:born-peer-ch-head coordinator) peer)
        (<!! offer-ch-spy)
        (extensions/delete sync pulse)
        (<!! evict-ch-spy)
+       (<!! shutdown-ch-spy)
 
        (facts "There are no peers"
               (let [query '[:find ?p :where [?e :node/peer ?p]]
@@ -135,7 +140,8 @@
 
 (defn test-task-life-cycle
   [{:keys [log sync sync-spy ack-ch-spy completion-ch-spy offer-ch-spy
-           peer-node payload-node next-payload-node task-name pulse-node]}]
+           peer-node payload-node next-payload-node task-name pulse-node
+           shutdown-node]}]
   (facts "The payload node is populated"
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
@@ -166,7 +172,9 @@
              (let [event (<!! ack-ch-spy)]
                (fact (:path event) => (:ack nodes)))))
 
-    (extensions/write-place sync peer-node {:pulse pulse-node :payload next-payload-node})
+    (extensions/write-place sync peer-node {:pulse pulse-node
+                                            :shutdown shutdown-node
+                                            :payload next-payload-node})
     (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
     (facts "Touching the completion node triggers the callback"
@@ -196,6 +204,7 @@
    (fn [coordinator sync log]
      (let [peer-node (extensions/create sync :peer)
            pulse-node (extensions/create sync :pulse)
+           shutdown-node (extensions/create sync :shutdown)
                  
            in-payload-node (extensions/create sync :payload)
            inc-payload-node (extensions/create sync :payload)
@@ -228,7 +237,9 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
 
-       (extensions/write-place sync peer-node {:pulse pulse-node :payload in-payload-node})
+       (extensions/write-place sync peer-node {:pulse pulse-node
+                                               :shutdown shutdown-node
+                                               :payload in-payload-node})
        (extensions/on-change sync in-payload-node #(>!! sync-spy %))
 
        (>!! (:born-peer-ch-head coordinator) peer-node)
@@ -287,6 +298,7 @@
 
            peer-node (extensions/create sync :peer)
            pulse-node (extensions/create sync :pulse)
+           shutdown-node (extensions/create sync :shutdown)
            payload-node (extensions/create sync :payload)
                  
            sync-spy (chan 1)
@@ -299,8 +311,7 @@
 
        (>!! (:born-peer-ch-head coordinator) peer-node)
        (<!! offer-ch-spy)
-       (>!! (:planning-ch-head coordinator)
-            {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
        (<!! offer-ch-spy)
        (<!! sync-spy)
 
@@ -328,13 +339,14 @@
    (fn [coordinator sync log]
      (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 5)
            ack-ch-spy (chan 5)
            evict-ch-spy (chan 5)
            completion-ch-spy (chan 5)
            failure-ch-spy (chan 10)]
 
-       (extensions/write-place sync peer {:pulse pulse})
+       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
