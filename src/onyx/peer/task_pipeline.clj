@@ -1,30 +1,41 @@
 (ns onyx.peer.task-pipeline
-  (:require [clojure.core.async :refer [chan]]
+  (:require [clojure.core.async :refer [chan close!]]
             [com.stuartsierra.component :as component]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.extensions :as extensions]))
 
-(defn open-session-loop [read-ch])
+(defn open-session-loop [read-ch]
+  (loop []))
 
-(defn read-batch-loop [read-ch decompress-ch])
+(defn read-batch-loop [read-ch decompress-ch]
+  (loop []))
 
-(defn decompress-tx-loop [decompress-ch apply-fn-ch])
+(defn decompress-tx-loop [decompress-ch apply-fn-ch]
+  (loop []))
 
-(defn apply-fn-loop [apply-fn-ch compress-ch])
+(defn apply-fn-loop [apply-fn-ch compress-ch]
+  (loop []))
 
-(defn compress-tx-loop [compress-ch write-batch-ch])
+(defn compress-tx-loop [compress-ch write-batch-ch]
+  (loop []))
 
-(defn write-batch-loop [write-ch status-check-ch])
+(defn write-batch-loop [write-ch status-check-ch]
+  (loop []))
 
-(defn status-check-loop [status-ch commit-tx-ch])
+(defn status-check-loop [status-ch commit-tx-ch]
+  (loop []))
 
-(defn commit-tx-loop [commit-ch close-session-ch])
+(defn commit-tx-loop [commit-ch close-session-ch]
+  (loop []))
 
-(defn close-session-loop [close-ch complete-task-ch])
+(defn close-session-loop [close-ch complete-task-ch]
+  (loop []))
 
-(defn complete-task-loop [complete-ch reset-payload-node-ch])
+(defn complete-task-loop [complete-ch reset-payload-node-ch]
+  (loop []))
 
-(defn reset-payload-node-loop [reset-ch])
+(defn reset-payload-node-loop [reset-ch]
+  (loop []))
 
 (defrecord TaskPipeline [payload-node]
   component/Lifecycle
@@ -69,6 +80,17 @@
 
   (stop [component]
     (prn "Stopping Task Pipeline")
+
+    (close! (:read-batch-ch component))
+    (close! (:decompress-tx-ch component))
+    (close! (:apply-fn-ch component))
+    (close! (:compress-tx-ch component))
+    (close! (:write-batch-ch component))
+    (close! (:status-check-ch component))
+    (close! (:commit-tx-ch component))
+    (close! (:close-session-ch component))
+    (close! (:complete-task-ch component))
+    (close! (:reset-payload-node-ch component))
 
     (future-cancel (:open-session-loop component))
     (future-cancel (:read-batch-loop component))
