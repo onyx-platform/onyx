@@ -4,7 +4,7 @@
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.extensions :as extensions]))
 
-(defn open-session-loop [read-ch]
+(defn open-session-loop [queue read-ch]
   (loop []
     (recur)))
 
@@ -87,17 +87,17 @@
         :complete-task-ch complete-task-ch
         :reset-payload-node-ch reset-payload-node-ch        
         
-        :open-session-loop (future)
-        :read-batch-loop (future)
-        :decompress-tx-loop (future)
-        :apply-fn-loop (future)
-        :compress-tx-loop (future)
-        :write-batch-loop (future)
-        :status-check-loop (future)
-        :commit-tx-loop (future)
-        :close-session-loop (future)
-        :complete-task-loop (future)
-        :reset-payload-node-loop (future))))
+        :open-session-loop (future (open-session-loop queue read-batch-ch))
+        :read-batch-loop (future (read-batch-loop read-batch-ch decompress-tx-ch))
+        :decompress-tx-loop (future (decompress-tx-loop decompress-tx-ch apply-fn-ch))
+        :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-tx-ch))
+        :compress-tx-loop (future (compress-tx-loop compress-tx-ch write-batch-ch))
+        :write-batch-loop (future (write-batch-loop write-batch-ch status-check-ch))
+        :status-check-loop (future (status-check-loop status-check-ch commit-tx-ch))
+        :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-session-ch))
+        :close-session-loop (future (close-session-loop close-session-ch complete-task-ch))
+        :complete-task-loop (future (complete-task-loop complete-task-ch reset-payload-node-ch))
+        :reset-payload-node-loop (future (reset-payload-node-loop reset-payload-node-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")
