@@ -46,10 +46,17 @@
    :phase phase
    :consumption (:onyx/consumption element)})
 
-(defmethod extensions/create-queue :hornetq
+(defmethod extensions/create-queue HornetQ
   [queue task]
-  )
+  (let [session-factory (:session-factory queue)
+        session (.createTransactedSession session-factory)
+        ingress-queue (:ingress-queues task)
+        egress-queues (vals (:egress-queues task))]
+    (doseq [queue-name (conj egress-queues ingress-queue)]
+      (try
+        (.createQueue session queue-name queue-name true)
+        (catch Exception e (prn e))))))
 
-(defmethod extensions/cap-queue :hornetq
+(defmethod extensions/cap-queue HornetQ
   [queue task] true)
 

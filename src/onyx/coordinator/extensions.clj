@@ -36,9 +36,9 @@
 
 (defmulti on-delete (fn [sync place db] (type sync)))
 
-(defmulti create-queue (fn [queue queue-name] queue))
+(defmulti create-queue (fn [queue queue-name] (type queue)))
 
-(defmulti cap-queue (fn [queue task] queue))
+(defmulti cap-queue (fn [queue task] (type queue)))
 
 (defmulti create-io-task
   (fn [element parent children phase]
