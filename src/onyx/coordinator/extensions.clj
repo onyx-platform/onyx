@@ -20,6 +20,8 @@
 
 (defmulti node-basis (fn [log basis node] (type log)))
 
+(defmulti node->task (fn [log basis node] (type log)))
+
 (defmulti idle-peers (fn [log] (type log)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
@@ -38,7 +40,7 @@
 
 (defmulti create-queue (fn [queue queue-name] (type queue)))
 
-(defmulti cap-queue (fn [queue task] (type queue)))
+(defmulti cap-queue (fn [queue queue-names] (type queue)))
 
 (defmulti create-io-task
   (fn [element parent children phase]

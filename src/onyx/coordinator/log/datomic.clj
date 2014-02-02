@@ -172,6 +172,14 @@
         ent (into {} (d/entity db result))]
     (select-nodes ent)))
 
+(defmethod extensions/node->task Datomic
+  [log basis node]
+  (let [db (d/db (:conn log))
+        query '[:find ?task :in $ ?basis ?node :where
+                [?peer ?basis ?node]
+                [?peer :peer/task ?task]]]
+    (into {} (d/entity db (ffirst (d/q query db basis node))))))
+
 (defmethod extensions/idle-peers Datomic
   [log]
   (let [db (d/db (:conn log))

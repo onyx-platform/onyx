@@ -58,5 +58,6 @@
         (catch HornetQQueueExistsException e)))))
 
 (defmethod extensions/cap-queue HornetQ
-  [queue task] true)
+  [queue task]
+  )
 

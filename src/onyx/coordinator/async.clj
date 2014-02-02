@@ -52,11 +52,12 @@
     (evict-cb peer-node)))
 
 (defn complete-task [log sync queue complete-place]
-  (if-let [result (extensions/complete log complete-place)]
-    (do (extensions/delete sync complete-place)
-        (extensions/cap-queue queue complete-place)
-        result)
-    false))
+  (let [task (extensions/node->task log :node/completion complete-place)]
+    (if-let [result (extensions/complete log complete-place)]
+      (do (extensions/delete sync complete-place)
+          (extensions/cap-queue queue (:egress-queues task))
+          result)
+      false)))
 
 (defn shutdown-peer [sync peer]
   (let [shutdown (:shutdown (extensions/read-place sync peer))]
