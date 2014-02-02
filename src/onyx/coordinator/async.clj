@@ -15,8 +15,9 @@
 (defn mark-peer-death [log peer]
   (extensions/mark-peer-dead log peer))
 
-(defn plan-job [log {:keys [catalog workflow]}]
+(defn plan-job [log queue {:keys [catalog workflow]}]
   (let [tasks (planning/discover-tasks catalog workflow)]
+    (doseq [task tasks] (extensions/create-queue queue task))
     (extensions/plan-job log catalog workflow tasks)))
 
 (defn acknowledge-task [log sync ack-place]
@@ -76,10 +77,10 @@
         (>!! offer-head peer))
       (recur))))
 
-(defn planning-ch-loop [log planning-tail offer-head]
+(defn planning-ch-loop [log queue planning-tail offer-head]
   (loop []
     (when-let [job (<!! planning-tail)]
-      (let [job-id (plan-job log job)]
+      (let [job-id (plan-job log queue job)]
         (>!! offer-head job-id)
         (recur)))))
 
@@ -289,7 +290,7 @@
 
         :born-peer-thread (future (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (future (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head offer-ch-head))
-        :planning-thread (future (planning-ch-loop log planning-ch-tail offer-ch-head))
+        :planning-thread (future (planning-ch-loop log queue planning-ch-tail offer-ch-head))
         :ack-thread (future (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (future (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-thread (future (offer-ch-loop log sync revoke-delay offer-ch-tail ack-ch-head completion-ch-head offer-revoke-ch-head))

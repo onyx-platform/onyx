@@ -36,6 +36,8 @@
 
 (defmulti on-delete (fn [sync place db] (type sync)))
 
+(defmulti create-queue (fn [queue queue-name] queue))
+
 (defmulti cap-queue (fn [queue task] queue))
 
 (defmulti create-io-task

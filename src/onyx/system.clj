@@ -3,9 +3,9 @@
             [onyx.coordinator.async :refer [coordinator]]
             [onyx.coordinator.log.datomic :refer [datomic log-schema]]
             [onyx.coordinator.sync.zookeeper :refer [zookeeper zk-addr]]
-            [onyx.coordinator.queue.hornetq]))
+            [onyx.coordinator.queue.hornetq :refer [hornetq]]))
 
-(def components [:log :sync :coordinator])
+(def components [:log :sync :queue :coordinator])
 
 (defrecord OnyxSystem [log sync queue]
   component/Lifecycle
@@ -14,13 +14,14 @@
   (stop [this]
     (component/stop-system this components)))
 
-(defn onyx-system [{:keys [queue revoke-delay]}]
+(defn onyx-system [{:keys [revoke-delay]}]
   (let [onyx-id (str (java.util.UUID/randomUUID))
+        hornetq-addr "localhost:5445"
         datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))]
     (map->OnyxSystem
      {:log (datomic datomic-uri (log-schema))
       :sync (zookeeper (zk-addr) onyx-id)
-      :queue queue
+      :queue (hornetq hornetq-addr)
       :coordinator (component/using (coordinator revoke-delay)
                                     [:log :sync :queue])})))
 
