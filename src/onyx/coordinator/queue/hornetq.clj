@@ -3,7 +3,7 @@
             [onyx.coordinator.planning :as planning]
             [onyx.coordinator.extensions :as extensions])
   (:import [org.hornetq.api.core.client HornetQClient]
-           [org.hornetq.api.core TransportConfiguration]
+           [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
 (defrecord HornetQ [addr]
@@ -55,7 +55,7 @@
     (doseq [queue-name (conj egress-queues ingress-queue)]
       (try
         (.createQueue session queue-name queue-name true)
-        (catch Exception e (prn e))))))
+        (catch HornetQQueueExistsException e)))))
 
 (defmethod extensions/cap-queue HornetQ
   [queue task] true)
