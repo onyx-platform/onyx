@@ -1,41 +1,62 @@
 (ns onyx.peer.task-pipeline
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [<!! >!! chan close!]]
             [com.stuartsierra.component :as component]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.extensions :as extensions]))
 
 (defn open-session-loop [read-ch]
-  (loop []))
+  (loop []
+    (recur)))
 
 (defn read-batch-loop [read-ch decompress-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! read-ch)]
+      (recur))))
 
 (defn decompress-tx-loop [decompress-ch apply-fn-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! decompress-ch)]
+      (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! apply-fn-ch)]
+      (recur))))
 
 (defn compress-tx-loop [compress-ch write-batch-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! compress-ch)]
+      (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! write-ch)]
+      (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! status-ch)]
+      (recur))))
 
 (defn commit-tx-loop [commit-ch close-session-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! commit-ch)]
+      (recur))))
 
 (defn close-session-loop [close-ch complete-task-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! close-ch)]
+      (recur))))
 
 (defn complete-task-loop [complete-ch reset-payload-node-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! complete-ch)]
+      (recur))))
 
 (defn reset-payload-node-loop [reset-ch]
-  (loop []))
+  (loop []
+    (when-let [event (<!! reset-ch)]
+      (recur))))
 
 (defrecord TaskPipeline [payload-node]
   component/Lifecycle
