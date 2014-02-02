@@ -20,7 +20,7 @@
   [element parent children phase]
   {:name (:onyx/name element)
    :ingress-queues (get (:egress-queues parent) (:onyx/name element))
-   :egress-queues (:hornetq/queue-name element)
+   :egress-queues {:self (:hornetq/queue-name element)}
    :phase phase
    :consumption (:onyx/consumption element)})
 
