@@ -1,4 +1,4 @@
-(ns onyx.coordinator.extensions)
+(ns onyx.extensions)
 
 (defmulti mark-peer-born (fn [log place] (type log)))
 

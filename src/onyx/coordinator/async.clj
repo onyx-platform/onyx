@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
-            [onyx.coordinator.extensions :as extensions]
+            [onyx.extensions :as extensions]
             [onyx.coordinator.planning :as planning]))
 
 (def ch-capacity 10000)

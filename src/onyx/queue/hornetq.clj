@@ -1,7 +1,7 @@
-(ns onyx.coordinator.queue.hornetq
+(ns onyx.queue.hornetq
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
-            [onyx.coordinator.extensions :as extensions])
+            [onyx.extensions :as extensions])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))

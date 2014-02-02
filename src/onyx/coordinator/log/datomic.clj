@@ -1,6 +1,6 @@
 (ns onyx.coordinator.log.datomic
   (:require [com.stuartsierra.component :as component]
-            [onyx.coordinator.extensions :as extensions]
+            [onyx.extensions :as extensions]
             [onyx.util :as u]
             [datomic.api :as d]))
 

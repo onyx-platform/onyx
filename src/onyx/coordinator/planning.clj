@@ -1,5 +1,5 @@
 (ns onyx.coordinator.planning
-  (:require [onyx.coordinator.extensions :as extensions])
+  (:require [onyx.extensions :as extensions])
   (:import [java.util UUID]))
 
 (defn only

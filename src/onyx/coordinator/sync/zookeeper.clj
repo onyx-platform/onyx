@@ -1,6 +1,6 @@
 (ns onyx.coordinator.sync.zookeeper
   (:require [com.stuartsierra.component :as component]
-            [onyx.coordinator.extensions :as extensions]
+            [onyx.extensions :as extensions]
             [onyx.util :as u]
             [zookeeper :as zk])
   (:import [java.util UUID]))

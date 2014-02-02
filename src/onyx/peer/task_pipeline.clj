@@ -1,0 +1,88 @@
+(ns onyx.peer.task-pipeline
+  (:require [clojure.core.async :refer [chan]]
+            [com.stuartsierra.component :as component]
+            [onyx.queue.hornetq :refer [hornetq]]
+            [onyx.extensions :as extensions]))
+
+(defn open-session-loop [read-ch])
+
+(defn read-batch-loop [read-ch decompress-ch])
+
+(defn decompress-tx-loop [decompress-ch apply-fn-ch])
+
+(defn apply-fn-loop [apply-fn-ch compress-ch])
+
+(defn compress-tx-loop [compress-ch write-batch-ch])
+
+(defn write-batch-loop [write-ch status-check-ch])
+
+(defn status-check-loop [status-ch commit-tx-ch])
+
+(defn commit-tx-loop [commit-ch close-session-ch])
+
+(defn close-session-loop [close-ch complete-task-ch])
+
+(defn complete-task-loop [complete-ch reset-payload-node-ch])
+
+(defn reset-payload-node-loop [reset-ch])
+
+(defrecord TaskPipeline [payload-node]
+  component/Lifecycle
+
+  (start [{:keys [sync queue] :as component}]
+    (prn "Starting Task Pipeline")
+
+    (let [read-batch-ch (chan 1)
+          decompress-tx-ch (chan 1)
+          apply-fn-ch (chan 1)
+          compress-tx-ch (chan 1)
+          status-check-ch (chan 1)
+          write-batch-ch (chan 1)
+          commit-tx-ch (chan 1)
+          close-session-ch (chan 1)
+          complete-task-ch (chan 1)
+          reset-payload-node-ch (chan 1)]
+
+      (assoc component
+        :read-batch-ch read-batch-ch
+        :decompress-tx-ch decompress-tx-ch
+        :apply-fn-ch apply-fn-ch
+        :compress-tx-ch compress-tx-ch
+        :write-batch-ch write-batch-ch
+        :status-check-ch status-check-ch
+        :commit-tx-ch commit-tx-ch
+        :close-session-ch close-session-ch
+        :complete-task-ch complete-task-ch
+        :reset-payload-node-ch reset-payload-node-ch        
+        
+        :open-session-loop (future)
+        :read-batch-loop (future)
+        :decompress-tx-loop (future)
+        :apply-fn-loop (future)
+        :compress-tx-loop (future)
+        :write-batch-loop (future)
+        :status-check-loop (future)
+        :commit-tx-loop (future)
+        :close-session-loop (future)
+        :complete-task-loop (future)
+        :reset-payload-node-loop (future))))
+
+  (stop [component]
+    (prn "Stopping Task Pipeline")
+
+    (future-cancel (:open-session-loop component))
+    (future-cancel (:read-batch-loop component))
+    (future-cancel (:decompress-tx-loop component))
+    (future-cancel (:apply-fn-loop component))
+    (future-cancel (:compress-tx-loop component))
+    (future-cancel (:status-check-loop component))
+    (future-cancel (:write-batch-loop component))
+    (future-cancel (:close-session-loop component))
+    (future-cancel (:complete-task-loop component))
+    (future-cancel (:reset-payload-node-loop component))
+    
+    component))
+
+(defn task-pipeline []
+  (map->TaskPipeline {}))
+

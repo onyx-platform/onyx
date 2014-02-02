@@ -3,7 +3,7 @@
             [onyx.coordinator.async :refer [coordinator]]
             [onyx.coordinator.log.datomic :refer [datomic log-schema]]
             [onyx.coordinator.sync.zookeeper :refer [zookeeper zk-addr]]
-            [onyx.coordinator.queue.hornetq :refer [hornetq]]))
+            [onyx.queue.hornetq :refer [hornetq]]))
 
 (def components [:log :sync :queue :coordinator])
 
