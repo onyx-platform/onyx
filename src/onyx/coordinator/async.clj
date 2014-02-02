@@ -132,8 +132,8 @@
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
-      (prn "Failed: " (:ch failure))
-      (prn "Details: " (:e failure))
+      ;; (prn "Failed: " (:ch failure))
+      ;; (prn "Details: " (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]
