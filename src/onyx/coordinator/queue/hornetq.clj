@@ -55,9 +55,20 @@
     (doseq [queue-name (conj egress-queues ingress-queue)]
       (try
         (.createQueue session queue-name queue-name true)
-        (catch HornetQQueueExistsException e)))))
+        (catch HornetQQueueExistsException e)))
+    (.close session)))
 
 (defmethod extensions/cap-queue HornetQ
   [queue task]
-  )
+  (let [egress-queues (:egress-queues task)
+        session-factory (:session-factory queue)
+        session (.createTransactedSession session-factory)]
+    (doseq [queue-name egress-queues]
+      (let [producer (.createProducer session)
+            message (.createMessage session true)]
+        (.writeString (.getBufferBody message) (pr-str :done))
+        (.send producer message)
+        (.close producer)
+        (.commit session)))
+    (.close session)))
 
