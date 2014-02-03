@@ -38,6 +38,12 @@
 
 (defmulti on-delete (fn [sync place db] (type sync)))
 
+(defmulti create-tx-session (fn [queue] (type queue)))
+
+(defmulti create-consumer (fn [queue session queue-name] (type queue)))
+
+(defmulti consume-message (fn [queue consumer] (type queue)))
+
 (defmulti create-queue (fn [queue queue-name] (type queue)))
 
 (defmulti cap-queue (fn [queue queue-names] (type queue)))

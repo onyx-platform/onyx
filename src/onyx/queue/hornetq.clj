@@ -46,10 +46,25 @@
    :phase phase
    :consumption (:onyx/consumption element)})
 
+(defmethod extensions/create-tx-session HornetQ
+  [queue]
+  (let [session-factory (:session-factory queue)]
+    (.createTransactedSession session-factory)))
+
+(defmethod extensions/create-consumer HornetQ
+  [queue session queue-name]
+  (.createConsumer session queue-name))
+
+(defmethod extensions/consume-message HornetQ
+  [queue consumer]
+  (let [message (.receive consumer)
+        contents (.readString (.getBodyBuffer message))]
+    (.acknowledge message)
+    message))
+
 (defmethod extensions/create-queue HornetQ
   [queue task]
-  (let [session-factory (:session-factory queue)
-        session (.createTransactedSession session-factory)
+  (let [session (extensions/create-tx-session queue)
         ingress-queue (:ingress-queues task)
         egress-queues (vals (:egress-queues task))]
     (doseq [queue-name (conj egress-queues ingress-queue)]
@@ -61,8 +76,7 @@
 (defmethod extensions/cap-queue HornetQ
   [queue task]
   (let [egress-queues (:egress-queues task)
-        session-factory (:session-factory queue)
-        session (.createTransactedSession session-factory)]
+        session (extensions/create-tx-session queue)]
     (doseq [queue-name egress-queues]
       (let [producer (.createProducer session)
             message (.createMessage session true)]
