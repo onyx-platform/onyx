@@ -21,6 +21,10 @@
 (defn compress-msg [message]
   (pr-str message))
 
+(defn write-batch [queue session producer msgs]
+  (doseq [msg msgs]
+    (extensions/produce-message queue producer msg)))
+
 (defn open-session-loop [queue read-ch]
   (loop []
     (when-let [session (create-tx-session queue)]
@@ -56,9 +60,12 @@
         (>!! compress-ch (assoc event :compressed compressed-msgs)))
       (recur))))
 
-(defn write-batch-loop [write-ch status-check-ch]
+(defn write-batch-loop [queue queue-name write-ch status-check-ch]
   (loop []
-    (when-let [event (<!! write-ch)]
+    (when-let [{:keys [session compressed] :as event} (<!! write-ch)]
+      (let [producer (extensions/create-producer queue session queue-name)
+            batch (write-batch queue session producer compressed)]
+        (>!! status-check-ch (assoc event :producer producer)))
       (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch]
@@ -105,7 +112,9 @@
 
           payload (extensions/read-place sync payload-node)
 
-          batch-size 1000]
+          batch-size 1000
+
+          queue-name "???"]
 
       (assoc component
         :read-batch-ch read-batch-ch
@@ -120,11 +129,11 @@
         :reset-payload-node-ch reset-payload-node-ch        
         
         :open-session-loop (future (open-session-loop queue read-batch-ch))
-        :read-batch-loop (future (read-batch-loop read-batch-ch decompress-tx-ch batch-size))
+        :read-batch-loop (future (read-batch-loop read-batch-ch queue-name decompress-tx-ch batch-size))
         :decompress-tx-loop (future (decompress-tx-loop decompress-tx-ch apply-fn-ch))
         :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-tx-ch))
         :compress-tx-loop (future (compress-tx-loop compress-tx-ch write-batch-ch))
-        :write-batch-loop (future (write-batch-loop write-batch-ch status-check-ch))
+        :write-batch-loop (future (write-batch-loop queue queue-name write-batch-ch status-check-ch))
         :status-check-loop (future (status-check-loop status-check-ch commit-tx-ch))
         :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (future (close-resources-loop close-resources-ch complete-task-ch))

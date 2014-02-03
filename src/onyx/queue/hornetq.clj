@@ -51,9 +51,19 @@
   (let [session-factory (:session-factory queue)]
     (.createTransactedSession session-factory)))
 
+(defmethod extensions/create-producer HornetQ
+  [queue session queue-name]
+  (.createProducer session queue-name))
+
 (defmethod extensions/create-consumer HornetQ
   [queue session queue-name]
   (.createConsumer session queue-name))
+
+(defmethod extensions/produce-message HornetQ
+  [queue producer session msg]
+  (let [message (.createMessage session true)]
+    (.writeString (.getBodyBuffer message) msg)
+    (.send producer message)))
 
 (defmethod extensions/consume-message HornetQ
   [queue consumer]

@@ -42,7 +42,11 @@
 
 (defmulti create-consumer (fn [queue session queue-name] (type queue)))
 
+(defmulti create-producer (fn [queue session queue-name] (type queue)))
+
 (defmulti consume-message (fn [queue consumer] (type queue)))
+
+(defmulti produce-message (fn [queue producer session msg] (type queue)))
 
 (defmulti create-queue (fn [queue queue-name] (type queue)))
 
