@@ -7,9 +7,8 @@
 (defn create-tx-session [queue]
   (extensions/create-tx-session queue))
 
-(defn read-batch [queue session queue-name batch-size]
-  (let [consumer (extensions/create-consumer queue session queue-name)]
-    (map (partial extensions/consume-message consumer) (range batch-size))))
+(defn read-batch [queue consumer batch-size]
+  (map (partial extensions/consume-message queue consumer) (range batch-size)))
 
 (defn decompress-message [message]
   (read-string message))
@@ -24,35 +23,37 @@
 
 (defn open-session-loop [queue read-ch]
   (loop []
-    (>!! read-ch (create-tx-session queue))
-    (recur)))
+    (when-let [session (create-tx-session queue)]
+      (>!! read-ch {:session session})
+      (recur))))
 
 (defn read-batch-loop [queue queue-name read-ch decompress-ch batch-size]
   (loop []
-    (when-let [session (<!! read-ch)]
-      (let [batch (read-batch queue session queue-name batch-size)]
-        (>!! decompress-ch batch))
+    (when-let [{:keys [session] :as event} (<!! read-ch)]
+      (let [consumer (extensions/create-consumer queue session queue-name)
+            batch (read-batch queue consumer batch-size)]
+        (>!! decompress-ch (assoc event :batch batch :consumer consumer)))
       (recur))))
 
 (defn decompress-tx-loop [decompress-ch apply-fn-ch]
   (loop []
-    (when-let [batch (<!! decompress-ch)]
+    (when-let [{:keys [batch] :as event} (<!! decompress-ch)]
       (let [decompressed-msgs (map decompress-message batch)]
-        (>!! apply-fn-ch decompressed-msgs))
+        (>!! apply-fn-ch (assoc event :decompressed decompressed-msgs)))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch task]
   (loop []
-    (when-let [msgs (<!! apply-fn-ch)]
-      (let [rets (map (partial apply-fn task) msgs)]
-        (>!! compress-ch rets))
+    (when-let [{:keys [decompressed] :as event} (<!! apply-fn-ch)]
+      (let [results (map (partial apply-fn task) decompressed)]
+        (>!! compress-ch (assoc event :results results)))
       (recur))))
 
 (defn compress-tx-loop [compress-ch write-batch-ch]
   (loop []
-    (when-let [batch (<!! compress-ch)]
-      (let [compressed-msgs (map compress-msg batch)]
-        (>!! compress-ch batch))
+    (when-let [{:keys [results] :as event} (<!! compress-ch)]
+      (let [compressed-msgs (map compress-msg results)]
+        (>!! compress-ch (assoc event :compressed compressed-msgs)))
       (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch]
