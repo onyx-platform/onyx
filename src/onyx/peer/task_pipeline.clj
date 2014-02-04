@@ -25,47 +25,65 @@
   (doseq [msg msgs]
     (extensions/produce-message queue producer msg)))
 
+(defn munge-open-session [session]
+  {:session session})
+
+(defn munge-read-batch [{:keys [session] :as event} queue queue-name batch-size]
+  (let [consumer (extensions/create-consumer queue session queue-name)
+        batch (read-batch queue consumer batch-size)]
+    (assoc event :batch batch :consumer consumer)))
+
+(defn munge-decompress-tx [{:keys [batch] :as event}]
+  (let [decompressed-msgs (map decompress-message batch)]
+    (assoc event :decompressed decompressed-msgs)))
+
+(defn munge-apply-fn [{:keys [decompressed] :as event} task]
+  (let [results (map (partial apply-fn task) decompressed)]
+    (assoc event :results results)))
+
+(defn munge-compress-tx [{:keys [results] :as event}]
+  (let [compressed-msgs (map compress-msg results)]
+    (assoc event :compressed compressed-msgs)))
+
+(defn munge-write-batch [{:keys [session compressed] :as event} queue queue-name]
+  (let [producer (extensions/create-producer queue session queue-name)
+        batch (write-batch queue session producer compressed)]
+    (assoc event :producer producer)))
+
 (defn open-session-loop [queue read-ch]
   (loop []
     (when-let [session (create-tx-session queue)]
-      (>!! read-ch {:session session})
+      (>!! read-ch (munge-open-session session))
       (recur))))
 
 (defn read-batch-loop [queue queue-name read-ch decompress-ch batch-size]
   (loop []
-    (when-let [{:keys [session] :as event} (<!! read-ch)]
-      (let [consumer (extensions/create-consumer queue session queue-name)
-            batch (read-batch queue consumer batch-size)]
-        (>!! decompress-ch (assoc event :batch batch :consumer consumer)))
+    (when-let [event (<!! read-ch)]
+      (>!! decompress-ch (munge-read-batch event queue queue-name batch-size))
       (recur))))
 
 (defn decompress-tx-loop [decompress-ch apply-fn-ch]
   (loop []
-    (when-let [{:keys [batch] :as event} (<!! decompress-ch)]
-      (let [decompressed-msgs (map decompress-message batch)]
-        (>!! apply-fn-ch (assoc event :decompressed decompressed-msgs)))
+    (when-let [event (<!! decompress-ch)]
+      (>!! apply-fn-ch (munge-decompress-tx event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch task]
   (loop []
-    (when-let [{:keys [decompressed] :as event} (<!! apply-fn-ch)]
-      (let [results (map (partial apply-fn task) decompressed)]
-        (>!! compress-ch (assoc event :results results)))
+    (when-let [event (<!! apply-fn-ch)]
+      (>!! compress-ch (munge-apply-fn event task))
       (recur))))
 
 (defn compress-tx-loop [compress-ch write-batch-ch]
   (loop []
-    (when-let [{:keys [results] :as event} (<!! compress-ch)]
-      (let [compressed-msgs (map compress-msg results)]
-        (>!! compress-ch (assoc event :compressed compressed-msgs)))
+    (when-let [event (<!! compress-ch)]
+      (>!! write-batch-ch (munge-compress-tx event))
       (recur))))
 
 (defn write-batch-loop [queue queue-name write-ch status-check-ch]
   (loop []
-    (when-let [{:keys [session compressed] :as event} (<!! write-ch)]
-      (let [producer (extensions/create-producer queue session queue-name)
-            batch (write-batch queue session producer compressed)]
-        (>!! status-check-ch (assoc event :producer producer)))
+    (when-let [event (<!! write-ch)]
+      (>!! status-check-ch (munge-write-batch event queue queue-name))
       (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch]
