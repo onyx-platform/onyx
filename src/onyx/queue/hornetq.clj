@@ -59,6 +59,17 @@
   [queue session queue-name]
   (.createConsumer session queue-name))
 
+(defmethod extensions/create-queue HornetQ
+  [queue task]
+  (let [session (extensions/create-tx-session queue)
+        ingress-queue (:ingress-queues task)
+        egress-queues (vals (:egress-queues task))]
+    (doseq [queue-name (conj egress-queues ingress-queue)]
+      (try
+        (.createQueue session queue-name queue-name true)
+        (catch HornetQQueueExistsException e)))
+    (.close session)))
+
 (defmethod extensions/produce-message HornetQ
   [queue producer session msg]
   (let [message (.createMessage session true)]
@@ -72,16 +83,13 @@
     (.acknowledge message)
     message))
 
-(defmethod extensions/create-queue HornetQ
-  [queue task]
-  (let [session (extensions/create-tx-session queue)
-        ingress-queue (:ingress-queues task)
-        egress-queues (vals (:egress-queues task))]
-    (doseq [queue-name (conj egress-queues ingress-queue)]
-      (try
-        (.createQueue session queue-name queue-name true)
-        (catch HornetQQueueExistsException e)))
-    (.close session)))
+(defmethod extensions/commit-tx HornetQ
+  [queue session]
+  (.commit session))
+
+(defmethod extensions/close-resource HornetQ
+  [queue resource]
+  (.close resource))
 
 (defmethod extensions/cap-queue HornetQ
   [queue task]

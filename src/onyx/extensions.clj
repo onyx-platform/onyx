@@ -34,6 +34,8 @@
 
 (defmulti read-place (fn [sync place] (type sync)))
 
+(defmulti place-exists? (fn [sync place] (type sync)))
+
 (defmulti on-change (fn [sync place cb] (type sync)))
 
 (defmulti on-delete (fn [sync place db] (type sync)))
@@ -48,9 +50,13 @@
 
 (defmulti produce-message (fn [queue producer session msg] (type queue)))
 
+(defmulti commit-tx (fn [queue session] (type queue)))
+
 (defmulti create-queue (fn [queue queue-name] (type queue)))
 
 (defmulti cap-queue (fn [queue queue-names] (type queue)))
+
+(defmulti close-resource (fn [queue resource] (type queue)))
 
 (defmulti create-io-task
   (fn [element parent children phase]

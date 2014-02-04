@@ -136,6 +136,10 @@
   [sync place]
   (deserialize-edn (:data (zk/data (:conn sync) place))))
 
+(defmethod extensions/place-exists? ZooKeeper
+  [sync place]
+  (boolean (zk/exists (:conn sync) place)))
+
 (defmethod extensions/on-change ZooKeeper
   [sync place cb]
   (let [f (fn [event]

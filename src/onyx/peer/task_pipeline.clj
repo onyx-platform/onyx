@@ -50,6 +50,21 @@
         batch (write-batch queue session producer compressed)]
     (assoc event :producer producer)))
 
+(defn munge-status-check [event sync status-node]
+  (assoc event :commit? (extensions/place-exists? status-node)))
+
+(defn munge-commit-tx [{:keys [session] :as event} queue]
+  (extensions/commit-tx queue session)
+  (assoc event :committed true))
+
+(defn munge-close-resources [{:keys [session producer consumer] :as event} queue]
+  (extensions/close-resource queue)
+  (assoc event :closed true))
+
+(defn munge-complete-task [event sync complete-node]
+  (extensions/touch-place sync complete-node)
+  (assoc event :completed true))
+
 (defn open-session-loop [queue read-ch]
   (loop []
     (when-let [session (create-tx-session queue)]
@@ -86,24 +101,31 @@
       (>!! status-check-ch (munge-write-batch event queue queue-name))
       (recur))))
 
-(defn status-check-loop [status-ch commit-tx-ch]
+(defn status-check-loop [sync status-node status-ch commit-tx-ch reset-payload-node-ch]
   (loop []
     (when-let [event (<!! status-ch)]
-      (recur))))
+      (let [event (munge-status-check event sync)]
+        (if (:commit? event)
+          (>!! commit-tx-ch event)
+          (>!! reset-payload-node-ch event))
+        (recur)))))
 
-(defn commit-tx-loop [commit-ch close-resources-ch]
+(defn commit-tx-loop [queue commit-ch close-resources-ch]
   (loop []
     (when-let [event (<!! commit-ch)]
+      (>!! close-resources-ch (munge-commit-tx event queue))
       (recur))))
 
-(defn close-resources-loop [close-ch complete-task-ch]
+(defn close-resources-loop [queue close-ch complete-task-ch]
   (loop []
     (when-let [event (<!! close-ch)]
+      (>!! complete-task-ch (munge-close-resources event queue))
       (recur))))
 
-(defn complete-task-loop [complete-ch reset-payload-node-ch]
+(defn complete-task-loop [sync complete-ch reset-payload-node-ch completed-node]
   (loop []
     (when-let [event (<!! complete-ch)]
+      (>!! reset-payload-node-ch (munge-complete-task event sync completed-node))
       (recur))))
 
 (defn reset-payload-node-loop [reset-ch]
@@ -132,7 +154,9 @@
 
           batch-size 1000
 
-          queue-name "???"]
+          queue-name "???"
+          status-node "???"
+          completed-node "???"]
 
       (assoc component
         :read-batch-ch read-batch-ch
@@ -152,10 +176,10 @@
         :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-tx-ch))
         :compress-tx-loop (future (compress-tx-loop compress-tx-ch write-batch-ch))
         :write-batch-loop (future (write-batch-loop queue queue-name write-batch-ch status-check-ch))
-        :status-check-loop (future (status-check-loop status-check-ch commit-tx-ch))
-        :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
-        :close-resources-loop (future (close-resources-loop close-resources-ch complete-task-ch))
-        :complete-task-loop (future (complete-task-loop complete-task-ch reset-payload-node-ch))
+        :status-check-loop (future (status-check-loop sync status-node status-check-ch commit-tx-ch reset-payload-node-ch))
+        :commit-tx-loop (future (commit-tx-loop queue commit-tx-ch close-resources-ch))
+        :close-resources-loop (future (close-resources-loop queue close-resources-ch complete-task-ch))
+        :complete-task-loop (future (complete-task-loop sync complete-task-ch reset-payload-node-ch completed-node))
         :reset-payload-node-loop (future (reset-payload-node-loop reset-payload-node-ch)))))
 
   (stop [component]
