@@ -1,7 +1,8 @@
 (ns onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
 (defn payload-loop [payload-ch shutdown-ch status-ch]
   (loop [pipeline nil]
@@ -9,7 +10,8 @@
       (when-not (nil? pipeline)
         (component/stop pipeline))
       (when (= ch payload-ch)
-        (let [new-pipeline (comment "Make a new one")]
+        (comment "Block on status-ch")
+        (let [new-pipeline (task-pipeline v)]
           (recur new-pipeline))))))
 
 (defrecord VirtualPeer []

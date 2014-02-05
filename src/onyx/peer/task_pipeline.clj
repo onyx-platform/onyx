@@ -209,6 +209,6 @@
     
     component))
 
-(defn task-pipeline []
-  (map->TaskPipeline {}))
+(defn task-pipeline [payload-node]
+  (map->TaskPipeline {:payload-node payload-node}))
 
