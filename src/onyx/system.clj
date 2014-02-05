@@ -14,7 +14,7 @@
   (stop [this]
     (component/stop-system this components)))
 
-(defn onyx-system [{:keys [revoke-delay]}]
+(defn in-memory-coordinator [{:keys [revoke-delay]}]
   (let [onyx-id (str (java.util.UUID/randomUUID))
         hornetq-addr "localhost:5445"
         datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))]
