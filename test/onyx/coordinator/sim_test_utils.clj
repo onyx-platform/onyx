@@ -6,7 +6,7 @@
             [datomic.api :as d]
             [incanter.core :refer [view]]
             [incanter.charts :refer [line-chart]]
-            [onyx.coordinator.extensions :as extensions]
+            [onyx.extensions :as extensions]
             [onyx.system :as s]))
 
 (defn with-system [f & opts]

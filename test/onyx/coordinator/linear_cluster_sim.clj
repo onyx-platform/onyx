@@ -6,7 +6,7 @@
             [simulant.util :as u]
             [datomic.api :as d]
             [onyx.system :as s]
-            [onyx.coordinator.extensions :as extensions]
+            [onyx.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :as sim-utils]))
 
