@@ -33,6 +33,11 @@
       (extensions/on-change sync payload #(>!! payload-ch %))
 
       (assoc component
+        :peer-node peer
+        :payload-node payload
+        :pulse-node pulse
+        :shutdown-ndoe shutdown
+        
         :payload-ch payload-ch
         :shutdown-ch shutdown-ch
         :status-ch status-ch

@@ -5,7 +5,7 @@
             [simulant.sim :as sim]
             [simulant.util :as u]
             [datomic.api :as d]
-            [onyx.system :as s]
+            [onyx.coordinator :refer [onyx-coordinator]]
             [onyx.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :as sim-utils]))
@@ -73,7 +73,7 @@
 
 (sim-utils/load-schema sim-conn "simulant/coordinator-sim.edn")
 
-(def system (s/in-memory-coordinator {:sync :zookeeper :queue :hornetq :revoke-delay 2000}))
+(def system (onyx-coordinator {:sync :zookeeper :queue :hornetq :revoke-delay 2000}))
 
 (def components (alter-var-root #'system component/start))
 

@@ -1,5 +1,4 @@
-(ns onyx.extensions
-  (:require [clojure.string :refer [split]]))
+(ns onyx.extensions)
 
 (defmulti mark-peer-born (fn [log place] (type log)))
 
@@ -62,7 +61,4 @@
 (defmulti create-io-task
   (fn [element parent children phase]
     (select-keys element [:onyx/direction :onyx/type :onyx/medium])))
-
-(defmulti connect
-  (fn [uri] (keyword (split (second (split uri #":")) #"//"))))
 

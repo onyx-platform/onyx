@@ -5,8 +5,8 @@
             [datomic.api :as d]
             [onyx.extensions :as extensions]
             [onyx.coordinator.async :as async]
-            [onyx.system :as s]
             [onyx.coordinator.log.datomic :as datomic]
+            [onyx.coordinator :refer [onyx-coordinator]]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
