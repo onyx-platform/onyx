@@ -43,18 +43,21 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(def v-peers (onyx.api/start-peers conn 4 peer-opts))
+(def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 ;;(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
 ;;(prn v-peers)
 
 (try
-  (onyx.api/shutdown conn)
-  (catch Exception e (prn e)))
-
-(doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (dorun (map deref (map :runner v-peers)))
+  (finally
+   (doseq [v-peer v-peers]
+     (try
+       ((:shutdown-fn v-peer))
+       (catch Exception e (prn e))))
+   
+   (try
+     (onyx.api/shutdown conn)
+     (catch Exception e (prn e)))))
 

@@ -16,11 +16,11 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (>!! (:planning-ch-head (:coordinator onyx-coord)) job))
+    (>!! (:planning-ch-head (:coordinator (var-get onyx-coord))) job))
 
   IRegister
   (register-peer [this peer-node]
-    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
+    (>!! (:born-peer-ch-head (:coordinator (var-get onyx-coord))) peer-node))
 
   IShutdown
   (shutdown [this] (alter-var-root onyx-coord component/stop)))
@@ -56,7 +56,7 @@
       (alter-var-root #'v-peer component/start)
       (let [rets {:runner (future @(:payload-thread (:peer v-peer)))
                   :shutdown-fn (fn [] (alter-var-root #'v-peer component/stop))}]
-;;        (register-peer coord (:peer-node (:peer v-peer)))
+        (register-peer coord (:peer-node (:peer v-peer)))
         rets))
     (range n))))
 
