@@ -7,18 +7,24 @@
             [incanter.core :refer [view]]
             [incanter.charts :refer [line-chart]]
             [onyx.extensions :as extensions]
-            [onyx.coordinator :refer [onyx-coordinator]]))
+            [onyx.system :refer [onyx-coordinator]]))
 
 (defn with-system [f & opts]
-  (def system (onyx-coordinator (apply merge {:sync :zookeeper :queue :hornetq :revoke-delay 4000} opts)))
-  (let [components (alter-var-root #'system component/start)
-        coordinator (:coordinator components)
-        sync (:sync components)
-        log (:log components)]
-    (try
-      (f coordinator sync log)
-      (finally
-       (alter-var-root #'system component/stop)))))
+  (let [id (str (java.util.UUID/randomUUID))
+        defaults {:datomic-uri (str "datomic:mem://" id)
+                  :hornetq-addr "localhost:5445"
+                  :zk-addr "127.0.0.1:2181"
+                  :onyx-id id
+                  :revoke-delay 4000}]
+    (def system (onyx-coordinator (apply merge defaults opts)))
+    (let [components (alter-var-root #'system component/start)
+          coordinator (:coordinator components)
+          sync (:sync components)
+          log (:log components)]
+      (try
+        (f coordinator sync log)
+        (finally
+         (alter-var-root #'system component/stop))))))
 
 (defn reset-conn
   "Reset connection to a scratch database. Use memory database if no

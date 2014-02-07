@@ -145,7 +145,7 @@
 (defrecord Coordinator []
   component/Lifecycle
 
-  (start [{:keys [log sync queue revoke-delay onyx-id] :as component}]
+  (start [{:keys [log sync queue revoke-delay] :as component}]
     (prn "Starting Coordinator")
     (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
@@ -327,6 +327,6 @@
 
     component))
 
-(defn coordinator [revoke-delay onyx-id]
-  (map->Coordinator {:revoke-delay revoke-delay :onyx-id onyx-id}))
+(defn coordinator [revoke-delay]
+  (map->Coordinator {:revoke-delay revoke-delay}))
 

@@ -5,7 +5,7 @@
             [simulant.sim :as sim]
             [simulant.util :as u]
             [datomic.api :as d]
-            [onyx.coordinator :refer [onyx-coordinator]]
+            [onyx.system :refer [onyx-coordinator]]
             [onyx.extensions :as extensions]
             [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :as sim-utils]))
@@ -84,7 +84,14 @@
 
 (sim-utils/load-schema sim-conn "simulant/coordinator-sim.edn")
 
-(def system (onyx-coordinator {:sync :zookeeper :queue :hornetq :revoke-delay 2000}))
+(def id (str (java.util.UUID/randomUUID)))
+
+(def system (onyx-coordinator
+             {:datomic-uri (str "datomic:mem://" id)
+              :hornetq-addr "localhost:5445"
+              :zk-addr "127.0.0.1:2181"
+              :onyx-id id
+              :revoke-delay 2000}))
 
 (def components (alter-var-root #'system component/start))
 

@@ -6,7 +6,6 @@
             [onyx.extensions :as extensions]
             [onyx.coordinator.async :as async]
             [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator :refer [onyx-coordinator]]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts

@@ -1,7 +1,6 @@
 (ns onyx.coordinator.log.datomic
   (:require [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
-            [onyx.util :as u]
             [datomic.api :as d]))
 
 (defn load-schema [file]
