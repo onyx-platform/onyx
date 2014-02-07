@@ -1,4 +1,4 @@
-(ns onyx.coordinator.sync.zookeeper
+(ns onyx.sync.zookeeper
   (:require [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
             [zookeeper :as zk])

@@ -1,6 +1,7 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [>!!]]
+            [com.stuartsierra.component :as component]
             [onyx.system :as system]))
 
 (defprotocol Submittable
@@ -49,7 +50,7 @@
       (alter-var-root #'v-peer component/start)
       (let [rets {:runner (future @(:payload-thread (:peer v-peer))
                                   (alter-var-root #'v-peer component/stop))}]
-        (coordinator/register-peer coord (:peer-node (:peer v-peer)))
+        (register-peer coord (:peer-node (:peer v-peer)))
         rets))
     (range n))))
 
