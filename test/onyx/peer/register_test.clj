@@ -31,12 +31,30 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def opts {:revoke-delay 3000 :onyx-id id})
+(def coord-opts {:datomic-uri (str "datomic:mem://" id)
+                 :hornetq-addr "localhost:5445"
+                 :zk-addr "127.0.0.1:2181"
+                 :onyx-id id
+                 :revoke-delay 2000})
 
-(def coordinator-conn (onyx.api/connect (str "onyx:mem//localhost/" id) opts))
+(def conn (onyx.api/connect (str "onyx:mem//localhost/" id) coord-opts))
 
-(def v-peers (onyx.api/start-peers coordinator-conn 2 {:onyx-id (:onyx-id opts)}))
+(def peer-opts {:hornetq-addr "localhost:5445"
+                :zk-addr "127.0.0.1:2181"
+                :onyx-id id})
 
-(onyx.api/submit-job catalog workflow)
+(def v-peers (onyx.api/start-peers conn 4 peer-opts))
 
-(dorun (map deref (map :runner v-peers)))
+;;(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
+
+;;(prn v-peers)
+
+(try
+  (onyx.api/shutdown conn)
+  (catch Exception e (prn e)))
+
+(doseq [v-peer v-peers]
+  (try
+    ((:shutdown-fn v-peer))
+    (catch Exception e (prn e))))
+
