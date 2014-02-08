@@ -17,7 +17,8 @@
    {:onyx/name :inc
     :onyx/fn :onyx.coordinator.single-peer-test/my-inc
     :onyx/type :transformer
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 1000}
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :concurrent

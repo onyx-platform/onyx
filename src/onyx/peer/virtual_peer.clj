@@ -1,10 +1,28 @@
 (ns onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
+            [dire.core :as dire]
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(defn payload-loop [sync payload-ch shutdown-ch status-ch]
+(def pipeline-components [:sync :queue :task-pipeline])
+
+(defrecord OnyxPeerPipeline []
+  component/Lifecycle
+  (start [this]
+    (component/start-system this pipeline-components))
+  (stop [this]
+    (component/stop-system this pipeline-components)))
+
+(defn onyx-peer-pipeline
+  [{:keys [sync queue payload]}]
+  (map->OnyxPeerPipeline
+   {:sync sync
+    :queue queue
+    :task-pipeline (component/using (task-pipeline payload)
+                                    [:sync :queue])}))
+
+(defn payload-loop [sync queue payload-ch shutdown-ch status-ch]
   (loop [pipeline nil]
     (when-let [[v ch] (alts!! [payload-ch shutdown-ch])]
       
@@ -16,20 +34,19 @@
               payload (extensions/read-place sync payload-node)
               status-ch (chan 1)]
           
-          (clojure.pprint/pprint payload)
-          
           (extensions/on-change sync (:status (:nodes payload)) #(>!! status-ch %))
-          (extensions/touch-place (:ack (:nodes payload)))
+          (extensions/touch-place sync (:ack (:nodes payload)))
           (<!! status-ch)
           
-          (let [new-pipeline (task-pipeline payload)]
+          (let [new-pipeline (onyx-peer-pipeline {:sync sync :queue queue :payload payload})]
+            (component/start new-pipeline)
             (recur new-pipeline)))))))
 
 (defrecord VirtualPeer []
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (prn "Starting Task Pipeline")
+    (prn "Starting Virtual Peer")
 
     (let [peer (extensions/create sync :peer)
           payload (extensions/create sync :payload)
@@ -43,20 +60,25 @@
       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown :payload payload})
       (extensions/on-change sync payload #(>!! payload-ch %))
 
+      (dire/with-handler! #'payload-loop
+        java.lang.Exception
+        (fn [e & _]
+          (.printStackTrace e)))
+
       (assoc component
         :peer-node peer
         :payload-node payload
         :pulse-node pulse
-        :shutdown-ndoe shutdown
+        :shutdown-node shutdown
         
         :payload-ch payload-ch
         :shutdown-ch shutdown-ch
         :status-ch status-ch
 
-        :payload-thread (future (payload-loop sync payload-ch shutdown-ch status-ch)))))
+        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch)))))
 
   (stop [component]
-    (prn "Stopping Task Pipeline")
+    (prn "Stopping Virtual Peer")
 
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))

@@ -133,12 +133,12 @@
     (when-let [event (<!! reset-ch)]
       (recur))))
 
-(defrecord TaskPipeline [payload-node]
+(defrecord TaskPipeline [payload]
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
     (prn "Starting Task Pipeline")
-
+    
     (let [read-batch-ch (chan 1)
           decompress-tx-ch (chan 1)
           apply-fn-ch (chan 1)
@@ -149,8 +149,6 @@
           close-resources-ch (chan 1)
           complete-task-ch (chan 1)
           reset-payload-node-ch (chan 1)
-
-          payload (extensions/read-place sync payload-node)
 
           batch-size 1000
 
@@ -209,6 +207,6 @@
     
     component))
 
-(defn task-pipeline [payload-node]
-  (map->TaskPipeline {:payload-node payload-node}))
+(defn task-pipeline [payload]
+  (map->TaskPipeline {:payload payload}))
 
