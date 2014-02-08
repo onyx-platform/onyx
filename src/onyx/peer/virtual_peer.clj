@@ -39,8 +39,7 @@
           (<!! status-ch)
           
           (let [new-pipeline (onyx-peer-pipeline {:sync sync :queue queue :payload payload})]
-            (component/start new-pipeline)
-            (recur new-pipeline)))))))
+            (recur (component/start new-pipeline))))))))
 
 (defrecord VirtualPeer []
   component/Lifecycle

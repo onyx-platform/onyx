@@ -52,12 +52,11 @@
   (doall
    (map
     (fn [_]
-      (def v-peer (system/onyx-peer config))
-      (alter-var-root #'v-peer component/start)
-      (let [rets {:runner (future @(:payload-thread (:peer v-peer)))
-                  :shutdown-fn (fn [] (alter-var-root #'v-peer component/stop))}]
-        (register-peer coord (:peer-node (:peer v-peer)))
-        rets))
+      (let [v-peer (component/start (system/onyx-peer config))]
+        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer)) (catch Exception e (.printStackTrace e))))
+                    :shutdown-fn (fn [] (component/stop v-peer))}]
+          (register-peer coord (:peer-node (:peer v-peer)))
+          rets)))
     (range n))))
 
 (defmethod start-peers NettyCoordinator
