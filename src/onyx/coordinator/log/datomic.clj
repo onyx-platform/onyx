@@ -145,10 +145,11 @@
         job-seq (job-candidate-seq (all-active-jobs-ids db)
                                    (last-offered-job db))
         inactive-candidates (mapcat (partial next-inactive-task db) job-seq)
-        active-candidates (mapcat (partial next-active-task db) job-seq)]
-    
-    (concat (filter identity inactive-candidates)
-            (filter identity active-candidates))))
+        active-candidates (mapcat (partial next-active-task db) job-seq)
+        ents (concat (filter identity inactive-candidates)
+                     (filter identity active-candidates))]
+    (map #(assoc (into {} %) :db/id (:db/id %))
+         ents)))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack

@@ -4,15 +4,26 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(defn payload-loop [payload-ch shutdown-ch status-ch]
+(defn payload-loop [sync payload-ch shutdown-ch status-ch]
   (loop [pipeline nil]
     (when-let [[v ch] (alts!! [payload-ch shutdown-ch])]
+      
       (when-not (nil? pipeline)
         (component/stop pipeline))
+      
       (when (= ch payload-ch)
-        (comment "Block on status-ch")
-        (let [new-pipeline (task-pipeline v)]
-          (recur new-pipeline))))))
+        (let [payload-node (:path v)
+              payload (extensions/read-place sync payload-node)
+              status-ch (chan 1)]
+          
+          (clojure.pprint/pprint payload)
+          
+          (extensions/on-change sync (:status (:nodes payload)) #(>!! status-ch %))
+          (extensions/touch-place (:ack (:nodes payload)))
+          (<!! status-ch)
+          
+          (let [new-pipeline (task-pipeline payload)]
+            (recur new-pipeline)))))))
 
 (defrecord VirtualPeer []
   component/Lifecycle
@@ -42,7 +53,7 @@
         :shutdown-ch shutdown-ch
         :status-ch status-ch
 
-        :payload-thread (future (payload-loop payload-ch shutdown-ch status-ch)))))
+        :payload-thread (future (payload-loop sync payload-ch shutdown-ch status-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")

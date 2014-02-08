@@ -45,9 +45,7 @@
 
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
-;;(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
-
-;;(prn v-peers)
+(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
 (try
   (dorun (map deref (map :runner v-peers)))
@@ -56,7 +54,7 @@
      (try
        ((:shutdown-fn v-peer))
        (catch Exception e (prn e))))
-   
+
    (try
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
