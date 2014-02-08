@@ -45,8 +45,9 @@
   (let [decompressed-msgs (map decompress-message batch)]
     (assoc event :decompressed decompressed-msgs)))
 
-(defn munge-apply-fn [{:keys [decompressed task] :as event}]
-  (let [results (map (partial apply-fn task) decompressed)]
+(defn munge-apply-fn [{:keys [decompressed task catalog] :as event}]
+  (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
+        results (map (partial apply-fn task) decompressed)]
     (assoc event :results results)))
 
 (defn munge-compress-tx [{:keys [results] :as event}]
@@ -165,6 +166,8 @@
                          :task (:task/name (:task payload))
                          :status-node (:status (:nodes payload))
                          :completion-node (:completion (:nodes payload))
+                         :catalog (extensions/read-place sync (:catalog (:nodes payload)))
+                         :workflow (extensions/read-place sync (:workflow (:nodes payload)))
                          :queue queue
                          :sync sync
                          :batch-size 1000
