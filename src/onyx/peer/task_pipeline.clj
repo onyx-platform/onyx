@@ -1,6 +1,7 @@
 (ns onyx.peer.task-pipeline
   (:require [clojure.core.async :refer [alts!! <!! >!! chan close!]]
             [com.stuartsierra.component :as component]
+            [dire.core :as dire]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.extensions :as extensions]))
 
@@ -8,8 +9,8 @@
   (extensions/create-tx-session queue))
 
 (defn read-batch [queue consumers batch-size timeout]
-  (let [consumer-chs (map (fn [_] (chan 1)) (count consumers))]
-    (doseq [[consumer ch] (map vector (consumers consumer-chs))]
+  (let [consumer-chs (map (fn [_] (chan 1)) (range (count consumers)))]
+    (doseq [[consumer ch] (map vector consumers consumer-chs)]
       (>!! ch (extensions/consume-message queue consumer timeout)))
     (let [rets (->> (range batch-size)
                     (map (fn [_] (first (apply alts!! consumer-chs))))
@@ -172,6 +173,50 @@
                          :sync sync
                          :batch-size 1000
                          :timeout 50}]
+
+      (dire/with-handler! #'open-session-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'read-batch-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'decompress-tx-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'apply-fn-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'compress-tx-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'write-batch-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'status-check-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'commit-tx-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'close-resources-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'complete-task-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'reset-payload-node-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))      
 
       (assoc component
         :read-batch-ch read-batch-ch
