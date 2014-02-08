@@ -16,14 +16,14 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (>!! (:planning-ch-head (:coordinator (var-get onyx-coord))) job))
+    (>!! (:planning-ch-head (:coordinator onyx-coord)) job))
 
   IRegister
   (register-peer [this peer-node]
-    (>!! (:born-peer-ch-head (:coordinator (var-get onyx-coord))) peer-node))
+    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
 
   IShutdown
-  (shutdown [this] (alter-var-root onyx-coord component/stop)))
+  (shutdown [this] (component/stop onyx-coord)))
 
 (deftype NettyCoordinator [uri]
   ISubmit
@@ -37,9 +37,8 @@
 
 (defmethod connect :mem
   [uri opts]
-  (def c (system/onyx-coordinator opts))
-  (alter-var-root #'c component/start)
-  (InMemoryCoordinator. #'c))
+  (let [c (system/onyx-coordinator opts)]
+    (InMemoryCoordinator. (component/start c))))
 
 (defmethod connect :netty
   [uri opts] (NettyCoordinator. nil))

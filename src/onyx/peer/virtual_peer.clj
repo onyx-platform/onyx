@@ -5,27 +5,9 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(def pipeline-components [:sync :queue :task-pipeline])
-
-(defrecord OnyxPeerPipeline []
-  component/Lifecycle
-  (start [this]
-    (component/start-system this pipeline-components))
-  (stop [this]
-    (component/stop-system this pipeline-components)))
-
-(defn onyx-peer-pipeline
-  [{:keys [sync queue payload]}]
-  (map->OnyxPeerPipeline
-   {:sync sync
-    :queue queue
-    :task-pipeline (component/using (task-pipeline payload)
-                                    [:sync :queue])}))
-
 (defn payload-loop [sync queue payload-ch shutdown-ch status-ch]
   (loop [pipeline nil]
-    (when-let [[v ch] (alts!! [payload-ch shutdown-ch])]
-      
+    (when-let [[v ch] (alts!! [shutdown-ch payload-ch] :priority true)]
       (when-not (nil? pipeline)
         (component/stop pipeline))
       
@@ -38,7 +20,7 @@
           (extensions/touch-place sync (:ack (:nodes payload)))
           (<!! status-ch)
           
-          (let [new-pipeline (onyx-peer-pipeline {:sync sync :queue queue :payload payload})]
+          (let [new-pipeline (task-pipeline payload sync queue)]
             (recur (component/start new-pipeline))))))))
 
 (defrecord VirtualPeer []
@@ -79,11 +61,11 @@
   (stop [component]
     (prn "Stopping Virtual Peer")
 
+    (>!! (:shutdown-ch component) true)
+    
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
     (close! (:status-ch component))
-
-    (future-cancel (:payload-thread component))
     
     component))
 
