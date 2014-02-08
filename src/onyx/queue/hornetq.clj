@@ -77,11 +77,16 @@
     (.send producer message)))
 
 (defmethod extensions/consume-message HornetQ
-  [queue consumer]
-  (let [message (.receive consumer)
-        contents (.readString (.getBodyBuffer message))]
-    (.acknowledge message)
-    message))
+  [queue consumer timeout]
+  (.receive consumer timeout))
+
+(defmethod extensions/read-message HornetQ
+  [queue message]
+  (.readString (.getBodyBuffer message)))
+
+(defmethod extensions/ack-message HornetQ
+  [queue message]
+  (.acknowledge message))
 
 (defmethod extensions/commit-tx HornetQ
   [queue session]
@@ -96,7 +101,7 @@
   (let [egress-queues (:egress-queues task)
         session (extensions/create-tx-session queue)]
     (doseq [queue-name egress-queues]
-      (let [producer (.createProducer session)
+      (let [producer (extensions/create-producer session)
             message (.createMessage session true)]
         (.writeString (.getBufferBody message) (pr-str :done))
         (.send producer message)

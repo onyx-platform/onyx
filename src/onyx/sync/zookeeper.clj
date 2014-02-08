@@ -27,6 +27,12 @@
 (defn status-path [prefix]
   (str root-path "/" prefix "/status"))
 
+(defn catalog-path [prefix]
+  (str root-path "/" prefix "/catalog"))
+
+(defn workflow-path [prefix]
+  (str root-path "/" prefix "/workflow"))
+
 (defn shutdown-path [prefix]
   (str root-path "/" prefix "/shutdown"))
 
@@ -45,6 +51,8 @@
       (zk/create conn (ack-path prefix) :persistent? true)
       (zk/create conn (completion-path prefix) :persistent? true)
       (zk/create conn (status-path prefix) :persistent? true)
+      (zk/create conn (catalog-path prefix) :persistent? true)
+      (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
       (assoc component
         :conn conn
@@ -103,6 +111,20 @@
   [sync _]
   (let [prefix (:onyx-id sync)
         place (str (status-path prefix) "/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :catalog]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (catalog-path prefix) "/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :workflow]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (workflow-path prefix) "/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :persistent? true)
     place))
 

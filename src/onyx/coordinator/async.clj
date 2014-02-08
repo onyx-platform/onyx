@@ -37,10 +37,21 @@
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
             status-node (extensions/create sync :status)
-            nodes {:payload payload-node :ack ack-node
-                   :completion complete-node :status status-node}]
+            catalog-node (extensions/create sync :catalog)
+            workflow-node (extensions/create sync :workflow)
+            nodes {:payload payload-node
+                   :ack ack-node
+                   :completion complete-node
+                   :status status-node
+                   :catalog catalog-node
+                   :workflow workflow-node}]
+
+        (extensions/write-place sync catalog-node [])
+        (extensions/write-place sync workflow-node [])
+        
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
+        
         (if (extensions/mark-offered log task peer nodes)
           (do (extensions/write-place sync payload-node {:task task :nodes nodes})
               (revoke-cb {:peer-node peer :ack-node ack-node})

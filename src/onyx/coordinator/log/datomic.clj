@@ -122,6 +122,18 @@
          (drop (inc (.indexOf job-seq last-offered)))
          (take (count job-seq)))))
 
+(defn to-task [db eid]
+  (let [query '[:find ?id ?catalog ?workflow :in $ ?id :where
+                [?job :job/task ?id]
+                [?job :job/catalog ?catalog]
+                [?job :job/workflow ?workflow]]
+        result (first (d/q query db eid))
+        [id catalog workflow] result]
+    (assoc (into {} (d/entity db id))
+      :db/id id
+      :catalog catalog
+      :workflow workflow)))
+
 (defmethod extensions/mark-peer-born Datomic
   [log place]
   (let [tx [[:onyx.fn/add-peer (d/tempid :onyx/log) :idle place]]]
@@ -147,9 +159,9 @@
         inactive-candidates (mapcat (partial next-inactive-task db) job-seq)
         active-candidates (mapcat (partial next-active-task db) job-seq)
         ents (concat (filter identity inactive-candidates)
-                     (filter identity active-candidates))]
-    (map #(assoc (into {} %) :db/id (:db/id %))
-         ents)))
+                     (filter identity active-candidates))
+        eids (map :db/id ents)]
+    (map (partial to-task db) eids)))
 
 (defn select-nodes [ent]
   (select-keys ent [:node/peer :node/payload :node/ack

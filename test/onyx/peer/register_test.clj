@@ -44,7 +44,7 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(def v-peers (onyx.api/start-peers conn 2 peer-opts))
+(def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 

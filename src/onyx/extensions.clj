@@ -46,7 +46,11 @@
 
 (defmulti create-producer (fn [queue session queue-name] (type queue)))
 
-(defmulti consume-message (fn [queue consumer] (type queue)))
+(defmulti consume-message (fn [queue consumer timeout] (type queue)))
+
+(defmulti read-message (fn [queue message] (type queue)))
+
+(defmulti ack-message (fn [queue message] (type queue)))
 
 (defmulti produce-message (fn [queue producer session msg] (type queue)))
 
