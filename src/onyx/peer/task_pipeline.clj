@@ -1,4 +1,4 @@
-(ns onyx.peer.transform-pipeline
+(ns onyx.peer.task-pipeline
   (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go] :as async]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
@@ -189,7 +189,7 @@
     (when-let [event (<!! reset-ch)]
       (recur))))
 
-(defrecord TransformPipeline [payload sync queue]
+(defrecord TaskPipeline [payload sync queue]
   component/Lifecycle
 
   (start [component]
@@ -315,6 +315,6 @@
     
     component))
 
-(defn transform-pipeline [payload sync queue]
-  (map->TransformPipeline {:payload payload :sync sync :queue queue}))
+(defn task-pipeline [payload sync queue]
+  (map->TaskPipeline {:payload payload :sync sync :queue queue}))
 
