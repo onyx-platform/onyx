@@ -3,7 +3,20 @@
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
-            [onyx.peer.task-pipeline :refer [task-pipeline]]))
+            [onyx.peer.transform-pipeline :refer [transform-pipeline]]
+            [onyx.peer.input-pipeline :refer [input-pipeline]]))
+
+(defmulti create-pipeline
+  (fn [payload sync queue]
+    (:task/type (:task payload))))
+
+(defmethod create-pipeline :input
+  [payload sync queue]
+  (input-pipeline payload sync queue))
+
+(defmethod create-pipeline :transformer
+  [payload sync queue]
+  (transform-pipeline payload sync queue))
 
 (defn payload-loop [sync queue payload-ch shutdown-ch status-ch]
   (loop [pipeline nil]
@@ -20,7 +33,7 @@
           (extensions/touch-place sync (:ack (:nodes payload)))
           (<!! status-ch)
           
-          (let [new-pipeline (task-pipeline payload sync queue)]
+          (let [new-pipeline (create-pipeline payload sync queue)]
             (recur (component/start new-pipeline))))))))
 
 (defrecord VirtualPeer []

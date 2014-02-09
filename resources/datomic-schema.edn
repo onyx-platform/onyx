@@ -154,6 +154,12 @@
   :db.install/_attribute :db.part/db}
 
  {:db/id #db/id [:db.part/db]
+  :db/ident :task/type
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id #db/id [:db.part/db]
   :db/ident :task/phase
   :db/valueType :db.type/long
   :db/cardinality :db.cardinality/one

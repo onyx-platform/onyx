@@ -4,7 +4,6 @@
             [onyx.coordinator.log.datomic :refer [datomic log-schema]]
             [onyx.sync.zookeeper :refer [zookeeper]]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
-            [onyx.peer.task-pipeline :refer [task-pipeline]]
             [onyx.queue.hornetq :refer [hornetq]]))
 
 (def coordinator-components [:log :sync :queue :coordinator])

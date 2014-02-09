@@ -30,6 +30,7 @@
    :onyx/medium :hornetq}
   [element parent children phase]
   {:name (:onyx/name element)
+   :type :input
    :ingress-queues (:hornetq/queue-name element)
    :egress-queues (planning/egress-queues-to-children children)
    :phase phase
@@ -41,6 +42,7 @@
    :onyx/medium :hornetq}
   [element parent children phase]
   {:name (:onyx/name element)
+   :type :output
    :ingress-queues (get (:egress-queues parent) (:onyx/name element))
    :egress-queues {:self (:hornetq/queue-name element)}
    :phase phase

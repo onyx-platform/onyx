@@ -33,7 +33,8 @@
   (loop [[task :as tasks] (extensions/next-tasks log)
          [peer :as peers] (extensions/idle-peers log)]
     (when (and (seq tasks) (seq peers))
-      (let [payload-node (:payload (extensions/read-place sync peer))
+      (let [task-attrs (dissoc task :workflow :catalog)
+            payload-node (:payload (extensions/read-place sync peer))
             ack-node (extensions/create sync :ack)
             complete-node (extensions/create sync :completion)
             status-node (extensions/create sync :status)
@@ -46,14 +47,14 @@
                    :catalog catalog-node
                    :workflow workflow-node}]
 
-        (extensions/write-place sync catalog-node [])
-        (extensions/write-place sync workflow-node [])
+        (extensions/write-place sync catalog-node (:catalog task))
+        (extensions/write-place sync workflow-node (:workflow task))
         
         (extensions/on-change sync ack-node ack-cb)
         (extensions/on-change sync complete-node complete-cb)
         
         (if (extensions/mark-offered log task peer nodes)
-          (do (extensions/write-place sync payload-node {:task task :nodes nodes})
+          (do (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
               (revoke-cb {:peer-node peer :ack-node ack-node})
               (recur (rest tasks) (rest peers)))
           (recur tasks (rest peers)))))))
