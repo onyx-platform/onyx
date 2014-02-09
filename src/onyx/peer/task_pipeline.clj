@@ -1,5 +1,5 @@
 (ns onyx.peer.task-pipeline
-  (:require [clojure.core.async :refer [alts!! <!! >!! chan close!]]
+  (:require [clojure.core.async :refer [alts!! <!! >!! chan close! go]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [onyx.queue.hornetq :refer [hornetq]]
@@ -11,10 +11,13 @@
 (defn read-batch [queue consumers batch-size timeout]
   (let [consumer-chs (map (fn [_] (chan 1)) (range (count consumers)))]
     (doseq [[consumer ch] (map vector consumers consumer-chs)]
-      (>!! ch (extensions/consume-message queue consumer timeout)))
-    (let [rets (->> (range batch-size)
-                    (map (fn [_] (first (apply alts!! consumer-chs))))
-                    (filter identity))]
+      (go (loop []
+            (let [m (extensions/consume-message queue consumer timeout)]
+              (if m
+                (>!! ch m)
+                (recur))))))
+    (let [rets (dorun (map (fn [_] (first (alts!! consumer-chs)))
+                           (range batch-size)))]
       (doseq [ch consumer-chs] (close! ch))
       rets)))
 
