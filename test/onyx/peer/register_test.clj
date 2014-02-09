@@ -1,6 +1,42 @@
 (ns onyx.coordinator.single-peer-test
   (:require [midje.sweet :refer :all]
-            [onyx.api]))
+            [onyx.api])
+  (:import [org.hornetq.api.core.client HornetQClient]
+           [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
+           [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+
+(def in-queue (str (java.util.UUID/randomUUID)))
+
+(def out-queue (str (java.util.UUID/randomUUID)))
+
+(def tc (TransportConfiguration. (.getName NettyConnectorFactory)))
+
+(def locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc])))
+
+(def session-factory (.createSessionFactory locator))
+
+(def session (.createTransactedSession session-factory))
+
+(.start session)
+
+(.createQueue session in-queue in-queue true)
+
+(.createQueue session out-queue out-queue true)
+
+(def producer (.createProducer session in-queue))
+
+(doseq [n (range 10)]
+  (let [message (.createMessage session true)]
+    (.writeString (.getBodyBuffer message) (pr-str n))
+    (.send producer message)))
+
+(def sentinel (.createMessage session true))
+(.writeString (.getBodyBuffer sentinel) (pr-str :done))
+(.send producer sentinel)
+
+(.commit session)
+(.close producer)
+(.close session)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -11,7 +47,7 @@
     :onyx/consumption :concurrent
     :onyx/type :queue
     :onyx/medium :hornetq
-    :hornetq/queue-name "in-queue"
+    :hornetq/queue-name in-queue
     :hornetq/host "localhost"
     :hornetq/port 5445}
    {:onyx/name :inc
@@ -24,7 +60,7 @@
     :onyx/consumption :concurrent
     :onyx/type :queue
     :onyx/medium :hornetq
-    :hornetq/queue-name "out-queue"
+    :hornetq/queue-name out-queue
     :hornetq/host "localhost"
     :hornetq/port 5445}])
 

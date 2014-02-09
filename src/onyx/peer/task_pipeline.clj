@@ -12,11 +12,16 @@
   (let [consumer-chs (map (fn [_] (chan 1)) (range (count consumers)))]
     (doseq [[consumer ch] (map vector consumers consumer-chs)]
       (go (loop []
+            (prn "loop")
             (let [m (extensions/consume-message queue consumer timeout)]
+              (prn (extensions/read-message queue m))
               (if m
-                (>!! ch m)
+                (>!! ch (extensions/read-message queue m))
                 (recur))))))
-    (let [rets (dorun (map (fn [_] (first (alts!! consumer-chs)))
+    (let [rets (dorun (map (fn [_]
+                             (let [v (first (alts!! consumer-chs))]
+                               (prn v)
+                               v))
                            (range batch-size)))]
       (doseq [ch consumer-chs] (close! ch))
       rets)))
@@ -174,7 +179,7 @@
                          :workflow (extensions/read-place sync (:workflow (:nodes payload)))
                          :queue queue
                          :sync sync
-                         :batch-size 1000
+                         :batch-size 2
                          :timeout 50}]
 
       (dire/with-handler! #'open-session-loop

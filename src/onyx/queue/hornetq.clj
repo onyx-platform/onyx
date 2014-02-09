@@ -48,8 +48,10 @@
 
 (defmethod extensions/create-tx-session HornetQ
   [queue]
-  (let [session-factory (:session-factory queue)]
-    (.createTransactedSession session-factory)))
+  (let [session-factory (:session-factory queue)
+        session (.createTransactedSession session-factory)]
+    (.start session)
+    session))
 
 (defmethod extensions/create-producer HornetQ
   [queue session queue-name]
