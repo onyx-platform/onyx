@@ -172,8 +172,6 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (clojure.pprint/pprint payload)
-
       (assoc component
         :read-batch-ch read-batch-ch
         :decompress-tx-ch decompress-tx-ch

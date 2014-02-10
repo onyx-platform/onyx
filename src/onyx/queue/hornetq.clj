@@ -112,11 +112,20 @@
         (.commit session)))
     (.close session)))
 
+(defn read-batch [catalog task]
+  (let [hq (hornetq (str (:hornetq/host task) ":" (:hornetq/port task)))
+        session (extensions/create-tx-session hq)
+        queue (:hornetq/queue-name task)
+        consumer (.createConsumer session queue)]))
+
 (defmethod storage-api/munge-read-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event])
+  [{:keys [catalog task-name] :as event}]
+  (let [task (planning/find-task catalog task-name)
+        batch (read-batch catalog task)]
+    (assoc event :batch batch)))
 
 (defmethod storage-api/munge-decompress-tx
   {:onyx/type :queue
@@ -128,13 +137,13 @@
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event])
+  [event] event)
 
 (defmethod storage-api/munge-apply-fn
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event])
+  [event] event)
 
 (defmethod storage-api/munge-compress-tx
   {:onyx/type :queue
