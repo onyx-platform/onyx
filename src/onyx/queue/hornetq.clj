@@ -1,6 +1,7 @@
 (ns onyx.queue.hornetq
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
+            [onyx.peer.storage-api :as storage-api]
             [onyx.extensions :as extensions])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
@@ -30,7 +31,6 @@
    :onyx/medium :hornetq}
   [element parent children phase]
   {:name (:onyx/name element)
-   :type :input
    :ingress-queues (:hornetq/queue-name element)
    :egress-queues (planning/egress-queues-to-children children)
    :phase phase
@@ -42,7 +42,6 @@
    :onyx/medium :hornetq}
   [element parent children phase]
   {:name (:onyx/name element)
-   :type :output
    :ingress-queues (get (:egress-queues parent) (:onyx/name element))
    :egress-queues {:self (:hornetq/queue-name element)}
    :phase phase
@@ -112,4 +111,40 @@
         (.close producer)
         (.commit session)))
     (.close session)))
+
+(defmethod storage-api/munge-read-batch
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [event])
+
+(defmethod storage-api/munge-decompress-tx
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [event])
+
+(defmethod storage-api/munge-apply-fn
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [event])
+
+(defmethod storage-api/munge-apply-fn
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [event])
+
+(defmethod storage-api/munge-compress-tx
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [event])
+
+(defmethod storage-api/munge-write-batch
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [event])
 

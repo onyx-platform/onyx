@@ -2,106 +2,16 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go] :as async]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
+            [onyx.peer.storage-api :as api]
             [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.peer.storage-api :as storage-api]
+            [onyx.peer.transform :as transform]
             [onyx.extensions :as extensions]))
 
 (defn create-tx-session [{:keys [queue]}]
   (extensions/create-tx-session queue))
 
-(defmethod storage-api/read-batch
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
-  [task event])
-
-(defmethod storage-api/decompress-segment
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
-  [task event])
-
-(defmethod storage-api/compress-segment
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
-  [task event])
-
-(defmethod storage-api/write-batch
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
-  [task event])
-
-(defmethod storage-api/read-batch :default
-  [task event])
-
-(defmethod storage-api/decompress-segment :default
-  [task event])
-
-(defmethod storage-api/compress-segment :default
-  [task event])
-
-(defmethod storage-api/write-batch :default
-  [task event])
-
-
-
-(defn read-batch [{:keys [batch-size timeout] :as task} queue consumers]
-  (let [consumer-chs (take (count consumers) (repeatedly #(chan 1)))]
-    (doseq [[c consumer-ch] (map vector consumers consumer-chs)]
-      (go (loop []
-            (when-let [m (.receive c)]
-              (extensions/ack-message queue m)
-              (>! consumer-ch m)
-              (recur)))))
-    (let [chs (conj consumer-chs (async/timeout timeout))
-          rets (doall (repeatedly batch-size #(first (alts!! chs))))]
-      (doseq [ch chs] (close! ch))
-      (filter identity rets))))
-
-(defn decompress-segment [queue message]
-  (let [segment (extensions/read-message queue message)]
-    (read-string segment)))
-
-(defn apply-fn [task segment]
-  (let [user-ns (symbol (name (namespace (:onyx/fn task))))
-        user-fn (symbol (name (:onyx/fn task)))]
-    ((ns-resolve user-ns user-fn) segment)))
-
-(defn compress-msg [segment]
-  (pr-str segment))
-
-(defn write-batch [queue session producer msgs]
-  (doseq [msg msgs]
-    (extensions/produce-message queue producer msg)))
-
 (defn munge-open-session [event session]
   (assoc event :session session))
-
-(defn munge-read-batch
-  [{:keys [task queue session ingress-queues batch-size timeout] :as event}]
-  (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
-        batch (read-batch task queue consumers batch-size timeout)]
-    (assoc event :batch batch :consumers consumers)))
-
-(defn munge-decompress-tx [{:keys [queue batch] :as event}]
-  (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
-    (assoc event :decompressed decompressed-msgs)))
-
-(defn munge-apply-fn [{:keys [decompressed task catalog] :as event}]
-  (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
-        results (map (partial apply-fn task) decompressed)]
-    (assoc event :results results)))
-
-(defn munge-compress-tx [{:keys [results] :as event}]
-  (let [compressed-msgs (map compress-msg results)]
-    (assoc event :compressed compressed-msgs)))
-
-(defn munge-write-batch [{:keys [queue queue-name session compressed] :as event}]
-  (let [producer (extensions/create-producer queue session queue-name)
-        batch (write-batch queue session producer compressed)]
-    (assoc event :producer producer)))
 
 (defn munge-status-check [{:keys [sync status-node] :as event}]
   (assoc event :commit? (extensions/place-exists? status-node)))
@@ -130,31 +40,31 @@
 (defn read-batch-loop [read-ch decompress-ch]
   (loop []
     (when-let [event (<!! read-ch)]
-      (>!! decompress-ch (munge-read-batch event))
+      (>!! decompress-ch (api/munge-read-batch event))
       (recur))))
 
 (defn decompress-tx-loop [decompress-ch apply-fn-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
-      (>!! apply-fn-ch (munge-decompress-tx event))
+      (>!! apply-fn-ch (api/munge-decompress-tx event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
   (loop []
     (when-let [event (<!! apply-fn-ch)]
-      (>!! compress-ch (munge-apply-fn event))
+      (>!! compress-ch (api/munge-apply-fn event))
       (recur))))
 
 (defn compress-tx-loop [compress-ch write-batch-ch]
   (loop []
     (when-let [event (<!! compress-ch)]
-      (>!! write-batch-ch (munge-compress-tx event))
+      (>!! write-batch-ch (api/munge-compress-tx event))
       (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch]
   (loop []
     (when-let [event (<!! write-ch)]
-      (>!! status-check-ch (munge-write-batch event))
+      (>!! status-check-ch (api/munge-write-batch event))
       (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch reset-payload-node-ch]
@@ -193,7 +103,7 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Starting Transformer Pipeline")
+    (prn "Starting Task Pipeline")
     
     (let [read-batch-ch (chan 1)
           decompress-tx-ch (chan 1)
@@ -289,7 +199,7 @@
         :reset-payload-node-loop (future (reset-payload-node-loop reset-payload-node-ch)))))
 
   (stop [component]
-    (prn "Stopping Transformer Pipeline")
+    (prn "Stopping Task Pipeline")
 
     (close! (:read-batch-ch component))
     (close! (:decompress-tx-ch component))

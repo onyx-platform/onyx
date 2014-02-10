@@ -1,13 +1,17 @@
-(ns onyx.peer.storage-api)
+(ns onyx.peer.storage-api
+  (:require [onyx.coordinator.planning :refer [find-task]]))
 
-(defn storage-dispatch [task event]
-  (select-keys task [:onyx/type :onyx/medium :onyx/direction]))
+(defn storage-dispatch [event]
+  (let [catalog-task (find-task (:catalog event) (:task event))]
+    (select-keys catalog-task [:onyx/type :onyx/medium :onyx/direction])))
 
-(defmulti read-batch storage-dispatch)
+(defmulti munge-read-batch storage-dispatch)
 
-(defmulti decompress-segment storage-dispatch)
+(defmulti munge-decompress-tx storage-dispatch)
 
-(defmulti compress-segment storage-dispatch)
+(defmulti munge-apply-fn storage-dispatch) 
 
-(defmulti write-batch storage-dispatch)
+(defmulti munge-compress-tx storage-dispatch)
+
+(defmulti munge-write-batch storage-dispatch)
 

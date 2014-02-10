@@ -32,7 +32,6 @@
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
     {:name (:onyx/name element)
-     :type :transformer
      :ingress-queues (get (:egress-queues parent) task-name)
      :egress-queues (egress-queues-to-children children)
      :phase phase

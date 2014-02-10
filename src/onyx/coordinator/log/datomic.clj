@@ -47,7 +47,6 @@
 (defn create-task-datom [task]
   {:db/id (d/tempid :onyx/log)
    :task/name (:name task)
-   :task/type (:type task)
    :task/phase (:phase task)
    :task/consumption (:consumption task)
    :task/complete? false
