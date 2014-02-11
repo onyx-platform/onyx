@@ -10,11 +10,15 @@
 (defn create-tx-session [{:keys [queue]}]
   (extensions/create-tx-session queue))
 
-(defn establish-new-payload [{:keys [sync peer-node payload-ch]}]
+(defn new-payload [sync peer-node payload-ch]
   (let [peer-contents (extensions/read-place sync peer-node)
         node (extensions/create sync :payload)]
-    (extensions/write-place sync (assoc :payload node))
-    (extensions/on-change sync node #(>!! payload-ch %))))
+    (extensions/write-place sync (assoc :payload node))))
+
+(defn munge-new-payload [{:keys [sync peer-node payload-ch] :as event}]
+  (let [node (new-payload sync peer-node payload-ch)]
+    (extensions/on-change sync node #(>!! payload-ch %))
+    (assoc event :new-payload-node node)))
 
 (defn munge-open-session [event session]
   (assoc event :session session))
@@ -106,7 +110,7 @@
 
 (defn reset-payload-node [reset-ch payload-ch]
   (when-let [event (<!! reset-ch)]
-    (establish-new-payload event)))
+    (munge-new-payload event)))
 
 (defrecord TaskPipeline [payload sync queue payload-ch]
   component/Lifecycle
