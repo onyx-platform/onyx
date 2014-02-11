@@ -1,4 +1,4 @@
-(ns onyx.peer.storage-api
+(ns onyx.peer.pipeline-extensions
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
 (defn storage-dispatch [event]

@@ -1,6 +1,6 @@
 (ns onyx.peer.transform
   (:require [clojure.core.async :refer [chan go alts!! close! >!] :as async]
-            [onyx.peer.storage-api :as api]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions]))
 
 (defn read-batch [{:keys [batch-size timeout] :as task} queue consumers]
@@ -32,29 +32,29 @@
   (doseq [msg msgs]
     (extensions/produce-message queue producer msg)))
 
-(defmethod api/munge-read-batch :default
+(defmethod p-ext/munge-read-batch :default
   [{:keys [task queue session ingress-queues batch-size timeout] :as event}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch task queue consumers batch-size timeout)]
     (assoc event :batch batch :consumers consumers)))
 
-(defmethod api/munge-decompress-tx :default
+(defmethod p-ext/munge-decompress-tx :default
   [{:keys [queue batch] :as event}]
   (let [decompressed-msgs (map (partial decompress-tx queue) batch)]
     (assoc event :decompressed decompressed-msgs)))
 
-(defmethod api/munge-apply-fn :default
+(defmethod p-ext/munge-apply-fn :default
   [{:keys [decompressed task catalog] :as event}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (map (partial apply-fn task) decompressed)]
     (assoc event :results results)))
 
-(defmethod api/munge-compress-tx :default
+(defmethod p-ext/munge-compress-tx :default
   [{:keys [results] :as event}]
   (let [compressed-msgs (map compress-tx results)]
     (assoc event :compressed compressed-msgs)))
 
-(defmethod api/munge-write-batch :default
+(defmethod p-ext/munge-write-batch :default
   [{:keys [queue queue-name session compressed] :as event}]
   (let [producer (extensions/create-producer queue session queue-name)
         batch (write-batch queue session producer compressed)]

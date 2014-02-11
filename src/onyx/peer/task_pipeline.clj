@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go] :as async]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
-            [onyx.peer.storage-api :as api]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
             [onyx.extensions :as extensions]))
@@ -14,57 +14,59 @@
   (assoc event :session session))
 
 (defn munge-status-check [{:keys [sync status-node] :as event}]
-  (assoc event :commit? (extensions/place-exists? status-node)))
+  (assoc event :commit? (extensions/place-exists? sync status-node)))
 
 (defn munge-commit-tx [{:keys [queue session] :as event}]
   (extensions/commit-tx queue session)
   (assoc event :committed true))
 
 (defn munge-close-resources [{:keys [queue session producer consumers] :as event}]
-  (extensions/close-resource queue)
-  (extensions/close-resource producer)
-  (doseq [consumer consumers] (extensions/close-resource consumer))  
+  (extensions/close-resource queue session)
+  (extensions/close-resource queue producer)
+  (doseq [consumer consumers] (extensions/close-resource queue consumer))  
   (assoc event :closed true))
 
-(defn munge-complete-task [{:keys [sync completion-node] :as event}]
-  (extensions/touch-place sync completion-node)
-  (assoc event :completed true))
+(defn munge-complete-task [{:keys [sync completion-node decompressed] :as event}]
+  (let [done? (= (last decompressed) :done)]
+    (prn decompressed " :: " done?)
+    (when done?
+      (extensions/touch-place sync completion-node))
+    (assoc event :completed done?)))
 
 (defn open-session-loop [read-ch pipeline-data]
-;;  (loop [])
-  (when-let [session (create-tx-session pipeline-data)]
-    (>!! read-ch (munge-open-session pipeline-data session))
-;;    (recur)
-    ))
+  (loop []
+    (when-let [session (create-tx-session pipeline-data)]
+      (>!! read-ch (munge-open-session pipeline-data session))
+      (recur))))
 
 (defn read-batch-loop [read-ch decompress-ch]
   (loop []
     (when-let [event (<!! read-ch)]
-      (>!! decompress-ch (api/munge-read-batch event))
+      (>!! decompress-ch (p-ext/munge-read-batch event))
       (recur))))
 
 (defn decompress-tx-loop [decompress-ch apply-fn-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
-      (>!! apply-fn-ch (api/munge-decompress-tx event))
+      (>!! apply-fn-ch (p-ext/munge-decompress-tx event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
   (loop []
     (when-let [event (<!! apply-fn-ch)]
-      (>!! compress-ch (api/munge-apply-fn event))
+      (>!! compress-ch (p-ext/munge-apply-fn event))
       (recur))))
 
 (defn compress-tx-loop [compress-ch write-batch-ch]
   (loop []
     (when-let [event (<!! compress-ch)]
-      (>!! write-batch-ch (api/munge-compress-tx event))
+      (>!! write-batch-ch (p-ext/munge-compress-tx event))
       (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch]
   (loop []
     (when-let [event (<!! write-ch)]
-      (>!! status-check-ch (api/munge-write-batch event))
+      (>!! status-check-ch (p-ext/munge-write-batch event))
       (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch reset-payload-node-ch]
@@ -91,7 +93,9 @@
 (defn complete-task-loop [complete-ch reset-payload-node-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
-      (>!! reset-payload-node-ch (munge-complete-task event))
+      (let [event (munge-complete-task event)]
+        (if (:completed event)
+          (>!! reset-payload-node-ch event)))
       (recur))))
 
 (defn reset-payload-node-loop [reset-ch]

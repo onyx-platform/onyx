@@ -1,7 +1,8 @@
 (ns onyx.queue.hornetq
-  (:require [com.stuartsierra.component :as component]
+  (:require [clojure.core.async :refer [chan go >! <! alts!! close!] :as async]
+            [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
-            [onyx.peer.storage-api :as storage-api]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
@@ -113,45 +114,64 @@
     (.close session)))
 
 (defn read-batch [catalog task]
-  (let [hq (hornetq (str (:hornetq/host task) ":" (:hornetq/port task)))
-        session (extensions/create-tx-session hq)
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
-        consumer (.createConsumer session queue)]))
+        consumer (.createConsumer session queue)
+        ch (chan 1)]
+    (.start session)
+    (go (loop []
+          (when-let [m (.receive consumer)]
+            (.acknowledge m)
+            (>! ch m)
+            (recur))))
+    (let [chs [ch (async/timeout (:onyx/timeout task))]
+          rets (doall (repeatedly (:onyx/batch-size task) #(first (alts!! chs))))]
+      (doseq [ch chs] (close! ch))
+      (.commit session)
+      (.close session)
+      (filter identity rets))))
 
-(defmethod storage-api/munge-read-batch
+(defn decompress-tx [segment]
+  (read-string (.readString (.getBodyBuffer segment))))
+
+(defmethod p-ext/munge-read-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [{:keys [catalog task-name] :as event}]
-  (let [task (planning/find-task catalog task-name)
-        batch (read-batch catalog task)]
+  [{:keys [catalog task] :as event}]
+  (let [task-map (planning/find-task catalog task)
+        batch (read-batch catalog task-map)]
     (assoc event :batch batch)))
 
-(defmethod storage-api/munge-decompress-tx
+(defmethod p-ext/munge-decompress-tx
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event])
+  [{:keys [batch] :as event}]
+  (assoc event :decompressed (map decompress-tx batch)))
 
-(defmethod storage-api/munge-apply-fn
+(defmethod p-ext/munge-apply-fn
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
   [event] event)
 
-(defmethod storage-api/munge-apply-fn
+(defmethod p-ext/munge-apply-fn
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
   [event] event)
 
-(defmethod storage-api/munge-compress-tx
+(defmethod p-ext/munge-compress-tx
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
   [event])
 
-(defmethod storage-api/munge-write-batch
+(defmethod p-ext/munge-write-batch
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
