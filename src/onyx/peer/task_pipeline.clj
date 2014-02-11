@@ -10,6 +10,12 @@
 (defn create-tx-session [{:keys [queue]}]
   (extensions/create-tx-session queue))
 
+(defn establish-new-payload [{:keys [sync peer-node payload-ch]}]
+  (let [peer-contents (extensions/read-place sync peer-node)
+        node (extensions/create sync :payload)]
+    (extensions/write-place sync (assoc :payload node))
+    (extensions/on-change sync node #(>!! payload-ch %))))
+
 (defn munge-open-session [event session]
   (assoc event :session session))
 
@@ -94,16 +100,15 @@
   (loop []
     (when-let [event (<!! complete-ch)]
       (let [event (munge-complete-task event)]
-        (if (:completed event)
+        (when (:completed event)
           (>!! reset-payload-node-ch event)))
       (recur))))
 
-(defn reset-payload-node-loop [reset-ch]
-  (loop []
-    (when-let [event (<!! reset-ch)]
-      (recur))))
+(defn reset-payload-node [reset-ch payload-ch]
+  (when-let [event (<!! reset-ch)]
+    (establish-new-payload event)))
 
-(defrecord TaskPipeline [payload sync queue]
+(defrecord TaskPipeline [payload sync queue payload-ch]
   component/Lifecycle
 
   (start [component]
@@ -123,6 +128,7 @@
           pipeline-data {:ingress-queues (:task/ingress-queues (:task payload))
                          :egress-queues (:task/egress-queues (:task payload))
                          :task (:task/name (:task payload))
+                         :peer-node (:peer (:nodes payload))
                          :status-node (:status (:nodes payload))
                          :completion-node (:completion (:nodes payload))
                          :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
@@ -172,7 +178,7 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'reset-payload-node-loop
+      (dire/with-handler! #'reset-payload-node
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -198,7 +204,7 @@
         :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (future (close-resources-loop close-resources-ch complete-task-ch))
         :complete-task-loop (future (complete-task-loop complete-task-ch reset-payload-node-ch))
-        :reset-payload-node-loop (future (reset-payload-node-loop reset-payload-node-ch)))))
+        :reset-payload-node (future (reset-payload-node reset-payload-node-ch payload-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")
@@ -223,10 +229,11 @@
     (future-cancel (:write-batch-loop component))
     (future-cancel (:close-resources-loop component))
     (future-cancel (:complete-task-loop component))
-    (future-cancel (:reset-payload-node-loop component))
+    (future-cancel (:reset-payload-node component))
     
     component))
 
-(defn task-pipeline [payload sync queue]
-  (map->TaskPipeline {:payload payload :sync sync :queue queue}))
+(defn task-pipeline [payload sync queue payload-ch]
+  (map->TaskPipeline {:payload payload :sync sync
+                      :queue queue :payload-ch payload-ch}))
 

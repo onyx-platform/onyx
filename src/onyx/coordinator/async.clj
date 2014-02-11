@@ -40,7 +40,8 @@
             status-node (extensions/create sync :status)
             catalog-node (extensions/create sync :catalog)
             workflow-node (extensions/create sync :workflow)
-            nodes {:payload payload-node
+            nodes {:peer peer
+                   :payload payload-node
                    :ack ack-node
                    :completion complete-node
                    :status status-node

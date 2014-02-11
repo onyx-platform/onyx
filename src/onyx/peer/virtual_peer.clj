@@ -20,7 +20,7 @@
           (extensions/touch-place sync (:ack (:nodes payload)))
           (<!! status-ch)
           
-          (let [new-pipeline (task-pipeline payload sync queue)]
+          (let [new-pipeline (task-pipeline payload sync queue payload-ch)]
             (recur (component/start new-pipeline))))))))
 
 (defrecord VirtualPeer []
