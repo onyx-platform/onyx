@@ -1,6 +1,5 @@
 (ns onyx.queue.hornetq
-  (:require [clojure.core.async :refer [chan go >! <! alts!! close!] :as async]
-            [com.stuartsierra.component :as component]
+  (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions])
@@ -117,20 +116,14 @@
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
-        session (.createTransactedSession session-factory)
+        session (.createSession session-factory)
         queue (:hornetq/queue-name task)
-        consumer (.createConsumer session queue)
-        ch (chan 1)]
+        consumer (.createConsumer session queue)]
     (.start session)
-    (go (loop []
-          (when-let [m (.receive consumer)]
-            (.acknowledge m)
-            (>! ch m)
-            (recur))))
-    (let [chs [ch (async/timeout (:onyx/timeout task))]
-          rets (doall (repeatedly (:onyx/batch-size task) #(first (alts!! chs))))]
-      (doseq [ch chs] (close! ch))
-      (.commit session)
+    (let [f #(when-let [m (.receive consumer (:hornetq/timeout task))]
+               (.acknowledge m)
+               m)
+          rets (doall (repeatedly (:hornetq/batch-size task) f))]
       (.close session)
       (filter identity rets))))
 

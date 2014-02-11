@@ -47,11 +47,11 @@
     :onyx/consumption :concurrent
     :onyx/type :queue
     :onyx/medium :hornetq
-    :onyx/batch-size 2
-    :onyx/timeout 50
     :hornetq/queue-name in-queue
     :hornetq/host "localhost"
-    :hornetq/port 5445}
+    :hornetq/port 5445
+    :hornetq/batch-size 2
+    :hornetq/timeout 50}
    {:onyx/name :inc
     :onyx/fn :onyx.coordinator.single-peer-test/my-inc
     :onyx/type :transformer
