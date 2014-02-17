@@ -51,7 +51,7 @@
 
 (defmethod p-ext/compress-batch :default
   [{:keys [results] :as event}]
-  (let [compressed-msgs (map compress-tx results)]
+  (let [compressed-msgs (map compress-segment results)]
     (assoc event :compressed compressed-msgs)))
 
 (defmethod p-ext/write-batch :default
