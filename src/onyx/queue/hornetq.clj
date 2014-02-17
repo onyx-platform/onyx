@@ -112,6 +112,8 @@
         (.commit session)))
     (.close session)))
 
+;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
+
 (defn read-batch [catalog task]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
@@ -127,44 +129,44 @@
       (.close session)
       (filter identity rets))))
 
-(defn decompress-tx [segment]
+(defn decompress-segment [segment]
   (read-string (.readString (.getBodyBuffer segment))))
 
-(defmethod p-ext/munge-read-batch
+(defmethod p-ext/read-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [{:keys [catalog task] :as event}]
+  [{:keys [catalog task]}]
   (let [task-map (planning/find-task catalog task)
         batch (read-batch catalog task-map)]
-    (assoc event :batch batch)))
+    {:batch batch}))
 
-(defmethod p-ext/munge-decompress-tx
+(defmethod p-ext/decompress-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [{:keys [batch] :as event}]
-  (assoc event :decompressed (map decompress-tx batch)))
+  [{:keys [batch]}]
+  {:decompressed (map decompress-segment batch)})
 
-(defmethod p-ext/munge-apply-fn
+(defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event] event)
+  [event] {})
 
-(defmethod p-ext/munge-apply-fn
+(defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
   [event] event)
 
-(defmethod p-ext/munge-compress-tx
+(defmethod p-ext/compress-batch
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
   [event])
 
-(defmethod p-ext/munge-write-batch
+(defmethod p-ext/write-batch
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}

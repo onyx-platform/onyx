@@ -33,30 +33,30 @@
     (extensions/produce-message queue producer msg)))
 
 (defmethod p-ext/read-batch :default
-  [{:keys [task queue session ingress-queues batch-size timeout] :as event}]
+  [{:keys [task queue session ingress-queues batch-size timeout]}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch task queue consumers batch-size timeout)]
-    (assoc event :batch batch :consumers consumers)))
+    {:batch batch :consumers consumers}))
 
 (defmethod p-ext/decompress-batch :default
-  [{:keys [queue batch] :as event}]
+  [{:keys [queue batch]}]
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
-    (assoc event :decompressed decompressed-msgs)))
+    {:decompressed decompressed-msgs}))
 
 (defmethod p-ext/apply-fn :default
-  [{:keys [decompressed task catalog] :as event}]
+  [{:keys [decompressed task catalog]}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (map (partial apply-fn task) decompressed)]
-    (assoc event :results results)))
+    {:results results}))
 
 (defmethod p-ext/compress-batch :default
-  [{:keys [results] :as event}]
+  [{:keys [results]}]
   (let [compressed-msgs (map compress-segment results)]
-    (assoc event :compressed compressed-msgs)))
+    {:compressed compressed-msgs}))
 
 (defmethod p-ext/write-batch :default
-  [{:keys [queue queue-name session compressed] :as event}]
+  [{:keys [queue queue-name session compressed]}]
   (let [producer (extensions/create-producer queue session queue-name)
         batch (write-batch queue session producer compressed)]
-    (assoc event :producer producer)))
+    {:producer producer}))
 
