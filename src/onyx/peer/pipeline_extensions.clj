@@ -5,13 +5,13 @@
   (let [catalog-task (find-task (:catalog event) (:task event))]
     (select-keys catalog-task [:onyx/type :onyx/medium :onyx/direction])))
 
-(defmulti munge-read-batch storage-dispatch)
+(defmulti read-batch storage-dispatch)
 
-(defmulti munge-decompress-tx storage-dispatch)
+(defmulti decompress-batch storage-dispatch)
 
-(defmulti munge-apply-fn storage-dispatch) 
+(defmulti apply-fn storage-dispatch) 
 
-(defmulti munge-compress-tx storage-dispatch)
+(defmulti compress-batch storage-dispatch)
 
-(defmulti munge-write-batch storage-dispatch)
+(defmulti write-batch storage-dispatch)
 

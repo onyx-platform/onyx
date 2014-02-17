@@ -16,7 +16,7 @@
       (doseq [ch chs] (close! ch))
       (filter identity rets))))
 
-(defn decompress-tx [queue message]
+(defn decompress-segment [queue message]
   (let [segment (extensions/read-message queue message)]
     (read-string segment)))
 
@@ -25,36 +25,36 @@
         user-fn (symbol (name (:onyx/fn task)))]
     ((ns-resolve user-ns user-fn) segment)))
 
-(defn compress-tx [segment]
+(defn compress-segment [segment]
   (pr-str segment))
 
 (defn write-batch [queue session producer msgs]
   (doseq [msg msgs]
     (extensions/produce-message queue producer msg)))
 
-(defmethod p-ext/munge-read-batch :default
+(defmethod p-ext/read-batch :default
   [{:keys [task queue session ingress-queues batch-size timeout] :as event}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch task queue consumers batch-size timeout)]
     (assoc event :batch batch :consumers consumers)))
 
-(defmethod p-ext/munge-decompress-tx :default
+(defmethod p-ext/decompress-batch :default
   [{:keys [queue batch] :as event}]
-  (let [decompressed-msgs (map (partial decompress-tx queue) batch)]
+  (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
     (assoc event :decompressed decompressed-msgs)))
 
-(defmethod p-ext/munge-apply-fn :default
+(defmethod p-ext/apply-fn :default
   [{:keys [decompressed task catalog] :as event}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (map (partial apply-fn task) decompressed)]
     (assoc event :results results)))
 
-(defmethod p-ext/munge-compress-tx :default
+(defmethod p-ext/compress-batch :default
   [{:keys [results] :as event}]
   (let [compressed-msgs (map compress-tx results)]
     (assoc event :compressed compressed-msgs)))
 
-(defmethod p-ext/munge-write-batch :default
+(defmethod p-ext/write-batch :default
   [{:keys [queue queue-name session compressed] :as event}]
   (let [producer (extensions/create-producer queue session queue-name)
         batch (write-batch queue session producer compressed)]

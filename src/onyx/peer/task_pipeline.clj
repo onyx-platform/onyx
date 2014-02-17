@@ -23,6 +23,26 @@
 (defn munge-open-session [event session]
   (assoc event :session session))
 
+(defn munge-read-batch [event]
+  (let [rets (p-ext/read-batch event)]
+    (merge event rets)))
+
+(defn munge-decompress-batch [event]
+  (let [rets (p-ext/decompress-batch event)]
+    (merge event rets)))
+
+(defn munge-apply-fn [event]
+  (let [rets (p-ext/apply-fn event)]
+    (merge event rets)))
+
+(defn munge-compress-batch [event]
+  (let [rets (p-ext/compress-batch event)]
+    (merge event rets)))
+
+(defn munge-write-batch [event]
+  (let [rets (p-ext/write-batch event)]
+    (merge event rets)))
+
 (defn munge-status-check [{:keys [sync status-node] :as event}]
   (assoc event :commit? (extensions/place-exists? sync status-node)))
 
@@ -30,15 +50,14 @@
   (extensions/commit-tx queue session)
   (assoc event :committed true))
 
-(defn munge-close-resources [{:keys [queue session producer consumers] :as event}]
+(defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
   (extensions/close-resource queue session)
-  (extensions/close-resource queue producer)
+  (doseq [producer producers] (extensions/close-resource queue producer))
   (doseq [consumer consumers] (extensions/close-resource queue consumer))  
   (assoc event :closed true))
 
 (defn munge-complete-task [{:keys [sync completion-node decompressed] :as event}]
   (let [done? (= (last decompressed) :done)]
-    (prn decompressed " :: " done?)
     (when done?
       (extensions/touch-place sync completion-node))
     (assoc event :completed done?)))
@@ -52,31 +71,31 @@
 (defn read-batch-loop [read-ch decompress-ch]
   (loop []
     (when-let [event (<!! read-ch)]
-      (>!! decompress-ch (p-ext/munge-read-batch event))
+      (>!! decompress-ch (munge-read-batch event))
       (recur))))
 
-(defn decompress-tx-loop [decompress-ch apply-fn-ch]
+(defn decompress-batch-loop [decompress-ch apply-fn-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
-      (>!! apply-fn-ch (p-ext/munge-decompress-tx event))
+      (>!! apply-fn-ch (munge-decompress-batch event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
   (loop []
     (when-let [event (<!! apply-fn-ch)]
-      (>!! compress-ch (p-ext/munge-apply-fn event))
+      (>!! compress-ch (munge-apply-fn event))
       (recur))))
 
-(defn compress-tx-loop [compress-ch write-batch-ch]
+(defn compress-batch-loop [compress-ch write-batch-ch]
   (loop []
     (when-let [event (<!! compress-ch)]
-      (>!! write-batch-ch (p-ext/munge-compress-tx event))
+      (>!! write-batch-ch (munge-compress-batch event))
       (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch]
   (loop []
     (when-let [event (<!! write-ch)]
-      (>!! status-check-ch (p-ext/munge-write-batch event))
+      (>!! status-check-ch (munge-write-batch event))
       (recur))))
 
 (defn status-check-loop [status-ch commit-tx-ch reset-payload-node-ch]
@@ -119,9 +138,9 @@
     (prn "Starting Task Pipeline")
     
     (let [read-batch-ch (chan 1)
-          decompress-tx-ch (chan 1)
+          decompress-batch-ch (chan 1)
           apply-fn-ch (chan 1)
-          compress-tx-ch (chan 1)
+          compress-batch-ch (chan 1)
           status-check-ch (chan 1)
           write-batch-ch (chan 1)
           commit-tx-ch (chan 1)
@@ -150,7 +169,7 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'decompress-tx-loop
+      (dire/with-handler! #'decompress-batch-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -158,7 +177,7 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'compress-tx-loop
+      (dire/with-handler! #'compress-batch-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -188,9 +207,9 @@
 
       (assoc component
         :read-batch-ch read-batch-ch
-        :decompress-tx-ch decompress-tx-ch
+        :decompress-batch-ch decompress-batch-ch
         :apply-fn-ch apply-fn-ch
-        :compress-tx-ch compress-tx-ch
+        :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
         :status-check-ch status-check-ch
         :commit-tx-ch commit-tx-ch
@@ -199,10 +218,10 @@
         :reset-payload-node-ch reset-payload-node-ch        
         
         :open-session-loop (future (open-session-loop read-batch-ch pipeline-data))
-        :read-batch-loop (future (read-batch-loop read-batch-ch decompress-tx-ch))
-        :decompress-tx-loop (future (decompress-tx-loop decompress-tx-ch apply-fn-ch))
-        :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-tx-ch))
-        :compress-tx-loop (future (compress-tx-loop compress-tx-ch write-batch-ch))
+        :read-batch-loop (future (read-batch-loop read-batch-ch decompress-batch-ch))
+        :decompress-batch-loop (future (decompress-batch-loop decompress-batch-ch apply-fn-ch))
+        :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-batch-ch))
+        :compress-batch-loop (future (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (future (write-batch-loop write-batch-ch status-check-ch))
         :status-check-loop (future (status-check-loop status-check-ch commit-tx-ch reset-payload-node-ch))
         :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
@@ -214,9 +233,9 @@
     (prn "Stopping Task Pipeline")
 
     (close! (:read-batch-ch component))
-    (close! (:decompress-tx-ch component))
+    (close! (:decompress-batch-ch component))
     (close! (:apply-fn-ch component))
-    (close! (:compress-tx-ch component))
+    (close! (:compress-batch-ch component))
     (close! (:write-batch-ch component))
     (close! (:status-check-ch component))
     (close! (:commit-tx-ch component))
@@ -226,9 +245,9 @@
 
     (future-cancel (:open-session-loop component))
     (future-cancel (:read-batch-loop component))
-    (future-cancel (:decompress-tx-loop component))
+    (future-cancel (:decompress-batch-loop component))
     (future-cancel (:apply-fn-loop component))
-    (future-cancel (:compress-tx-loop component))
+    (future-cancel (:compress-batch-loop component))
     (future-cancel (:status-check-loop component))
     (future-cancel (:write-batch-loop component))
     (future-cancel (:close-resources-loop component))
