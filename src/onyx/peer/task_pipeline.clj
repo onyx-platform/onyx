@@ -12,8 +12,10 @@
 
 (defn new-payload [sync peer-node payload-ch]
   (let [peer-contents (extensions/read-place sync peer-node)
-        node (extensions/create sync :payload)]
-    (extensions/write-place sync (assoc :payload node))))
+        node (extensions/create sync :payload)
+        updated-contents (assoc peer-contents :payload node)]
+    (extensions/write-place sync peer-node updated-contents)
+    node))
 
 (defn munge-new-payload [{:keys [sync peer-node payload-ch] :as event}]
   (let [node (new-payload sync peer-node payload-ch)]

@@ -152,13 +152,15 @@
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event] {})
+  [event]
+  {})
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event] event)
+  [event]
+  {})
 
 (defmethod p-ext/compress-batch
   {:onyx/type :queue
