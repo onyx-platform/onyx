@@ -129,7 +129,7 @@
           (>!! reset-payload-node-ch event)))
       (recur))))
 
-(defn reset-payload-node [reset-ch payload-ch]
+(defn reset-payload-node [reset-ch]
   (when-let [event (<!! reset-ch)]
     (munge-new-payload event)))
 
@@ -158,6 +158,7 @@
                          :completion-node (:completion (:nodes payload))
                          :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
                          :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
+                         :payload-ch payload-ch
                          :queue queue
                          :sync sync
                          :batch-size 2
@@ -229,7 +230,7 @@
         :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (future (close-resources-loop close-resources-ch complete-task-ch))
         :complete-task-loop (future (complete-task-loop complete-task-ch reset-payload-node-ch))
-        :reset-payload-node (future (reset-payload-node reset-payload-node-ch payload-ch)))))
+        :reset-payload-node (future (reset-payload-node reset-payload-node-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")
