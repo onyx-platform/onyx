@@ -53,9 +53,9 @@
   (assoc event :committed true))
 
 (defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
-  (extensions/close-resource queue session)
   (doseq [producer producers] (extensions/close-resource queue producer))
-  (doseq [consumer consumers] (extensions/close-resource queue consumer))  
+  (doseq [consumer consumers] (extensions/close-resource queue consumer))
+  (extensions/close-resource queue session)
   (assoc event :closed true))
 
 (defn munge-complete-task [{:keys [sync completion-node decompressed] :as event}]

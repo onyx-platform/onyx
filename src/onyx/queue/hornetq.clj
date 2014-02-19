@@ -108,8 +108,8 @@
             message (.createMessage session true)]
         (.writeString (.getBufferBody message) (pr-str :done))
         (.send producer message)
-        (.close producer)
-        (.commit session)))
+        (.close producer)))
+    (.commit session)
     (.close session)))
 
 ;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
