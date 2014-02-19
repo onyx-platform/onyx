@@ -3,7 +3,7 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions]))
 
-(defn read-batch [{:keys [batch-size timeout] :as task} queue consumers]
+(defn read-batch [queue consumers batch-size timeout]
   (let [consumer-chs (take (count consumers) (repeatedly #(chan 1)))]
     (doseq [[c consumer-ch] (map vector consumers consumer-chs)]
       (go (loop []
@@ -28,14 +28,14 @@
 (defn compress-segment [segment]
   (pr-str segment))
 
-(defn write-batch [queue session producer msgs]
-  (doseq [msg msgs]
-    (extensions/produce-message queue producer msg)))
+(defn write-batch [queue session producers msgs]
+  (for [p producers msg msgs]
+    (extensions/produce-message queue p session msg)))
 
 (defmethod p-ext/read-batch :default
   [{:keys [task queue session ingress-queues batch-size timeout]}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
-        batch (read-batch task queue consumers batch-size timeout)]
+        batch (read-batch queue consumers batch-size timeout)]
     {:batch batch :consumers consumers}))
 
 (defmethod p-ext/decompress-batch :default
@@ -55,8 +55,9 @@
     {:compressed compressed-msgs}))
 
 (defmethod p-ext/write-batch :default
-  [{:keys [queue queue-name session compressed]}]
-  (let [producer (extensions/create-producer queue session queue-name)
-        batch (write-batch queue session producer compressed)]
-    {:producer producer}))
+  [{:keys [queue egress-queues session compressed]}]
+  (prn "Transformer: Writing batch " compressed)
+  (let [producers (map (partial extensions/create-producer queue session) egress-queues)
+        batch (write-batch queue session producers compressed)]
+    {:producers producers}))
 
