@@ -2,7 +2,9 @@
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.extensions :as extensions])
+            [onyx.extensions :as extensions]
+            [dire.core :refer [with-post-hook!]]
+            [taoensso.timbre :refer [info]])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
@@ -132,45 +134,74 @@
 (defn decompress-segment [segment]
   (read-string (.readString (.getBodyBuffer segment))))
 
+(defn read-batch-shim [{:keys [catalog task]}]
+  (let [task-map (planning/find-task catalog task)
+        batch (read-batch catalog task-map)]
+    {:batch batch}))
+
+(defn decompress-batch-shim [{:keys [batch]}]
+  {:decompressed (map decompress-segment batch)})
+
+(defn apply-fn-in-shim [event]
+  {:results (:decompressed event)})
+
+(defn apply-fn-out-shim [event]
+  {})
+
+(defn compress-batch-shim [event]
+  {})
+
+(defn write-batch-shim [event]
+  {})
+
 (defmethod p-ext/read-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [{:keys [catalog task]}]
-  (let [task-map (planning/find-task catalog task)
-        batch (read-batch catalog task-map)]
-    {:batch batch}))
+  [event] (read-batch-shim event))
 
 (defmethod p-ext/decompress-batch
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [{:keys [batch]}]
-  {:decompressed (map decompress-segment batch)})
+  [event] (decompress-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event]
-  {:results (:decompressed event)})
+  [event] (apply-fn-in-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event]
-  {})
+  [event] (apply-fn-out-shim event))
 
 (defmethod p-ext/compress-batch
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event])
+  [event] (compress-batch-shim event))
 
 (defmethod p-ext/write-batch
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event])
+  [event] (write-batch-shim event))
+
+(with-post-hook! #'read-batch-shim
+  (fn [{:keys [batch]}]
+    (info "HornetQ ingress: Read" (count batch) "segments")))
+
+(with-post-hook! #'decompress-batch-shim
+  (fn [{:keys [decompressed]}]
+    (info "HornetQ ingress: Decompressed" (count decompressed) "segments")))
+
+(with-post-hook! #'apply-fn-in-shim
+  (fn [{:keys [results]}]
+    (info "HornetQ ingress: Applied fn to" (count results) "segments")))
+
+;;;;;;;;;;;;;;;;;;; End library ;;;;;;;;;;;;;;;;;;;;;;;;
+
 

@@ -10,6 +10,7 @@
                  [com.stuartsierra/component "0.2.1"]
                  [com.datomic/datomic-free "0.9.4384"]
                  [com.datomic/simulant "0.1.6"]
+                 [com.taoensso/timbre "3.0.1"]
                  [zookeeper-clj "0.9.1"]
                  [incanter "1.5.4"]
                  [dire "0.5.1"]]
