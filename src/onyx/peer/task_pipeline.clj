@@ -131,9 +131,10 @@
 
 (defn reset-payload-node [reset-ch]
   (when-let [event (<!! reset-ch)]
-    (munge-new-payload event)))
+    (munge-new-payload event)
+    (>!! (:complete-ch event) true)))
 
-(defrecord TaskPipeline [payload sync queue payload-ch]
+(defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
   component/Lifecycle
 
   (start [component]
@@ -159,6 +160,7 @@
                          :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
                          :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
                          :payload-ch payload-ch
+                         :complete-ch complete-ch
                          :queue queue
                          :sync sync
                          :batch-size 2
@@ -259,7 +261,8 @@
     
     component))
 
-(defn task-pipeline [payload sync queue payload-ch]
+(defn task-pipeline [payload sync queue payload-ch complete-ch]
   (map->TaskPipeline {:payload payload :sync sync
-                      :queue queue :payload-ch payload-ch}))
+                      :queue queue :payload-ch payload-ch
+                      :complete-ch complete-ch}))
 

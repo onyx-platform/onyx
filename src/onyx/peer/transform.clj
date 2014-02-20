@@ -33,7 +33,7 @@
     (extensions/produce-message queue p session msg)))
 
 (defmethod p-ext/read-batch :default
-  [{:keys [task queue session ingress-queues batch-size timeout]}]
+  [{:keys [queue session ingress-queues batch-size timeout]}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch queue consumers batch-size timeout)]
     {:batch batch :consumers consumers}))
@@ -56,7 +56,6 @@
 
 (defmethod p-ext/write-batch :default
   [{:keys [queue egress-queues session compressed]}]
-  (prn "Transformer: Writing batch " compressed)
   (let [producers (map (partial extensions/create-producer queue session) egress-queues)
         batch (write-batch queue session producers compressed)]
     {:producers producers}))

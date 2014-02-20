@@ -153,7 +153,7 @@
    :onyx/direction :input
    :onyx/medium :hornetq}
   [event]
-  {})
+  {:results (:decompressed event)})
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
