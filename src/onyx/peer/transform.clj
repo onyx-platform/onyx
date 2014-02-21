@@ -31,8 +31,9 @@
   (pr-str segment))
 
 (defn write-batch [queue session producers msgs]
-  (for [p producers msg msgs]
-    (extensions/produce-message queue p session msg)))
+  (dorun
+   (for [p producers msg msgs]
+     (extensions/produce-message queue p session msg))))
 
 (defn read-batch-shim
   [{:keys [queue session ingress-queues batch-size timeout]}]
