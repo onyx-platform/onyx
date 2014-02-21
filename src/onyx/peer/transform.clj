@@ -85,3 +85,11 @@
   (fn [{:keys [results]}]
     (info "Transformer: Applied fn to" (count results) "segments")))
 
+(with-post-hook! #'compress-batch-shim
+  (fn [{:keys [compressed]}]
+    (info "Transformer: Compressed" (count compressed) "segments")))
+
+(with-post-hook! #'write-batch-shim
+  (fn [{:keys [producers]}]
+    (info "Transformer: Wrote batch to" (count producers) "outputs")))
+
