@@ -27,7 +27,7 @@
 
 (doseq [n (range 10)]
   (let [message (.createMessage session true)]
-    (.writeString (.getBodyBuffer message) (pr-str n))
+    (.writeString (.getBodyBuffer message) (pr-str {:n n}))
     (.send producer message)))
 
 (def sentinel (.createMessage session true))
@@ -96,7 +96,6 @@
      (try
        ((:shutdown-fn v-peer))
        (catch Exception e (prn e))))
-
    (try
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))

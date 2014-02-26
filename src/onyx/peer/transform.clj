@@ -6,17 +6,13 @@
             [dire.core :refer [with-post-hook!]]))
 
 (defn read-batch [queue consumers batch-size timeout]
-  (let [consumer-chs (take (count consumers) (repeatedly #(chan 1)))]
-    (doseq [[c consumer-ch] (map vector consumers consumer-chs)]
-      (go (loop []
-            (when-let [m (.receive c)]
-              (extensions/ack-message queue m)
-              (>! consumer-ch m)
-              (recur)))))
-    (let [chs (conj consumer-chs (async/timeout timeout))
-          rets (doall (repeatedly batch-size #(first (alts!! chs))))]
-      (doseq [ch chs] (close! ch))
-      (filter identity rets))))
+  ;; Multi-consumer not yet implemented.
+  (let [consumer (first consumers)
+        f #(when-let [m (.receive consumer timeout)]
+             (.acknowledge m)
+             m)
+        rets (doall (repeatedly batch-size f))]
+    (filter identity rets)))
 
 (defn decompress-segment [queue message]
   (let [segment (extensions/read-message queue message)]
