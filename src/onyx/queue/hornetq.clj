@@ -128,11 +128,31 @@
                (.acknowledge m)
                m)
           rets (doall (repeatedly (:hornetq/batch-size task) f))]
+      (.close consumer)
       (.close session)
       (filter identity rets))))
 
 (defn decompress-segment [segment]
   (read-string (.readString (.getBodyBuffer segment))))
+
+(defn compress-segment [segment]
+  (pr-str segment))
+
+(defn write-batch [task compressed]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createSession session-factory)
+        queue (:hornetq/queue-name task)
+        producer (.createProducer session queue)]
+    (.start session)
+    (doseq [x compressed]
+      (let [message (.createMessage session true)]
+        (.writeString (.getBodyBuffer message) x)
+        (.send producer message)))
+    (.commit session)
+    (.close producer)
+    (.close session)))
 
 (defn read-batch-shim [{:keys [catalog task]}]
   (let [task-map (planning/find-task catalog task)
@@ -146,13 +166,15 @@
   {:results (:decompressed event)})
 
 (defn apply-fn-out-shim [event]
-  {})
+  {:results (:decompressed event)})
 
-(defn compress-batch-shim [event]
-  {})
+(defn compress-batch-shim [{:keys [results]}]
+  {:compressed (map compress-segment results)})
 
-(defn write-batch-shim [event]
-  {})
+(defn write-batch-shim [{:keys [catalog task compressed]}]
+  (let [task-map (planning/find-task catalog task)]
+    (write-batch task-map compressed)
+    {:written? true}))
 
 (defmethod p-ext/read-batch
   {:onyx/type :queue
@@ -202,6 +224,17 @@
   (fn [{:keys [results]}]
     (info "HornetQ ingress: Applied fn to" (count results) "segments")))
 
-;;;;;;;;;;;;;;;;;;; End library ;;;;;;;;;;;;;;;;;;;;;;;;
+(with-post-hook! #'apply-fn-out-shim
+  (fn [{:keys [results]}]
+    (info "HornetQ egress: Applied fn to" (count results) "segments")))
 
+(with-post-hook! #'compress-batch-shim
+  (fn [{:keys [compressed]}]
+    (info "HornetQ egress: Compressed batch of" (count compressed) "segments")))
+
+(with-post-hook! #'write-batch-shim
+  (fn [{:keys [written?]}]
+    (info "HornetQ egress: Wrote batch with value" written?)))
+
+;;;;;;;;;;;;;;;;;;; End library ;;;;;;;;;;;;;;;;;;;;;;;;
 

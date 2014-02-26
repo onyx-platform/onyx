@@ -89,8 +89,25 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
+(def session (.createTransactedSession session-factory))
+
+(.start session)
+
+(def consumer (.createConsumer session out-queue))
+
+(def results (atom []))
+
+(doseq [n (range 10)]
+  (let [message (.receive consumer)]
+    (.acknowledge message)
+    (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
+
+(.commit session)
+(.close producer)
+(.close session)
+
 (try
-  (dorun (map deref (map :runner v-peers)))
+  ;; (dorun (map deref (map :runner v-peers)))
   (finally
    (doseq [v-peer v-peers]
      (try
@@ -99,4 +116,6 @@
    (try
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
+
+(fact @results => (map (fn [x] {:n x}) (range 1 11)))
 

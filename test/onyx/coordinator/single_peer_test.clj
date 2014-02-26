@@ -155,9 +155,9 @@
 
     (facts "The payload node contains the other node paths"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
-             (fact (clojure.set/difference
+             (fact (contains?
                     (into #{} (keys nodes))
-                    #{:payload :ack :completion :status}) => empty?)))
+                    #{:payload :ack :completion :status}) => true?)))
     
     (facts "Touching the ack node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
