@@ -97,7 +97,7 @@
 
 (def results (atom []))
 
-(doseq [n (range 10)]
+(doseq [n (range 11)]
   (let [message (.receive consumer)]
     (.acknowledge message)
     (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
@@ -117,5 +117,5 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(fact @results => (map (fn [x] {:n x}) (range 1 11)))
+(fact @results => (conj (vec (map (fn [x] {:n x}) (range 1 11))) :done))
 
