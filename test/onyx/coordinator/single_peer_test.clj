@@ -155,9 +155,8 @@
 
     (facts "The payload node contains the other node paths"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
-             (fact (contains?
-                    (into #{} (keys nodes))
-                    #{:payload :ack :completion :status}) => true?)))
+             (fact (into #{} (keys nodes)) =>
+                   #{:payload :ack :completion :status :catalog :workflow :peer})))
     
     (facts "Touching the ack node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
