@@ -33,6 +33,12 @@
   (let [rets (p-ext/decompress-batch event)]
     (merge event rets)))
 
+(defn munge-strip-sentinel-ch [event]
+  (let [segments (:decompressed event)]
+    (if (= (last segments) :done)
+      (assoc event :tail-batch? true :decompressed (butlast segments))
+      (assoc event :tail-batch? false))))
+
 (defn munge-apply-fn [event]
   (let [rets (p-ext/apply-fn event)]
     (merge event rets)))
@@ -58,11 +64,9 @@
   (extensions/close-resource queue session)
   (assoc event :closed true))
 
-(defn munge-complete-task [{:keys [sync completion-node decompressed] :as event}]
-  (let [done? (= (last decompressed) :done)]
-    (when done?
-      (extensions/touch-place sync completion-node))
-    (assoc event :completed done?)))
+(defn munge-complete-task [{:keys [sync completion-node tail-batch?] :as event}]
+  (when tail-batch?
+    (extensions/touch-place sync completion-node)))
 
 (defn open-session-loop [read-ch kill-ch pipeline-data]
   (loop []
@@ -77,10 +81,16 @@
       (>!! decompress-ch (munge-read-batch event))
       (recur))))
 
-(defn decompress-batch-loop [decompress-ch apply-fn-ch]
+(defn decompress-batch-loop [decompress-ch strip-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
-      (>!! apply-fn-ch (munge-decompress-batch event))
+      (>!! strip-ch (munge-decompress-batch event))
+      (recur))))
+
+(defn strip-sentinel-loop [strip-ch apply-fn-ch]
+  (loop []
+    (when-let [event (<!! strip-ch)]
+      (>!! apply-fn-ch (munge-strip-sentinel-ch event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
@@ -126,7 +136,7 @@
   (loop []
     (when-let [event (<!! complete-ch)]
       (let [event (munge-complete-task event)]
-        (when (:completed event)
+        (when (:tail-batch? event)
           (>!! reset-payload-node-ch event)))
       (recur))))
 
@@ -144,6 +154,7 @@
     (let [open-session-kill-ch (chan 1)
           read-batch-ch (chan 1)
           decompress-batch-ch (chan 1)
+          strip-sentinel-ch (chan 1)
           apply-fn-ch (chan 1)
           compress-batch-ch (chan 1)
           status-check-ch (chan 1)
@@ -177,6 +188,10 @@
         (fn [e & _] (.printStackTrace e)))
 
       (dire/with-handler! #'decompress-batch-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'strip-sentinel-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -216,6 +231,7 @@
         :open-session-kill-ch open-session-kill-ch
         :read-batch-ch read-batch-ch
         :decompress-batch-ch decompress-batch-ch
+        :strip-sentinel-ch strip-sentinel-ch
         :apply-fn-ch apply-fn-ch
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
@@ -227,7 +243,8 @@
         
         :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
-        :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch))
+        :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch))
+        :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch apply-fn-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
@@ -243,6 +260,7 @@
     (close! (:open-session-kill-ch component))
     (close! (:read-batch-ch component))
     (close! (:decompress-batch-ch component))
+    (close! (:strip-sentinel-ch component))
     (close! (:apply-fn-ch component))
     (close! (:compress-batch-ch component))
     (close! (:write-batch-ch component))

@@ -19,11 +19,9 @@
     (read-string segment)))
 
 (defn apply-fn [task segment]
-  (if (= segment :done)
-    :done
-    (let [user-ns (symbol (name (namespace (:onyx/fn task))))
-          user-fn (symbol (name (:onyx/fn task)))]
-      ((ns-resolve user-ns user-fn) segment))))
+  (let [user-ns (symbol (name (namespace (:onyx/fn task))))
+        user-fn (symbol (name (:onyx/fn task)))]
+    ((ns-resolve user-ns user-fn) segment)))
 
 (defn compress-segment [segment]
   (pr-str segment))
