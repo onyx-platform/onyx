@@ -1,5 +1,5 @@
 (ns onyx.peer.task-pipeline
-  (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go] :as async]
+  (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [onyx.peer.pipeline-extensions :as p-ext]
@@ -222,17 +222,17 @@
         :complete-task-ch complete-task-ch
         :reset-payload-node-ch reset-payload-node-ch        
         
-        :open-session-loop (future (open-session-loop read-batch-ch pipeline-data))
-        :read-batch-loop (future (read-batch-loop read-batch-ch decompress-batch-ch))
-        :decompress-batch-loop (future (decompress-batch-loop decompress-batch-ch apply-fn-ch))
-        :apply-fn-loop (future (apply-fn-loop apply-fn-ch compress-batch-ch))
-        :compress-batch-loop (future (compress-batch-loop compress-batch-ch write-batch-ch))
-        :write-batch-loop (future (write-batch-loop write-batch-ch status-check-ch))
-        :status-check-loop (future (status-check-loop status-check-ch commit-tx-ch reset-payload-node-ch))
-        :commit-tx-loop (future (commit-tx-loop commit-tx-ch close-resources-ch))
-        :close-resources-loop (future (close-resources-loop close-resources-ch complete-task-ch))
-        :complete-task-loop (future (complete-task-loop complete-task-ch reset-payload-node-ch))
-        :reset-payload-node (future (reset-payload-node reset-payload-node-ch)))))
+        :open-session-loop (thread (open-session-loop read-batch-ch pipeline-data))
+        :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
+        :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch))
+        :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
+        :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
+        :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch commit-tx-ch reset-payload-node-ch))
+        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
+        :close-resources-loop (thread (close-resources-loop close-resources-ch complete-task-ch))
+        :complete-task-loop (thread (complete-task-loop complete-task-ch reset-payload-node-ch))
+        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")
@@ -248,17 +248,6 @@
     (close! (:complete-task-ch component))
     (close! (:reset-payload-node-ch component))
 
-    (future-cancel (:open-session-loop component))
-    (future-cancel (:read-batch-loop component))
-    (future-cancel (:decompress-batch-loop component))
-    (future-cancel (:apply-fn-loop component))
-    (future-cancel (:compress-batch-loop component))
-    (future-cancel (:status-check-loop component))
-    (future-cancel (:write-batch-loop component))
-    (future-cancel (:close-resources-loop component))
-    (future-cancel (:complete-task-loop component))
-    (future-cancel (:reset-payload-node component))
-    
     component))
 
 (defn task-pipeline [payload sync queue payload-ch complete-ch]
