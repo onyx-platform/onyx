@@ -64,11 +64,12 @@
       (extensions/touch-place sync completion-node))
     (assoc event :completed done?)))
 
-(defn open-session-loop [read-ch pipeline-data]
+(defn open-session-loop [read-ch kill-ch pipeline-data]
   (loop []
-    (when-let [session (create-tx-session pipeline-data)]
-      (>!! read-ch (munge-open-session pipeline-data session))
-      (recur))))
+    (when (first (alts!! [kill-ch] :default true))
+      (when-let [session (create-tx-session pipeline-data)]
+        (>!! read-ch (munge-open-session pipeline-data session))
+        (recur)))))
 
 (defn read-batch-loop [read-ch decompress-ch]
   (loop []
@@ -140,7 +141,8 @@
   (start [component]
     (prn "Starting Task Pipeline")
     
-    (let [read-batch-ch (chan 1)
+    (let [open-session-kill-ch (chan 1)
+          read-batch-ch (chan 1)
           decompress-batch-ch (chan 1)
           apply-fn-ch (chan 1)
           compress-batch-ch (chan 1)
@@ -211,6 +213,7 @@
         (fn [e & _] (.printStackTrace e)))
 
       (assoc component
+        :open-session-kill-ch open-session-kill-ch
         :read-batch-ch read-batch-ch
         :decompress-batch-ch decompress-batch-ch
         :apply-fn-ch apply-fn-ch
@@ -220,9 +223,9 @@
         :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
         :complete-task-ch complete-task-ch
-        :reset-payload-node-ch reset-payload-node-ch        
+        :reset-payload-node-ch reset-payload-node-ch
         
-        :open-session-loop (future (open-session-loop read-batch-ch pipeline-data))
+        :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
         :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
@@ -237,8 +240,7 @@
   (stop [component]
     (prn "Stopping Task Pipeline")
 
-    (future-cancel (:open-session-loop component))
-
+    (close! (:open-session-kill-ch component))
     (close! (:read-batch-ch component))
     (close! (:decompress-batch-ch component))
     (close! (:apply-fn-ch component))
