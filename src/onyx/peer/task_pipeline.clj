@@ -66,7 +66,8 @@
 
 (defn munge-complete-task [{:keys [sync completion-node tail-batch?] :as event}]
   (when tail-batch?
-    (extensions/touch-place sync completion-node)))
+    (extensions/touch-place sync completion-node))
+  event)
 
 (defn open-session-loop [read-ch kill-ch pipeline-data]
   (loop []
