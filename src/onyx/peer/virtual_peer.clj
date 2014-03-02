@@ -11,7 +11,8 @@
       (when-not (nil? pipeline)
         (component/stop pipeline))
       
-      (cond (= ch complete-ch) (recur nil)
+      (cond (nil? v) (comment "Shutdown")
+            (= ch complete-ch) (recur nil)
             (= ch payload-ch)
             (let [payload-node (:path v)
                   payload (extensions/read-place sync payload-node)
@@ -64,8 +65,6 @@
   (stop [component]
     (prn "Stopping Virtual Peer")
 
-    (>!! (:shutdown-ch component) true)
-    
     (close! (:payload-ch component))
     (close! (:complete-ch component))
     (close! (:shutdown-ch component))

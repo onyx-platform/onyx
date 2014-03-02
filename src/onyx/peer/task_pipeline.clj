@@ -222,7 +222,7 @@
         :complete-task-ch complete-task-ch
         :reset-payload-node-ch reset-payload-node-ch        
         
-        :open-session-loop (thread (open-session-loop read-batch-ch pipeline-data))
+        :open-session-loop (future (open-session-loop read-batch-ch pipeline-data))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
         :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
@@ -236,6 +236,8 @@
 
   (stop [component]
     (prn "Stopping Task Pipeline")
+
+    (future-cancel (:open-session-loop component))
 
     (close! (:read-batch-ch component))
     (close! (:decompress-batch-ch component))
