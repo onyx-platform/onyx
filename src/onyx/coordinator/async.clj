@@ -327,17 +327,6 @@
     (close! (:failure-ch-head component))
     (close! (:shutdown-ch-head component))
 
-    (future-cancel (:born-peer-thread component))
-    (future-cancel (:dead-peer-thread component))
-    (future-cancel (:planning-thread component))
-    (future-cancel (:evict-thread component))
-    (future-cancel (:offer-thread component))
-    (future-cancel (:offer-revoke-thread component))
-    (future-cancel (:ack-thread component))
-    (future-cancel (:completion-thread component))
-    (future-cancel (:failure-thread component))
-    (future-cancel (:shutdown-thread component))
-
     component))
 
 (defn coordinator [revoke-delay]
