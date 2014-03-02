@@ -102,13 +102,12 @@
   (.close resource))
 
 (defmethod extensions/cap-queue HornetQ
-  [queue task]
-  (let [egress-queues (:egress-queues task)
-        session (extensions/create-tx-session queue)]
+  [queue egress-queues]
+  (let [session (extensions/create-tx-session queue)]
     (doseq [queue-name egress-queues]
-      (let [producer (extensions/create-producer session)
+      (let [producer (extensions/create-producer queue session queue-name)
             message (.createMessage session true)]
-        (.writeString (.getBufferBody message) (pr-str :done))
+        (.writeString (.getBodyBuffer message) (pr-str :done))
         (.send producer message)
         (.close producer)))
     (.commit session)
