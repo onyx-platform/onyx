@@ -53,7 +53,7 @@
     :hornetq/batch-size 2
     :hornetq/timeout 50}
    {:onyx/name :inc
-    :onyx/fn :onyx.coordinator.single-peer-test/my-inc
+    :onyx/fn :onyx.coordinator.multi-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size 2
