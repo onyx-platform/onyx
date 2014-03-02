@@ -35,12 +35,12 @@
 (defmulti connect
   (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
 
-(defmethod connect :mem
+(defmethod connect :memory
   [uri opts]
   (let [c (system/onyx-coordinator opts)]
     (InMemoryCoordinator. (component/start c))))
 
-(defmethod connect :netty
+(defmethod connect :distributed
   [uri opts] (NettyCoordinator. nil))
 
 (defmulti start-peers

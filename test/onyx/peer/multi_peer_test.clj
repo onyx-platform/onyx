@@ -79,7 +79,7 @@
                  :onyx-id id
                  :revoke-delay 2000})
 
-(def conn (onyx.api/connect (str "onyx:mem//localhost/" id) coord-opts))
+(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
 (def peer-opts {:hornetq-addr "localhost:5445"
                 :zk-addr "127.0.0.1:2181"
