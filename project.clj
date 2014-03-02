@@ -14,6 +14,6 @@
                  [zookeeper-clj "0.9.1"]
                  [incanter "1.5.4"]
                  [dire "0.5.1"]]
-  :profiles {:dev {:dependencies [[midje "1.6.0"]]
-                   :plugins [[lein-midje "3.1.1"]]}})
+  :profiles {:dev {:dependencies [[midje "1.6.2"]]
+                   :plugins [[lein-midje "3.1.3"]]}})
 
