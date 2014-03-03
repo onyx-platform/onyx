@@ -155,7 +155,7 @@
 
 (defn read-batch-shim [{:keys [catalog task]}]
   (let [task-map (planning/find-task catalog task)
-        batch (read-batch catalog task-map)]
+        batch (or (read-batch catalog task-map) [])]
     {:batch batch}))
 
 (defn decompress-batch-shim [{:keys [batch]}]
@@ -217,15 +217,15 @@
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
-    (info "HornetQ ingress: Decompressed" (count decompressed) "segments")))
+    (info "HornetQ ingress: Decompressed" decompressed "segments")))
 
 (with-post-hook! #'apply-fn-in-shim
   (fn [{:keys [results]}]
-    (info "HornetQ ingress: Applied fn to" (count results) "segments")))
+    (info "HornetQ ingress: Applied fn to" results "segments")))
 
 (with-post-hook! #'apply-fn-out-shim
   (fn [{:keys [results]}]
-    (info "HornetQ egress: Applied fn to" (count results) "segments")))
+    (info "HornetQ egress: Applied fn to" results "segments")))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [compressed]}]

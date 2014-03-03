@@ -9,7 +9,6 @@
   ;; Multi-consumer not yet implemented.
   (let [consumer (first consumers)
         f #(when-let [m (.receive consumer timeout)]
-             (.acknowledge m)
              m)
         rets (doall (repeatedly batch-size f))]
     (filter identity rets)))
@@ -76,11 +75,11 @@
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
-    (info "Transformer: Decompressed" (count decompressed) "segments")))
+    (info "Transformer: Decompressed" decompressed "segments")))
 
 (with-post-hook! #'apply-fn-shim
   (fn [{:keys [results]}]
-    (info "Transformer: Applied fn to" (count results) "segments")))
+    (info "Transformer: Applied fn to" results "segments")))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [compressed]}]

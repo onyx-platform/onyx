@@ -103,7 +103,7 @@
     (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
 
 (.commit session)
-(.close producer)
+(.close consumer)
 (.close session)
 
 (try
