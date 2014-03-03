@@ -141,25 +141,27 @@
       (>!! close-resources-ch (munge-commit-tx event))
       (recur))))
 
-(defn close-resources-loop [close-ch complete-task-ch]
+(defn close-resources-loop [close-ch reset-payload-ch]
   (loop []
     (when-let [event (<!! close-ch)]
-      (taoensso.timbre/info "Closing out resources for " (:session event))
-      (>!! complete-task-ch (munge-close-resources event))
+      (>!! reset-payload-ch (munge-close-resources event))
       (recur))))
 
-(defn complete-task-loop [complete-ch reset-payload-node-ch]
+(defn reset-payload-node [reset-ch internal-complete-ch]
+  (loop []
+    (when-let [event (<!! reset-ch)]
+      (when (:tail-batch? event)
+        (let [event (munge-new-payload event)]
+          (>!! (:complete-ch event) true)))
+      (>!! internal-complete-ch event)
+      (recur))))
+
+(defn complete-task-loop [complete-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
-      (let [event (munge-complete-task event)]
-        (when (:tail-batch? event)
-          (>!! reset-payload-node-ch event)))
+      (when (:tail-batch? event)
+        (munge-complete-task event))
       (recur))))
-
-(defn reset-payload-node [reset-ch]
-  (when-let [event (<!! reset-ch)]
-    (munge-new-payload event)
-    (>!! (:complete-ch event) true)))
 
 (defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
   component/Lifecycle
@@ -178,8 +180,8 @@
           ack-ch (chan 1)
           commit-tx-ch (chan 1)
           close-resources-ch (chan 1)
-          complete-task-ch (chan 1)
           reset-payload-node-ch (chan 1)
+          complete-task-ch (chan 1)
 
           pipeline-data {:ingress-queues (:task/ingress-queues (:task payload))
                          :egress-queues (:task/egress-queues (:task payload))
@@ -240,11 +242,11 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'complete-task-loop
+      (dire/with-handler! #'reset-payload-node
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'reset-payload-node
+      (dire/with-handler! #'complete-task-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -260,8 +262,8 @@
         :ack-ch ack-ch
         :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
-        :complete-task-ch complete-task-ch
         :reset-payload-node-ch reset-payload-node-ch
+        :complete-task-ch complete-task-ch
         
         :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
@@ -273,9 +275,9 @@
         :status-check-loop (thread (status-check-loop status-check-ch ack-ch reset-payload-node-ch))
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
-        :close-resources-loop (thread (close-resources-loop close-resources-ch complete-task-ch))
-        :complete-task-loop (thread (complete-task-loop complete-task-ch reset-payload-node-ch))
-        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch)))))
+        :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch))
+        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch complete-task-ch))
+        :complete-task-loop (thread (complete-task-loop complete-task-ch)))))
 
   (stop [component]
     (prn "Stopping Task Pipeline")
@@ -291,8 +293,8 @@
     (close! (:ack-ch component))
     (close! (:commit-tx-ch component))
     (close! (:close-resources-ch component))
-    (close! (:complete-task-ch component))
     (close! (:reset-payload-node-ch component))
+    (close! (:complete-task-ch component))
 
     component))
 
