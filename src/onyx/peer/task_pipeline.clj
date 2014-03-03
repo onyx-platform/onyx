@@ -120,30 +120,31 @@
       (>!! status-check-ch (munge-write-batch event))
       (recur))))
 
-(defn status-check-loop [status-ch commit-tx-ch reset-payload-node-ch]
+(defn status-check-loop [status-ch ack-ch reset-payload-node-ch]
   (loop []
     (when-let [event (<!! status-ch)]
       (let [event (munge-status-check event)]
         (if (:commit? event)
-          (>!! commit-tx-ch event)
+          (>!! ack-ch event)
           (>!! reset-payload-node-ch event))
         (recur)))))
 
-(defn commit-tx-loop [commit-ch ack-ch]
-  (loop []
-    (when-let [event (<!! commit-ch)]
-      (>!! ack-ch (munge-commit-tx event))
-      (recur))))
-
-(defn ack-loop [ack-ch close-resources-ch]
+(defn ack-loop [ack-ch commit-ch]
   (loop []
     (when-let [event (<!! ack-ch)]
-      (>!! close-resources-ch (munge-ack event))
+      (>!! commit-ch (munge-ack event))
+      (recur))))
+
+(defn commit-tx-loop [commit-ch close-resources-ch]
+  (loop []
+    (when-let [event (<!! commit-ch)]
+      (>!! close-resources-ch (munge-commit-tx event))
       (recur))))
 
 (defn close-resources-loop [close-ch complete-task-ch]
   (loop []
     (when-let [event (<!! close-ch)]
+      (taoensso.timbre/info "Closing out resources for " (:session event))
       (>!! complete-task-ch (munge-close-resources event))
       (recur))))
 
@@ -174,8 +175,8 @@
           compress-batch-ch (chan 1)
           status-check-ch (chan 1)
           write-batch-ch (chan 1)
-          commit-tx-ch (chan 1)
           ack-ch (chan 1)
+          commit-tx-ch (chan 1)
           close-resources-ch (chan 1)
           complete-task-ch (chan 1)
           reset-payload-node-ch (chan 1)
@@ -227,13 +228,13 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'commit-tx-loop
-        java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
-
       (dire/with-handler! #'ack-loop
         java.lang.Exception
         (fn [e & args] (.printStackTrace e)))
+
+      (dire/with-handler! #'commit-tx-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
 
       (dire/with-handler! #'close-resources-loop
         java.lang.Exception
@@ -256,8 +257,8 @@
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
         :status-check-ch status-check-ch
-        :commit-tx-ch commit-tx-ch
         :ack-ch ack-ch
+        :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
         :complete-task-ch complete-task-ch
         :reset-payload-node-ch reset-payload-node-ch
@@ -269,9 +270,9 @@
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch commit-tx-ch reset-payload-node-ch))
-        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch ack-ch))
-        :ack-loop (thread (ack-loop ack-ch close-resources-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch ack-ch reset-payload-node-ch))
+        :ack-loop (thread (ack-loop ack-ch commit-tx-ch))
+        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch complete-task-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch reset-payload-node-ch))
         :reset-payload-node (thread (reset-payload-node reset-payload-node-ch)))))
@@ -287,8 +288,8 @@
     (close! (:compress-batch-ch component))
     (close! (:write-batch-ch component))
     (close! (:status-check-ch component))
-    (close! (:commit-tx-ch component))
     (close! (:ack-ch component))
+    (close! (:commit-tx-ch component))
     (close! (:close-resources-ch component))
     (close! (:complete-task-ch component))
     (close! (:reset-payload-node-ch component))
