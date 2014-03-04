@@ -28,7 +28,8 @@
 (defn write-batch [queue session producers msgs]
   (dorun
    (for [p producers msg msgs]
-     (extensions/produce-message queue p session msg))))
+     (extensions/produce-message queue p session msg)))
+  {:written? true})
 
 (defn read-batch-shim
   [{:keys [queue session ingress-queues batch-size timeout]}]
