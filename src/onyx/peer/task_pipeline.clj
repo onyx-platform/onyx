@@ -17,10 +17,12 @@
     (extensions/write-place sync peer-node updated-contents)
     node))
 
-(defn munge-new-payload [{:keys [sync peer-node payload-ch] :as event}]
-  (let [node (new-payload sync peer-node payload-ch)]
-    (extensions/on-change sync node #(>!! payload-ch %))
-    (assoc event :new-payload-node node)))
+(defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
+  (if (= (extensions/version sync peer-node) peer-version)
+    (let [node (new-payload sync peer-node payload-ch)]
+      (extensions/on-change sync node #(>!! payload-ch %))
+      (assoc event :new-payload-node node))
+    event))
 
 (defn munge-open-session [event session]
   (assoc event :session session))
@@ -62,8 +64,8 @@
   (let [f (if tail-batch? butlast identity)
         messages (f batch)]
     (doseq [message messages]
-      (extensions/ack-message queue message)))
-  event)
+      (extensions/ack-message queue message))
+    event))
 
 (defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -191,6 +193,7 @@
                          :completion-node (:completion (:nodes payload))
                          :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
                          :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
+                         :peer-version (extensions/version sync (:peer (:nodes payload)))
                          :payload-ch payload-ch
                          :complete-ch complete-ch
                          :queue queue

@@ -157,6 +157,10 @@
   [sync place]
   (boolean (zk/exists (:conn sync) place)))
 
+(defmethod extensions/version ZooKeeper
+  [sync place]
+  (:version (zk/exists (:conn sync) place)))
+
 (defmethod extensions/on-change ZooKeeper
   [sync place cb]
   (let [f (fn [event]
