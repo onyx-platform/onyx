@@ -40,7 +40,7 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Starting ZooKeeper")
+    (taoensso.timbre/info "Starting ZooKeeper")
     (let [conn (zk/connect addr)
           prefix onyx-id]
       (zk/create conn root-path :persistent? true)
@@ -59,7 +59,7 @@
         :prefix onyx-id)))
 
   (stop [component]
-    (prn "Stopping ZooKeeper")
+    (taoensso.timbre/info "Stopping ZooKeeper")
     (zk/close (:conn component))
     component))
 

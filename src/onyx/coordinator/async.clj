@@ -159,7 +159,7 @@
   component/Lifecycle
 
   (start [{:keys [log sync queue revoke-delay] :as component}]
-    (prn "Starting Coordinator")
+    (taoensso.timbre/info "Starting Coordinator")
     (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
@@ -314,7 +314,7 @@
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail)))))
 
   (stop [component]
-    (prn "Stopping Coordinator")
+    (taoensso.timbre/info "Stopping Coordinator")
     
     (close! (:born-peer-ch-head component))
     (close! (:dead-peer-ch-head component))

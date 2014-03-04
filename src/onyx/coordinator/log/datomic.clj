@@ -24,12 +24,12 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Starting Datomic")
+    (taoensso.timbre/info "Starting Datomic")
     (let [conn (start-datomic! uri schema)]
       (assoc component :conn conn)))
 
   (stop [component]
-    (prn "Stopping Datomic")
+    (taoensso.timbre/info "Stopping Datomic")
     (d/delete-database uri)
     (d/shutdown false)
     component))

@@ -167,7 +167,7 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Starting Task Pipeline")
+    (taoensso.timbre/info "Starting Task Pipeline")
     
     (let [open-session-kill-ch (chan 1)
           read-batch-ch (chan 1)
@@ -280,7 +280,7 @@
         :complete-task-loop (thread (complete-task-loop complete-task-ch)))))
 
   (stop [component]
-    (prn "Stopping Task Pipeline")
+    (taoensso.timbre/info "Stopping Task Pipeline")
 
     (close! (:open-session-kill-ch component))
     (close! (:read-batch-ch component))

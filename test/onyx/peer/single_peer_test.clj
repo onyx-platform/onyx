@@ -5,7 +5,7 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def n-messages 20)
+(def n-messages 10)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 

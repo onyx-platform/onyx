@@ -30,7 +30,7 @@
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (prn "Starting Virtual Peer")
+    (taoensso.timbre/info "Starting Virtual Peer")
 
     (let [peer (extensions/create sync :peer)
           payload (extensions/create sync :payload)
@@ -62,7 +62,7 @@
         :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch)))))
 
   (stop [component]
-    (prn "Stopping Virtual Peer")
+    (taoensso.timbre/info "Stopping Virtual Peer")
 
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))

@@ -13,7 +13,7 @@
   component/Lifecycle
 
   (start [component]
-    (prn "Starting HornetQ")
+    (taoensso.timbre/info "Starting HornetQ")
 
     (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
           locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
@@ -21,7 +21,7 @@
       (assoc component :session-factory session-factory)))
 
   (stop [component]
-    (prn "Stopping HornetQ")
+    (taoensso.timbre/info "Stopping HornetQ")
     component))
 
 (defn hornetq [addr]
