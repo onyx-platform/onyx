@@ -5,6 +5,8 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
+(def n-messages 20)
+
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
@@ -25,7 +27,7 @@
 
 (def producer (.createProducer session in-queue))
 
-(doseq [n (range 10)]
+(doseq [n (range n-messages)]
   (let [message (.createMessage session true)]
     (.writeString (.getBodyBuffer message) (pr-str {:n n}))
     (.send producer message)))
@@ -97,7 +99,7 @@
 
 (def results (atom []))
 
-(doseq [n (range 11)]
+(doseq [n (range (inc n-messages))]
   (let [message (.receive consumer)]
     (.acknowledge message)
     (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
@@ -117,5 +119,5 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(fact @results => (conj (vec (map (fn [x] {:n x}) (range 1 11))) :done))
+(fact @results => (conj (vec (map (fn [x] {:n x}) (range 1 (inc n-messages)))) :done))
 
