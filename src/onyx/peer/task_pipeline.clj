@@ -119,13 +119,13 @@
       (>!! status-check-ch (munge-write-batch event))
       (recur))))
 
-(defn status-check-loop [status-ch ack-ch reset-payload-node-ch]
+(defn status-check-loop [status-ch ack-ch close-resources-ch]
   (loop []
     (when-let [event (<!! status-ch)]
       (let [event (munge-status-check event)]
         (if (:commit? event)
           (>!! ack-ch event)
-          (>!! reset-payload-node-ch event))
+          (>!! close-resources-ch event))
         (recur)))))
 
 (defn ack-loop [ack-ch commit-ch]
@@ -271,7 +271,7 @@
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch ack-ch reset-payload-node-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch ack-ch close-resources-ch))
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch))
