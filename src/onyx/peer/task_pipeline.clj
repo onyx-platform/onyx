@@ -61,7 +61,6 @@
 (defn munge-ack [{:keys [queue batch tail-batch?] :as event}]
   (let [f (if tail-batch? butlast identity)
         messages (f batch)]
-    (taoensso.timbre/info "Acking " (:decompressed event))
     (doseq [message messages]
       (extensions/ack-message queue message)))
   event)
