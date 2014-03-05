@@ -151,18 +151,17 @@
 (defn reset-payload-node [reset-ch internal-complete-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
-      (if (:tail-batch? event)
+      (when (:tail-batch? event)
         (let [event (munge-new-payload event)]
-          (>!! internal-complete-ch event)
-          (>!! (:complete-ch event) true))
-        (>!! internal-complete-ch event))
+          (>!! internal-complete-ch event)))
       (recur))))
 
 (defn complete-task-loop [complete-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
       (when (:tail-batch? event)
-        (munge-complete-task event))
+        (munge-complete-task event)
+        (>!! (:complete-ch event) true))
       (recur))))
 
 (defrecord TaskPipeline [payload sync queue payload-ch complete-ch]

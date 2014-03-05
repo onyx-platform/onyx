@@ -1,6 +1,7 @@
 (ns onyx.coordinator.async
   (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
             [com.stuartsierra.component :as component]
+            [taoensso.timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
             [onyx.coordinator.planning :as planning]))
