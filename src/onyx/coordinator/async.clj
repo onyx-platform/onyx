@@ -1,7 +1,7 @@
 (ns onyx.coordinator.async
   (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre]
+            [taoensso.timbre :refer [info]]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
             [onyx.coordinator.planning :as planning]))
@@ -160,7 +160,7 @@
   component/Lifecycle
 
   (start [{:keys [log sync queue revoke-delay] :as component}]
-    (taoensso.timbre/info "Starting Coordinator")
+    (info "Starting Coordinator")
     (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
@@ -315,7 +315,7 @@
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail)))))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Coordinator")
+    (info "Stopping Coordinator")
     
     (close! (:born-peer-ch-head component))
     (close! (:dead-peer-ch-head component))

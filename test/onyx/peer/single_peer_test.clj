@@ -5,7 +5,7 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def n-messages 10)
+(def n-messages 200)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -95,7 +95,7 @@
 
 (.start session)
 
-(def consumer (.createConsumer session out-queue))
+(def consumer (.createConsumer session out-queue "" 0 64000 false))
 
 (def results (atom []))
 

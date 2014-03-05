@@ -93,7 +93,7 @@
 
 (.start session)
 
-(def consumer (.createConsumer session out-queue))
+(def consumer (.createConsumer session out-queue "" 0 64000 false))
 
 (def results (atom []))
 

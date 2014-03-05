@@ -62,7 +62,7 @@
 
 (defmethod extensions/create-consumer HornetQ
   [queue session queue-name]
-  (.createConsumer session queue-name))
+  (.createConsumer session queue-name "" 0 64000 false))
 
 (defmethod extensions/create-queue HornetQ
   [queue task]
@@ -121,7 +121,7 @@
         session-factory (.createSessionFactory locator)
         session (.createSession session-factory)
         queue (:hornetq/queue-name task)
-        consumer (.createConsumer session queue)]
+        consumer (.createConsumer session queue "" 0 64000 false)]
     (.start session)
     (let [f #(when-let [m (.receive consumer (:hornetq/timeout task))]
                (.acknowledge m)

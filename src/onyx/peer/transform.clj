@@ -8,7 +8,7 @@
 (defn read-batch [queue consumers batch-size timeout]
   ;; Multi-consumer not yet implemented.
   (let [consumer (first consumers)
-        f #(when-let [m (.receive consumer timeout)]
+        f #(when-let [m (extensions/consume-message queue consumer timeout)]
              m)
         rets (doall (repeatedly batch-size f))]
     (filter identity rets)))
