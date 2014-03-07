@@ -1,5 +1,6 @@
-(ns onyx.coordinator.single-peer-test
+(ns onyx.peer.single-peer-test
   (:require [midje.sweet :refer :all]
+            [onyx.peer.hornetq-util :as hq-util]
             [onyx.api])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
@@ -11,34 +12,7 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def tc (TransportConfiguration. (.getName NettyConnectorFactory)))
-
-(def locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc])))
-
-(def session-factory (.createSessionFactory locator))
-
-(def session (.createTransactedSession session-factory))
-
-(.start session)
-
-(.createQueue session in-queue in-queue true)
-
-(.createQueue session out-queue out-queue true)
-
-(def producer (.createProducer session in-queue))
-
-(doseq [n (range n-messages)]
-  (let [message (.createMessage session true)]
-    (.writeString (.getBodyBuffer message) (pr-str {:n n}))
-    (.send producer message)))
-
-(def sentinel (.createMessage session true))
-(.writeString (.getBodyBuffer sentinel) (pr-str :done))
-(.send producer sentinel)
-
-(.commit session)
-(.close producer)
-(.close session)
+(hq-util/write-and-cap! in-queue (map #(pr-str {:n %}) (range n-messages)))
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -55,7 +29,7 @@
     :hornetq/batch-size 2
     :hornetq/timeout 50}
    {:onyx/name :inc
-    :onyx/fn :onyx.coordinator.single-peer-test/my-inc
+    :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size 2
@@ -91,22 +65,7 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def session (.createTransactedSession session-factory))
-
-(.start session)
-
-(def consumer (.createConsumer session out-queue "" 0 64000 false))
-
-(def results (atom []))
-
-(doseq [n (range (inc n-messages))]
-  (let [message (.receive consumer)]
-    (.acknowledge message)
-    (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
-
-(.commit session)
-(.close consumer)
-(.close session)
+(def results (hq-util/read! out-queue (inc n-messages)))
 
 (try
   ;; (dorun (map deref (map :runner v-peers)))
@@ -119,5 +78,5 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(fact @results => (conj (vec (map (fn [x] {:n x}) (range 1 (inc n-messages)))) :done))
+(fact results => (conj (vec (map (fn [x] {:n x}) (range 1 (inc n-messages)))) :done))
 

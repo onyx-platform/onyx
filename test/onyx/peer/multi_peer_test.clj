@@ -1,9 +1,11 @@
-(ns onyx.coordinator.multi-peer-test
+(ns onyx.peer.multi-peer-test
   (:require [midje.sweet :refer :all]
             [onyx.api])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+
+(def k 500)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -25,7 +27,7 @@
 
 (def producer (.createProducer session in-queue))
 
-(doseq [n (range 10)]
+(doseq [n (range k)]
   (let [message (.createMessage session true)]
     (.writeString (.getBodyBuffer message) (pr-str {:n n}))
     (.send producer message)))
@@ -85,7 +87,7 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(def v-peers (onyx.api/start-peers conn 2 peer-opts))
+(def v-peers (onyx.api/start-peers conn 4 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
@@ -97,7 +99,7 @@
 
 (def results (atom []))
 
-(doseq [n (range 11)]
+(doseq [n (range (inc k))]
   (let [message (.receive consumer)]
     (.acknowledge message)
     (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
@@ -117,6 +119,8 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(let [expected-ns (vec (map (fn [x] {:n x}) (range 1 11)))]
+(prn @results)
+
+(let [expected-ns (vec (map (fn [x] {:n x}) (range 1 (inc k))))]
   (fact (into #{} @results) => (into #{} (conj expected-ns :done))))
 
