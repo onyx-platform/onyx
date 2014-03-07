@@ -110,17 +110,30 @@
                              peer (ffirst result)
                              task (second (first result))
                              [payload ack status completion] (first (q node-query db peer))
-                             tx [{:db/id task
-                                  :task/complete? true}
-                                 {:db/id peer
-                                  :peer/status :idle}
-                                 [:db/retract peer :peer/task task]
-                                 [:db/retract peer :node/payload payload]
-                                 [:db/retract peer :node/ack ack]
-                                 [:db/retract peer :node/status status]
-                                 [:db/retract peer :node/completion completion]]]
+                             peer-query '[:find (count ?peer) :in $ ?task :where
+                                          [?peer :peer/task ?task]
+                                          [?peer :peer/status :active]]
+                             n-peers (ffirst (q peer-query db task))]
                          (if (and peer task)
-                           tx
+                           (if (= n-peers 1)
+                             [{:db/id task
+                               :task/complete? true}
+                              {:db/id peer
+                               :peer/status :idle}
+                              [:db/retract peer :peer/task task]
+                              [:db/retract peer :node/payload payload]
+                              [:db/retract peer :node/ack ack]
+                              [:db/retract peer :node/status status]
+                              [:db/retract peer :node/completion completion]]
+                             [{:db/id task
+                               :task/complete? false}
+                              {:db/id peer
+                               :peer/status :idle}
+                              [:db/retract peer :peer/task task]
+                              [:db/retract peer :node/payload payload]
+                              [:db/retract peer :node/ack ack]
+                              [:db/retract peer :node/status status]
+                              [:db/retract peer :node/completion completion]])
                            (throw (ex-info "Error for peer trying to complete task" {}))))}}
 
  {:db/id #db/id [:db.part/db]

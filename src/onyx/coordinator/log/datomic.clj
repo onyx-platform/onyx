@@ -1,5 +1,6 @@
 (ns onyx.coordinator.log.datomic
   (:require [com.stuartsierra.component :as component]
+            [taoensso.timbre]
             [onyx.extensions :as extensions]
             [datomic.api :as d]))
 
@@ -167,6 +168,19 @@
   (select-keys ent [:node/peer :node/payload :node/ack
                     :node/status :node/completion]))
 
+(defn node->task [db basis node]
+  (let [query '[:find ?task :in $ ?basis ?node :where
+                [?peer ?basis ?node]
+                [?peer :peer/task ?task]]
+        result (ffirst (d/q query db basis node))]
+    (assoc (into {} (d/entity db result))
+      :db/id result)))
+
+(defn n-peers [db task-id]
+  (let [query '[:find (count ?peer) :in $ ?task :where
+                [?peer :peer/task ?task]]]
+    (ffirst (d/q query db task-id))))
+
 (defmethod extensions/nodes Datomic
   [log peer]
   (let [db (d/db (:conn log))
@@ -186,11 +200,8 @@
 
 (defmethod extensions/node->task Datomic
   [log basis node]
-  (let [db (d/db (:conn log))
-        query '[:find ?task :in $ ?basis ?node :where
-                [?peer ?basis ?node]
-                [?peer :peer/task ?task]]]
-    (into {} (d/entity db (ffirst (d/q query db basis node))))))
+  (let [db (d/db (:conn log))]
+    (node->task db basis node)))
 
 (defmethod extensions/idle-peers Datomic
   [log]
@@ -218,6 +229,10 @@
 
 (defmethod extensions/complete Datomic
   [log complete-place]
-  (let [tx [[:onyx.fn/complete-task complete-place]]]
-    (:tx (first (:tx-data @(d/transact (:conn log) tx))))))
+  (let [tx [[:onyx.fn/complete-task complete-place]]
+        tx-result @(d/transact (:conn log) tx)
+        db (:db-before tx-result)
+        task (node->task db :node/completion complete-place)
+        n (n-peers db (:db/id task))]
+    {:n-peers n :tx (:tx (first (:tx-data tx-result)))}))
 

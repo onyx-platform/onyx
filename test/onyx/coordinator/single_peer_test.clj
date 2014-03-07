@@ -176,7 +176,7 @@
                (fact (:path event) => (:completion nodes)))))
 
     (facts "The offer channel receives the tx id of the completion"
-           (let [tx-id (<!! offer-ch-spy)
+           (let [tx-id (:tx (<!! offer-ch-spy))
                  db (d/as-of (d/db (:conn log)) tx-id)]
 
              (facts "The peer's nodes have been stripped"
@@ -252,7 +252,7 @@
           (assoc base-cycle
             :task-name :in
             :payload-node in-payload-node
-            :next-payload-node inc-payload-node))
+           :next-payload-node inc-payload-node))
 
          (test-task-life-cycle
           (assoc base-cycle
