@@ -35,11 +35,17 @@
   (let [rets (p-ext/decompress-batch event)]
     (merge event rets)))
 
-(defn munge-strip-sentinel-ch [event]
+(defn munge-strip-sentinel [event]
   (let [segments (:decompressed event)]
     (if (= (last segments) :done)
       (assoc event :tail-batch? true :decompressed (or (butlast segments) []))
       (assoc event :tail-batch? false))))
+
+(defn munge-requeue-sentinel [{:keys [queue session ingress-queues tail-batch?] :as event}]
+  (when tail-batch?
+    ;; Caps all queues - only supports 1 consumers
+    (extensions/cap-queue queue ingress-queues))
+  event)
 
 (defn munge-apply-fn [event]
   (let [rets (p-ext/apply-fn event)]
@@ -97,10 +103,16 @@
       (>!! strip-ch (munge-decompress-batch event))
       (recur))))
 
-(defn strip-sentinel-loop [strip-ch apply-fn-ch]
+(defn strip-sentinel-loop [strip-ch requeue-ch]
   (loop []
     (when-let [event (<!! strip-ch)]
-      (>!! apply-fn-ch (munge-strip-sentinel-ch event))
+      (>!! requeue-ch (munge-strip-sentinel event))
+      (recur))))
+
+(defn requeue-sentinel-loop [requeue-ch apply-fn-ch]
+  (loop []
+    (when-let [event (<!! requeue-ch)]
+      (>!! apply-fn-ch (munge-requeue-sentinel event))
       (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch]
@@ -174,6 +186,7 @@
           read-batch-ch (chan 1)
           decompress-batch-ch (chan 1)
           strip-sentinel-ch (chan 1)
+          requeue-sentinel-ch (chan 1)
           apply-fn-ch (chan 1)
           compress-batch-ch (chan 1)
           status-check-ch (chan 1)
@@ -213,6 +226,10 @@
         (fn [e & _] (.printStackTrace e)))
 
       (dire/with-handler! #'strip-sentinel-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-handler! #'requeue-sentinel-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -257,6 +274,7 @@
         :read-batch-ch read-batch-ch
         :decompress-batch-ch decompress-batch-ch
         :strip-sentinel-ch strip-sentinel-ch
+        :requeue-sentinel-ch requeue-sentinel-ch
         :apply-fn-ch apply-fn-ch
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
@@ -270,7 +288,8 @@
         :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
         :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch))
-        :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch apply-fn-ch))
+        :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch))
+        :requeue-sentinel-ch (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
@@ -288,6 +307,7 @@
     (close! (:read-batch-ch component))
     (close! (:decompress-batch-ch component))
     (close! (:strip-sentinel-ch component))
+    (close! (:requeue-sentinel-ch component))
     (close! (:apply-fn-ch component))
     (close! (:compress-batch-ch component))
     (close! (:write-batch-ch component))

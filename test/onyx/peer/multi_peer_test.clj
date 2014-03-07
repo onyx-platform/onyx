@@ -5,7 +5,7 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def k 500)
+(def k 100)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
