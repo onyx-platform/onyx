@@ -1,4 +1,5 @@
 (ns onyx.peer.hornetq-util
+  (:require [clojure.data.fressian :as fressian])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
@@ -20,11 +21,11 @@
       (.start session)
       (doseq [m messages]
         (let [message (.createMessage session true)]
-          (.writeString (.getBodyBuffer message) m)
+          (.writeBytes (.getBodyBuffer message) (.array (fressian/write m)))
           (.send producer message)))
 
       (let [sentinel (.createMessage session true)]
-        (.writeString (.getBodyBuffer sentinel) (pr-str :done))
+        (.writeBytes (.getBodyBuffer sentinel) (.array (fressian/write :done)))
         (.send producer sentinel))
 
       (.commit session)
@@ -45,7 +46,7 @@
       (doseq [k (range n)]
         (let [message (.receive consumer)]
           (.acknowledge message)
-          (swap! results conj (read-string (.readString (.getBodyBuffer message))))))
+          (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message))))))
       (.commit session)
       (.close consumer)
       (.close session)

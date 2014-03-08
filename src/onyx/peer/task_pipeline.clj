@@ -201,8 +201,8 @@
                          :peer-node (:peer (:nodes payload))
                          :status-node (:status (:nodes payload))
                          :completion-node (:completion (:nodes payload))
-                         :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
-                         :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
+                         :catalog (extensions/read-place sync (:catalog (:nodes payload)))
+                         :workflow (extensions/read-place sync (:workflow (:nodes payload)))
                          :peer-version (extensions/version sync (:peer (:nodes payload)))
                          :payload-ch payload-ch
                          :complete-ch complete-ch

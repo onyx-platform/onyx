@@ -1,5 +1,6 @@
 (ns onyx.peer.transform
   (:require [clojure.core.async :refer [chan go alts!! close! >!] :as async]
+            [clojure.data.fressian :as fressian]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
@@ -16,8 +17,7 @@
     (filter identity rets)))
 
 (defn decompress-segment [queue message]
-  (let [segment (extensions/read-message queue message)]
-    (read-string segment)))
+  (extensions/read-message queue message))
 
 (defn apply-fn [task segment]
   (let [user-ns (symbol (name (namespace (:onyx/fn task))))
@@ -25,7 +25,7 @@
     ((ns-resolve user-ns user-fn) segment)))
 
 (defn compress-segment [segment]
-  (pr-str segment))
+  (.array (fressian/write segment)))
 
 (defn write-batch [queue session producers msgs]
   (dorun

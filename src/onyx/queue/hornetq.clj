@@ -1,5 +1,6 @@
 (ns onyx.queue.hornetq
-  (:require [com.stuartsierra.component :as component]
+  (:require [clojure.data.fressian :as fressian]
+            [com.stuartsierra.component :as component]
             [onyx.coordinator.planning :as planning]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions]
@@ -78,7 +79,7 @@
 (defmethod extensions/produce-message HornetQ
   [queue producer session msg]
   (let [message (.createMessage session true)]
-    (.writeString (.getBodyBuffer message) msg)
+    (.writeBytes (.getBodyBuffer message) (.array (fressian/write msg)))
     (.send producer message)))
 
 (defmethod extensions/consume-message HornetQ
@@ -87,7 +88,7 @@
 
 (defmethod extensions/read-message HornetQ
   [queue message]
-  (.readString (.getBodyBuffer message)))
+  (fressian/read (.toByteBuffer (.getBodyBuffer message))))
 
 (defmethod extensions/ack-message HornetQ
   [queue message]
@@ -107,7 +108,7 @@
     (doseq [queue-name egress-queues]
       (let [producer (extensions/create-producer queue session queue-name)
             message (.createMessage session true)]
-        (.writeString (.getBodyBuffer message) (pr-str :done))
+        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
         (.send producer message)
         (.close producer)))
     (.commit session)
@@ -132,10 +133,10 @@
       (filter identity rets))))
 
 (defn decompress-segment [segment]
-  (read-string (.readString (.getBodyBuffer segment))))
+  (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
 
 (defn compress-segment [segment]
-  (pr-str segment))
+  (.array (.writeBytes segment)))
 
 (defn write-batch [task compressed]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
@@ -147,7 +148,7 @@
     (.start session)
     (doseq [x compressed]
       (let [message (.createMessage session true)]
-        (.writeString (.getBodyBuffer message) x)
+        (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
         (.send producer message)))
     (.commit session)
     (.close producer)
