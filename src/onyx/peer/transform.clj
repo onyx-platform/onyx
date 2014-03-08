@@ -41,6 +41,11 @@
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
     {:decompressed decompressed-msgs}))
 
+(defn acknowledge-batch-shim [{:keys [queue batch]}]
+  (doseq [message batch]
+    (extensions/ack-message queue message))
+  {:acked (count batch)})
+
 (defn apply-fn-shim [{:keys [decompressed task catalog]}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (map (partial apply-fn task) decompressed)]
@@ -60,6 +65,9 @@
 
 (defmethod p-ext/decompress-batch :default
   [event] (decompress-batch-shim event))
+
+(defmethod p-ext/ack-batch :default
+  [event] (acknowledge-batch-shim event))
 
 (defmethod p-ext/apply-fn :default
   [event] (apply-fn-shim event))

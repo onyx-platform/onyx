@@ -63,9 +63,8 @@
   (assoc event :commit? (extensions/place-exists? sync status-node)))
 
 (defn munge-ack [{:keys [queue batch] :as event}]
-  (doseq [message batch]
-    (extensions/ack-message queue message))
-  event)
+  (let [rets (p-ext/ack-batch event)]
+    (merge event rets)))
 
 (defn munge-commit-tx [{:keys [queue session] :as event}]
   (extensions/commit-tx queue session)

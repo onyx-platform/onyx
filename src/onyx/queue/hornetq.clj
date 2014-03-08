@@ -161,6 +161,11 @@
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
 
+(defn ack-batch-shim [{:keys [queue batch]}]
+  (doseq [message batch]
+    (extensions/ack-message queue message))
+  {:acked (count batch)})
+
 (defn apply-fn-in-shim [event]
   {:results (:decompressed event)})
 
@@ -187,11 +192,23 @@
    :onyx/medium :hornetq}
   [event] (decompress-batch-shim event))
 
+(defmethod p-ext/ack-batch
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [event] event)
+
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
   [event] (apply-fn-in-shim event))
+
+(defmethod p-ext/ack-batch
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [event] (ack-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
