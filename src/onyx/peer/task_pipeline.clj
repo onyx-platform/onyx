@@ -21,7 +21,7 @@
   (if (= (extensions/version sync peer-node) peer-version)
     (let [node (new-payload sync peer-node payload-ch)]
       (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :new-payload-node node))
+      (assoc event :new-payload-node node :completion? true))
     event))
 
 (defn munge-open-session [event session]
@@ -77,10 +77,9 @@
   (assoc event :closed true))
 
 (defn munge-complete-task
-  [{:keys [sync completion-node peer-node peer-version tail-batch?] :as event}]
-  (when tail-batch?
-    (when (= (extensions/version sync peer-node) (inc peer-version))
-      (extensions/touch-place sync completion-node)))
+  [{:keys [sync completion-node completion?] :as event}]
+  (when completion?
+    (extensions/touch-place sync completion-node))
   event)
 
 (defn open-session-loop [read-ch kill-ch pipeline-data]
