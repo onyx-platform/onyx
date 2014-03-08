@@ -79,7 +79,7 @@
 (defn munge-complete-task
   [{:keys [sync completion-node peer-node peer-version tail-batch?] :as event}]
   (when tail-batch?
-    (if (= (extensions/version sync peer-node) peer-version)
+    (when (= (extensions/version sync peer-node) (inc peer-version))
       (extensions/touch-place sync completion-node)))
   event)
 
