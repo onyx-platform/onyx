@@ -6,7 +6,7 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def n-messages 50)
+(def n-messages 15000)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -26,14 +26,14 @@
     :hornetq/queue-name in-queue
     :hornetq/host "localhost"
     :hornetq/port 5445
-    :hornetq/batch-size 50
-    :hornetq/timeout 50}
+    :hornetq/batch-size 1500
+    :hornetq/timeout 5}
    {:onyx/name :inc
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
-    :onyx/batch-size 25
-    :onyx/timeout 50}
+    :onyx/batch-size 1500
+    :onyx/timeout 5}
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :concurrent
@@ -42,8 +42,8 @@
     :hornetq/queue-name out-queue
     :hornetq/host "localhost"
     :hornetq/port 5445
-    :onyx/batch-size 15
-    :onyx/timeout 50}])
+    :onyx/batch-size 1500
+    :onyx/timeout 5}])
 
 (def workflow {:in {:inc :out}})
 

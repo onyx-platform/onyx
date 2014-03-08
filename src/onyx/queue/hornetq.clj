@@ -234,15 +234,19 @@
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
-    (info "HornetQ ingress: Decompressed" decompressed "segments")))
+    (info "HornetQ ingress: Decompressed" (count decompressed) "segments")))
 
 (with-post-hook! #'apply-fn-in-shim
   (fn [{:keys [results]}]
-    (info "HornetQ ingress: Applied fn to" results "segments")))
+    (info "HornetQ ingress: Applied fn to" (count results) "segments")))
+
+(with-post-hook! #'ack-batch-shim
+  (fn [{:keys [acked]}]
+    (info "HornetQ egress: Acked" acked "segments")))
 
 (with-post-hook! #'apply-fn-out-shim
   (fn [{:keys [results]}]
-    (info "HornetQ egress: Applied fn to" results "segments")))
+    (info "HornetQ egress: Applied fn to" (count results) "segments")))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [compressed]}]
