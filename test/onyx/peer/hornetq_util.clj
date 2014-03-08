@@ -40,7 +40,7 @@
 
     (create-queue session queue-name)
     
-    (let [consumer (.createConsumer session queue-name "" 0 64000 false)
+    (let [consumer (.createConsumer session queue-name)
           results (atom [])]
       (.start session)
       (doseq [k (range n)]
