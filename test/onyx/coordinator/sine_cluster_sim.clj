@@ -112,7 +112,7 @@
     :hornetq/queue-name "in-queue"}
    {:onyx/name :inc
     :onyx/type :transformer
-    :onyx/consumption :concurrent}
+    :onyx/consumption :sequential}
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :sequential

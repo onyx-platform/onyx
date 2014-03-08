@@ -68,9 +68,10 @@
 (defn complete-task [log sync queue complete-place]
   (let [task (extensions/node->task log :node/completion complete-place)]
     (if-let [result (extensions/complete log complete-place)]
-      (do (extensions/delete sync complete-place)
-          (extensions/cap-queue queue (:task/egress-queues task))
-          result)
+      (when (= (:n-peers result) 1)
+        (extensions/delete sync complete-place)
+        (extensions/cap-queue queue (:task/egress-queues task))
+        result)
       false)))
 
 (defn shutdown-peer [sync peer]
