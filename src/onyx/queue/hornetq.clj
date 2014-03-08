@@ -79,7 +79,7 @@
 (defmethod extensions/produce-message HornetQ
   [queue producer session msg]
   (let [message (.createMessage session true)]
-    (.writeBytes (.getBodyBuffer message) (.array (fressian/write msg)))
+    (.writeBytes (.getBodyBuffer message) msg)
     (.send producer message)))
 
 (defmethod extensions/consume-message HornetQ
@@ -136,7 +136,7 @@
   (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
 
 (defn compress-segment [segment]
-  (.array (.writeBytes segment)))
+  (.array (fressian/write segment)))
 
 (defn write-batch [task compressed]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
@@ -148,7 +148,7 @@
     (.start session)
     (doseq [x compressed]
       (let [message (.createMessage session true)]
-        (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+        (.writeBytes (.getBodyBuffer message) x)
         (.send producer message)))
     (.commit session)
     (.close producer)
