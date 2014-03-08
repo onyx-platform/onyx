@@ -1,5 +1,7 @@
 (ns onyx.sync.zookeeper
-  (:require [com.stuartsierra.component :as component]
+  (:require [clojure.data.fressian :as fressian]
+            [com.stuartsierra.component :as component]
+            [taoensso.timbre]
             [onyx.extensions :as extensions]
             [zookeeper :as zk])
   (:import [java.util UUID]))
@@ -67,10 +69,10 @@
   (map->ZooKeeper {:addr addr :onyx-id onyx-id}))
 
 (defn serialize-edn [x]
-  (.getBytes (pr-str x)))
+  (.array (fressian/write x)))
 
 (defn deserialize-edn [x]
-  (read-string (String. x "UTF-8")))
+  (fressian/read x))
 
 (defmethod extensions/create [ZooKeeper :peer]
   [sync _]
