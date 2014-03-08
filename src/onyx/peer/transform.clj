@@ -1,16 +1,18 @@
 (ns onyx.peer.transform
   (:require [clojure.core.async :refer [chan go alts!! close! >!] :as async]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]]
             [dire.core :refer [with-post-hook!]]))
 
-(defn read-batch [queue consumers batch-size timeout]
+(defn read-batch [queue consumers catalog task-name]
   ;; Multi-consumer not yet implemented.
-  (let [consumer (first consumers)
-        f #(when-let [m (extensions/consume-message queue consumer timeout)]
+  (let [task (find-task catalog task-name)
+        consumer (first consumers)
+        f #(when-let [m (extensions/consume-message queue consumer (:onyx/timeout task))]
              m)
-        rets (doall (repeatedly batch-size f))]
+        rets (doall (repeatedly (:onyx/batch-size task) f))]
     (filter identity rets)))
 
 (defn decompress-segment [queue message]
@@ -32,9 +34,9 @@
   {:written? true})
 
 (defn read-batch-shim
-  [{:keys [queue session ingress-queues batch-size timeout]}]
+  [{:keys [queue session ingress-queues catalog task]}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
-        batch (read-batch queue consumers batch-size timeout)]
+        batch (read-batch queue consumers catalog task)]
     {:batch batch :consumers consumers}))
 
 (defn decompress-batch-shim [{:keys [queue batch]}]

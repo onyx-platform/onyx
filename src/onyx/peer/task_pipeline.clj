@@ -207,9 +207,7 @@
                          :payload-ch payload-ch
                          :complete-ch complete-ch
                          :queue queue
-                         :sync sync
-                         :batch-size 2
-                         :timeout 50}]
+                         :sync sync}]
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
