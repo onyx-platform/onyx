@@ -62,16 +62,14 @@
 (defn munge-status-check [{:keys [sync status-node] :as event}]
   (assoc event :commit? (extensions/place-exists? sync status-node)))
 
+(defn munge-ack [{:keys [queue batch] :as event}]
+  (doseq [message batch]
+    (extensions/ack-message queue message))
+  event)
+
 (defn munge-commit-tx [{:keys [queue session] :as event}]
   (extensions/commit-tx queue session)
   (assoc event :committed true))
-
-(defn munge-ack [{:keys [queue batch tail-batch?] :as event}]
-  (let [f (if tail-batch? butlast identity)
-        messages (f batch)]
-    (doseq [message messages]
-      (extensions/ack-message queue message))
-    event))
 
 (defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -163,9 +161,10 @@
 (defn reset-payload-node [reset-ch internal-complete-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
-      (when (:tail-batch? event)
+      (if (:tail-batch? event)
         (let [event (munge-new-payload event)]
-          (>!! internal-complete-ch event)))
+          (>!! internal-complete-ch event))
+        (>!! internal-complete-ch event))
       (recur))))
 
 (defn complete-task-loop [complete-ch]
