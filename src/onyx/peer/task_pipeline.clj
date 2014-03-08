@@ -76,9 +76,11 @@
   (extensions/close-resource queue session)
   (assoc event :closed true))
 
-(defn munge-complete-task [{:keys [sync completion-node tail-batch?] :as event}]
+(defn munge-complete-task
+  [{:keys [sync completion-node peer-node peer-version tail-batch?] :as event}]
   (when tail-batch?
-    (extensions/touch-place sync completion-node))
+    (if (= (extensions/version sync peer-node) peer-version)
+      (extensions/touch-place sync completion-node)))
   event)
 
 (defn open-session-loop [read-ch kill-ch pipeline-data]
