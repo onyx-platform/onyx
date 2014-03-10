@@ -62,13 +62,17 @@
 (defn munge-status-check [{:keys [sync status-node] :as event}]
   (assoc event :commit? (extensions/place-exists? sync status-node)))
 
-(defn munge-ack [{:keys [queue batch] :as event}]
-  (let [rets (p-ext/ack-batch event)]
-    (merge event rets)))
+(defn munge-ack [{:keys [queue batch commit?] :as event}]
+  (if commit?
+    (let [rets (p-ext/ack-batch event)]
+      (merge event rets))
+    event))
 
-(defn munge-commit-tx [{:keys [queue session] :as event}]
-  (extensions/commit-tx queue session)
-  (assoc event :committed true))
+(defn munge-commit-tx [{:keys [queue session commit?] :as event}]
+  (if commit?
+    (do (extensions/commit-tx queue session)
+        (assoc event :committed true))
+    event))
 
 (defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -131,14 +135,11 @@
       (>!! status-check-ch (munge-write-batch event))
       (recur))))
 
-(defn status-check-loop [status-ch ack-ch close-resources-ch]
+(defn status-check-loop [status-ch ack-ch]
   (loop []
     (when-let [event (<!! status-ch)]
-      (let [event (munge-status-check event)]
-        (if (:commit? event)
-          (>!! ack-ch event)
-          (>!! close-resources-ch event))
-        (recur)))))
+      (>!! ack-ch (munge-status-check event))
+      (recur))))
 
 (defn ack-loop [ack-ch commit-ch]
   (loop []
@@ -161,7 +162,7 @@
 (defn reset-payload-node [reset-ch internal-complete-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
-      (if (:tail-batch? event)
+      (if (and (:tail-batch? event) (:commit? event))
         (let [event (munge-new-payload event)]
           (>!! internal-complete-ch event))
         (>!! internal-complete-ch event))
@@ -170,7 +171,7 @@
 (defn complete-task-loop [complete-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
-      (when (:tail-batch? event)
+      (when (and (:tail-batch? event) (:commit? event))
         (munge-complete-task event)
         (>!! (:complete-ch event) true))
       (recur))))
@@ -290,7 +291,7 @@
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch ack-ch close-resources-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch ack-ch))
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch))

@@ -127,10 +127,10 @@
     (let [f #(when-let [m (.receive consumer (:hornetq/timeout task))]
                (.acknowledge m)
                m)
-          rets (doall (repeatedly (:hornetq/batch-size task) f))]
+          rets (doall (take-while (comp not nil?) (repeatedly (:hornetq/batch-size task) f)))]
       (.close consumer)
       (.close session)
-      (filter identity rets))))
+      rets)))
 
 (defn decompress-segment [segment]
   (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
