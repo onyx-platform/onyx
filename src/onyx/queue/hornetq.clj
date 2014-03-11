@@ -19,10 +19,16 @@
     (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
           locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
           session-factory (.createSessionFactory locator)]
-      (assoc component :session-factory session-factory)))
+      (assoc component
+        :locator locator
+        :session-factory session-factory)))
 
-  (stop [component]
+  (stop [{:keys [locator session-factory] :as component}]
     (taoensso.timbre/info "Stopping HornetQ")
+
+    (.close session-factory)
+    (.close locator)
+    
     component))
 
 (defn hornetq [addr]
@@ -120,7 +126,7 @@
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
-        session (.createSession session-factory)
+        session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
         consumer (.createConsumer session queue "" 0 64000 false)]
     (.start session)
@@ -128,8 +134,11 @@
                (.acknowledge m)
                m)
           rets (doall (take-while (comp not nil?) (repeatedly (:hornetq/batch-size task) f)))]
+      (.commit session)
       (.close consumer)
       (.close session)
+      (.close session-factory)
+      (.close locator)
       rets)))
 
 (defn decompress-segment [segment]
@@ -142,7 +151,7 @@
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
-        session (.createSession session-factory)
+        session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
         producer (.createProducer session queue)]
     (.start session)
@@ -152,7 +161,9 @@
         (.send producer message)))
     (.commit session)
     (.close producer)
-    (.close session)))
+    (.close session)
+    (.close session-factory)
+    (.close locator)))
 
 (defn read-batch-shim [{:keys [catalog task]}]
   (let [task-map (planning/find-task catalog task)
