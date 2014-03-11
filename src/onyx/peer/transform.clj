@@ -13,8 +13,8 @@
         consumer (first consumers)
         f #(when-let [m (extensions/consume-message queue consumer (:onyx/timeout task))]
              m)
-        rets (doall (repeatedly (:onyx/batch-size task) f))]
-    (filter identity rets)))
+        coll (repeatedly (:onyx/batch-size task) f)]
+    (doall (take-while (comp not nil?) coll))))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
