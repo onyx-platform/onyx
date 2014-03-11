@@ -17,13 +17,6 @@
     (extensions/write-place sync peer-node updated-contents)
     node))
 
-(defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
-  (if (= (extensions/version sync peer-node) peer-version)
-    (let [node (new-payload sync peer-node payload-ch)]
-      (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :new-payload-node node :completion? true))
-    event))
-
 (defn munge-open-session [event session]
   (assoc event :session session))
 
@@ -79,6 +72,13 @@
   (doseq [consumer consumers] (extensions/close-resource queue consumer))
   (extensions/close-resource queue session)
   (assoc event :closed true))
+
+(defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
+  (if (= (extensions/version sync peer-node) peer-version)
+    (let [node (new-payload sync peer-node payload-ch)]
+      (extensions/on-change sync node #(>!! payload-ch %))
+      (assoc event :new-payload-node node :completion? true))
+    event))
 
 (defn munge-complete-task
   [{:keys [sync completion-node completion?] :as event}]
