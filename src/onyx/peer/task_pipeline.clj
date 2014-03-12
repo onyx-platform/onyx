@@ -249,7 +249,7 @@
 
       (dire/with-handler! #'ack-loop
         java.lang.Exception
-        (fn [e & args] (.printStackTrace e)))
+        (fn [e & _] (.printStackTrace e)))
 
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception

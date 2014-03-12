@@ -30,7 +30,9 @@
 
       (.commit session)
       (.close producer)
-      (.close session))))
+      (.close session)
+      (.close session-factory)
+      (.close locator))))
 
 (defn read! [queue-name n]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))

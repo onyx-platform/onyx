@@ -46,8 +46,7 @@
 
       (dire/with-handler! #'payload-loop
         java.lang.Exception
-        (fn [e & _]
-          (.printStackTrace e)))
+        (fn [e & _] (.printStackTrace e)))
 
       (assoc component
         :peer-node peer
