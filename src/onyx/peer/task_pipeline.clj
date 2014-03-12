@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
+            [taoensso.timbre :as timbre]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
