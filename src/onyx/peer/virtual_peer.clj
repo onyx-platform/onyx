@@ -6,8 +6,8 @@
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
 (defn payload-loop [sync queue payload-ch shutdown-ch status-ch]
-  (loop [pipeline nil]
-    (let [complete-ch (chan 1)]
+  (let [complete-ch (chan 1)]
+    (loop [pipeline nil]
       (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
         (when-not (nil? pipeline)
           (component/stop pipeline))
