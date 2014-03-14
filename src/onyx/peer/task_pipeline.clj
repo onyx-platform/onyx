@@ -72,7 +72,7 @@
   (doseq [producer producers] (extensions/close-resource queue producer))
   (doseq [consumer consumers] (extensions/close-resource queue consumer))
   (extensions/close-resource queue session)
-  (assoc event :closed true))
+  (assoc event :closed? true))
 
 (defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
   (if (= (extensions/version sync peer-node) peer-version)
@@ -174,7 +174,8 @@
     (when-let [event (<!! complete-ch)]
       (when (and (:tail-batch? event) (:commit? event))
         (munge-complete-task event)
-        (>!! (:complete-ch event) true))
+        (when (:completion? event)
+          (>!! (:complete-ch event) :task-completed)))
       (recur))))
 
 (defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
@@ -323,4 +324,52 @@
   (map->TaskPipeline {:payload payload :sync sync
                       :queue queue :payload-ch payload-ch
                       :complete-ch complete-ch}))
+
+(dire/with-post-hook! #'munge-open-session
+  (fn [{:keys [id]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] created new tx session" id))))
+
+(dire/with-post-hook! #'munge-strip-sentinel
+  (fn [{:keys [id decompressed]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Stripped sentinel. %s segments left" id (count decompressed)))))
+
+(dire/with-post-hook! #'munge-requeue-sentinel
+  (fn [{:keys [id tail-batch?]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Requeueing sentinel value: %s" id tail-batch?))))
+
+(dire/with-post-hook! #'munge-read-batch
+  (fn [{:keys [id batch]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Read %s segments" id (count batch)))))
+
+(dire/with-post-hook! #'munge-decompress-batch
+  (fn [{:keys [id decompressed batch]}]    
+    (taoensso.timbre/info (format "[Pipeline] [%s] Decompressed %s segments" id (count decompressed)))))
+
+(dire/with-post-hook! #'munge-apply-fn
+  (fn [{:keys [id results]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Applied fn to %s segments" id (count results)))))
+
+(dire/with-post-hook! #'munge-compress-batch
+  (fn [{:keys [id compressed]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Compressed fn to %s segments" id (count compressed)))))
+
+(dire/with-post-hook! #'munge-write-batch
+  (fn [{:keys [id]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Wrote batch" id))))
+
+(dire/with-post-hook! #'munge-status-check
+  (fn [{:keys [id status-node]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Checked the status node" id))))
+
+(dire/with-post-hook! #'munge-ack
+  (fn [{:keys [id acked]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Acked %s segments" id acked))))
+
+(dire/with-post-hook! #'munge-commit-tx
+  (fn [{:keys [id commit?]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Committed transaction? %s" id commit?))))
+
+(dire/with-post-hook! #'munge-close-resources
+  (fn [{:keys [id]}]
+    (taoensso.timbre/info (format "[Pipeline] [%s] Closed resources" id))))
 

@@ -18,6 +18,7 @@
 
     (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
           locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+          _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
       (assoc component
         :locator locator
@@ -69,7 +70,7 @@
 
 (defmethod extensions/create-consumer HornetQ
   [queue session queue-name]
-  (.createConsumer session queue-name "" 0 64000 false))
+  (.createConsumer session queue-name))
 
 (defmethod extensions/create-queue HornetQ
   [queue task]
@@ -125,10 +126,11 @@
 (defn read-batch [catalog task]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
-        consumer (.createConsumer session queue "" 0 64000 false)]
+        consumer (.createConsumer session queue)]
     (.start session)
     (let [f #(when-let [m (.receive consumer (:hornetq/timeout task))]
                (.acknowledge m)
@@ -150,6 +152,7 @@
 (defn write-batch [task compressed]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)

@@ -37,6 +37,7 @@
 (defn read! [queue-name n]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
