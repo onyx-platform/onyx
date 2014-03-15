@@ -182,7 +182,7 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Task Pipeline for " (:task/name (:task payload)))
+    (taoensso.timbre/info "Starting Task Pipeline for" (:task/name (:task payload)))
 
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
