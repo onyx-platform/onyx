@@ -1,21 +1,22 @@
 (ns onyx.peer.single-peer-test
   (:require [midje.sweet :refer :all]
             [onyx.peer.hornetq-util :as hq-util]
-            [onyx.api])
-  (:import [org.hornetq.api.core.client HornetQClient]
-           [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
-           [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+            [onyx.api]))
 
-(def n-messages 15000)
+(def n-messages 150000)
+
+(def batch-size 3000)
+
+(def timeout 1000)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(hq-util/write-and-cap! in-queue (map #(pr-str {:n %}) (range n-messages)))
+(hq-util/write-and-cap! in-queue (map (fn [x] {:n x}) (range n-messages)))
 
 (defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
+  (assoc segment :n n))
 
 (def catalog
   [{:onyx/name :in
@@ -26,14 +27,20 @@
     :hornetq/queue-name in-queue
     :hornetq/host "localhost"
     :hornetq/port 5445
-    :hornetq/batch-size 1500
-    :hornetq/timeout 5}
+    :hornetq/batch-size batch-size
+    :hornetq/timeout timeout}
    {:onyx/name :inc
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
-    :onyx/batch-size 1500
-    :onyx/timeout 5}
+    :onyx/batch-size batch-size
+    :onyx/timeout timeout}
+   {:onyx/name :inc-2
+    :onyx/fn :onyx.peer.single-peer-test/my-inc
+    :onyx/type :transformer
+    :onyx/consumption :concurrent
+    :onyx/batch-size batch-size
+    :onyx/timeout timeout}
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :concurrent
@@ -42,8 +49,8 @@
     :hornetq/queue-name out-queue
     :hornetq/host "localhost"
     :hornetq/port 5445
-    :onyx/batch-size 1500
-    :onyx/timeout 5}])
+    :onyx/batch-size batch-size
+    :onyx/timeout timeout}])
 
 (def workflow {:in {:inc :out}})
 
@@ -78,5 +85,5 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(fact results => (conj (vec (map (fn [x] {:n x}) (range 1 (inc n-messages)))) :done))
+(fact results => (conj (vec (map (fn [x] {:n x}) (range n-messages))) :done))
 

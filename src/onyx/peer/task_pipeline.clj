@@ -182,22 +182,22 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Task Pipeline")
-    
-    (let [open-session-kill-ch (chan 1)
-          read-batch-ch (chan 1)
-          decompress-batch-ch (chan 1)
-          strip-sentinel-ch (chan 1)
-          requeue-sentinel-ch (chan 1)
-          apply-fn-ch (chan 1)
-          compress-batch-ch (chan 1)
-          status-check-ch (chan 1)
-          write-batch-ch (chan 1)
-          ack-ch (chan 1)
-          commit-tx-ch (chan 1)
-          close-resources-ch (chan 1)
-          reset-payload-node-ch (chan 1)
-          complete-task-ch (chan 1)
+    (taoensso.timbre/info "Starting Task Pipeline for " (:task/name (:task payload)))
+
+    (let [open-session-kill-ch (chan 0)
+          read-batch-ch (chan 0)
+          decompress-batch-ch (chan 0)
+          strip-sentinel-ch (chan 0)
+          requeue-sentinel-ch (chan 0)
+          apply-fn-ch (chan 0)
+          compress-batch-ch (chan 0)
+          status-check-ch (chan 0)
+          write-batch-ch (chan 0)
+          ack-ch (chan 0)
+          commit-tx-ch (chan 0)
+          close-resources-ch (chan 0)
+          reset-payload-node-ch (chan 0)
+          complete-task-ch (chan 0)
 
           pipeline-data {:ingress-queues (:task/ingress-queues (:task payload))
                          :egress-queues (:task/egress-queues (:task payload))
