@@ -9,7 +9,7 @@
     (.createQueue session queue-name queue-name true)
     (catch Exception e)))
 
-(defn write-and-cap! [queue-name messages]
+(defn write-and-cap! [queue-name messages echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
@@ -20,6 +20,8 @@
     (let [producer (.createProducer session queue-name)]
       (.start session)
       (doseq [m messages]
+        (when (zero? (mod (:n m) echo))
+          (prn (format "Wrote %s segments" (:n m))))
         (let [message (.createMessage session true)]
           (.writeBytes (.getBodyBuffer message) (.array (fressian/write m)))
           (.send producer message)))
@@ -34,7 +36,7 @@
       (.close session-factory)
       (.close locator))))
 
-(defn read! [queue-name n]
+(defn read! [queue-name n echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
@@ -47,6 +49,8 @@
           results (atom [])]
       (.start session)
       (doseq [k (range n)]
+        (when (zero? (mod k echo))
+          (prn (format "Read %s segments" k)))
         (let [message (.receive consumer)]
           (.acknowledge message)
           (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message))))))
