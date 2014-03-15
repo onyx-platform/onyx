@@ -3,11 +3,11 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def n-messages 150000)
+(def n-messages 150)
 
-(def batch-size 3000)
+(def batch-size 25)
 
-(def timeout 1000)
+(def timeout 500)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
