@@ -304,19 +304,19 @@
     (taoensso.timbre/info "Stopping Task Pipeline")
 
     (close! (:open-session-kill-ch component))
-    (close! (:read-batch-ch component))
-    (close! (:decompress-batch-ch component))
-    (close! (:strip-sentinel-ch component))
-    (close! (:requeue-sentinel-ch component))
-    (close! (:apply-fn-ch component))
-    (close! (:compress-batch-ch component))
-    (close! (:write-batch-ch component))
-    (close! (:status-check-ch component))
-    (close! (:ack-ch component))
-    (close! (:commit-tx-ch component))
-    (close! (:close-resources-ch component))
-    (close! (:reset-payload-node-ch component))
-    (close! (:complete-task-ch component))
+    ;; (close! (:read-batch-ch component))
+    ;; (close! (:decompress-batch-ch component))
+    ;; (close! (:strip-sentinel-ch component))
+    ;; (close! (:requeue-sentinel-ch component))
+    ;; (close! (:apply-fn-ch component))
+    ;; (close! (:compress-batch-ch component))
+    ;; (close! (:write-batch-ch component))
+    ;; (close! (:status-check-ch component))
+    ;; (close! (:ack-ch component))
+    ;; (close! (:commit-tx-ch component))
+    ;; (close! (:close-resources-ch component))
+    ;; (close! (:reset-payload-node-ch component))
+    ;; (close! (:complete-task-ch component))
 
     component))
 
@@ -343,7 +343,7 @@
 
 (dire/with-post-hook! #'munge-decompress-batch
   (fn [{:keys [decompressed batch]}]
-    (taoensso.timbre/info (format "[Pipeline] Decompressed %s segments" (vec decompressed)))))
+    (taoensso.timbre/info (format "[Pipeline] Decompressed %s segments" (count decompressed)))))
 
 (dire/with-post-hook! #'munge-apply-fn
   (fn [{:keys [results]}]

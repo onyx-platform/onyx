@@ -5,7 +5,7 @@
 
 (def n-messages 1500)
 
-(def batch-size 20)
+(def batch-size 25)
 
 (def timeout 1000)
 
