@@ -82,25 +82,25 @@
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [batch consumers]}]
-    (info "Transformer: Read batch of" (count batch) "segments")))
+    (info "[Transformer] Read batch of" (count batch) "segments")))
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
-    (info "Transformer: Decompressed" (count decompressed) "segments")))
+    (info "[Transformer] Decompressed" (count decompressed) "segments")))
 
 (with-post-hook! #'acknowledge-batch-shim
   (fn [{:keys [acked]}]
-    (info "Transformer: Acked" acked "segments")))
+    (info "[Transformer] Acked" acked "segments")))
 
 (with-post-hook! #'apply-fn-shim
   (fn [{:keys [results]}]
-    (info "Transformer: Applied fn to" (count results) "segments")))
+    (info "[Transformer] Applied fn to" (count results) "segments")))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [compressed]}]
-    (info "Transformer: Compressed" (count compressed) "segments")))
+    (info "[Transformer] Compressed" (count compressed) "segments")))
 
 (with-post-hook! #'write-batch-shim
   (fn [{:keys [producers]}]
-    (info "Transformer: Wrote batch to" (count producers) "outputs")))
+    (info "[Transformer] Wrote batch to" (count producers) "outputs")))
 

@@ -1,5 +1,6 @@
 (ns onyx.peer.hornetq-util
-  (:require [clojure.data.fressian :as fressian])
+  (:require [clojure.data.fressian :as fressian]
+            [taoensso.timbre :refer [info]])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
@@ -21,7 +22,7 @@
       (.start session)
       (doseq [m messages]
         (when (zero? (mod (:n m) echo))
-          (prn (format "Wrote %s segments" (:n m))))
+          (info (format "[HQ Util] Wrote %s segments" (:n m))))
         (let [message (.createMessage session true)]
           (.writeBytes (.getBodyBuffer message) (.array (fressian/write m)))
           (.send producer message)))
@@ -50,10 +51,13 @@
       (.start session)
       (doseq [k (range n)]
         (when (zero? (mod k echo))
-          (prn (format "Read %s segments" k)))
-        (let [message (.receive consumer)]
-          (.acknowledge message)
-          (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message))))))
+          (info (format "[HQ Util] Read %s segments" k)))
+        (let [message (.receive consumer 10000)]
+          (when message
+            (.acknowledge message)
+            (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))
+
+      (info "[HQ Util] Done reading")
       (.commit session)
       (.close consumer)
       (.close session)

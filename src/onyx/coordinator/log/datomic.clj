@@ -178,7 +178,8 @@
 
 (defn n-peers [db task-id]
   (let [query '[:find (count ?peer) :in $ ?task :where
-                [?peer :peer/task ?task]]]
+                [?peer :peer/task ?task]
+                [?peer :peer/status :active]]]
     (ffirst (d/q query db task-id))))
 
 (defmethod extensions/nodes Datomic

@@ -3,11 +3,11 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def n-messages 100)
+(def n-messages 1500)
 
-(def batch-size 5)
+(def batch-size 20)
 
-(def timeout 500)
+(def timeout 1000)
 
 (def echo 100)
 
@@ -64,7 +64,7 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(def v-peers (onyx.api/start-peers conn 2 peer-opts))
+(def v-peers (onyx.api/start-peers conn 4 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 

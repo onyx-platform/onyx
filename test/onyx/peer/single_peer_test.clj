@@ -9,11 +9,13 @@
 
 (def timeout 500)
 
+(def echo 10)
+
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(hq-util/write-and-cap! in-queue (map (fn [x] {:n x}) (range n-messages)))
+(hq-util/write-and-cap! in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n n))
@@ -72,7 +74,7 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! out-queue (inc n-messages)))
+(def results (hq-util/read! out-queue (inc n-messages) echo))
 
 (try
   ;; (dorun (map deref (map :runner v-peers)))

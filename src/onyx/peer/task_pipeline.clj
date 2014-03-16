@@ -329,6 +329,10 @@
   (fn [{:keys []}]
     (taoensso.timbre/info (format "[Pipeline] Created new tx session"))))
 
+(dire/with-post-hook! #'munge-read-batch
+  (fn [{:keys [batch]}]
+    (taoensso.timbre/info (format "[Pipeline] Read %s segments" (count batch)))))
+
 (dire/with-post-hook! #'munge-strip-sentinel
   (fn [{:keys [decompressed]}]
     (taoensso.timbre/info (format "[Pipeline] Stripped sentinel. %s segments left" (count decompressed)))))
@@ -337,13 +341,9 @@
   (fn [{:keys [tail-batch?]}]
     (taoensso.timbre/info (format "[Pipeline] Requeueing sentinel value: %s" tail-batch?))))
 
-(dire/with-post-hook! #'munge-read-batch
-  (fn [{:keys [batch]}]
-    (taoensso.timbre/info (format "[Pipeline] Read %s segments" (count batch)))))
-
 (dire/with-post-hook! #'munge-decompress-batch
-  (fn [{:keys [decompressed batch]}]    
-    (taoensso.timbre/info (format "[Pipeline] Decompressed %s segments" (count decompressed)))))
+  (fn [{:keys [decompressed batch]}]
+    (taoensso.timbre/info (format "[Pipeline] Decompressed %s segments" (vec decompressed)))))
 
 (dire/with-post-hook! #'munge-apply-fn
   (fn [{:keys [results]}]
