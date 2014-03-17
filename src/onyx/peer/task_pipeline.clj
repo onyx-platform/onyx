@@ -87,96 +87,110 @@
     (extensions/touch-place sync completion-node))
   event)
 
-(defn open-session-loop [read-ch kill-ch pipeline-data]
+(defn open-session-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
     (when (first (alts!! [kill-ch] :default true))
       (when-let [session (create-tx-session pipeline-data)]
         (>!! read-ch (munge-open-session pipeline-data session))
-        (recur)))))
+        (recur))))
+  (>!! dead-ch true))
 
-(defn read-batch-loop [read-ch decompress-ch]
+(defn read-batch-loop [read-ch decompress-ch dead-ch]
   (loop []
     (when-let [event (<!! read-ch)]
       (>!! decompress-ch (munge-read-batch event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn decompress-batch-loop [decompress-ch strip-ch]
+(defn decompress-batch-loop [decompress-ch strip-ch dead-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
       (>!! strip-ch (munge-decompress-batch event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn strip-sentinel-loop [strip-ch requeue-ch]
+(defn strip-sentinel-loop [strip-ch requeue-ch dead-ch]
   (loop []
     (when-let [event (<!! strip-ch)]
       (>!! requeue-ch (munge-strip-sentinel event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn requeue-sentinel-loop [requeue-ch apply-fn-ch]
+(defn requeue-sentinel-loop [requeue-ch apply-fn-ch dead-ch]
   (loop []
     (when-let [event (<!! requeue-ch)]
       (>!! apply-fn-ch (munge-requeue-sentinel event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn apply-fn-loop [apply-fn-ch compress-ch]
+(defn apply-fn-loop [apply-fn-ch compress-ch dead-ch]
   (loop []
     (when-let [event (<!! apply-fn-ch)]
       (>!! compress-ch (munge-apply-fn event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn compress-batch-loop [compress-ch write-batch-ch]
+(defn compress-batch-loop [compress-ch write-batch-ch dead-ch]
   (loop []
     (when-let [event (<!! compress-ch)]
       (>!! write-batch-ch (munge-compress-batch event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn write-batch-loop [write-ch status-check-ch]
+(defn write-batch-loop [write-ch status-check-ch dead-ch]
   (loop []
     (when-let [event (<!! write-ch)]
       (>!! status-check-ch (munge-write-batch event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn status-check-loop [status-ch ack-ch]
+(defn status-check-loop [status-ch ack-ch dead-ch]
   (loop []
     (when-let [event (<!! status-ch)]
       (>!! ack-ch (munge-status-check event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn ack-loop [ack-ch commit-ch]
+(defn ack-loop [ack-ch commit-ch dead-ch]
   (loop []
     (when-let [event (<!! ack-ch)]
       (>!! commit-ch (munge-ack event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn commit-tx-loop [commit-ch close-resources-ch]
+(defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
   (loop []
     (when-let [event (<!! commit-ch)]
       (>!! close-resources-ch (munge-commit-tx event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn close-resources-loop [close-ch reset-payload-ch]
+(defn close-resources-loop [close-ch reset-payload-ch dead-ch]
   (loop []
     (when-let [event (<!! close-ch)]
       (>!! reset-payload-ch (munge-close-resources event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn reset-payload-node [reset-ch internal-complete-ch]
+(defn reset-payload-node [reset-ch internal-complete-ch dead-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
       (if (and (:tail-batch? event) (:commit? event))
         (let [event (munge-new-payload event)]
           (>!! internal-complete-ch event))
         (>!! internal-complete-ch event))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
-(defn complete-task-loop [complete-ch]
+(defn complete-task-loop [complete-ch dead-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
       (when (and (:tail-batch? event) (:commit? event))
         (munge-complete-task event)
         (when (:completion? event)
           (>!! (:complete-ch event) :task-completed)))
-      (recur))))
+      (recur)))
+  (>!! dead-ch true))
 
 (defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
   component/Lifecycle
@@ -198,6 +212,21 @@
           close-resources-ch (chan 0)
           reset-payload-node-ch (chan 0)
           complete-task-ch (chan 0)
+
+          open-session-dead-ch (chan)
+          read-batch-dead-ch (chan)
+          decompress-batch-dead-ch (chan)
+          strip-sentinel-dead-ch (chan)
+          requeue-sentinel-dead-ch (chan)
+          apply-fn-dead-ch (chan)
+          compress-batch-dead-ch (chan)
+          status-check-dead-ch (chan)
+          write-batch-dead-ch (chan)
+          ack-dead-ch (chan)
+          commit-tx-dead-ch (chan)
+          close-resources-dead-ch (chan)
+          reset-payload-node-dead-ch (chan)
+          complete-task-dead-ch (chan)
 
           pipeline-data {:ingress-queues (:task/ingress-queues (:task payload))
                          :egress-queues (:task/egress-queues (:task payload))
@@ -284,39 +313,96 @@
         :close-resources-ch close-resources-ch
         :reset-payload-node-ch reset-payload-node-ch
         :complete-task-ch complete-task-ch
+
+        :open-session-dead-ch open-session-dead-ch
+        :read-batch-dead-ch read-batch-dead-ch
+        :decompress-batch-dead-ch decompress-batch-dead-ch
+        :strip-sentinel-dead-ch strip-sentinel-dead-ch
+        :requeue-sentinel-dead-ch requeue-sentinel-dead-ch
+        :apply-fn-dead-ch apply-fn-dead-ch
+        :compress-batch-dead-ch compress-batch-dead-ch
+        :status-check-dead-ch status-check-dead-ch
+        :write-batch-dead-ch write-batch-dead-ch
+        :ack-dead-ch ack-dead-ch
+        :commit-tx-dead-ch commit-tx-dead-ch
+        :close-resources-dead-ch close-resources-dead-ch
+        :reset-payload-node-dead-ch reset-payload-node-dead-ch
+        :complete-task-dead-ch complete-task-dead-ch
         
-        :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data))
-        :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch))
-        :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch))
-        :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch))
-        :requeue-sentinel-ch (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch))
-        :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch))
-        :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch))
-        :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch ack-ch))
-        :ack-loop (thread (ack-loop ack-ch commit-tx-ch))
-        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch))
-        :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch))
-        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch complete-task-ch))
-        :complete-task-loop (thread (complete-task-loop complete-task-ch)))))
+        :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
+        :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch))
+        :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch))
+        :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch strip-sentinel-dead-ch))
+        :requeue-sentinel-ch (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch))
+        :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch))
+        :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch))
+        :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch ack-ch status-check-dead-ch))
+        :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
+        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
+        :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch close-resources-dead-ch))
+        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
+        :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch)))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Task Pipeline")
 
     (close! (:open-session-kill-ch component))
-    ;; (close! (:read-batch-ch component))
-    ;; (close! (:decompress-batch-ch component))
-    ;; (close! (:strip-sentinel-ch component))
-    ;; (close! (:requeue-sentinel-ch component))
-    ;; (close! (:apply-fn-ch component))
-    ;; (close! (:compress-batch-ch component))
-    ;; (close! (:write-batch-ch component))
-    ;; (close! (:status-check-ch component))
-    ;; (close! (:ack-ch component))
-    ;; (close! (:commit-tx-ch component))
-    ;; (close! (:close-resources-ch component))
-    ;; (close! (:reset-payload-node-ch component))
-    ;; (close! (:complete-task-ch component))
+    (<!! (:open-session-dead-ch component))
+
+    (close! (:read-batch-ch component))
+    (<!! (:read-batch-dead-ch component))
+
+    (close! (:decompress-batch-ch component))
+    (<!! (:decompress-batch-dead-ch component))
+
+    (close! (:strip-sentinel-ch component))
+    (<!! (:strip-sentinel-dead-ch component))
+
+    (close! (:requeue-sentinel-ch component))
+    (<!! (:requeue-sentinel-dead-ch component))
+
+    (close! (:apply-fn-ch component))
+    (<!! (:apply-fn-dead-ch component))
+
+    (close! (:compress-batch-ch component))
+    (<!! (:compress-batch-dead-ch component))
+
+    (close! (:write-batch-ch component))
+    (<!! (:write-batch-dead-ch component))
+
+    (close! (:status-check-ch component))
+    (<!! (:status-check-dead-ch component))
+
+    (close! (:ack-ch component))
+    (<!! (:ack-dead-ch component))
+
+    (close! (:commit-tx-ch component))
+    (<!! (:commit-tx-dead-ch component))
+
+    (close! (:close-resources-ch component))
+    (<!! (:close-resources-dead-ch component))
+
+    (close! (:reset-payload-node-ch component))
+    (<!! (:reset-payload-node-dead-ch component))
+
+    (close! (:complete-task-ch component))
+    (<!! (:complete-task-dead-ch component))
+
+    (close! (:open-session-dead-ch component))
+    (close! (:read-batch-dead-ch component))
+    (close! (:decompress-batch-dead-ch component))
+    (close! (:strip-sentinel-dead-ch component))
+    (close! (:requeue-sentinel-dead-ch component))
+    (close! (:apply-fn-dead-ch component))
+    (close! (:compress-batch-dead-ch component))
+    (close! (:status-check-dead-ch component))
+    (close! (:write-batch-dead-ch component))
+    (close! (:ack-dead-ch component))
+    (close! (:commit-tx-dead-ch component))
+    (close! (:close-resources-dead-ch component))
+    (close! (:reset-payload-node-dead-ch component))
+    (close! (:complete-task-dead-ch component))
 
     component))
 
