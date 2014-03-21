@@ -13,6 +13,7 @@
                  [com.datomic/simulant "0.1.6"]
                  [com.taoensso/timbre "3.0.1"]
                  [zookeeper-clj "0.9.1"]
+                 [clj-http "0.9.1"]
                  [incanter "1.5.4"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.2"]]

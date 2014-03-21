@@ -2,6 +2,7 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [>!!]]
             [com.stuartsierra.component :as component]
+            [clj-http.client :refer [post]]
             [onyx.system :as system]))
 
 (defprotocol ISubmit
@@ -27,10 +28,14 @@
 
 (deftype NettyCoordinator [uri]
   ISubmit
-  (submit-job [this job])
+  (submit-job [this job]
+    (post (str uri "/submit-job")
+          {:body {:job job}}))
 
   IRegister
-  (register-peer [this peer-node]))
+  (register-peer [this peer-node]
+    (post (str uri "/register-peer")
+          {:body {:peer-node peer-node}})))
 
 (defmulti connect
   (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
@@ -41,7 +46,8 @@
     (InMemoryCoordinator. (component/start c))))
 
 (defmethod connect :distributed
-  [uri opts] (NettyCoordinator. nil))
+  [uri opts]
+  (NettyCoordinator. (first (split (second (split uri #"//")) #"/"))))
 
 (defmulti start-peers
   (fn [coordinator n config] (type coordinator)))
