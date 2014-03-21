@@ -10,13 +10,14 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(defrecord HornetQ [addr]
+(defrecord HornetQ [host port]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting HornetQ")
 
-    (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+    (let [config {"host" host "port" port}
+          tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
           locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
           _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
@@ -32,8 +33,8 @@
     
     component))
 
-(defn hornetq [addr]
-  (map->HornetQ {:addr addr}))
+(defn hornetq [host port]
+  (map->HornetQ {:host host :port port}))
 
 (defmethod extensions/create-io-task
   {:onyx/type :queue
@@ -124,7 +125,8 @@
 ;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
 
 (defn read-batch [catalog task]
-  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+  (let [config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
@@ -150,7 +152,8 @@
   (.array (fressian/write segment)))
 
 (defn write-batch [task compressed]
-  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+  (let [config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)

@@ -59,14 +59,16 @@
 (def id (str (java.util.UUID/randomUUID)))
 
 (def coord-opts {:datomic-uri (str "datomic:mem://" id)
-                 :hornetq-addr "localhost:5445"
+                 :hornetq-host "localhost"
+                 :hornetq-port 5445
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
                  :revoke-delay 2000})
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def peer-opts {:hornetq-addr "localhost:5445"
+(def peer-opts {:hornetq-host "localhost"
+                :hornetq-port 5445
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
