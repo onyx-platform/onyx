@@ -10,8 +10,8 @@
     (.createQueue session queue-name queue-name true)
     (catch Exception e)))
 
-(defn write-and-cap! [queue-name messages echo]
-  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+(defn write-and-cap! [config queue-name messages echo]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
@@ -37,8 +37,8 @@
       (.close session-factory)
       (.close locator))))
 
-(defn read! [queue-name n echo]
-  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory))
+(defn read! [config queue-name n echo]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
