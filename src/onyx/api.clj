@@ -58,7 +58,8 @@
    (map
     (fn [_]
       (let [v-peer (component/start (system/onyx-peer config))]
-        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer)) (catch Exception e (.printStackTrace e))))
+        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer))
+                                         (catch Exception e (.printStackTrace e))))
                     :shutdown-fn (fn [] (component/stop v-peer))}]
           (register-peer coord (:peer-node (:peer v-peer)))
           rets)))
