@@ -69,7 +69,7 @@
                  :onyx-id id
                  :revoke-delay 2000})
 
-(def conn (onyx.api/connect (str "onyx:distributed//localhost:8500/" id) coord-opts))
+(def conn (onyx.api/connect (str "onyx:distributed//localhost:9950/" id) coord-opts))
 
 (def peer-opts {:hornetq-host hornetq-host
                 :hornetq-port hornetq-port

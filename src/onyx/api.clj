@@ -26,16 +26,19 @@
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
-(deftype NettyCoordinator [uri]
+(deftype HttpCoordinator [uri]
   ISubmit
   (submit-job [this job]
-    (post (str uri "/submit-job")
-          {:body {:job job}}))
+    (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
+      (read-string (:body response))))
 
   IRegister
   (register-peer [this peer-node]
-    (post (str uri "/register-peer")
-          {:body {:peer-node peer-node}})))
+    (let [response (post (str "http://" uri "/register-peer") {:body (pr-str peer-node)})]
+      (read-string (:body response))))
+
+  IShutdown
+  (shutdown [this]))
 
 (defmulti connect
   (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
@@ -47,12 +50,9 @@
 
 (defmethod connect :distributed
   [uri opts]
-  (NettyCoordinator. (first (split (second (split uri #"//")) #"/"))))
+  (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
 
-(defmulti start-peers
-  (fn [coordinator n config] (type coordinator)))
-
-(defmethod start-peers InMemoryCoordinator
+(defn start-peers 
   [coord n config]
   (doall
    (map
@@ -63,7 +63,4 @@
           (register-peer coord (:peer-node (:peer v-peer)))
           rets)))
     (range n))))
-
-(defmethod start-peers NettyCoordinator
-  [coordinator n config])
 

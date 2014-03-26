@@ -12,9 +12,11 @@
                  [com.datomic/datomic-free "0.9.4384"]
                  [com.datomic/simulant "0.1.6"]
                  [com.taoensso/timbre "3.0.1"]
+                 [javax.servlet/servlet-api "2.5"]
                  [zookeeper-clj "0.9.1"]
                  [clj-http "0.9.1"]
                  [incanter "1.5.4"]
+                 [ring "1.2.2"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.2"]]
                    :plugins [[lein-midje "3.1.3"]]}})
