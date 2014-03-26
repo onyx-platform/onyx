@@ -33,14 +33,19 @@
     (let [coordinator (component/start (onyx-coordinator opts))]
       (assoc component
         :coordinator coordinator
-        :server (jetty/run-jetty (handler coordinator) {:port 9950}))))
+        :server (jetty/run-jetty (handler coordinator) {:port (:onyx-port opts)
+                                                        :join? false}))))
   
   (stop [component]
-    (component/stop (:coordinator component))
-
     (taoensso.timbre/info "Stopping Coordinator Netty server")
-    ((:server component))
+
+    (component/stop (:coordinator component))
+    (.stop (:server component))
+
     component))
+
+(defn coordinator-server [opts]
+  (map->CoordinatorServer {:opts opts}))
 
 (defn -main [& args]
   (let [id (str (java.util.UUID/randomUUID))
@@ -49,7 +54,8 @@
               :hornetq-port 5445
               :zk-addr "127.0.0.1:2181"
               :onyx-id id
-              :revoke-delay 2000}
+              :revoke-delay 2000
+              :onyx-port 9950}
         server (component/start (CoordinatorServer. opts))]
     (try
       @(future (<!! (chan)))

@@ -1,6 +1,8 @@
 (ns onyx.peer.distributed-test
-  (:require [midje.sweet :refer :all]
+  (:require [com.stuartsierra.component :as component]
+            [midje.sweet :refer :all]
             [onyx.peer.hornetq-util :as hq-util]
+            [onyx.coordinator.distributed :as server]
             [onyx.api]))
 
 (def n-messages 10)
@@ -16,6 +18,8 @@
 (def hornetq-port 5445)
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
+
+(def onyx-port (+ 10000 (rand-int 10000)))
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -67,9 +71,12 @@
                  :hornetq-port hornetq-port
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
+                 :onyx-port onyx-port
                  :revoke-delay 2000})
 
-(def conn (onyx.api/connect (str "onyx:distributed//localhost:9950/" id) coord-opts))
+(def onyx-server (component/start (server/coordinator-server coord-opts)))
+
+(def conn (onyx.api/connect (str "onyx:distributed//localhost:" onyx-port "/" id) coord-opts))
 
 (def peer-opts {:hornetq-host hornetq-host
                 :hornetq-port hornetq-port
@@ -91,6 +98,7 @@
        (catch Exception e (prn e))))
    (try
      (onyx.api/shutdown conn)
+     (component/stop onyx-server)
      (catch Exception e (prn e)))))
 
 (fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done))
