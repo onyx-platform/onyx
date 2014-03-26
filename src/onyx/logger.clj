@@ -122,7 +122,7 @@
     component)
 
   (stop [component]
-    (info "Stopping Virtual Peer")
+    (info "Stopping Logger")
 
     component))
 
