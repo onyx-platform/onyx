@@ -44,14 +44,14 @@
           :hornetq/port hornetq-port
           :hornetq/batch-size batch-size
           :hornetq/timeout timeout}
-         
+
          {:onyx/name :inc
           :onyx/fn :onyx.peer.single-peer-test/my-inc
           :onyx/type :transformer
           :onyx/consumption :concurrent
           :onyx/batch-size batch-size
           :onyx/timeout timeout}
-         
+
          {:onyx/name :out
           :onyx/direction :output
           :onyx/consumption :concurrent
