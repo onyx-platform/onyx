@@ -3,13 +3,13 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def n-messages 150)
+(def n-messages 15000)
 
-(def batch-size 50)
+(def batch-size 1320)
 
 (def timeout 500)
 
-(def echo 1)
+(def echo 1000)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -94,7 +94,4 @@
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
-
-
-(fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done))
 
