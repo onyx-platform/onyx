@@ -3,22 +3,28 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def n-messages 1500)
+(def n-messages 15)
 
-(def batch-size 25)
+(def batch-size 5)
 
-(def timeout 1000)
+(def timeout 500)
 
-(def echo 100)
+(def echo 1)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(hq-util/write-and-cap! in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+(def hornetq-host "localhost")
 
-(defn my-identity [{:keys [n] :as segment}]
-  (assoc segment :n n))
+(def hornetq-port 5445)
+
+(def hq-config {"host" hornetq-host "port" hornetq-port})
+
+(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
 
 (def catalog
   [{:onyx/name :in
@@ -27,48 +33,52 @@
     :onyx/type :queue
     :onyx/medium :hornetq
     :hornetq/queue-name in-queue
-    :hornetq/host "localhost"
-    :hornetq/port 5445
+    :hornetq/host hornetq-host
+    :hornetq/port hornetq-port
     :hornetq/batch-size batch-size
     :hornetq/timeout timeout}
-   {:onyx/name :identity
-    :onyx/fn :onyx.peer.multi-peer-test/my-identity
+   
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.multi-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size
     :onyx/timeout timeout}
+   
    {:onyx/name :out
     :onyx/direction :output
     :onyx/consumption :concurrent
     :onyx/type :queue
     :onyx/medium :hornetq
     :hornetq/queue-name out-queue
-    :hornetq/host "localhost"
-    :hornetq/port 5445
+    :hornetq/host hornetq-host
+    :hornetq/port hornetq-port
     :onyx/batch-size batch-size
     :onyx/timeout timeout}])
 
-(def workflow {:in {:identity :out}})
+(def workflow {:in {:inc :out}})
 
 (def id (str (java.util.UUID/randomUUID)))
 
 (def coord-opts {:datomic-uri (str "datomic:mem://" id)
-                 :hornetq-addr "localhost:5445"
+                 :hornetq-host hornetq-host
+                 :hornetq-port hornetq-port
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
                  :revoke-delay 2000})
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def peer-opts {:hornetq-addr "localhost:5445"
+(def peer-opts {:hornetq-host hornetq-host
+                :hornetq-port hornetq-port
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(def v-peers (onyx.api/start-peers conn 4 peer-opts))
+(def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! out-queue (inc n-messages) echo))
+(def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
 
 (try
   ;; (dorun (map deref (map :runner v-peers)))
@@ -81,7 +91,7 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 

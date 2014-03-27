@@ -52,7 +52,7 @@
       (doseq [k (range n)]
         (when (zero? (mod k echo))
           (info (format "[HQ Util] Read %s segments" k)))
-        (let [message (.receive consumer 10000)]
+        (let [message (.receive consumer 60000)]
           (when message
             (.acknowledge message)
             (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))

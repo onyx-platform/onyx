@@ -92,95 +92,82 @@
     (when (first (alts!! [kill-ch] :default true))
       (when-let [session (create-tx-session pipeline-data)]
         (>!! read-ch (munge-open-session pipeline-data session))
-        (recur))))
-  (>!! dead-ch true))
+        (recur)))))
 
 (defn read-batch-loop [read-ch decompress-ch dead-ch]
   (loop []
     (when-let [event (<!! read-ch)]
       (>!! decompress-ch (munge-read-batch event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn decompress-batch-loop [decompress-ch strip-ch dead-ch]
   (loop []
     (when-let [event (<!! decompress-ch)]
       (>!! strip-ch (munge-decompress-batch event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn strip-sentinel-loop [strip-ch requeue-ch dead-ch]
   (loop []
     (when-let [event (<!! strip-ch)]
       (>!! requeue-ch (munge-strip-sentinel event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn requeue-sentinel-loop [requeue-ch apply-fn-ch dead-ch]
   (loop []
     (when-let [event (<!! requeue-ch)]
       (>!! apply-fn-ch (munge-requeue-sentinel event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn apply-fn-loop [apply-fn-ch compress-ch dead-ch]
   (loop []
     (when-let [event (<!! apply-fn-ch)]
       (>!! compress-ch (munge-apply-fn event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn compress-batch-loop [compress-ch write-batch-ch dead-ch]
   (loop []
     (when-let [event (<!! compress-ch)]
       (>!! write-batch-ch (munge-compress-batch event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn write-batch-loop [write-ch status-check-ch dead-ch]
   (loop []
     (when-let [event (<!! write-ch)]
       (>!! status-check-ch (munge-write-batch event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn status-check-loop [status-ch ack-ch dead-ch]
   (loop []
     (when-let [event (<!! status-ch)]
       (>!! ack-ch (munge-status-check event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn ack-loop [ack-ch commit-ch dead-ch]
   (loop []
     (when-let [event (<!! ack-ch)]
       (>!! commit-ch (munge-ack event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
   (loop []
     (when-let [event (<!! commit-ch)]
       (>!! close-resources-ch (munge-commit-tx event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn close-resources-loop [close-ch reset-payload-ch dead-ch]
   (loop []
     (when-let [event (<!! close-ch)]
       (>!! reset-payload-ch (munge-close-resources event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
-(defn reset-payload-node [reset-ch internal-complete-ch dead-ch]
+(defn reset-payload-node-loop [reset-ch internal-complete-ch dead-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
       (if (and (:tail-batch? event) (:commit? event))
         (let [event (munge-new-payload event)]
           (>!! internal-complete-ch event))
         (>!! internal-complete-ch event))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defn complete-task-loop [complete-ch dead-ch]
   (loop []
@@ -189,8 +176,7 @@
         (munge-complete-task event)
         (when (:completion? event)
           (>!! (:complete-ch event) :task-completed)))
-      (recur)))
-  (>!! dead-ch true))
+      (recur))))
 
 (defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
   component/Lifecycle
@@ -290,13 +276,70 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'reset-payload-node
+      (dire/with-handler! #'reset-payload-node-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
       (dire/with-handler! #'complete-task-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
+
+      (dire/with-finally! #'open-session-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'read-batch-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'decompress-batch-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'strip-sentinel-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'requeue-sentinel-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'apply-fn-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'compress-batch-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'write-batch-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'status-check-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'ack-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'commit-tx-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'close-resources-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'reset-payload-node-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
+      (dire/with-finally! #'complete-task-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
 
       (assoc component
         :open-session-kill-ch open-session-kill-ch
@@ -341,7 +384,7 @@
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch close-resources-dead-ch))
-        :reset-payload-node (thread (reset-payload-node reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
+        :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch)))))
 
   (stop [component]

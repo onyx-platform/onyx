@@ -3,13 +3,17 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def n-messages 10)
+(def n-messages 15000)
 
-(def batch-size 5)
+(def batch-size 1320)
 
 (def timeout 500)
 
-(def echo 1)
+(def echo 1000)
+
+(def in-queue (str (java.util.UUID/randomUUID)))
+
+(def out-queue (str (java.util.UUID/randomUUID)))
 
 (def hornetq-host "localhost")
 
@@ -17,13 +21,7 @@
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
-(def in-queue (str (java.util.UUID/randomUUID)))
-
-(def out-queue (str (java.util.UUID/randomUUID)))
-
-(def before-msgs (mapv (fn [x] {:n x}) (range n-messages)))
-
-(hq-util/write-and-cap! hq-config in-queue before-msgs echo)
+(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -67,7 +65,7 @@
                  :hornetq-port hornetq-port
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
-                 :revoke-delay 2000})
+                 :revoke-delay 5000})
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
