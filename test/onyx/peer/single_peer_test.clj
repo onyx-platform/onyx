@@ -71,9 +71,9 @@
 
       (fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done)))))
 
- (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 10 1 1)
- (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100 10 10)
- (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 1000 100 100)
- (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 15000 1320 1000)
- (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100000 3000 10000)
+(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 10 1 1)
+(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100 10 10)
+(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 1000 100 100)
+(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 15000 1320 1000)
+(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100000 3000 10000)
 
