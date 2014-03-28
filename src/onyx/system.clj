@@ -27,7 +27,7 @@
 (defn onyx-coordinator
   [{:keys [datomic-uri hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
   (map->OnyxCoordinator
-   {:log (component/using (datomic datomic-uri (log-schema)) [:log])
+   {:log (component/using (datomic datomic-uri (log-schema)) [])
     :sync (component/using (zookeeper zk-addr onyx-id) [:log])
     :queue (component/using (hornetq hornetq-host hornetq-port) [:log])
     :coordinator (component/using (coordinator revoke-delay)
