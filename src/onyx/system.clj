@@ -4,21 +4,20 @@
             [onyx.coordinator.log.datomic :refer [datomic log-schema]]
             [onyx.sync.zookeeper :refer [zookeeper]]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
-            [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.logger :refer [logger]]))
+            [onyx.queue.hornetq :refer [hornetq]]))
 
-(def coordinator-components [:logger :log :sync :queue :coordinator])
+(def coordinator-components [:log :sync :queue :coordinator])
 
-(def peer-components [:logger :sync :queue :peer])
+(def peer-components [:sync :queue :peer])
 
-(defrecord OnyxCoordinator [logger log sync queue]
+(defrecord OnyxCoordinator [log sync queue]
   component/Lifecycle
   (start [this]
     (component/start-system this coordinator-components))
   (stop [this]
     (component/stop-system this coordinator-components)))
 
-(defrecord OnyxPeer [logger sync queue]
+(defrecord OnyxPeer [sync queue]
   component/Lifecycle
   (start [this]
     (component/start-system this peer-components))
@@ -28,19 +27,17 @@
 (defn onyx-coordinator
   [{:keys [datomic-uri hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
   (map->OnyxCoordinator
-   {:logger (logger)
-    :log (component/using (datomic datomic-uri (log-schema)) [:logger])
-    :sync (component/using (zookeeper zk-addr onyx-id) [:logger])
-    :queue (component/using (hornetq hornetq-host hornetq-port) [:logger])
+   {:log (component/using (datomic datomic-uri (log-schema)) [:log])
+    :sync (component/using (zookeeper zk-addr onyx-id) [:log])
+    :queue (component/using (hornetq hornetq-host hornetq-port) [:log])
     :coordinator (component/using (coordinator revoke-delay)
-                                  [:logger :log :sync :queue])}))
+                                  [:log :sync :queue])}))
 
 (defn onyx-peer
   [{:keys [hornetq-host hornetq-port zk-addr onyx-id]}]
   (map->OnyxPeer
-   {:logger (logger)
-    :sync (component/using (zookeeper zk-addr onyx-id) [:logger])
-    :queue (component/using (hornetq hornetq-host hornetq-port) [:logger])
+   {:sync (component/using (zookeeper zk-addr onyx-id) [])
+    :queue (component/using (hornetq hornetq-host hornetq-port) [:sync])
     :peer (component/using (virtual-peer)
-                           [:logger :sync :queue])}))
+                           [:sync :queue])}))
 
