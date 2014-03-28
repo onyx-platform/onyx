@@ -3,8 +3,6 @@
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
 
-(def timeout 500)
-
 (def hornetq-host "localhost")
 
 (def hornetq-port 5445)
@@ -42,15 +40,13 @@
           :hornetq/queue-name in-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port
-          :hornetq/batch-size batch-size
-          :hornetq/timeout timeout}
+          :hornetq/batch-size batch-size}
 
          {:onyx/name :inc
           :onyx/fn :onyx.peer.single-peer-test/my-inc
           :onyx/type :transformer
           :onyx/consumption :concurrent
-          :onyx/batch-size batch-size
-          :onyx/timeout timeout}
+          :onyx/batch-size batch-size}
 
          {:onyx/name :out
           :onyx/direction :output
@@ -60,8 +56,7 @@
           :hornetq/queue-name out-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port
-          :onyx/batch-size batch-size
-          :onyx/timeout timeout}]
+          :onyx/batch-size batch-size}]
         conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts)
         v-peers (onyx.api/start-peers conn 1 peer-opts)]
     (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
@@ -76,9 +71,12 @@
 
       (fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done)))))
 
-(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 10 1 1)
-(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100 10 10)
-(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 1000 100 100)
-(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 15000 1320 1000)
-(run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100000 3000 10000)
+ (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 10 1 1)
+; (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100 10 10)
+
+;; (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 1000 100 100)
+;; (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 15000 1320 1000)
+;; (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100000 3000 10000)
+
+
 

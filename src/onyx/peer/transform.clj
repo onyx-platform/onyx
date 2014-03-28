@@ -4,6 +4,7 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
+            [onyx.queue.hornetq :refer [take-segments]]
             [taoensso.timbre :refer [info]]
             [dire.core :refer [with-post-hook!]]))
 
@@ -11,10 +12,8 @@
   ;; Multi-consumer not yet implemented.
   (let [task (find-task catalog task-name)
         consumer (first consumers)
-        f #(when-let [m (extensions/consume-message queue consumer (:onyx/timeout task))]
-             m)
-        coll (repeatedly (:onyx/batch-size task) f)]
-    (doall (take-while (comp not nil?) coll))))
+        f #(extensions/consume-message queue consumer)]
+    (doall (take (:onyx/batch-size task) (take-segments (repeatedly f))))))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))

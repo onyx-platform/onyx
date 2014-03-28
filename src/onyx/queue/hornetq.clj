@@ -91,8 +91,8 @@
     (.send producer message)))
 
 (defmethod extensions/consume-message HornetQ
-  [queue consumer timeout]
-  (.receive consumer timeout))
+  [queue consumer]
+  (.receive consumer))
 
 (defmethod extensions/read-message HornetQ
   [queue message]
@@ -122,6 +122,15 @@
     (.commit session)
     (.close session)))
 
+(defn take-segments [coll]
+  (lazy-seq
+   (when (seq coll)
+     (if (= (first coll) :done)
+       [:done]
+       (if (nil? (first coll))
+         []
+         (cons (first coll) (take-segments (rest coll))))))))
+
 ;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
 
 (defn read-batch [catalog task]
@@ -134,16 +143,20 @@
         queue (:hornetq/queue-name task)
         consumer (.createConsumer session queue)]
     (.start session)
-    (let [f #(when-let [m (.receive consumer (:hornetq/timeout task))]
-               (.acknowledge m)
-               m)
-          rets (doall (take-while (comp not nil?) (repeatedly (:hornetq/batch-size task) f)))]
+    (prn "!!!")
+    (prn "~~> " (:hornetq/batch-size task))
+    (let [f (fn [] (prn "Go") (when-let [m (.receive consumer)]
+                    (when m
+                      (.acknowledge m))
+                    (prn "Stop")
+                    m))
+          rets (doall (take (:hornetq/batch-size task) (take-segments (repeatedly f))))]
       (.commit session)
       (.close consumer)
       (.close session)
       (.close session-factory)
       (.close locator)
-      rets)))
+      (or rets []))))
 
 (defn decompress-segment [segment]
   (fressian/read (.toByteBuffer (.getBodyBuffer segment))))

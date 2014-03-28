@@ -149,8 +149,8 @@
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
-      (info (format "%s failed" (:ch failure)))
-      (.printStackTrace (:e failure))
+      (info (format "[Coordinator] %s failed" (:ch failure)))
+;      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]

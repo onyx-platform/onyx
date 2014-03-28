@@ -7,8 +7,6 @@
 
 (def batch-size 1320)
 
-(def timeout 500)
-
 (def echo 1000)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
@@ -35,15 +33,13 @@
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size batch-size
-    :hornetq/timeout timeout}
+    :hornetq/batch-size batch-size}
    
    {:onyx/name :inc
     :onyx/fn :onyx.peer.multi-peer-mem-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
-    :onyx/batch-size batch-size
-    :onyx/timeout timeout}
+    :onyx/batch-size batch-size}
    
    {:onyx/name :out
     :onyx/direction :output
@@ -53,8 +49,7 @@
     :hornetq/queue-name out-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :onyx/batch-size batch-size
-    :onyx/timeout timeout}])
+    :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
 
