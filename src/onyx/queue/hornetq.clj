@@ -122,14 +122,18 @@
     (.commit session)
     (.close session)))
 
-(defn take-segments [coll]
-  (lazy-seq
-   (when (seq coll)
-     (if (= (first coll) :done)
-       [:done]
-       (if (nil? (first coll))
-         []
-         (cons (first coll) (take-segments (rest coll))))))))
+(defn take-segments
+  ([f n] (take-segments f n []))
+  ([f n rets]
+     (if (= n (count rets))
+       rets
+       (let [segment (f)]
+         (if (nil? segment)
+           rets
+           (let [decompressed (fressian/read (.toByteBuffer (.getBodyBufferCopy segment)))]
+             (if (= :done decompressed)
+               (conj rets segment)
+               (recur f n (conj rets segment)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
 
@@ -143,14 +147,11 @@
         queue (:hornetq/queue-name task)
         consumer (.createConsumer session queue)]
     (.start session)
-    (prn "!!!")
-    (prn "~~> " (:hornetq/batch-size task))
-    (let [f (fn [] (prn "Go") (when-let [m (.receive consumer)]
-                    (when m
-                      (.acknowledge m))
-                    (prn "Stop")
-                    m))
-          rets (doall (take (:hornetq/batch-size task) (take-segments (repeatedly f))))]
+    (let [f #(when-let [m (.receive consumer)]
+               (when m
+                 (.acknowledge m))
+               m)
+          rets (doall (take-segments f (:hornetq/batch-size task)))]
       (.commit session)
       (.close consumer)
       (.close session)
@@ -185,9 +186,8 @@
     (.close locator)))
 
 (defn read-batch-shim [{:keys [catalog task]}]
-  (let [task-map (planning/find-task catalog task)
-        batch (or (read-batch catalog task-map) [])]
-    {:batch batch}))
+  (let [task-map (planning/find-task catalog task)]
+    {:batch (read-batch catalog task-map)}))
 
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
