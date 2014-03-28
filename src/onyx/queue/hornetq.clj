@@ -259,5 +259,33 @@
    :onyx/medium :hornetq}
   [event] (write-batch-shim event))
 
+(with-post-hook! #'read-batch-shim
+  (fn [{:keys [batch]}]
+    (info "[HornetQ ingress] Read" (count batch) "segments")))
+
+(with-post-hook! #'decompress-batch-shim
+  (fn [{:keys [decompressed]}]
+    (info "[HornetQ ingress] Decompressed" (count decompressed) "segments")))
+
+(with-post-hook! #'apply-fn-in-shim
+  (fn [{:keys [results]}]
+    (info "[HornetQ ingress] Applied fn to" (count results) "segments")))
+
+(with-post-hook! #'ack-batch-shim
+  (fn [{:keys [acked]}]
+    (info "[HornetQ egress] Acked" acked "segments")))
+
+(with-post-hook! #'apply-fn-out-shim
+  (fn [{:keys [results]}]
+    (info "[HornetQ egress] Applied fn to" (count results) "segments")))
+
+(with-post-hook! #'compress-batch-shim
+  (fn [{:keys [compressed]}]
+    (info "[HornetQ egress] Compressed batch of" (count compressed) "segments")))
+
+(with-post-hook! #'write-batch-shim
+  (fn [{:keys [written?]}]
+    (info "[HornetQ egress] Wrote batch with value" written?)))
+
 ;;;;;;;;;;;;;;;;;;; End library ;;;;;;;;;;;;;;;;;;;;;;;;
 
