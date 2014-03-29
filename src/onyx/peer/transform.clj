@@ -13,7 +13,7 @@
   (let [task (find-task catalog task-name)
         consumer (first consumers)
         f #(extensions/consume-message queue consumer)]
-    (doall (take-segments f (:hornetq/batch-size task)))))
+    (doall (take-segments f (:onyx/batch-size task)))))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
