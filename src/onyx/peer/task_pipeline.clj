@@ -226,7 +226,8 @@
                          :payload-ch payload-ch
                          :complete-ch complete-ch
                          :queue queue
-                         :sync sync}]
+                         :sync sync}
+          pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources pipeline-data))]
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
@@ -340,7 +341,6 @@
         (fn [& args]
           (>!! (last args) true)))
 
-
       (assoc component
         :open-session-kill-ch open-session-kill-ch
         :read-batch-ch read-batch-ch
@@ -385,7 +385,9 @@
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch close-resources-dead-ch))
         :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
-        :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch)))))
+        :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
+
+        :pipeline-data pipeline-data)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Task Pipeline")
@@ -446,6 +448,8 @@
     (close! (:close-resources-dead-ch component))
     (close! (:reset-payload-node-dead-ch component))
     (close! (:complete-task-dead-ch component))
+
+    (p-ext/close-pipeline-resources (:pipeline-data component))
 
     component))
 

@@ -14,11 +14,11 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def n-messages 150)
+(def n-messages 15000)
 
-(def batch-size 50)
+(def batch-size 1320)
 
-(def echo 1)
+(def echo 1000)
 
 (def hornetq-host "localhost")
 
@@ -148,7 +148,7 @@
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
     :model/n-peers 1
-    :model/peek-peers 1
+    :model/peek-peers 3
     :model/peer-rate 200
     :model/silence-gap 5000}])
 

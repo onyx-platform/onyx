@@ -137,27 +137,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
 
-(defn read-batch [catalog task]
-  (let [config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
-        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setConsumerWindowSize locator 0)
-        session-factory (.createSessionFactory locator)
-        session (.createTransactedSession session-factory)
+(defn read-batch [session-factory catalog task]
+  (let [session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
         consumer (.createConsumer session queue)]
     (.start session)
-    (let [f #(when-let [m (.receive consumer)]
-               (when m
-                 (.acknowledge m))
-               m)
+    (let [f #(.receive consumer)
           rets (doall (take-segments f (:hornetq/batch-size task)))]
-      (.commit session)
-      (.close consumer)
-      (.close session)
-      (.close session-factory)
-      (.close locator)
-      (or rets []))))
+      {:batch (or rets [])
+       :hornetq/session session
+       :hornetq/consumer consumer})))
 
 (defn decompress-segment [segment]
   (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
@@ -165,13 +154,8 @@
 (defn compress-segment [segment]
   (.array (fressian/write segment)))
 
-(defn write-batch [task compressed]
-  (let [config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
-        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setConsumerWindowSize locator 0)
-        session-factory (.createSessionFactory locator)
-        session (.createTransactedSession session-factory)
+(defn write-batch [session-factory task compressed]
+  (let [session (.createTransactedSession session-factory)
         queue (:hornetq/queue-name task)
         producer (.createProducer session queue)]
     (.start session)
@@ -179,23 +163,34 @@
       (let [message (.createMessage session true)]
         (.writeBytes (.getBodyBuffer message) x)
         (.send producer message)))
-    (.commit session)
-    (.close producer)
-    (.close session)
-    (.close session-factory)
-    (.close locator)))
+    {:hornetq/session session
+     :hornetq/producer producer
+     :written? true}))
 
-(defn read-batch-shim [{:keys [catalog task]}]
+(defn read-batch-shim [{:keys [catalog task] :as event}]
   (let [task-map (planning/find-task catalog task)]
-    {:batch (read-batch catalog task-map)}))
+    (read-batch (:hornetq/session-factory event) catalog task-map)))
 
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
 
-(defn ack-batch-shim [{:keys [queue batch]}]
+(defn ack-ingress-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
+
+  (.commit (:hornetq/session event))
+  (.close (:hornetq/consumer event))
+  (.close (:hornetq/session event))
   {:acked (count batch)})
+
+(defn ack-egress-batch-shim [{:keys [queue batch] :as event}]
+  (doseq [message batch]
+    (extensions/ack-message queue message))
+
+  (.commit (:hornetq/session event))
+  (.close (:hornetq/producer event))
+  (.close (:hornetq/session event))
+  {})
 
 (defn apply-fn-in-shim [event]
   {:results (:decompressed event)})
@@ -206,10 +201,32 @@
 (defn compress-batch-shim [{:keys [results]}]
   {:compressed (map compress-segment results)})
 
-(defn write-batch-shim [{:keys [catalog task compressed]}]
+(defn write-batch-shim [{:keys [catalog task compressed] :as event}]
   (let [task-map (planning/find-task catalog task)]
-    (write-batch task-map compressed)
-    {:written? true}))
+    (write-batch (:hornetq/session-factory event) task-map compressed)))
+
+(defmethod p-ext/inject-pipeline-resources
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
+        config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setConsumerWindowSize locator 0)
+        session-factory (.createSessionFactory locator)]
+    {:hornetq/locator locator
+     :hornetq/session-factory session-factory}))
+
+(defmethod p-ext/close-pipeline-resources
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (.close (:hornetq/session-factory pipeline-data))
+  (.close (:hornetq/locator pipeline-data))
+  {})
 
 (defmethod p-ext/read-batch
   {:onyx/type :queue
@@ -227,7 +244,7 @@
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event] event)
+  [event] (ack-ingress-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
@@ -239,7 +256,7 @@
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event] (ack-batch-shim event))
+  [event] (ack-egress-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
@@ -259,6 +276,32 @@
    :onyx/medium :hornetq}
   [event] (write-batch-shim event))
 
+(defmethod p-ext/inject-pipeline-resources
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
+        config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setConsumerWindowSize locator 0)
+        session-factory (.createSessionFactory locator)]
+    {:hornetq/locator locator
+     :hornetq/session-factory session-factory}))
+
+(defmethod p-ext/close-pipeline-resources
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (.commit (:hornetq/session pipeline-data))
+  (.close (:hornetq/producer pipeline-data))
+  (.close (:hornetq/session pipeline-data))
+  (.close (:hornetq/session-factory pipeline-data))
+  (.close (:hornetq/locator pipeline-data))
+  {})
+
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [batch]}]
     (info "[HornetQ ingress] Read" (count batch) "segments")))
@@ -271,7 +314,11 @@
   (fn [{:keys [results]}]
     (info "[HornetQ ingress] Applied fn to" (count results) "segments")))
 
-(with-post-hook! #'ack-batch-shim
+(with-post-hook! #'ack-ingress-batch-shim
+  (fn [{:keys [acked]}]
+    (info "[HornetQ igress] Acked" acked "segments")))
+
+(with-post-hook! #'ack-egress-batch-shim
   (fn [{:keys [acked]}]
     (info "[HornetQ egress] Acked" acked "segments")))
 
