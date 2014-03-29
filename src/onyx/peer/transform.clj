@@ -84,8 +84,7 @@
   [event] (write-batch-shim event))
 
 (defmethod p-ext/close-pipeline-resources :default
-  [event]
-  (info "[Transformer] Closing pipeline injections"))
+  [event] {})
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [batch consumers]}]
