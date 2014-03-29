@@ -40,7 +40,6 @@
 (defn read! [config queue-name n echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
