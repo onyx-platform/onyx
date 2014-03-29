@@ -128,7 +128,6 @@
 (def linear-cluster-model-data
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
-    :model/n-peers 5
     :model/peek-peers 50
     :model/peer-rate 200
     :model/silence-gap 5000

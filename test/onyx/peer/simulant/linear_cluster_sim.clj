@@ -147,8 +147,7 @@
 (def linear-cluster-model-data
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
-    :model/n-peers 1
-    :model/peek-peers 3
+    :model/peek-peers 4
     :model/peer-rate 200
     :model/silence-gap 5000}])
 
@@ -163,8 +162,11 @@
 
 (defmethod sim/perform-action :action.type/unregister-linear-peer
   [action process]
-  (let [peer (rand-nth @cluster)]
-    ((:shutdown-fn peer))))
+  (let [peer (first @cluster)]
+    (swap! cluster rest)
+    (try
+      ((:shutdown-fn peer))
+      (catch Exception e))))
 
 (def linear-cluster-test
   (sim/create-test sim-conn
@@ -183,6 +185,9 @@
 
 (sim/create-action-log sim-conn linear-cluster-sim)
 
+(doseq [n (range 2)]
+  (swap! cluster conj (onyx.api/start-peers conn 1 peer-opts)))
+
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id linear-cluster-sim))
        (repeatedly (:sim/processCount linear-cluster-sim))
@@ -195,7 +200,9 @@
 (onyx.api/shutdown conn)
 
 (doseq [peer @cluster]
-  ((:shutdown-fn peer)))
+  (try
+    ((:shutdown-fn peer))
+    (catch Exception e)))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)

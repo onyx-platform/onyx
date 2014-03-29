@@ -295,9 +295,6 @@
    :onyx/direction :output
    :onyx/medium :hornetq}
   [pipeline-data]
-  (.commit (:hornetq/session pipeline-data))
-  (.close (:hornetq/producer pipeline-data))
-  (.close (:hornetq/session pipeline-data))
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   {})
