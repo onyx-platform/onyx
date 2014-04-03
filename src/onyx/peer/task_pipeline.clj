@@ -1,5 +1,5 @@
 (ns onyx.peer.task-pipeline
-  (:require [clojure.core.async :refer [alts!! <!! >!! >! chan close! go thread]]
+  (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [taoensso.timbre :as timbre]
@@ -67,6 +67,9 @@
     (do (extensions/commit-tx queue session)
         (assoc event :committed true))
     event))
+
+(defn munge-close-temporal-resources [event]
+  (merge event (p-ext/close-temporal-resources event)))
 
 (defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -148,10 +151,16 @@
       (>!! commit-ch (munge-ack event))
       (recur))))
 
-(defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
+(defn commit-tx-loop [commit-ch close-temporal-ch dead-ch]
   (loop []
     (when-let [event (<!! commit-ch)]
-      (>!! close-resources-ch (munge-commit-tx event))
+      (>!! close-temporal-ch (munge-commit-tx event))
+      (recur))))
+
+(defn close-temporal-loop [close-temporal-ch close-resources-ch dead-ch]
+  (loop []
+    (when-let [event (<!! close-temporal-ch)]
+      (>!! close-resources-ch (munge-close-temporal-resources event))
       (recur))))
 
 (defn close-resources-loop [close-ch reset-payload-ch dead-ch]
@@ -195,6 +204,7 @@
           write-batch-ch (chan 1)
           ack-ch (chan 1)
           commit-tx-ch (chan 1)
+          close-temporal-ch (chan 1)
           close-resources-ch (chan 1)
           reset-payload-node-ch (chan 1)
           complete-task-ch (chan 1)
@@ -210,6 +220,7 @@
           write-batch-dead-ch (chan)
           ack-dead-ch (chan)
           commit-tx-dead-ch (chan)
+          close-temporal-dead-ch (chan)
           close-resources-dead-ch (chan)
           reset-payload-node-dead-ch (chan)
           complete-task-dead-ch (chan)
@@ -273,6 +284,10 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
+      (dire/with-handler! #'close-temporal-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
       (dire/with-handler! #'close-resources-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
@@ -329,6 +344,10 @@
         (fn [& args]
           (>!! (last args) true)))
 
+      (dire/with-finally! #'close-temporal-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
       (dire/with-finally! #'close-resources-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -353,6 +372,7 @@
         :status-check-ch status-check-ch
         :ack-ch ack-ch
         :commit-tx-ch commit-tx-ch
+        :close-temporal-ch close-temporal-ch
         :close-resources-ch close-resources-ch
         :reset-payload-node-ch reset-payload-node-ch
         :complete-task-ch complete-task-ch
@@ -368,6 +388,7 @@
         :write-batch-dead-ch write-batch-dead-ch
         :ack-dead-ch ack-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
+        :close-temporal-dead-ch close-temporal-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
         :reset-payload-node-dead-ch reset-payload-node-dead-ch
         :complete-task-dead-ch complete-task-dead-ch
@@ -382,7 +403,8 @@
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
         :status-check-loop (thread (status-check-loop status-check-ch ack-ch status-check-dead-ch))
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
-        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
+        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-temporal-ch commit-tx-dead-ch))
+        :close-temporal-loop (thread (close-temporal-loop close-temporal-ch close-resources-ch close-temporal-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch close-resources-dead-ch))
         :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
@@ -425,6 +447,9 @@
     (close! (:commit-tx-ch component))
     (<!! (:commit-tx-dead-ch component))
 
+    (close! (:close-temporal-ch component))
+    (<!! (:close-temporal-dead-ch component))
+
     (close! (:close-resources-ch component))
     (<!! (:close-resources-dead-ch component))
 
@@ -445,6 +470,7 @@
     (close! (:write-batch-dead-ch component))
     (close! (:ack-dead-ch component))
     (close! (:commit-tx-dead-ch component))
+    (close! (:close-temporal-dead-ch component))
     (close! (:close-resources-dead-ch component))
     (close! (:reset-payload-node-dead-ch component))
     (close! (:complete-task-dead-ch component))
@@ -501,6 +527,10 @@
 (dire/with-post-hook! #'munge-commit-tx
   (fn [{:keys [commit?]}]
     (taoensso.timbre/info (format "[Pipeline] Committed transaction? %s" commit?))))
+
+(dire/with-post-hook! #'munge-close-temporal-resources
+  (fn [{:keys []}]
+    (taoensso.timbre/info (format "[Pipeline] Closed temporal plugin resources"))))
 
 (dire/with-post-hook! #'munge-close-resources
   (fn [{:keys []}]

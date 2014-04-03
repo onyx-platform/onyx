@@ -174,23 +174,10 @@
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
 
-(defn ack-ingress-batch-shim [{:keys [queue batch] :as event}]
+(defn ack-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
-
-  (.commit (:hornetq/session event))
-  (.close (:hornetq/consumer event))
-  (.close (:hornetq/session event))
   {:acked (count batch)})
-
-(defn ack-egress-batch-shim [{:keys [queue batch] :as event}]
-  (doseq [message batch]
-    (extensions/ack-message queue message))
-
-  (.commit (:hornetq/session event))
-  (.close (:hornetq/producer event))
-  (.close (:hornetq/session event))
-  {})
 
 (defn apply-fn-in-shim [event]
   {:results (:decompressed event)})
@@ -228,6 +215,17 @@
   (.close (:hornetq/locator pipeline-data))
   {})
 
+(defmethod p-ext/close-temporal-resources
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (.commit (:hornetq/session pipeline-data))
+  (.close (:hornetq/consumer pipeline-data))
+  (.close (:hornetq/session pipeline-data))
+  {})
+
+
 (defmethod p-ext/read-batch
   {:onyx/type :queue
    :onyx/direction :input
@@ -244,7 +242,7 @@
   {:onyx/type :queue
    :onyx/direction :input
    :onyx/medium :hornetq}
-  [event] (ack-ingress-batch-shim event))
+  [event] (ack-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
@@ -256,7 +254,7 @@
   {:onyx/type :queue
    :onyx/direction :output
    :onyx/medium :hornetq}
-  [event] (ack-egress-batch-shim event))
+  [event] (ack-batch-shim event))
 
 (defmethod p-ext/apply-fn
   {:onyx/type :queue
@@ -290,6 +288,16 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
+(defmethod p-ext/close-temporal-resources
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (.commit (:hornetq/session pipeline-data))
+  (.close (:hornetq/producer pipeline-data))
+  (.close (:hornetq/session pipeline-data))
+  {})
+
 (defmethod p-ext/close-pipeline-resources
   {:onyx/type :queue
    :onyx/direction :output
@@ -311,13 +319,9 @@
   (fn [{:keys [results]}]
     (info "[HornetQ ingress] Applied fn to" (count results) "segments")))
 
-(with-post-hook! #'ack-ingress-batch-shim
+(with-post-hook! #'ack-batch-shim
   (fn [{:keys [acked]}]
-    (info "[HornetQ igress] Acked" acked "segments")))
-
-(with-post-hook! #'ack-egress-batch-shim
-  (fn [{:keys [acked]}]
-    (info "[HornetQ egress] Acked" acked "segments")))
+    (info "[HornetQ] Acked" acked "segments")))
 
 (with-post-hook! #'apply-fn-out-shim
   (fn [{:keys [results]}]

@@ -19,5 +19,7 @@
 
 (defmulti write-batch storage-dispatch)
 
+(defmulti close-temporal-resources storage-dispatch)
+
 (defmulti close-pipeline-resources storage-dispatch)
 

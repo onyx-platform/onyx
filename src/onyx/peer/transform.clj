@@ -83,6 +83,9 @@
 (defmethod p-ext/write-batch :default
   [event] (write-batch-shim event))
 
+(defmethod p-ext/close-temporal-resources :default
+  [event] {})
+
 (defmethod p-ext/close-pipeline-resources :default
   [event] {})
 
