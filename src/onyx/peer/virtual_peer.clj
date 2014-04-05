@@ -5,14 +5,14 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(defn payload-loop [sync queue payload-ch shutdown-ch status-ch]
+(defn payload-loop [sync queue payload-ch shutdown-ch status-ch pulse]
   (let [complete-ch (chan 1)]
     (loop [pipeline nil]
       (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
         (when-not (nil? pipeline)
           (component/stop pipeline))
 
-        (cond (nil? v) (comment "Shutdown")
+        (cond (nil? v) (extensions/delete sync pulse)
               (= ch complete-ch) (recur nil)
               (= ch payload-ch)
               (let [payload-node (:path v)
@@ -58,7 +58,7 @@
         :shutdown-ch shutdown-ch
         :status-ch status-ch
 
-        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch)))))
+        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch pulse)))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Virtual Peer")

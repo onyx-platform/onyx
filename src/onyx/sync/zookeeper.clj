@@ -85,7 +85,7 @@
   [sync _]
   (let [prefix (:onyx-id sync)
         place (str (pulse-path prefix) "/" (UUID/randomUUID))]
-    (zk/create (:conn sync) place :ephemeral? true)
+    (zk/create (:conn sync) place :persistent? false)
     place))
 
 (defmethod extensions/create [ZooKeeper :payload]
