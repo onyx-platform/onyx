@@ -14,7 +14,7 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def n-messages 2000)
+(def n-messages 40000)
 
 (def batch-size 1320)
 
@@ -147,7 +147,7 @@
 (def linear-cluster-model-data
   [{:db/id linear-model-id
     :model/type :model.type/linear-cluster
-    :model/peek-peers 4
+    :model/peek-peers 5
     :model/peer-rate 200
     :model/silence-gap 5000}])
 
@@ -173,7 +173,7 @@
   (sim/create-test sim-conn
                    linear-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration (u/hours->msec 1)}))
+                    :test/duration 60000}))
 
 (def linear-cluster-sim
   (sim/create-sim sim-conn
@@ -186,7 +186,7 @@
 
 (sim/create-action-log sim-conn linear-cluster-sim)
 
-(doseq [n (range 2)]
+(doseq [n (range 3)]
   (swap! cluster conj (onyx.api/start-peers conn 1 peer-opts)))
 
 (def pruns
