@@ -63,3 +63,29 @@
 
       @results)))
 
+(defn consume-queue! [config queue-name echo]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createTransactedSession session-factory)]
+
+    (create-queue session queue-name)
+
+    (let [consumer (.createConsumer session queue-name)
+          results (atom [])]
+      (.start session)
+      (while (not= (last @results) :done)
+        (when (zero? (mod (count @results) echo))
+          (info (format "[HQ Util] Read %s segments" (count @results))))
+        (let [message (.receive consumer)]
+          (when message
+            (.acknowledge message)
+            (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))
+
+      (info "[HQ Util] Done reading")
+      (.commit session)
+      (.close consumer)
+      (.close session)
+
+      @results)))
+
