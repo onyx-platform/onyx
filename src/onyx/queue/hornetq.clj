@@ -163,6 +163,7 @@
       (let [message (.createMessage session true)]
         (.writeBytes (.getBodyBuffer message) x)
         (.send producer message)))
+    (.commit session)
     {:hornetq/session session
      :hornetq/producer producer
      :written? true}))
@@ -206,15 +207,6 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
-(defmethod p-ext/close-pipeline-resources
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
-  [pipeline-data]
-  (.close (:hornetq/session-factory pipeline-data))
-  (.close (:hornetq/locator pipeline-data))
-  {})
-
 (defmethod p-ext/close-temporal-resources
   {:onyx/type :queue
    :onyx/direction :input
@@ -225,6 +217,14 @@
   (.close (:hornetq/session pipeline-data))
   {})
 
+(defmethod p-ext/close-pipeline-resources
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (.close (:hornetq/session-factory pipeline-data))
+  (.close (:hornetq/locator pipeline-data))
+  {})
 
 (defmethod p-ext/read-batch
   {:onyx/type :queue
@@ -293,7 +293,6 @@
    :onyx/direction :output
    :onyx/medium :hornetq}
   [pipeline-data]
-  (.commit (:hornetq/session pipeline-data))
   (.close (:hornetq/producer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   {})
