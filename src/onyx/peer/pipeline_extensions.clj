@@ -11,6 +11,8 @@
 
 (defmulti decompress-batch storage-dispatch)
 
+(defmulti requeue-sentinel storage-dispatch)
+
 (defmulti ack-batch storage-dispatch)
 
 (defmulti apply-fn storage-dispatch)

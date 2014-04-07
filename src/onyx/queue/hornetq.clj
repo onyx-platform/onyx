@@ -175,6 +175,18 @@
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
 
+(defn requeue-sentinel-shim [{:keys [ingress-queues] :as event}]
+  (let [session (.createTransactedSession (:hornetq/session-factory event))]
+    (doseq [queue-name ingress-queues]
+      (let [producer (.createProducer session queue-name)
+            message (.createMessage session true)]
+        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
+        (.send producer message)
+        (.close producer)))
+    (.commit session)
+    (.close session))
+  {:requeued? true})
+
 (defn ack-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
@@ -237,6 +249,12 @@
    :onyx/direction :input
    :onyx/medium :hornetq}
   [event] (decompress-batch-shim event))
+
+(defmethod p-ext/requeue-sentinel
+  {:onyx/type :queue
+   :onyx/direction :input
+   :onyx/medium :hornetq}
+  [event] (requeue-sentinel-shim event))
 
 (defmethod p-ext/ack-batch
   {:onyx/type :queue
@@ -313,6 +331,10 @@
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
     (info "[HornetQ ingress] Decompressed" (count decompressed) "segments")))
+
+(with-post-hook! #'requeue-sentinel-shim
+  (fn [{:keys []}]
+    (info "[HornetQ ingress] Requeued sentinel value")))
 
 (with-post-hook! #'apply-fn-in-shim
   (fn [{:keys [results]}]

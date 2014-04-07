@@ -42,6 +42,10 @@
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
     {:decompressed decompressed-msgs}))
 
+(defn requeue-sentinel-shim [{:keys [queue ingress-queues]}]
+  (extensions/cap-queue queue ingress-queues)
+  {:requeued? true})
+
 (defn acknowledge-batch-shim [{:keys [queue batch]}]
   (doseq [message batch]
     (extensions/ack-message queue message))
@@ -62,14 +66,16 @@
     {:producers producers}))
 
 (defmethod p-ext/inject-pipeline-resources :default
-  [event]
-  {})
+  [event] {})
 
 (defmethod p-ext/read-batch :default
   [event] (read-batch-shim event))
 
 (defmethod p-ext/decompress-batch :default
   [event] (decompress-batch-shim event))
+
+(defmethod p-ext/requeue-sentinel :default
+  [event] (requeue-sentinel-shim event))
 
 (defmethod p-ext/ack-batch :default
   [event] (acknowledge-batch-shim event))
@@ -96,6 +102,10 @@
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [decompressed]}]
     (info "[Transformer] Decompressed" (count decompressed) "segments")))
+
+(with-post-hook! #'requeue-sentinel-shim
+  (fn [{:keys []}]
+    (info "[Transformer] Requeued sentinel value")))
 
 (with-post-hook! #'acknowledge-batch-shim
   (fn [{:keys [acked]}]

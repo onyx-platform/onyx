@@ -35,11 +35,12 @@
       (assoc event :tail-batch? true :decompressed (or (butlast segments) []))
       (assoc event :tail-batch? false))))
 
-(defn munge-requeue-sentinel [{:keys [queue session ingress-queues tail-batch?] :as event}]
-  (when tail-batch?
-    ;; Caps all queues - only supports 1 consumers
-    (extensions/cap-queue queue ingress-queues))
-  event)
+(defn munge-requeue-sentinel [{:keys [tail-batch?] :as event}]
+  (if tail-batch?
+    ;; Caps all queues - only supports 1 ingress queue
+    (let [rets (p-ext/requeue-sentinel event)]
+      (merge event rets))
+    event))
 
 (defn munge-apply-fn [event]
   (let [rets (p-ext/apply-fn event)]
@@ -151,22 +152,22 @@
       (>!! commit-ch (munge-ack event))
       (recur))))
 
-(defn commit-tx-loop [commit-ch close-temporal-ch dead-ch]
+(defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
   (loop []
     (when-let [event (<!! commit-ch)]
-      (>!! close-temporal-ch (munge-commit-tx event))
+      (>!! close-resources-ch (munge-commit-tx event))
       (recur))))
 
-(defn close-temporal-loop [close-temporal-ch close-resources-ch dead-ch]
-  (loop []
-    (when-let [event (<!! close-temporal-ch)]
-      (>!! close-resources-ch (munge-close-temporal-resources event))
-      (recur))))
-
-(defn close-resources-loop [close-ch reset-payload-ch dead-ch]
+(defn close-resources-loop [close-ch close-temporal-ch dead-ch]
   (loop []
     (when-let [event (<!! close-ch)]
-      (>!! reset-payload-ch (munge-close-resources event))
+      (>!! close-temporal-ch (munge-close-resources event))
+      (recur))))
+
+(defn close-temporal-loop [close-temporal-ch reset-payload-ch dead-ch]
+  (loop []
+    (when-let [event (<!! close-temporal-ch)]
+      (>!! reset-payload-ch (munge-close-temporal-resources event))
       (recur))))
 
 (defn reset-payload-node-loop [reset-ch internal-complete-ch dead-ch]
@@ -204,8 +205,8 @@
           write-batch-ch (chan 0)
           ack-ch (chan 0)
           commit-tx-ch (chan 0)
-          close-temporal-ch (chan 0)
           close-resources-ch (chan 0)
+          close-temporal-ch (chan 0)
           reset-payload-node-ch (chan 0)
           complete-task-ch (chan 0)
 
@@ -220,8 +221,8 @@
           write-batch-dead-ch (chan)
           ack-dead-ch (chan)
           commit-tx-dead-ch (chan)
-          close-temporal-dead-ch (chan)
           close-resources-dead-ch (chan)
+          close-temporal-dead-ch (chan)
           reset-payload-node-dead-ch (chan)
           complete-task-dead-ch (chan)
 
@@ -284,11 +285,11 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
-      (dire/with-handler! #'close-temporal-loop
+      (dire/with-handler! #'close-resources-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
-
-      (dire/with-handler! #'close-resources-loop
+      
+      (dire/with-handler! #'close-temporal-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
@@ -344,11 +345,11 @@
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'close-temporal-loop
+      (dire/with-finally! #'close-resources-loop
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'close-resources-loop
+      (dire/with-finally! #'close-temporal-loop
         (fn [& args]
           (>!! (last args) true)))
 
@@ -372,8 +373,8 @@
         :status-check-ch status-check-ch
         :ack-ch ack-ch
         :commit-tx-ch commit-tx-ch
-        :close-temporal-ch close-temporal-ch
         :close-resources-ch close-resources-ch
+        :close-temporal-ch close-temporal-ch
         :reset-payload-node-ch reset-payload-node-ch
         :complete-task-ch complete-task-ch
 
@@ -388,8 +389,8 @@
         :write-batch-dead-ch write-batch-dead-ch
         :ack-dead-ch ack-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
-        :close-temporal-dead-ch close-temporal-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
+        :close-temporal-dead-ch close-temporal-dead-ch
         :reset-payload-node-dead-ch reset-payload-node-dead-ch
         :complete-task-dead-ch complete-task-dead-ch
         
@@ -403,9 +404,9 @@
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
         :status-check-loop (thread (status-check-loop status-check-ch ack-ch status-check-dead-ch))
         :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
-        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-temporal-ch commit-tx-dead-ch))
-        :close-temporal-loop (thread (close-temporal-loop close-temporal-ch close-resources-ch close-temporal-dead-ch))
-        :close-resources-loop (thread (close-resources-loop close-resources-ch reset-payload-node-ch close-resources-dead-ch))
+        :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
+        :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
+        :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
         :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
 
@@ -447,11 +448,11 @@
     (close! (:commit-tx-ch component))
     (<!! (:commit-tx-dead-ch component))
 
-    (close! (:close-temporal-ch component))
-    (<!! (:close-temporal-dead-ch component))
-
     (close! (:close-resources-ch component))
     (<!! (:close-resources-dead-ch component))
+    
+    (close! (:close-temporal-ch component))
+    (<!! (:close-temporal-dead-ch component))
 
     (close! (:reset-payload-node-ch component))
     (<!! (:reset-payload-node-dead-ch component))
@@ -470,8 +471,8 @@
     (close! (:write-batch-dead-ch component))
     (close! (:ack-dead-ch component))
     (close! (:commit-tx-dead-ch component))
-    (close! (:close-temporal-dead-ch component))
     (close! (:close-resources-dead-ch component))
+    (close! (:close-temporal-dead-ch component))
     (close! (:reset-payload-node-dead-ch component))
     (close! (:complete-task-dead-ch component))
 
@@ -498,7 +499,7 @@
 
 (dire/with-post-hook! #'munge-requeue-sentinel
   (fn [{:keys [tail-batch?]}]
-    (taoensso.timbre/info (format "[Pipeline] Requeueing sentinel value: %s" tail-batch?))))
+    (taoensso.timbre/info (format "[Pipeline] Requeued sentinel value"))))
 
 (dire/with-post-hook! #'munge-decompress-batch
   (fn [{:keys [decompressed batch]}]
@@ -528,11 +529,11 @@
   (fn [{:keys [commit?]}]
     (taoensso.timbre/info (format "[Pipeline] Committed transaction? %s" commit?))))
 
-(dire/with-post-hook! #'munge-close-temporal-resources
-  (fn [{:keys []}]
-    (taoensso.timbre/info (format "[Pipeline] Closed temporal plugin resources"))))
-
 (dire/with-post-hook! #'munge-close-resources
   (fn [{:keys []}]
     (taoensso.timbre/info (format "[Pipeline] Closed resources"))))
+
+(dire/with-post-hook! #'munge-close-temporal-resources
+  (fn [{:keys []}]
+    (taoensso.timbre/info (format "[Pipeline] Closed temporal plugin resources"))))
 
