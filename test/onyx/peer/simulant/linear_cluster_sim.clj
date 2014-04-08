@@ -4,6 +4,7 @@
             [simulant.sim :as sim]
             [simulant.util :as u]
             [datomic.api :as d]
+            [taoensso.timbre :refer [info]]
             [onyx.coordinator.sim-test-utils :as sim-utils]
             [onyx.peer.hornetq-util :as hq-util]
             [onyx.api]))
@@ -14,7 +15,7 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def n-messages 40000)
+(def n-messages 60000)
 
 (def batch-size 1320)
 
@@ -157,17 +158,19 @@
 
 (defmethod sim/perform-action :action.type/register-linear-peer
   [action process]
-  (let [peer (first (onyx.api/start-peers conn 1 peer-opts))]
-    (swap! cluster conj peer)))
+  (let [peers (onyx.api/start-peers conn 1 peer-opts)]
+    (info (count @cluster) "in the cluster")
+    (swap! cluster concat peers)))
 
 (defmethod sim/perform-action :action.type/unregister-linear-peer
   [action process]
   (let [peer (first @cluster)]
     (swap! cluster rest)
-    (prn "---------> " (count @cluster) "left <-------------")
+    (info (count @cluster) "left in the cluster")
     (try
       ((:shutdown-fn peer))
-      (catch Exception e))))
+      (catch Exception e
+        (.printStackTrace e)))))
 
 (def linear-cluster-test
   (sim/create-test sim-conn
@@ -187,7 +190,7 @@
 (sim/create-action-log sim-conn linear-cluster-sim)
 
 (doseq [n (range 3)]
-  (swap! cluster conj (onyx.api/start-peers conn 1 peer-opts)))
+  (swap! cluster concat (onyx.api/start-peers conn 1 peer-opts)))
 
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id linear-cluster-sim))
