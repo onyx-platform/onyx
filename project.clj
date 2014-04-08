@@ -1,4 +1,4 @@
-(defproject com.mdrogalis/onyx "0.1.0"
+(defproject com.mdrogalis/onyx "0.1.1-SNAPSHOT"
   :description "Distributed data processing"
   :url "https://github.com/MichaelDrogalis/onyx"
   :license {:name "Eclipse Public License"
