@@ -201,8 +201,8 @@
           requeue-sentinel-ch (chan 0)
           apply-fn-ch (chan 0)
           compress-batch-ch (chan 0)
-          status-check-ch (chan 0)
           write-batch-ch (chan 0)
+          status-check-ch (chan 0)
           ack-ch (chan 0)
           commit-tx-ch (chan 0)
           close-resources-ch (chan 0)
@@ -217,8 +217,8 @@
           requeue-sentinel-dead-ch (chan)
           apply-fn-dead-ch (chan)
           compress-batch-dead-ch (chan)
-          status-check-dead-ch (chan)
           write-batch-dead-ch (chan)
+          status-check-dead-ch (chan)
           ack-dead-ch (chan)
           commit-tx-dead-ch (chan)
           close-resources-dead-ch (chan)
@@ -385,8 +385,8 @@
         :requeue-sentinel-dead-ch requeue-sentinel-dead-ch
         :apply-fn-dead-ch apply-fn-dead-ch
         :compress-batch-dead-ch compress-batch-dead-ch
-        :status-check-dead-ch status-check-dead-ch
         :write-batch-dead-ch write-batch-dead-ch
+        :status-check-dead-ch status-check-dead-ch
         :ack-dead-ch ack-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
@@ -467,8 +467,8 @@
     (close! (:requeue-sentinel-dead-ch component))
     (close! (:apply-fn-dead-ch component))
     (close! (:compress-batch-dead-ch component))
-    (close! (:status-check-dead-ch component))
     (close! (:write-batch-dead-ch component))
+    (close! (:status-check-dead-ch component))
     (close! (:ack-dead-ch component))
     (close! (:commit-tx-dead-ch component))
     (close! (:close-resources-dead-ch component))
