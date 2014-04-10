@@ -36,28 +36,6 @@
 (defn hornetq [host port]
   (map->HornetQ {:host host :port port}))
 
-(defmethod extensions/create-io-task
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
-  [element parent children phase]
-  {:name (:onyx/name element)
-   :ingress-queues (:hornetq/queue-name element)
-   :egress-queues (planning/egress-queues-to-children children)
-   :phase phase
-   :consumption (:onyx/consumption element)})
-
-(defmethod extensions/create-io-task
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
-  [element parent children phase]
-  {:name (:onyx/name element)
-   :ingress-queues (get (:egress-queues parent) (:onyx/name element))
-   :egress-queues {:self (:hornetq/queue-name element)}
-   :phase phase
-   :consumption (:onyx/consumption element)})
-
 (defmethod extensions/create-tx-session HornetQ
   [queue]
   (let [session-factory (:session-factory queue)
@@ -175,17 +153,18 @@
 (defn decompress-batch-shim [{:keys [batch]}]
   {:decompressed (map decompress-segment batch)})
 
-(defn requeue-sentinel-shim [{:keys [ingress-queues] :as event}]
-  (let [session (.createTransactedSession (:hornetq/session-factory event))]
-    (doseq [queue-name ingress-queues]
+(defn requeue-sentinel-shim [{:keys [task catalog] :as event}]
+  (let [task (planning/find-task catalog task)
+        queue-name (:hornetq/queue-name task)]
+    (let [session (.createTransactedSession (:hornetq/session-factory event))]
       (let [producer (.createProducer session queue-name)
             message (.createMessage session true)]
         (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
         (.send producer message)
-        (.close producer)))
-    (.commit session)
-    (.close session))
-  {:requeued? true})
+        (.close producer))
+      (.commit session)
+      (.close session))
+    {:requeued? true}))
 
 (defn ack-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]

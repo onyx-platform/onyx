@@ -21,7 +21,7 @@
   (fn [catalog task-name parent children-names phase]
     (:onyx/type (find-task catalog task-name))))
 
-(defmethod create-task :queue
+(defmethod create-task :default
   [catalog task-name parent children-names phase]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
@@ -36,6 +36,22 @@
      :egress-queues (egress-queues-to-children children)
      :phase phase
      :consumption (:onyx/consumption element)}))
+
+(defmethod extensions/create-io-task :input
+  [element parent children phase]
+  {:name (:onyx/name element)
+   :ingress-queues (str (UUID/randomUUID))
+   :egress-queues (egress-queues-to-children children)
+   :phase phase
+   :consumption (:onyx/consumption element)})
+
+(defmethod extensions/create-io-task :output
+  [element parent children phase]
+  {:name (:onyx/name element)
+   :ingress-queues (get (:egress-queues parent) (:onyx/name element))
+   :egress-queues {:self (str (UUID/randomUUID))}
+   :phase phase
+   :consumption (:onyx/consumption element)})
 
 (defn children [tree]
   (if (map? tree)

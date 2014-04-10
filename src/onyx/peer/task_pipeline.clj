@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [taoensso.timbre :as timbre]
+            [onyx.coordinator.planning :refer [find-task]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
@@ -226,13 +227,17 @@
           reset-payload-node-dead-ch (chan)
           complete-task-dead-ch (chan)
 
-          pipeline-data {:ingress-queues (:task/ingress-queues (:task payload))
+          task (:task/name (:task payload))
+          catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
+
+          pipeline-data {:task task
+                         :catalog catalog
+                         :task-map (find-task catalog task)
+                         :ingress-queues (:task/ingress-queues (:task payload))
                          :egress-queues (:task/egress-queues (:task payload))
-                         :task (:task/name (:task payload))
                          :peer-node (:peer (:nodes payload))
                          :status-node (:status (:nodes payload))
                          :completion-node (:completion (:nodes payload))
-                         :catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
                          :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
                          :peer-version (extensions/version sync (:peer (:nodes payload)))
                          :payload-ch payload-ch
