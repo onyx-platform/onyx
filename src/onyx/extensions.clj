@@ -10,6 +10,8 @@
 
 (defmulti ack (fn [log place] (type log)))
 
+(defmulti seal-resource? (fn [log place] (type log)))
+
 (defmulti revoke-offer (fn [log ack-place] (type log)))
 
 (defmulti complete (fn [log complete-place] (type log)))

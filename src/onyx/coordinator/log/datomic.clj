@@ -165,8 +165,8 @@
     (map (partial to-task db) eids)))
 
 (defn select-nodes [ent]
-  (select-keys ent [:node/peer :node/payload :node/ack
-                    :node/status :node/completion]))
+  (select-keys ent [:node/peer :node/payload :node/ack :node/exhaust
+                    :node/seal :node/status :node/completion]))
 
 (defn node->task [db basis node]
   (let [query '[:find ?task :in $ ?basis ?node :where
@@ -211,6 +211,21 @@
                      [?peer :peer/status :idle]
                      [?peer :node/peer ?place]] db)]
     (map first peers)))
+
+(defmethod extensions/seal-resource? Datomic
+  [log exhaust-place]
+  (let [db (d/db (:conn log))
+        query '[:find ?task :in $ ?exhaust-node :where
+                [?peer :peer/status :active]
+                [?peer :peer/task ?task]
+                [?peer :node/exhaust ?exhaust-node]
+                [?task :task/complete? false]]
+        result (d/q query db exhaust-place)
+        task (ffirst result)
+        n (n-peers db (:db/id task))
+        nodes (extensions/node->task log :node/exhaust exhaust-place)]
+    {:seal? (= n 1)
+     :seal-node (:node/seal nodes)}))
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]

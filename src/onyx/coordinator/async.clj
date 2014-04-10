@@ -30,13 +30,15 @@
   (if-let [status-node (:node/status (extensions/nodes log peer))]
     (extensions/delete sync status-node)))
 
-(defn offer-task [log sync ack-cb complete-cb revoke-cb]
+(defn offer-task [log sync ack-cb exhaust-cb complete-cb revoke-cb]
   (loop [[task :as tasks] (extensions/next-tasks log)
          [peer :as peers] (extensions/idle-peers log)]
     (when (and (seq tasks) (seq peers))
       (let [task-attrs (dissoc task :workflow :catalog)
             payload-node (:payload (extensions/read-place sync peer))
             ack-node (extensions/create sync :ack)
+            exhaust-node (extensions/create sync :exhaust)
+            seal-node (extensions/create sync :seal)
             complete-node (extensions/create sync :completion)
             status-node (extensions/create sync :status)
             catalog-node (extensions/create sync :catalog)
@@ -44,6 +46,8 @@
             nodes {:peer peer
                    :payload payload-node
                    :ack ack-node
+                   :exhaust exhaust-node
+                   :seal seal-node
                    :completion complete-node
                    :status status-node
                    :catalog catalog-node
@@ -53,6 +57,7 @@
         (extensions/write-place sync workflow-node (:workflow task))
         
         (extensions/on-change sync ack-node ack-cb)
+        (extensions/on-change sync exhaust-node exhaust-cb)
         (extensions/on-change sync complete-node complete-cb)
         
         (if (extensions/mark-offered log task peer nodes)
@@ -65,12 +70,17 @@
   (when (extensions/revoke-offer log ack-node)
     (evict-cb peer-node)))
 
-(defn complete-task [log sync queue complete-place]
+(defn exhaust-queue [log exhaust-place]
+  (extensions/seal-resource? log exhaust-place))
+
+(defn seal-resource [sync seal? seal-place]
+  (extensions/write-place sync seal-place seal?))
+
+(defn complete-task [log sync complete-place]
   (let [task (extensions/node->task log :node/completion complete-place)]
     (if-let [result (extensions/complete log complete-place)]
       (when (= (:n-peers result) 1)
         (extensions/delete sync complete-place)
-        (extensions/cap-queue queue (:task/egress-queues task))
         result)
       false)))
 
@@ -115,11 +125,12 @@
       (recur))))
 
 (defn offer-ch-loop
-  [log sync revoke-delay offer-tail ack-head complete-head revoke-head]
+  [log sync revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
   (loop []
     (when-let [event (<!! offer-tail)]
       (offer-task log sync
                   #(>!! ack-head %)
+                  #(>!! exhaust-head %)
                   #(>!! complete-head %)
                   #(thread (<!! (timeout revoke-delay))
                            (>!! revoke-head %)))
@@ -132,11 +143,24 @@
                     #(>!! evict-head %))
       (recur))))
 
+(defn exhaust-queue-loop [log exhaust-tail seal-head]
+  (loop []
+    (when-let [place (:path (<!! exhaust-tail))]
+      (when-let [result (exhaust-queue log place)]
+        (>!! seal-head result))
+      (recur))))
+
+(defn seal-resource-loop [sync seal-tail]
+  (loop []
+    (when-let [result (<!! seal-tail)]
+      (seal-resource sync (:seal? result) (:seal-node result))
+      (recur))))
+
 (defn completion-ch-loop
-  [log sync queue complete-tail offer-head]
+  [log sync complete-tail offer-head]
   (loop []
     (when-let [place (:path (<!! complete-tail))]
-      (when-let [result (complete-task log sync queue place)]
+      (when-let [result (complete-task log sync place)]
         (>!! offer-head result))
       (recur))))
 
@@ -169,6 +193,8 @@
           offer-ch-head (chan ch-capacity)
           offer-revoke-ch-head (chan ch-capacity)
           ack-ch-head (chan ch-capacity)
+          exhaust-ch-head (chan ch-capacity)
+          seal-ch-head (chan ch-capacity)
           completion-ch-head (chan ch-capacity)
           failure-ch-head (chan ch-capacity)
           shutdown-ch-head (chan ch-capacity)
@@ -180,6 +206,8 @@
           offer-ch-tail (chan ch-capacity)
           offer-revoke-ch-tail (chan ch-capacity)
           ack-ch-tail (chan ch-capacity)
+          exhaust-ch-tail (chan ch-capacity)
+          seal-ch-tail (chan ch-capacity)
           completion-ch-tail (chan ch-capacity)
           failure-ch-tail (chan ch-capacity)
           shutdown-ch-tail (chan ch-capacity)
@@ -191,6 +219,8 @@
           offer-mult (mult offer-ch-head)
           offer-revoke-mult (mult offer-revoke-ch-head)
           ack-mult (mult ack-ch-head)
+          exhaust-mult (mult exhaust-ch-head)
+          seal-mult (mult seal-ch-head)
           completion-mult (mult completion-ch-head)
           failure-mult (mult failure-ch-head)
           shutdown-mult (mult shutdown-ch-head)]
@@ -202,6 +232,8 @@
       (tap offer-mult offer-ch-tail)
       (tap offer-revoke-mult offer-revoke-ch-tail)
       (tap ack-mult ack-ch-tail)
+      (tap exhaust-mult exhaust-ch-tail)
+      (tap seal-mult seal-ch-tail)
       (tap completion-mult completion-ch-tail)
       (tap failure-mult failure-ch-tail)
       (tap shutdown-mult shutdown-ch-tail)
@@ -235,6 +267,16 @@
         (fn [e & _]
           (>!! failure-ch-head {:ch :revoke-offer :e e})
           false))
+
+      (dire/with-handler! #'exhaust-queue
+        java.lang.Exception
+        (fn [e & _]
+          (>!! failure-ch-loop {:ch :exhaust-queue :e e})))
+
+      (dire/with-handler! #'seal-resource
+        java.lang.Exception
+        (fn [e & _]
+          (>!! failure-ch-loop {:ch :seal-resource :e e})))
 
       (dire/with-handler! #'complete-task
         java.lang.Exception
@@ -275,6 +317,12 @@
       (dire/with-handler! #'offer-revoke-ch-loop
         java.lang.Exception print-if-not-thread-death)
 
+      (dire/with-handler! #'exhaust-queue-loop
+        java.lang.Exception print-if-not-thread-death)
+
+      (dire/with-handler! #'seal-resource-loop
+        java.lang.Exception print-if-not-thread-death)
+
       (dire/with-handler! #'completion-ch-loop
         java.lang.Exception print-if-not-thread-death)
 
@@ -289,6 +337,8 @@
         :offer-ch-head offer-ch-head
         :offer-revoke-ch-head offer-revoke-ch-head
         :ack-ch-head ack-ch-head
+        :exhaust-ch-head exhaust-ch-head
+        :seal-ch-head seal-ch-head
         :completion-ch-head completion-ch-head
         :failure-ch-head failure-ch-head
         :shutdown-ch-head shutdown-ch-head
@@ -300,6 +350,8 @@
         :offer-mult offer-mult
         :offer-revoke-mult offer-revoke-mult
         :ack-mult ack-mult
+        :exhaust-mult exhaust-mult
+        :seal-mult seal-mult
         :completion-mult completion-mult
         :failure-mult failure-mult
         :shutdown-mult shutdown-mult
@@ -309,11 +361,14 @@
         :planning-thread (thread (planning-ch-loop log queue planning-ch-tail offer-ch-head))
         :ack-thread (thread (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
-        :offer-thread (thread (offer-ch-loop log sync revoke-delay offer-ch-tail ack-ch-head completion-ch-head offer-revoke-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop log sync offer-revoke-ch-tail evict-ch-head))
-        :completion-thread (thread (completion-ch-loop log sync queue completion-ch-tail offer-ch-head))
+        :exhaust-thread (thread (exhaust-queue-loop log exhaust-ch-tail seal-ch-head))
+        :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
+        :completion-thread (thread (completion-ch-loop log sync completion-ch-tail offer-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
-        :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail)))))
+        :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
+        :offer-thread (thread (offer-ch-loop log sync revoke-delay offer-ch-tail ack-ch-head
+                                             exhaust-ch-head completion-ch-head offer-revoke-ch-head)))))
 
   (stop [component]
     (info "Stopping Coordinator")
@@ -325,6 +380,8 @@
     (close! (:offer-ch-head component))
     (close! (:offer-revoke-ch-head component))
     (close! (:ack-ch-head component))
+    (close! (:exhaust-ch-head component))
+    (close! (:seal-ch-head component))
     (close! (:completion-ch-head component))
     (close! (:failure-ch-head component))
     (close! (:shutdown-ch-head component))
