@@ -23,6 +23,12 @@
 (defn ack-path [prefix]
   (str root-path "/" prefix "/ack"))
 
+(defn exhaust-path [prefix]
+  (str root-path "/" prefix "/exhaust"))
+
+(defn seal-path [prefix]
+  (str root-path "/" prefix "/seal"))
+
 (defn completion-path [prefix]
   (str root-path "/" prefix "/completion"))
 
@@ -51,6 +57,8 @@
       (zk/create conn (pulse-path prefix) :persistent? true)
       (zk/create conn (payload-path prefix)  :persistent? true)
       (zk/create conn (ack-path prefix) :persistent? true)
+      (zk/create conn (exhaust-path prefix) :persistent? true)
+      (zk/create conn (seal-path prefix) :persistent? true)
       (zk/create conn (completion-path prefix) :persistent? true)
       (zk/create conn (status-path prefix) :persistent? true)
       (zk/create conn (catalog-path prefix) :persistent? true)
@@ -99,6 +107,20 @@
   [sync _]
   (let [prefix (:onyx-id sync)
         place (str (ack-path prefix) "/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :exhaust]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (exhaust-path prefix) "/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :seal]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (seal-path prefix) "/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :persistent? true)
     place))
 
