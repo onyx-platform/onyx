@@ -133,8 +133,8 @@
 
 (defn test-task-life-cycle
   [{:keys [log sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
-           peer-node payload-node next-payload-node task-name pulse-node
-           shutdown-node]}]
+           status-spy seal-node-spy peer-node payload-node next-payload-node task-name
+           pulse-node shutdown-node]}]
   (facts "The payload node is populated"
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
@@ -157,7 +157,9 @@
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
              (fact (into #{} (keys nodes)) =>
                    #{:payload :ack :completion :status :catalog
-                     :workflow :peer :exhaust :seal})))
+                     :workflow :peer :exhaust :seal})
+             (extensions/on-change sync (:status nodes) #(>!! status-spy %))
+             (extensions/on-change sync (:seal nodes) #(>!! seal-node-spy %))))
     
     (facts "Touching the ack node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -170,11 +172,20 @@
                                             :payload next-payload-node})
     (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
+    (<!! status-spy)
+
     (facts "Touching the exhaustion node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
              (extensions/touch-place sync (:exhaust nodes))
              (let [event (<!! seal-ch-spy)]
-               (fact event => 1))))
+               (fact (:seal? event) => true)
+               (fact (:seal-node event) => (:seal nodes)))))
+
+    (<!! seal-node-spy)
+
+    (facts "The resource should be sealed"
+           (let [nodes (:nodes (extensions/read-place sync payload-node))]
+             (fact (extensions/read-place sync (:seal nodes)) => true)))
 
     (facts "Touching the completion node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -212,8 +223,10 @@
                  
            sync-spy (chan 1)
            ack-ch-spy (chan 1)
+           status-spy (chan 1)
            offer-ch-spy (chan 1)
            seal-ch-spy (chan 1)
+           seal-node-spy (chan 1)
            completion-ch-spy (chan 1)
                  
            catalog [{:onyx/name :in
@@ -254,7 +267,9 @@
                          :sync-spy sync-spy
                          :ack-ch-spy ack-ch-spy
                          :offer-ch-spy offer-ch-spy
+                         :status-spy status-spy
                          :seal-ch-spy seal-ch-spy
+                         :seal-node-spy seal-node-spy
                          :completion-ch-spy completion-ch-spy
                          :peer-node peer-node
                          :pulse-node pulse-node}]

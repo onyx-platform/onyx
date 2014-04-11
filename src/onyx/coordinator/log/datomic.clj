@@ -222,10 +222,10 @@
                 [?task :task/complete? false]]
         result (d/q query db exhaust-place)
         task (ffirst result)
-        n (n-peers db (:db/id task))
-        nodes (extensions/node->task log :node/exhaust exhaust-place)]
+        peer (into {} (d/entity db (second (first result))))
+        n (n-peers db task)]
     {:seal? (= n 1)
-     :seal-node (:node/seal nodes)}))
+     :seal-node (:node/seal peer)}))
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
