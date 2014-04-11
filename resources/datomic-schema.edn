@@ -73,6 +73,8 @@
                              :peer/task task
                              :node/payload (:payload nodes)
                              :node/ack (:ack nodes)
+                             :node/exhaust (:exhaust nodes)
+                             :node/seal (:seal nodes)
                              :node/status (:status nodes)
                              :node/completion (:completion nodes)}]
                            (throw (ex-info "Error trying to offer to peer"
@@ -101,15 +103,18 @@
                                      [?peer :peer/task ?task]
                                      [?peer :node/completion ?complete-node]
                                      [?task :task/complete? false]]
-                             node-query '[:find ?payload ?ack ?status ?completion :in $ ?peer :where
+                             node-query '[:find ?payload ?ack ?exhaust ?seal ?status ?completion
+                                          :in $ ?peer :where
                                           [?peer :node/payload ?payload]
                                           [?peer :node/ack ?ack]
+                                          [?peer :node/seal ?seal]
+                                          [?peer :node/exhaust ?exhaust]
                                           [?peer :node/status ?status]
                                           [?peer :node/completion ?completion]]
                              result (q query db complete-place)
                              peer (ffirst result)
                              task (second (first result))
-                             [payload ack status completion] (first (q node-query db peer))
+                             [payload ack exhaust seal status completion] (first (q node-query db peer))
                              peer-query '[:find (count ?peer) :in $ ?task :where
                                           [?peer :peer/task ?task]
                                           [?peer :peer/status :active]]
@@ -123,6 +128,8 @@
                               [:db/retract peer :peer/task task]
                               [:db/retract peer :node/payload payload]
                               [:db/retract peer :node/ack ack]
+                              [:db/retract peer :node/exhaust exhaust]
+                              [:db/retract peer :node/seal seal]
                               [:db/retract peer :node/status status]
                               [:db/retract peer :node/completion completion]]
                              [{:db/id task
@@ -132,6 +139,8 @@
                               [:db/retract peer :peer/task task]
                               [:db/retract peer :node/payload payload]
                               [:db/retract peer :node/ack ack]
+                              [:db/retract peer :node/exhaust exhaust]
+                              [:db/retract peer :node/seal seal]
                               [:db/retract peer :node/status status]
                               [:db/retract peer :node/completion completion]])
                            (throw (ex-info "Error for peer trying to complete task" {}))))}}

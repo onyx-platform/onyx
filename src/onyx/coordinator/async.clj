@@ -174,7 +174,7 @@
   (loop []
     (when-let [failure (<!! failure-tail)]
       (info (format "[Coordinator] %s failed" (:ch failure)))
-;      (.printStackTrace (:e failure))
+      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]
@@ -271,12 +271,12 @@
       (dire/with-handler! #'exhaust-queue
         java.lang.Exception
         (fn [e & _]
-          (>!! failure-ch-loop {:ch :exhaust-queue :e e})))
+          (>!! failure-ch-head {:ch :exhaust-queue :e e})))
 
       (dire/with-handler! #'seal-resource
         java.lang.Exception
         (fn [e & _]
-          (>!! failure-ch-loop {:ch :seal-resource :e e})))
+          (>!! failure-ch-head {:ch :seal-resource :e e})))
 
       (dire/with-handler! #'complete-task
         java.lang.Exception

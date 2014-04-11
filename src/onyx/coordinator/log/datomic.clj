@@ -215,7 +215,7 @@
 (defmethod extensions/seal-resource? Datomic
   [log exhaust-place]
   (let [db (d/db (:conn log))
-        query '[:find ?task :in $ ?exhaust-node :where
+        query '[:find ?task ?peer :in $ ?exhaust-node :where
                 [?peer :peer/status :active]
                 [?peer :peer/task ?task]
                 [?peer :node/exhaust ?exhaust-node]

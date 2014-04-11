@@ -101,11 +101,11 @@
                 (let [query '[:find ?n :where [?t :task/name ?n]]]
                   (fact (d/q query db) => #{[:in] [:inc] [:out]})))
 
-         (facts ":in's ingress queue is preset"
+         (facts ":in's ingress queue is generated"
                 (let [query '[:find ?qs :where
                               [?t :task/name :in]
                               [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q query db) => #{["in-queue"]})))
+                  (fact (d/q query db) =not=> empty?)))
 
          (facts ":inc's ingress queue is :in's egress queue"
                 (let [in-query '[:find ?qs :where
@@ -125,14 +125,14 @@
                                   [?t :task/ingress-queues ?qs]]]
                   (fact (d/q inc-query db) => (d/q out-query db))))
 
-         (facts ":out's egress queue is preset"
+         (facts ":out's egress queue is generated"
                 (let [query '[:find ?qs :where
                               [?t :task/name :out]
                               [?t :task/egress-queues ?qs]]]
-                  (fact (d/q query db) => #{["out-queue"]}))))))))
+                  (fact (d/q query db) =not=> empty?))))))))
 
 (defn test-task-life-cycle
-  [{:keys [log sync sync-spy ack-ch-spy completion-ch-spy offer-ch-spy
+  [{:keys [log sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
            peer-node payload-node next-payload-node task-name pulse-node
            shutdown-node]}]
   (facts "The payload node is populated"
@@ -156,7 +156,8 @@
     (facts "The payload node contains the other node paths"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
              (fact (into #{} (keys nodes)) =>
-                   #{:payload :ack :completion :status :catalog :workflow :peer})))
+                   #{:payload :ack :completion :status :catalog
+                     :workflow :peer :exhaust :seal})))
     
     (facts "Touching the ack node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -168,6 +169,12 @@
                                             :shutdown shutdown-node
                                             :payload next-payload-node})
     (extensions/on-change sync next-payload-node #(>!! sync-spy %))
+
+    (facts "Touching the exhaustion node triggers the callback"
+           (let [nodes (:nodes (extensions/read-place sync payload-node))]
+             (extensions/touch-place sync (:exhaust nodes))
+             (let [event (<!! seal-ch-spy)]
+               (fact event => 1))))
 
     (facts "Touching the completion node triggers the callback"
            (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -206,6 +213,7 @@
            sync-spy (chan 1)
            ack-ch-spy (chan 1)
            offer-ch-spy (chan 1)
+           seal-ch-spy (chan 1)
            completion-ch-spy (chan 1)
                  
            catalog [{:onyx/name :in
@@ -227,6 +235,7 @@
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
+       (tap (:seal-mult coordinator) seal-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
 
        (extensions/write-place sync peer-node {:pulse pulse-node
@@ -245,6 +254,7 @@
                          :sync-spy sync-spy
                          :ack-ch-spy ack-ch-spy
                          :offer-ch-spy offer-ch-spy
+                         :seal-ch-spy seal-ch-spy
                          :completion-ch-spy completion-ch-spy
                          :peer-node peer-node
                          :pulse-node pulse-node}]
@@ -252,7 +262,7 @@
           (assoc base-cycle
             :task-name :in
             :payload-node in-payload-node
-           :next-payload-node inc-payload-node))
+            :next-payload-node inc-payload-node))
 
          (test-task-life-cycle
           (assoc base-cycle
