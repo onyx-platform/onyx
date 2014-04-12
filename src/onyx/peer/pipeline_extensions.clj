@@ -25,3 +25,5 @@
 
 (defmulti close-pipeline-resources storage-dispatch)
 
+(defmulti seal-resource storage-dispatch)
+

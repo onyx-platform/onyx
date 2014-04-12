@@ -8,6 +8,15 @@
             [taoensso.timbre :refer [info]]
             [dire.core :refer [with-post-hook!]]))
 
+(defn cap-queue [queue queue-names]
+  (let [session (extensions/create-tx-session queue)]
+    (doseq [queue-name queue-names]
+      (let [producer (extensions/create-producer queue session queue-name)]
+        (extensions/produce-message queue producer session (.array (fressian/write :done)))
+        (extensions/close-resource queue producer)))
+    (extensions/commit-tx queue session)
+    (extensions/close-resource queue session)))
+
 (defn read-batch [queue consumers catalog task-name]
   ;; Multi-consumer not yet implemented.
   (let [task (find-task catalog task-name)
@@ -43,7 +52,7 @@
     {:decompressed decompressed-msgs}))
 
 (defn requeue-sentinel-shim [{:keys [queue ingress-queues]}]
-  (extensions/cap-queue queue ingress-queues)
+  (cap-queue queue ingress-queues)
   {:requeued? true})
 
 (defn acknowledge-batch-shim [{:keys [queue batch]}]
@@ -64,6 +73,9 @@
   (let [producers (map (partial extensions/create-producer queue session) egress-queues)
         batch (write-batch queue session producers compressed)]
     {:producers producers}))
+
+(defn seal-resource-shim [{:keys [queue egress-queues]}]
+  (cap-queue queue egress-queues))
 
 (defmethod p-ext/inject-pipeline-resources :default
   [event] {})
@@ -88,6 +100,9 @@
 
 (defmethod p-ext/write-batch :default
   [event] (write-batch-shim event))
+
+(defmethod p-ext/seal-resource :default
+  [event] (seal-resource-shim event))
 
 (defmethod p-ext/close-temporal-resources :default
   [event] {})
@@ -122,4 +137,8 @@
 (with-post-hook! #'write-batch-shim
   (fn [{:keys [producers]}]
     (info "[Transformer] Wrote batch to" (count producers) "outputs")))
+
+(with-post-hook! #'seal-resource-shim
+  (fn [{:keys []}]
+    (info "[Transformer] Sealing resource")))
 

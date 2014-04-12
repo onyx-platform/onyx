@@ -60,7 +60,7 @@
         conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts)
         v-peers (onyx.api/start-peers conn 1 peer-opts)]
     (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
-    (let [results (hq-util/read! hq-config out-queue n-messages echo)]
+    (let [results (hq-util/read! hq-config out-queue (inc n-messages) echo)]
       (doseq [v-peer v-peers]
         (try
           ((:shutdown-fn v-peer))

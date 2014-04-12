@@ -21,6 +21,7 @@
 
                 (extensions/on-change sync (:status (:nodes payload)) #(>!! status-ch %))
                 (extensions/touch-place sync (:ack (:nodes payload)))
+
                 (<!! status-ch)
 
                 (let [new-pipeline (task-pipeline payload sync queue payload-ch complete-ch)]

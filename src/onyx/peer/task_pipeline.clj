@@ -86,6 +86,16 @@
       (assoc event :new-payload-node node :completion? true))
     event))
 
+(defn munge-seal-resource [{:keys [sync exhaust-node seal-node] :as event}]
+  (let [seal-response-ch (chan)]
+    (extensions/on-change sync seal-node #(>!! seal-response-ch %))
+    (extensions/touch-place sync exhaust-node)
+    (let [path (:path (<!! seal-response-ch))
+          seal? (extensions/read-place sync path)]
+      (if seal?
+        (merge event (p-ext/seal-resource event))
+        event))))
+
 (defn munge-complete-task
   [{:keys [sync completion-node completion?] :as event}]
   (when completion?
@@ -171,12 +181,20 @@
       (>!! reset-payload-ch (munge-close-temporal-resources event))
       (recur))))
 
-(defn reset-payload-node-loop [reset-ch internal-complete-ch dead-ch]
+(defn reset-payload-node-loop [reset-ch seal-ch dead-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
       (if (and (:tail-batch? event) (:commit? event))
         (let [event (munge-new-payload event)]
-          (>!! internal-complete-ch event))
+          (>!! seal-ch event))
+        (>!! seal-ch event))
+      (recur))))
+
+(defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
+  (loop []
+    (when-let [event (<!! seal-ch)]
+      (if (:completion? event)
+        (>!! internal-complete-ch (munge-seal-resource event))
         (>!! internal-complete-ch event))
       (recur))))
 
@@ -209,6 +227,7 @@
           close-resources-ch (chan 0)
           close-temporal-ch (chan 0)
           reset-payload-node-ch (chan 0)
+          seal-ch (chan 0)
           complete-task-ch (chan 0)
 
           open-session-dead-ch (chan)
@@ -225,6 +244,7 @@
           close-resources-dead-ch (chan)
           close-temporal-dead-ch (chan)
           reset-payload-node-dead-ch (chan)
+          seal-dead-ch (chan)
           complete-task-dead-ch (chan)
 
           task (:task/name (:task payload))
@@ -237,6 +257,8 @@
                          :egress-queues (:task/egress-queues (:task payload))
                          :peer-node (:peer (:nodes payload))
                          :status-node (:status (:nodes payload))
+                         :exhaust-node (:exhaust (:nodes payload))
+                         :seal-node (:seal (:nodes payload))
                          :completion-node (:completion (:nodes payload))
                          :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
                          :peer-version (extensions/version sync (:peer (:nodes payload)))
@@ -302,6 +324,10 @@
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
 
+      (dire/with-handler! #'seal-resource-loop
+        java.lang.Exception
+        (fn [e & _] (.printStackTrace e)))
+
       (dire/with-handler! #'complete-task-loop
         java.lang.Exception
         (fn [e & _] (.printStackTrace e)))
@@ -362,6 +388,10 @@
         (fn [& args]
           (>!! (last args) true)))
 
+      (dire/with-finally! #'seal-resource-loop
+        (fn [& args]
+          (>!! (last args) true)))
+
       (dire/with-finally! #'complete-task-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -381,6 +411,7 @@
         :close-resources-ch close-resources-ch
         :close-temporal-ch close-temporal-ch
         :reset-payload-node-ch reset-payload-node-ch
+        :seal-ch seal-ch
         :complete-task-ch complete-task-ch
 
         :open-session-dead-ch open-session-dead-ch
@@ -397,6 +428,7 @@
         :close-resources-dead-ch close-resources-dead-ch
         :close-temporal-dead-ch close-temporal-dead-ch
         :reset-payload-node-dead-ch reset-payload-node-dead-ch
+        :seal-dead-ch seal-dead-ch
         :complete-task-dead-ch complete-task-dead-ch
         
         :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
@@ -412,7 +444,8 @@
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
         :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
-        :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch complete-task-ch reset-payload-node-dead-ch))
+        :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch seal-ch reset-payload-node-dead-ch))
+        :seal-resource-loop (thread (seal-resource-loop seal-ch complete-task-ch seal-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
 
         :pipeline-data pipeline-data)))
@@ -462,6 +495,9 @@
     (close! (:reset-payload-node-ch component))
     (<!! (:reset-payload-node-dead-ch component))
 
+    (close! (:seal-ch component))
+    (<!! (:seal-dead-ch component))
+
     (close! (:complete-task-ch component))
     (<!! (:complete-task-dead-ch component))
 
@@ -479,6 +515,7 @@
     (close! (:close-resources-dead-ch component))
     (close! (:close-temporal-dead-ch component))
     (close! (:reset-payload-node-dead-ch component))
+    (close! (:seal-dead-ch component))
     (close! (:complete-task-dead-ch component))
 
     (p-ext/close-pipeline-resources (:pipeline-data component))
@@ -541,4 +578,8 @@
 (dire/with-post-hook! #'munge-close-temporal-resources
   (fn [{:keys []}]
     (taoensso.timbre/info (format "[Pipeline] Closed temporal plugin resources"))))
+
+(dire/with-post-hook! #'munge-seal-resource
+  (fn [{:keys []}]
+    (taoensso.timbre/info (format "[Pipeline] Sealing resource"))))
 

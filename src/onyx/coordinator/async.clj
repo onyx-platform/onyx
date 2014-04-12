@@ -174,7 +174,7 @@
   (loop []
     (when-let [failure (<!! failure-tail)]
       (info (format "[Coordinator] %s failed" (:ch failure)))
-      (.printStackTrace (:e failure))
+;;      (.printStackTrace (:e failure))
       (recur))))
 
 (defn print-if-not-thread-death [e & _]

@@ -62,8 +62,6 @@
 
 (defmulti create-queue (fn [queue queue-name] (type queue)))
 
-(defmulti cap-queue (fn [queue queue-names] (type queue)))
-
 (defmulti close-resource (fn [queue resource] (type queue)))
 
 (defmulti create-io-task

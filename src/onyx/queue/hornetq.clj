@@ -88,18 +88,6 @@
   [queue resource]
   (.close resource))
 
-(defmethod extensions/cap-queue HornetQ
-  [queue egress-queues]
-  (let [session (extensions/create-tx-session queue)]
-    (doseq [queue-name egress-queues]
-      (let [producer (extensions/create-producer queue session queue-name)
-            message (.createMessage session true)]
-        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
-        (.send producer message)
-        (.close producer)))
-    (.commit session)
-    (.close session)))
-
 (defn take-segments
   ([f n] (take-segments f n []))
   ([f n rets]
@@ -183,6 +171,18 @@
 (defn write-batch-shim [{:keys [catalog task compressed] :as event}]
   (let [task-map (planning/find-task catalog task)]
     (write-batch (:hornetq/session-factory event) task-map compressed)))
+
+(defn seal-resource-shim [{:keys [catalog task] :as event}]
+  (let [task (planning/find-task catalog task)
+        queue-name (:hornetq/queue-name task)]
+    (let [session (.createTransactedSession (:hornetq/session-factory event))]
+      (let [producer (.createProducer session queue-name)
+            message (.createMessage session true)]
+        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
+        (.send producer message)
+        (.close producer))
+      (.commit session)
+      (.close session))))
 
 (defmethod p-ext/inject-pipeline-resources
   {:onyx/type :queue
@@ -301,6 +301,14 @@
   [pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
+  {})
+
+(defmethod p-ext/seal-resource
+  {:onyx/type :queue
+   :onyx/direction :output
+   :onyx/medium :hornetq}
+  [pipeline-data]
+  (seal-resource-shim pipeline-data)
   {})
 
 (with-post-hook! #'read-batch-shim
