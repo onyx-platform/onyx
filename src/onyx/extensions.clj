@@ -60,7 +60,9 @@
 
 (defmulti commit-tx (fn [queue session] (type queue)))
 
-(defmulti create-queue (fn [queue queue-name] (type queue)))
+(defmulti create-queue (fn [queue task] (type queue)))
+
+(defmulti bootstrap-queue (fn [queue task] (type queue)))
 
 (defmulti close-resource (fn [queue resource] (type queue)))
 

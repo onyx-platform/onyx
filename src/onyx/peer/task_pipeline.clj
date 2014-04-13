@@ -43,9 +43,10 @@
       (merge event rets))
     event))
 
-(defn munge-apply-fn [event]
-  (let [rets (p-ext/apply-fn event)]
-    (merge event rets)))
+(defn munge-apply-fn [{:keys [decompressed] :as event}]
+  (if (seq decompressed)
+    (merge event (p-ext/apply-fn event))
+    (merge event {:results []})))
 
 (defn munge-compress-batch [event]
   (let [rets (p-ext/compress-batch event)]

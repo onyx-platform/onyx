@@ -62,6 +62,15 @@
         (catch HornetQQueueExistsException e)))
     (.close session)))
 
+(defmethod extensions/bootstrap-queue HornetQ
+  [queue task]
+  (let [session (extensions/create-tx-session queue)
+        producer (extensions/create-producer queue session (:ingress-queues task))]
+    (extensions/produce-message queue producer session (.array (fressian/write {})))
+    (extensions/produce-message queue producer session (.array (fressian/write :done)))
+    (extensions/commit-tx queue session)
+    (extensions/close-resource queue session)))
+
 (defmethod extensions/produce-message HornetQ
   [queue producer session msg]
   (let [message (.createMessage session true)]

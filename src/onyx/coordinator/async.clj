@@ -19,6 +19,10 @@
 (defn plan-job [log queue {:keys [catalog workflow]}]
   (let [tasks (planning/discover-tasks catalog workflow)]
     (doseq [task tasks] (extensions/create-queue queue task))
+    (doseq [task tasks]
+      (let [task-map (planning/find-task catalog (:name task))]
+        (when (:onyx/bootstrap? task-map)
+          (extensions/bootstrap-queue queue task))))
     (extensions/plan-job log catalog workflow tasks)))
 
 (defn acknowledge-task [log sync ack-place]
