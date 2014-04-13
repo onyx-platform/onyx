@@ -265,7 +265,7 @@
                          :peer-version (extensions/version sync (:peer (:nodes payload)))
                          :payload-ch payload-ch
                          :complete-ch complete-ch
-                         :params (get fn-params task)
+                         :params (or (get fn-params task) [])
                          :queue queue
                          :sync sync}
           pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources pipeline-data))]
