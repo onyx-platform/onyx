@@ -27,10 +27,10 @@
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
 
-(defn apply-fn [task segment]
+(defn apply-fn [task params segment]
   (let [user-ns (symbol (name (namespace (:onyx/fn task))))
         user-fn (symbol (name (:onyx/fn task)))]
-    ((ns-resolve user-ns user-fn) segment)))
+    ((reduce #(partial %1 %2) (ns-resolve user-ns user-fn) params) segment)))
 
 (defn compress-segment [segment]
   (.array (fressian/write segment)))
@@ -60,9 +60,9 @@
     (extensions/ack-message queue message))
   {:acked (count batch)})
 
-(defn apply-fn-shim [{:keys [decompressed task catalog]}]
+(defn apply-fn-shim [{:keys [decompressed task catalog params]}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
-        results (map (partial apply-fn task) decompressed)]
+        results (map (partial apply-fn task params) decompressed)]
     {:results results}))
 
 (defn compress-batch-shim [{:keys [results]}]

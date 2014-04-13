@@ -208,7 +208,7 @@
           (>!! (:complete-ch event) :task-completed)))
       (recur))))
 
-(defrecord TaskPipeline [payload sync queue payload-ch complete-ch]
+(defrecord TaskPipeline [payload sync queue payload-ch complete-ch fn-params]
   component/Lifecycle
 
   (start [component]
@@ -265,6 +265,7 @@
                          :peer-version (extensions/version sync (:peer (:nodes payload)))
                          :payload-ch payload-ch
                          :complete-ch complete-ch
+                         :params (get fn-params task)
                          :queue queue
                          :sync sync}
           pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources pipeline-data))]
@@ -523,10 +524,10 @@
 
     component))
 
-(defn task-pipeline [payload sync queue payload-ch complete-ch]
+(defn task-pipeline [payload sync queue payload-ch complete-ch fn-params]
   (map->TaskPipeline {:payload payload :sync sync
                       :queue queue :payload-ch payload-ch
-                      :complete-ch complete-ch}))
+                      :complete-ch complete-ch :fn-params fn-params}))
 
 (dire/with-post-hook! #'munge-open-session
   (fn [{:keys []}]

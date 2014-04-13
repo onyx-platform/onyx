@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(defn payload-loop [sync queue payload-ch shutdown-ch status-ch dead-ch pulse]
+(defn payload-loop [sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params]
   (let [complete-ch (chan 1)]
     (loop [pipeline nil]
       (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
@@ -24,11 +24,11 @@
 
                 (<!! status-ch)
 
-                (let [new-pipeline (task-pipeline payload sync queue payload-ch complete-ch)]
+                (let [new-pipeline (task-pipeline payload sync queue payload-ch complete-ch fn-params)]
                   (recur (component/start new-pipeline)))))))
     (>!! dead-ch true)))
 
-(defrecord VirtualPeer []
+(defrecord VirtualPeer [fn-params]
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
@@ -62,7 +62,7 @@
         :status-ch status-ch
         :dead-ch dead-ch
 
-        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch dead-ch pulse)))))
+        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params)))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Virtual Peer")
@@ -75,6 +75,6 @@
     
     component))
 
-(defn virtual-peer []
-  (map->VirtualPeer {}))
+(defn virtual-peer [fn-params]
+  (map->VirtualPeer {:fn-params fn-params}))
 

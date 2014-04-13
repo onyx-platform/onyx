@@ -34,10 +34,10 @@
                                   [:log :sync :queue])}))
 
 (defn onyx-peer
-  [{:keys [hornetq-host hornetq-port zk-addr onyx-id]}]
+  [{:keys [hornetq-host hornetq-port zk-addr onyx-id fn-params]}]
   (map->OnyxPeer
    {:sync (component/using (zookeeper zk-addr onyx-id) [])
     :queue (component/using (hornetq hornetq-host hornetq-port) [:sync])
-    :peer (component/using (virtual-peer)
+    :peer (component/using (virtual-peer fn-params)
                            [:sync :queue])}))
 
