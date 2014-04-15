@@ -5,7 +5,9 @@
   (let [catalog-task (find-task (:catalog event) (:task event))]
     (select-keys catalog-task [:onyx/type :onyx/medium :onyx/direction])))
 
-(defmulti inject-pipeline-resources storage-dispatch)
+(defmulti inject-pipeline-resources
+  (fn [event]
+    (:onyx/ident (find-task (:catalog event) (:task event)))))
 
 (defmulti read-batch storage-dispatch)
 

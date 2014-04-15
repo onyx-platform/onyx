@@ -194,9 +194,7 @@
       (.close session))))
 
 (defmethod p-ext/inject-pipeline-resources
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+  :hornetq/read-segments
   [pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
@@ -281,9 +279,7 @@
   [event] (write-batch-shim event))
 
 (defmethod p-ext/inject-pipeline-resources
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+  :hornetq/write-segments
   [pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}

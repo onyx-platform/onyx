@@ -33,6 +33,7 @@
 
   (let [catalog
         [{:onyx/name :in
+          :onyx/ident :hornetq/read-segments
           :onyx/direction :input
           :onyx/consumption :concurrent
           :onyx/type :queue
@@ -49,6 +50,7 @@
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
+          :onyx/ident :hornetq/write-segments
           :onyx/direction :output
           :onyx/consumption :concurrent
           :onyx/type :queue
