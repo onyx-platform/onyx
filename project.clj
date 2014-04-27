@@ -9,15 +9,21 @@
                  [org.clojure/data.fressian "0.2.0"]
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
                  [com.stuartsierra/component "0.2.1"]
-                 [com.datomic/datomic-free "0.9.4384"]
+                 [com.datomic/datomic-free "0.9.4384"
+                  :exclusions [org.fressian/fressian]]
                  [com.datomic/simulant "0.1.6"]
                  [com.taoensso/timbre "3.0.1"]
                  [javax.servlet/servlet-api "2.5"]
                  [zookeeper-clj "0.9.1"]
-                 [clj-http "0.9.1"]
-                 [incanter "1.5.4"]
-                 [ring "1.2.2"]
+                 [clj-http "0.9.1"
+                  :exclusions [com.fasterxml.jackson.core/jackson-core
+                               commons-codec]]
+                 [incanter "1.5.4" :exclusions [joda-time]]
+                 [ring "1.2.2" :exclusions [commons-codec
+                                            joda-time]]
                  [dire "0.5.1"]]
-  :profiles {:dev {:dependencies [[midje "1.6.2"]]
+  :profiles {:dev {:dependencies [[midje "1.6.2"
+                                   :exclusions [commons-codec
+                                                joda-time]]]
                    :plugins [[lein-midje "3.1.3"]]}})
 
