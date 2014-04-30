@@ -1,6 +1,6 @@
 (ns onyx.peer.params-test
   (:require [midje.sweet :refer :all]
-            [onyx.peer.hornetq-util :as hq-util]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
 (def hornetq-host "localhost")

@@ -268,6 +268,7 @@
                          :params (or (get fn-params task) [])
                          :queue queue
                          :sync sync}
+          
           pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources pipeline-data))]
 
       (dire/with-handler! #'open-session-loop

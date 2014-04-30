@@ -6,7 +6,7 @@
             [datomic.api :as d]
             [taoensso.timbre :refer [info]]
             [onyx.coordinator.sim-test-utils :as sim-utils]
-            [onyx.peer.hornetq-util :as hq-util]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
 (def cluster (atom []))

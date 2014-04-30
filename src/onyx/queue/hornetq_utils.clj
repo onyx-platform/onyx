@@ -1,4 +1,4 @@
-(ns onyx.peer.hornetq-util
+(ns onyx.queue.hornetq-utils
   (:require [clojure.data.fressian :as fressian]
             [taoensso.timbre :refer [info]])
   (:import [org.hornetq.api.core.client HornetQClient]

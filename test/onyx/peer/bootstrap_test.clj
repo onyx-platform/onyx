@@ -1,6 +1,6 @@
 (ns onyx.peer.bootstrap-test
   (:require [midje.sweet :refer :all]
-            [onyx.peer.hornetq-util :as hq-util]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.api]))
 

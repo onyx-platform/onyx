@@ -1,7 +1,7 @@
 (ns onyx.peer.distributed-test
   (:require [com.stuartsierra.component :as component]
             [midje.sweet :refer :all]
-            [onyx.peer.hornetq-util :as hq-util]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.coordinator.distributed :as server]
             [onyx.api]))
 
