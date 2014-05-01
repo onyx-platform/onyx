@@ -4,8 +4,6 @@
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
-            [incanter.core :refer [view]]
-            [incanter.charts :refer [line-chart]]
             [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
@@ -157,23 +155,5 @@
       (when-not (= result total-tasks)
         (recur)))))
 
-(defn view-peer-chart! [result-db]
-  (let [insts (->> (-> '[:find ?inst :where
-                         [_ :peer/status _ ?tx]
-                         [?tx :db/txInstant ?inst]]
-                       (d/q (d/history result-db)))
-                   (map first)
-                   (sort))
-        dt-and-peers
-        (map (fn [tx]
-               (let [db (d/as-of result-db tx)]
-                 (->> (d/q '[:find (count ?p) :where [?p :peer/status]] db)
-                      (map first)
-                      (concat [tx]))))
-             insts)]
-    (view (line-chart
-           (map first dt-and-peers)
-           (map second dt-and-peers)
-           :x-label "Time"
-           :y-label "Peers"))))
+
 
