@@ -20,7 +20,7 @@
     
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [n (range messages)]
+      (doseq [n (range (count messages))]
         (when (zero? (mod n echo))
           (info (format "[HQ Util] Wrote %s segments" n)))
         (let [message (.createMessage session true)]
