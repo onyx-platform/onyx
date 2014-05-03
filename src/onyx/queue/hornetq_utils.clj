@@ -20,11 +20,11 @@
     
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [m messages]
-        (when (zero? (mod (:n m) echo))
-          (info (format "[HQ Util] Wrote %s segments" (:n m))))
+      (doseq [n (range messages)]
+        (when (zero? (mod n echo))
+          (info (format "[HQ Util] Wrote %s segments" n)))
         (let [message (.createMessage session true)]
-          (.writeBytes (.getBodyBuffer message) (.array (fressian/write m)))
+          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
           (.send producer message)))
 
       (let [sentinel (.createMessage session true)]
