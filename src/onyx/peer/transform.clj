@@ -62,7 +62,7 @@
 
 (defn apply-fn-shim [{:keys [decompressed task catalog params]}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
-        results (map (partial apply-fn task params) decompressed)]
+        results (flatten (map (partial apply-fn task params) decompressed))]
     {:results results}))
 
 (defn compress-batch-shim [{:keys [results]}]
