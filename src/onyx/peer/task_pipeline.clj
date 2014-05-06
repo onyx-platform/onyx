@@ -38,7 +38,6 @@
 
 (defn munge-requeue-sentinel [{:keys [tail-batch?] :as event}]
   (if tail-batch?
-    ;; Caps all queues - only supports 1 ingress queue
     (let [rets (p-ext/requeue-sentinel event)]
       (merge event rets))
     event))
