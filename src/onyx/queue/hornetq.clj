@@ -72,10 +72,15 @@
     (extensions/close-resource queue session)))
 
 (defmethod extensions/produce-message HornetQ
-  [queue producer session msg]
-  (let [message (.createMessage session true)]
-    (.writeBytes (.getBodyBuffer message) msg)
-    (.send producer message)))
+  ([queue producer session msg]
+     (let [message (.createMessage session true)]
+       (.writeBytes (.getBodyBuffer message) msg)
+       (.send producer message)))
+  ([queue producer session msg group]
+     (let [message (.createMessage session true)]
+       (.putStringProperty message "_HQ_GROUP_ID" group)
+       (.writeBytes (.getBodyBuffer message) msg)
+       (.send producer message))))
 
 (defmethod extensions/consume-message HornetQ
   [queue consumer]

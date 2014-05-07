@@ -56,7 +56,8 @@
 
 (defmulti ack-message (fn [queue message] (type queue)))
 
-(defmulti produce-message (fn [queue producer session msg] (type queue)))
+(defmulti produce-message (fn ([queue producer session msg] (type queue))
+                            ([queue producer session msg group] (type queue))))
 
 (defmulti commit-tx (fn [queue session] (type queue)))
 
