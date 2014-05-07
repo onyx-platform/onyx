@@ -198,8 +198,7 @@
       (.commit session)
       (.close session))))
 
-(defmethod p-ext/inject-pipeline-resources
-  :hornetq/read-segments
+(defmethod p-ext/inject-pipeline-resources :hornetq/read-segments
   [pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
@@ -210,81 +209,47 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
-(defmethod p-ext/close-temporal-resources
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/close-temporal-resources :hornetq/read-segments
   [pipeline-data]
   (.commit (:hornetq/session pipeline-data))
   (.close (:hornetq/consumer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   {})
 
-(defmethod p-ext/close-pipeline-resources
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/close-pipeline-resources :hornetq/read-segments
   [pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   {})
 
-(defmethod p-ext/read-batch
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/read-batch [:input :hornetq]
   [event] (read-batch-shim event))
 
-(defmethod p-ext/decompress-batch
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/decompress-batch [:input :hornetq]
   [event] (decompress-batch-shim event))
 
-(defmethod p-ext/requeue-sentinel
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/requeue-sentinel [:input :hornetq]
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/ack-batch [:input :hornetq]
   [event] (ack-batch-shim event))
 
-(defmethod p-ext/apply-fn
-  {:onyx/type :queue
-   :onyx/direction :input
-   :onyx/medium :hornetq}
+(defmethod p-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
 
-(defmethod p-ext/ack-batch
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
-  [event] (ack-batch-shim event))
-
-(defmethod p-ext/apply-fn
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/apply-fn [:output :hornetq]
   [event] (apply-fn-out-shim event))
 
-(defmethod p-ext/compress-batch
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/ack-batch [:output :hornetq]
+  [event] (ack-batch-shim event))
+
+(defmethod p-ext/compress-batch [:output :hornetq]
   [event] (compress-batch-shim event))
 
-(defmethod p-ext/write-batch
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/write-batch [:output :hornetq]
   [event] (write-batch-shim event))
 
-(defmethod p-ext/inject-pipeline-resources
-  :hornetq/write-segments
+(defmethod p-ext/inject-pipeline-resources :hornetq/write-segments
   [pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
@@ -295,28 +260,19 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
-(defmethod p-ext/close-temporal-resources
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/close-temporal-resources :hornetq/write-segments
   [pipeline-data]
   (.close (:hornetq/producer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   {})
 
-(defmethod p-ext/close-pipeline-resources
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/close-pipeline-resources :hornetq/write-segments
   [pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   {})
 
-(defmethod p-ext/seal-resource
-  {:onyx/type :queue
-   :onyx/direction :output
-   :onyx/medium :hornetq}
+(defmethod p-ext/seal-resource [:output :hornetq]
   [pipeline-data]
   (seal-resource-shim pipeline-data)
   {})

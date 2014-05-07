@@ -77,9 +77,6 @@
 (defn seal-resource-shim [{:keys [queue egress-queues]}]
   (cap-queue queue egress-queues))
 
-(defmethod p-ext/inject-pipeline-resources :default
-  [event] {})
-
 (defmethod p-ext/read-batch :default
   [event] (read-batch-shim event))
 
@@ -103,12 +100,6 @@
 
 (defmethod p-ext/seal-resource :default
   [event] (seal-resource-shim event))
-
-(defmethod p-ext/close-temporal-resources :default
-  [event] {})
-
-(defmethod p-ext/close-pipeline-resources :default
-  [event] {})
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [batch consumers]}]

@@ -34,10 +34,9 @@
   (let [catalog
         [{:onyx/name :in
           :onyx/ident :hornetq/read-segments
-          :onyx/direction :input
-          :onyx/consumption :concurrent
-          :onyx/type :queue
+          :onyx/type :input
           :onyx/medium :hornetq
+          :onyx/consumption :concurrent
           :hornetq/queue-name in-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port
@@ -51,10 +50,9 @@
 
          {:onyx/name :out
           :onyx/ident :hornetq/write-segments
-          :onyx/direction :output
-          :onyx/consumption :concurrent
-          :onyx/type :queue
+          :onyx/type :output
           :onyx/medium :hornetq
+          :onyx/consumption :concurrent
           :hornetq/queue-name out-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port

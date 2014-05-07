@@ -69,5 +69,5 @@
 
 (defmulti create-io-task
   (fn [element parent children phase]
-    (:onyx/direction element)))
+    (:onyx/type element)))
 

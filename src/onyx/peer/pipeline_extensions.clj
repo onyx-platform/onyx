@@ -1,31 +1,41 @@
 (ns onyx.peer.pipeline-extensions
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
-(defn storage-dispatch [event]
+(defn type-and-medium-dispatch [event]
   (let [catalog-task (find-task (:catalog event) (:task event))]
-    (select-keys catalog-task [:onyx/type :onyx/medium :onyx/direction])))
+    [(:onyx/type catalog-task) (:onyx/medium catalog-task)]))
 
-(defmulti inject-pipeline-resources
-  (fn [event]
-    (:onyx/ident (find-task (:catalog event) (:task event)))))
+(defn ident-dispatch [event]
+  (:onyx/ident (find-task (:catalog event) (:task event))))
 
-(defmulti read-batch storage-dispatch)
+(defmulti inject-pipeline-resources ident-dispatch)
 
-(defmulti decompress-batch storage-dispatch)
+(defmulti read-batch type-and-medium-dispatch)
 
-(defmulti requeue-sentinel storage-dispatch)
+(defmulti decompress-batch type-and-medium-dispatch)
 
-(defmulti ack-batch storage-dispatch)
+(defmulti requeue-sentinel type-and-medium-dispatch)
 
-(defmulti apply-fn storage-dispatch)
+(defmulti ack-batch type-and-medium-dispatch)
 
-(defmulti compress-batch storage-dispatch)
+(defmulti apply-fn type-and-medium-dispatch)
 
-(defmulti write-batch storage-dispatch)
+(defmulti compress-batch type-and-medium-dispatch)
 
-(defmulti close-temporal-resources storage-dispatch)
+(defmulti write-batch type-and-medium-dispatch)
 
-(defmulti close-pipeline-resources storage-dispatch)
+(defmulti close-temporal-resources ident-dispatch)
 
-(defmulti seal-resource storage-dispatch)
+(defmulti close-pipeline-resources ident-dispatch)
+
+(defmulti seal-resource type-and-medium-dispatch)
+
+(defmethod inject-pipeline-resources :default
+  [event] {})
+
+(defmethod close-temporal-resources :default
+  [event] {})
+
+(defmethod close-pipeline-resources :default
+  [event] {})
 
