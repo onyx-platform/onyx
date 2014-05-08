@@ -34,8 +34,7 @@
            status-spy (chan 2)
            
            catalog-a [{:onyx/name :in-a
-                       :onyx/direction :input
-                       :onyx/type :queue
+                       :onyx/type :input
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
@@ -43,15 +42,13 @@
                        :onyx/type :transformer
                        :onyx/consumption :sequential}
                       {:onyx/name :out-a
-                       :onyx/direction :output
-                       :onyx/type :queue
+                       :onyx/type :output
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "out-queue"}]
            
            catalog-b [{:onyx/name :in-b
-                       :onyx/direction :input
-                       :onyx/type :queue
+                       :onyx/type :input
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
@@ -59,8 +56,7 @@
                        :onyx/type :transformer
                        :onyx/consumption :sequential}
                       {:onyx/name :out-b
-                       :onyx/direction :output
-                       :onyx/type :queue
+                       :onyx/type :output
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "out-queue"}]

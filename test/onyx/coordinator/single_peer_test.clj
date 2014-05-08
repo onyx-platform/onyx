@@ -67,19 +67,17 @@
  (with-system
    (fn [coordinator sync log]
      (let [catalog [{:onyx/name :in
-                     :onyx/direction :input
-                     :onyx/consumption :sequential
-                     :onyx/type :queue
+                     :onyx/type :input
                      :onyx/medium :hornetq
+                     :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
                      :onyx/type :transformer
                      :onyx/consumption :sequential}
                     {:onyx/name :out
-                     :onyx/direction :output
-                     :onyx/consumption :sequential
-                     :onyx/type :queue
+                     :onyx/type :output
                      :onyx/medium :hornetq
+                     :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}
            offer-ch-spy (chan 1)]
@@ -230,8 +228,7 @@
            completion-ch-spy (chan 1)
                  
            catalog [{:onyx/name :in
-                     :onyx/direction :input
-                     :onyx/type :queue
+                     :onyx/type :input
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
@@ -239,8 +236,7 @@
                      :onyx/type :transformer
                      :onyx/consumption :sequential}
                     {:onyx/name :out
-                     :onyx/direction :output
-                     :onyx/type :queue
+                     :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
@@ -297,18 +293,16 @@
  (with-system
    (fn [coordinator sync log]
      (let [catalog [{:onyx/name :in
-                     :onyx/direction :input
                      :onyx/consumption :sequential
-                     :onyx/type :queue
+                     :onyx/type :input
                      :onyx/medium :hornetq
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
                      :onyx/type :transformer
                      :onyx/consumption :sequential}
                     {:onyx/name :out
-                     :onyx/direction :output
                      :onyx/consumption :sequential
-                     :onyx/type :queue
+                     :onyx/type :output
                      :onyx/medium :hornetq
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}

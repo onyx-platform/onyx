@@ -34,8 +34,7 @@
            status-spy (chan 2)
            
            catalog [{:onyx/name :in
-                     :onyx/direction :input
-                     :onyx/type :queue
+                     :onyx/type :input
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
@@ -43,8 +42,7 @@
                      :onyx/type :transformer
                      :onyx/consumption :sequential}
                     {:onyx/name :out
-                     :onyx/direction :output
-                     :onyx/type :queue
+                     :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
@@ -153,8 +151,7 @@
            ack-ch-spy (chan (* n 5))
 
            catalog [{:onyx/name :in
-                     :onyx/direction :input
-                     :onyx/type :queue
+                     :onyx/type :input
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
@@ -162,8 +159,7 @@
                      :onyx/type :transformer
                      :onyx/consumption :sequential}
                     {:onyx/name :out
-                     :onyx/direction :output
-                     :onyx/type :queue
+                     :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
