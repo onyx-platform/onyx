@@ -32,10 +32,10 @@
 
 (def catalog
   [{:onyx/name :in
-    :onyx/direction :input
-    :onyx/consumption :concurrent
-    :onyx/type :queue
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
     :onyx/medium :hornetq
+    :onyx/consumption :concurrent    
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
@@ -48,10 +48,10 @@
     :onyx/batch-size batch-size}
    
    {:onyx/name :out
-    :onyx/direction :output
-    :onyx/consumption :concurrent
-    :onyx/type :queue
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
     :onyx/medium :hornetq
+    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port

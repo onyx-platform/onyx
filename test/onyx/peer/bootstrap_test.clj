@@ -31,19 +31,15 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(defmethod p-ext/apply-fn
-  {:onyx/type :memory
-   :onyx/direction :input
-   :onyx/medium :onyx-memory-test}
+(defmethod p-ext/apply-fn [:input :onyx-memory-test-plugin]
   [event] {:results [{:n 42}]})
 
 (def catalog
   [{:onyx/name :in-bootstrapped
-    :onyx/bootstrap? true
-    :onyx/direction :input
+    :onyx/type :input
+    :onyx/medium :onyx-memory-test-plugin
     :onyx/consumption :concurrent
-    :onyx/type :memory
-    :onyx/medium :onyx-memory-test
+    :onyx/bootstrap? true
     :onyx/batch-size 2}
 
    {:onyx/name :inc
@@ -53,10 +49,10 @@
     :onyx/batch-size 5}
 
    {:onyx/name :out
-    :onyx/direction :output
-    :onyx/consumption :concurrent
-    :onyx/type :queue
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
     :onyx/medium :hornetq
+    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
