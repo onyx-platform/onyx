@@ -105,18 +105,16 @@
 
 (def catalog
   [{:onyx/name :in
-    :onyx/direction :input
+    :onyx/type :input
     :onyx/consumption :sequential
-    :onyx/type :queue
     :onyx/medium :hornetq
     :hornetq/queue-name "in-queue"}
    {:onyx/name :inc
     :onyx/type :transformer
     :onyx/consumption :sequential}
    {:onyx/name :out
-    :onyx/direction :output
+    :onyx/type :output
     :onyx/consumption :sequential
-    :onyx/type :queue
     :onyx/medium :hornetq
     :hornetq/queue-name "out-queue"}])
 
