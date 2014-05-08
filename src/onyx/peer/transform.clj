@@ -38,7 +38,9 @@
 (defn write-batch [queue session producers msgs]
   (dorun
    (for [p producers msg msgs]
-     (extensions/produce-message queue p session msg)))
+     (if-let [group (:group (meta msg))]
+       (extensions/produce-message queue p session msg group)
+       (extensions/produce-message queue p session msg))))
   {:written? true})
 
 (defn read-batch-shim

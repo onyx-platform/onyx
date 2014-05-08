@@ -27,8 +27,7 @@
         children (map (partial find-task catalog) children-names)]
     (extensions/create-io-task element parent children phase)))
 
-(defmethod create-task :transformer
-  [catalog task-name parent children-names phase]
+(defn onyx-internal-task [catalog task-name parent children-names phase]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
     {:name (:onyx/name element)
@@ -36,6 +35,14 @@
      :egress-queues (egress-queues-to-children children)
      :phase phase
      :consumption (:onyx/consumption element)}))
+
+(defmethod create-task :transformer
+  [catalog task-name parent children-names phase]
+  (onyx-internal-task catalog task-name parent children-names phase))
+
+(defmethod create-task :grouper
+  [catalog task-name parent children-names phase]
+  (onyx-internal-task catalog task-name parent children-names phase))
 
 (defmethod extensions/create-io-task :input
   [element parent children phase]
