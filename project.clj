@@ -19,6 +19,6 @@
                  [clj-http "0.9.1"]
                  [ring "1.2.2" :exclusions [joda-time]]
                  [dire "0.5.1"]]
-  :profiles {:dev {:dependencies [[midje "1.6.2" :exclusions [joda-time]]]
+  :profiles {:dev {:dependencies [[midje "1.6.2"]]
                    :plugins [[lein-midje "3.1.3"]]}})
 
