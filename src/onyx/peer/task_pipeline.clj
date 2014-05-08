@@ -7,6 +7,7 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
+            [onyx.peer.group :as group]
             [onyx.extensions :as extensions]))
 
 (defn create-tx-session [{:keys [queue]}]

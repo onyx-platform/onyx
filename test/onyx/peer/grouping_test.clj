@@ -14,6 +14,9 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
+(defn group-by-name [{:keys [name] :as segment}]
+  name)
+
 (defmethod p-ext/inject-pipeline-resources
   :onyx.peer.grouping-test/sum-balance
   [event]
@@ -25,9 +28,6 @@
   :onyx.peer.grouping-test/sum-balance
   [{:keys [balance]}]
   (prn "The total balance was: " @balance))
-
-(defn group-by-name [{:keys [name] :as segment}]
-  name)
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
