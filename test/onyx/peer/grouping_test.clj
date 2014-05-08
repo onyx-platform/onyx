@@ -30,8 +30,7 @@
   name)
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
-  (prn "State: " state " :: " segment)
-  (swap! state (fn [v] (assoc v name (+ (get v :name 0) amount))))
+  (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
   [])
 
 (def workflow {:in {:group-by-name {:sum-balance :out}}})
@@ -100,14 +99,14 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! hq-config out-queue (inc (count data)) 1))
+#_(def results (hq-util/read! hq-config out-queue (inc (count data)) 1))
 
-(doseq [v-peer v-peers]
-        (try
-          ((:shutdown-fn v-peer))
-          (catch Exception e (prn e))))
+#_(doseq [v-peer v-peers]
+  (try
+    ((:shutdown-fn v-peer))
+    (catch Exception e (prn e))))
 
-(try
+#_(try
   (onyx.api/shutdown conn)
   (catch Exception e (prn e)))
 
