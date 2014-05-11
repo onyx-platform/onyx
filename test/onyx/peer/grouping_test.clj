@@ -89,13 +89,15 @@
    {:name "Mike" :amount 20}
 
    {:name "Dorrene" :amount 30}
-   {:name "Dorrene" :amount 40}])
+   {:name "Dorrene" :amount 40}
+
+   {:name "Benti" :amount 55}])
 
 (hq-util/write-and-cap! hq-config in-queue data 1)
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def v-peers (onyx.api/start-peers conn 7 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
