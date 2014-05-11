@@ -22,16 +22,17 @@
       (.start session)
       (doseq [n (range (count messages))]
         (when (zero? (mod n echo))
-          (info (format "[HQ Util] Wrote %s segments" n)))
+          (info (format "[HQ Util] Wrote %s segments" n))
+          (.commit session))
         (let [message (.createMessage session true)]
           (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
           (.send producer message)))
 
       (let [sentinel (.createMessage session true)]
         (.writeBytes (.getBodyBuffer sentinel) (.array (fressian/write :done)))
-        (.send producer sentinel))
-
-      (.commit session)
+        (.send producer sentinel)
+        (.commit session))
+      
       (.close producer)
       (.close session)
       (.close session-factory)
