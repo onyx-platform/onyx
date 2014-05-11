@@ -2,8 +2,8 @@
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
 (defn type-and-medium-dispatch [event]
-  (let [catalog-task (find-task (:catalog event) (:task event))]
-    [(:onyx/type catalog-task) (:onyx/medium catalog-task)]))
+  (let [t (find-task (:catalog event) (:task event))]
+    [(:onyx/type t) (:onyx/medium t)]))
 
 (defn ident-dispatch [event]
   (:onyx/ident (find-task (:catalog event) (:task event))))

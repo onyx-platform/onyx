@@ -5,9 +5,11 @@
             [taoensso.timbre :as timbre]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.pipeline-internal-extensions :as internal-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
             [onyx.peer.group :as group]
+            [onyx.peer.aggregate :as aggregate]
             [onyx.extensions :as extensions]))
 
 (defn create-tx-session [{:keys [queue]}]
@@ -72,12 +74,15 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (merge event (p-ext/close-temporal-resources event)))
+  (merge event
+         (internal-ext/close-temporal-resources event)
+         (p-ext/close-temporal-resources event)))
 
-(defn munge-close-resources [{:keys [queue session producers consumers] :as event}]
+(defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
-  (doseq [consumer consumers] (extensions/close-resource queue consumer))
-  (extensions/close-resource queue session)
+  (when-not reserve?
+    (doseq [consumer consumers] (extensions/close-resource queue consumer))
+    (extensions/close-resource queue session))
   (assoc event :closed? true))
 
 (defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
@@ -269,7 +274,9 @@
                          :queue queue
                          :sync sync}
           
-          pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources pipeline-data))]
+          pipeline-data (merge pipeline-data
+                               (internal-ext/inject-pipeline-resources pipeline-data)
+                               (p-ext/inject-pipeline-resources pipeline-data))]
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
@@ -521,6 +528,7 @@
     (close! (:seal-dead-ch component))
     (close! (:complete-task-dead-ch component))
 
+    (internal-ext/close-pipeline-resources (:pipeline-data component))
     (p-ext/close-pipeline-resources (:pipeline-data component))
 
     component))

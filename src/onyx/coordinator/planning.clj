@@ -44,6 +44,10 @@
   [catalog task-name parent children-names phase]
   (onyx-internal-task catalog task-name parent children-names phase))
 
+(defmethod create-task :aggregator
+  [catalog task-name parent children-names phase]
+  (onyx-internal-task catalog task-name parent children-names phase))
+
 (defmethod extensions/create-io-task :input
   [element parent children phase]
   {:name (:onyx/name element)

@@ -1,6 +1,5 @@
 (ns onyx.peer.transform
-  (:require [clojure.core.async :refer [chan go alts!! close! >!] :as async]
-            [clojure.data.fressian :as fressian]
+  (:require [clojure.data.fressian :as fressian]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
@@ -33,14 +32,15 @@
     ((reduce #(partial %1 %2) (ns-resolve user-ns user-fn) params) segment)))
 
 (defn compress-segment [segment]
-  (.array (fressian/write segment)))
+  {:compressed (.array (fressian/write segment))
+   :group (:group (meta segment))})
 
 (defn write-batch [queue session producers msgs]
   (dorun
    (for [p producers msg msgs]
-     (if-let [group (:group (meta msg))]
-       (extensions/produce-message queue p session msg group)
-       (extensions/produce-message queue p session msg))))
+     (if-let [group (:group msg)]
+       (extensions/produce-message queue p session (:compressed msg) group)
+       (extensions/produce-message queue p session (:compressed msg)))))
   {:written? true})
 
 (defn read-batch-shim

@@ -8,7 +8,7 @@
 (def md5 (MessageDigest/getInstance "MD5"))
 
 (defn hash-segment [segment]
-  (.digest md5 (.getBytes (pr-str segment) "UTF-8")))
+  (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8"))))
 
 (defn apply-fn-shim [event]
   (let [groups (:results (transform/apply-fn-shim event))]
