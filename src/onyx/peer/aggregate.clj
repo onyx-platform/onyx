@@ -15,7 +15,7 @@
         (let [task (find-task (:catalog event) (:task event))
               consumer (first consumers)
               f #(extensions/consume-message (:queue event) consumer)
-              msgs (doall (take-segments f 1))]
+              msgs (doall (take-segments f (:onyx/batch-size task)))]
           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
         (when (<! halting-ch)
           (recur)))))

@@ -74,9 +74,9 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (merge event
-         (internal-ext/close-temporal-resources event)
-         (p-ext/close-temporal-resources event)))
+  (taoensso.timbre/info "Attempting temporal close")
+  (internal-ext/close-temporal-resources event)
+  (merge event (p-ext/close-temporal-resources event)))
 
 (defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
