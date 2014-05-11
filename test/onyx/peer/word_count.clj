@@ -42,7 +42,7 @@
 (defmethod p-ext/close-pipeline-resources
   :onyx.peer.word-count/count-words
   [{:keys [words->n]}]
-  (clojure.pprint/pprint @words->n))
+  (info @words->n))
 
 (def hornetq-host "localhost")
 
@@ -109,15 +109,13 @@
                 :onyx-id id})
 
 (def data
-  [{:sentence "Hi my name is Mike"}
-   {:sentence "Aww yeah word count works"}
-   {:sentence "Mike is happy"}])
+  (map (fn [x] {:sentence x}) (clojure.string/split (slurp (clojure.java.io/resource "words.txt")) #"\n")))
 
 (hq-util/write-and-cap! hq-config in-queue data 100)
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def v-peers (onyx.api/start-peers conn 5 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
