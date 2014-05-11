@@ -2,7 +2,8 @@
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.api]))
+            [onyx.api]
+            [taoensso.timbre :refer [info]]))
 
 (def hornetq-host "localhost")
 
@@ -27,7 +28,8 @@
 (defmethod p-ext/close-pipeline-resources
   :onyx.peer.grouping-test/sum-balance
   [{:keys [balance]}]
-  (prn "The total balance was: " @balance))
+  (info "Balance was: " @balance)
+  {})
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
@@ -55,8 +57,8 @@
    {:onyx/name :sum-balance
     :onyx/ident :onyx.peer.grouping-test/sum-balance
     :onyx/fn :onyx.peer.grouping-test/sum-balance
-    :onyx/type :transformer
-    :onyx/consumption :sequential
+    :onyx/type :aggregator
+    :onyx/consumption :concurrent
     :onyx/batch-size 1000}
    
    {:onyx/name :out
@@ -84,20 +86,22 @@
                 :onyx-id id})
 
 (def data
-  [{:name "Mike" :amount 10}
-   {:name "Mike" :amount 15}
-   {:name "Mike" :amount 20}
+  (concat
+   (map (fn [_] {:name "Mike" :amount 10}) (range 1500))
+   [{:name "Mike" :amount 10}
+    {:name "Mike" :amount 15}
+    {:name "Mike" :amount 20}
 
-   {:name "Dorrene" :amount 30}
-   {:name "Dorrene" :amount 40}
+    {:name "Dorrene" :amount 30}
+    {:name "Dorrene" :amount 40}
 
-   {:name "Benti" :amount 55}])
+    {:name "Benti" :amount 55}]))
 
 (hq-util/write-and-cap! hq-config in-queue data 1)
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def v-peers (onyx.api/start-peers conn 7 peer-opts))
+(def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 

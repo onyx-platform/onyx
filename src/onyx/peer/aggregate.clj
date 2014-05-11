@@ -42,11 +42,15 @@
 (defmethod p-ext/read-batch [:aggregator nil]
   [event]
   (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
-    {:session session :batch msgs :onyx.aggregate/halting-ch halting-ch}))
+    {:session session
+     :batch msgs
+     :onyx.aggregate/halting-ch halting-ch
+     :onyx.pipeline/session-origin (:session event)}))
 
 (defmethod internal-ext/close-temporal-resources :aggregator
   [event]
   (>!! (:onyx.aggregate/halting-ch event) true)
+  (extensions/close-resource (:queue event) (:onyx.pipeline/session-origin event))
   {})
 
 (defmethod internal-ext/close-pipeline-resources :aggregator

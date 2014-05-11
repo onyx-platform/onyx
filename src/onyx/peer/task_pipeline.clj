@@ -80,8 +80,8 @@
 
 (defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
+  (doseq [consumer consumers] (extensions/close-resource queue consumer))
   (when-not reserve?
-    (doseq [consumer consumers] (extensions/close-resource queue consumer))
     (extensions/close-resource queue session))
   (assoc event :closed? true))
 
