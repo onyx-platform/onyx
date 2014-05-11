@@ -1,9 +1,48 @@
-(ns onyx.peer.grouping-test
+(ns onyx.peer.word-count
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.api]
             [taoensso.timbre :refer [info]]))
+
+(def workflow {:in {:split-sentence {:group-by-word {:count-words :out}}}})
+
+;;; Fn implementations
+
+(defn split-sentence [sentence]
+  (filter (partial not= "") (clojure.string/split sentence #"\s")))
+
+(defn group-by-word [word]
+  word)
+
+(defn count-words [accretion word]
+  (assoc accretion word (inc (get accretion word 0))))
+
+;;; Fn interfaces
+
+(defn split-sentence-interface [{:keys [sentence]}]
+  (map (fn [x] {:word x}) (split-sentence sentence)))
+
+(defn group-by-word-interface [{:keys [word] :as segment}]
+  (group-by-word word))
+
+(defn count-words-interface [state {:keys [word]}]
+  (swap! state count-words word)
+  [])
+
+;;; Pipeline argument injection
+
+(defmethod p-ext/inject-pipeline-resources
+  :onyx.peer.word-count/count-words
+  [event]
+  (let [words->n (atom {})]
+    {:params [words->n]
+     :words->n words->n}))
+
+(defmethod p-ext/close-pipeline-resources
+  :onyx.peer.word-count/count-words
+  [{:keys [words->n]}]
+  (clojure.pprint/pprint @words->n))
 
 (def hornetq-host "localhost")
 
@@ -14,28 +53,6 @@
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
-
-(defn group-by-name [{:keys [name] :as segment}]
-  name)
-
-(defmethod p-ext/inject-pipeline-resources
-  :onyx.peer.grouping-test/sum-balance
-  [event]
-  (let [balance (atom {})]
-    {:params [balance]
-     :balance balance}))
-
-(defmethod p-ext/close-pipeline-resources
-  :onyx.peer.grouping-test/sum-balance
-  [{:keys [balance]}]
-  (info "Balance was: " @balance)
-  {})
-
-(defn sum-balance [state {:keys [name amount] :as segment}]
-  (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
-  [])
-
-(def workflow {:in {:group-by-name {:sum-balance :out}}})
 
 (def catalog
   [{:onyx/name :in
@@ -48,15 +65,21 @@
     :hornetq/port hornetq-port
     :hornetq/batch-size 1000}
 
-   {:onyx/name :group-by-name
-    :onyx/fn :onyx.peer.grouping-test/group-by-name
+   {:onyx/name :split-sentence
+    :onyx/fn :onyx.peer.word-count/split-sentence-interface
+    :onyx/type :transformer
+    :onyx/consumption :concurrent
+    :onyx/batch-size 1000}
+
+   {:onyx/name :group-by-word
+    :onyx/fn :onyx.peer.word-count/group-by-word-interface
     :onyx/type :grouper
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}
 
-   {:onyx/name :sum-balance
-    :onyx/ident :onyx.peer.grouping-test/sum-balance
-    :onyx/fn :onyx.peer.grouping-test/sum-balance
+   {:onyx/name :count-words
+    :onyx/ident :onyx.peer.word-count/count-words
+    :onyx/fn :onyx.peer.word-count/count-words-interface
     :onyx/type :aggregator
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}
@@ -86,16 +109,9 @@
                 :onyx-id id})
 
 (def data
-  (concat
-   (map (fn [_] {:name "Mike" :amount 10}) (range 1500))
-   [{:name "Mike" :amount 10}
-    {:name "Mike" :amount 15}
-    {:name "Mike" :amount 20}
-
-    {:name "Dorrene" :amount 30}
-    {:name "Dorrene" :amount 40}
-
-    {:name "Benti" :amount 55}]))
+  [{:sentence "Hi my name is Mike"}
+   {:sentence "Aww yeah word count works"}
+   {:sentence "Mike is happy"}])
 
 (hq-util/write-and-cap! hq-config in-queue data 100)
 
@@ -115,5 +131,4 @@
 #_(try
   (onyx.api/shutdown conn)
   (catch Exception e (prn e)))
-
 
