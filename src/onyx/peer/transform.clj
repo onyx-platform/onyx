@@ -44,40 +44,40 @@
   {:written? true})
 
 (defn read-batch-shim
-  [{:keys [queue session ingress-queues catalog task]}]
+  [{:keys [queue session ingress-queues catalog task] :as event}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch queue consumers catalog task)]
-    {:batch batch :consumers consumers}))
+    (merge event {:batch batch :consumers consumers})))
 
-(defn decompress-batch-shim [{:keys [queue batch]}]
+(defn decompress-batch-shim [{:keys [queue batch] :as event}]
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
-    {:decompressed decompressed-msgs}))
+    (merge event {:decompressed decompressed-msgs})))
 
-(defn requeue-sentinel-shim [{:keys [queue ingress-queues]}]
+(defn requeue-sentinel-shim [{:keys [queue ingress-queues] :as event}]
   (cap-queue queue ingress-queues)
-  {:requeued? true})
+  (merge event {:requeued? true}))
 
-(defn acknowledge-batch-shim [{:keys [queue batch]}]
+(defn acknowledge-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
-  {:acked (count batch)})
+  (merge event {:acked (count batch)}))
 
-(defn apply-fn-shim [{:keys [decompressed task catalog params]}]
+(defn apply-fn-shim [{:keys [decompressed task catalog params] :as event}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (flatten (map (partial apply-fn task params) decompressed))]
-    {:results results}))
+    (merge event {:results results})))
 
-(defn compress-batch-shim [{:keys [results]}]
+(defn compress-batch-shim [{:keys [results] :as event}]
   (let [compressed-msgs (map compress-segment results)]
-    {:compressed compressed-msgs}))
+    (merge event {:compressed compressed-msgs})))
 
-(defn write-batch-shim [{:keys [queue egress-queues session compressed]}]
+(defn write-batch-shim [{:keys [queue egress-queues session compressed] :as event}]
   (let [producers (map (partial extensions/create-producer queue session) egress-queues)
         batch (write-batch queue session producers compressed)]
-    {:producers producers}))
+    (merge event {:producers producers})))
 
-(defn seal-resource-shim [{:keys [queue egress-queues]}]
-  (cap-queue queue egress-queues))
+(defn seal-resource-shim [{:keys [queue egress-queues] :as event}]
+  (merge event (cap-queue queue egress-queues)))
 
 (defmethod p-ext/read-batch :default
   [event] (read-batch-shim event))
@@ -104,34 +104,34 @@
   [event] (seal-resource-shim event))
 
 (with-post-hook! #'read-batch-shim
-  (fn [{:keys [batch consumers]}]
-    (info "[Transformer] Read batch of" (count batch) "segments")))
+  (fn [{:keys [id batch consumers]}]
+    (info (format "[%s] Read batch of %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [decompressed]}]
-    (info "[Transformer] Decompressed" (count decompressed) "segments")))
+  (fn [{:keys [id decompressed]}]
+    (info (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys []}]
-    (info "[Transformer] Requeued sentinel value")))
+  (fn [{:keys [id]}]
+    (info (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'acknowledge-batch-shim
-  (fn [{:keys [acked]}]
-    (info "[Transformer] Acked" acked "segments")))
+  (fn [{:keys [id acked]}]
+    (info (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-shim
-  (fn [{:keys [results]}]
-    (info "[Transformer] Applied fn to" (count results) "segments")))
+  (fn [{:keys [id results]}]
+    (info (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
-  (fn [{:keys [compressed]}]
-    (info "[Transformer] Compressed" (count compressed) "segments")))
+  (fn [{:keys [id compressed]}]
+    (info (format "[%s] Compressed %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
-  (fn [{:keys [producers]}]
-    (info "[Transformer] Wrote batch to" (count producers) "outputs")))
+  (fn [{:keys [id producers]}]
+    (info (format "[%s] Wrote batch to %s outputs" id (count producers)))))
 
 (with-post-hook! #'seal-resource-shim
-  (fn [{:keys []}]
-    (info "[Transformer] Sealing resource")))
+  (fn [{:keys [id]}]
+    (info (format "[%s] Sealing resource" id))))
 
