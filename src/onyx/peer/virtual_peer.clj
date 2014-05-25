@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
 
-(defn payload-loop [sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params]
+(defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params]
   (let [complete-ch (chan 1)]
     (loop [pipeline nil]
       (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
@@ -24,7 +24,7 @@
 
                 (<!! status-ch)
 
-                (let [new-pipeline (task-pipeline payload sync queue payload-ch complete-ch fn-params)]
+                (let [new-pipeline (task-pipeline id payload sync queue payload-ch complete-ch fn-params)]
                   (recur (component/start new-pipeline)))))))
     (>!! dead-ch true)))
 
@@ -32,40 +32,43 @@
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (taoensso.timbre/info "Starting Virtual Peer")
+    (let [id (java.util.UUID/randomUUID)]
+      (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
-    (let [peer (extensions/create sync :peer)
-          payload (extensions/create sync :payload)
-          pulse (extensions/create sync :pulse)
-          shutdown (extensions/create sync :shutdown)
+      (let [peer (extensions/create sync :peer)
+            payload (extensions/create sync :payload)
+            pulse (extensions/create sync :pulse)
+            shutdown (extensions/create sync :shutdown)
 
-          payload-ch (chan 1)
-          shutdown-ch (chan 1)
-          status-ch (chan 1)
-          dead-ch (chan)]
-      
-      (extensions/write-place sync peer {:pulse pulse :shutdown shutdown :payload payload})
-      (extensions/on-change sync payload #(>!! payload-ch %))
-
-      (dire/with-handler! #'payload-loop
-        java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
-
-      (assoc component
-        :peer-node peer
-        :payload-node payload
-        :pulse-node pulse
-        :shutdown-node shutdown
+            payload-ch (chan 1)
+            shutdown-ch (chan 1)
+            status-ch (chan 1)
+            dead-ch (chan)]
         
-        :payload-ch payload-ch
-        :shutdown-ch shutdown-ch
-        :status-ch status-ch
-        :dead-ch dead-ch
+        (extensions/write-place sync peer {:pulse pulse :shutdown shutdown :payload payload})
+        (extensions/on-change sync payload #(>!! payload-ch %))
 
-        :payload-thread (future (payload-loop sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params)))))
+        (dire/with-handler! #'payload-loop
+          java.lang.Exception
+          (fn [e & _] (.printStackTrace e)))
+
+        (assoc component
+          :id id
+          
+          :peer-node peer
+          :payload-node payload
+          :pulse-node pulse
+          :shutdown-node shutdown
+          
+          :payload-ch payload-ch
+          :shutdown-ch shutdown-ch
+          :status-ch status-ch
+          :dead-ch dead-ch
+
+          :payload-thread (future (payload-loop id sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params))))))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Virtual Peer")
+    (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
