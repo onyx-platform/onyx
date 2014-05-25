@@ -26,18 +26,18 @@
     (component/stop-system this peer-components)))
 
 (defn onyx-coordinator
-  [{:keys [datomic-uri hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
+  [{:keys [log-file datomic-uri hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
   (map->OnyxCoordinator
-   {:logging-config (logging-config/logging-configuration)
+   {:logging-config (logging-config/logging-configuration log-file)
     :log (component/using (datomic datomic-uri (log-schema)) [:logging-config])
     :sync (component/using (zookeeper zk-addr onyx-id) [:log])
     :queue (component/using (hornetq hornetq-host hornetq-port) [:log])
     :coordinator (component/using (coordinator revoke-delay) [:log :sync :queue])}))
 
 (defn onyx-peer
-  [{:keys [hornetq-host hornetq-port zk-addr onyx-id fn-params]}]
+  [{:keys [log-file hornetq-host hornetq-port zk-addr onyx-id fn-params]}]
   (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration)
+   {:logging-config (logging-config/logging-configuration log-file)
     :sync (component/using (zookeeper zk-addr onyx-id) [:logging-config])
     :queue (component/using (hornetq hornetq-host hornetq-port) [:sync])
     :peer (component/using (virtual-peer fn-params) [:sync :queue])}))
