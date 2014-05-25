@@ -6,14 +6,13 @@
   component/Lifecycle
 
   (start [component]
+    (timbre/set-config! [:appenders :standard-out :enabled?] false)
+    (timbre/set-config! [:appenders :spit :enabled?] true)
+    (timbre/set-config! [:shared-appender-config :spit-filename] "onyx.log")
+
     (info "Starting Logging Configuration")
 
-    (timbre/set-config!
-     [:appenders :standard-out]
-     {:min-level nil :enabled? true :async? false :rate-limit nil
-      :fn (fn [{:keys [timestamp error? output message]}]
-            (binding [*out* (if error? *err* *out*)]
-              (timbre/str-println timestamp message)))}))
+    component)
 
   (stop [component]
     (info "Stopping Logging Configuration")

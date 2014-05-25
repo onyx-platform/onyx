@@ -29,8 +29,6 @@
                 :onyx-id id})
 
 (defn run-job [in-queue out-queue n-messages batch-size echo]
-  (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
-
   (let [catalog
         [{:onyx/name :in
           :onyx/ident :hornetq/read-segments
@@ -59,6 +57,7 @@
           :onyx/batch-size batch-size}]
         conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts)
         v-peers (onyx.api/start-peers conn 1 peer-opts)]
+    (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
     (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
     (let [results (hq-util/read! hq-config out-queue (inc n-messages) echo)]
       (doseq [v-peer v-peers]
