@@ -177,13 +177,12 @@
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
-      (info (format "%s failed" (:ch failure)))
-;;      (.printStackTrace (:e failure))
+      (info (:e failure) (:ch failure))
       (recur))))
 
-(defn print-if-not-thread-death [e & _]
+(defn log-if-not-interrupted [e & _]
   (if-not (instance? java.lang.InterruptedException e)
-    (.printStackTrace e)))
+    (info e)))
 
 (defrecord Coordinator []
   component/Lifecycle
@@ -301,37 +300,37 @@
           false))
 
       (dire/with-handler! #'born-peer-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'dead-peer-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'planning-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'ack-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'evict-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'offer-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'offer-revoke-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'exhaust-queue-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'seal-resource-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'completion-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (dire/with-handler! #'shutdown-ch-loop
-        java.lang.Exception print-if-not-thread-death)
+        java.lang.Exception log-if-not-interrupted)
 
       (assoc component
         :planning-ch-head planning-ch-head

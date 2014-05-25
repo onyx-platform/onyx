@@ -3,6 +3,7 @@
             [clojure.core.async :refer [>!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
+            [taoensso.timbre :refer [info]]
             [onyx.system :as system]))
 
 (defprotocol ISubmit
@@ -59,7 +60,8 @@
     (fn [_]
       (let [v-peer (component/start (system/onyx-peer config))]
         (let [rets {:runner (future (try @(:payload-thread (:peer v-peer))
-                                         (catch Exception e (.printStackTrace e))))
+                                         (catch Exception e
+                                           (info e))))
                     :shutdown-fn (fn [] (component/stop v-peer))}]
           (register-peer coord (:peer-node (:peer v-peer)))
           rets)))

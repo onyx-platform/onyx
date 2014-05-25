@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
-            [taoensso.timbre :as timbre]
+            [taoensso.timbre :refer [info] :as timbre]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.pipeline-internal-extensions :as internal-ext]
@@ -280,67 +280,67 @@
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'read-batch-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'decompress-batch-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'strip-sentinel-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'requeue-sentinel-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'apply-fn-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'compress-batch-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'write-batch-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'status-check-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'ack-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'close-resources-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
       
       (dire/with-handler! #'close-temporal-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'reset-payload-node-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'seal-resource-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'complete-task-loop
         java.lang.Exception
-        (fn [e & _] (.printStackTrace e)))
+        (fn [e & _] (info e)))
 
       (dire/with-finally! #'open-session-loop
         (fn [& args]

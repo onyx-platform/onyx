@@ -1,6 +1,7 @@
 (ns onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
+            [taoensso.timbre :as timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
             [onyx.peer.task-pipeline :refer [task-pipeline]]))
@@ -50,7 +51,7 @@
 
         (dire/with-handler! #'payload-loop
           java.lang.Exception
-          (fn [e & _] (.printStackTrace e)))
+          (fn [e & _] (timbre/info e)))
 
         (assoc component
           :id id
