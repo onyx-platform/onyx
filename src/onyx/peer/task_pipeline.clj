@@ -74,7 +74,6 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (taoensso.timbre/info "Attempting temporal close")
   (internal-ext/close-temporal-resources event)
   (merge event (p-ext/close-temporal-resources event)))
 
