@@ -44,6 +44,8 @@
   [{:keys [words->n]}]
   (info @words->n))
 
+;;; Execution
+
 (def hornetq-host "localhost")
 
 (def hornetq-port 5445)
