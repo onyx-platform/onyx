@@ -115,7 +115,7 @@
                (conj rets segment)
                (recur f n (conj rets segment)))))))))
 
-;;;;;;;;;;;;;;;;;;;;; To be split out into a library ;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;; To be split out into a plugin ;;;;;;;;;;;;;;;;;;;;;
 
 (defn read-batch [session-factory catalog task]
   (let [session (.createTransactedSession session-factory)
@@ -150,10 +150,10 @@
 
 (defn read-batch-shim [{:keys [catalog task] :as event}]
   (let [task-map (planning/find-task catalog task)]
-    (read-batch (:hornetq/session-factory event) catalog task-map)))
+    (merge event (read-batch (:hornetq/session-factory event) catalog task-map))))
 
-(defn decompress-batch-shim [{:keys [batch]}]
-  {:decompressed (map decompress-segment batch)})
+(defn decompress-batch-shim [{:keys [batch] :as event}]
+  (merge event {:decompressed (map decompress-segment batch)}))
 
 (defn requeue-sentinel-shim [{:keys [task catalog] :as event}]
   (let [task (planning/find-task catalog task)
@@ -166,25 +166,25 @@
         (.close producer))
       (.commit session)
       (.close session))
-    {:requeued? true}))
+    (merge event {:requeued? true})))
 
 (defn ack-batch-shim [{:keys [queue batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
-  {:acked (count batch)})
+  (merge event {:acked (count batch)}))
 
 (defn apply-fn-in-shim [event]
-  {:results (:decompressed event)})
+  (merge event {:results (:decompressed event)}))
 
 (defn apply-fn-out-shim [event]
-  {:results (:decompressed event)})
+  (merge event {:results (:decompressed event)}))
 
-(defn compress-batch-shim [{:keys [results]}]
-  {:compressed (map compress-segment results)})
+(defn compress-batch-shim [{:keys [results] :as event}]
+  (merge event {:compressed (map compress-segment results)}))
 
 (defn write-batch-shim [{:keys [catalog task compressed] :as event}]
   (let [task-map (planning/find-task catalog task)]
-    (write-batch (:hornetq/session-factory event) task-map compressed)))
+    (merge event (write-batch (:hornetq/session-factory event) task-map compressed))))
 
 (defn seal-resource-shim [{:keys [catalog task] :as event}]
   (let [task (planning/find-task catalog task)
@@ -206,21 +206,22 @@
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)]
-    {:hornetq/locator locator
-     :hornetq/session-factory session-factory}))
+    (merge pipeline-data
+           {:hornetq/locator locator
+            :hornetq/session-factory session-factory})))
 
 (defmethod p-ext/close-temporal-resources :hornetq/read-segments
   [pipeline-data]
   (.commit (:hornetq/session pipeline-data))
   (.close (:hornetq/consumer pipeline-data))
   (.close (:hornetq/session pipeline-data))
-  {})
+  pipeline-data)
 
 (defmethod p-ext/close-pipeline-resources :hornetq/read-segments
   [pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
-  {})
+  pipeline-data)
 
 (defmethod p-ext/read-batch [:input :hornetq]
   [event] (read-batch-shim event))
@@ -278,36 +279,36 @@
   {})
 
 (with-post-hook! #'read-batch-shim
-  (fn [{:keys [batch]}]
-    (info "[HornetQ ingress] Read" (count batch) "segments")))
+  (fn [{:keys [id batch]}]
+    (info (format "[%s] Read %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [decompressed]}]
-    (info "[HornetQ ingress] Decompressed" (count decompressed) "segments")))
+  (fn [{:keys [id decompressed]}]
+    (info (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys []}]
-    (info "[HornetQ ingress] Requeued sentinel value")))
+  (fn [{:keys [id]}]
+    (info (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'apply-fn-in-shim
-  (fn [{:keys [results]}]
-    (info "[HornetQ ingress] Applied fn to" (count results) "segments")))
+  (fn [{:keys [id results]}]
+    (info (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'ack-batch-shim
-  (fn [{:keys [acked]}]
-    (info "[HornetQ] Acked" acked "segments")))
+  (fn [{:keys [id acked]}]
+    (info (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-out-shim
-  (fn [{:keys [results]}]
-    (info "[HornetQ egress] Applied fn to" (count results) "segments")))
+  (fn [{:keys [id results]}]
+    (info (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
-  (fn [{:keys [compressed]}]
-    (info "[HornetQ egress] Compressed batch of" (count compressed) "segments")))
+  (fn [{:keys [id compressed]}]
+    (info (format "[%s] Compressed batch of %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
-  (fn [{:keys [written?]}]
-    (info "[HornetQ egress] Wrote batch with value" written?)))
+  (fn [{:keys [id written?]}]
+    (info (format "[%s] Wrote batch with value" id written?))))
 
-;;;;;;;;;;;;;;;;;;; End library ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;; End plugin ;;;;;;;;;;;;;;;;;;;;;;;;
 

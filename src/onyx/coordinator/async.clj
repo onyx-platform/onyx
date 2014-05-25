@@ -177,7 +177,7 @@
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
-      (info (format "[Coordinator] %s failed" (:ch failure)))
+      (info (format "%s failed" (:ch failure)))
 ;;      (.printStackTrace (:e failure))
       (recur))))
 
