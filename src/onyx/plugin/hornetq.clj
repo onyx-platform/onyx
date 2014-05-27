@@ -16,7 +16,7 @@
         consumer (.createConsumer session queue)]
     (.start session)
     (let [f #(.receive consumer)
-          rets (doall (take-segments f (:hornetq/batch-size task)))]
+          rets (doall (take-segments f (:onyx/batch-size task)))]
       {:batch (or rets [])
        :hornetq/session session
        :hornetq/consumer consumer})))

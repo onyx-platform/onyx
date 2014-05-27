@@ -65,7 +65,7 @@
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size 1000}
+    :onyx/batch-size 1000}
 
    {:onyx/name :split-sentence
     :onyx/fn :onyx.peer.word-count/split-sentence-interface

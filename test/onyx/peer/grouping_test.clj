@@ -46,7 +46,7 @@
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size 1000}
+    :onyx/batch-size 1000}
 
    {:onyx/name :group-by-name
     :onyx/fn :onyx.peer.grouping-test/group-by-name

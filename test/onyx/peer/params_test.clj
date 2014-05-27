@@ -50,7 +50,7 @@
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size batch-size}
+    :onyx/batch-size batch-size}
 
    {:onyx/name :add
     :onyx/fn :onyx.peer.params-test/my-adder

@@ -33,7 +33,7 @@
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size batch-size}
+    :onyx/batch-size batch-size}
    
    {:onyx/name :inc
     :onyx/fn :onyx.peer.multi-peer-mem-test/my-inc

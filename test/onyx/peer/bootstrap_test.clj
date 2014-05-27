@@ -56,7 +56,7 @@
     :hornetq/queue-name out-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
-    :hornetq/batch-size 5}])
+    :onyx/batch-size 5}])
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
