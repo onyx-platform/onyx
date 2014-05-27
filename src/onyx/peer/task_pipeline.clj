@@ -10,7 +10,8 @@
             [onyx.peer.transform :as transform]
             [onyx.peer.group :as group]
             [onyx.peer.aggregate :as aggregate]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.plugin.hornetq]))
 
 (defn create-tx-session [{:keys [queue]}]
   (extensions/create-tx-session queue))
