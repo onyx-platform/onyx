@@ -7,14 +7,22 @@
             [onyx.system :as system]))
 
 (defprotocol ISubmit
+  "Protocol for sending a job to the coordinator for execution."
   (submit-job [this job]))
 
 (defprotocol IRegister
+  "Protocol for registering a virtual peer with the coordinator.
+   Registering allows the virtual peer to accept tasks."
   (register-peer [this peer-node]))
 
 (defprotocol IShutdown
+  "Protocol for stopping a virtual peer's task and no longer allowing
+   it to accept new tasks. Releases all resources that were previously
+   acquired."
   (shutdown [this]))
 
+;; A coordinator that runs strictly in memory. Peers communicate with
+;; the coordinator by directly accessing its channels.
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
@@ -27,6 +35,8 @@
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
+;; A coordinator that can run remotely. Peers commuicate with the
+;; coordinator by submitting HTTP requests and parsing the responses.
 (deftype HttpCoordinator [uri]
   ISubmit
   (submit-job [this job]
@@ -42,6 +52,7 @@
   (shutdown [this]))
 
 (defmulti connect
+  "A polymorphic function to connect with the coordinator."
   (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
 
 (defmethod connect :memory
@@ -53,7 +64,10 @@
   [uri opts]
   (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
 
-(defn start-peers 
+(defn start-peers
+  "Launches a number of virtual peers. Starts n
+   (the number of peers to launch) threads, one for each virtual peer.
+   Takes a coordinator type to connect to and a virtual peer configuration."
   [coord n config]
   (doall
    (map
