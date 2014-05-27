@@ -74,8 +74,8 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (internal-ext/close-temporal-resources event)
-  (merge event (p-ext/close-temporal-resources event)))
+  (merge event (internal-ext/close-temporal-resources
+                (merge event (p-ext/close-temporal-resources event)))))
 
 (defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -528,8 +528,11 @@
     (close! (:seal-dead-ch component))
     (close! (:complete-task-dead-ch component))
 
-    (internal-ext/close-pipeline-resources (:pipeline-data component))
-    (p-ext/close-pipeline-resources (:pipeline-data component))
+    (dorun
+     (merge (:pipeline-data component)
+            (p-ext/close-pipeline-resources
+             (merge (:pipeline-data component)
+                    (internal-ext/close-pipeline-resources (:pipeline-data component))))))
 
     component))
 
