@@ -99,8 +99,8 @@
     (let [path (:path (<!! seal-response-ch))
           seal? (extensions/read-place sync path)]
       (if seal?
-        (merge event (p-ext/seal-resource event))
-        event))))
+        (merge event (p-ext/seal-resource event) {:sealed? true})
+        (merge event {:sealed? false})))))
 
 (defn munge-complete-task
   [{:keys [sync completion-node completion?] :as event}]
@@ -595,6 +595,6 @@
     (taoensso.timbre/info (format "[%s] Closed temporal plugin resources" id))))
 
 (dire/with-post-hook! #'munge-seal-resource
-  (fn [{:keys [id]}]
-    (taoensso.timbre/info (format "[%s] Sealing resource" id))))
+  (fn [{:keys [id task sealed?]}]
+    (taoensso.timbre/info (format "[%s] Sealing resource for %s? %s" id task sealed?))))
 

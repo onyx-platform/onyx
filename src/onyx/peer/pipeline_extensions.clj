@@ -68,8 +68,8 @@
 
 (defmulti seal-resource
   "Closes any resources that remain open during a task being executed.
-   Called once at the end of a task for each virtual peer after the outgoing
-   queue for this task has been capped by the coordinator."
+   Called once at the end of a task for each virtual peer after the incoming
+   queue has been exhausted. Only called once globally for a single task."
   type-and-medium-dispatch)
 
 (defmethod inject-pipeline-resources :default
