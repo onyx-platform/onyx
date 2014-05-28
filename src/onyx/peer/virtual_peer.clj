@@ -26,7 +26,8 @@
                 (<!! status-ch)
 
                 (let [new-pipeline (task-pipeline id payload sync queue payload-ch complete-ch fn-params)]
-                  (recur (component/start new-pipeline)))))))
+                  (recur (component/start new-pipeline))))
+              :else (recur nil))))
     (>!! dead-ch true)))
 
 (defrecord VirtualPeer [fn-params]
