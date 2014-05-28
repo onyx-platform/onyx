@@ -1,4 +1,4 @@
-(ns onyx.coordinator.distributed
+(ns ^:no-doc onyx.coordinator.distributed
   (:require [clojure.core.async :refer [>!! <!! chan]]
             [com.stuartsierra.component :as component]          
             [taoensso.timbre :as timbre]

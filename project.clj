@@ -20,5 +20,6 @@
                  [ring "1.2.2" :exclusions [joda-time]]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.2"]]
-                   :plugins [[lein-midje "3.1.3"]]}})
+                   :plugins [[lein-midje "3.1.3"]
+                             [codox "0.8.8"]]}})
 

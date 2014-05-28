@@ -1,4 +1,4 @@
-(ns onyx.queue.hornetq
+(ns ^:no-doc onyx.queue.hornetq
   (:require [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
             [onyx.peer.pipeline-extensions :as p-ext]

@@ -1,4 +1,4 @@
-(ns onyx.peer.aggregate
+(ns ^:no-doc onyx.peer.aggregate
   (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.pipeline-internal-extensions :as internal-ext]

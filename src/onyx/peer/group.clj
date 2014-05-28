@@ -1,4 +1,4 @@
-(ns onyx.peer.group
+(ns ^:no-doc onyx.peer.group
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.transform :as transform]
             [taoensso.timbre :refer [info]]

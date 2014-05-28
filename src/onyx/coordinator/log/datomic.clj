@@ -1,4 +1,4 @@
-(ns onyx.coordinator.log.datomic
+(ns ^:no-doc onyx.coordinator.log.datomic
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre]
             [onyx.extensions :as extensions]

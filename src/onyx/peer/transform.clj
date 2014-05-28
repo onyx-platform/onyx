@@ -1,4 +1,4 @@
-(ns onyx.peer.transform
+(ns ^:no-doc onyx.peer.transform
   (:require [clojure.data.fressian :as fressian]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.coordinator.planning :refer [find-task]]

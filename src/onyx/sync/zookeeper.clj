@@ -1,4 +1,4 @@
-(ns onyx.sync.zookeeper
+(ns ^:no-doc onyx.sync.zookeeper
   (:require [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
             [taoensso.timbre]

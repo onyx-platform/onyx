@@ -1,4 +1,6 @@
-(ns onyx.extensions)
+(ns onyx.extensions
+  "Extension interfaces for internally used queues, logs,
+   and distributed coordinators.")
 
 (defmulti mark-peer-born (fn [log place] (type log)))
 

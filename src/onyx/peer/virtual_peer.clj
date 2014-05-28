@@ -1,4 +1,4 @@
-(ns onyx.peer.virtual-peer
+(ns ^:no-doc onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :as timbre]

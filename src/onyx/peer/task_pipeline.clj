@@ -1,4 +1,4 @@
-(ns onyx.peer.task-pipeline
+(ns ^:no-doc onyx.peer.task-pipeline
   (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]

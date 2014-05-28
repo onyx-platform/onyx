@@ -1,4 +1,4 @@
-(ns onyx.logging-configuration
+(ns ^:no-doc onyx.logging-configuration
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info] :as timbre]))
 
