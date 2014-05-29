@@ -598,3 +598,7 @@
   (fn [{:keys [id task sealed?]}]
     (taoensso.timbre/info (format "[%s] Sealing resource for %s? %s" id task sealed?))))
 
+(dire/with-post-hook! #'munge-complete-task
+  (fn [{:keys [id]}]
+    (taoensso.timbre/info (format "[%s] Completing task" id))))
+

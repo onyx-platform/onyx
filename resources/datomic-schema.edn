@@ -95,11 +95,24 @@
                                            {:peer-entity peer-entity :ack ack-place}))))}}
 
  {:db/id #db/id [:db.part/user]
+  :db/ident :onyx.fn/seal-peer
+  :db/fn #db/fn {:lang "clojure"
+                 :params [db exhaust-place]
+                 :code (let [query '[:find ?peer :in $ ?exhaust-node :where
+                                     [?peer :peer/status :active]
+                                     [?peer :peer/task ?task]
+                                     [?peer :node/exhaust ?exhaust-node]
+                                     [?task :task/complete? false]]
+                             result (d/q query db exhaust-place)]
+                         [{:db/id (ffirst result)
+                           :peer/status :sealing}])}}
+
+ {:db/id #db/id [:db.part/user]
   :db/ident :onyx.fn/complete-task
   :db/fn #db/fn {:lang "clojure"
                  :params [db complete-place]
                  :code (let [query '[:find ?peer ?task :in $ ?complete-node :where
-                                     [?peer :peer/status :active]
+                                     [?peer :peer/status :sealing]
                                      [?peer :peer/task ?task]
                                      [?peer :node/completion ?complete-node]
                                      [?task :task/complete? false]]
@@ -115,10 +128,14 @@
                              peer (ffirst result)
                              task (second (first result))
                              [payload ack exhaust seal status completion] (first (q node-query db peer))
-                             peer-query '[:find (count ?peer) :in $ ?task :where
-                                          [?peer :peer/task ?task]
-                                          [?peer :peer/status :active]]
-                             n-peers (ffirst (q peer-query db task))]
+                             active-peer-query '[:find (count ?peer) :in $ ?task :where
+                                                 [?peer :peer/task ?task]
+                                                 [?peer :peer/status :active]]
+                             sealing-peer-query '[:find (count ?peer) :in $ ?task :where
+                                                  [?peer :peer/task ?task]
+                                                  [?peer :peer/status :sealing]]
+                             n-peers (+ (or (ffirst (q active-peer-query db task)) 0)
+                                        (or (ffirst (q sealing-peer-query db task)) 0))]
                          (if (and peer task)
                            (if (= n-peers 1)
                              [{:db/id task

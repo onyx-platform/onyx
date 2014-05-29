@@ -14,22 +14,19 @@
 
 (def workflow {:in {:inc :out}})
 
-(def id (str (java.util.UUID/randomUUID)))
-
-(def coord-opts {:datomic-uri (str "datomic:mem://" id)
-                 :hornetq-host hornetq-host
-                 :hornetq-port hornetq-port
-                 :zk-addr "127.0.0.1:2181"
-                 :onyx-id id
-                 :revoke-delay 5000})
-
-(def peer-opts {:hornetq-host hornetq-host
-                :hornetq-port hornetq-port
-                :zk-addr "127.0.0.1:2181"
-                :onyx-id id})
-
 (defn run-job [in-queue out-queue n-messages batch-size echo]
-  (let [catalog
+  (let [id (str (java.util.UUID/randomUUID))
+        coord-opts {:datomic-uri (str "datomic:mem://" id)
+                    :hornetq-host hornetq-host
+                    :hornetq-port hornetq-port
+                    :zk-addr "127.0.0.1:2181"
+                    :onyx-id id
+                    :revoke-delay 5000}
+        peer-opts {:hornetq-host hornetq-host
+                   :hornetq-port hornetq-port
+                   :zk-addr "127.0.0.1:2181"
+                   :onyx-id id}
+        catalog
         [{:onyx/name :in
           :onyx/ident :hornetq/read-segments
           :onyx/type :input

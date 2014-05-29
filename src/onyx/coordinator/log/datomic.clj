@@ -177,10 +177,14 @@
       :db/id result)))
 
 (defn n-peers [db task-id]
-  (let [query '[:find (count ?peer) :in $ ?task :where
-                [?peer :peer/task ?task]
-                [?peer :peer/status :active]]]
-    (ffirst (d/q query db task-id))))
+  (let [active-query '[:find (count ?peer) :in $ ?task :where
+                       [?peer :peer/task ?task]
+                       [?peer :peer/status :active]]
+        sealing-query '[:find (count ?peer) :in $ ?task :where
+                        [?peer :peer/task ?task]
+                        [?peer :peer/status :sealing]]]
+    (+ (or (ffirst (d/q active-query db task-id)) 0)
+       (or (ffirst (d/q sealing-query db task-id)) 0))))
 
 (defmethod extensions/nodes Datomic
   [log peer]
@@ -190,14 +194,16 @@
         ent (into {} (d/entity db result))]
     (select-nodes ent)))
 
-(defmethod extensions/node-basis Datomic
-  [log basis node]
-  (let [db (d/db (:conn log))
-        query '[:find ?peer :in $ ?node-basis ?node-place :where
+(defn node-basis [db basis node]
+  (let [query '[:find ?peer :in $ ?node-basis ?node-place :where
                 [?peer ?node-basis ?node-place]]
         result (ffirst (d/q query db basis node))
         ent (into {} (d/entity db result))]
     (select-nodes ent)))
+
+(defmethod extensions/node-basis Datomic
+  [log basis node]
+  (node-basis (d/db (:conn log)) basis node))
 
 (defmethod extensions/node->task Datomic
   [log basis node]
@@ -214,18 +220,20 @@
 
 (defmethod extensions/seal-resource? Datomic
   [log exhaust-place]
-  (let [db (d/db (:conn log))
+  (let [tx [[:onyx.fn/seal-peer exhaust-place]]
+        tx-result @(d/transact (:conn log) tx)
+        db (:db-after tx-result)
         query '[:find ?task ?peer :in $ ?exhaust-node :where
-                [?peer :peer/status :active]
+                [?peer :peer/status :sealing]
                 [?peer :peer/task ?task]
                 [?peer :node/exhaust ?exhaust-node]
                 [?task :task/complete? false]]
         result (d/q query db exhaust-place)
         task (ffirst result)
-        peer (into {} (d/entity db (second (first result))))
-        n (n-peers db task)]
+        n (n-peers db task)
+        nodes (node-basis db :node/exhaust exhaust-place)]
     {:seal? (= n 1)
-     :seal-node (:node/seal peer)}))
+     :seal-node (:node/seal nodes)}))
 
 (defmethod extensions/mark-offered Datomic
   [log task peer nodes]
