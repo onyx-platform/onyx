@@ -112,7 +112,6 @@
   :db/fn #db/fn {:lang "clojure"
                  :params [db complete-place]
                  :code (let [query '[:find ?peer ?task :in $ ?complete-node :where
-                                     [?peer :peer/status :sealing]
                                      [?peer :peer/task ?task]
                                      [?peer :node/completion ?complete-node]
                                      [?task :task/complete? false]]

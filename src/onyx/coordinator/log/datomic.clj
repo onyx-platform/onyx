@@ -176,15 +176,21 @@
     (assoc (into {} (d/entity db result))
       :db/id result)))
 
-(defn n-peers [db task-id]
+(defn n-active-peers [db task-id]
   (let [active-query '[:find (count ?peer) :in $ ?task :where
                        [?peer :peer/task ?task]
-                       [?peer :peer/status :active]]
-        sealing-query '[:find (count ?peer) :in $ ?task :where
+                       [?peer :peer/status :active]]]
+    (or (ffirst (d/q active-query db task-id)) 0)))
+
+(defn n-sealing-peers [db task-id]
+  (let [sealing-query '[:find (count ?peer) :in $ ?task :where
                         [?peer :peer/task ?task]
                         [?peer :peer/status :sealing]]]
-    (+ (or (ffirst (d/q active-query db task-id)) 0)
-       (or (ffirst (d/q sealing-query db task-id)) 0))))
+    (or (ffirst (d/q sealing-query db task-id)) 0)))
+
+(defn n-peers [db task-id]
+  (+ (n-active-peers db task-id)
+     (n-sealing-peers db task-id)))
 
 (defmethod extensions/nodes Datomic
   [log peer]
@@ -232,7 +238,7 @@
         task (ffirst result)
         n (n-peers db task)
         nodes (node-basis db :node/exhaust exhaust-place)]
-    {:seal? (= n 1)
+    {:seal? (or (= n 1) (zero? (n-active-peers db task)))
      :seal-node (:node/seal nodes)}))
 
 (defmethod extensions/mark-offered Datomic
