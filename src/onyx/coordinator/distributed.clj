@@ -47,18 +47,3 @@
 (defn coordinator-server [opts]
   (map->CoordinatorServer {:opts opts}))
 
-(defn -main [& args]
-  (let [id (str (java.util.UUID/randomUUID))
-        opts {:datomic-uri (str "datomic:mem://" id)
-              :hornetq-host "localhost"
-              :hornetq-port 5445
-              :zk-addr "127.0.0.1:2181"
-              :onyx-id id
-              :revoke-delay 2000
-              :onyx-port 9950}
-        server (component/start (CoordinatorServer. opts))]
-    (try
-      @(future (<!! (chan)))
-      (finally
-       (component/stop server)))))
-

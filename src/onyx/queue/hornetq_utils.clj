@@ -10,6 +10,43 @@
     (.createQueue session queue-name queue-name true)
     (catch Exception e)))
 
+(defn create-queue! [config queue-name]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createTransactedSession session-factory)]
+    
+    (create-queue session queue-name)
+
+    (.commit session)
+    (.close session)
+    (.close session-factory)
+    (.close locator)))
+
+(defn write! [config queue-name messages echo]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createTransactedSession session-factory)]
+    
+    (create-queue session queue-name)
+    
+    (let [producer (.createProducer session queue-name)]
+      (.start session)
+      (doseq [n (range (count messages))]
+        (when (zero? (mod n echo))
+          (info (format "Wrote %s segments" n))
+          (.commit session))
+        (let [message (.createMessage session true)]
+          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
+          (.send producer message)))
+
+      (.commit session)
+      (.close producer)
+      (.close session)
+      (.close session-factory)
+      (.close locator))))
+
 (defn write-and-cap! [config queue-name messages echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
@@ -61,6 +98,8 @@
       (.commit session)
       (.close consumer)
       (.close session)
+      (.close session-factory)
+      (.close locator)
 
       @results)))
 
@@ -87,6 +126,8 @@
       (.commit session)
       (.close consumer)
       (.close session)
+      (.close session-factory)
+      (.close locator)
 
       @results)))
 
