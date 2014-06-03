@@ -46,3 +46,9 @@
 (defn coordinator-server [opts]
   (map->CoordinatorServer {:opts opts}))
 
+(defn start-distributed-coordinator [opts]
+  (component/start (coordinator-server opts)))
+
+(defn stop-distributed-coordinator [coordinator]
+  (component/stop coordinator))
+
