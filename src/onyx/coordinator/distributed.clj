@@ -28,9 +28,8 @@
 (defrecord CoordinatorServer [opts]
   component/Lifecycle
   (start [component]
-    (taoensso.timbre/info "Starting Coordinator Netty server")
-
     (let [coordinator (component/start (onyx-coordinator opts))]
+      (taoensso.timbre/info "Starting Coordinator Netty server")
       (assoc component
         :coordinator coordinator
         :server (jetty/run-jetty (handler coordinator) {:port (:onyx-port opts)
