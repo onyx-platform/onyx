@@ -4,7 +4,7 @@
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
             [onyx.queue.hornetq :refer [take-segments]]
-            [taoensso.timbre :refer [info]]
+            [taoensso.timbre :refer [debug]]
             [dire.core :refer [with-post-hook!]]))
 
 (defn cap-queue [queue queue-names]
@@ -105,33 +105,33 @@
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [id batch consumers]}]
-    (info (format "[%s] Read batch of %s segments" id (count batch)))))
+    (debug (format "[%s] Read batch of %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [id decompressed]}]
-    (info (format "[%s] Decompressed %s segments" id (count decompressed)))))
+    (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
   (fn [{:keys [id]}]
-    (info (format "[%s] Requeued sentinel value" id))))
+    (debug (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'acknowledge-batch-shim
   (fn [{:keys [id acked]}]
-    (info (format "[%s] Acked %s segments" id acked))))
+    (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-shim
   (fn [{:keys [id results]}]
-    (info (format "[%s] Applied fn to %s segments" id (count results)))))
+    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [id compressed]}]
-    (info (format "[%s] Compressed %s segments" id (count compressed)))))
+    (debug (format "[%s] Compressed %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
   (fn [{:keys [id producers]}]
-    (info (format "[%s] Wrote batch to %s outputs" id (count producers)))))
+    (debug (format "[%s] Wrote batch to %s outputs" id (count producers)))))
 
 (with-post-hook! #'seal-resource-shim
   (fn [{:keys [id]}]
-    (info (format "[%s] Sealing resource" id))))
+    (debug (format "[%s] Sealing resource" id))))
 

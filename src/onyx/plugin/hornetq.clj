@@ -5,7 +5,7 @@
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
-            [taoensso.timbre :refer [info]])
+            [taoensso.timbre :refer [debug]])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
@@ -173,33 +173,33 @@
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [id batch]}]
-    (info (format "[%s] Read %s segments" id (count batch)))))
+    (debug (format "[%s] Read %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
   (fn [{:keys [id decompressed]}]
-    (info (format "[%s] Decompressed %s segments" id (count decompressed)))))
+    (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
   (fn [{:keys [id]}]
-    (info (format "[%s] Requeued sentinel value" id))))
+    (debug (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'apply-fn-in-shim
   (fn [{:keys [id results]}]
-    (info (format "[%s] Applied fn to %s segments" id (count results)))))
+    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'ack-batch-shim
   (fn [{:keys [id acked]}]
-    (info (format "[%s] Acked %s segments" id acked))))
+    (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-out-shim
   (fn [{:keys [id results]}]
-    (info (format "[%s] Applied fn to %s segments" id (count results)))))
+    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
   (fn [{:keys [id compressed]}]
-    (info (format "[%s] Compressed batch of %s segments" id (count compressed)))))
+    (debug (format "[%s] Compressed batch of %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
   (fn [{:keys [id written?]}]
-    (info (format "[%s] Wrote batch with value" id written?))))
+    (debug (format "[%s] Wrote batch with value" id written?))))
 
