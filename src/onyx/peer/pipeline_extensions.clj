@@ -18,7 +18,7 @@
 (defn merge-api-levels [f event]
   (reduce
    (fn [result g]
-     (merge result (f g)))
+     (merge result (f g result)))
    event
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
