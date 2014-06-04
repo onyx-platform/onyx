@@ -16,10 +16,11 @@
   (:onyx/type (find-task (:catalog event) (:task event))))
 
 (defn merge-api-levels [f event]
-  (let [x (merge event (f name-dispatch event))
-        x (merge x (f ident-dispatch x))
-        x (merge x (f type-and-medium-dispatch x))]
-    (merge x (f type-dispatch x))))
+  (reduce
+   (fn [result g]
+     (merge result (f g)))
+   event
+   [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
 (defmulti inject-pipeline-resources
   "Adds keys to the event map. This function is called once
