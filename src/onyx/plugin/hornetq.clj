@@ -92,7 +92,7 @@
       (.close session))))
 
 (defmethod p-ext/inject-pipeline-resources :hornetq/read-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
@@ -104,14 +104,14 @@
             :hornetq/session-factory session-factory})))
 
 (defmethod p-ext/close-temporal-resources :hornetq/read-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (.commit (:hornetq/session pipeline-data))
   (.close (:hornetq/consumer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   pipeline-data)
 
 (defmethod p-ext/close-pipeline-resources :hornetq/read-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   pipeline-data)
@@ -144,7 +144,7 @@
   [event] (write-batch-shim event))
 
 (defmethod p-ext/inject-pipeline-resources :hornetq/write-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
@@ -155,13 +155,13 @@
      :hornetq/session-factory session-factory}))
 
 (defmethod p-ext/close-temporal-resources :hornetq/write-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (.close (:hornetq/producer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   {})
 
 (defmethod p-ext/close-pipeline-resources :hornetq/write-segments
-  [pipeline-data]
+  [_ pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   {})

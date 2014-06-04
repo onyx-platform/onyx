@@ -5,7 +5,6 @@
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.peer.pipeline-internal-extensions :as internal-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
             [onyx.peer.group :as group]
@@ -75,8 +74,7 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (merge event (internal-ext/close-temporal-resources
-                (merge event (p-ext/close-temporal-resources event)))))
+  (merge event (p-ext/close-temporal-resources* event)))
 
 (defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -275,9 +273,7 @@
                          :queue queue
                          :sync sync}
           
-          pipeline-data (merge pipeline-data
-                               (internal-ext/inject-pipeline-resources pipeline-data)
-                               (p-ext/inject-pipeline-resources pipeline-data))]
+          pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources* pipeline-data))]
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
@@ -531,9 +527,7 @@
 
     (dorun
      (merge (:pipeline-data component)
-            (p-ext/close-pipeline-resources
-             (merge (:pipeline-data component)
-                    (internal-ext/close-pipeline-resources (:pipeline-data component))))))
+            (p-ext/close-pipeline-resources* (:pipeline-data component))))
 
     component))
 

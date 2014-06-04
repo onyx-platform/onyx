@@ -34,14 +34,14 @@
 
 (defmethod p-ext/inject-pipeline-resources
   :onyx.peer.word-count/count-words
-  [event]
+  [_ event]
   (let [words->n (atom {})]
     {:params [words->n]
      :words->n words->n}))
 
 (defmethod p-ext/close-pipeline-resources
   :onyx.peer.word-count/count-words
-  [{:keys [words->n]}]
+  [_ {:keys [words->n]}]
   (info @words->n))
 
 ;;; Execution

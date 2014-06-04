@@ -20,14 +20,14 @@
 
 (defmethod p-ext/inject-pipeline-resources
   :onyx.peer.grouping-test/sum-balance
-  [event]
+  [_ event]
   (let [balance (atom {})]
     {:params [balance]
      :balance balance}))
 
 (defmethod p-ext/close-pipeline-resources
   :onyx.peer.grouping-test/sum-balance
-  [{:keys [balance]}]
+  [_ {:keys [balance]}]
   (info "Balance was: " @balance)
   {})
 

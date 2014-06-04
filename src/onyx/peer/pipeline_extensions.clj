@@ -2,19 +2,31 @@
   "Public API extensions for implementors of plugins."
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
+(defn name-dispatch [event]
+  (:onyx/name (find-task (:catalog event) (:task event))))
+
+(defn ident-dispatch [event]
+  (:onyx/ident (find-task (:catalog event) (:task event))))
+
 (defn type-and-medium-dispatch [event]
   (let [t (find-task (:catalog event) (:task event))]
     [(:onyx/type t) (:onyx/medium t)]))
 
-(defn ident-dispatch [event]
-  (:onyx/ident (find-task (:catalog event) (:task event))))
+(defn type-dispatch [event]
+  (:onyx/type (find-task (:catalog event) (:task event))))
+
+(defn merge-api-levels [f event]
+  (let [x (merge event (f type-dispatch event))
+        x (merge x (f type-and-medium-dispatch x))
+        x (merge x (f ident-dispatch x))]
+    (merge x (f name-dispatch x))))
 
 (defmulti inject-pipeline-resources
   "Adds keys to the event map. This function is called once
    at the start of each task each for each virtual peer.
    Keys added may be accessed later in the pipeline.
    Must return a map."
-  ident-dispatch)
+  (fn [dispatch-fn event] (dispatch-fn event)))
 
 (defmulti read-batch
   "Reads :onyx/batch-size segments off the incoming data source.
@@ -58,13 +70,13 @@
 (defmulti close-temporal-resources
   "Closes any resources that were opened during a particular pipeline run.
    Called once for each pipeline run. Must return a map."
-  ident-dispatch)
+  (fn [dispatch-fn event] (dispatch-fn event)))
 
 (defmulti close-pipeline-resources
   "Closes any resources that were opened during the execution of a task by a
    virtual peer. Called once at the end of a task for each virtual peer.
    Must return a map."
-  ident-dispatch)
+  (fn [dispatch-fn event] (dispatch-fn event)))
 
 (defmulti seal-resource
   "Closes any resources that remain open during a task being executed.
@@ -72,12 +84,21 @@
    queue has been exhausted. Only called once globally for a single task."
   type-and-medium-dispatch)
 
+(defn inject-pipeline-resources* [event]
+  (merge-api-levels inject-pipeline-resources event))
+
+(defn close-temporal-resources* [event]
+  (merge-api-levels close-temporal-resources event))
+
+(defn close-pipeline-resources* [event]
+  (merge-api-levels close-pipeline-resources event))
+
 (defmethod inject-pipeline-resources :default
-  [event] {})
+  [_ event] {})
 
 (defmethod close-temporal-resources :default
-  [event] {})
+  [_ event] {})
 
 (defmethod close-pipeline-resources :default
-  [event] {})
+  [_ event] {})
 
