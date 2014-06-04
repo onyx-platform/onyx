@@ -1,4 +1,4 @@
-(ns onyx.peer.pipeline-extensions
+(ns onyx.peer.task-lifecycle-extensions
   "Public API extensions for implementors of plugins."
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
@@ -22,10 +22,10 @@
    event
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
-(defmulti inject-pipeline-resources
+(defmulti inject-lifecycle-resources
   "Adds keys to the event map. This function is called once
    at the start of each task each for each virtual peer.
-   Keys added may be accessed later in the pipeline.
+   Keys added may be accessed later in the lifecycle.
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
@@ -69,11 +69,11 @@
   type-and-medium-dispatch)
 
 (defmulti close-temporal-resources
-  "Closes any resources that were opened during a particular pipeline run.
-   Called once for each pipeline run. Must return a map."
+  "Closes any resources that were opened during a particular lifecycle run.
+   Called once for each lifecycle run. Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti close-pipeline-resources
+(defmulti close-lifecycle-resources
   "Closes any resources that were opened during the execution of a task by a
    virtual peer. Called once at the end of a task for each virtual peer.
    Must return a map."
@@ -85,21 +85,21 @@
    queue has been exhausted. Only called once globally for a single task."
   type-and-medium-dispatch)
 
-(defn inject-pipeline-resources* [event]
-  (merge-api-levels inject-pipeline-resources event))
+(defn inject-lifecycle-resources* [event]
+  (merge-api-levels inject-lifecycle-resources event))
 
 (defn close-temporal-resources* [event]
   (merge-api-levels close-temporal-resources event))
 
-(defn close-pipeline-resources* [event]
-  (merge-api-levels close-pipeline-resources event))
+(defn close-lifecycle-resources* [event]
+  (merge-api-levels close-lifecycle-resources event))
 
-(defmethod inject-pipeline-resources :default
+(defmethod inject-lifecycle-resources :default
   [_ event] {})
 
 (defmethod close-temporal-resources :default
   [_ event] {})
 
-(defmethod close-pipeline-resources :default
+(defmethod close-lifecycle-resources :default
   [_ event] {})
 

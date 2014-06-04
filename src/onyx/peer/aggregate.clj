@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.aggregate
   (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.extensions :as extensions]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.queue.hornetq :refer [take-segments]]
@@ -59,20 +59,20 @@
     (extensions/close-resource queue (:session queue-bundle)))
   event)
 
-(defmethod p-ext/inject-pipeline-resources :aggregator
+(defmethod l-ext/inject-lifecycle-resources :aggregator
   [_ event]
   (inject-pipeline-resource-shim event))
 
-(defmethod p-ext/read-batch [:aggregator nil]
+(defmethod l-ext/read-batch [:aggregator nil]
   [event]
   (read-batch-shim event))
 
-(defmethod p-ext/close-temporal-resources :aggregator
+(defmethod l-ext/close-temporal-resources :aggregator
   [_ event]
   (close-temporal-resources-shim event)
   {})
 
-(defmethod p-ext/close-pipeline-resources :aggregator
+(defmethod l-ext/close-lifecycle-resources :aggregator
   [_ event]
   (close-pipeline-resources-shim event)
   {})

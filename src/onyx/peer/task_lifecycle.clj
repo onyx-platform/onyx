@@ -1,10 +1,10 @@
-(ns ^:no-doc onyx.peer.task-pipeline
+(ns ^:no-doc onyx.peer.task-lifecycle
   (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
             [com.stuartsierra.component :as component]
             [dire.core :as dire]
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.coordinator.planning :refer [find-task]]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.peer.transform :as transform]
             [onyx.peer.group :as group]
@@ -26,11 +26,11 @@
   (assoc event :session session))
 
 (defn munge-read-batch [event]
-  (let [rets (p-ext/read-batch event)]
+  (let [rets (l-ext/read-batch event)]
     (merge event rets)))
 
 (defn munge-decompress-batch [event]
-  (let [rets (p-ext/decompress-batch event)]
+  (let [rets (l-ext/decompress-batch event)]
     (merge event rets)))
 
 (defn munge-strip-sentinel [event]
@@ -41,21 +41,21 @@
 
 (defn munge-requeue-sentinel [{:keys [tail-batch?] :as event}]
   (if tail-batch?
-    (let [rets (p-ext/requeue-sentinel event)]
+    (let [rets (l-ext/requeue-sentinel event)]
       (merge event rets))
     event))
 
 (defn munge-apply-fn [{:keys [decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (p-ext/apply-fn event))
+    (merge event (l-ext/apply-fn event))
     (merge event {:results []})))
 
 (defn munge-compress-batch [event]
-  (let [rets (p-ext/compress-batch event)]
+  (let [rets (l-ext/compress-batch event)]
     (merge event rets)))
 
 (defn munge-write-batch [event]
-  (let [rets (p-ext/write-batch event)]
+  (let [rets (l-ext/write-batch event)]
     (merge event rets)))
 
 (defn munge-status-check [{:keys [sync status-node] :as event}]
@@ -63,7 +63,7 @@
 
 (defn munge-ack [{:keys [queue batch commit?] :as event}]
   (if commit?
-    (let [rets (p-ext/ack-batch event)]
+    (let [rets (l-ext/ack-batch event)]
       (merge event rets))
     event))
 
@@ -74,7 +74,7 @@
     event))
 
 (defn munge-close-temporal-resources [event]
-  (merge event (p-ext/close-temporal-resources* event)))
+  (merge event (l-ext/close-temporal-resources* event)))
 
 (defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
@@ -97,7 +97,7 @@
     (let [path (:path (<!! seal-response-ch))
           seal? (extensions/read-place sync path)]
       (if seal?
-        (merge event (p-ext/seal-resource event) {:sealed? true})
+        (merge event (l-ext/seal-resource event) {:sealed? true})
         (merge event {:sealed? false})))))
 
 (defn munge-complete-task
@@ -211,11 +211,11 @@
           (>!! (:complete-ch event) :task-completed)))
       (recur))))
 
-(defrecord TaskPipeline [id payload sync queue payload-ch complete-ch fn-params]
+(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch fn-params]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Task Pipeline for" (:task/name (:task payload)))
+    (taoensso.timbre/info "Starting Task LifeCycle for" (:task/name (:task payload)))
 
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
@@ -273,7 +273,7 @@
                          :queue queue
                          :sync sync}
           
-          pipeline-data (merge pipeline-data (p-ext/inject-pipeline-resources* pipeline-data))]
+          pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
       (dire/with-handler! #'open-session-loop
         java.lang.Exception
@@ -458,7 +458,7 @@
         :pipeline-data pipeline-data)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Task Pipeline")
+    (taoensso.timbre/info "Stopping Task LifeCycle")
 
     (close! (:open-session-kill-ch component))
     (<!! (:open-session-dead-ch component))
@@ -527,14 +527,14 @@
 
     (dorun
      (merge (:pipeline-data component)
-            (p-ext/close-pipeline-resources* (:pipeline-data component))))
+            (l-ext/close-lifecycle-resources* (:pipeline-data component))))
 
     component))
 
-(defn task-pipeline [id payload sync queue payload-ch complete-ch fn-params]
-  (map->TaskPipeline {:id id :payload payload :sync sync
-                      :queue queue :payload-ch payload-ch
-                      :complete-ch complete-ch :fn-params fn-params}))
+(defn task-lifecycle [id payload sync queue payload-ch complete-ch fn-params]
+  (map->TaskLifeCycle {:id id :payload payload :sync sync
+                       :queue queue :payload-ch payload-ch
+                       :complete-ch complete-ch :fn-params fn-params}))
 
 (dire/with-post-hook! #'munge-open-session
   (fn [{:keys [id]}]

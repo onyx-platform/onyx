@@ -1,7 +1,7 @@
 (ns onyx.peer.bootstrap-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.api]))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
@@ -31,7 +31,7 @@
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
-(defmethod p-ext/apply-fn [:input :onyx-memory-test-plugin]
+(defmethod l-ext/apply-fn [:input :onyx-memory-test-plugin]
   [event] {:results [{:n 42}]})
 
 (def catalog

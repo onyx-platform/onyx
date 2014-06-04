@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.transform
   (:require [clojure.data.fressian :as fressian]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.coordinator.planning :refer [find-task]]
             [onyx.extensions :as extensions]
             [onyx.queue.hornetq :refer [take-segments]]
@@ -79,28 +79,28 @@
 (defn seal-resource-shim [{:keys [queue egress-queues] :as event}]
   (merge event (cap-queue queue egress-queues)))
 
-(defmethod p-ext/read-batch :default
+(defmethod l-ext/read-batch :default
   [event] (read-batch-shim event))
 
-(defmethod p-ext/decompress-batch :default
+(defmethod l-ext/decompress-batch :default
   [event] (decompress-batch-shim event))
 
-(defmethod p-ext/requeue-sentinel :default
+(defmethod l-ext/requeue-sentinel :default
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch :default
+(defmethod l-ext/ack-batch :default
   [event] (acknowledge-batch-shim event))
 
-(defmethod p-ext/apply-fn :default
+(defmethod l-ext/apply-fn :default
   [event] (apply-fn-shim event))
 
-(defmethod p-ext/compress-batch :default
+(defmethod l-ext/compress-batch :default
   [event] (compress-batch-shim event))
 
-(defmethod p-ext/write-batch :default
+(defmethod l-ext/write-batch :default
   [event] (write-batch-shim event))
 
-(defmethod p-ext/seal-resource :default
+(defmethod l-ext/seal-resource :default
   [event] (seal-resource-shim event))
 
 (with-post-hook! #'read-batch-shim

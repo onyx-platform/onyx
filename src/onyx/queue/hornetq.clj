@@ -1,7 +1,6 @@
 (ns ^:no-doc onyx.queue.hornetq
   (:require [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
-            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]])
   (:import [org.hornetq.api.core.client HornetQClient]

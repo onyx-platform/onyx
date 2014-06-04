@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.group
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.transform :as transform]
             [taoensso.timbre :refer [info]]
             [dire.core :refer [with-post-hook!]])
@@ -17,7 +17,7 @@
             (with-meta segment {:group (hash-segment group)}))
           (:decompressed event) groups)}))
 
-(defmethod p-ext/apply-fn [:grouper nil]
+(defmethod l-ext/apply-fn [:grouper nil]
   [event] (apply-fn-shim event))
 
 (with-post-hook! #'apply-fn-shim

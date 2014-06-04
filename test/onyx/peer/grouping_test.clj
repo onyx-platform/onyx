@@ -1,7 +1,7 @@
 (ns onyx.peer.grouping-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.api]
             [taoensso.timbre :refer [info]]))
 
@@ -18,14 +18,14 @@
 (defn group-by-name [{:keys [name] :as segment}]
   name)
 
-(defmethod p-ext/inject-pipeline-resources
+(defmethod l-ext/inject-lifecycle-resources
   :onyx.peer.grouping-test/sum-balance
   [_ event]
   (let [balance (atom {})]
     {:params [balance]
      :balance balance}))
 
-(defmethod p-ext/close-pipeline-resources
+(defmethod l-ext/close-lifecycle-resources
   :onyx.peer.grouping-test/sum-balance
   [_ {:keys [balance]}]
   (info "Balance was: " @balance)

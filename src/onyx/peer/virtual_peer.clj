@@ -4,7 +4,7 @@
             [taoensso.timbre :as timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
-            [onyx.peer.task-pipeline :refer [task-pipeline]]))
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]))
 
 (defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params]
   (let [complete-ch (chan 1)]
@@ -25,7 +25,7 @@
 
                 (<!! status-ch)
 
-                (let [new-pipeline (task-pipeline id payload sync queue payload-ch complete-ch fn-params)]
+                (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch fn-params)]
                   (recur (component/start new-pipeline))))
               :else (recur nil))))
     (>!! dead-ch true)))

@@ -1,7 +1,7 @@
 (ns onyx.plugin.hornetq
   (:require [clojure.data.fressian :as fressian]
             [onyx.coordinator.planning :as planning]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
@@ -91,7 +91,7 @@
       (.commit session)
       (.close session))))
 
-(defmethod p-ext/inject-pipeline-resources :hornetq/read-segments
+(defmethod l-ext/inject-lifecycle-resources :hornetq/read-segments
   [_ pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
@@ -103,47 +103,47 @@
            {:hornetq/locator locator
             :hornetq/session-factory session-factory})))
 
-(defmethod p-ext/close-temporal-resources :hornetq/read-segments
+(defmethod l-ext/close-temporal-resources :hornetq/read-segments
   [_ pipeline-data]
   (.commit (:hornetq/session pipeline-data))
   (.close (:hornetq/consumer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   pipeline-data)
 
-(defmethod p-ext/close-pipeline-resources :hornetq/read-segments
+(defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
   [_ pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   pipeline-data)
 
-(defmethod p-ext/read-batch [:input :hornetq]
+(defmethod l-ext/read-batch [:input :hornetq]
   [event] (read-batch-shim event))
 
-(defmethod p-ext/decompress-batch [:input :hornetq]
+(defmethod l-ext/decompress-batch [:input :hornetq]
   [event] (decompress-batch-shim event))
 
-(defmethod p-ext/requeue-sentinel [:input :hornetq]
+(defmethod l-ext/requeue-sentinel [:input :hornetq]
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch [:input :hornetq]
+(defmethod l-ext/ack-batch [:input :hornetq]
   [event] (ack-batch-shim event))
 
-(defmethod p-ext/apply-fn [:input :hornetq]
+(defmethod l-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
 
-(defmethod p-ext/apply-fn [:output :hornetq]
+(defmethod l-ext/apply-fn [:output :hornetq]
   [event] (apply-fn-out-shim event))
 
-(defmethod p-ext/ack-batch [:output :hornetq]
+(defmethod l-ext/ack-batch [:output :hornetq]
   [event] (ack-batch-shim event))
 
-(defmethod p-ext/compress-batch [:output :hornetq]
+(defmethod l-ext/compress-batch [:output :hornetq]
   [event] (compress-batch-shim event))
 
-(defmethod p-ext/write-batch [:output :hornetq]
+(defmethod l-ext/write-batch [:output :hornetq]
   [event] (write-batch-shim event))
 
-(defmethod p-ext/inject-pipeline-resources :hornetq/write-segments
+(defmethod l-ext/inject-lifecycle-resources :hornetq/write-segments
   [_ pipeline-data]
   (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
@@ -154,19 +154,19 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
-(defmethod p-ext/close-temporal-resources :hornetq/write-segments
+(defmethod l-ext/close-temporal-resources :hornetq/write-segments
   [_ pipeline-data]
   (.close (:hornetq/producer pipeline-data))
   (.close (:hornetq/session pipeline-data))
   {})
 
-(defmethod p-ext/close-pipeline-resources :hornetq/write-segments
+(defmethod l-ext/close-lifecycle-resources :hornetq/write-segments
   [_ pipeline-data]
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   {})
 
-(defmethod p-ext/seal-resource [:output :hornetq]
+(defmethod l-ext/seal-resource [:output :hornetq]
   [pipeline-data]
   (seal-resource-shim pipeline-data)
   {})

@@ -1,7 +1,7 @@
 (ns onyx.peer.word-count
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.api]
             [taoensso.timbre :refer [info]]))
 
@@ -32,14 +32,14 @@
 
 ;;; Pipeline argument injection
 
-(defmethod p-ext/inject-pipeline-resources
+(defmethod l-ext/inject-lifecycle-resources
   :onyx.peer.word-count/count-words
   [_ event]
   (let [words->n (atom {})]
     {:params [words->n]
      :words->n words->n}))
 
-(defmethod p-ext/close-pipeline-resources
+(defmethod l-ext/close-lifecycle-resources
   :onyx.peer.word-count/count-words
   [_ {:keys [words->n]}]
   (info @words->n))
