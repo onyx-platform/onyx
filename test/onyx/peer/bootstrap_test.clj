@@ -32,7 +32,7 @@
                 :onyx-id id})
 
 (defmethod l-ext/apply-fn [:input :onyx-memory-test-plugin]
-  [event] {:results [{:n 42}]})
+  [event] {:onyx.core/results [{:n 42}]})
 
 (def catalog
   [{:onyx/name :in-bootstrapped

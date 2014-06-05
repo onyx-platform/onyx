@@ -5,6 +5,8 @@
             [onyx.api]
             [taoensso.timbre :refer [info]]))
 
+(def output (atom nil))
+
 (def hornetq-host "localhost")
 
 (def hornetq-port 5445)
@@ -22,13 +24,13 @@
   :onyx.peer.grouping-test/sum-balance
   [_ event]
   (let [balance (atom {})]
-    {:params [balance]
-     :balance balance}))
+    {:onyx.core/params [balance]
+     :test/balance balance}))
 
 (defmethod l-ext/close-lifecycle-resources
   :onyx.peer.grouping-test/sum-balance
-  [_ {:keys [balance]}]
-  (info "Balance was: " @balance)
+  [_ {:keys [test/balance]}]
+  (reset! output @balance)
   {})
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
@@ -105,15 +107,17 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-#_(def results (hq-util/read! hq-config out-queue (inc (count data)) 1))
+(def results (hq-util/read! hq-config out-queue 1 1))
 
-#_(doseq [v-peer v-peers]
+(doseq [v-peer v-peers]
   (try
     ((:shutdown-fn v-peer))
     (catch Exception e (prn e))))
 
-#_(try
+(try
   (onyx.api/shutdown conn)
   (catch Exception e (prn e)))
 
+(fact @output => {"Mike" 15045 "Benti" 55 "Dorrene" 70})
+(fact results => [:done])
 

@@ -17,7 +17,7 @@
     (.start session)
     (let [f #(.receive consumer)
           rets (doall (take-segments f (:onyx/batch-size task)))]
-      {:batch (or rets [])
+      {:onyx.core/batch (or rets [])
        :hornetq/session session
        :hornetq/consumer consumer})))
 
@@ -39,16 +39,16 @@
     (.commit session)
     {:hornetq/session session
      :hornetq/producer producer
-     :written? true}))
+     :onyx.core/written? true}))
 
-(defn read-batch-shim [{:keys [catalog task] :as event}]
+(defn read-batch-shim [{:keys [onyx.core/catalog onyx.core/task] :as event}]
   (let [task-map (planning/find-task catalog task)]
     (merge event (read-batch (:hornetq/session-factory event) catalog task-map))))
 
-(defn decompress-batch-shim [{:keys [batch] :as event}]
-  (merge event {:decompressed (map decompress-segment batch)}))
+(defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
+  (merge event {:onyx.core/decompressed (map decompress-segment batch)}))
 
-(defn requeue-sentinel-shim [{:keys [task catalog] :as event}]
+(defn requeue-sentinel-shim [{:keys [onyx.core/task onyx.core/catalog] :as event}]
   (let [task (planning/find-task catalog task)
         queue-name (:hornetq/queue-name task)]
     (let [session (.createTransactedSession (:hornetq/session-factory event))]
@@ -59,27 +59,28 @@
         (.close producer))
       (.commit session)
       (.close session))
-    (merge event {:requeued? true})))
+    (merge event {:onyx.core/requeued? true})))
 
-(defn ack-batch-shim [{:keys [queue batch] :as event}]
+(defn ack-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
-  (merge event {:acked (count batch)}))
+  (merge event {:onyx.core/acked (count batch)}))
 
 (defn apply-fn-in-shim [event]
-  (merge event {:results (:decompressed event)}))
+  (merge event {:onyx.core/results (:onyx.core/decompressed event)}))
 
 (defn apply-fn-out-shim [event]
-  (merge event {:results (:decompressed event)}))
+  (merge event {:onyx.core/results (:onyx.core/decompressed event)}))
 
-(defn compress-batch-shim [{:keys [results] :as event}]
-  (merge event {:compressed (map compress-segment results)}))
+(defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
+  (merge event {:onyx.core/compressed (map compress-segment results)}))
 
-(defn write-batch-shim [{:keys [catalog task compressed] :as event}]
+(defn write-batch-shim
+  [{:keys [onyx.core/catalog onyx.core/task onyx.core/compressed] :as event}]
   (let [task-map (planning/find-task catalog task)]
     (merge event (write-batch (:hornetq/session-factory event) task-map compressed))))
 
-(defn seal-resource-shim [{:keys [catalog task] :as event}]
+(defn seal-resource-shim [{:keys [onyx.core/catalog onyx.core/task] :as event}]
   (let [task (planning/find-task catalog task)
         queue-name (:hornetq/queue-name task)]
     (let [session (.createTransactedSession (:hornetq/session-factory event))]
@@ -93,7 +94,8 @@
 
 (defmethod l-ext/inject-lifecycle-resources :hornetq/read-segments
   [_ pipeline-data]
-  (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
+  (let [task (planning/find-task (:onyx.core/catalog pipeline-data)
+                                 (:onyx.core/task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
@@ -145,7 +147,8 @@
 
 (defmethod l-ext/inject-lifecycle-resources :hornetq/write-segments
   [_ pipeline-data]
-  (let [task (planning/find-task (:catalog pipeline-data) (:task pipeline-data))
+  (let [task (planning/find-task (:onyx.core/catalog pipeline-data)
+                                 (:onyx.core/task pipeline-data))
         config {"host" (:hornetq/host task) "port" (:hornetq/port task)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
@@ -172,34 +175,34 @@
   {})
 
 (with-post-hook! #'read-batch-shim
-  (fn [{:keys [id batch]}]
+  (fn [{:keys [onyx.core/id onyx.core/batch]}]
     (debug (format "[%s] Read %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [id decompressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
     (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'apply-fn-in-shim
-  (fn [{:keys [id results]}]
+  (fn [{:keys [onyx.core/id onyx.core/results]}]
     (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'ack-batch-shim
-  (fn [{:keys [id acked]}]
+  (fn [{:keys [onyx.core/id onyx.core/acked]}]
     (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-out-shim
-  (fn [{:keys [id results]}]
+  (fn [{:keys [onyx.core/id onyx.core/results]}]
     (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
-  (fn [{:keys [id compressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
     (debug (format "[%s] Compressed batch of %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
-  (fn [{:keys [id written?]}]
+  (fn [{:keys [onyx.core/id onyx.core/written?]}]
     (debug (format "[%s] Wrote batch with value" id written?))))
 

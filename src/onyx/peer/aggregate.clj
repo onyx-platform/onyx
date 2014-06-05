@@ -12,15 +12,16 @@
 
 (defn consumer-loop [event session consumers halting-ch session-ch]
   (go (loop []
-        (let [task (find-task (:catalog event) (:task event))
+        (let [task (find-task (:onyx.core/catalog event) (:onyx.core/task event))
               consumer (first consumers)
-              f #(extensions/consume-message (:queue event) consumer)
+              f #(extensions/consume-message (:onyx.core/queue event) consumer)
               msgs (doall (take-segments f (:onyx/batch-size task)))]
           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
         (when (<! halting-ch)
           (recur)))))
 
-(defn inject-pipeline-resource-shim [{:keys [queue ingress-queues] :as event}]
+(defn inject-pipeline-resource-shim
+  [{:keys [onyx.core/queue onyx.core/ingress-queues] :as event}]
   (let [rets
         {:onyx.aggregate/queue
          (->> (range n-pipeline-threads)
@@ -29,7 +30,7 @@
                                                    ingress-queues))))
               (map (fn [x] (assoc x :halting-ch (chan 0)))))
          :onyx.aggregate/read-ch (chan n-pipeline-threads)
-         :reserve? true}]
+         :onyx.core/reserve? true}]
     (doseq [queue-bundle (:onyx.aggregate/queue rets)]
       (consumer-loop event
                      (:session queue-bundle)
@@ -39,19 +40,20 @@
     (merge event rets)))
 
 (defn read-batch-shim [event]
-  (let [{:keys [session halting-ch msgs]}(<!! (:onyx.aggregate/read-ch event))]
+  (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
     (merge event
-           {:session session
-            :batch msgs
+           {:onyx.core/session session
+            :onyx.core/batch msgs
             :onyx.aggregate/halting-ch halting-ch
-            :onyx.pipeline/session-origin (:session event)})))
+            :onyx.aggregate/session-origin (:onyx.core/session event)})))
 
 (defn close-temporal-resources-shim [event]
   (>!! (:onyx.aggregate/halting-ch event) true)
-  (merge event
-         (extensions/close-resource (:queue event) (:onyx.pipeline/session-origin event))))
+  (merge event (extensions/close-resource
+                (:onyx.core/queue event)
+                (:onyx.aggregate/session-origin event))))
 
-(defn close-pipeline-resources-shim [{:keys [queue] :as event}]
+(defn close-pipeline-resources-shim [{:keys [onyx.core/queue] :as event}]
   (close! (:onyx.aggregate/read-ch event))
   (doseq [queue-bundle (:onyx.aggregate/queue event)]
     (close! (:halting-ch queue-bundle))
@@ -78,18 +80,18 @@
   {})
 
 (with-post-hook! #'inject-pipeline-resource-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Injecting resources" id))))
 
 (with-post-hook! #'read-batch-shim
-  (fn [{:keys [id batch]}]
+  (fn [{:keys [onyx.core/id onyx.core/batch]}]
     (debug (format "[%s] Read batch of %s segments" id (count batch)))))
 
 (with-post-hook! #'close-temporal-resources-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Closing temporal resources" id))))
 
 (with-post-hook! #'close-pipeline-resources-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Closing pipeline resources" id))))
 

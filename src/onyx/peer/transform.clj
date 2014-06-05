@@ -41,42 +41,47 @@
      (if-let [group (:group msg)]
        (extensions/produce-message queue p session (:compressed msg) group)
        (extensions/produce-message queue p session (:compressed msg)))))
-  {:written? true})
+  {:onyx.core/written? true})
 
 (defn read-batch-shim
-  [{:keys [queue session ingress-queues catalog task] :as event}]
+  [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
+           onyx.core/catalog onyx.core/task] :as event}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
         batch (read-batch queue consumers catalog task)]
-    (merge event {:batch batch :consumers consumers})))
+    (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
-(defn decompress-batch-shim [{:keys [queue batch] :as event}]
+(defn decompress-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
-    (merge event {:decompressed decompressed-msgs})))
+    (merge event {:onyx.core/decompressed decompressed-msgs})))
 
-(defn requeue-sentinel-shim [{:keys [queue ingress-queues] :as event}]
+(defn requeue-sentinel-shim [{:keys [onyx.core/queue onyx.core/ingress-queues] :as event}]
   (cap-queue queue ingress-queues)
-  (merge event {:requeued? true}))
+  (merge event {:onyx.core/requeued? true}))
 
-(defn acknowledge-batch-shim [{:keys [queue batch] :as event}]
+(defn acknowledge-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
   (doseq [message batch]
     (extensions/ack-message queue message))
-  (merge event {:acked (count batch)}))
+  (merge event {:onyx.core/acked (count batch)}))
 
-(defn apply-fn-shim [{:keys [decompressed task catalog params] :as event}]
+(defn apply-fn-shim
+  [{:keys [onyx.core/decompressed onyx.core/task
+           onyx.core/catalog onyx.core/params] :as event}]
   (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
         results (flatten (map (partial apply-fn task params) decompressed))]
-    (merge event {:results results})))
+    (merge event {:onyx.core/results results})))
 
-(defn compress-batch-shim [{:keys [results] :as event}]
+(defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
   (let [compressed-msgs (map compress-segment results)]
-    (merge event {:compressed compressed-msgs})))
+    (merge event {:onyx.core/compressed compressed-msgs})))
 
-(defn write-batch-shim [{:keys [queue egress-queues session compressed] :as event}]
+(defn write-batch-shim
+  [{:keys [onyx.core/queue onyx.core/egress-queues
+           onyx.core/session onyx.core/compressed] :as event}]
   (let [producers (map (partial extensions/create-producer queue session) egress-queues)
         batch (write-batch queue session producers compressed)]
-    (merge event {:producers producers})))
+    (merge event {:onyx.core/producers producers})))
 
-(defn seal-resource-shim [{:keys [queue egress-queues] :as event}]
+(defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
   (merge event (cap-queue queue egress-queues)))
 
 (defmethod l-ext/read-batch :default
@@ -104,34 +109,34 @@
   [event] (seal-resource-shim event))
 
 (with-post-hook! #'read-batch-shim
-  (fn [{:keys [id batch consumers]}]
+  (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/consumers]}]
     (debug (format "[%s] Read batch of %s segments" id (count batch)))))
 
 (with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [id decompressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
     (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Requeued sentinel value" id))))
 
 (with-post-hook! #'acknowledge-batch-shim
-  (fn [{:keys [id acked]}]
+  (fn [{:keys [onyx.core/id onyx.core/acked]}]
     (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-shim
-  (fn [{:keys [id results]}]
+  (fn [{:keys [onyx.core/id onyx.core/results]}]
     (debug (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (with-post-hook! #'compress-batch-shim
-  (fn [{:keys [id compressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
     (debug (format "[%s] Compressed %s segments" id (count compressed)))))
 
 (with-post-hook! #'write-batch-shim
-  (fn [{:keys [id producers]}]
+  (fn [{:keys [onyx.core/id onyx.core/producers]}]
     (debug (format "[%s] Wrote batch to %s outputs" id (count producers)))))
 
 (with-post-hook! #'seal-resource-shim
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Sealing resource" id))))
 

@@ -12,7 +12,7 @@
             [onyx.extensions :as extensions]
             [onyx.plugin.hornetq]))
 
-(defn create-tx-session [{:keys [queue]}]
+(defn create-tx-session [{:keys [onyx.core/queue]}]
   (extensions/create-tx-session queue))
 
 (defn new-payload [sync peer-node payload-ch]
@@ -23,7 +23,7 @@
     node))
 
 (defn munge-open-session [event session]
-  (assoc event :session session))
+  (assoc event :onyx.core/session session))
 
 (defn munge-read-batch [event]
   (let [rets (l-ext/read-batch event)]
@@ -33,22 +33,23 @@
   (let [rets (l-ext/decompress-batch event)]
     (merge event rets)))
 
-(defn munge-strip-sentinel [event]
-  (let [segments (:decompressed event)]
-    (if (= (last segments) :done)
-      (assoc event :tail-batch? true :decompressed (or (butlast segments) []))
-      (assoc event :tail-batch? false))))
+(defn munge-strip-sentinel [{:keys [onyx.core/decompressed] :as event}]
+  (if (= (last decompressed) :done)
+    (assoc event
+      :onyx.core/tail-batch? true
+      :onyx.core/decompressed (or (butlast decompressed) []))
+    (assoc event :onyx.core/tail-batch? false)))
 
-(defn munge-requeue-sentinel [{:keys [tail-batch?] :as event}]
+(defn munge-requeue-sentinel [{:keys [onyx.core/tail-batch?] :as event}]
   (if tail-batch?
     (let [rets (l-ext/requeue-sentinel event)]
       (merge event rets))
     event))
 
-(defn munge-apply-fn [{:keys [decompressed] :as event}]
+(defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
     (merge event (l-ext/apply-fn event))
-    (merge event {:results []})))
+    (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
   (let [rets (l-ext/compress-batch event)]
@@ -58,50 +59,56 @@
   (let [rets (l-ext/write-batch event)]
     (merge event rets)))
 
-(defn munge-status-check [{:keys [sync status-node] :as event}]
-  (assoc event :commit? (extensions/place-exists? sync status-node)))
+(defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
+  (assoc event :onyx.core/commit? (extensions/place-exists? sync status-node)))
 
-(defn munge-ack [{:keys [queue batch commit?] :as event}]
+(defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
   (if commit?
     (let [rets (l-ext/ack-batch event)]
       (merge event rets))
     event))
 
-(defn munge-commit-tx [{:keys [queue session commit?] :as event}]
+(defn munge-commit-tx
+  [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
   (if commit?
     (do (extensions/commit-tx queue session)
-        (assoc event :committed true))
+        (assoc event :onyx.core/committed true))
     event))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
 
-(defn munge-close-resources [{:keys [queue session producers consumers reserve?] :as event}]
+(defn munge-close-resources
+  [{:keys [onyx.core/queue onyx.core/session onyx.core/producers
+           onyx.core/consumers onyx.core/reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
   (doseq [consumer consumers] (extensions/close-resource queue consumer))
   (when-not reserve?
     (extensions/close-resource queue session))
-  (assoc event :closed? true))
+  (assoc event :onyx.core/closed? true))
 
-(defn munge-new-payload [{:keys [sync peer-node peer-version payload-ch] :as event}]
+(defn munge-new-payload
+  [{:keys [onyx.core/sync onyx.core/peer-node
+           onyx.core/peer-version onyx.core/payload-ch] :as event}]
   (if (= (extensions/version sync peer-node) peer-version)
     (let [node (new-payload sync peer-node payload-ch)]
       (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :new-payload-node node :completion? true))
+      (assoc event :onyx.core/new-payload-node node :onyx.core/completion? true))
     event))
 
-(defn munge-seal-resource [{:keys [sync exhaust-node seal-node] :as event}]
+(defn munge-seal-resource
+  [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node] :as event}]
   (let [seal-response-ch (chan)]
     (extensions/on-change sync seal-node #(>!! seal-response-ch %))
     (extensions/touch-place sync exhaust-node)
     (let [path (:path (<!! seal-response-ch))
           seal? (extensions/read-place sync path)]
       (if seal?
-        (merge event (l-ext/seal-resource event) {:sealed? true})
-        (merge event {:sealed? false})))))
+        (merge event (l-ext/seal-resource event) {:onyx.core/sealed? true})
+        (merge event {:onyx.core/sealed? false})))))
 
 (defn munge-complete-task
-  [{:keys [sync completion-node completion?] :as event}]
+  [{:keys [onyx.core/sync onyx.core/completion-node onyx.core/completion?] :as event}]
   (when completion?
     (extensions/touch-place sync completion-node))
   event)
@@ -188,7 +195,7 @@
 (defn reset-payload-node-loop [reset-ch seal-ch dead-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
-      (if (and (:tail-batch? event) (:commit? event))
+      (if (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
         (let [event (munge-new-payload event)]
           (>!! seal-ch event))
         (>!! seal-ch event))
@@ -197,7 +204,7 @@
 (defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
   (loop []
     (when-let [event (<!! seal-ch)]
-      (if (:completion? event)
+      (if (:onyx.core/completion? event)
         (>!! internal-complete-ch (munge-seal-resource event))
         (>!! internal-complete-ch event))
       (recur))))
@@ -205,10 +212,10 @@
 (defn complete-task-loop [complete-ch dead-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
-      (when (and (:tail-batch? event) (:commit? event))
+      (when (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
         (munge-complete-task event)
-        (when (:completion? event)
-          (>!! (:complete-ch event) :task-completed)))
+        (when (:onyx.core/completion? event)
+          (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed)))
       (recur))))
 
 (defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch fn-params]
@@ -254,24 +261,24 @@
           task (:task/name (:task payload))
           catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
 
-          pipeline-data {:id id
-                         :task task
-                         :catalog catalog
-                         :task-map (find-task catalog task)
-                         :ingress-queues (:task/ingress-queues (:task payload))
-                         :egress-queues (:task/egress-queues (:task payload))
-                         :peer-node (:peer (:nodes payload))
-                         :status-node (:status (:nodes payload))
-                         :exhaust-node (:exhaust (:nodes payload))
-                         :seal-node (:seal (:nodes payload))
-                         :completion-node (:completion (:nodes payload))
-                         :workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
-                         :peer-version (extensions/version sync (:peer (:nodes payload)))
-                         :payload-ch payload-ch
-                         :complete-ch complete-ch
-                         :params (or (get fn-params task) [])
-                         :queue queue
-                         :sync sync}
+          pipeline-data {:onyx.core/id id
+                         :onyx.core/task task
+                         :onyx.core/catalog catalog
+                         :onyx.core/task-map (find-task catalog task)
+                         :onyx.core/ingress-queues (:task/ingress-queues (:task payload))
+                         :onyx.core/egress-queues (:task/egress-queues (:task payload))
+                         :onyx.core/peer-node (:peer (:nodes payload))
+                         :onyx.core/status-node (:status (:nodes payload))
+                         :onyx.core/exhaust-node (:exhaust (:nodes payload))
+                         :onyx.core/seal-node (:seal (:nodes payload))
+                         :onyx.core/completion-node (:completion (:nodes payload))
+                         :onyx.core/workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
+                         :onyx.core/peer-version (extensions/version sync (:peer (:nodes payload)))
+                         :onyx.core/payload-ch payload-ch
+                         :onyx.core/complete-ch complete-ch
+                         :onyx.core/params (or (get fn-params task) [])
+                         :onyx.core/queue queue
+                         :onyx.core/sync sync}
           
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
@@ -525,9 +532,7 @@
     (close! (:seal-dead-ch component))
     (close! (:complete-task-dead-ch component))
 
-    (dorun
-     (merge (:pipeline-data component)
-            (l-ext/close-lifecycle-resources* (:pipeline-data component))))
+    (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
     component))
 
@@ -537,62 +542,62 @@
                        :complete-ch complete-ch :fn-params fn-params}))
 
 (dire/with-post-hook! #'munge-open-session
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Created new tx session" id))))
 
 (dire/with-post-hook! #'munge-read-batch
-  (fn [{:keys [id batch]}]
+  (fn [{:keys [onyx.core/id onyx.core/batch]}]
     (taoensso.timbre/info (format "[%s] Read %s segments" id (count batch)))))
 
 (dire/with-post-hook! #'munge-strip-sentinel
-  (fn [{:keys [id decompressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
     (taoensso.timbre/info (format "[%s] Stripped sentinel. %s segments left" id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-requeue-sentinel
-  (fn [{:keys [id tail-batch?]}]
+  (fn [{:keys [onyx.core/id onyx.core/tail-batch?]}]
     (taoensso.timbre/info (format "[%s] Requeued sentinel value" id))))
 
 (dire/with-post-hook! #'munge-decompress-batch
-  (fn [{:keys [id decompressed batch]}]
+  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch]}]
     (taoensso.timbre/info (format "[%s] Decompressed %s segments" id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-apply-fn
-  (fn [{:keys [id results]}]
+  (fn [{:keys [onyx.core/id onyx.core/results]}]
     (taoensso.timbre/info (format "[%s] Applied fn to %s segments" id (count results)))))
 
 (dire/with-post-hook! #'munge-compress-batch
-  (fn [{:keys [id compressed]}]
+  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
     (taoensso.timbre/info (format "[%s] Compressed %s segments" id (count compressed)))))
 
 (dire/with-post-hook! #'munge-write-batch
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Wrote batch" id))))
 
 (dire/with-post-hook! #'munge-status-check
-  (fn [{:keys [id status-node]}]
+  (fn [{:keys [onyx.core/id onyx.core/status-node]}]
     (taoensso.timbre/info (format "[%s] Checked the status node" id))))
 
 (dire/with-post-hook! #'munge-ack
-  (fn [{:keys [id acked]}]
+  (fn [{:keys [onyx.core/id onyx.core/acked]}]
     (taoensso.timbre/info (format "[%s] Acked %s segments" id acked))))
 
 (dire/with-post-hook! #'munge-commit-tx
-  (fn [{:keys [id commit?]}]
+  (fn [{:keys [onyx.core/id onyx.core/commit?]}]
     (taoensso.timbre/info (format "[%s] Committed transaction? %s" id commit?))))
 
 (dire/with-post-hook! #'munge-close-resources
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Closed resources" id))))
 
 (dire/with-post-hook! #'munge-close-temporal-resources
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Closed temporal plugin resources" id))))
 
 (dire/with-post-hook! #'munge-seal-resource
-  (fn [{:keys [id task sealed?]}]
+  (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed?]}]
     (taoensso.timbre/info (format "[%s] Sealing resource for %s? %s" id task sealed?))))
 
 (dire/with-post-hook! #'munge-complete-task
-  (fn [{:keys [id]}]
+  (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Completing task" id))))
 

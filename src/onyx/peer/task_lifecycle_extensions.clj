@@ -3,17 +3,17 @@
   (:require [onyx.coordinator.planning :refer [find-task]]))
 
 (defn name-dispatch [event]
-  (:onyx/name (find-task (:catalog event) (:task event))))
+  (:onyx/name (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
 
 (defn ident-dispatch [event]
-  (:onyx/ident (find-task (:catalog event) (:task event))))
+  (:onyx/ident (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
 
 (defn type-and-medium-dispatch [event]
-  (let [t (find-task (:catalog event) (:task event))]
+  (let [t (find-task (:onyx.core/catalog event) (:onyx.core/task event))]
     [(:onyx/type t) (:onyx/medium t)]))
 
 (defn type-dispatch [event]
-  (:onyx/type (find-task (:catalog event) (:task event))))
+  (:onyx/type (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
 
 (defn merge-api-levels [f event]
   (reduce

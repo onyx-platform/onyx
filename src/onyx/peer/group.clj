@@ -11,16 +11,16 @@
   (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8"))))
 
 (defn apply-fn-shim [event]
-  (let [groups (:results (transform/apply-fn-shim event))]
-    {:results
+  (let [groups (:onyx.core/results (transform/apply-fn-shim event))]
+    {:onyx.core/results
      (map (fn [segment group]
             (with-meta segment {:group (hash-segment group)}))
-          (:decompressed event) groups)}))
+          (:onyx.core/decompressed event) groups)}))
 
 (defmethod l-ext/apply-fn [:grouper nil]
   [event] (apply-fn-shim event))
 
 (with-post-hook! #'apply-fn-shim
-  (fn [{:keys [results]}]
+  (fn [{:keys [onyx.core/results]}]
     (info "[Grouper] Applied grouping fn to" (count results) "segments")))
 

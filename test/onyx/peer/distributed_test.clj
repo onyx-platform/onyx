@@ -84,17 +84,11 @@
 
 (def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
 
-(try
-  ;; (dorun (map deref (map :runner v-peers)))
-  (finally
-   (doseq [v-peer v-peers]
-     (try
-       ((:shutdown-fn v-peer))
-       (catch Exception e (prn e))))
-   (try
-     (onyx.api/shutdown conn)
-     (component/stop onyx-server)
-     (catch Exception e (prn e)))))
+(doseq [v-peer v-peers]
+  ((:shutdown-fn v-peer)))
+
+(onyx.api/shutdown conn)
+(component/stop onyx-server)
 
 (fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done))
 
