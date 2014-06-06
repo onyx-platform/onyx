@@ -94,6 +94,7 @@
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
+        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)]
     (merge pipeline-data
            {:hornetq/locator locator
@@ -145,6 +146,7 @@
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         _ (.setConsumerWindowSize locator 0)
+        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)]
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
