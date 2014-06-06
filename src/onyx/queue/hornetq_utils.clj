@@ -3,21 +3,24 @@
             [taoensso.timbre :refer [info]])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
-           [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+           [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]
+           [org.hornetq.api.core SimpleString]))
 
 (defn create-queue [session queue-name]
   (try
     (.createQueue session queue-name queue-name true)
-    (catch Exception e)))
+    (catch Exception e
+      (.printStackTrace e))))
 
 (defn create-queue! [config queue-name]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
+    (.start session)
     
     (create-queue session queue-name)
-
+    
     (.commit session)
     (.close session)
     (.close session-factory)
@@ -27,9 +30,7 @@
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
-        session (.createTransactedSession session-factory)]
-    
-    (create-queue session queue-name)
+        session (.createTransactedSession session-factory)]   
     
     (let [producer (.createProducer session queue-name)]
       (.start session)
@@ -51,10 +52,8 @@
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
         session-factory (.createSessionFactory locator)
-        session (.createTransactedSession session-factory)]
-    
-    (create-queue session queue-name)
-    
+        session (.createTransactedSession session-factory)]   
+
     (let [producer (.createProducer session queue-name)]
       (.start session)
       (doseq [n (range (count messages))]
@@ -81,8 +80,6 @@
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
-    (create-queue session queue-name)
-    
     (let [consumer (.createConsumer session queue-name)
           results (atom [])]
       (.start session)
@@ -109,8 +106,6 @@
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
-    (create-queue session queue-name)
-
     (let [consumer (.createConsumer session queue-name)
           results (atom [])]
       (.start session)
@@ -130,4 +125,12 @@
       (.close locator)
 
       @results)))
+
+(defn message-count [config queue-name]
+  (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)
+        session (.createTransactedSession session-factory)
+        query (.queueQuery session (SimpleString. queue-name))]
+    (.getMessageCount query)))
 

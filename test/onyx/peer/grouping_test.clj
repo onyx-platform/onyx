@@ -17,6 +17,9 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
 (defn group-by-name [{:keys [name] :as segment}]
   name)
 

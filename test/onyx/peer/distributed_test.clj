@@ -23,6 +23,9 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
 (def before-msgs (mapv (fn [x] {:n x}) (range n-messages)))
 
 (hq-util/write-and-cap! hq-config in-queue before-msgs echo)

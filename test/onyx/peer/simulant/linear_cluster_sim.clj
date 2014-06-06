@@ -27,6 +27,9 @@
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
 (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [{:keys [n] :as segment}]

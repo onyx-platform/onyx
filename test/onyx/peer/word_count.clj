@@ -36,7 +36,7 @@
   :onyx.peer.word-count/count-words
   [_ event]
   (let [words->n (atom {})]
-    {:params [words->n]
+    {:onyx.core/params [words->n]
      :words->n words->n}))
 
 (defmethod l-ext/close-lifecycle-resources
@@ -55,6 +55,9 @@
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
+
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
 
 (def catalog
   [{:onyx/name :in

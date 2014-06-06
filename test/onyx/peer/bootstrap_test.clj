@@ -4,13 +4,16 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.api]))
 
-(def out-queue (str (java.util.UUID/randomUUID)))
 
 (def hornetq-host "localhost")
 
 (def hornetq-port 5445)
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
+
+(def out-queue (str (java.util.UUID/randomUUID)))
+
+(hq-util/create-queue! hq-config out-queue)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))

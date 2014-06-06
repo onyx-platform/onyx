@@ -15,6 +15,9 @@
 (def workflow {:in {:inc :out}})
 
 (defn run-job [in-queue out-queue n-messages batch-size echo]
+  (hq-util/create-queue! hq-config in-queue)
+  (hq-util/create-queue! hq-config out-queue)
+
   (let [id (str (java.util.UUID/randomUUID))
         coord-opts {:datomic-uri (str "datomic:mem://" id)
                     :hornetq-host hornetq-host

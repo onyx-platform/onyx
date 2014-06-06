@@ -9,11 +9,14 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
+(def hq-config {"host" hornetq-host "port" hornetq-port})
+
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def hq-config {"host" hornetq-host "port" hornetq-port})
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
 
 (def n-messages 1000)
 
