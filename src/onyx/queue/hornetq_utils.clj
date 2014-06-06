@@ -52,8 +52,8 @@
 
 (defn write-and-cap! [config queue-name messages echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        _ (.setReconnectAttempts locator -1)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]   
 
