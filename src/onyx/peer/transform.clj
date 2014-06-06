@@ -24,10 +24,8 @@
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
 
-(defn apply-fn [task params segment]
-  (let [user-ns (symbol (name (namespace (:onyx/fn task))))
-        user-fn (symbol (name (:onyx/fn task)))]
-    ((reduce #(partial %1 %2) (ns-resolve user-ns user-fn) params) segment)))
+(defn apply-fn [f params segment]
+  ((reduce #(partial %1 %2) f params) segment))
 
 (defn compress-segment [segment]
   {:compressed (.array (fressian/write segment))
@@ -62,10 +60,8 @@
   (merge event {:onyx.core/acked (count batch)}))
 
 (defn apply-fn-shim
-  [{:keys [onyx.core/decompressed onyx.core/task
-           onyx.core/catalog onyx.core/params] :as event}]
-  (let [task (first (filter (fn [entry] (= (:onyx/name entry) task)) catalog))
-        results (flatten (map (partial apply-fn task params) decompressed))]
+  [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params] :as event}]
+  (let [results (flatten (map (partial apply-fn fn params) decompressed))]
     (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
@@ -81,6 +77,12 @@
 
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
   (merge event (cap-queue queue egress-queues)))
+
+(defmethod l-ext/inject-lifecycle-resources :transformer
+  [_ {:keys [onyx.core/task-map]}]
+  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
+        user-fn (symbol (name (:onyx/fn task-map)))]
+    {:onyx.transform/fn (ns-resolve user-ns user-fn)}))
 
 (defmethod l-ext/read-batch :default
   [event] (read-batch-shim event))
