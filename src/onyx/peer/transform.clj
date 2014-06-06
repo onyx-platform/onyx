@@ -1,11 +1,10 @@
 (ns ^:no-doc onyx.peer.transform
-  (:require [clojure.data.fressian :as fressian]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.coordinator.planning :refer [find-task]]
-            [onyx.extensions :as extensions]
-            [onyx.queue.hornetq :refer [take-segments]]
-            [taoensso.timbre :refer [debug]]
-            [dire.core :refer [with-post-hook!]]))
+    (:require [clojure.data.fressian :as fressian]
+              [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.extensions :as extensions]
+              [onyx.queue.hornetq :refer [take-segments]]
+              [taoensso.timbre :refer [debug]]
+              [dire.core :refer [with-post-hook!]]))
 
 (defn cap-queue [queue queue-names]
   (let [session (extensions/create-tx-session queue)]
@@ -16,12 +15,11 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defn read-batch [queue consumers catalog task-name]
+(defn read-batch [queue consumers task-map]
   ;; Multi-consumer not yet implemented.
-  (let [task (find-task catalog task-name)
-        consumer (first consumers)
+  (let [consumer (first consumers)
         f #(extensions/consume-message queue consumer)]
-    (doall (take-segments f (:onyx/batch-size task)))))
+    (doall (take-segments f (:onyx/batch-size task-map)))))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
@@ -45,9 +43,9 @@
 
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
-           onyx.core/catalog onyx.core/task] :as event}]
+           onyx.core/catalog onyx.core/task-map] :as event}]
   (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
-        batch (read-batch queue consumers catalog task)]
+        batch (read-batch queue consumers task-map)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
 (defn decompress-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]

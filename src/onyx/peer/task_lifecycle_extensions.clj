@@ -1,19 +1,17 @@
 (ns onyx.peer.task-lifecycle-extensions
-  "Public API extensions for implementors of plugins."
-  (:require [onyx.coordinator.planning :refer [find-task]]))
+  "Public API extensions for implementors of plugins.")
 
-(defn name-dispatch [event]
-  (:onyx/name (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
+(defn name-dispatch [{:keys [onyx.core/task-map]}]
+  (:onyx/name task-map))
 
-(defn ident-dispatch [event]
-  (:onyx/ident (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
+(defn ident-dispatch [{:keys [onyx.core/task-map]}]
+  (:onyx/ident task-map))
 
-(defn type-and-medium-dispatch [event]
-  (let [t (find-task (:onyx.core/catalog event) (:onyx.core/task event))]
-    [(:onyx/type t) (:onyx/medium t)]))
+(defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
+  [(:onyx/type task-map) (:onyx/medium task-map)])
 
-(defn type-dispatch [event]
-  (:onyx/type (find-task (:onyx.core/catalog event) (:onyx.core/task event))))
+(defn type-dispatch [{:keys [onyx.core/task-map]}]
+  (:onyx/type task-map))
 
 (defn merge-api-levels [f event]
   (reduce

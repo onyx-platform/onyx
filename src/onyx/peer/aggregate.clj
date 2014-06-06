@@ -2,7 +2,6 @@
   (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.planning :refer [find-task]]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.peer.transform :as transformer]
             [taoensso.timbre :refer [debug]]
@@ -12,10 +11,9 @@
 
 (defn consumer-loop [event session consumers halting-ch session-ch]
   (go (loop []
-        (let [task (find-task (:onyx.core/catalog event) (:onyx.core/task event))
-              consumer (first consumers)
+        (let [consumer (first consumers)
               f #(extensions/consume-message (:onyx.core/queue event) consumer)
-              msgs (doall (take-segments f (:onyx/batch-size task)))]
+              msgs (doall (take-segments f (:onyx/batch-size (:task-map event))))]
           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
         (when (<! halting-ch)
           (recur)))))
