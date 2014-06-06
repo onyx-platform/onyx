@@ -19,8 +19,10 @@
           (recur)))))
 
 (defn inject-pipeline-resource-shim
-  [{:keys [onyx.core/queue onyx.core/ingress-queues] :as event}]
-  (let [rets
+  [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
+  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
+        user-fn (symbol (name (:onyx/fn task-map)))
+        rets
         {:onyx.aggregate/queue
          (->> (range n-pipeline-threads)
               (map (fn [x] {:session (extensions/create-tx-session queue)}))
@@ -28,7 +30,8 @@
                                                    ingress-queues))))
               (map (fn [x] (assoc x :halting-ch (chan 0)))))
          :onyx.aggregate/read-ch (chan n-pipeline-threads)
-         :onyx.core/reserve? true}]
+         :onyx.core/reserve? true
+         :onyx.transform/fn (ns-resolve user-ns user-fn)}]
     (doseq [queue-bundle (:onyx.aggregate/queue rets)]
       (consumer-loop event
                      (:session queue-bundle)

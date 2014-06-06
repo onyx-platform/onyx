@@ -17,6 +17,12 @@
             (with-meta segment {:group (hash-segment group)}))
           (:onyx.core/decompressed event) groups)}))
 
+(defmethod l-ext/inject-lifecycle-resources :grouper
+  [_ {:keys [onyx.core/task-map]}]
+  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
+        user-fn (symbol (name (:onyx/fn task-map)))]
+    {:onyx.transform/fn (ns-resolve user-ns user-fn)}))
+
 (defmethod l-ext/apply-fn [:grouper nil]
   [event] (apply-fn-shim event))
 
