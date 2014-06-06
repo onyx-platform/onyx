@@ -56,7 +56,8 @@
     (doseq [queue-name (conj egress-queues ingress-queue)]
       (try
         (.createQueue session queue-name queue-name true)
-        (catch HornetQQueueExistsException e)))
+        (catch HornetQQueueExistsException e
+          (info e))))
     (.close session)))
 
 (defmethod extensions/bootstrap-queue HornetQ

@@ -82,11 +82,13 @@
 (doseq [v-peer v-peers]
   (try
     ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+    (catch Exception e
+      (.printStackTrace e))))
 
 (try
   (onyx.api/shutdown conn)
-  (catch Exception e (prn e)))
+  (catch Exception e
+    (.printStackTrace e)))
 
 (fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
 

@@ -168,7 +168,8 @@
         (extensions/delete (:sync components) pulse)
         (future-cancel (get cluster-val victim))
         (swap! cluster dissoc victim)))
-    (catch Exception e)))
+    (catch Exception e
+      (.printStackTrace e))))
 
 (sim-utils/create-peers! sine-cluster-model components cluster)
 

@@ -222,7 +222,8 @@
 (doseq [peer @cluster]
   (try
     ((:shutdown-fn peer))
-    (catch Exception e)))
+    (catch Exception e
+      (.printStackTrace e))))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
