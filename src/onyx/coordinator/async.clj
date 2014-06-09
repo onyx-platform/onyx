@@ -67,7 +67,7 @@
         (extensions/on-change sync exhaust-node exhaust-cb)
         (extensions/on-change sync complete-node complete-cb)
         
-        (if (extensions/mark-offered log task peer nodes)
+        (if (extensions/mark-offered sync task peer nodes)
           (do (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
               (revoke-cb {:peer-node peer :ack-node ack-node})
               (recur (rest tasks) (rest peers)))

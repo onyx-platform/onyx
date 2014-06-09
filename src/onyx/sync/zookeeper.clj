@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre]
             [onyx.extensions :as extensions]
-            [zookeeper :as zk])
+            [zookeeper :as zk]
+            [zookeeper.util :as util])
   (:import [java.util UUID]))
 
 (def root-path "/onyx")
@@ -228,6 +229,14 @@
   (let [prefix (:onyx-id sync)
         place (str (peer-state-path prefix) "/" subpath)]
     (extensions/read-place sync place)))
+
+(defmethod extensions/deref-place-at [ZooKeeper :peer-state]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (peer-state-path prefix) "/" subpath)
+        children (zk/children (:conn sync) place)
+        sorted-children (util/sort-sequential-nodes children)]
+    (extensions/read-place sync (last sorted-children))))
 
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]

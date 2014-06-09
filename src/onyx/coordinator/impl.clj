@@ -14,6 +14,9 @@
    :task/ingress-queues (:ingress-queues task)
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
+(defn task-complete? [sync task-node]
+  (extensions/place-exists? sync (str task-node ".complete")))
+
 (defn create-job-datom [catalog workflow tasks])
 
 (defn create-task-datom [task])
@@ -82,6 +85,16 @@
       (let [place (extensions/create-at sync :task job-id)]
         (extensions/write-place sync place (serialize-task task))))))
 
+(defmethod extensions/mark-offered ZooKeeper
+  [sync task-node peer-node nodes]
+  (let [peer-data (extensions/read-place sync peer-node)
+        peer-state (extensions/deref-place-at sync :peer-state (:id peer-data))
+        complete? (task-complete? sync task-node)]
+    (when (and (= (:state peer-state) :idle) (not complete?))
+      (let [next-path (extensions/create-at sync :peer-state (:id peer-state))
+            state {:id (:id peer-data) :state :acking :task-node task-node :nodes nodes}]
+        (extensions/write-place sync next-path state)))))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
 
@@ -99,9 +112,6 @@
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-place])
-
-(defmethod extensions/mark-offered ZooKeeper
-  [sync task peer nodes])
 
 (defmethod extensions/ack ZooKeeper
   [sync ack-place])
