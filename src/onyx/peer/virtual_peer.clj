@@ -48,6 +48,8 @@
             dead-ch (chan)]
         
         (extensions/write-place sync peer {:id id :pulse pulse :shutdown shutdown :payload payload})
+        (extensions/write-place sync pulse {:id id})
+        (extensions/write-place sync shutdown {:id id})
         (extensions/on-change sync payload #(>!! payload-ch %))
 
         (dire/with-handler! #'payload-loop

@@ -223,6 +223,12 @@
   [sync place]
   (deserialize-edn (:data (zk/data (:conn sync) place))))
 
+(defmethod extensions/read-place-at [ZooKeeper :peer-state]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (peer-state-path prefix) "/" subpath)]
+    (extensions/read-place sync place)))
+
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]
   (boolean (zk/exists (:conn sync) place)))

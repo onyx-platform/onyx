@@ -46,14 +46,18 @@
 (defn node-basis [db basis node])
 
 (defmethod extensions/mark-peer-born ZooKeeper
-  [sync place]
-  (let [peer-data (extensions/read-place sync place)
-        peer-state-path (extensions/create-at sync place (:id peer-data))
+  [sync peer-node]
+  (let [peer-data (extensions/read-place sync peer-node)
+        peer-state-path (extensions/create-at sync :peer-state (:id peer-data))
         state {:id (:id peer-data) :state :idle}]
     (extensions/write-place peer-state-path state)))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
-  [sync place])
+  [sync pulse-node]
+  (let [peer-state (extensions/read-place sync pulse-node)
+        peer-state-path (extensions/read-place-at sync :peer-state (:id peer-state))
+        state {:id (:id peer-state) :state :dead}]
+    (extensions/write-place peer-state-path state)))
 
 (defmethod extensions/plan-job ZooKeeper
   [sync catalog workflow tasks])
