@@ -5,6 +5,15 @@
             [onyx.sync.zookeeper])
   (:import [onyx.sync.zookeeper ZooKeeper]))
 
+(defn serialize-task [task]
+  {:task/id (java.util.UUID/randomUUID)
+   :task/name (:name task)
+   :task/phase (:phase task)
+   :task/consumption (:consumption task)
+   :task/complete? false
+   :task/ingress-queues (:ingress-queues task)
+   :task/egress-queues (or (vals (:egress-queues task)) [])})
+
 (defn create-job-datom [catalog workflow tasks])
 
 (defn create-task-datom [task])
@@ -61,7 +70,17 @@
     (extensions/write-place next-state-path state)))
 
 (defmethod extensions/plan-job ZooKeeper
-  [sync catalog workflow tasks])
+  [sync catalog workflow tasks]
+  (let [job-id (extensions/create sync :job)
+        workflow-path (extensions/create-at sync :workflow job-id)
+        catalog-path (extensions/create-at sync :catalog job-id)]
+
+    (extensions/write-place sync workflow-path workflow)
+    (extensions/write-place sync catalog-path catalog)
+
+    (doseq [task tasks]
+      (let [place (extensions/create-at sync :task job-id)]
+        (extensions/write-place sync place (serialize-task task))))))
 
 (defmethod extensions/next-tasks ZooKeeper
   [sync])

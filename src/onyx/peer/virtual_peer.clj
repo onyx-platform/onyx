@@ -34,7 +34,7 @@
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (let [id (str (java.util.UUID/randomUUID))]
+    (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
       (let [peer (extensions/create sync :peer)

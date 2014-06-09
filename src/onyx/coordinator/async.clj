@@ -8,15 +8,6 @@
 
 (def ch-capacity 10000)
 
-(defn serialize-task [task]
-  {:task/id (str (java.util.UUID/randomUUID))
-   :task/name (:name task)
-   :task/phase (:phase task)
-   :task/consumption (:consumption task)
-   :task/complete? false
-   :task/ingress-queues (:ingress-queues task)
-   :task/egress-queues (or (vals (:egress-queues task)) [])})
-
 (defn mark-peer-birth [sync peer death-cb]
   (let [pulse (:pulse (extensions/read-place sync peer))]
     (extensions/on-delete sync pulse death-cb)
@@ -25,27 +16,17 @@
 (defn mark-peer-death [sync pulse]
   (extensions/mark-peer-dead sync pulse))
 
-(defn plan-job [log sync queue {:keys [catalog workflow]}]
-  (let [tasks (planning/discover-tasks catalog workflow)
-        job-id (extensions/create sync :job)
-        workflow-path (extensions/create-at sync :workflow job-id)
-        catalog-path (extensions/create-at sync :catalog job-id)]
+(defn plan-job [sync queue {:keys [catalog workflow]}]
+  (let [tasks (planning/discover-tasks catalog workflow)]
+    (extensions/plan-job sync catalog workflow tasks)
 
-    (extensions/write-place sync workflow-path workflow)
-    (extensions/write-place sync catalog-path catalog)
-
-    (doseq [task tasks] (extensions/create-queue queue task))
+    (doseq [task tasks]
+      (extensions/create-queue queue task))
 
     (doseq [task tasks]
       (let [task-map (planning/find-task catalog (:name task))]
         (when (:onyx/bootstrap? task-map)
-          (extensions/bootstrap-queue queue task))))
-
-    (doseq [task tasks]
-      (let [place (extensions/create-at sync :task job-id)]
-        (extensions/write-place sync place (serialize-task task))))
-
-    (extensions/plan-job log catalog workflow tasks)))
+          (extensions/bootstrap-queue queue task))))))
 
 (defn acknowledge-task [log sync ack-place]
   (let [nodes (extensions/node-basis log :node/ack ack-place)]
@@ -129,10 +110,10 @@
         (>!! offer-head pulse))
       (recur))))
 
-(defn planning-ch-loop [log sync queue planning-tail offer-head]
+(defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
     (when-let [job (<!! planning-tail)]
-      (let [job-id (plan-job log sync queue job)]
+      (let [job-id (plan-job sync queue job)]
         (>!! offer-head job-id)
         (recur)))))
 
@@ -383,7 +364,7 @@
 
         :born-peer-thread (thread (born-peer-ch-loop sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (thread (dead-peer-ch-loop sync dead-peer-ch-tail evict-ch-head offer-ch-head))
-        :planning-thread (thread (planning-ch-loop log sync queue planning-ch-tail offer-ch-head))
+        :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))
         :ack-thread (thread (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop log sync offer-revoke-ch-tail evict-ch-head))
