@@ -14,6 +14,9 @@
 (defn peer-path [prefix]
   (str root-path "/" prefix "/peer"))
 
+(defn peer-state-path [prefix]
+  (str root-path "/" prefix "/peer-state"))
+
 (defn pulse-path [prefix]
   (str root-path "/" prefix "/pulse"))
 
@@ -44,6 +47,12 @@
 (defn shutdown-path [prefix]
   (str root-path "/" prefix "/shutdown"))
 
+(defn job-path [prefix]
+  (str root-path "/" prefix "/job"))
+
+(defn task-path [prefix job-id]
+  (str root-path "/" prefix "/job/" job-id))
+
 (defrecord ZooKeeper [addr onyx-id]
   component/Lifecycle
 
@@ -54,6 +63,7 @@
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path prefix) :persistent? true)
       (zk/create conn (peer-path prefix) :persistent? true)
+      (zk/create conn (peer-state-path prefix) :persistent? true)
       (zk/create conn (pulse-path prefix) :persistent? true)
       (zk/create conn (payload-path prefix)  :persistent? true)
       (zk/create conn (ack-path prefix) :persistent? true)
@@ -64,9 +74,9 @@
       (zk/create conn (catalog-path prefix) :persistent? true)
       (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
-      (assoc component
-        :conn conn
-        :prefix onyx-id)))
+      (zk/create conn (job-path prefix) :persistent? true)
+
+      (assoc component :conn conn :prefix onyx-id)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper")
@@ -86,6 +96,13 @@
   [sync _]
   (let [prefix (:onyx-id sync)
         place (str (peer-path prefix) "/" (UUID/randomUUID))]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :peer-state]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (peer-state-path prefix) "/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :persistent? true)
     place))
 
@@ -157,6 +174,35 @@
   (let [prefix (:onyx-id sync)
         place (str (shutdown-path prefix) "/" (UUID/randomUUID))]
     (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create [ZooKeeper :job]
+  [sync _]
+  (let [job-id (UUID/randomUUID)
+        prefix (:onyx-id sync)
+        place (str (job-path prefix) "/" job-id)]
+    (zk/create (:conn sync) place :persistent? true)
+    job-id))
+
+(defmethod extensions/create-at [ZooKeeper :workflow]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (job-path prefix) "/" subpath "/workflow")]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create-at [ZooKeeper :catalog]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (job-path prefix) "/" subpath "/catalog")]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
+
+(defmethod extensions/create-at [ZooKeeper :task]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (task-path prefix subpath) "-")]
+    (zk/create (:conn sync) place :persistent? true :sequential? true)
     place))
 
 (defmethod extensions/delete ZooKeeper

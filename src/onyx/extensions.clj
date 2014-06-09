@@ -30,6 +30,8 @@
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
 
+(defmulti create-at (fn [sync bucket subpath] [(type sync) bucket]))
+
 (defmulti delete (fn [sync place] (type sync)))
 
 (defmulti write-place (fn [sync place contents] (type sync)))
