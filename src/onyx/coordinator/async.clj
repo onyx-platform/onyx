@@ -22,8 +22,8 @@
     (extensions/on-delete sync pulse death-cb)
     (extensions/mark-peer-born sync peer)))
 
-(defn mark-peer-death [log peer]
-  (extensions/mark-peer-dead log peer))
+(defn mark-peer-death [sync pulse]
+  (extensions/mark-peer-dead sync pulse))
 
 (defn plan-job [log sync queue {:keys [catalog workflow]}]
   (let [tasks (planning/discover-tasks catalog workflow)
@@ -114,19 +114,19 @@
   (let [shutdown (:shutdown (extensions/read-place sync peer))]
     (extensions/delete sync shutdown)))
 
-(defn born-peer-ch-loop [log sync born-tail offer-head dead-head]
+(defn born-peer-ch-loop [sync born-tail offer-head dead-head]
   (loop []
     (when-let [peer (<!! born-tail)]
-      (when (mark-peer-birth log sync peer (fn [_] (>!! dead-head peer)))
+      (when (mark-peer-birth sync peer (fn [_] (>!! dead-head peer)))
         (>!! offer-head peer))
       (recur))))
 
-(defn dead-peer-ch-loop [log dead-tail evict-head offer-head]
+(defn dead-peer-ch-loop [sync dead-tail evict-head offer-head]
   (loop []
-    (when-let [peer (<!! dead-tail)]
-      (when (mark-peer-death log peer)
-        (>!! evict-head peer)
-        (>!! offer-head peer))
+    (when-let [pulse (<!! dead-tail)]
+      (when (mark-peer-death sync pulse)
+        (>!! evict-head pulse)
+        (>!! offer-head pulse))
       (recur))))
 
 (defn planning-ch-loop [log sync queue planning-tail offer-head]
@@ -381,8 +381,8 @@
         :failure-mult failure-mult
         :shutdown-mult shutdown-mult
 
-        :born-peer-thread (thread (born-peer-ch-loop log sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
-        :dead-peer-thread (thread (dead-peer-ch-loop log dead-peer-ch-tail evict-ch-head offer-ch-head))
+        :born-peer-thread (thread (born-peer-ch-loop sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
+        :dead-peer-thread (thread (dead-peer-ch-loop sync dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (thread (planning-ch-loop log sync queue planning-ch-tail offer-ch-head))
         :ack-thread (thread (ack-ch-loop log sync ack-ch-tail))
         :evict-thread (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
