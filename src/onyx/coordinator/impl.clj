@@ -56,8 +56,9 @@
   [sync pulse-node]
   (let [peer-state (extensions/read-place sync pulse-node)
         peer-state-path (extensions/read-place-at sync :peer-state (:id peer-state))
+        next-state-path (extensions/create-at sync :peer-state (:id peer-state))
         state {:id (:id peer-state) :state :dead}]
-    (extensions/write-place peer-state-path state)))
+    (extensions/write-place next-state-path state)))
 
 (defmethod extensions/plan-job ZooKeeper
   [sync catalog workflow tasks])
