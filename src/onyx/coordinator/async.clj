@@ -28,10 +28,10 @@
         (when (:onyx/bootstrap? task-map)
           (extensions/bootstrap-queue queue task))))))
 
-(defn acknowledge-task [log sync ack-place]
-  (let [nodes (extensions/node-basis log :node/ack ack-place)]
-    (extensions/ack log ack-place)
-    (extensions/touch-place sync (:node/status nodes))))
+(defn acknowledge-task [sync ack-place]
+  (let [nodes (extensions/node-basis sync :node/ack ack-place)]
+    (when (extensions/ack sync ack-place)
+      (extensions/touch-place sync (:node/status nodes)))))
 
 (defn evict-peer [log sync peer]
   (if-let [status-node (:node/status (extensions/nodes log peer))]
@@ -117,10 +117,10 @@
         (>!! offer-head job-id)
         (recur)))))
 
-(defn ack-ch-loop [log sync ack-tail]
+(defn ack-ch-loop [sync ack-tail]
   (loop []
     (when-let [ack-place (:path (<!! ack-tail))]
-      (acknowledge-task log sync ack-place)
+      (acknowledge-task sync ack-place)
       (recur))))
 
 (defn evict-ch-loop [log sync evict-tail offer-head shutdown-head]
@@ -365,7 +365,7 @@
         :born-peer-thread (thread (born-peer-ch-loop sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (thread (dead-peer-ch-loop sync dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))
-        :ack-thread (thread (ack-ch-loop log sync ack-ch-tail))
+        :ack-thread (thread (ack-ch-loop sync ack-ch-tail))
         :evict-thread (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop log sync offer-revoke-ch-tail evict-ch-head))
         :exhaust-thread (thread (exhaust-queue-loop log exhaust-ch-tail seal-ch-head))

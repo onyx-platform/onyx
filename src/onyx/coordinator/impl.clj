@@ -95,6 +95,16 @@
             state {:id (:id peer-data) :state :acking :task-node task-node :nodes nodes}]
         (extensions/write-place sync next-path state)))))
 
+(defmethod extensions/ack ZooKeeper
+  [sync ack-place]
+  (let [ack-data (extensions/read-place sync ack-place)
+        peer-state (extensions/deref-place-at sync :peer-state (:id ack-data))
+        complete? (task-complete? sync (:task-node peer-state))]
+    (when (and (= (:state peer-state) :acking) (not complete?))
+      (let [next-path (extensions/create-at sync :peer-state (:id peer-state))
+            state (assoc peer-state :state :active)]
+        (extensions/write-place sync next-path state)))))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
 
@@ -112,9 +122,6 @@
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-place])
-
-(defmethod extensions/ack ZooKeeper
-  [sync ack-place])
 
 (defmethod extensions/revoke-offer ZooKeeper
   [sync ack-place])
