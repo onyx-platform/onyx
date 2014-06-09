@@ -99,13 +99,6 @@
     (zk/create (:conn sync) place :persistent? true)
     place))
 
-(defmethod extensions/create [ZooKeeper :peer-state]
-  [sync _]
-  (let [prefix (:onyx-id sync)
-        place (str (peer-state-path prefix) "/" (UUID/randomUUID))]
-    (zk/create (:conn sync) place :persistent? true)
-    place))
-
 (defmethod extensions/create [ZooKeeper :pulse]
   [sync _]
   (let [prefix (:onyx-id sync)
@@ -183,6 +176,13 @@
         place (str (job-path prefix) "/" job-id)]
     (zk/create (:conn sync) place :persistent? true)
     job-id))
+
+(defmethod extensions/create-at [ZooKeeper :peer-state]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        place (str (peer-state-path prefix) "/" subpath)]
+    (zk/create (:conn sync) place :persistent? true)
+    place))
 
 (defmethod extensions/create-at [ZooKeeper :workflow]
   [sync _ subpath]

@@ -34,7 +34,7 @@
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (let [id (java.util.UUID/randomUUID)]
+    (let [id (str (java.util.UUID/randomUUID))]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
       (let [peer (extensions/create sync :peer)
@@ -47,7 +47,7 @@
             status-ch (chan 1)
             dead-ch (chan)]
         
-        (extensions/write-place sync peer {:pulse pulse :shutdown shutdown :payload payload})
+        (extensions/write-place sync peer {:id id :pulse pulse :shutdown shutdown :payload payload})
         (extensions/on-change sync payload #(>!! payload-ch %))
 
         (dire/with-handler! #'payload-loop

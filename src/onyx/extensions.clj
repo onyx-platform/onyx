@@ -2,31 +2,31 @@
   "Extension interfaces for internally used queues, logs,
    and distributed coordinators.")
 
-(defmulti mark-peer-born (fn [log place] (type log)))
+(defmulti mark-peer-born (fn [sync place] (type sync)))
 
-(defmulti mark-peer-dead (fn [log place] (type log)))
+(defmulti mark-peer-dead (fn [sync place] (type sync)))
 
-(defmulti mark-offered (fn [log task peer nodes] (type log)))
+(defmulti mark-offered (fn [sync task peer nodes] (type sync)))
 
-(defmulti plan-job (fn [log catalog workflow tasks] (type log)))
+(defmulti plan-job (fn [sync catalog workflow tasks] (type sync)))
 
-(defmulti ack (fn [log place] (type log)))
+(defmulti ack (fn [sync place] (type sync)))
 
-(defmulti seal-resource? (fn [log place] (type log)))
+(defmulti seal-resource? (fn [sync place] (type sync)))
 
-(defmulti revoke-offer (fn [log ack-place] (type log)))
+(defmulti revoke-offer (fn [sync ack-place] (type sync)))
 
-(defmulti complete (fn [log complete-place] (type log)))
+(defmulti complete (fn [sync complete-place] (type sync)))
 
-(defmulti next-tasks (fn [log] (type log)))
+(defmulti next-tasks (fn [sync] (type sync)))
 
-(defmulti nodes (fn [log peer] (type log)))
+(defmulti nodes (fn [sync peer] (type sync)))
 
-(defmulti node-basis (fn [log basis node] (type log)))
+(defmulti node-basis (fn [sync basis node] (type sync)))
 
-(defmulti node->task (fn [log basis node] (type log)))
+(defmulti node->task (fn [sync basis node] (type sync)))
 
-(defmulti idle-peers (fn [log] (type log)))
+(defmulti idle-peers (fn [sync] (type sync)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
 

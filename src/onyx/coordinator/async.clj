@@ -17,10 +17,10 @@
    :task/ingress-queues (:ingress-queues task)
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
-(defn mark-peer-birth [log sync peer death-cb]
+(defn mark-peer-birth [sync peer death-cb]
   (let [pulse (:pulse (extensions/read-place sync peer))]
     (extensions/on-delete sync pulse death-cb)
-    (extensions/mark-peer-born log peer)))
+    (extensions/mark-peer-born sync peer)))
 
 (defn mark-peer-death [log peer]
   (extensions/mark-peer-dead log peer))
