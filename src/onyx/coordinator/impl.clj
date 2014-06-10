@@ -49,11 +49,29 @@
 
 (defn node->task [db basis node])
 
-(defn n-active-peers [db task-id])
+(defn n-active-peers [sync task-node]
+  (let [peers (extensions/bucket sync :peer-state)]
+    (count
+     (filter
+      (fn [peer]
+        (let [state (extensions/deref-place-at sync :peer-state peer)]
+          (and (= (:task-node state) task-node)
+               (= (:state state) :active))))
+      peers))))
 
-(defn n-sealing-peers [db task-id])
+(defn n-sealing-peers [sync task-node]
+  (let [peers (extensions/bucket sync :peer-state)]
+    (count
+     (filter
+      (fn [peer]
+        (let [state (extensions/deref-place-at sync :peer-state peer)]
+          (and (= (:task-node state) task-node)
+               (= (:state state) :sealing))))
+      peers))))
 
-(defn n-peers [db task-id])
+(defn n-peers [sync task-node]
+  (+ (n-active-peers sync task-node)
+     (n-sealing-peers sync task-node)))
 
 (defn node-basis [db basis node])
 
@@ -135,11 +153,21 @@
          (= (:state state) :idle)))
      peers)))
 
+(defmethod extensions/seal-resource? ZooKeeper
+  [sync exhaust-place]
+  (let [node-data (extensions/read-place sync exhaust-place)
+        peer-state (extensions/deref-place-at sync :peer-state (:id node-data))
+        next-path (extensions/create-at sync :peer-state (:id peer-state))
+        state (assoc peer-state :state :sealing)]
+    (extensions/write-place sync next-path state)
+
+    (let [n-active (n-active-peers sync (:task-node peer-state))
+          n (n-peers sync (:task-node peer-state))]
+      {:seal? (or (= n 1) (zero? n-active))
+       :seal-node (:node/seal (:nodes peer-state))})))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
-
-(defmethod extensions/seal-resource? ZooKeeper
-  [sync exhaust-place])
 
 (defmethod extensions/complete ZooKeeper
   [sync complete-place])

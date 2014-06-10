@@ -77,8 +77,8 @@
   (when (extensions/revoke-offer sync ack-node)
     (evict-cb peer-node)))
 
-(defn exhaust-queue [log exhaust-place]
-  (extensions/seal-resource? log exhaust-place))
+(defn exhaust-queue [sync exhaust-place]
+  (extensions/seal-resource? sync exhaust-place))
 
 (defn seal-resource [sync seal? seal-place]
   (extensions/write-place sync seal-place seal?))
@@ -150,10 +150,10 @@
                     #(>!! evict-head %))
       (recur))))
 
-(defn exhaust-queue-loop [log exhaust-tail seal-head]
+(defn exhaust-queue-loop [sync exhaust-tail seal-head]
   (loop []
     (when-let [place (:path (<!! exhaust-tail))]
-      (when-let [result (exhaust-queue log place)]
+      (when-let [result (exhaust-queue sync place)]
         (>!! seal-head result))
       (recur))))
 
@@ -368,7 +368,7 @@
         :ack-thread (thread (ack-ch-loop sync ack-ch-tail))
         :evict-thread (thread (evict-ch-loop sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop sync offer-revoke-ch-tail evict-ch-head))
-        :exhaust-thread (thread (exhaust-queue-loop log exhaust-ch-tail seal-ch-head))
+        :exhaust-thread (thread (exhaust-queue-loop sync exhaust-ch-tail seal-ch-head))
         :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
         :completion-thread (thread (completion-ch-loop log sync completion-ch-tail offer-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
