@@ -38,11 +38,11 @@
 
 (defmulti read-place (fn [sync place] (type sync)))
 
-(defmulti read-place-at (fn [sync bucket subpath] [(type sync) bucket]))
-
 (defmulti deref-place-at (fn [sync bucket subpath] [(type sync) bucket]))
 
 (defmulti place-exists? (fn [sync place] (type sync)))
+
+(defmulti bucket (fn [sync bucket] [(type sync) bucket]))
 
 (defmulti version (fn [sync place] (type sync)))
 

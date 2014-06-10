@@ -39,7 +39,7 @@
 
 (defn offer-task [log sync ack-cb exhaust-cb complete-cb revoke-cb]
   (loop [[task :as tasks] (extensions/next-tasks log)
-         [peer :as peers] (extensions/idle-peers log)]
+         [peer :as peers] (extensions/idle-peers sync)]
     (when (and (seq tasks) (seq peers))
       (let [task-attrs (dissoc task :workflow :catalog)
             payload-node (:payload (extensions/read-place sync peer))

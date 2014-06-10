@@ -67,7 +67,7 @@
 (defmethod extensions/mark-peer-dead ZooKeeper
   [sync pulse-node]
   (let [peer-state (extensions/read-place sync pulse-node)
-        peer-state-path (extensions/read-place-at sync :peer-state (:id peer-state))
+        peer-state (extensions/deref-place-at sync :peer-state (:id peer-state))
         next-state-path (extensions/create-at sync :peer-state (:id peer-state))
         state {:id (:id peer-state) :state :dead}]
     (extensions/write-place next-state-path state)))
@@ -126,10 +126,16 @@
         peer-state (extensions/deref-place-at sync :peer-state (:id node-data))]
     (:task-node peer-state)))
 
-(defmethod extensions/next-tasks ZooKeeper
-  [sync])
-
 (defmethod extensions/idle-peers ZooKeeper
+  [sync]
+  (let [peers (extensions/bucket sync :peer-state)]
+    (filter
+     (fn [peer]
+       (let [state (extensions/deref-place-at sync :peer-state peer)]
+         (= (:state state) :idle)))
+     peers)))
+
+(defmethod extensions/next-tasks ZooKeeper
   [sync])
 
 (defmethod extensions/seal-resource? ZooKeeper

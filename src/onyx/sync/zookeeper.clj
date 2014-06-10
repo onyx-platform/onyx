@@ -206,6 +206,11 @@
     (zk/create (:conn sync) place :persistent? true :sequential? true)
     place))
 
+(defmethod extensions/bucket [ZooKeeper :peer-state]
+  [sync _]
+  (let [prefix (:onyx-id sync)]
+    (zk/children (:conn sync) (peer-state-path prefix))))
+
 (defmethod extensions/delete ZooKeeper
   [sync place] (zk/delete (:conn sync) place))
 
@@ -223,12 +228,6 @@
 (defmethod extensions/read-place ZooKeeper
   [sync place]
   (deserialize-edn (:data (zk/data (:conn sync) place))))
-
-(defmethod extensions/read-place-at [ZooKeeper :peer-state]
-  [sync _ subpath]
-  (let [prefix (:onyx-id sync)
-        place (str (peer-state-path prefix) "/" subpath)]
-    (extensions/read-place sync place)))
 
 (defmethod extensions/deref-place-at [ZooKeeper :peer-state]
   [sync _ subpath]
