@@ -114,11 +114,14 @@
             state {:id (:id peer-state) :state :dead}]
         (extensions/write-place sync next-path state)))))
 
+(defmethod extensions/nodes ZooKeeper
+  [sync peer-node]
+  (let [peer-data (extensions/read-place sync peer-node)
+        peer-state (extensions/deref-place-at sync :peer-state (:id peer-data))]
+    (:nodes peer-state)))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
-
-(defmethod extensions/nodes ZooKeeper
-  [sync peer])
 
 (defmethod extensions/node-basis ZooKeeper
   [sync basis node])

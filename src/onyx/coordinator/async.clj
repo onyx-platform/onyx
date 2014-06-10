@@ -33,8 +33,8 @@
     (when (extensions/ack sync ack-place)
       (extensions/touch-place sync (:node/status nodes)))))
 
-(defn evict-peer [log sync peer]
-  (if-let [status-node (:node/status (extensions/nodes log peer))]
+(defn evict-peer [sync peer]
+  (if-let [status-node (:node/status (extensions/nodes sync peer))]
     (extensions/delete sync status-node)))
 
 (defn offer-task [log sync ack-cb exhaust-cb complete-cb revoke-cb]
@@ -123,10 +123,10 @@
       (acknowledge-task sync ack-place)
       (recur))))
 
-(defn evict-ch-loop [log sync evict-tail offer-head shutdown-head]
+(defn evict-ch-loop [sync evict-tail offer-head shutdown-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
-      (evict-peer log sync peer)
+      (evict-peer sync peer)
       (>!! shutdown-head peer)
       (>!! offer-head peer)
       (recur))))
@@ -366,7 +366,7 @@
         :dead-peer-thread (thread (dead-peer-ch-loop sync dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))
         :ack-thread (thread (ack-ch-loop sync ack-ch-tail))
-        :evict-thread (thread (evict-ch-loop log sync evict-ch-tail offer-ch-head shutdown-ch-head))
+        :evict-thread (thread (evict-ch-loop sync evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop sync offer-revoke-ch-tail evict-ch-head))
         :exhaust-thread (thread (exhaust-queue-loop log exhaust-ch-tail seal-ch-head))
         :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
