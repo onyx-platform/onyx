@@ -115,16 +115,19 @@
         (extensions/write-place sync next-path state)))))
 
 (defmethod extensions/nodes ZooKeeper
-  [sync peer-node]
-  (let [peer-data (extensions/read-place sync peer-node)
-        peer-state (extensions/deref-place-at sync :peer-state (:id peer-data))]
+  [sync node]
+  (let [node-data (extensions/read-place sync node)
+        peer-state (extensions/deref-place-at sync :peer-state (:id node-data))]
     (:nodes peer-state)))
+
+(defmethod extensions/node->task ZooKeeper
+  [sync node]
+  (let [node-data (extensions/read-place sync node)
+        peer-state (extensions/deref-place-at sync :peer-state (:id node-data))]
+    (:task-node peer-state)))
 
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
-
-(defmethod extensions/node->task ZooKeeper
-  [sync basis node])
 
 (defmethod extensions/idle-peers ZooKeeper
   [sync])

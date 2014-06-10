@@ -22,9 +22,7 @@
 
 (defmulti nodes (fn [sync peer] (type sync)))
 
-(defmulti node-basis (fn [sync basis node] (type sync)))
-
-(defmulti node->task (fn [sync basis node] (type sync)))
+(defmulti node->task (fn [sync node] (type sync)))
 
 (defmulti idle-peers (fn [sync] (type sync)))
 
