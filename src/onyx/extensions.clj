@@ -22,11 +22,11 @@
 
 (defmulti nodes (fn [sync peer] (type sync)))
 
-(defmulti node->task (fn [sync node] (type sync)))
-
 (defmulti idle-peers (fn [sync] (type sync)))
 
 (defmulti create (fn [sync bucket] [(type sync) bucket]))
+
+(defmulti create-node (fn [sync node] (type sync)))
 
 (defmulti create-at (fn [sync bucket subpath] [(type sync) bucket]))
 

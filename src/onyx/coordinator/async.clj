@@ -83,13 +83,12 @@
 (defn seal-resource [sync seal? seal-place]
   (extensions/write-place sync seal-place seal?))
 
-(defn complete-task [log sync complete-place]
-  (let [task (extensions/node->task log complete-place)]
-    (if-let [result (extensions/complete log complete-place)]
-      (when (= (:n-peers result) 1)
-        (extensions/delete sync complete-place)
-        result)
-      false)))
+(defn complete-task [sync complete-place]
+  (if-let [result (extensions/complete sync complete-place)]
+    (when (= (:n-peers result) 1)
+      (extensions/delete sync complete-place)
+      result)
+    false))
 
 (defn shutdown-peer [sync peer]
   (let [shutdown (:shutdown (extensions/read-place sync peer))]

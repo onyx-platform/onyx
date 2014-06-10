@@ -178,6 +178,10 @@
     (zk/create (:conn sync) place :persistent? true)
     job-id))
 
+(defmethod extensions/create-node ZooKeeper
+  [sync node]
+  (zk/create :conn sync) node :persistent? true)
+
 (defmethod extensions/create-at [ZooKeeper :peer-state]
   [sync _ subpath]
   (let [prefix (:onyx-id sync)

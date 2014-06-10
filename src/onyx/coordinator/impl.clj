@@ -5,6 +5,8 @@
             [onyx.sync.zookeeper])
   (:import [onyx.sync.zookeeper ZooKeeper]))
 
+(def complete-marker ".complete")
+
 (defn serialize-task [task]
   {:task/id (java.util.UUID/randomUUID)
    :task/name (:name task)
@@ -15,7 +17,10 @@
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
 (defn task-complete? [sync task-node]
-  (extensions/place-exists? sync (str task-node ".complete")))
+  (extensions/place-exists? sync (str task-node complete-marker)))
+
+(defn complete-task [sync task-node]
+  (extensions/create-node sync (str task-node complete-marker)))
 
 (defn create-job-datom [catalog workflow tasks])
 
@@ -46,8 +51,6 @@
 (defn to-task [db eid])
 
 (defn select-nodes [ent])
-
-(defn node->task [db basis node])
 
 (defn n-active-peers [sync task-node]
   (let [peers (extensions/bucket sync :peer-state)]
@@ -138,12 +141,6 @@
         peer-state (extensions/deref-place-at sync :peer-state (:id node-data))]
     (:nodes peer-state)))
 
-(defmethod extensions/node->task ZooKeeper
-  [sync node]
-  (let [node-data (extensions/read-place sync node)
-        peer-state (extensions/deref-place-at sync :peer-state (:id node-data))]
-    (:task-node peer-state)))
-
 (defmethod extensions/idle-peers ZooKeeper
   [sync]
   (let [peers (extensions/bucket sync :peer-state)]
@@ -166,9 +163,20 @@
       {:seal? (or (= n 1) (zero? n-active))
        :seal-node (:node/seal (:nodes peer-state))})))
 
+(defmethod extensions/complete ZooKeeper
+  [sync complete-node]
+  (let [node-data (extensions/read-place sync complete-node)
+        peer-state (extensions/deref-place-at sync :peer-state (:id node-data))
+        complete? (task-complete? sync (:task-node node-data))
+        n (n-peers sync (:task-node node-data))]
+    (when (not complete?)
+      (let [next-path (extensions/create-at sync :peer-state (:id node-data))
+            state {:id (:id node-data) :state :idle}]
+        (when (= n 1)
+          (complete-task (:task-node node-data)))
+        (extensions/write-place sync next-path state)
+        {:n-peers n}))))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
-
-(defmethod extensions/complete ZooKeeper
-  [sync complete-place])
 
