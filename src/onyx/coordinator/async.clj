@@ -29,7 +29,7 @@
           (extensions/bootstrap-queue queue task))))))
 
 (defn acknowledge-task [sync ack-place]
-  (let [nodes (extensions/node-basis sync :node/ack ack-place)]
+  (let [nodes (extensions/nodes sync ack-place)]
     (when (extensions/ack sync ack-place)
       (extensions/touch-place sync (:node/status nodes)))))
 
@@ -50,15 +50,15 @@
             status-node (extensions/create sync :status)
             catalog-node (extensions/create sync :catalog)
             workflow-node (extensions/create sync :workflow)
-            nodes {:peer peer
-                   :payload payload-node
-                   :ack ack-node
-                   :exhaust exhaust-node
-                   :seal seal-node
-                   :completion complete-node
-                   :status status-node
-                   :catalog catalog-node
-                   :workflow workflow-node}]
+            nodes {:node/peer peer
+                   :node/payload payload-node
+                   :node/ack ack-node
+                   :node/exhaust exhaust-node
+                   :node/seal seal-node
+                   :node/completion complete-node
+                   :node/status status-node
+                   :node/catalog catalog-node
+                   :node/workflow workflow-node}]
 
         (extensions/write-place sync catalog-node (:catalog task))
         (extensions/write-place sync workflow-node (:workflow task))

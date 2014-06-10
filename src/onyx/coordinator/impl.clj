@@ -123,9 +123,6 @@
 (defmethod extensions/next-tasks ZooKeeper
   [sync])
 
-(defmethod extensions/node-basis ZooKeeper
-  [sync basis node])
-
 (defmethod extensions/node->task ZooKeeper
   [sync basis node])
 
