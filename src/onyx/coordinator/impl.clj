@@ -22,17 +22,6 @@
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
 
-(defn incomplete-jobs-ids [sync])
-
-(defn last-offered-job [sync])
-
-(defn job-candidate-seq [job-seq last-offered]
-  (if (nil? last-offered)
-    job-seq
-    (->> (cycle job-seq)
-         (drop (inc (.indexOf job-seq last-offered)))
-         (take (count job-seq)))))
-
 (defn n-active-peers [sync task-node]
   (let [peers (extensions/bucket sync :peer-state)]
     (count
@@ -161,6 +150,31 @@
         (extensions/write-place sync next-path state)
         {:n-peers n}))))
 
+(defn incomplete-jobs-ids [sync]
+  (let [job-ids (extensions/bucket sync :job)]
+    (filter
+     (fn [job-id]
+       (let [tasks (extensions/bucket-at sync :task job-id)]
+         (seq
+          (filter
+           (fn [task]
+             (let [completion (str task complete-marker)]
+               (not (extensions/place-exists-at? sync :task job-id completion))))
+           tasks))))
+     job-ids)))
+
+(defn last-offered-job [sync]
+  (extensions/deref-place-at sync :job-log nil))
+
+(defn job-candidate-seq [job-seq last-offered]
+  (if (nil? last-offered)
+    job-seq
+    (->> (cycle job-seq)
+         (drop (inc (.indexOf job-seq last-offered)))
+         (take (count job-seq)))))
+
 (defmethod extensions/next-tasks ZooKeeper
-  [sync])
+  [sync]
+  (let [job-seq (job-candidate-seq (incomplete-jobs-ids sync)
+                                   (last-offered-job sync))]))
 

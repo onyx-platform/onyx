@@ -226,6 +226,16 @@
   (let [prefix (:onyx-id sync)]
     (zk/children (:conn sync) (peer-state-path prefix))))
 
+(defmethod extensions/bucket [ZooKeeper :job]
+  [sync _]
+  (let [prefix (:onyx-id sync)]
+    (zk/children (:conn sync) (job-path prefix))))
+
+(defmethod extensions/bucket-at [ZooKeeper :task]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)]
+    (zk/children (:conn sync) (task-path prefix subpath))))
+
 (defmethod extensions/delete ZooKeeper
   [sync place] (zk/delete (:conn sync) place))
 
@@ -252,9 +262,24 @@
         sorted-children (util/sort-sequential-nodes children)]
     (extensions/read-place sync (last sorted-children))))
 
+(defmethod extensions/deref-place-at [ZooKeeper :job-log]
+  [sync _ _]
+  (let [prefix (:onyx-id sync)
+        place (str (job-log-path prefix))
+        children (zk/children (:conn sync) place)
+        sorted-children (util/sort-sequential-nodes children)]
+    (extensions/read-place sync (last sorted-children))))
+
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]
   (boolean (zk/exists (:conn sync) place)))
+
+(defmethod extensions/place-exists-at? [ZooKeeper :task]
+  [sync _ & subpaths]
+  (let [prefix (:onyx-id sync)
+        job-id (first subpaths)
+        task-id (second subpaths)]
+    (extensions/place-exists? sync (task-path prefix job-id task-id))))
 
 (defmethod extensions/version ZooKeeper
   [sync place]
