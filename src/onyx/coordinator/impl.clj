@@ -8,7 +8,7 @@
 (def complete-marker ".complete")
 
 (defn serialize-task [task]
-  {:task/id (java.util.UUID/randomUUID)
+  {:task/id (:id task)
    :task/name (:name task)
    :task/phase (:phase task)
    :task/consumption (:consumption task)
@@ -194,7 +194,8 @@
                 (= (:task/consumption task-data) :concurrent)))
             active)))
 
-(defn sort-tasks-by-peer-count [sync tasks])
+(defn sort-tasks-by-peer-count [sync tasks]
+  (sort-by (partial n-peers sync) tasks))
 
 (defn next-active-task [sync job-id]
   (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-id)]
@@ -205,5 +206,8 @@
   (let [job-seq (job-candidate-seq (incomplete-jobs-ids sync)
                                    (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
-        active-candidates (mapcat (partial next-active-task sync) job-seq)]))
+        active-candidates (mapcat (partial next-active-task sync) job-seq)
+        tasks (concat (filter identity inactive-candidates)
+                      (filter identity active-candidates))]
+    (map serialize-task tasks)))
 

@@ -37,8 +37,8 @@
   (if-let [status-node (:node/status (extensions/nodes sync peer))]
     (extensions/delete sync status-node)))
 
-(defn offer-task [log sync ack-cb exhaust-cb complete-cb revoke-cb]
-  (loop [[task :as tasks] (extensions/next-tasks log)
+(defn offer-task [sync ack-cb exhaust-cb complete-cb revoke-cb]
+  (loop [[task :as tasks] (extensions/next-tasks sync)
          [peer :as peers] (extensions/idle-peers sync)]
     (when (and (seq tasks) (seq peers))
       (let [task-attrs (dissoc task :workflow :catalog)
@@ -131,10 +131,10 @@
       (recur))))
 
 (defn offer-ch-loop
-  [log sync revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
+  [sync revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
   (loop []
     (when-let [event (<!! offer-tail)]
-      (offer-task log sync
+      (offer-task sync
                   #(>!! ack-head %)
                   #(>!! exhaust-head %)
                   #(>!! complete-head %)
@@ -372,7 +372,7 @@
         :completion-thread (thread (completion-ch-loop log sync completion-ch-tail offer-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
-        :offer-thread (thread (offer-ch-loop log sync revoke-delay offer-ch-tail ack-ch-head
+        :offer-thread (thread (offer-ch-loop sync revoke-delay offer-ch-tail ack-ch-head
                                              exhaust-ch-head completion-ch-head offer-revoke-ch-head)))))
 
   (stop [component]
