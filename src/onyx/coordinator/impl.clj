@@ -161,7 +161,8 @@
              (let [completion (str task complete-marker)]
                (not (extensions/place-exists-at? sync :task job-id completion))))
            tasks))))
-     job-ids)))
+     job-ids)
+    (sort-by (fn [job-id] (extensions/creation-time sync job-id)) job-ids)))
 
 (defn last-offered-job [sync]
   (extensions/deref-place-at sync :job-log nil))

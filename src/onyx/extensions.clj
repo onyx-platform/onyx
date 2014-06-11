@@ -44,6 +44,8 @@
 
 (defmulti place-exists-at? (fn [sync bucket & subpaths] [(type sync) bucket]))
 
+(defmulti creation-time (fn [sync node] (type sync)))
+
 (defmulti bucket (fn [sync bucket] [(type sync) bucket]))
 
 (defmulti bucket-at (fn [sync bucket subpath] [(type sync) bucket]))

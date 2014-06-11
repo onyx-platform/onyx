@@ -285,6 +285,10 @@
   [sync place]
   (:version (zk/exists (:conn sync) place)))
 
+(defmethod extensions/creation-time ZooKeeper
+  [sync node]
+  (:ctime (zk/exists (:conn sync) node)))
+
 (defmethod extensions/on-change ZooKeeper
   [sync place cb]
   (let [f (fn [event]
