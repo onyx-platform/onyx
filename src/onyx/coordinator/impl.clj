@@ -22,35 +22,16 @@
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
 
-(defn create-job-datom [catalog workflow tasks])
+(defn incomplete-jobs-ids [sync])
 
-(defn create-task-datom [task])
+(defn last-offered-job [sync])
 
-(defn find-incomplete-tasks [db job-id])
-
-(defn find-incomplete-concurrent-tasks [db job-id])
-
-(defn find-active-task-ids [db job-id tasks])
-
-(defn peer-count [db task])
-
-(defn sort-tasks-by-phase [db tasks])
-
-(defn sort-tasks-by-peer-count [db tasks])
-
-(defn next-inactive-task [db job-id])
-
-(defn next-active-task [db job-id])
-
-(defn all-active-jobs-ids [db])
-
-(defn last-offered-job [db])
-
-(defn job-candidate-seq [job-seq last-offered])
-
-(defn to-task [db eid])
-
-(defn select-nodes [ent])
+(defn job-candidate-seq [job-seq last-offered]
+  (if (nil? last-offered)
+    job-seq
+    (->> (cycle job-seq)
+         (drop (inc (.indexOf job-seq last-offered)))
+         (take (count job-seq)))))
 
 (defn n-active-peers [sync task-node]
   (let [peers (extensions/bucket sync :peer-state)]
@@ -113,7 +94,10 @@
         complete? (task-complete? sync task-node)]
     (when (and (= (:state peer-state) :idle) (not complete?))
       (let [next-path (extensions/create-at sync :peer-state (:id peer-state))
-            state {:id (:id peer-data) :state :acking :task-node task-node :nodes nodes}]
+            state {:id (:id peer-data) :state :acking :task-node task-node :nodes nodes}
+            offer-log (extensions/create sync :job-log)
+            job-id (:job-id (extensions/read-place sync task-node))]
+        (extensions/write-place sync offer-log {:job-id job-id})
         (extensions/write-place sync next-path state)))))
 
 (defmethod extensions/ack ZooKeeper

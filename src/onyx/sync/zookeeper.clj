@@ -51,6 +51,9 @@
 (defn job-path [prefix]
   (str root-path "/" prefix "/job"))
 
+(defn job-log-path [prefix]
+  (str root-path "/" prefix "/job-log"))
+
 (defn task-path [prefix job-id]
   (str root-path "/" prefix "/job/" job-id))
 
@@ -76,6 +79,7 @@
       (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
       (zk/create conn (job-path prefix) :persistent? true)
+      (zk/create conn (job-log-path prefix) :persistent? true)
 
       (assoc component :conn conn :prefix onyx-id)))
 
@@ -177,6 +181,13 @@
         place (str (job-path prefix) "/" job-id)]
     (zk/create (:conn sync) place :persistent? true)
     job-id))
+
+(defmethod extensions/create [ZooKeeper :job-log]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        place (str (job-log-path prefix) "/offer-")]
+    (zk/create (:conn sync) place :persistent? true :sequential? true)
+    place))
 
 (defmethod extensions/create-node ZooKeeper
   [sync node]
