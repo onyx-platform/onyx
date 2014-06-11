@@ -174,8 +174,21 @@
          (drop (inc (.indexOf job-seq last-offered)))
          (take (count job-seq)))))
 
+(defn sort-tasks-by-phase [sync tasks]
+  (sort-by :task/phase (map (fn [t] (extensions/read-place sync t)) tasks)))
+
+(defn find-active-task-ids [sync sorted-tasks]
+  (filter (fn [task] (not (task-complete? sync task))) sorted-tasks))
+
+(defn next-incomplete-task [sync job-id]
+  (let [incomplete-tasks (extensions/bucket-at sync :task job-id)
+        sorted-tasks (sort-tasks-by-phase sync incomplete-tasks)
+        active-tasks (find-active-task-ids sync sorted-tasks)]
+    (filter (fn [t] (not (contains? active-tasks (:id t)))) sorted-tasks)))
+
 (defmethod extensions/next-tasks ZooKeeper
   [sync]
   (let [job-seq (job-candidate-seq (incomplete-jobs-ids sync)
-                                   (last-offered-job sync))]))
+                                   (last-offered-job sync))
+        incomplete-candidates (mapcat (partial next-incomplete-task sync) job-seq)]))
 
