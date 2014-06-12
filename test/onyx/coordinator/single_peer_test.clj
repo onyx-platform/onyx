@@ -59,9 +59,15 @@
        (<!! evict-ch-spy)
        (<!! shutdown-ch-spy)
 
-       (fact
-        "There are no peers"
-        (seq (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))) => false)))))
+       (fact "There are no peers"
+             (extensions/place-exists? sync pulse) => false)
+
+       (fact "The only peer is marked as dead"
+             (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
+                   peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))
+                   peer-id (:id (extensions/read-place sync peer-path))
+                   state (extensions/deref-place-at sync :peer-state peer-id)]
+               (:state state) => :dead))))))
 
 (facts
  "planning one job with no peers"
