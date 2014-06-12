@@ -259,7 +259,8 @@
         place (str (peer-state-path prefix) "/" subpath)
         children (zk/children (:conn sync) place)
         sorted-children (util/sort-sequential-nodes children)]
-    (extensions/read-place sync (last sorted-children))))
+    (when (seq sorted-children)
+      (extensions/read-place sync (str place "/" (last sorted-children))))))
 
 (defmethod extensions/deref-place-at [ZooKeeper :job-log]
   [sync _ _]
@@ -267,7 +268,8 @@
         place (str (job-log-path prefix))
         children (zk/children (:conn sync) place)
         sorted-children (util/sort-sequential-nodes children)]
-    (extensions/read-place sync (last sorted-children))))
+    (when (seq sorted-children)
+      (extensions/read-place sync (str place "/" (last sorted-children))))))
 
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]

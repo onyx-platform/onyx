@@ -36,8 +36,9 @@
 (facts
  "peer joins and dies"
  (with-system
-   (fn [coordinator sync log]
-     (let [peer (extensions/create sync :peer)
+   (fn [coordinator sync]
+     (let [id (java.util.UUID/randomUUID)
+           peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
@@ -45,7 +46,7 @@
            shutdown-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown})
+       (extensions/write-place sync peer {:id id :pulse pulse :shutdown shutdown})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:evict-mult coordinator) evict-ch-spy)
@@ -58,15 +59,14 @@
        (<!! evict-ch-spy)
        (<!! shutdown-ch-spy)
 
-       (facts "There are no peers"
-              (let [query '[:find ?p :where [?e :node/peer ?p]]
-                    result (d/q query (d/db (:conn log)))]
-                (fact (count result) => zero?)))))))
+       (fact
+        "There are no peers"
+        (seq (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))) => false)))))
 
 (facts
  "planning one job with no peers"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [catalog [{:onyx/name :in
                      :onyx/type :input
                      :onyx/medium :hornetq
@@ -210,7 +210,7 @@
 (facts
  "planning one job with one peer"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [peer-node (extensions/create sync :peer)
            pulse-node (extensions/create sync :pulse)
            shutdown-node (extensions/create sync :shutdown)
@@ -292,7 +292,7 @@
 (facts
  "evicting one peer"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [catalog [{:onyx/name :in
                      :onyx/consumption :sequential
                      :onyx/type :input
@@ -348,7 +348,7 @@
 (facts
  "error cases"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
