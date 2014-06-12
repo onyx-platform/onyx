@@ -28,9 +28,10 @@
        (<!! offer-ch-spy)
 
        (facts "There is one peer"
-              (let [peers (zk/children (onyx-zk/peer-path (:onyx-id sync)))]
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
+                    peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))]
                 (fact (count peers) => 1)
-                (fact (:id (:data (zk/data (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))))) => id)))))))
+                (fact (:id (extensions/read-place sync peer-path)) => id)))))))
 
 (facts
  "peer joins and dies"

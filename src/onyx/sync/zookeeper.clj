@@ -197,8 +197,7 @@
   [sync _ subpath]
   (let [prefix (:onyx-id sync)
         place (str (peer-state-path prefix) "/" subpath "/state-")]
-    (zk/create (:conn sync) place :persistent? true :sequential? true)
-    place))
+    (zk/create-all (:conn sync) place :persistent? true :sequential? true)))
 
 (defmethod extensions/create-at [ZooKeeper :workflow]
   [sync _ subpath]

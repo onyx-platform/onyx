@@ -53,7 +53,7 @@
   (let [peer-data (extensions/read-place sync peer-node)
         peer-state-path (extensions/create-at sync :peer-state (:id peer-data))
         state {:id (:id peer-data) :state :idle}]
-    (extensions/write-place peer-state-path state)))
+    (extensions/write-place sync peer-state-path state)))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
   [sync pulse-node]
@@ -61,7 +61,7 @@
         peer-state (extensions/deref-place-at sync :peer-state (:id peer-state))
         next-state-path (extensions/create-at sync :peer-state (:id peer-state))
         state {:id (:id peer-state) :state :dead}]
-    (extensions/write-place next-state-path state)))
+    (extensions/write-place sync next-state-path state)))
 
 (defmethod extensions/plan-job ZooKeeper
   [sync catalog workflow tasks]

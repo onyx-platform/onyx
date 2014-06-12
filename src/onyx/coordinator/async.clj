@@ -4,7 +4,8 @@
             [taoensso.timbre :refer [info]]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.planning :as planning]))
+            [onyx.coordinator.planning :as planning]
+            [onyx.coordinator.impl]))
 
 (def ch-capacity 10000)
 

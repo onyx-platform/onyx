@@ -4,8 +4,7 @@
             [onyx.sync.zookeeper :refer [zookeeper]]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.logging-configuration :as logging-config]
-            [onyx.coordinator.impl]))
+            [onyx.logging-configuration :as logging-config]))
 
 (def coordinator-components [:logging-config :sync :queue :coordinator])
 
