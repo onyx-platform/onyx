@@ -41,7 +41,8 @@
   (loop [[task :as tasks] (extensions/next-tasks sync)
          [peer :as peers] (extensions/idle-peers sync)]
     (when (and (seq tasks) (seq peers))
-      (let [task-attrs (dissoc task :workflow :catalog)
+      (let [id (:id peer)
+            task-attrs (dissoc task :workflow :catalog)
             payload-node (:payload (extensions/read-place sync peer))
             ack-node (extensions/create sync :ack)
             exhaust-node (extensions/create sync :exhaust)
@@ -59,6 +60,12 @@
                    :node/status status-node
                    :node/catalog catalog-node
                    :node/workflow workflow-node}]
+
+        (extensions/write-place sync ack-node {:id id})
+        (extensions/write-place sync exhaust-node {:id id})
+        (extensions/write-place sync seal-node {:id id})
+        (extensions/write-place sync complete-node {:id id})
+        (extensions/write-place sync status-node {:id id})
 
         (extensions/write-place sync catalog-node (:catalog task))
         (extensions/write-place sync workflow-node (:workflow task))
@@ -163,10 +170,10 @@
       (recur))))
 
 (defn completion-ch-loop
-  [log sync complete-tail offer-head]
+  [sync complete-tail offer-head]
   (loop []
     (when-let [place (:path (<!! complete-tail))]
-      (when-let [result (complete-task log sync place)]
+      (when-let [result (complete-task sync place)]
         (>!! offer-head result))
       (recur))))
 
@@ -189,7 +196,7 @@
 (defrecord Coordinator []
   component/Lifecycle
 
-  (start [{:keys [log sync queue revoke-delay] :as component}]
+  (start [{:keys [sync queue revoke-delay] :as component}]
     (info "Starting Coordinator")
     (let [planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
@@ -369,7 +376,7 @@
         :offer-revoke-thread (thread (offer-revoke-ch-loop sync offer-revoke-ch-tail evict-ch-head))
         :exhaust-thread (thread (exhaust-queue-loop sync exhaust-ch-tail seal-ch-head))
         :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
-        :completion-thread (thread (completion-ch-loop log sync completion-ch-tail offer-ch-head))
+        :completion-thread (thread (completion-ch-loop sync completion-ch-tail offer-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
         :offer-thread (thread (offer-ch-loop sync revoke-delay offer-ch-tail ack-ch-head

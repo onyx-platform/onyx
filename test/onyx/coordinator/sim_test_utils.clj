@@ -9,18 +9,16 @@
 
 (defn with-system [f & opts]
   (let [id (str (java.util.UUID/randomUUID))
-        defaults {:datomic-uri (str "datomic:mem://" id)
-                  :hornetq-addr "localhost:5445"
+        defaults {:hornetq-addr "localhost:5445"
                   :zk-addr "127.0.0.1:2181"
                   :onyx-id id
                   :revoke-delay 4000}]
     (def system (onyx-coordinator (apply merge defaults opts)))
     (let [components (alter-var-root #'system component/start)
           coordinator (:coordinator components)
-          sync (:sync components)
-          log (:log components)]
+          sync (:sync components)]
       (try
-        (f coordinator sync log)
+        (f coordinator sync)
         (finally
          (alter-var-root #'system component/stop))))))
 

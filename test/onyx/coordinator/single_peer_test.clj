@@ -2,23 +2,24 @@
   (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan tap >!! <!!]]
             [com.stuartsierra.component :as component]
-            [datomic.api :as d]
+            [zookeeper :as zk]
             [onyx.extensions :as extensions]
             [onyx.coordinator.async :as async]
-            [onyx.coordinator.log.datomic :as datomic]
+            [onyx.sync.zookeeper :as onyx-zk]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
  "new peer"
  (with-system
-   (fn [coordinator sync log]
-     (let [peer (extensions/create sync :peer)
+   (fn [coordinator sync]
+     (let [id (java.util.UUID/randomUUID)
+           peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:pulse pulse :shutdown shutdown})
+       (extensions/write-place sync peer {:id id :pulse pulse :shutdown shutdown})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
@@ -27,10 +28,9 @@
        (<!! offer-ch-spy)
 
        (facts "There is one peer"
-              (let [query '[:find ?p :where [?e :node/peer ?p]]
-                    result (d/q query (d/db (:conn log)))]
-                (fact (count result) => 1)
-                (fact (ffirst result) => peer)))))))
+              (let [peers (zk/children (onyx-zk/peer-path (:onyx-id sync)))]
+                (fact (count peers) => 1)
+                (fact (:id (:data (zk/data (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))))) => id)))))))
 
 (facts
  "peer joins and dies"

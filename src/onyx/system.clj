@@ -1,17 +1,17 @@
 (ns onyx.system
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.async :refer [coordinator]]
-            [onyx.coordinator.log.datomic :refer [datomic log-schema]]
             [onyx.sync.zookeeper :refer [zookeeper]]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.logging-configuration :as logging-config]))
+            [onyx.logging-configuration :as logging-config]
+            [onyx.coordinator.impl]))
 
-(def coordinator-components [:logging-config :log :sync :queue :coordinator])
+(def coordinator-components [:logging-config :sync :queue :coordinator])
 
 (def peer-components [:logging-config :sync :queue :peer])
 
-(defrecord OnyxCoordinator [logging-config log sync queue]
+(defrecord OnyxCoordinator [logging-config sync queue]
   component/Lifecycle
   (start [this]
     (component/start-system this coordinator-components))
@@ -26,13 +26,12 @@
     (component/stop-system this peer-components)))
 
 (defn onyx-coordinator
-  [{:keys [log-file log-config datomic-uri hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
+  [{:keys [log-file log-config hornetq-host hornetq-port zk-addr onyx-id revoke-delay]}]
   (map->OnyxCoordinator
    {:logging-config (logging-config/logging-configuration log-file log-config)
-    :log (component/using (datomic datomic-uri (log-schema)) [:logging-config])
-    :sync (component/using (zookeeper zk-addr onyx-id) [:log])
-    :queue (component/using (hornetq hornetq-host hornetq-port) [:log])
-    :coordinator (component/using (coordinator revoke-delay) [:log :sync :queue])}))
+    :sync (component/using (zookeeper zk-addr onyx-id) [:logging-config])
+    :queue (component/using (hornetq hornetq-host hornetq-port) [:sync])
+    :coordinator (component/using (coordinator revoke-delay) [:sync :queue])}))
 
 (defn onyx-peer
   [{:keys [log-file log-config hornetq-host hornetq-port zk-addr onyx-id fn-params]}]
