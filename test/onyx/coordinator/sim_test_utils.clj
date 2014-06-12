@@ -13,14 +13,14 @@
                   :zk-addr "127.0.0.1:2181"
                   :onyx-id id
                   :revoke-delay 4000}]
-    (def system (onyx-coordinator (apply merge defaults opts)))
-    (let [components (alter-var-root #'system component/start)
-          coordinator (:coordinator components)
-          sync (:sync components)]
+    (let [system (onyx-coordinator (apply merge defaults opts))
+          live (component/start system)
+          coordinator (:coordinator live)
+          sync (:sync live)]
       (try
         (f coordinator sync)
         (finally
-         (alter-var-root #'system component/stop))))))
+         (component/stop live))))))
 
 (defn reset-conn
   "Reset connection to a scratch database. Use memory database if no
