@@ -104,15 +104,20 @@
                 (let [task-nodes (extensions/bucket-at sync :task job-id)
                       tasks (map #(extensions/read-place-at sync :task job-id %) task-nodes)]
                   (fact (count task-nodes) => 3)
-                  (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})))
+                  (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})
 
-         #_(facts ":in's ingress queue is generated"
-                (let [query '[:find ?qs :where
-                              [?t :task/name :in]
-                              [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q query db) =not=> empty?)))
+                  (facts ":in has an ingress queue")
+                  (let [task (first (filter #(= (:task/name %) :in) tasks))
+                        in-queues (:task/ingress-queues task)]
+                    (fact in-queues =not=> nil?))
 
-         #_(facts ":inc's ingress queue is :in's egress queue"
+                  (facts ":inc's ingress queue is one of :in's egress queues"
+                         (let [in (first (filter #(= (:task/name %) :in) tasks))
+                               inc (first (filter #(= (:task/name %) :inc) tasks))]
+                           (fact (:task/ingress-queues inc) =>
+                                 (first (:task/egress-queues in)))))))
+
+         #_(facts 
                 (let [in-query '[:find ?qs :where
                                  [?t :task/name :in]
                                  [?t :task/egress-queues ?qs]]
