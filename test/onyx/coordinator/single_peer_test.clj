@@ -106,40 +106,27 @@
                   (fact (count task-nodes) => 3)
                   (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})
 
-                  (facts ":in has an ingress queue")
-                  (let [task (first (filter #(= (:task/name %) :in) tasks))
-                        in-queues (:task/ingress-queues task)]
-                    (fact in-queues =not=> nil?))
+                  (facts ":in has an ingress queue"
+                         (let [task (first (filter #(= (:task/name %) :in) tasks))
+                               in-queues (:task/ingress-queues task)]
+                           (fact in-queues =not=> nil?)))
 
-                  (facts ":inc's ingress queue is one of :in's egress queues"
+                  (facts ":inc's ingress queue is :in's egress queues"
                          (let [in (first (filter #(= (:task/name %) :in) tasks))
                                inc (first (filter #(= (:task/name %) :inc) tasks))]
                            (fact (:task/ingress-queues inc) =>
-                                 (first (:task/egress-queues in)))))))
+                                 (first (:task/egress-queues in)))))
 
-         #_(facts 
-                (let [in-query '[:find ?qs :where
-                                 [?t :task/name :in]
-                                 [?t :task/egress-queues ?qs]]
-                      inc-query '[:find ?qs :where
-                                  [?t :task/name :inc]
-                                  [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q in-query db) => (d/q inc-query db))))
+                  (facts ":out's ingess queue is :inc's egress queue"
+                         (let [inc (first (filter #(= (:task/name %) :inc) tasks))
+                               out (first (filter #(= (:task/name %) :out) tasks))]
+                           (fact (:task/ingress-queues out) =>
+                                 (first (:task/egress-queues inc)))))
 
-         #_(facts ":out's ingess queue is :inc's egress queue"
-                (let [inc-query '[:find ?qs :where
-                                  [?t :task/name :inc]
-                                  [?t :task/egress-queues ?qs]]
-                      out-query '[:find ?qs :where
-                                  [?t :task/name :out]
-                                  [?t :task/ingress-queues ?qs]]]
-                  (fact (d/q inc-query db) => (d/q out-query db))))
-
-         #_(facts ":out's egress queue is generated"
-                (let [query '[:find ?qs :where
-                              [?t :task/name :out]
-                              [?t :task/egress-queues ?qs]]]
-                  (fact (d/q query db) =not=> empty?))))))))
+                  (facts ":out's egress queue is generated"
+                         (let [task (first (filter #(= (:task/name %) :out) tasks))
+                               out-queues (:task/egress-queues task)]
+                           (fact out-queues =not=> empty?))))))))))
 
 (defn test-task-life-cycle
   [{:keys [log sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
