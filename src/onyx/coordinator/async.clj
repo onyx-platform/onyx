@@ -18,8 +18,8 @@
   (extensions/mark-peer-dead sync pulse))
 
 (defn plan-job [sync queue {:keys [catalog workflow]}]
-  (let [tasks (planning/discover-tasks catalog workflow)]
-    (extensions/plan-job sync catalog workflow tasks)
+  (let [tasks (planning/discover-tasks catalog workflow)
+        job-id (extensions/plan-job sync catalog workflow tasks)]
 
     (doseq [task tasks]
       (extensions/create-queue queue task))
@@ -27,7 +27,9 @@
     (doseq [task tasks]
       (let [task-map (planning/find-task catalog (:name task))]
         (when (:onyx/bootstrap? task-map)
-          (extensions/bootstrap-queue queue task))))))
+          (extensions/bootstrap-queue queue task))))
+
+    job-id))
 
 (defn acknowledge-task [sync ack-place]
   (let [nodes (extensions/nodes sync ack-place)]

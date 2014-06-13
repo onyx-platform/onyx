@@ -55,7 +55,7 @@
   (str root-path "/" prefix "/job-log"))
 
 (defn task-path [prefix job-id]
-  (str root-path "/" prefix "/job/" job-id))
+  (str root-path "/" prefix "/job/" job-id "/task"))
 
 (defrecord ZooKeeper [addr onyx-id]
   component/Lifecycle
@@ -216,9 +216,8 @@
 (defmethod extensions/create-at [ZooKeeper :task]
   [sync _ subpath]
   (let [prefix (:onyx-id sync)
-        place (str (task-path prefix subpath) "-")]
-    (zk/create (:conn sync) place :persistent? true :sequential? true)
-    place))
+        place (str (task-path prefix subpath) "/task-")]
+    (zk/create-all (:conn sync) place :persistent? true :sequential? true)))
 
 (defmethod extensions/bucket [ZooKeeper :peer-state]
   [sync _]
@@ -252,6 +251,13 @@
 (defmethod extensions/read-place ZooKeeper
   [sync place]
   (deserialize-edn (:data (zk/data (:conn sync) place))))
+
+(defmethod extensions/read-place-at [ZooKeeper :task]
+  [sync _ & subpaths]
+  (let [prefix (:onyx-id sync)
+        job-id (first subpaths)
+        task-id (second subpaths)]
+    (extensions/read-place sync (str (task-path prefix job-id) "/" task-id))))
 
 (defmethod extensions/deref-place-at [ZooKeeper :peer-state]
   [sync _ subpath]

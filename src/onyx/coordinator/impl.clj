@@ -46,8 +46,6 @@
   (+ (n-active-peers sync task-node)
      (n-sealing-peers sync task-node)))
 
-(defn node-basis [db basis node])
-
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
   (let [peer-data (extensions/read-place sync peer-node)
@@ -74,7 +72,9 @@
 
     (doseq [task tasks]
       (let [place (extensions/create-at sync :task job-id)]
-        (extensions/write-place sync place (serialize-task task))))))
+        (extensions/write-place sync place (serialize-task task))))
+
+    job-id))
 
 (defmethod extensions/mark-offered ZooKeeper
   [sync task-node peer-node nodes]
@@ -174,17 +174,23 @@
          (drop (inc (.indexOf job-seq last-offered)))
          (take (count job-seq)))))
 
-(defn sort-tasks-by-phase [sync tasks]
+(defn sort-tasks-by-phase [sync job-id tasks]
   (sort-by :task/phase (map (fn [t] (extensions/read-place sync t)) tasks)))
 
-(defn find-active-task-ids [sync sorted-tasks]
-  (filter (fn [task] (not (task-complete? sync task))) sorted-tasks))
+(defn find-incomplete-tasks [sync tasks]
+  (clojure.pprint/pprint tasks)
+  (filter (fn [task] (not (task-complete? sync task))) tasks))
+
+(defn find-active-task-ids [sync tasks]
+  (filter (fn [task] (> (n-peers sync task) 1)) tasks))
 
 (defn next-inactive-task [sync job-id]
-  (let [inactive-tasks (extensions/bucket-at sync :task job-id)
-        sorted-tasks (sort-tasks-by-phase sync inactive-tasks)
+  (let [task-nodes (extensions/bucket-at sync :task job-id)
+        tasks (map #(extensions/read-place-at sync :task job-id %) task-nodes)
+        incomplete-tasks (find-incomplete-tasks sync tasks)
+        sorted-tasks (sort-tasks-by-phase sync job-id incomplete-tasks)
         active-tasks (find-active-task-ids sync sorted-tasks)]
-    (filter (fn [t] (not (contains? active-tasks (:id t)))) sorted-tasks)))
+    (filter (fn [t] (not (contains? active-tasks (:task/id t)))) sorted-tasks)))
 
 (defn find-incomplete-concurrent-tasks [sync job-id]
   (let [tasks (extensions/bucket-at sync :task job-id)
