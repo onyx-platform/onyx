@@ -100,9 +100,11 @@
                 (let [jobs (extensions/bucket sync :job)]
                   (fact (count jobs) => 1)))
 
-         #_(facts "There are three tasks"
-                (let [query '[:find ?n :where [?t :task/name ?n]]]
-                  (fact (d/q query db) => #{[:in] [:inc] [:out]})))
+         (facts "There are three tasks"
+                (let [task-nodes (extensions/bucket-at sync :task job-id)
+                      tasks (map #(extensions/read-place-at sync :task job-id %) task-nodes)]
+                  (fact (count task-nodes) => 3)
+                  (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})))
 
          #_(facts ":in's ingress queue is generated"
                 (let [query '[:find ?qs :where
