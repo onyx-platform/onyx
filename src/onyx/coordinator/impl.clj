@@ -63,18 +63,18 @@
 
 (defmethod extensions/plan-job ZooKeeper
   [sync catalog workflow tasks]
-  (let [job-id (extensions/create sync :job)
-        workflow-path (extensions/create-at sync :workflow job-id)
-        catalog-path (extensions/create-at sync :catalog job-id)]
+  (let [job (extensions/create sync :job)
+        workflow-path (extensions/create-at sync :workflow (:uuid job))
+        catalog-path (extensions/create-at sync :catalog (:uuid job))]
 
     (extensions/write-place sync workflow-path workflow)
     (extensions/write-place sync catalog-path catalog)
 
     (doseq [task tasks]
-      (let [place (extensions/create-at sync :task job-id)]
+      (let [place (extensions/create-at sync :task (:uuid job))]
         (extensions/write-place sync place (serialize-task task))))
 
-    job-id))
+    (:uuid job)))
 
 (defmethod extensions/mark-offered ZooKeeper
   [sync task peer-data nodes]
