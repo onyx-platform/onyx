@@ -221,18 +221,32 @@
 
 (defmethod extensions/bucket [ZooKeeper :peer-state]
   [sync _]
-  (let [prefix (:onyx-id sync)]
-    (zk/children (:conn sync) (peer-state-path prefix))))
+  (let [prefix (:onyx-id sync)
+        children (zk/children (:conn sync) (peer-state-path prefix))]
+    (map #(str (peer-state-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
-  (let [prefix (:onyx-id sync)]
-    (zk/children (:conn sync) (job-path prefix))))
+  (let [prefix (:onyx-id sync)
+        children (zk/children (:conn sync) (job-log-path prefix))]
+    (map #(str (job-log-path prefix) "/" %) children)))
+
+(defmethod extensions/bucket [ZooKeeper :job-log]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        children (zk/children (:conn sync) (job-log-path prefix))]
+    (map #(str (job-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
+  (let [prefix (:onyx-id sync)
+        children (zk/children (:conn sync) (task-path prefix subpath))]
+    (map #(str (task-path prefix subpath) "/" %) children)))
+
+(defmethod extensions/resolve-node [ZooKeeper :peer-state]
+  [sync _ subpath]
   (let [prefix (:onyx-id sync)]
-    (zk/children (:conn sync) (task-path prefix subpath))))
+    (str (peer-state-path prefix) "/" subpath)))
 
 (defmethod extensions/delete ZooKeeper
   [sync place] (zk/delete (:conn sync) place))
@@ -259,23 +273,13 @@
         task-id (second subpaths)]
     (extensions/read-place sync (str (task-path prefix job-id) "/" task-id))))
 
-(defmethod extensions/deref-place-at [ZooKeeper :peer-state]
-  [sync _ subpath]
+(defmethod extensions/dereference ZooKeeper
+  [sync node]
   (let [prefix (:onyx-id sync)
-        place (str (peer-state-path prefix) "/" subpath)
-        children (zk/children (:conn sync) place)
+        children (zk/children (:conn sync) node)
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)
-      (extensions/read-place sync (str place "/" (last sorted-children))))))
-
-(defmethod extensions/deref-place-at [ZooKeeper :job-log]
-  [sync _ _]
-  (let [prefix (:onyx-id sync)
-        place (str (job-log-path prefix))
-        children (zk/children (:conn sync) place)
-        sorted-children (util/sort-sequential-nodes children)]
-    (when (seq sorted-children)
-      (extensions/read-place sync (str place "/" (last sorted-children))))))
+      (extensions/read-place sync (str node "/" (last sorted-children))))))
 
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]

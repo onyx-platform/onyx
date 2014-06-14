@@ -1,6 +1,6 @@
 (ns onyx.extensions
   "Extension interfaces for internally used queues, logs,
-   and distributed coordinators.")
+   and distributed coordination.")
 
 (defmulti mark-peer-born (fn [sync place] (type sync)))
 
@@ -40,7 +40,9 @@
 
 (defmulti read-place-at (fn [sync place & subpaths] [(type sync) place]))
 
-(defmulti deref-place-at (fn [sync bucket subpath] [(type sync) bucket]))
+(defmulti dereference (fn [sync node] (type sync)))
+
+(defmulti resolve-node (fn [sync bucket subpath] [(type sync) bucket]))
 
 (defmulti place-exists? (fn [sync place] (type sync)))
 
