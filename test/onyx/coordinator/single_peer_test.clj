@@ -161,20 +161,21 @@
                      :node/peer :node/exhaust :node/seal}))
 
     (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
-    (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %)))
+    (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
-  #_(facts "Touching the ack node triggers the callback"
-         (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (extensions/touch-place sync (:ack nodes))
+    (facts "Touching the ack node triggers the callback"
+           (extensions/touch-place sync (:node/ack (:nodes state)))
            (let [event (<!! ack-ch-spy)]
-             (fact (:path event) => (:ack nodes)))))
+             (fact (:path event) => (:node/ack (:nodes state))))))
 
-  #_(extensions/write-place sync peer-node {:pulse pulse-node
+  (extensions/write-place sync peer-node {:peer peer-node
+                                          :pulse pulse-node
                                           :shutdown shutdown-node
                                           :payload next-payload-node})
-  #_(extensions/on-change sync next-payload-node #(>!! sync-spy %))
+  
+  (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
-  #_(<!! status-spy)
+  (<!! status-spy)
 
   #_(facts "Touching the exhaustion node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
