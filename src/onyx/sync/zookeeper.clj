@@ -244,9 +244,14 @@
     (map #(str (task-path prefix subpath) "/" %) children)))
 
 (defmethod extensions/resolve-node [ZooKeeper :peer-state]
-  [sync _ subpath]
+  [sync _ subpath & more]
   (let [prefix (:onyx-id sync)]
     (str (peer-state-path prefix) "/" subpath)))
+
+(defmethod extensions/resolve-node [ZooKeeper :job-log]
+  [sync _ & more]
+  (let [prefix (:onyx-id sync)]
+    (job-log-path prefix)))
 
 (defmethod extensions/delete ZooKeeper
   [sync place] (zk/delete (:conn sync) place))

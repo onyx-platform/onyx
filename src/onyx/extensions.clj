@@ -42,7 +42,7 @@
 
 (defmulti dereference (fn [sync node] (type sync)))
 
-(defmulti resolve-node (fn [sync bucket subpath] [(type sync) bucket]))
+(defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
 (defmulti place-exists? (fn [sync place] (type sync)))
 
