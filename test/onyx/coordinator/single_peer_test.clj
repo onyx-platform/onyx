@@ -143,11 +143,18 @@
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
 
+  (facts "It receives the task"
+         (let [task (:task (extensions/read-place sync payload-node))
+               state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-place sync peer-node)))
+               state (extensions/dereference sync state-path)
+               peer-task (extensions/read-place sync (:task-node state))]
+           (= peer-task task)))
+  
   #_(facts "It receives the task"
-           (let [task (:task (extensions/read-place sync payload-node))
-                 query '[:find ?task :in $ ?t-name :where
-                         [?task :task/name ?t-name]]]
-             (fact (:db/id task) => (ffirst (d/q query db task-name)))))
+         (let [task (:task (extensions/read-place sync payload-node))
+               query '[:find ?task :in $ ?t-name :where
+                       [?task :task/name ?t-name]]]
+           (fact (:db/id task) => (ffirst (d/q query db task-name)))))
 
   #_(facts "The peer is marked as :acking the task"
            (let [query '[:find ?task :in $ ?t-name :where

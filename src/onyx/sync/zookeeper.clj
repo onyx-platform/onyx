@@ -194,10 +194,11 @@
     {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :job-log]
-  [sync _]
+  [sync _ content]
   (let [prefix (:onyx-id sync)
-        place (str (job-log-path prefix) "/offer-")]
-    (zk/create (:conn sync) place :persistent? true :sequential? true)
+        place (str (job-log-path prefix) "/offer-")
+        data (serialize-edn content)]
+    (zk/create (:conn sync) place :data data :persistent? true :sequential? true)
     {:node place}))
 
 (defmethod extensions/create-node ZooKeeper
@@ -205,10 +206,11 @@
   (zk/create :conn sync) node :persistent? true)
 
 (defmethod extensions/create-at [ZooKeeper :peer-state]
-  [sync _ subpath]
+  [sync _ subpath content]
   (let [prefix (:onyx-id sync)
-        place (str (peer-state-path prefix) "/" subpath "/state-")]
-    (zk/create-all (:conn sync) place :persistent? true :sequential? true)))
+        place (str (peer-state-path prefix) "/" subpath "/state-")
+        data (serialize-edn content)]
+    (zk/create-all (:conn sync) place :data data :persistent? true :sequential? true)))
 
 (defmethod extensions/create-at [ZooKeeper :workflow]
   [sync _ subpath]

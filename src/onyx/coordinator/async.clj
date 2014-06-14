@@ -41,10 +41,11 @@
     (extensions/delete sync status-node)))
 
 (defn offer-task [sync ack-cb exhaust-cb complete-cb revoke-cb]
-  (loop [[task :as tasks] (extensions/next-tasks sync)
+  (loop [[task-node :as task-nodes] (extensions/next-tasks sync)
          [peer :as peers] (extensions/idle-peers sync)]
-    (when (and (seq tasks) (seq peers))
+    (when (and (seq task-nodes) (seq peers))
       (let [id (:uuid peer)
+            task (extensions/read-place sync task-node)
             task-attrs (dissoc task :workflow :catalog)
             ack (extensions/create sync :ack)
             exhaust (extensions/create sync :exhaust)
@@ -76,11 +77,11 @@
         (extensions/on-change sync (:node exhaust) exhaust-cb)
         (extensions/on-change sync (:node complete) complete-cb)
         
-        (if (extensions/mark-offered sync task peer nodes)
+        (if (extensions/mark-offered sync task-node peer nodes)
           (do (extensions/write-place sync (:payload-node peer) {:task task-attrs :nodes nodes})
               (revoke-cb {:peer-node (:peer-node peer) :ack-node (:node ack)})
-              (recur (rest tasks) (rest peers)))
-          (recur tasks (rest peers)))))))
+              (recur (rest task-nodes) (rest peers)))
+          (recur task-nodes (rest peers)))))))
 
 (defn revoke-offer [sync peer-node ack-node evict-cb]
   (when (extensions/revoke-offer sync ack-node)

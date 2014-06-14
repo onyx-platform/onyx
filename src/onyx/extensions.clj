@@ -24,11 +24,17 @@
 
 (defmulti idle-peers (fn [sync] (type sync)))
 
-(defmulti create (fn [sync bucket] [(type sync) bucket]))
+(defmulti create
+  (fn
+    ([sync bucket] [(type sync) bucket])
+    ([sync bucket content] [(type sync) bucket])))
+
+(defmulti create-at
+  (fn
+    ([sync bucket subpath] [(type sync) bucket])
+    ([sync bucket subpath content] [(type sync) bucket])))
 
 (defmulti create-node (fn [sync node] (type sync)))
-
-(defmulti create-at (fn [sync bucket subpath] [(type sync) bucket]))
 
 (defmulti delete (fn [sync place] (type sync)))
 
