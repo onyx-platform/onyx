@@ -100,94 +100,105 @@
 (defmethod extensions/create [ZooKeeper :peer]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (peer-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (peer-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :pulse]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (pulse-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (pulse-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? false)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :payload]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (payload-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (payload-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :ack]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (ack-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (ack-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :exhaust]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (exhaust-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (exhaust-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :seal]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (seal-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (seal-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :completion]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (completion-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (completion-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :status]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (status-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (status-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :catalog]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (catalog-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (catalog-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :workflow]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (workflow-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (workflow-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :shutdown]
   [sync _]
   (let [prefix (:onyx-id sync)
-        place (str (shutdown-path prefix) "/" (UUID/randomUUID))]
+        uuid (UUID/randomUUID)
+        place (str (shutdown-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    place))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :job]
   [sync _]
-  (let [job-id (UUID/randomUUID)
-        prefix (:onyx-id sync)
-        place (str (job-path prefix) "/" job-id)]
+  (let [prefix (:onyx-id sync)
+        uuid (UUID/randomUUID)
+        place (str (job-path prefix) "/" uuid)]
     (zk/create (:conn sync) place :persistent? true)
-    job-id))
+    {:node place :uuid uuid}))
 
 (defmethod extensions/create [ZooKeeper :job-log]
   [sync _]
   (let [prefix (:onyx-id sync)
         place (str (job-log-path prefix) "/offer-")]
     (zk/create (:conn sync) place :persistent? true :sequential? true)
-    place))
+    {:node place}))
 
 (defmethod extensions/create-node ZooKeeper
   [sync node]

@@ -12,33 +12,33 @@
  "new peer"
  (with-system
    (fn [coordinator sync]
-     (let [id (java.util.UUID/randomUUID)
-           peer (extensions/create sync :peer)
+     (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:id id :peer peer :pulse pulse :shutdown shutdown})
+       (extensions/write-place sync (:node peer)
+                               {:id (:uuid peer) :peer (:node peer)
+                                :pulse (:node pulse) :shutdown (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
              
-       (>!! (:born-peer-ch-head coordinator) peer)
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
        (<!! offer-ch-spy)
 
        (facts "There is one peer"
               (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
                     peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))]
                 (fact (count peers) => 1)
-                (fact (:id (extensions/read-place sync peer-path)) => id)))))))
+                (fact (:id (extensions/read-place sync peer-path)) => (:uuid peer))))))))
 
 (facts
  "peer joins and dies"
  (with-system
    (fn [coordinator sync]
-     (let [id (java.util.UUID/randomUUID)
-           peer (extensions/create sync :peer)
+     (let [peer (extensions/create sync :peer)
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
            offer-ch-spy (chan 1)
@@ -46,21 +46,23 @@
            shutdown-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync peer {:id id :peer peer :pulse pulse :shutdown shutdown})
+       (extensions/write-place sync (:node peer)
+                               {:id (:uuid peer) :peer (:node peer)
+                                :pulse (:node pulse) :shutdown (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:evict-mult coordinator) evict-ch-spy)
        (tap (:shutdown-mult coordinator) shutdown-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
              
-       (>!! (:born-peer-ch-head coordinator) peer)
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
        (<!! offer-ch-spy)
-       (extensions/delete sync pulse)
+       (extensions/delete sync (:node pulse))
        (<!! evict-ch-spy)
        (<!! shutdown-ch-spy)
 
        (fact "There are no peers"
-             (extensions/place-exists? sync pulse) => false)
+             (extensions/place-exists? sync (:node pulse)) => false)
 
        (fact "The only peer is marked as dead"
              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
