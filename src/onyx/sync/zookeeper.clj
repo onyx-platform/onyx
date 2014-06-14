@@ -254,8 +254,8 @@
     (job-log-path prefix)))
 
 (defmethod extensions/resolve-node [ZooKeeper :task]
-  [sync _ job-id & more]
-  (str job-id "/task"))
+  [sync _ job-node & more]
+  (str job-node "/task"))
 
 (defmethod extensions/children ZooKeeper
   [sync node]

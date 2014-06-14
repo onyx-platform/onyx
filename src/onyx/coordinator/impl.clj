@@ -190,7 +190,8 @@
   (filter (fn [task] (> (n-peers sync task) 1)) tasks))
 
 (defn next-inactive-task [sync job-node]
-  (let [task-nodes (extensions/children sync (str job-node "/task"))
+  (let [task-path (extensions/resolve-node sync :task job-node)
+        task-nodes (extensions/children sync task-path)
         incomplete-tasks (find-incomplete-tasks sync task-nodes)
         sorted-tasks (sort-tasks-by-phase sync incomplete-tasks)
         active-tasks (find-active-task-ids sync sorted-tasks)]
