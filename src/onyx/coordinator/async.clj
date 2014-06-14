@@ -10,7 +10,7 @@
 (def ch-capacity 10000)
 
 (defn mark-peer-birth [sync peer death-cb]
-  (let [pulse (:pulse (extensions/read-place sync peer))]
+  (let [pulse (:pulse-node (extensions/read-place sync peer))]
     (extensions/on-delete sync pulse death-cb)
     (extensions/mark-peer-born sync peer)))
 
@@ -44,42 +44,41 @@
   (loop [[task :as tasks] (extensions/next-tasks sync)
          [peer :as peers] (extensions/idle-peers sync)]
     (when (and (seq tasks) (seq peers))
-      (let [id (:id peer)
+      (let [id (:uuid peer)
             task-attrs (dissoc task :workflow :catalog)
-            payload-node (:payload peer)
-            ack-node (extensions/create sync :ack)
-            exhaust-node (extensions/create sync :exhaust)
-            seal-node (extensions/create sync :seal)
-            complete-node (extensions/create sync :completion)
-            status-node (extensions/create sync :status)
-            catalog-node (extensions/create sync :catalog)
-            workflow-node (extensions/create sync :workflow)
-            nodes {:node/peer (:peer peer)
-                   :node/payload payload-node
-                   :node/ack ack-node
-                   :node/exhaust exhaust-node
-                   :node/seal seal-node
-                   :node/completion complete-node
-                   :node/status status-node
-                   :node/catalog catalog-node
-                   :node/workflow workflow-node}]
+            ack (extensions/create sync :ack)
+            exhaust (extensions/create sync :exhaust)
+            seal (extensions/create sync :seal)
+            complete (extensions/create sync :completion)
+            status (extensions/create sync :status)
+            catalog (extensions/create sync :catalog)
+            workflow (extensions/create sync :workflow)
+            nodes {:node/peer (:peer-node peer)
+                   :node/payload (:payload-node peer)
+                   :node/ack (:node ack)
+                   :node/exhaust (:node exhaust)
+                   :node/seal (:node seal)
+                   :node/completion (:node complete)
+                   :node/status (:node status)
+                   :node/catalog (:node catalog)
+                   :node/workflow (:node workflow)}]
 
-        (extensions/write-place sync ack-node {:id id})
-        (extensions/write-place sync exhaust-node {:id id})
-        (extensions/write-place sync seal-node {:id id})
-        (extensions/write-place sync complete-node {:id id})
-        (extensions/write-place sync status-node {:id id})
+        (extensions/write-place sync (:node ack) {:id id})
+        (extensions/write-place sync (:node exhaust) {:id id})
+        (extensions/write-place sync (:node seal) {:id id})
+        (extensions/write-place sync (:node complete) {:id id})
+        (extensions/write-place sync (:node status) {:id id})
 
-        (extensions/write-place sync catalog-node (:catalog task))
-        (extensions/write-place sync workflow-node (:workflow task))
+        (extensions/write-place sync (:node catalog) (:catalog task))
+        (extensions/write-place sync (:node workflow) (:workflow task))
         
-        (extensions/on-change sync ack-node ack-cb)
-        (extensions/on-change sync exhaust-node exhaust-cb)
-        (extensions/on-change sync complete-node complete-cb)
+        (extensions/on-change sync (:node ack) ack-cb)
+        (extensions/on-change sync (:node exhaust) exhaust-cb)
+        (extensions/on-change sync (:node complete) complete-cb)
         
         (if (extensions/mark-offered sync task peer nodes)
-          (do (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
-              (revoke-cb {:peer-node peer :ack-node ack-node})
+          (do (extensions/write-place sync (:payload-node peer) {:task task-attrs :nodes nodes})
+              (revoke-cb {:peer-node (:peer-node peer) :ack-node (:node ack)})
               (recur (rest tasks) (rest peers)))
           (recur tasks (rest peers)))))))
 

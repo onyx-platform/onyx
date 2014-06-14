@@ -19,8 +19,10 @@
            failure-ch-spy (chan 1)]
 
        (extensions/write-place sync (:node peer)
-                               {:id (:uuid peer) :peer (:node peer)
-                                :pulse (:node pulse) :shutdown (:node shutdown)})
+                               {:id (:uuid peer)
+                                :peer-node (:node peer)
+                                :pulse-node (:node pulse)
+                                :shutdown-node (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
@@ -47,8 +49,10 @@
            failure-ch-spy (chan 1)]
 
        (extensions/write-place sync (:node peer)
-                               {:id (:uuid peer) :peer (:node peer)
-                                :pulse (:node pulse) :shutdown (:node shutdown)})
+                               {:id (:uuid peer)
+                                :peer-node (:node peer)
+                                :pulse-node (:node pulse)
+                                :shutdown-node (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:evict-mult coordinator) evict-ch-spy)
@@ -211,15 +215,14 @@
  "planning one job with one peer"
  (with-system
    (fn [coordinator sync]
-     (let [id (java.util.UUID/randomUUID)
-           peer-node (extensions/create sync :peer)
-           pulse-node (extensions/create sync :pulse)
-           shutdown-node (extensions/create sync :shutdown)
+     (let [peer (extensions/create sync :peer)
+           pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
 
-           in-payload-node (extensions/create sync :payload)
-           inc-payload-node (extensions/create sync :payload)
-           out-payload-node (extensions/create sync :payload)
-           future-payload-node (extensions/create sync :payload)
+           in-payload (extensions/create sync :payload)
+           inc-payload (extensions/create sync :payload)
+           out-payload (extensions/create sync :payload)
+           future-payload (extensions/create sync :payload)
                  
            sync-spy (chan 1)
            ack-ch-spy (chan 1)
@@ -249,15 +252,16 @@
        (tap (:seal-mult coordinator) seal-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
 
-       (extensions/write-place sync peer-node {:id id
-                                               :peer peer-node
-                                               :pulse pulse-node
-                                               :shutdown shutdown-node
-                                               :payload in-payload-node})
+       (extensions/write-place sync (:node peer)
+                               {:id (:uuid peer)
+                                :peer-node (:node peer)
+                                :pulse-node (:node pulse)
+                                :shutdown-node (:node shutdown)
+                                :payload-node (:node in-payload)})
 
-       (extensions/on-change sync in-payload-node #(>!! sync-spy %))
+       (extensions/on-change sync (:node in-payload) #(>!! sync-spy %))
 
-       (>!! (:born-peer-ch-head coordinator) peer-node)
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
        (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
 
        (<!! offer-ch-spy)
@@ -271,25 +275,25 @@
                          :seal-ch-spy seal-ch-spy
                          :seal-node-spy seal-node-spy
                          :completion-ch-spy completion-ch-spy
-                         :peer-node peer-node
-                         :pulse-node pulse-node}]
+                         :peer-node (:node peer)
+                         :pulse-node (:node pulse)}]
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :in
-            :payload-node in-payload-node
-            :next-payload-node inc-payload-node))
+            :payload-node (:node in-payload)
+            :next-payload-node (:node inc-payload)))
 
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :inc
-            :payload-node inc-payload-node
-            :next-payload-node out-payload-node))
+            :payload-node (:node inc-payload)
+            :next-payload-node (:node out-payload)))
 
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :out
-            :payload-node out-payload-node
-            :next-payload-node future-payload-node)))))
+            :payload-node (:node out-payload)
+            :next-payload-node (:node future-payload))))))
    {:revoke-delay 500000}))
 
 (facts
