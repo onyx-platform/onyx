@@ -44,6 +44,8 @@
 
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
+(defmulti children (fn [sync node] (type sync)))
+
 (defmulti place-exists? (fn [sync place] (type sync)))
 
 (defmulti place-exists-at? (fn [sync bucket & subpaths] [(type sync) bucket]))

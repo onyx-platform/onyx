@@ -228,14 +228,14 @@
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) (job-log-path prefix))]
-    (map #(str (job-log-path prefix) "/" %) children)))
+        children (zk/children (:conn sync) (job-path prefix))]
+    (map #(str (job-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job-log]
   [sync _]
   (let [prefix (:onyx-id sync)
         children (zk/children (:conn sync) (job-log-path prefix))]
-    (map #(str (job-path prefix) "/" %) children)))
+    (map #(str (job-log-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
@@ -252,6 +252,15 @@
   [sync _ & more]
   (let [prefix (:onyx-id sync)]
     (job-log-path prefix)))
+
+(defmethod extensions/resolve-node [ZooKeeper :task]
+  [sync _ job-id & more]
+  (str job-id "/task"))
+
+(defmethod extensions/children ZooKeeper
+  [sync node]
+  (let [children (zk/children (:conn sync) node)]
+    (map #(str node "/" %) children)))
 
 (defmethod extensions/delete ZooKeeper
   [sync place] (zk/delete (:conn sync) place))

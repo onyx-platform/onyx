@@ -103,7 +103,7 @@
 
          (facts "There are three tasks"
                 (let [task-nodes (extensions/bucket-at sync :task job-id)
-                      tasks (map #(extensions/read-place-at sync :task job-id %) task-nodes)]
+                      tasks (map #(extensions/read-place sync %) task-nodes)]
                   (fact (count task-nodes) => 3)
                   (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})
 
@@ -137,7 +137,6 @@
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
 
-  (prn "!!")
   #_(facts "It receives the task"
            (let [task (:task (extensions/read-place sync payload-node))
                  query '[:find ?task :in $ ?t-name :where

@@ -156,7 +156,7 @@
         (extensions/write-place sync next-path state)
         {:n-peers n}))))
 
-(defn incomplete-jobs-ids [sync]
+(defn incomplete-job-ids [sync]
   (let [job-ids (extensions/bucket sync :job)]
     (filter
      (fn [job-id]
@@ -180,7 +180,7 @@
          (drop (inc (.indexOf job-seq last-offered)))
          (take (count job-seq)))))
 
-(defn sort-tasks-by-phase [sync job-id tasks]
+(defn sort-tasks-by-phase [sync tasks]
   (sort-by :task/phase (map (fn [t] (extensions/read-place sync t)) tasks)))
 
 (defn find-incomplete-tasks [sync tasks]
@@ -189,16 +189,15 @@
 (defn find-active-task-ids [sync tasks]
   (filter (fn [task] (> (n-peers sync task) 1)) tasks))
 
-(defn next-inactive-task [sync job-id]
-  (let [task-nodes (extensions/bucket-at sync :task job-id)
-        tasks (map #(extensions/read-place-at sync :task job-id %) task-nodes)
+(defn next-inactive-task [sync job-node]
+  (let [task-nodes (extensions/children sync (str job-node "/task"))
         incomplete-tasks (find-incomplete-tasks sync task-nodes)
-        sorted-tasks (sort-tasks-by-phase sync job-id incomplete-tasks)
+        sorted-tasks (sort-tasks-by-phase sync incomplete-tasks)
         active-tasks (find-active-task-ids sync sorted-tasks)]
-    (filter (fn [t] (not (contains? active-tasks (:task/id t)))) sorted-tasks)))
+    (filter (fn [t] (not (contains? #{(:task/id t)} active-tasks))) sorted-tasks)))
 
-(defn find-incomplete-concurrent-tasks [sync job-id]
-  (let [tasks (extensions/bucket-at sync :task job-id)
+(defn find-incomplete-concurrent-tasks [sync job-node]
+  (let [tasks (extensions/children sync job-node)
         active (find-active-task-ids sync tasks)]
     (filter (fn [task]
               (let [task-data (extensions/read-place sync task)]
@@ -208,13 +207,13 @@
 (defn sort-tasks-by-peer-count [sync tasks]
   (sort-by (partial n-peers sync) tasks))
 
-(defn next-active-task [sync job-id]
-  (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-id)]
+(defn next-active-task [sync job-node]
+  (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-node)]
     (sort-tasks-by-peer-count sync incomplete-tasks)))
 
 (defmethod extensions/next-tasks ZooKeeper
   [sync]
-  (let [job-seq (job-candidate-seq (incomplete-jobs-ids sync)
+  (let [job-seq (job-candidate-seq (incomplete-job-ids sync)
                                    (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
         active-candidates (mapcat (partial next-active-task sync) job-seq)
