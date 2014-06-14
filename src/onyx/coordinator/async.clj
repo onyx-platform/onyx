@@ -46,7 +46,7 @@
     (when (and (seq tasks) (seq peers))
       (let [id (:id peer)
             task-attrs (dissoc task :workflow :catalog)
-            payload-node (:payload (extensions/read-place sync peer))
+            payload-node (:payload peer)
             ack-node (extensions/create sync :ack)
             exhaust-node (extensions/create sync :exhaust)
             seal-node (extensions/create sync :seal)
@@ -54,7 +54,7 @@
             status-node (extensions/create sync :status)
             catalog-node (extensions/create sync :catalog)
             workflow-node (extensions/create sync :workflow)
-            nodes {:node/peer peer
+            nodes {:node/peer (:peer peer)
                    :node/payload payload-node
                    :node/ack ack-node
                    :node/exhaust exhaust-node

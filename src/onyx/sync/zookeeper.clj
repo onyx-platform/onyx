@@ -243,6 +243,11 @@
         children (zk/children (:conn sync) (task-path prefix subpath))]
     (map #(str (task-path prefix subpath) "/" %) children)))
 
+(defmethod extensions/resolve-node [ZooKeeper :peer]
+  [sync _ subpath]
+  (let [prefix (:onyx-id sync)]
+    (str (peer-path prefix) "/" subpath)))
+
 (defmethod extensions/resolve-node [ZooKeeper :peer-state]
   [sync _ subpath & more]
   (let [prefix (:onyx-id sync)]

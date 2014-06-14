@@ -49,7 +49,7 @@
   [sync peer-node]
   (let [peer-data (extensions/read-place sync peer-node)
         peer-state-path (extensions/create-at sync :peer-state (:id peer-data))
-        state {:id (:id peer-data) :state :idle}]
+        state {:id (:id peer-data) :peer (:peer peer-data) :state :idle}]
     (extensions/write-place sync peer-state-path state)))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
@@ -58,7 +58,7 @@
         state-path (extensions/resolve-node sync :peer-state (:id peer-state))
         peer-state (extensions/dereference sync state-path)
         next-state-path (extensions/create-at sync :peer-state (:id peer-state))
-        state {:id (:id peer-state) :state :dead}]
+        state {:id (:id peer-state) :peer (:peer peer-state) :state :dead}]
     (extensions/write-place sync next-state-path state)))
 
 (defmethod extensions/plan-job ZooKeeper
@@ -77,16 +77,16 @@
     job-id))
 
 (defmethod extensions/mark-offered ZooKeeper
-  [sync task-node peer-node nodes]
-  (let [peer-data (extensions/read-place sync peer-node)
-        state-path (extensions/resolve-node sync :peer-state (:id peer-data))
+  [sync task peer-data nodes]
+  (let [state-path (extensions/resolve-node sync :peer-state (:id peer-data))
         peer-state (extensions/dereference sync state-path)
-        complete? (task-complete? sync task-node)]
+        complete? (task-complete? sync task)]
     (when (and (= (:state peer-state) :idle) (not complete?))
       (let [next-path (extensions/create-at sync :peer-state (:id peer-state))
-            state {:id (:id peer-data) :state :acking :task-node task-node :nodes nodes}
+            state {:id (:id peer-data) :peer (:peer peer-data)
+                   :state :acking :task-node (:id task) :nodes nodes}
             offer-log (extensions/create sync :job-log)
-            job-id (:job-id (extensions/read-place sync task-node))]
+            job-id (:job-id (extensions/read-place sync task))]
         (extensions/write-place sync offer-log {:job-id job-id})
         (extensions/write-place sync next-path state)))))
 
@@ -121,11 +121,15 @@
 (defmethod extensions/idle-peers ZooKeeper
   [sync]
   (let [peers (extensions/bucket sync :peer-state)]
-    (filter
+    (map
      (fn [peer]
        (let [state (extensions/dereference sync peer)]
-         (= (:state state) :idle)))
-     peers)))
+         (extensions/read-place sync (:peer state))))
+     (filter
+      (fn [peer]
+        (let [state (extensions/dereference sync peer)]
+          (= (:state state) :idle)))
+      peers))))
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-place]
@@ -217,8 +221,7 @@
   (let [job-seq (job-candidate-seq (incomplete-job-ids sync)
                                    (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
-        active-candidates (mapcat (partial next-active-task sync) job-seq)
-        tasks (concat (filter identity inactive-candidates)
-                      (filter identity active-candidates))]
-    (map serialize-task tasks)))
+        active-candidates (mapcat (partial next-active-task sync) job-seq)]
+    (concat (filter identity inactive-candidates)
+            (filter identity active-candidates))))
 
