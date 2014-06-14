@@ -143,34 +143,26 @@
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
 
-  (facts "It receives the task"
-         (let [task (:task (extensions/read-place sync payload-node))
-               state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-place sync peer-node)))
-               state (extensions/dereference sync state-path)
-               peer-task (extensions/read-place sync (:task-node state))]
-           (= peer-task task)))
-  
-  #_(facts "It receives the task"
-         (let [task (:task (extensions/read-place sync payload-node))
-               query '[:find ?task :in $ ?t-name :where
-                       [?task :task/name ?t-name]]]
-           (fact (:db/id task) => (ffirst (d/q query db task-name)))))
+  (let [task (:task (extensions/read-place sync payload-node))
+        state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-place sync peer-node)))
+        state (extensions/dereference sync state-path)]
 
-  #_(facts "The peer is marked as :acking the task"
-           (let [query '[:find ?task :in $ ?t-name :where
-                         [?peer :peer/status :acking]
-                         [?peer :peer/task ?task]
-                         [?task :task/name ?t-name]]]
-             (fact (count (d/q query db task-name)) => 1)))
+    (fact "It receives the task"
+          (extensions/read-place sync (:task-node state)) => task)
 
-  #_(facts "The payload node contains the other node paths"
-         (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (fact (into #{} (keys nodes)) =>
-                 #{:payload :ack :completion :status :catalog
-                   :workflow :peer :exhaust :seal})
-           (extensions/on-change sync (:status nodes) #(>!! status-spy %))
-           (extensions/on-change sync (:seal nodes) #(>!! seal-node-spy %))))
-  
+    (fact "The peer's state is :acking the task"
+          (:state state) => :acking)
+
+
+    (fact "The payload node contains the other node paths"
+          (fact (into #{} (keys (:nodes state)))
+                => #{:node/payload :node/ack :node/completion
+                     :node/status :node/catalog :node/workflow
+                     :node/peer :node/exhaust :node/seal}))
+
+    (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
+    (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %)))
+
   #_(facts "Touching the ack node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
            (extensions/touch-place sync (:ack nodes))
