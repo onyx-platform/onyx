@@ -186,15 +186,15 @@
 
   (<!! seal-node-spy)
 
-  #_(facts "The resource should be sealed"
+  (facts "The resource should be sealed"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (fact (extensions/read-place sync (:seal nodes)) => true)))
+           (fact (extensions/read-place sync (:node/seal nodes)) => true)))
 
-  #_(facts "Touching the completion node triggers the callback"
+  (facts "Touching the completion node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (extensions/touch-place sync (:completion nodes))
+           (extensions/touch-place sync (:node/completion nodes))
            (let [event (<!! completion-ch-spy)]
-             (fact (:path event) => (:completion nodes)))))
+             (fact (:path event) => (:node/completion nodes)))))
 
   #_(facts "The offer channel receives the tx id of the completion"
            (let [tx-id (:tx (<!! offer-ch-spy))
