@@ -144,7 +144,7 @@
   (let [node-data (extensions/read-place sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (extensions/dereference sync state-path)
-        complete? (task-complete? sync (:task-node node-data))
+        complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node node-data))]
     (when (not complete?)
       (let [state {:id (:id node-data) :state :idle}]

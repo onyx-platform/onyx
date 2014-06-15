@@ -196,20 +196,19 @@
            (let [event (<!! completion-ch-spy)]
              (fact (:path event) => (:node/completion nodes)))))
 
-  #_(facts "The offer channel receives the tx id of the completion"
-           (let [tx-id (:tx (<!! offer-ch-spy))
-                 db (d/as-of (d/db (:conn log)) tx-id)]
+  (facts "The offer channel receives the number of peers active"
+         (prn (<!! offer-ch-spy))
 
-             (facts "The peer's nodes have been stripped"
-                    (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
-                                  [?p :peer/status :idle]
-                                  [?p :node/peer ?peer-node]
-                                  [?p :node/payload ?payload]
-                                  [?p :node/ack ?ack]
-                                  [?p :node/status ?status]
-                                  [?p :node/completion ?completion]]
-                          result (d/q query db peer-node)]
-                      (fact result => empty?))))))
+         #_(facts "The peer's nodes have been stripped"
+                (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
+                              [?p :peer/status :idle]
+                              [?p :node/peer ?peer-node]
+                              [?p :node/payload ?payload]
+                              [?p :node/ack ?ack]
+                              [?p :node/status ?status]
+                              [?p :node/completion ?completion]]
+                      result (d/q query db peer-node)]
+                  (fact result => empty?)))))
 
 (facts
  "planning one job with one peer"
