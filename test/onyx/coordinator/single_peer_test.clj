@@ -177,14 +177,14 @@
 
   (<!! status-spy)
 
-  #_(facts "Touching the exhaustion node triggers the callback"
+  (facts "Touching the exhaustion node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (extensions/touch-place sync (:exhaust nodes))
+           (extensions/touch-place sync (:node/exhaust nodes))
            (let [event (<!! seal-ch-spy)]
              (fact (:seal? event) => true)
-             (fact (:seal-node event) => (:seal nodes)))))
+             (fact (:seal-node event) => (:node/seal nodes)))))
 
-  #_(<!! seal-node-spy)
+  (<!! seal-node-spy)
 
   #_(facts "The resource should be sealed"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
