@@ -44,7 +44,7 @@
   (loop [[task-node :as task-nodes] (extensions/next-tasks sync)
          [peer :as peers] (extensions/idle-peers sync)]
     (when (and (seq task-nodes) (seq peers))
-      (let [id (:uuid peer)
+      (let [id (:id peer)
             task (extensions/read-place sync task-node)
             task-attrs (dissoc task :workflow :catalog)
             ack (extensions/create sync :ack)

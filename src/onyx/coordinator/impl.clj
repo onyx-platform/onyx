@@ -70,9 +70,8 @@
     (extensions/write-place sync catalog-path catalog)
 
     (doseq [task tasks]
-      (let [place (extensions/create-at sync :task (:uuid job))]
-        (extensions/write-place sync place (serialize-task task (:uuid job)))))
-
+      (let [data (serialize-task task (:uuid job))
+            place (extensions/create-at sync :task (:uuid job) data)]))
     (:uuid job)))
 
 (defmethod extensions/mark-offered ZooKeeper
@@ -191,9 +190,11 @@
   (let [task-path (extensions/resolve-node sync :task job-node)
         task-nodes (extensions/children sync task-path)
         incomplete-tasks (find-incomplete-tasks sync task-nodes)
-        sorted-tasks (sort-tasks-by-phase sync incomplete-tasks)
-        active-tasks (find-active-task-ids sync sorted-tasks)]
-    (filter (fn [t] (not (contains? #{(:task/id t)} active-tasks))) sorted-tasks)))
+        sorted-task-nodes (sort-tasks-by-phase sync incomplete-tasks)
+        active-task-ids (find-active-task-ids sync sorted-task-nodes)]
+    (filter (fn [t] (not (some #{(:task/id (extensions/read-place sync t))}
+                              active-task-ids)))
+            sorted-task-nodes)))
 
 (defn find-incomplete-concurrent-tasks [sync job-node]
   (let [tasks (extensions/children sync job-node)

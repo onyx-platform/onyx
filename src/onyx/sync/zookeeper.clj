@@ -232,6 +232,13 @@
         place (str (task-path prefix subpath) "/task-")]
     (zk/create-all (:conn sync) place :persistent? true :sequential? true)))
 
+(defmethod extensions/create-at [ZooKeeper :task]
+  [sync _ subpath content]
+  (let [prefix (:onyx-id sync)
+        data (serialize-edn content)
+        place (str (task-path prefix subpath) "/task-")]
+    (zk/create-all (:conn sync) place :data data :persistent? true :sequential? true)))
+
 (defmethod extensions/bucket [ZooKeeper :peer-state]
   [sync _]
   (let [prefix (:onyx-id sync)
