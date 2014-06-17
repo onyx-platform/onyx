@@ -23,8 +23,8 @@
   (serialize sync-ch extensions/mark-peer-dead sync pulse))
 
 (defn plan-job [sync queue {:keys [catalog workflow]}]
-  (let [tasks (planning/discover-tasks catalog workflow)
-        job-id (extensions/plan-job sync catalog workflow tasks)]
+  (let [job-id (java.util.UUID/randomUUID)
+        tasks (planning/discover-tasks catalog workflow)]
 
     (doseq [task tasks]
       (extensions/create-queue queue task))
@@ -34,6 +34,7 @@
         (when (:onyx/bootstrap? task-map)
           (extensions/bootstrap-queue queue task))))
 
+    (extensions/plan-job sync job-id tasks)
     job-id))
 
 (defn acknowledge-task [sync sync-ch ack-place]
