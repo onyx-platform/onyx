@@ -315,7 +315,8 @@
         children (or (zk/children (:conn sync) node) [])
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)
-      (extensions/read-place sync (str node "/" (last sorted-children))))))
+      (let [path  (str node "/" (last sorted-children))]
+        {:node path :content (extensions/read-place sync path)}))))
 
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]

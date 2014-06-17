@@ -73,7 +73,7 @@
                    peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))
                    peer-id (:id (extensions/read-place sync peer-path))
                    state-path (extensions/resolve-node sync :peer-state peer-id)
-                   state (extensions/dereference sync state-path)]
+                   state (:content (extensions/dereference sync state-path))]
                (:state state) => :dead))))))
 
 (facts

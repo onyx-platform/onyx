@@ -30,7 +30,7 @@
     (count
      (filter
       (fn [peer]
-        (let [state (extensions/dereference sync peer)]
+        (let [state (:content (extensions/dereference sync peer))]
           (and (= (:task-node state) task-node)
                (= (:state state) :active))))
       peers))))
@@ -40,7 +40,7 @@
     (count
      (filter
       (fn [peer]
-        (let [state (extensions/dereference sync peer)]
+        (let [state (:content (extensions/dereference sync peer))]
           (and (= (:task-node state) task-node)
                (= (:state state) :sealing))))
       peers))))
@@ -56,10 +56,10 @@
     (:node (extensions/create-at sync :peer-state (:id peer-data) state))))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
-  [sync pulse-node]
-  (let [peer-state (extensions/read-place sync pulse-node)
-        state-path (extensions/resolve-node sync :peer-state (:id peer-state))
-        peer-state (extensions/dereference sync state-path)
+  [sync peer-node]
+  (let [node-data (extensions/read-place sync peer-node)
+        state-path (extensions/resolve-node sync :peer-state (:id node-data))
+        peer-state (:content (extensions/dereference sync state-path))
         state {:id (:id peer-state) :peer-node (:peer-node peer-state) :state :dead}]
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
 
@@ -72,12 +72,11 @@
   job-id)
 
 (defmethod extensions/mark-offered ZooKeeper
-  [sync task-node peer-data nodes]
-  (let [state-path (extensions/resolve-node sync :peer-state (:id peer-data))
-        peer-state (extensions/dereference sync state-path)
+  [sync task-node state-path nodes]
+  (let [peer-state (extensions/read-place sync state-path)
         complete? (task-complete? sync task-node)]
     (when (and (= (:state peer-state) :idle) (not complete?))
-      (let [state {:id (:id peer-data) :peer-node (:peer-node peer-data)
+      (let [state {:id (:id peer-state) :peer-node (:peer-node peer-state)
                    :state :acking :task-node task-node :nodes nodes}
             next-path (:node (extensions/create-at sync :peer-state (:id peer-state) state))
             task (extensions/read-place sync task-node)
@@ -87,8 +86,7 @@
 (defmethod extensions/ack ZooKeeper
   [sync ack-place]
   (let [ack-data (extensions/read-place sync ack-place)
-        state-path (extensions/resolve-node sync :peer-state (:id ack-data))
-        peer-state (extensions/dereference sync state-path)
+        peer-state (extensions/read-place sync (:state-node ack-data))
         complete? (task-complete? sync (:task-node peer-state))]
     (when (and (= (:state peer-state) :acking) (not complete?))
       (let [state (assoc peer-state :state :active)]
@@ -97,8 +95,7 @@
 (defmethod extensions/revoke-offer ZooKeeper
   [sync ack-place]
   (let [ack-data (extensions/read-place sync ack-place)
-        state-path (extensions/resolve-node sync :peer-state (:id ack-data))
-        peer-state (extensions/dereference sync state-path)]
+        peer-state (extensions/read-place sync (:state-node ack-data))]
     (when (= (:state peer-state) :acking)
       (let [state {:id (:id peer-state) :state :dead}]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
@@ -106,21 +103,20 @@
 (defmethod extensions/nodes ZooKeeper
   [sync node]
   (let [node-data (extensions/read-place sync node)
-        state-path (extensions/resolve-node sync :peer-state (:id node-data))
-        peer-state (extensions/dereference sync state-path)]
+        peer-state (extensions/read-place sync (:state-node node-data))]
     (:nodes peer-state)))
 
 (defmethod extensions/idle-peers ZooKeeper
   [sync]
   (->> (extensions/bucket sync :peer-state)
        (map (partial extensions/dereference sync))
-       (filter #(= (:state %) :idle))))
+       (filter #(= (:state (:content %)) :idle))))
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-place]
   (let [node-data (extensions/read-place sync exhaust-place)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
-        peer-state (extensions/dereference sync state-path)
+        peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :sealing)]
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))        
 
@@ -133,7 +129,7 @@
   [sync complete-node]
   (let [node-data (extensions/read-place sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
-        peer-state (extensions/dereference sync state-path)
+        peer-state (:content (extensions/dereference sync state-path))
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node peer-state))]
     (when (not complete?)
@@ -158,7 +154,7 @@
     (sort-by (fn [job-id] (extensions/creation-time sync job-id)) job-ids)))
 
 (defn last-offered-job [sync]
-  (extensions/dereference sync (extensions/resolve-node sync :job-log)))
+  (:content (extensions/dereference sync (extensions/resolve-node sync :job-log))))
 
 (defn job-candidate-seq [job-seq last-offered]
   (if (nil? last-offered)
@@ -171,7 +167,6 @@
   (try
     (doall (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
     (catch Exception e
-      (prn "->" tasks)
       (.printStackTrace e)
       [])))
 
@@ -205,7 +200,6 @@
   (try
     (sort-by (partial n-peers sync) tasks)
     (catch Exception e
-      (prn "~~~~>" tasks)
       (.printStackTrace e)
       [])))
 
@@ -221,6 +215,6 @@
         active-candidates (mapcat (partial next-active-task sync) job-seq)
         rets (concat (filter identity inactive-candidates)
                      (filter identity active-candidates))]
-    (clojure.pprint/pprint rets)
+;;    (clojure.pprint/pprint rets)
     rets))
 

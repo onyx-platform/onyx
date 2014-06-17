@@ -1,11 +1,11 @@
 (ns ^:no-doc onyx.coordinator.async
-  (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
-            [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info]]
-            [dire.core :as dire]
-            [onyx.extensions :as extensions]
-            [onyx.coordinator.planning :as planning]
-            [onyx.coordinator.impl]))
+    (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
+              [com.stuartsierra.component :as component]
+              [taoensso.timbre :refer [info]]
+              [dire.core :as dire]
+              [onyx.extensions :as extensions]
+              [onyx.coordinator.planning :as planning]
+              [onyx.coordinator.impl]))
 
 (def ch-capacity 10000)
 
@@ -19,8 +19,8 @@
     (extensions/on-delete sync pulse death-cb)
     (serialize sync-ch extensions/mark-peer-born sync peer)))
 
-(defn mark-peer-death [sync sync-ch pulse]
-  (serialize sync-ch extensions/mark-peer-dead sync pulse))
+(defn mark-peer-death [sync sync-ch peer-node]
+  (serialize sync-ch extensions/mark-peer-dead sync peer-node))
 
 (defn plan-job [sync queue {:keys [catalog workflow]}]
   (let [job-id (java.util.UUID/randomUUID)
@@ -44,21 +44,23 @@
       (when (extensions/ack sync ack-place)
         (extensions/touch-place sync (:node/status nodes))))))
 
-(defn evict-peer [sync sync-ch peer]
+(defn evict-peer [sync sync-ch peer-node]
   (serialize
    sync-ch
-   #(if-let [status-node (:node/status (extensions/nodes sync peer))]
+   #(let [node-data (extensions/read-place sync peer-node)
+          state-path (extensions/resolve-node sync :peer-state (:id node-data))
+          peer-state (:content (extensions/dereference sync state-path))
+          status-node (:node/status (:nodes peer-state))]
       (extensions/delete sync status-node))))
 
 (defn offer-task [sync sync-ch ack-cb exhaust-cb complete-cb revoke-cb]
-  (prn "Calling to offer")
   (serialize
    sync-ch
    #(loop [[task-node :as task-nodes] (extensions/next-tasks sync)
            [peer :as peers] (extensions/idle-peers sync)]
-      (prn (count task-nodes) "::" (count peers))
       (when (and (seq task-nodes) (seq peers))
-        (let [id (:id peer)
+        (let [peer-node (:node peer)
+              peer-content (:content peer)
               task (extensions/read-place sync task-node)
               task-attrs (dissoc task :workflow :catalog)
               ack (extensions/create sync :ack)
@@ -68,8 +70,8 @@
               status (extensions/create sync :status)
               catalog (extensions/create sync :catalog)
               workflow (extensions/create sync :workflow)
-              nodes {:node/peer (:peer-node peer)
-                     :node/payload (:payload-node peer)
+              nodes {:node/peer (:peer-node peer-content)
+                     :node/payload (:payload-node peer-content)
                      :node/ack (:node ack)
                      :node/exhaust (:node exhaust)
                      :node/seal (:node seal)
@@ -78,11 +80,11 @@
                      :node/catalog (:node catalog)
                      :node/workflow (:node workflow)}]
 
-          (extensions/write-place sync (:node ack) {:id id})
-          (extensions/write-place sync (:node exhaust) {:id id})
-          (extensions/write-place sync (:node seal) {:id id})
-          (extensions/write-place sync (:node complete) {:id id})
-          (extensions/write-place sync (:node status) {:id id})
+          (extensions/write-place sync (:node ack) {:state-node peer-node})
+          (extensions/write-place sync (:node exhaust) {:state-node peer-node})
+          (extensions/write-place sync (:node seal) {:state-node peer-node})
+          (extensions/write-place sync (:node complete) {:state-node peer-node})
+          (extensions/write-place sync (:node status) {:state-node peer-node})
 
           (extensions/write-place sync (:node catalog) (:catalog task))
           (extensions/write-place sync (:node workflow) (:workflow task))
@@ -91,16 +93,16 @@
           (extensions/on-change sync (:node exhaust) exhaust-cb)
           (extensions/on-change sync (:node complete) complete-cb)
          
-          (if (extensions/mark-offered sync task-node peer nodes)
-            (let [peer-data (extensions/read-place sync (:peer-node peer))]
-              (extensions/write-place sync (:payload-node peer-data) {:task task-attrs :nodes nodes})
-              (revoke-cb {:peer-node (:peer-node peer-data) :ack-node (:node ack)})
+          (if (extensions/mark-offered sync task-node peer-node nodes)
+            (do
+              (extensions/write-place sync (:payload-node peer-content) {:task task-attrs :nodes nodes})
+              (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))
             (recur task-nodes (rest peers))))))))
 
 (defn revoke-offer [sync peer-node ack-node evict-cb]
   (when (extensions/revoke-offer sync ack-node)
-    (evict-cb peer-node)))
+    (evict-cb ack-node)))
 
 (defn exhaust-queue [sync sync-ch exhaust-place]
   (serialize
@@ -113,7 +115,6 @@
 (defn complete-task [sync complete-place]
   (if-let [result (extensions/complete sync complete-place)]
     (when (= (:n-peers result) 1)
-      (prn "Deleted the completion node")
       (extensions/delete sync complete-place)
       result)
     false))
@@ -131,10 +132,10 @@
 
 (defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
   (loop []
-    (when-let [pulse (<!! dead-tail)]
-      (when (mark-peer-death sync sync-ch pulse)
-        (>!! evict-head pulse)
-        (>!! offer-head pulse))
+    (when-let [peer-node (<!! dead-tail)]
+      (when (mark-peer-death sync sync-ch peer-node)
+        (>!! evict-head peer-node)
+        (>!! offer-head peer-node))
       (recur))))
 
 (defn planning-ch-loop [sync queue planning-tail offer-head]
@@ -152,10 +153,10 @@
 
 (defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
   (loop []
-    (when-let [peer (<!! evict-tail)]
-      (evict-peer sync sync-ch peer)
-      (>!! shutdown-head peer)
-      (>!! offer-head peer)
+    (when-let [node (<!! evict-tail)]
+      (evict-peer sync sync-ch node)
+      (>!! shutdown-head node)
+      (>!! offer-head node)
       (recur))))
 
 (defn offer-ch-loop
@@ -174,7 +175,7 @@
   (loop []
     (when-let [{:keys [peer-node ack-node]} (<!! offer-revoke-tail)]
       (revoke-offer sync peer-node ack-node
-                    #(>!! evict-head %))
+                    #(>!! evict-head ack-node))
       (recur))))
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
