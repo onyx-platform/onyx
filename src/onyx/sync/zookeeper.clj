@@ -203,7 +203,7 @@
 
 (defmethod extensions/create-node ZooKeeper
   [sync node]
-  (zk/create :conn sync) node :persistent? true)
+  (zk/create (:conn sync) node :persistent? true))
 
 (defmethod extensions/create-at [ZooKeeper :peer-state]
   [sync _ subpath content]

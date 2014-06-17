@@ -1,9 +1,9 @@
 (ns ^:no-doc onyx.coordinator.impl
-  (:require [com.stuartsierra.component :as component]
-            [taoensso.timbre]
-            [onyx.extensions :as extensions]
-            [onyx.sync.zookeeper])
-  (:import [onyx.sync.zookeeper ZooKeeper]))
+    (:require [com.stuartsierra.component :as component]
+              [taoensso.timbre]
+              [onyx.extensions :as extensions]
+              [onyx.sync.zookeeper])
+    (:import [onyx.sync.zookeeper ZooKeeper]))
 
 (def complete-marker ".complete")
 
@@ -18,6 +18,9 @@
 
 (defn task-complete? [sync task-node]
   (extensions/place-exists? sync (str task-node complete-marker)))
+
+(defn completed-task? [task-node]
+  (.endsWith task-node complete-marker))
 
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
@@ -115,16 +118,9 @@
 
 (defmethod extensions/idle-peers ZooKeeper
   [sync]
-  (let [peers (extensions/bucket sync :peer-state)]
-    (map
-     (fn [peer]
-       (let [state (extensions/dereference sync peer)]
-         (extensions/read-place sync (:peer-node state))))
-     (filter
-      (fn [peer]
-        (let [state (extensions/dereference sync peer)]
-          (= (:state state) :idle)))
-      peers))))
+  (->> (extensions/bucket sync :peer-state)
+       (map (partial extensions/dereference sync))
+       (filter #(= (:state %) :idle))))
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-place]
@@ -145,13 +141,13 @@
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (extensions/dereference sync state-path)
         complete? (task-complete? sync (:task-node peer-state))
-        n (n-peers sync (:task-node node-data))]
+        n (n-peers sync (:task-node peer-state))]
     (when (not complete?)
-      (let [state {:id (:id node-data) :state :idle}]
+      (let [state {:id (:id node-data) :peer-node (:peer-node peer-state) :state :idle}]
         (extensions/create-at sync :peer-state (:id node-data) state)
         (when (= n 1)
-          (complete-task (:task-node node-data)))
-        {:n-peers n}))))
+          (complete-task sync (:task-node peer-state)))
+        {:n-peers n :peer-state peer-state}))))
 
 (defn incomplete-job-ids [sync]
   (let [job-ids (extensions/bucket sync :job)]
@@ -178,10 +174,15 @@
          (take (count job-seq)))))
 
 (defn sort-tasks-by-phase [sync tasks]
-  (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
+  (try
+    (doall (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
+    (catch Exception e
+      (prn "->" tasks)
+      (.printStackTrace e)
+      [])))
 
-(defn find-incomplete-tasks [sync tasks]
-  (filter (fn [task] (not (task-complete? sync task))) tasks))
+(defn find-incomplete-tasks [tasks]
+  (filter (fn [task] (not (completed-task? task))) tasks))
 
 (defn find-active-task-ids [sync tasks]
   (filter (fn [task] (> (n-peers sync task) 1)) tasks))
@@ -189,7 +190,7 @@
 (defn next-inactive-task [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
         task-nodes (extensions/children sync task-path)
-        incomplete-tasks (find-incomplete-tasks sync task-nodes)
+        incomplete-tasks (find-incomplete-tasks task-nodes)
         sorted-task-nodes (sort-tasks-by-phase sync incomplete-tasks)
         active-task-ids (find-active-task-ids sync sorted-task-nodes)]
     (filter (fn [t] (not (some #{(:task/id (extensions/read-place sync t))}
@@ -197,15 +198,22 @@
             sorted-task-nodes)))
 
 (defn find-incomplete-concurrent-tasks [sync job-node]
-  (let [tasks (extensions/children sync job-node)
-        active (find-active-task-ids sync tasks)]
+  (let [task-path (extensions/resolve-node sync :task job-node)
+        task-nodes (extensions/children sync task-path)
+        incomplete-tasks (find-incomplete-tasks task-nodes)
+        active (find-active-task-ids sync incomplete-tasks)]
     (filter (fn [task]
               (let [task-data (extensions/read-place sync task)]
                 (= (:task/consumption task-data) :concurrent)))
             active)))
 
 (defn sort-tasks-by-peer-count [sync tasks]
-  (sort-by (partial n-peers sync) tasks))
+  (try
+    (sort-by (partial n-peers sync) tasks)
+    (catch Exception e
+      (prn "~~~~>" tasks)
+      (.printStackTrace e)
+      [])))
 
 (defn next-active-task [sync job-node]
   (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-node)]
@@ -216,7 +224,9 @@
   (let [job-seq (job-candidate-seq (incomplete-job-ids sync)
                                    (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
-        active-candidates (mapcat (partial next-active-task sync) job-seq)]
-    (concat (filter identity inactive-candidates)
-            (filter identity active-candidates))))
+        active-candidates (mapcat (partial next-active-task sync) job-seq)
+        rets (concat (filter identity inactive-candidates)
+                     (filter identity active-candidates))]
+    (clojure.pprint/pprint rets)
+    rets))
 

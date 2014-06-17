@@ -9,13 +9,18 @@
 
 (def ch-capacity 10000)
 
-(defn mark-peer-birth [sync peer death-cb]
+(defn serialize [ch f & args]
+  (let [p (promise)]
+    (>!! ch [p f args])
+    @p))
+
+(defn mark-peer-birth [sync sync-ch peer death-cb]
   (let [pulse (:pulse-node (extensions/read-place sync peer))]
     (extensions/on-delete sync pulse death-cb)
-    (extensions/mark-peer-born sync peer)))
+    (serialize sync-ch extensions/mark-peer-born sync peer)))
 
-(defn mark-peer-death [sync pulse]
-  (extensions/mark-peer-dead sync pulse))
+(defn mark-peer-death [sync sync-ch pulse]
+  (serialize sync-ch extensions/mark-peer-dead sync pulse))
 
 (defn plan-job [sync queue {:keys [catalog workflow]}]
   (let [tasks (planning/discover-tasks catalog workflow)
@@ -31,64 +36,73 @@
 
     job-id))
 
-(defn acknowledge-task [sync ack-place]
-  (let [nodes (extensions/nodes sync ack-place)]
-    (when (extensions/ack sync ack-place)
-      (extensions/touch-place sync (:node/status nodes)))))
+(defn acknowledge-task [sync sync-ch ack-place]
+  (serialize
+   sync-ch
+   #(let [nodes (extensions/nodes sync ack-place)]
+      (when (extensions/ack sync ack-place)
+        (extensions/touch-place sync (:node/status nodes))))))
 
-(defn evict-peer [sync peer]
-  (if-let [status-node (:node/status (extensions/nodes sync peer))]
-    (extensions/delete sync status-node)))
+(defn evict-peer [sync sync-ch peer]
+  (serialize
+   sync-ch
+   #(if-let [status-node (:node/status (extensions/nodes sync peer))]
+      (extensions/delete sync status-node))))
 
-(defn offer-task [sync ack-cb exhaust-cb complete-cb revoke-cb]
-  (loop [[task-node :as task-nodes] (extensions/next-tasks sync)
-         [peer :as peers] (extensions/idle-peers sync)]
-    (when (and (seq task-nodes) (seq peers))
-      (let [id (:id peer)
-            task (extensions/read-place sync task-node)
-            task-attrs (dissoc task :workflow :catalog)
-            ack (extensions/create sync :ack)
-            exhaust (extensions/create sync :exhaust)
-            seal (extensions/create sync :seal)
-            complete (extensions/create sync :completion)
-            status (extensions/create sync :status)
-            catalog (extensions/create sync :catalog)
-            workflow (extensions/create sync :workflow)
-            nodes {:node/peer (:peer-node peer)
-                   :node/payload (:payload-node peer)
-                   :node/ack (:node ack)
-                   :node/exhaust (:node exhaust)
-                   :node/seal (:node seal)
-                   :node/completion (:node complete)
-                   :node/status (:node status)
-                   :node/catalog (:node catalog)
-                   :node/workflow (:node workflow)}]
+(defn offer-task [sync sync-ch ack-cb exhaust-cb complete-cb revoke-cb]
+  (prn "Calling to offer")
+  (serialize
+   sync-ch
+   #(loop [[task-node :as task-nodes] (extensions/next-tasks sync)
+           [peer :as peers] (extensions/idle-peers sync)]
+      (prn (count task-nodes) "::" (count peers))
+      (when (and (seq task-nodes) (seq peers))
+        (let [id (:id peer)
+              task (extensions/read-place sync task-node)
+              task-attrs (dissoc task :workflow :catalog)
+              ack (extensions/create sync :ack)
+              exhaust (extensions/create sync :exhaust)
+              seal (extensions/create sync :seal)
+              complete (extensions/create sync :completion)
+              status (extensions/create sync :status)
+              catalog (extensions/create sync :catalog)
+              workflow (extensions/create sync :workflow)
+              nodes {:node/peer (:peer-node peer)
+                     :node/payload (:payload-node peer)
+                     :node/ack (:node ack)
+                     :node/exhaust (:node exhaust)
+                     :node/seal (:node seal)
+                     :node/completion (:node complete)
+                     :node/status (:node status)
+                     :node/catalog (:node catalog)
+                     :node/workflow (:node workflow)}]
 
-        (extensions/write-place sync (:node ack) {:id id})
-        (extensions/write-place sync (:node exhaust) {:id id})
-        (extensions/write-place sync (:node seal) {:id id})
-        (extensions/write-place sync (:node complete) {:id id})
-        (extensions/write-place sync (:node status) {:id id})
+          (extensions/write-place sync (:node ack) {:id id})
+          (extensions/write-place sync (:node exhaust) {:id id})
+          (extensions/write-place sync (:node seal) {:id id})
+          (extensions/write-place sync (:node complete) {:id id})
+          (extensions/write-place sync (:node status) {:id id})
 
-        (extensions/write-place sync (:node catalog) (:catalog task))
-        (extensions/write-place sync (:node workflow) (:workflow task))
-        
-        (extensions/on-change sync (:node ack) ack-cb)
-        (extensions/on-change sync (:node exhaust) exhaust-cb)
-        (extensions/on-change sync (:node complete) complete-cb)
-        
-        (if (extensions/mark-offered sync task-node peer nodes)
-          (do (extensions/write-place sync (:payload-node peer) {:task task-attrs :nodes nodes})
-              (revoke-cb {:peer-node (:peer-node peer) :ack-node (:node ack)})
+          (extensions/write-place sync (:node catalog) (:catalog task))
+          (extensions/write-place sync (:node workflow) (:workflow task))
+         
+          (extensions/on-change sync (:node ack) ack-cb)
+          (extensions/on-change sync (:node exhaust) exhaust-cb)
+          (extensions/on-change sync (:node complete) complete-cb)
+         
+          (if (extensions/mark-offered sync task-node peer nodes)
+            (let [peer-data (extensions/read-place sync (:peer-node peer))]
+              (extensions/write-place sync (:payload-node peer-data) {:task task-attrs :nodes nodes})
+              (revoke-cb {:peer-node (:peer-node peer-data) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))
-          (recur task-nodes (rest peers)))))))
+            (recur task-nodes (rest peers))))))))
 
 (defn revoke-offer [sync peer-node ack-node evict-cb]
   (when (extensions/revoke-offer sync ack-node)
     (evict-cb peer-node)))
 
-(defn exhaust-queue [sync exhaust-place]
-  (extensions/seal-resource? sync exhaust-place))
+(defn exhaust-queue [sync sync-ch exhaust-place]
+  (extensions/seal-resource? sync-ch sync exhaust-place))
 
 (defn seal-resource [sync seal? seal-place]
   (extensions/write-place sync seal-place seal?))
@@ -96,6 +110,7 @@
 (defn complete-task [sync complete-place]
   (if-let [result (extensions/complete sync complete-place)]
     (when (= (:n-peers result) 1)
+      (prn "Deleted the completion node")
       (extensions/delete sync complete-place)
       result)
     false))
@@ -104,17 +119,17 @@
   (let [shutdown (:shutdown (extensions/read-place sync peer))]
     (extensions/delete sync shutdown)))
 
-(defn born-peer-ch-loop [sync born-tail offer-head dead-head]
+(defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
   (loop []
     (when-let [peer (<!! born-tail)]
-      (when (mark-peer-birth sync peer (fn [_] (>!! dead-head peer)))
+      (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
         (>!! offer-head peer))
       (recur))))
 
-(defn dead-peer-ch-loop [sync dead-tail evict-head offer-head]
+(defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
   (loop []
     (when-let [pulse (<!! dead-tail)]
-      (when (mark-peer-death sync pulse)
+      (when (mark-peer-death sync sync-ch pulse)
         (>!! evict-head pulse)
         (>!! offer-head pulse))
       (recur))))
@@ -126,25 +141,25 @@
         (>!! offer-head job-id)
         (recur)))))
 
-(defn ack-ch-loop [sync ack-tail]
+(defn ack-ch-loop [sync sync-ch ack-tail]
   (loop []
     (when-let [ack-place (:path (<!! ack-tail))]
-      (acknowledge-task sync ack-place)
+      (acknowledge-task sync sync-ch ack-place)
       (recur))))
 
-(defn evict-ch-loop [sync evict-tail offer-head shutdown-head]
+(defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
   (loop []
     (when-let [peer (<!! evict-tail)]
-      (evict-peer sync peer)
+      (evict-peer sync sync-ch peer)
       (>!! shutdown-head peer)
       (>!! offer-head peer)
       (recur))))
 
 (defn offer-ch-loop
-  [sync revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
+  [sync sync-ch revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
   (loop []
     (when-let [event (<!! offer-tail)]
-      (offer-task sync
+      (offer-task sync sync-ch
                   #(>!! ack-head %)
                   #(>!! exhaust-head %)
                   #(>!! complete-head %)
@@ -159,10 +174,10 @@
                     #(>!! evict-head %))
       (recur))))
 
-(defn exhaust-queue-loop [sync exhaust-tail seal-head]
+(defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
     (when-let [place (:path (<!! exhaust-tail))]
-      (when-let [result (exhaust-queue sync place)]
+      (when-let [result (exhaust-queue sync sync-ch place)]
         (>!! seal-head result))
       (recur))))
 
@@ -186,6 +201,12 @@
       (shutdown-peer sync peer)
       (recur))))
 
+(defn sync-ch-loop [sync sync-ch]
+  (loop []
+    (when-let [[p f args] (<!! sync-ch)]
+      (deliver p (apply f args))
+      (recur))))
+
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
@@ -201,7 +222,9 @@
 
   (start [{:keys [sync queue revoke-delay] :as component}]
     (info "Starting Coordinator")
-    (let [planning-ch-head (chan ch-capacity)
+    (let [sync-ch (chan 0)
+
+          planning-ch-head (chan ch-capacity)
           born-peer-ch-head (chan ch-capacity)
           dead-peer-ch-head (chan ch-capacity)
           evict-ch-head (chan ch-capacity)
@@ -311,6 +334,9 @@
           (>!! failure-ch-head {:ch :shutdown :e e})
           false))
 
+      (dire/with-handler! #'sync-ch-loop
+        java.lang.Exception log-if-not-interrupted)
+
       (dire/with-handler! #'born-peer-ch-loop
         java.lang.Exception log-if-not-interrupted)
 
@@ -345,6 +371,8 @@
         java.lang.Exception log-if-not-interrupted)
 
       (assoc component
+        :sync-ch sync-ch
+        
         :planning-ch-head planning-ch-head
         :born-peer-ch-head born-peer-ch-head
         :dead-peer-ch-head dead-peer-ch-head
@@ -371,23 +399,25 @@
         :failure-mult failure-mult
         :shutdown-mult shutdown-mult
 
-        :born-peer-thread (thread (born-peer-ch-loop sync born-peer-ch-tail offer-ch-head dead-peer-ch-head))
-        :dead-peer-thread (thread (dead-peer-ch-loop sync dead-peer-ch-tail evict-ch-head offer-ch-head))
+        :sync-thread (thread (sync-ch-loop sync sync-ch))
+        :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head))
+        :dead-peer-thread (thread (dead-peer-ch-loop sync sync-ch dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))
-        :ack-thread (thread (ack-ch-loop sync ack-ch-tail))
-        :evict-thread (thread (evict-ch-loop sync evict-ch-tail offer-ch-head shutdown-ch-head))
+        :ack-thread (thread (ack-ch-loop sync sync-ch ack-ch-tail))
+        :evict-thread (thread (evict-ch-loop sync sync-ch evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop sync offer-revoke-ch-tail evict-ch-head))
-        :exhaust-thread (thread (exhaust-queue-loop sync exhaust-ch-tail seal-ch-head))
+        :exhaust-thread (thread (exhaust-queue-loop sync sync-ch exhaust-ch-tail seal-ch-head))
         :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
         :completion-thread (thread (completion-ch-loop sync completion-ch-tail offer-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
-        :offer-thread (thread (offer-ch-loop sync revoke-delay offer-ch-tail ack-ch-head
+        :offer-thread (thread (offer-ch-loop sync sync-ch revoke-delay offer-ch-tail ack-ch-head
                                              exhaust-ch-head completion-ch-head offer-revoke-ch-head)))))
 
   (stop [component]
     (info "Stopping Coordinator")
-    
+
+    (close! (:sync-ch component))
     (close! (:born-peer-ch-head component))
     (close! (:dead-peer-ch-head component))
     (close! (:planning-ch-head component))

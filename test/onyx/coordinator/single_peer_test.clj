@@ -136,9 +136,10 @@
                            (fact out-queues =not=> empty?))))))))))
 
 (defn test-task-life-cycle
-  [{:keys [sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
+  [{:keys [id sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
            status-spy seal-node-spy peer-node payload-node next-payload-node task-name
            pulse-node shutdown-node]}]
+  (prn "a")
   (facts "The payload node is populated"
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
@@ -160,6 +161,7 @@
                      :node/status :node/catalog :node/workflow
                      :node/peer :node/exhaust :node/seal}))
 
+    (prn "b")
     (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
     (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
@@ -168,10 +170,13 @@
            (let [event (<!! ack-ch-spy)]
              (fact (:path event) => (:node/ack (:nodes state))))))
 
-  (extensions/write-place sync peer-node {:peer peer-node
-                                          :pulse pulse-node
-                                          :shutdown shutdown-node
-                                          :payload next-payload-node})
+  (prn "C")
+
+  (extensions/write-place sync peer-node {:id id
+                                          :peer-node peer-node
+                                          :pulse-node pulse-node
+                                          :shutdown-node shutdown-node
+                                          :payload-node next-payload-node})
   
   (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
@@ -196,19 +201,7 @@
            (let [event (<!! completion-ch-spy)]
              (fact (:path event) => (:node/completion nodes)))))
 
-  (facts "The offer channel receives the number of peers active"
-         (prn (<!! offer-ch-spy))
-
-         #_(facts "The peer's nodes have been stripped"
-                (let [query '[:find ?payload ?ack ?status ?completion :in $ ?peer-node :where
-                              [?p :peer/status :idle]
-                              [?p :node/peer ?peer-node]
-                              [?p :node/payload ?payload]
-                              [?p :node/ack ?ack]
-                              [?p :node/status ?status]
-                              [?p :node/completion ?completion]]
-                      result (d/q query db peer-node)]
-                  (fact result => empty?)))))
+  (<!! offer-ch-spy))
 
 (facts
  "planning one job with one peer"
@@ -266,7 +259,8 @@
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
 
-       (let [base-cycle {:sync sync
+       (let [base-cycle {:id (:uuid peer)
+                         :sync sync
                          :sync-spy sync-spy
                          :ack-ch-spy ack-ch-spy
                          :offer-ch-spy offer-ch-spy
@@ -276,17 +270,22 @@
                          :completion-ch-spy completion-ch-spy
                          :peer-node (:node peer)
                          :pulse-node (:node pulse)}]
+         (prn "1")
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :in
             :payload-node (:node in-payload)
             :next-payload-node (:node inc-payload)))
 
+         (prn "2")
+
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :inc
             :payload-node (:node inc-payload)
             :next-payload-node (:node out-payload)))
+
+         (prn "3")
 
          (test-task-life-cycle
           (assoc base-cycle
