@@ -74,6 +74,7 @@
                    peer-id (:id (extensions/read-place sync peer-path))
                    state-path (extensions/resolve-node sync :peer-state peer-id)
                    state (:content (extensions/dereference sync state-path))]
+
                (:state state) => :dead))))))
 
 (facts
@@ -146,7 +147,7 @@
 
   (let [task (:task (extensions/read-place sync payload-node))
         state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-place sync peer-node)))
-        state (extensions/dereference sync state-path)]
+        state (:content (extensions/dereference sync state-path))]
 
     (fact "It receives the task"
           (extensions/read-place sync (:task-node state)) => task)
@@ -162,10 +163,10 @@
                      :node/peer :node/exhaust :node/seal}))
 
     (prn "b")
-    (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
-    (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
+    #_(extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
+    #_(extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
-    (facts "Touching the ack node triggers the callback"
+    #_(facts "Touching the ack node triggers the callback"
            (extensions/touch-place sync (:node/ack (:nodes state)))
            (let [event (<!! ack-ch-spy)]
              (fact (:path event) => (:node/ack (:nodes state))))))
@@ -180,7 +181,9 @@
   
   (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
+  (prn "D")
   (<!! status-spy)
+  (prn "E")
 
   (facts "Touching the exhaustion node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]

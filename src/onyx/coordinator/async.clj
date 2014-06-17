@@ -94,8 +94,9 @@
           (extensions/on-change sync (:node complete) complete-cb)
          
           (if (extensions/mark-offered sync task-node peer-node nodes)
-            (do
-              (extensions/write-place sync (:payload-node peer-content) {:task task-attrs :nodes nodes})
+            (let [node (extensions/resolve-node sync :peer (:id peer-content))
+                  payload-node (:payload-node (extensions/read-place sync node))]
+              (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
               (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))
             (recur task-nodes (rest peers))))))))

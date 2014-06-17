@@ -91,6 +91,9 @@
 (defn zookeeper [addr onyx-id]
   (map->ZooKeeper {:addr addr :onyx-id onyx-id}))
 
+(defn trailing-id [s]
+  (last (clojure.string/split s #"/")))
+
 (defn serialize-edn [x]
   (.array (fressian/write x)))
 
@@ -277,7 +280,8 @@
 
 (defmethod extensions/resolve-node [ZooKeeper :task]
   [sync _ job-node & more]
-  (str job-node "/task"))
+  (let [prefix (:onyx-id sync)]
+    (task-path prefix (trailing-id job-node))))
 
 (defmethod extensions/children ZooKeeper
   [sync node]

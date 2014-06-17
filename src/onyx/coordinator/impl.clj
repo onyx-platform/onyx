@@ -215,6 +215,5 @@
         active-candidates (mapcat (partial next-active-task sync) job-seq)
         rets (concat (filter identity inactive-candidates)
                      (filter identity active-candidates))]
-;;    (clojure.pprint/pprint rets)
     rets))
 
