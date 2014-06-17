@@ -242,25 +242,25 @@
 (defmethod extensions/bucket [ZooKeeper :peer-state]
   [sync _]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) (peer-state-path prefix))]
+        children (or (zk/children (:conn sync) (peer-state-path prefix)) [])]
     (map #(str (peer-state-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) (job-path prefix))]
+        children (or (zk/children (:conn sync) (job-path prefix)) [])]
     (map #(str (job-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job-log]
   [sync _]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) (job-log-path prefix))]
+        children (or (zk/children (:conn sync) (job-log-path prefix)) [])]
     (map #(str (job-log-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) (task-path prefix subpath))]
+        children (or (zk/children (:conn sync) (task-path prefix subpath)) [])]
     (map #(str (task-path prefix subpath) "/" %) children)))
 
 (defmethod extensions/resolve-node [ZooKeeper :peer]
@@ -284,7 +284,7 @@
 
 (defmethod extensions/children ZooKeeper
   [sync node]
-  (let [children (zk/children (:conn sync) node)]
+  (let [children (or (zk/children (:conn sync) node) [])]
     (map #(str node "/" %) children)))
 
 (defmethod extensions/delete ZooKeeper
@@ -315,7 +315,7 @@
 (defmethod extensions/dereference ZooKeeper
   [sync node]
   (let [prefix (:onyx-id sync)
-        children (zk/children (:conn sync) node)
+        children (or (zk/children (:conn sync) node) [])
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)
       (extensions/read-place sync (str node "/" (last sorted-children))))))

@@ -102,7 +102,9 @@
     (evict-cb peer-node)))
 
 (defn exhaust-queue [sync sync-ch exhaust-place]
-  (extensions/seal-resource? sync-ch sync exhaust-place))
+  (serialize
+   sync-ch
+   #(extensions/seal-resource? sync exhaust-place)))
 
 (defn seal-resource [sync seal? seal-place]
   (extensions/write-place sync seal-place seal?))

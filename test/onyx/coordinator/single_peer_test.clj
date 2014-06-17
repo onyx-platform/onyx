@@ -269,7 +269,8 @@
                          :seal-node-spy seal-node-spy
                          :completion-ch-spy completion-ch-spy
                          :peer-node (:node peer)
-                         :pulse-node (:node pulse)}]
+                         :pulse-node (:node pulse)
+                         :shutdown-node (:node shutdown)}]
          (prn "1")
          (test-task-life-cycle
           (assoc base-cycle
