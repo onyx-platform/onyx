@@ -124,8 +124,7 @@
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :sealing)]
-    (:node (extensions/create-at sync :peer-state (:id peer-state) state))        
-
+    (extensions/create-at sync :peer-state (:id peer-state) state)
     (let [n-active (n-active-peers sync (:task-node peer-state))
           n (n-peers sync (:task-node peer-state))]
       {:seal? (or (= n 1) (zero? n-active))
@@ -139,7 +138,9 @@
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node peer-state))]
     (if (and (not complete?)
-             (= (:task-node node-data) (:task-node peer-state)))
+             (= (:task-node node-data) (:task-node peer-state))
+             (or (= (:state peer-state) :active)
+                 (= (:state peer-state) :sealing)))
       (let [state (assoc (dissoc peer-state :task-node :nodes) :state :idle)]
         (extensions/create-at sync :peer-state (:id node-data) state)
         (when (= n 1)

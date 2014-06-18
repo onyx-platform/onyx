@@ -388,25 +388,7 @@
        (facts "Completing a task that doesn't exist fails"
               (>!! (:completion-ch-head coordinator) {:path "dead path"})
               (let [failure (<!! failure-ch-spy)]
-                (fact (:ch failure) => :complete)))
-
-       #_(facts "Completing a task from an idle peer fails"
-              (let [peer-id (d/tempid :onyx/log)
-                    task-id (d/tempid :onyx/log)
-                    node-path (str (java.util.UUID/randomUUID))
-                    tx [{:db/id peer-id
-                         :peer/status :idle
-                         :node/completion node-path
-                         :node/payload (str (java.util.UUID/randomUUID))
-                         :node/ack (str (java.util.UUID/randomUUID))
-                         :node/status (str (java.util.UUID/randomUUID))
-                         :peer/task {:db/id task-id
-                                     :task/complete? false}}]]
-                @(d/transact (:conn log) tx)
-                      
-                (>!! (:completion-ch-head coordinator) {:path node-path})
-                (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :complete))))))
+                (fact (:ch failure) => :complete)))))
    {:revoke-delay 50000}))
 
 (facts
@@ -532,6 +514,17 @@
        
        (<!! offer-ch-spy)
        (<!! sync-spy)
+
+       (facts
+        "Completing a task from an idle peer fails"
+        (let [state-path (extensions/resolve-node sync :peer-state (:uuid peer))
+              state (:content (extensions/dereference sync state-path))]
+          (extensions/create-at sync :peer-state (:id state) (assoc state :state :idle)))
+
+        (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
+          (>!! (:completion-ch-head coordinator) {:path node})
+          (let [failure (<!! failure-ch-spy)]
+            (fact (:ch failure) => :complete))))
 
        ;;; Complete all the tasks.
        (let [job-path (first (extensions/bucket sync :job))
