@@ -214,7 +214,11 @@
 (defn sync-ch-loop [sync sync-ch]
   (loop []
     (when-let [[p f args] (<!! sync-ch)]
-      (deliver p (apply-serial-fn f args))
+      (try
+        (deliver p (apply-serial-fn f args))
+        (catch Exception e
+          (deliver p nil)
+          (throw e)))
       (recur))))
 
 (defn failure-ch-loop [failure-tail]

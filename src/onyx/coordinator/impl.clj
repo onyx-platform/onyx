@@ -92,11 +92,14 @@
         peer-state (:content (extensions/dereference sync peer-path))
         complete? (task-complete? sync (:task-node ack-data))]
     ;; Serialize this.
-    (when (and (= (:state peer-state) :acking)
-               (= (:task-node ack-data) (:task-node peer-state))
-               (not complete?))
+    (if (and (= (:state peer-state) :acking)
+             (= (:task-node ack-data) (:task-node peer-state))
+             (not complete?))
       (let [state (assoc peer-state :state :active)]
-        (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
+        (:node (extensions/create-at sync :peer-state (:id peer-state) state)))
+      (let [err-val {:complete? complete? :state (:state peer-state)
+                     :ack-task (:task-node ack-data) :peer-task (:task-node peer-state)}]
+        (throw (ex-info "Failed to acknowledge task" err-val))))))
 
 (defmethod extensions/revoke-offer ZooKeeper
   [sync ack-place]

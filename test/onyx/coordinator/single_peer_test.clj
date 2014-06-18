@@ -6,6 +6,7 @@
             [onyx.extensions :as extensions]
             [onyx.coordinator.async :as async]
             [onyx.sync.zookeeper :as onyx-zk]
+            [onyx.coordinator.impl :as impl]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
@@ -153,7 +154,6 @@
 
     (fact "The peer's state is :acking the task"
           (:state state) => :acking)
-
 
     (fact "The payload node contains the other node paths"
           (fact (into #{} (keys (:nodes state)))
@@ -380,55 +380,12 @@
               (let [failure (<!! failure-ch-spy)]
                 (fact (:ch failure) => :serial-fn)))
 
-       #_(facts "Attempts to delete a non-existent peer fails"
-              (extensions/delete sync pulse)
-              (<!! evict-ch-spy)
-
-              (facts "A failure is raised for the second callback"
-                     (let [failure (<!! failure-ch-spy)]
-                       (fact (:ch failure) => :peer-death)))
-                    
-              (facts "A failure is raised for the second delete"
-                     (>!! (:dead-peer-ch-head coordinator) peer)
-                     (let [failure (<!! failure-ch-spy)]
-                       (fact (:ch failure) => :peer-death))))
-
-       #_(facts "Acking a non-existent node fails"
+       (facts "Acking a non-existent node fails"
               (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
               (let [failure (<!! failure-ch-spy)]
-                (fact (:ch failure) => :ack)))
+                (fact (:ch failure) => :serial-fn)))
 
-       #_(facts "Acking a completed task fails"
-              (let [peer-id (d/tempid :onyx/log)
-                    task-id (d/tempid :onyx/log)
-                    node-path (str (java.util.UUID/randomUUID))
-                    tx [{:db/id peer-id
-                         :peer/status :acking
-                         :node/ack node-path
-                         :peer/task {:db/id task-id
-                                     :task/complete? true}}]]
-                @(d/transact (:conn log) tx)
-                      
-                (>!! (:ack-ch-head coordinator) {:path node-path})
-                (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :ack))))
-
-       #_(facts "Acking with a peer who's state isnt :acking fails"
-              (let [peer-id (d/tempid :onyx/log)
-                    task-id (d/tempid :onyx/log)
-                    node-path (str (java.util.UUID/randomUUID))
-                    tx [{:db/id peer-id
-                         :peer/status :idle
-                         :node/ack node-path
-                         :peer/task {:db/id task-id
-                                     :task/complete? false}}]]
-                @(d/transact (:conn log) tx)
-                      
-                (>!! (:ack-ch-head coordinator) {:path node-path})
-                (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :ack))))
-
-       #_(facts "Completing a task that doesn't exist fails"
+       (facts "Completing a task that doesn't exist fails"
               (>!! (:completion-ch-head coordinator) {:path "dead path"})
               (let [failure (<!! failure-ch-spy)]
                 (fact (:ch failure) => :complete)))
@@ -469,4 +426,78 @@
                 (let [failure (<!! failure-ch-spy)]
                   (fact (:ch failure) => :complete))))))
    {:revoke-delay 50000}))
+
+(facts
+ "error cases"
+ (with-system
+   (fn [coordinator sync]
+     (let [peer (extensions/create sync :peer)
+           pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
+           payload (extensions/create sync :payload)
+           offer-ch-spy (chan 5)
+           sync-spy (chan 1)
+           ack-ch-spy (chan 5)
+           evict-ch-spy (chan 5)
+           completion-ch-spy (chan 5)
+           failure-ch-spy (chan 10)
+
+           catalog [{:onyx/name :in
+                     :onyx/type :input
+                     :onyx/medium :hornetq
+                     :onyx/consumption :sequential
+                     :hornetq/queue-name "in-queue"}
+                    {:onyx/name :inc
+                     :onyx/type :transformer
+                     :onyx/consumption :sequential}
+                    {:onyx/name :out
+                     :onyx/type :output
+                     :onyx/medium :hornetq
+                     :onyx/consumption :sequential
+                     :hornetq/queue-name "out-queue"}]
+           workflow {:in {:inc :out}}]
+
+       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+                                                  :peer-node (:node peer)
+                                                  :pulse-node (:node pulse)
+                                                  :payload-node (:node payload)
+                                                  :shutdown-node (:node shutdown)})
+             
+       (tap (:offer-mult coordinator) offer-ch-spy)
+       (tap (:ack-mult coordinator) ack-ch-spy)
+       (tap (:completion-mult coordinator) completion-ch-spy)
+       (tap (:failure-mult coordinator) failure-ch-spy)
+
+       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (<!! offer-ch-spy)
+
+       (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       
+       (<!! offer-ch-spy)
+       (<!! sync-spy)
+
+       ;;; Complete all the tasks.
+       (let [job-path (first (extensions/bucket sync :job))
+             task-path (onyx-zk/task-path (:onyx-id sync) (onyx-zk/trailing-id job-path))]
+         (doseq [child (extensions/children sync task-path)]
+           (impl/complete-task sync child)))
+
+       (facts "Acking a completed task fails"
+              (let [ack-node (:node/ack (:nodes (extensions/read-place sync (:node payload))))]
+                (>!! (:ack-ch-head coordinator) {:path ack-node})
+                (let [failure (<!! failure-ch-spy)]
+                  (fact (:ch failure) => :serial-fn))))
+
+       (facts
+        "Acking with a peer who's state isnt :acking fails"
+        (let [state-path (extensions/resolve-node sync :peer-state (:uuid peer))
+              state (:content (extensions/dereference sync state-path))]
+          (extensions/create-at sync :peer-state (:id state) (assoc state :state :idle)))
+
+        (let [ack-node (:node/ack (:nodes (extensions/read-place sync (:node payload))))]
+          (>!! (:ack-ch-head coordinator) {:path ack-node})
+          (let [failure (<!! failure-ch-spy)]
+            (fact (:ch failure) => :serial-fn)))))
+   {:revoke-delay 50000})))
 
