@@ -347,7 +347,7 @@
    {:revoke-delay 0}))
 
 (facts
- "error cases"
+ "Peer error cases"
  (with-system
    (fn [coordinator sync]
      (let [peer (extensions/create sync :peer)
@@ -389,24 +389,6 @@
               (>!! (:completion-ch-head coordinator) {:path "dead path"})
               (let [failure (<!! failure-ch-spy)]
                 (fact (:ch failure) => :complete)))
-             
-       #_(facts "Completing a task that's already been completed fails"
-              (let [peer-id (d/tempid :onyx/log)
-                    task-id (d/tempid :onyx/log)
-                    node-path (str (java.util.UUID/randomUUID))
-                    tx [{:db/id peer-id
-                         :peer/status :active
-                         :node/completion node-path
-                         :node/payload (str (java.util.UUID/randomUUID))
-                         :node/ack (str (java.util.UUID/randomUUID))
-                         :node/status (str (java.util.UUID/randomUUID))
-                         :peer/task {:db/id task-id
-                                     :task/complete? true}}]]
-                @(d/transact (:conn log) tx)
-                      
-                (>!! (:completion-ch-head coordinator) {:path node-path})
-                (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :complete))))
 
        #_(facts "Completing a task from an idle peer fails"
               (let [peer-id (d/tempid :onyx/log)
@@ -428,7 +410,7 @@
    {:revoke-delay 50000}))
 
 (facts
- "error cases"
+ "Acking error cases"
  (with-system
    (fn [coordinator sync]
      (let [peer (extensions/create sync :peer)
@@ -500,4 +482,67 @@
           (let [failure (<!! failure-ch-spy)]
             (fact (:ch failure) => :serial-fn)))))
    {:revoke-delay 50000})))
+
+(facts
+ "Completion error cases"
+ (with-system
+   (fn [coordinator sync]
+     (let [peer (extensions/create sync :peer)
+           pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
+           payload (extensions/create sync :payload)
+           offer-ch-spy (chan 5)
+           sync-spy (chan 1)
+           ack-ch-spy (chan 5)
+           evict-ch-spy (chan 5)
+           completion-ch-spy (chan 5)
+           failure-ch-spy (chan 10)
+
+           catalog [{:onyx/name :in
+                     :onyx/type :input
+                     :onyx/medium :hornetq
+                     :onyx/consumption :sequential
+                     :hornetq/queue-name "in-queue"}
+                    {:onyx/name :inc
+                     :onyx/type :transformer
+                     :onyx/consumption :sequential}
+                    {:onyx/name :out
+                     :onyx/type :output
+                     :onyx/medium :hornetq
+                     :onyx/consumption :sequential
+                     :hornetq/queue-name "out-queue"}]
+           workflow {:in {:inc :out}}]
+
+       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+                                                  :peer-node (:node peer)
+                                                  :pulse-node (:node pulse)
+                                                  :payload-node (:node payload)
+                                                  :shutdown-node (:node shutdown)})
+             
+       (tap (:offer-mult coordinator) offer-ch-spy)
+       (tap (:ack-mult coordinator) ack-ch-spy)
+       (tap (:completion-mult coordinator) completion-ch-spy)
+       (tap (:failure-mult coordinator) failure-ch-spy)
+
+       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (<!! offer-ch-spy)
+
+       (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       
+       (<!! offer-ch-spy)
+       (<!! sync-spy)
+
+       ;;; Complete all the tasks.
+       (let [job-path (first (extensions/bucket sync :job))
+             task-path (onyx-zk/task-path (:onyx-id sync) (onyx-zk/trailing-id job-path))]
+         (doseq [child (extensions/children sync task-path)]
+           (impl/complete-task sync child)))
+
+       (facts "Completing a task that's already been completed fails"
+              (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
+                (>!! (:completion-ch-head coordinator) {:path node})
+                (let [failure (<!! failure-ch-spy)]
+                  (fact (:ch failure) => :complete)))))
+     {:revoke-delay 50000})))
 

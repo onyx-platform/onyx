@@ -138,12 +138,14 @@
         peer-state (:content (extensions/dereference sync state-path))
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node peer-state))]
-    (when (not complete?)
+    (if (and (not complete?)
+             (= (:task-node node-data) (:task-node peer-state)))
       (let [state (assoc (dissoc peer-state :task-node :nodes) :state :idle)]
         (extensions/create-at sync :peer-state (:id node-data) state)
         (when (= n 1)
           (complete-task sync (:task-node peer-state)))
-        {:n-peers n :peer-state peer-state}))))
+        {:n-peers n :peer-state peer-state})
+      (throw (ex-info "Failed to complete task" {:complete? complete? :n n})))))
 
 (defn incomplete-job-ids [sync]
   (let [job-ids (extensions/bucket sync :job)]
