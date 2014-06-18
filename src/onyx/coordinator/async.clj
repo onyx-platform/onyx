@@ -14,6 +14,9 @@
     (>!! ch [p f args])
     @p))
 
+(defn apply-serial-fn [f args]
+  (apply f args))
+
 (defn mark-peer-birth [sync sync-ch peer death-cb]
   (let [pulse (:pulse-node (extensions/read-place sync peer))]
     (extensions/on-delete sync pulse death-cb)
@@ -50,9 +53,9 @@
    sync-ch
    #(let [node-data (extensions/read-place sync peer-node)
           state-path (extensions/resolve-node sync :peer-state (:id node-data))
-          peer-state (:content (extensions/dereference sync state-path))
-          status-node (:node/status (:nodes peer-state))]
-      (extensions/delete sync status-node))))
+          peer-state (:content (extensions/dereference sync state-path))]
+      (if-let [status-node (:node/status (:nodes peer-state))]
+        (extensions/delete sync status-node)))))
 
 (defn offer-task [sync sync-ch ack-cb exhaust-cb complete-cb revoke-cb]
   (serialize
@@ -211,7 +214,7 @@
 (defn sync-ch-loop [sync sync-ch]
   (loop []
     (when-let [[p f args] (<!! sync-ch)]
-      (deliver p (apply f args))
+      (deliver p (apply-serial-fn f args))
       (recur))))
 
 (defn failure-ch-loop [failure-tail]
@@ -283,6 +286,12 @@
       (tap failure-mult failure-ch-tail)
       (tap shutdown-mult shutdown-ch-tail)
 
+      (dire/with-handler! #'apply-serial-fn
+        java.lang.Exception
+        (fn [e & _]
+          (>!! failure-ch-head {:ch :serial-fn :e e})
+          false))
+      
       (dire/with-handler! #'mark-peer-birth
         java.lang.Exception
         (fn [e & _]
