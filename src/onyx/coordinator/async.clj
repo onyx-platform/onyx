@@ -62,6 +62,7 @@
       (when (and (seq task-nodes) (seq peers))
         (let [peer-node (:node peer)
               peer-content (:content peer)
+              payload-node (:payload-node (extensions/read-place sync (:peer-node peer-content)))
               task (extensions/read-place sync task-node)
               task-attrs (dissoc task :workflow :catalog)
               ack (extensions/create sync :ack)
@@ -72,7 +73,7 @@
               catalog (extensions/create sync :catalog)
               workflow (extensions/create sync :workflow)
               nodes {:node/peer (:peer-node peer-content)
-                     :node/payload (:payload-node peer-content)
+                     :node/payload payload-node
                      :node/ack (:node ack)
                      :node/exhaust (:node exhaust)
                      :node/seal (:node seal)
@@ -82,10 +83,6 @@
                      :node/workflow (:node workflow)}
               snapshot {:id (:id peer-content) :peer-node peer-node
                         :task-node task-node :nodes nodes}]
-
-          (prn peer-content)
-          (prn "==")
-          (prn peer)
 
           (extensions/write-place sync (:node ack) snapshot)
           (extensions/write-place sync (:node exhaust) snapshot)
@@ -101,8 +98,7 @@
           (extensions/on-change sync (:node complete) complete-cb)
           
           (if (extensions/mark-offered sync task-node peer-node nodes)
-            (let [node (extensions/resolve-node sync :peer (:id peer-content))
-                  payload-node (:payload-node (extensions/read-place sync node))]
+            (let [node (extensions/resolve-node sync :peer (:id peer-content))]
               (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
               (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))

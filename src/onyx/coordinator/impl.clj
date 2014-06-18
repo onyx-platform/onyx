@@ -52,8 +52,7 @@
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
   (let [peer-data (extensions/read-place sync peer-node)
-        state {:id (:id peer-data) :peer-node (:peer-node peer-data)
-               :payload-node (:payload-node peer-data) :state :idle}]
+        state {:id (:id peer-data) :peer-node (:peer-node peer-data) :state :idle}]
     (:node (extensions/create-at sync :peer-state (:id peer-data) state))))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
@@ -164,14 +163,13 @@
          (take (count job-seq)))))
 
 (defn sort-tasks-by-phase [sync tasks]
-  (try
-    (doall (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
-    (catch Exception e
-      (.printStackTrace e)
-      [])))
+  (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
 
-(defn find-incomplete-tasks [tasks]
-  (filter (fn [task] (not (completed-task? task))) tasks))
+(defn find-incomplete-tasks [sync tasks]
+  (filter (fn [task]
+            (and (not (completed-task? task))
+                 (not (task-complete? sync task))))
+          tasks))
 
 (defn find-active-task-ids [sync tasks]
   (filter (fn [task] (> (n-peers sync task) 1)) tasks))
@@ -179,7 +177,7 @@
 (defn next-inactive-task [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
         task-nodes (extensions/children sync task-path)
-        incomplete-tasks (find-incomplete-tasks task-nodes)
+        incomplete-tasks (find-incomplete-tasks sync task-nodes)
         sorted-task-nodes (sort-tasks-by-phase sync incomplete-tasks)
         active-task-ids (find-active-task-ids sync sorted-task-nodes)]
     (filter (fn [t] (not (some #{(:task/id (extensions/read-place sync t))}
@@ -189,7 +187,7 @@
 (defn find-incomplete-concurrent-tasks [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
         task-nodes (extensions/children sync task-path)
-        incomplete-tasks (find-incomplete-tasks task-nodes)
+        incomplete-tasks (find-incomplete-tasks sync task-nodes)
         active (find-active-task-ids sync incomplete-tasks)]
     (filter (fn [task]
               (let [task-data (extensions/read-place sync task)]
@@ -197,11 +195,7 @@
             active)))
 
 (defn sort-tasks-by-peer-count [sync tasks]
-  (try
-    (sort-by (partial n-peers sync) tasks)
-    (catch Exception e
-      (.printStackTrace e)
-      [])))
+  (sort-by (partial n-peers sync) tasks))
 
 (defn next-active-task [sync job-node]
   (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-node)]
