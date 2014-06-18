@@ -163,10 +163,10 @@
                      :node/peer :node/exhaust :node/seal}))
 
     (prn "b")
-    #_(extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
-    #_(extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
+    (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
+    (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
-    #_(facts "Touching the ack node triggers the callback"
+    (facts "Touching the ack node triggers the callback"
            (extensions/touch-place sync (:node/ack (:nodes state)))
            (let [event (<!! ack-ch-spy)]
              (fact (:path event) => (:node/ack (:nodes state))))))

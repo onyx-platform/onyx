@@ -52,7 +52,8 @@
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
   (let [peer-data (extensions/read-place sync peer-node)
-        state {:id (:id peer-data) :peer-node (:peer-node peer-data) :state :idle}]
+        state {:id (:id peer-data) :peer-node (:peer-node peer-data)
+               :payload-node (:payload-node peer-data) :state :idle}]
     (:node (extensions/create-at sync :peer-state (:id peer-data) state))))
 
 (defmethod extensions/mark-peer-dead ZooKeeper
@@ -86,9 +87,13 @@
 (defmethod extensions/ack ZooKeeper
   [sync ack-place]
   (let [ack-data (extensions/read-place sync ack-place)
-        peer-state (extensions/read-place sync (:state-node ack-data))
-        complete? (task-complete? sync (:task-node peer-state))]
-    (when (and (= (:state peer-state) :acking) (not complete?))
+        peer-path (extensions/resolve-node sync :peer-state (:id ack-data))
+        peer-state (:content (extensions/dereference sync peer-path))
+        complete? (task-complete? sync (:task-node ack-data))]
+    ;; Serialize this.
+    (when (and (= (:state peer-state) :acking)
+               (= (:task-node ack-data) (:task-node peer-state))
+               (not complete?))
       (let [state (assoc peer-state :state :active)]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
 
@@ -96,15 +101,10 @@
   [sync ack-place]
   (let [ack-data (extensions/read-place sync ack-place)
         peer-state (extensions/read-place sync (:state-node ack-data))]
+    ;; Serialize this.
     (when (= (:state peer-state) :acking)
       (let [state {:id (:id peer-state) :state :dead}]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
-
-(defmethod extensions/nodes ZooKeeper
-  [sync node]
-  (let [node-data (extensions/read-place sync node)
-        peer-state (extensions/read-place sync (:state-node node-data))]
-    (:nodes peer-state)))
 
 (defmethod extensions/idle-peers ZooKeeper
   [sync]

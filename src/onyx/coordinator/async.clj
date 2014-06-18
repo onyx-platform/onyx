@@ -40,7 +40,8 @@
 (defn acknowledge-task [sync sync-ch ack-place]
   (serialize
    sync-ch
-   #(let [nodes (extensions/nodes sync ack-place)]
+   #(let [nodes (:nodes (extensions/read-place sync ack-place))]
+      ;;; payload-node is null in the ack-node. Fix this
       (when (extensions/ack sync ack-place)
         (extensions/touch-place sync (:node/status nodes))))))
 
@@ -78,13 +79,19 @@
                      :node/completion (:node complete)
                      :node/status (:node status)
                      :node/catalog (:node catalog)
-                     :node/workflow (:node workflow)}]
+                     :node/workflow (:node workflow)}
+              snapshot {:id (:id peer-content) :peer-node peer-node
+                        :task-node task-node :nodes nodes}]
 
-          (extensions/write-place sync (:node ack) {:state-node peer-node})
-          (extensions/write-place sync (:node exhaust) {:state-node peer-node})
-          (extensions/write-place sync (:node seal) {:state-node peer-node})
-          (extensions/write-place sync (:node complete) {:state-node peer-node})
-          (extensions/write-place sync (:node status) {:state-node peer-node})
+          (prn peer-content)
+          (prn "==")
+          (prn peer)
+
+          (extensions/write-place sync (:node ack) snapshot)
+          (extensions/write-place sync (:node exhaust) snapshot)
+          (extensions/write-place sync (:node seal) snapshot)
+          (extensions/write-place sync (:node complete) snapshot)
+          (extensions/write-place sync (:node status) snapshot)
 
           (extensions/write-place sync (:node catalog) (:catalog task))
           (extensions/write-place sync (:node workflow) (:workflow task))
@@ -92,7 +99,7 @@
           (extensions/on-change sync (:node ack) ack-cb)
           (extensions/on-change sync (:node exhaust) exhaust-cb)
           (extensions/on-change sync (:node complete) complete-cb)
-         
+          
           (if (extensions/mark-offered sync task-node peer-node nodes)
             (let [node (extensions/resolve-node sync :peer (:id peer-content))
                   payload-node (:payload-node (extensions/read-place sync node))]

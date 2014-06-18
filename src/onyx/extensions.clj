@@ -20,8 +20,6 @@
 
 (defmulti next-tasks (fn [sync] (type sync)))
 
-(defmulti nodes (fn [sync peer] (type sync)))
-
 (defmulti idle-peers (fn [sync] (type sync)))
 
 (defmulti create
