@@ -178,8 +178,7 @@
 (defn offer-revoke-ch-loop [sync offer-revoke-tail evict-head]
   (loop []
     (when-let [{:keys [peer-node ack-node]} (<!! offer-revoke-tail)]
-      (revoke-offer sync peer-node ack-node
-                    #(>!! evict-head ack-node))
+      (revoke-offer sync peer-node ack-node #(>!! evict-head %))
       (recur))))
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]

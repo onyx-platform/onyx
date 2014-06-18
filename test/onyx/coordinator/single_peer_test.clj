@@ -140,7 +140,6 @@
   [{:keys [id sync sync-spy ack-ch-spy seal-ch-spy completion-ch-spy offer-ch-spy
            status-spy seal-node-spy peer-node payload-node next-payload-node task-name
            pulse-node shutdown-node]}]
-  (prn "a")
   (facts "The payload node is populated"
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
@@ -162,7 +161,6 @@
                      :node/status :node/catalog :node/workflow
                      :node/peer :node/exhaust :node/seal}))
 
-    (prn "b")
     (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
     (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
@@ -170,8 +168,6 @@
            (extensions/touch-place sync (:node/ack (:nodes state)))
            (let [event (<!! ack-ch-spy)]
              (fact (:path event) => (:node/ack (:nodes state))))))
-
-  (prn "C")
 
   (extensions/write-place sync peer-node {:id id
                                           :peer-node peer-node
@@ -181,9 +177,7 @@
   
   (extensions/on-change sync next-payload-node #(>!! sync-spy %))
 
-  (prn "D")
   (<!! status-spy)
-  (prn "E")
 
   (facts "Touching the exhaustion node triggers the callback"
          (let [nodes (:nodes (extensions/read-place sync payload-node))]
@@ -274,22 +268,18 @@
                          :peer-node (:node peer)
                          :pulse-node (:node pulse)
                          :shutdown-node (:node shutdown)}]
-         (prn "1")
+         
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :in
             :payload-node (:node in-payload)
             :next-payload-node (:node inc-payload)))
 
-         (prn "2")
-
          (test-task-life-cycle
           (assoc base-cycle
             :task-name :inc
             :payload-node (:node inc-payload)
             :next-payload-node (:node out-payload)))
-
-         (prn "3")
 
          (test-task-life-cycle
           (assoc base-cycle
@@ -317,20 +307,25 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}
 
-           peer-node (extensions/create sync :peer)
-           pulse-node (extensions/create sync :pulse)
-           shutdown-node (extensions/create sync :shutdown)
-           payload-node (extensions/create sync :payload)
+           peer (extensions/create sync :peer)
+           pulse (extensions/create sync :pulse)
+           shutdown (extensions/create sync :shutdown)
+           payload (extensions/create sync :payload)
                  
            sync-spy (chan 1)
            offer-ch-spy (chan 3)]
              
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (extensions/write-place sync peer-node {:pulse pulse-node :payload payload-node})
-       (extensions/on-change sync payload-node #(>!! sync-spy %))
+       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+                                                  :peer-node (:node peer)
+                                                  :pulse-node (:node pulse)
+                                                  :payload-node (:node payload)
+                                                  :shutdown-node (:node shutdown)})
+       
+       (extensions/on-change sync (:node payload) #(>!! sync-spy %))
 
-       (>!! (:born-peer-ch-head coordinator) peer-node)
+       (>!! (:born-peer-ch-head coordinator) (:node peer))
        (<!! offer-ch-spy)
        (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
        (<!! offer-ch-spy)
@@ -339,19 +334,16 @@
        ;; Instant revoke.
        (<!! offer-ch-spy)
 
-       (facts "The peer gets deleted after eviction"
-              (let [db (d/db (:conn log))
-                    query '[:find ?p :in $ ?peer-node :where
-                            [?p :node/peer ?peer-node]]]
-                (fact (count (d/q query db peer-node)) => zero?)))
+       (facts "The peer gets marked as :dead after eviction"
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx-id sync)))
+                    path (extensions/resolve-node sync :peer-state (first peers))
+                    state (:content (extensions/dereference sync path))]
+                (fact (count peers) => 1)
+                (fact (:state state) => :dead)
 
-       (facts "The status node gets deleted on sync storage"
-              (let [db (d/history (d/db (:conn log)))
-                    query '[:find ?status :in $ ?peer-node :where
-                            [?p :node/peer ?peer-node]
-                            [?p :node/status ?status]]
-                    status-node (ffirst (d/q query db peer-node))]
-                (fact (extensions/read-place sync status-node) => (throws Exception))))))
+                (facts "The status node gets deleted on sync storage"
+                       (let [status-node (:node/status (:nodes state))]
+                         (fact (extensions/read-place sync status-node) => (throws Exception))))))))
    {:revoke-delay 0}))
 
 (facts

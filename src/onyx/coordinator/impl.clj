@@ -60,7 +60,7 @@
   (let [node-data (extensions/read-place sync peer-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
-        state {:id (:id peer-state) :peer-node (:peer-node peer-state) :state :dead}]
+        state (assoc peer-state :state :dead)]
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
 
 (defmethod extensions/plan-job ZooKeeper
@@ -76,8 +76,7 @@
   (let [peer-state (extensions/read-place sync state-path)
         complete? (task-complete? sync task-node)]
     (when (and (= (:state peer-state) :idle) (not complete?))
-      (let [state {:id (:id peer-state) :peer-node (:peer-node peer-state)
-                   :state :acking :task-node task-node :nodes nodes}
+      (let [state (merge peer-state {:state :acking :task-node task-node :nodes nodes})
             next-path (:node (extensions/create-at sync :peer-state (:id peer-state) state))
             task (extensions/read-place sync task-node)
             job-log-record {:job (:task/job-id task) :task (:task/id task)}]
@@ -99,10 +98,11 @@
 (defmethod extensions/revoke-offer ZooKeeper
   [sync ack-place]
   (let [ack-data (extensions/read-place sync ack-place)
-        peer-state (extensions/read-place sync (:state-node ack-data))]
+        state-path (extensions/resolve-node sync :peer-state (:id ack-data))
+        peer-state (:content (extensions/dereference sync state-path))]
     ;; Serialize this.
     (when (= (:state peer-state) :acking)
-      (let [state {:id (:id peer-state) :state :dead}]
+      (let [state (assoc peer-state :state :dead)]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
 
 (defmethod extensions/idle-peers ZooKeeper
