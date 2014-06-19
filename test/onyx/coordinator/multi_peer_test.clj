@@ -2,8 +2,10 @@
   (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan tap alts!! >!! <!!]]
             [com.stuartsierra.component :as component]
+            [zookeeper :as zk]
             [onyx.coordinator.async :as async]
             [onyx.extensions :as extensions]
+            [onyx.sync.zookeeper :as onyx-zk]
             [onyx.coordinator.impl :as impl]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
@@ -146,7 +148,7 @@
 (facts
  "plan one job with four peers"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [n 4
            peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
            pulses (take n (repeatedly (fn [] (extensions/create sync :pulse))))
@@ -178,13 +180,16 @@
        
        (doseq [[peer pulse shutdown payload sync-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
-         (extensions/write-place sync peer {:pulse pulse
-                                            :shutdown shutdown
-                                            :payload payload})
-         (extensions/on-change sync payload #(>!! sync-spy %)))
+         (extensions/write-place sync (:node peer)
+                                 {:id (:uuid peer)
+                                  :peer-node (:node peer)
+                                  :pulse-node (:node pulse)
+                                  :shutdown-node (:node shutdown)
+                                  :payload-node (:node payload)})
+         (extensions/on-change sync (:node payload) #(>!! sync-spy %)))
 
        (doseq [peer peers]
-         (>!! (:born-peer-ch-head coordinator) peer))
+         (>!! (:born-peer-ch-head coordinator) (:node peer)))
 
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
@@ -196,29 +201,25 @@
        (alts!! sync-spies)
        (alts!! sync-spies)
 
-       (let [db (d/db (:conn log))]
+       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+                         (zk/children (:conn sync))
+                         (map (partial extensions/resolve-node sync :peer-state))
+                         (map (partial extensions/dereference sync))
+                         (map :content))]
          
-         (facts "Three peers are :acking"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/status :acking]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 3)))
+         (fact "Three peers are acking"
+               (count (filter (partial = :acking) (map :state states))) => 3)
 
-         (facts "One peer is idle"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/status :idle]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 1)))
+         (fact "One peer is idle"
+               (count (filter (partial = :idle) (map :state states))) => 1)
 
-         (let [query '[:find ?node :where
-                       [?peer :peer/status :acking]
-                       [?peer :node/payload ?node]]
-               payload-nodes (map first (d/q query db))]
-           
+         (let [ackers (filter #(= (:state %) :acking) states)
+               payload-nodes (map (comp :node/payload :nodes) ackers)]
+
            (doseq [payload-node payload-nodes]
              (let [payload (extensions/read-place sync payload-node)]
-               (extensions/on-change sync (:status (:nodes payload)) #(>!! status-spy %))
-               (extensions/touch-place sync (:ack (:nodes payload)))))
+               (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-spy %))
+               (extensions/touch-place sync (:node/ack (:nodes payload)))))
 
            (doseq [_ (range 3)]
              (<!! ack-ch-spy)
@@ -226,21 +227,23 @@
 
            (doseq [payload-node payload-nodes]
              (let [payload (extensions/read-place sync payload-node)]
-               (extensions/touch-place sync (:completion (:nodes payload)))
+               (extensions/touch-place sync (:node/completion (:nodes payload)))
                (<!! offer-ch-spy)))))
 
-       (let [db (d/db (:conn log))]
+       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+                         (zk/children (:conn sync))
+                         (map (partial extensions/resolve-node sync :peer-state))
+                         (map (partial extensions/dereference sync))
+                         (map :content))]
          
          (facts "Four peers are :idle"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/status :idle]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 4)))
+                (count (filter (partial = :idle) (map :state states))) => 4)
 
          (facts "All three tasks are complete"
-                (let [query '[:find (count ?task) :where
-                              [?task :task/complete? true]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 3))))))
+                (let [job-node (first (extensions/bucket sync :job))
+                      task-path (extensions/resolve-node sync :task job-node)]
+                  (doseq [task-node (extensions/children sync task-path)]
+                    (when-not (impl/completed-task? task-node)
+                      (fact (impl/task-complete? sync task-node) => true))))))))
    {:revoke-delay 50000}))
 

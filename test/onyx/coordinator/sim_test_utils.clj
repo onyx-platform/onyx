@@ -153,5 +153,3 @@
       (when-not (= result total-tasks)
         (recur)))))
 
-
-
