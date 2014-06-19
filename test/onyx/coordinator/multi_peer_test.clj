@@ -2,16 +2,15 @@
   (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan tap alts!! >!! <!!]]
             [com.stuartsierra.component :as component]
-            [datomic.api :as d]
             [onyx.coordinator.async :as async]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.log.datomic :as datomic]
+            [onyx.coordinator.impl :as impl]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
  "plan one job with two peers"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [peer-node-a (extensions/create sync :peer)
            peer-node-b (extensions/create sync :peer)
 
@@ -51,18 +50,24 @@
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (extensions/write-place sync peer-node-a {:pulse pulse-node-a
-                                                 :shutdown shutdown-node-a
-                                                 :payload payload-node-a-1})
-       (extensions/on-change sync payload-node-a-1 #(>!! sync-spy-a %))
+       (extensions/write-place sync (:node peer-node-a)
+                               {:id (:uuid peer-node-a)
+                                :peer-node (:node peer-node-a)
+                                :pulse-node (:node pulse-node-a)
+                                :shutdown-node (:node shutdown-node-a)
+                                :payload-node (:node payload-node-a-1)})
+       (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
 
-       (extensions/write-place sync peer-node-b {:pulse pulse-node-b
-                                                 :shutdown shutdown-node-b
-                                                 :payload payload-node-b-1})
-       (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
+       (extensions/write-place sync (:node peer-node-b)
+                               {:id (:uuid peer-node-b)
+                                :peer-node (:node peer-node-b)
+                                :pulse-node (:node pulse-node-b)
+                                :shutdown-node (:node shutdown-node-b)
+                                :payload-node (:node payload-node-b-1)})
+       (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
 
-       (>!! (:born-peer-ch-head coordinator) peer-node-a)
-       (>!! (:born-peer-ch-head coordinator) peer-node-b)
+       (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
+       (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
 
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
@@ -74,17 +79,17 @@
        (<!! sync-spy-b)
 
        (facts "Both payloads are received"
-              (let [payload-a (extensions/read-place sync payload-node-a-1)
-                    payload-b (extensions/read-place sync payload-node-b-1)]
+              (let [payload-a (extensions/read-place sync (:node payload-node-a-1))
+                    payload-b (extensions/read-place sync (:node payload-node-b-1))]
                 (fact payload-a => (comp not nil?))
                 (fact payload-b => (comp not nil?))
                 (fact (not= payload-a payload-b) => true)
 
-                (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
-                (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
+                (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
+                (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
 
-                (extensions/touch-place sync (:ack (:nodes payload-a)))
-                (extensions/touch-place sync (:ack (:nodes payload-b)))
+                (extensions/touch-place sync (:node/ack (:nodes payload-a)))
+                (extensions/touch-place sync (:node/ack (:nodes payload-b)))
 
                 (<!! ack-ch-spy)
                 (<!! ack-ch-spy)
@@ -92,47 +97,50 @@
                 (<!! status-spy)
                 (<!! status-spy)
 
-                (extensions/write-place sync peer-node-a {:pulse pulse-node-a
-                                                          :shutdown shutdown-node-a
-                                                          :payload payload-node-a-2})
-                (extensions/on-change sync payload-node-a-2 #(>!! sync-spy-a %))
+                (extensions/write-place sync (:node peer-node-a)
+                                        {:id (:uuid peer-node-a)
+                                         :peer-node (:node peer-node-a)
+                                         :pulse-node (:node pulse-node-a)
+                                         :shutdown-node (:node shutdown-node-a)
+                                         :payload-node (:node payload-node-a-2)})
+                (extensions/on-change sync (:node payload-node-a-2) #(>!! sync-spy-a %))
 
-                (extensions/write-place sync peer-node-b {:pulse pulse-node-b
-                                                          :shutdown shutdown-node-b
-                                                          :payload payload-node-b-2})
-                (extensions/on-change sync payload-node-b-2 #(>!! sync-spy-b %))
+                (extensions/write-place sync (:node peer-node-b)
+                                        {:id (:uuid peer-node-b)
+                                         :peer-node (:node peer-node-b)
+                                         :pulse-node (:node pulse-node-b)
+                                         :shutdown-node (:node shutdown-node-b)
+                                         :payload-node (:node payload-node-b-2)})
+                (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
 
-                (extensions/touch-place sync (:completion (:nodes payload-a)))
-                (extensions/touch-place sync (:completion (:nodes payload-b)))
+                (extensions/touch-place sync (:node/completion (:nodes payload-a)))
+                (extensions/touch-place sync (:node/completion (:nodes payload-b)))
 
                 (<!! offer-ch-spy)
                 (<!! offer-ch-spy)
 
                 (let [[v ch] (alts!! [sync-spy-a sync-spy-b])
                       nodes (:nodes (extensions/read-place sync (:path v)))]
-                  (extensions/on-change sync (:status nodes) #(>!! status-spy %))
-                  (extensions/touch-place sync (:ack nodes))
+                  (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
+                  (extensions/touch-place sync (:node/ack nodes))
 
                   (<!! ack-ch-spy)
                   (<!! status-spy)
 
-                  (extensions/touch-place sync (:completion nodes))
+                  (extensions/touch-place sync (:node/completion nodes))
                   (<!! offer-ch-spy))
 
-                (let [db (d/db (:conn log))]
-                  
-                  (facts "All tasks are complete"
-                         (let [query '[:find (count ?task) :where
-                                       [?task :task/complete? true]]
-                               result (ffirst (d/q query db))]
-                           (fact result => 3)))
+                (facts "All tasks are complete"
+                       (let [job-node (first (extensions/bucket sync :job))
+                             task-path (extensions/resolve-node sync :task job-node)]
+                         (doseq [task-node (extensions/children sync task-path)]
+                           (when-not (impl/completed-task? task-node)
+                             (fact (impl/task-complete? sync task-node) => true)))))
 
-                  (facts "All peers are idle"
-                         (let [query '[:find (count ?peer) :where
-                                       [?peer :peer/status :idle]]
-                               result (ffirst (d/q query db))]
-                           (fact result => 2))))))))
-   
+                (facts "All peers are idle"
+                       (doseq [state-path (extensions/bucket sync :peer-state)]
+                         (let [state (extensions/dereference sync state-path)]
+                           (fact (:state (:content state)) => :idle))))))))
    {:revoke-delay 50000}))
 
 (facts
