@@ -221,16 +221,18 @@
     {:node (zk/create-all (:conn sync) place :data data :persistent? true :sequential? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :workflow]
-  [sync _ subpath]
+  [sync _ job-id content]
   (let [prefix (:onyx-id sync)
-        place (str (job-path prefix) "/" subpath "/workflow")]
-    {:node (zk/create (:conn sync) place :persistent? true)}))
+        data (serialize-edn content)
+        place (str (workflow-path prefix) "/" job-id)]
+    {:node (zk/create (:conn sync) place :data data :persistent? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :catalog]
-  [sync _ subpath]
+  [sync _ job-id content]
   (let [prefix (:onyx-id sync)
-        place (str (job-path prefix) "/" subpath "/catalog")]
-    {:node (zk/create (:conn sync) place :persistent? true)}))
+        data (serialize-edn content)
+        place (str (catalog-path prefix) "/" job-id)]
+    {:node (zk/create (:conn sync) place :data data :persistent? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :task]
   [sync _ subpath content]

@@ -8,7 +8,7 @@
 
 (defmulti mark-offered (fn [sync task peer nodes] (type sync)))
 
-(defmulti plan-job (fn [sync job-id tasks] (type sync)))
+(defmulti plan-job (fn [sync job-id tasks catalog workflow] (type sync)))
 
 (defmulti ack (fn [sync place] (type sync)))
 

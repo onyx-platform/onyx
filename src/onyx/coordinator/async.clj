@@ -37,7 +37,7 @@
         (when (:onyx/bootstrap? task-map)
           (extensions/bootstrap-queue queue task))))
 
-    (extensions/plan-job sync job-id tasks)
+    (extensions/plan-job sync job-id tasks catalog workflow)
     job-id))
 
 (defn acknowledge-task [sync sync-ch ack-place]
@@ -63,18 +63,16 @@
    #(loop [[task-node :as task-nodes] (extensions/next-tasks sync)
            [peer :as peers] (extensions/idle-peers sync)]
       (when (and (seq task-nodes) (seq peers))
+        (prn "Offering " task-node "to" (:node peer))
         (let [peer-node (:node peer)
               peer-content (:content peer)
               payload-node (:payload-node (extensions/read-place sync (:peer-node peer-content)))
               task (extensions/read-place sync task-node)
-              task-attrs (dissoc task :workflow :catalog)
               ack (extensions/create sync :ack)
               exhaust (extensions/create sync :exhaust)
               seal (extensions/create sync :seal)
               complete (extensions/create sync :completion)
               status (extensions/create sync :status)
-              catalog (extensions/create sync :catalog)
-              workflow (extensions/create sync :workflow)
               nodes {:node/peer (:peer-node peer-content)
                      :node/payload payload-node
                      :node/ack (:node ack)
@@ -82,8 +80,8 @@
                      :node/seal (:node seal)
                      :node/completion (:node complete)
                      :node/status (:node status)
-                     :node/catalog (:node catalog)
-                     :node/workflow (:node workflow)}
+                     :node/catalog (:task/catalog-node task)
+                     :node/workflow (:task/workflow-node task)}
               snapshot {:id (:id peer-content) :peer-node peer-node
                         :task-node task-node :nodes nodes}]
 
@@ -93,16 +91,14 @@
           (extensions/write-place sync (:node complete) snapshot)
           (extensions/write-place sync (:node status) snapshot)
 
-          (extensions/write-place sync (:node catalog) (:catalog task))
-          (extensions/write-place sync (:node workflow) (:workflow task))
-         
           (extensions/on-change sync (:node ack) ack-cb)
           (extensions/on-change sync (:node exhaust) exhaust-cb)
           (extensions/on-change sync (:node complete) complete-cb)
           
           (if (extensions/mark-offered sync task-node peer-node nodes)
             (let [node (extensions/resolve-node sync :peer (:id peer-content))]
-              (extensions/write-place sync payload-node {:task task-attrs :nodes nodes})
+              (prn "Accepted " task-node)
+              (extensions/write-place sync payload-node {:task task :nodes nodes})
               (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))
             (recur task-nodes (rest peers))))))))
@@ -121,9 +117,11 @@
 
 (defn complete-task [sync complete-place]
   (if-let [result (extensions/complete sync complete-place)]
-    (when (= (:n-peers result) 1)
-      (extensions/delete sync complete-place)
-      result)
+    (do
+      (prn "->>" (:n-peers result))
+      (when (= (:n-peers result) 1)
+        (extensions/delete sync complete-place)
+        result))
     false))
 
 (defn shutdown-peer [sync peer]

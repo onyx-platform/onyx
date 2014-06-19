@@ -7,9 +7,11 @@
 
 (def complete-marker ".complete")
 
-(defn serialize-task [task job-id]
+(defn serialize-task [task job-id catalog-node workflow-node]
   {:task/id (:id task)
    :task/job-id job-id
+   :task/catalog-node catalog-node
+   :task/workflow-node workflow-node
    :task/name (:name task)
    :task/phase (:phase task)
    :task/consumption (:consumption task)
@@ -46,8 +48,16 @@
       peers))))
 
 (defn n-peers [sync task-node]
-  (+ (n-active-peers sync task-node)
-     (n-sealing-peers sync task-node)))
+  (let [peers (extensions/bucket sync :peer-state)
+        states (map :content (map (partial extensions/dereference sync) peers))]
+    (count
+     (filter
+      (fn [state]
+        (and (= (:task-node state) task-node)
+             (or (= (:state state) :acking)
+                 (= (:state state) :sealing)
+                 (= (:state state) :active))))
+      states))))
 
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
@@ -67,12 +77,16 @@
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
 
 (defmethod extensions/plan-job ZooKeeper
-  [sync job-id tasks]
-  (doseq [task tasks]
-    (let [data (serialize-task task job-id)
-          place (:node (extensions/create-at sync :task job-id data))]))
-  (extensions/create sync :job job-id)
-  job-id)
+  [sync job-id tasks catalog workflow]
+  (let [catalog-node (:node (extensions/create-at sync :catalog job-id catalog))
+        workflow-node (:node (extensions/create-at sync :workflow job-id workflow))]
+
+    (doseq [task tasks]
+      (let [data (serialize-task task job-id catalog-node workflow-node)
+            place (:node (extensions/create-at sync :task job-id data))]))
+    
+    (extensions/create sync :job job-id)  
+    job-id))
 
 (defmethod extensions/mark-offered ZooKeeper
   [sync task-node state-path nodes]
@@ -182,7 +196,7 @@
           tasks))
 
 (defn find-active-task-ids [sync tasks]
-  (filter (fn [task] (> (n-peers sync task) 1)) tasks))
+  (filter (fn [task] (>= (n-peers sync task) 1)) tasks))
 
 (defn next-inactive-task [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
@@ -190,9 +204,7 @@
         incomplete-tasks (find-incomplete-tasks sync task-nodes)
         sorted-task-nodes (sort-tasks-by-phase sync incomplete-tasks)
         active-task-ids (find-active-task-ids sync sorted-task-nodes)]
-    (filter (fn [t] (not (some #{(:task/id (extensions/read-place sync t))}
-                              active-task-ids)))
-            sorted-task-nodes)))
+    (filter (fn [t] (not (some #{t} active-task-ids))) sorted-task-nodes)))
 
 (defn find-incomplete-concurrent-tasks [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
@@ -216,8 +228,7 @@
   (let [job-seq (job-candidate-seq (incomplete-job-ids sync)
                                    (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
-        active-candidates (mapcat (partial next-active-task sync) job-seq)
-        rets (concat (filter identity inactive-candidates)
-                     (filter identity active-candidates))]
-    rets))
+        active-candidates (mapcat (partial next-active-task sync) job-seq)]
+    (concat (filter identity inactive-candidates)
+            (filter identity active-candidates))))
 
