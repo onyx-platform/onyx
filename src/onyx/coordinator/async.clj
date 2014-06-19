@@ -63,7 +63,6 @@
    #(loop [[task-node :as task-nodes] (extensions/next-tasks sync)
            [peer :as peers] (extensions/idle-peers sync)]
       (when (and (seq task-nodes) (seq peers))
-        (prn "Offering " task-node "to" (:node peer))
         (let [peer-node (:node peer)
               peer-content (:content peer)
               payload-node (:payload-node (extensions/read-place sync (:peer-node peer-content)))
@@ -97,7 +96,6 @@
           
           (if (extensions/mark-offered sync task-node peer-node nodes)
             (let [node (extensions/resolve-node sync :peer (:id peer-content))]
-              (prn "Accepted " task-node)
               (extensions/write-place sync payload-node {:task task :nodes nodes})
               (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
               (recur (rest task-nodes) (rest peers)))
@@ -117,11 +115,9 @@
 
 (defn complete-task [sync complete-place]
   (if-let [result (extensions/complete sync complete-place)]
-    (do
-      (prn "->>" (:n-peers result))
-      (when (= (:n-peers result) 1)
-        (extensions/delete sync complete-place)
-        result))
+    (when (= (:n-peers result) 1)
+      (extensions/delete sync complete-place)
+      result)
     false))
 
 (defn shutdown-peer [sync peer]

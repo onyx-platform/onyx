@@ -179,11 +179,11 @@
 (defn last-offered-job [sync]
   (:content (extensions/dereference sync (extensions/resolve-node sync :job-log))))
 
-(defn job-candidate-seq [job-seq last-offered]
+(defn job-candidate-seq [sync job-seq last-offered]
   (if (nil? last-offered)
     job-seq
     (->> (cycle job-seq)
-         (drop (inc (.indexOf job-seq last-offered)))
+         (drop (inc (.indexOf job-seq (extensions/resolve-node sync :job (:job last-offered)))))
          (take (count job-seq)))))
 
 (defn sort-tasks-by-phase [sync tasks]
@@ -225,8 +225,7 @@
 
 (defmethod extensions/next-tasks ZooKeeper
   [sync]
-  (let [job-seq (job-candidate-seq (incomplete-job-ids sync)
-                                   (last-offered-job sync))
+  (let [job-seq (job-candidate-seq sync (incomplete-job-ids sync) (last-offered-job sync))
         inactive-candidates (mapcat (partial next-inactive-task sync) job-seq)
         active-candidates (mapcat (partial next-active-task sync) job-seq)]
     (concat (filter identity inactive-candidates)

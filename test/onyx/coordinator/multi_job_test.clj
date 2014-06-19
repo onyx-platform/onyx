@@ -136,9 +136,10 @@
        (<!! sync-spy-a)
 
        (let [payload-a (extensions/read-place sync (:node payload-node-a-2))]
-         (facts "Payload A is for job B"
-                (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
-                (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
+         (facts
+          "Payload A is for job B"
+          (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
+          (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
 
          (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
          (extensions/touch-place sync (:node/ack (:nodes payload-a)))

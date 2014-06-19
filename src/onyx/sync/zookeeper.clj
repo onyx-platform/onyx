@@ -280,6 +280,11 @@
   (let [prefix (:onyx-id sync)]
     (job-log-path prefix)))
 
+(defmethod extensions/resolve-node [ZooKeeper :job]
+  [sync _ job-id & more]
+  (let [prefix (:onyx-id sync)]
+    (str (job-path prefix) "/" job-id)))
+
 (defmethod extensions/resolve-node [ZooKeeper :task]
   [sync _ job-node & more]
   (let [prefix (:onyx-id sync)]
