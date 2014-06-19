@@ -4,6 +4,7 @@
             [com.stuartsierra.component :as component]
             [onyx.coordinator.async :as async]
             [onyx.extensions :as extensions]
+            [onyx.coordinator.impl :as impl]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
@@ -132,128 +133,122 @@
          (extensions/touch-place sync (:node/completion (:nodes payload-a))))
 
        (<!! offer-ch-spy)
-       (prn "1")
        (<!! sync-spy-a)
-       (prn "2")
 
-       #_(let [payload-a (extensions/read-place sync payload-node-a-2)]
+       (let [payload-a (extensions/read-place sync (:node payload-node-a-2))]
          (facts "Payload A is for job B"
-                (let [db (d/db (:conn log))
-                      query '[:find ?job :in $ ?task ?catalog :where
-                              [?job :job/task ?task]
-                              [?job :job/catalog ?catalog]]
-                      result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-b))
-                      jobs (map first result)]
-                  (fact (count jobs) => 1)))
+                (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
+                (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
 
-         (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
-         (extensions/touch-place sync (:ack (:nodes payload-a)))
+         (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
+         (extensions/touch-place sync (:node/ack (:nodes payload-a)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-b (extensions/read-place sync payload-node-b-1)]
-         (extensions/write-place sync peer-node-b {:pulse pulse-node-b
-                                                   :payload payload-node-b-2
-                                                   :shutdown shutdown-node-b})
-         (extensions/on-change sync payload-node-b-2 #(>!! sync-spy-b %))
-         (extensions/touch-place sync (:completion (:nodes payload-b)))
+       (let [payload-b (extensions/read-place sync (:node payload-node-b-1))]
+         (extensions/write-place sync (:node peer-node-b)
+                                 {:id (:uuid peer-node-b)
+                                  :peer-node (:node peer-node-b)
+                                  :pulse-node (:node pulse-node-b)
+                                  :payload-node (:node payload-node-b-2)
+                                  :shutdown-node (:node shutdown-node-b)})
+         
+         (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
+         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-b))
 
-       #_(let [payload-b (extensions/read-place sync payload-node-b-2)]
-         (facts "Payload B is for job A"
-                (let [db (d/db (:conn log))
-                      query '[:find ?job :in $ ?task ?catalog :where
-                              [?job :job/task ?task]
-                              [?job :job/catalog ?catalog]]
-                      result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-a))
-                      jobs (map first result)]
-                  (fact (count jobs) => 1)))
+       (let [payload-b (extensions/read-place sync (:node payload-node-b-2))]
+         (facts
+          "Payload B is for job A"
+          (extensions/read-place sync (:node/catalog (:nodes payload-b))) => catalog-a
+          (extensions/read-place sync (:node/workflow (:nodes payload-b))) => workflow-a)
          
-         (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
-         (extensions/touch-place sync (:ack (:nodes payload-b)))
+         (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
+         (extensions/touch-place sync (:node/ack (:nodes payload-b)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-a (extensions/read-place sync payload-node-a-2)]
-         (extensions/write-place sync peer-node-a {:pulse pulse-node-a
-                                                   :shutdown shutdown-node-a
-                                                   :payload payload-node-a-1})
-         (extensions/on-change sync payload-node-a-1 #(>!! sync-spy-a %))
-         (extensions/touch-place sync (:completion (:nodes payload-a)))
+       (let [payload-a (extensions/read-place sync (:node payload-node-a-2))]
+         (extensions/write-place sync (:node peer-node-a)
+                                 {:id (:uuid peer-node-a)
+                                  :peer-node (:node peer-node-a)
+                                  :pulse-node (:node pulse-node-a)
+                                  :shutdown-node (:node shutdown-node-a)
+                                  :payload-node (:node payload-node-a-1)})
+         
+         (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
+         (extensions/touch-place sync (:node/completion (:nodes payload-a)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-a))
 
-       #_(let [payload-a (extensions/read-place sync payload-node-a-1)]
-         (facts "Payload A is for job B"
-                (let [db (d/db (:conn log))
-                      query '[:find ?job :in $ ?task ?catalog :where
-                              [?job :job/task ?task]
-                              [?job :job/catalog ?catalog]]
-                      result (d/q query db (:db/id (:task payload-a)) (pr-str catalog-b))
-                      jobs (map first result)]
-                  (fact (count jobs) => 1)))
+       (let [payload-a (extensions/read-place sync (:node payload-node-a-1))]
+         (facts
+          "Payload A is for job B"
+          (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
+          (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
 
-         (extensions/on-change sync (:status (:nodes payload-a)) #(>!! status-spy %))
-         (extensions/touch-place sync (:ack (:nodes payload-a)))
+         (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
+         (extensions/touch-place sync (:node/ack (:nodes payload-a)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-b (extensions/read-place sync payload-node-b-2)]
-         (extensions/write-place sync peer-node-b {:pulse pulse-node-b
-                                                   :shutdown shutdown-node-b
-                                                   :payload payload-node-b-1})
-         (extensions/on-change sync payload-node-b-1 #(>!! sync-spy-b %))
-         (extensions/touch-place sync (:completion (:nodes payload-b)))
+       (let [payload-b (extensions/read-place sync (:node payload-node-b-2))]
+         (extensions/write-place sync (:node peer-node-b)
+                                 {:id (:uuid peer-node-b)
+                                  :peer-node (:node peer-node-b)
+                                  :pulse-node (:node pulse-node-b)
+                                  :shutdown-node (:node shutdown-node-b)
+                                  :payload-node (:node payload-node-b-1)})
+         
+         (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
+         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-b))
 
-       #_(let [payload-b (extensions/read-place sync payload-node-b-1)]
-         (facts "Payload B is for job B"
-                (let [db (d/db (:conn log))
-                      query '[:find ?job :in $ ?task ?catalog :where
-                              [?job :job/task ?task]
-                              [?job :job/catalog ?catalog]]
-                      result (d/q query db (:db/id (:task payload-b)) (pr-str catalog-b))
-                      jobs (map first result)]
-                  (fact (count jobs) => 1)))
+       (let [payload-b (extensions/read-place sync (:node payload-node-b-1))]
+         (facts
+          "Payload B is for job B"
+          (extensions/read-place sync (:node/catalog (:nodes payload-b))) => catalog-b
+          (extensions/read-place sync (:node/workflow (:nodes payload-b))) => workflow-b)
 
-         (extensions/on-change sync (:status (:nodes payload-b)) #(>!! status-spy %))
-         (extensions/touch-place sync (:ack (:nodes payload-b)))
+         (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
+         (extensions/touch-place sync (:node/ack (:nodes payload-b)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-a (extensions/read-place sync payload-node-a-1)
-             payload-b (extensions/read-place sync payload-node-b-1)]
-         (extensions/touch-place sync (:completion (:nodes payload-a)))
-         (extensions/touch-place sync (:completion (:nodes payload-b)))
+       (let [payload-a (extensions/read-place sync (:node payload-node-a-1))
+             payload-b (extensions/read-place sync (:node payload-node-b-1))]
+         (extensions/touch-place sync (:node/completion (:nodes payload-a)))
+         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! offer-ch-spy))
 
-       #_(let [db (d/db (:conn log))]
-           (facts "All tasks are complete"
-                  (let [query '[:find (count ?task) :where
-                                [?task :task/complete? true]]
-                        result (ffirst (d/q query db))]
-                    (fact result => 6)))
+       (facts
+        "All tasks are complete"
+        (let [job-nodes (extensions/bucket sync :job)
+              task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
+          (doseq [task-path task-paths]
+            (doseq [task-node (extensions/children sync task-path)]
+              (when-not (impl/completed-task? task-node)
+                (fact (impl/task-complete? sync task-node) => true))))))
 
-           (facts "All peers are idle"
-                  (let [query '[:find (count ?peer) :where
-                                [?peer :peer/status :idle]]
-                        result (ffirst (d/q query db))]
-                    (fact result => 2))))
+       (facts "All peers are idle"
+              (doseq [state-path (extensions/bucket sync :peer-state)]
+                (let [state (extensions/dereference sync state-path)]
+                  (fact (:state (:content state)) => :idle))))
 
        (facts "Peer death succeeds"
-              (extensions/delete sync pulse-node-a)
-              (extensions/delete sync pulse-node-b)
+              (extensions/delete sync (:node pulse-node-a))
+              (extensions/delete sync (:node pulse-node-b))
               (<!! offer-ch-spy)
               (<!! offer-ch-spy))))
    
