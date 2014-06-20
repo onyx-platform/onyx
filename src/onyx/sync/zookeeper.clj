@@ -355,6 +355,13 @@
               (cb event)))]
     (zk/exists (:conn sync) place :watcher f)))
 
+(defmethod extensions/on-child-change ZooKeeper
+  [sync node cb]
+  (let [f (fn [event]
+            (when (= (:event-type event) :NodeChildrenChanged)
+              (cb event)))]
+    (zk/children (:conn sync) node :watcher f)))
+
 (defmethod extensions/on-delete ZooKeeper
   [sync place cb]
   (let [f (fn [event]

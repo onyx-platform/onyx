@@ -4,6 +4,7 @@
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
+            [taoensso.timbre :refer [info]]
             [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
@@ -124,6 +125,7 @@
         (>!! (:born-peer-ch-head coordinator) (:node peer))
 
         (loop [p payload]
+          (info (:uuid peer))
           (<!! sync-spy)
           (<!! (timeout (gen/geometric (/ 1 (:model/mean-ack-time model)))))
 
@@ -134,7 +136,10 @@
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
-              (extensions/write-place sync (:node peer) {:pulse-node (:node pulse)
+              (extensions/write-place sync (:node peer) {:id (:uuid peer)
+                                                         :peer-node (:node peer)
+                                                         :pulse-node (:node pulse)
+                                                         :shutdown-node (:node shutdown)
                                                          :payload-node (:node next-payload)})
               (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
               (extensions/touch-place sync (:node/completion nodes))

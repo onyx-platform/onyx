@@ -27,15 +27,15 @@
    acquired."
   (shutdown [this]))
 
-(defn- await-job-completion* [sync job-id]
+(defn await-job-completion* [sync job-id]
   (future
     (loop []
       (let [ch (chan 1)
             task-path (extensions/resolve-node sync :task job-id)
-            task-nodes (extensions/bucket-at sync :task task-path)
+            task-nodes (extensions/bucket-at sync :task job-id)
             task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
-        (extensions/on-change sync (fn [_] (>!! ch true)))
-        (if (every? impl/task-complete? task-nodes)
+        (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
+        (if (every? (partial impl/task-complete? sync) task-nodes)
           true
           (do (<!! ch)
               (recur)))))))

@@ -64,6 +64,8 @@
 
 (defmulti on-change (fn [sync place cb] (type sync)))
 
+(defmulti on-child-change (fn [sync place cb] (type sync)))
+
 (defmulti on-delete (fn [sync place db] (type sync)))
 
 (defmulti create-tx-session (fn [queue] (type queue)))
