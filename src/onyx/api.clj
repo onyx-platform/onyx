@@ -4,7 +4,9 @@
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [info]]
-            [onyx.system :as system]))
+            [onyx.coordinator.impl :as impl]
+            [onyx.system :as system]
+            [onyx.extensions :as extensions]))
 
 (defprotocol ISubmit
   "Protocol for sending a job to the coordinator for execution."
@@ -15,11 +17,28 @@
    Registering allows the virtual peer to accept tasks."
   (register-peer [this peer-node]))
 
+(defprotocol IAwait
+  "Protocol for waiting for completion of Onyx internals"
+  (await-job-completion [this job-id]))
+
 (defprotocol IShutdown
   "Protocol for stopping a virtual peer's task and no longer allowing
    it to accept new tasks. Releases all resources that were previously
    acquired."
   (shutdown [this]))
+
+(defn- await-job-completion* [sync job-id]
+  (future
+    (loop []
+      (let [ch (chan 1)
+            task-path (extensions/resolve-node sync :task job-id)
+            task-nodes (extensions/bucket-at sync :task task-path)
+            task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
+        (extensions/on-change sync (fn [_] (>!! ch true)))
+        (if (every? impl/task-complete? task-nodes)
+          true
+          (do (<!! ch)
+              (recur)))))))
 
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
@@ -30,6 +49,10 @@
       (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
       (<!! ch)))
 
+  IAwait
+  (await-job-completion [this job-id]
+    (await-job-completion* (:sync onyx-coord) job-id))
+
   IRegister
   (register-peer [this peer-node]
     (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
@@ -37,7 +60,7 @@
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
-;; A coordinator that can run remotely. Peers commuicate with the
+;; A coordinator runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
 (deftype HttpCoordinator [uri]
   ISubmit
@@ -54,7 +77,7 @@
   (shutdown [this]))
 
 (defmulti connect
-  "A polymorphic function to connect with the coordinator."
+  "Establish a communication channel with the coordinator."
   (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
 
 (defmethod connect :memory
