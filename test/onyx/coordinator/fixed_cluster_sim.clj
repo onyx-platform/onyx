@@ -7,7 +7,6 @@
             [datomic.api :as d]
             [onyx.system :refer [onyx-coordinator]]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :as sim-utils]))
 
 (def cluster (atom {}))
@@ -40,19 +39,14 @@
 (def id (str (java.util.UUID/randomUUID)))
 
 (def system (onyx-coordinator
-             {:datomic-uri (str "datomic:mem://" id)
-              :hornetq-addr "localhost:5445"
+             {:hornetq-addr "localhost:5445"
               :zk-addr "127.0.0.1:2181"
               :onyx-id id
               :revoke-delay 500000}))
 
-(def components (alter-var-root #'system component/start))
+(def components (component/start system))
 
 (def coordinator (:coordinator components))
-
-(def log (:log components))
-
-(def tx-queue (d/tx-report-queue (:conn log)))
 
 (def offer-spy (chan 10000))
 
@@ -79,10 +73,13 @@
 
 (def tasks-per-job 3)
 
+(def job-chs (map (fn [_] (chan 1)) (range n-jobs)))
+
 (tap (:offer-mult coordinator) offer-spy)
 
-(doseq [_ (range n-jobs)]
-  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
+(doseq [n (range n-jobs)]
+  (>!! (:planning-ch-head coordinator)
+       [{:catalog catalog :workflow workflow} (nth job-chs n)]))
 
 (doseq [_ (range n-jobs)]
   (<!! offer-spy))
@@ -129,12 +126,10 @@
 
 (def sim-db (d/db sim-conn))
 
-(def result-db (d/db (:conn log)))
-
 (facts (sim-utils/task-completeness result-db)
        (sim-utils/sequential-safety result-db)
        (sim-utils/peer-fairness result-db n-peers n-jobs tasks-per-job)
        (sim-utils/peer-liveness result-db n-peers))
 
-(alter-var-root #'system component/stop)
+(component/stop components)
 

@@ -57,7 +57,8 @@
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} (chan 1)])
        (<!! offer-ch-spy)
 
        (doseq [_ (range n)]

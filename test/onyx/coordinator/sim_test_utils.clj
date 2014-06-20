@@ -113,27 +113,31 @@
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
-        (extensions/write-place sync peer {:pulse pulse
-                                           :shutdown shutdown
-                                           :payload payload})
-        (extensions/on-change sync payload #(>!! sync-spy %))
+        (extensions/write-place sync (:node peer)
+                                {:id (:uuid peer)
+                                 :peer-node (:node peer)
+                                 :pulse-node (:node pulse)
+                                 :shutdown-node (:node shutdown)
+                                 :payload-node (:node payload)})
+        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
         
-        (>!! (:born-peer-ch-head coordinator) peer)
+        (>!! (:born-peer-ch-head coordinator) (:node peer))
 
-        (loop [payload-node payload]
+        (loop [p payload]
           (<!! sync-spy)
           (<!! (timeout (gen/geometric (/ 1 (:model/mean-ack-time model)))))
 
-          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-            (extensions/on-change sync (:status nodes) #(>!! status-spy %))
-            (extensions/touch-place sync (:ack nodes))
+          (let [nodes (:nodes (extensions/read-place sync (:node p)))]
+            (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
+            (extensions/touch-place sync (:node/ack nodes))
             (<!! status-spy)
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
-              (extensions/write-place sync peer {:pulse pulse :payload next-payload})
-              (extensions/on-change sync next-payload #(>!! sync-spy %))
-              (extensions/touch-place sync (:completion nodes))
+              (extensions/write-place sync (:node peer) {:pulse-node (:node pulse)
+                                                         :payload-node (:node next-payload)})
+              (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
+              (extensions/touch-place sync (:node/completion nodes))
 
               (recur next-payload)))))
       (catch Exception e (prn "Peer: " e)))))
@@ -142,14 +146,4 @@
   (doseq [_ (range (:model/n-peers model))]
     (let [peer (extensions/create (:sync components) :peer)]
       (swap! cluster assoc peer (create-peer model components peer)))))
-
-(defn block-until-completion! [tx-queue total-tasks]
-  (loop []
-    (let [tx (.take tx-queue)
-          db (:db-after tx)
-          query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (prn result)
-      (when-not (= result total-tasks)
-        (recur)))))
 

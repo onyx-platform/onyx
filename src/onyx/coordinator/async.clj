@@ -141,8 +141,9 @@
 
 (defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
-    (when-let [job (<!! planning-tail)]
+    (when-let [[job ch] (<!! planning-tail)]
       (let [job-id (plan-job sync queue job)]
+        (>!! ch job-id)
         (>!! offer-head job-id)
         (recur)))))
 

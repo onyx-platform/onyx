@@ -99,9 +99,9 @@
            offer-ch-spy (chan 1)]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
-             
+
        (>!! (:planning-ch-head coordinator)
-            {:catalog catalog :workflow workflow})
+            [{:catalog catalog :workflow workflow} (chan 1)])
 
        (let [job-id (<!! offer-ch-spy)]
 
@@ -251,7 +251,8 @@
        (extensions/on-change sync (:node in-payload) #(>!! sync-spy %))
 
        (>!! (:born-peer-ch-head coordinator) (:node peer))
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} (chan 1)])
 
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
@@ -327,7 +328,8 @@
 
        (>!! (:born-peer-ch-head coordinator) (:node peer))
        (<!! offer-ch-spy)
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} (chan 1)])
        (<!! offer-ch-spy)
        (<!! sync-spy)
 
@@ -405,6 +407,7 @@
            evict-ch-spy (chan 5)
            completion-ch-spy (chan 5)
            failure-ch-spy (chan 10)
+           job-ch (chan 1)
 
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -432,7 +435,8 @@
        (tap (:completion-mult coordinator) completion-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} job-ch])
        (<!! offer-ch-spy)
 
        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
@@ -442,8 +446,7 @@
        (<!! sync-spy)
 
        ;;; Complete all the tasks.
-       (let [job-path (first (extensions/bucket sync :job))
-             task-path (onyx-zk/task-path (:onyx-id sync) (onyx-zk/trailing-id job-path))]
+       (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
          (doseq [child (extensions/children sync task-path)]
            (impl/complete-task sync child)))
 
@@ -479,6 +482,7 @@
            evict-ch-spy (chan 5)
            completion-ch-spy (chan 5)
            failure-ch-spy (chan 10)
+           job-ch (chan 1)
 
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -506,7 +510,8 @@
        (tap (:completion-mult coordinator) completion-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} job-ch])
        (<!! offer-ch-spy)
 
        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
@@ -526,9 +531,7 @@
           (let [failure (<!! failure-ch-spy)]
             (fact (:ch failure) => :complete))))
 
-       ;;; Complete all the tasks.
-       (let [job-path (first (extensions/bucket sync :job))
-             task-path (onyx-zk/task-path (:onyx-id sync) (onyx-zk/trailing-id job-path))]
+       (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
          (doseq [child (extensions/children sync task-path)]
            (impl/complete-task sync child)))
 

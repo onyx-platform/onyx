@@ -33,6 +33,7 @@
            ack-ch-spy (chan 2)
            offer-ch-spy (chan 10)
            status-spy (chan 2)
+           job-ch (chan 1)
            
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -74,7 +75,8 @@
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} job-ch])
 
        (<!! offer-ch-spy)
        (<!! sync-spy-a)
@@ -133,8 +135,7 @@
                   (<!! offer-ch-spy))
 
                 (facts "All tasks are complete"
-                       (let [job-node (first (extensions/bucket sync :job))
-                             task-path (extensions/resolve-node sync :task job-node)]
+                       (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
                          (doseq [task-node (extensions/children sync task-path)]
                            (when-not (impl/completed-task? task-node)
                              (fact (impl/task-complete? sync task-node) => true)))))
@@ -159,6 +160,7 @@
            status-spy (chan (* n 5))
            offer-ch-spy (chan (* n 5))
            ack-ch-spy (chan (* n 5))
+           job-ch (chan 1)
 
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -194,7 +196,8 @@
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} job-ch])
        (<!! offer-ch-spy)
 
        (alts!! sync-spies)
@@ -240,8 +243,7 @@
                 (count (filter (partial = :idle) (map :state states))) => 4)
 
          (facts "All three tasks are complete"
-                (let [job-node (first (extensions/bucket sync :job))
-                      task-path (extensions/resolve-node sync :task job-node)]
+                (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
                   (doseq [task-node (extensions/children sync task-path)]
                     (when-not (impl/completed-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))

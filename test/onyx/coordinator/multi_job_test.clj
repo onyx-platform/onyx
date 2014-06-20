@@ -85,7 +85,8 @@
        (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog-a :workflow workflow-a})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog-a :workflow workflow-a} (chan 1)])
        (<!! offer-ch-spy)
        
        (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
@@ -119,7 +120,8 @@
          (<!! status-spy)
          (<!! status-spy)
 
-         (>!! (:planning-ch-head coordinator) {:catalog catalog-b :workflow workflow-b})
+         (>!! (:planning-ch-head coordinator)
+              [{:catalog catalog-b :workflow workflow-b} (chan 1)])
          (<!! offer-ch-spy)
 
          (extensions/write-place sync (:node peer-node-a)
