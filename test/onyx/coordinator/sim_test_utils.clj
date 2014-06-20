@@ -5,6 +5,7 @@
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
             [taoensso.timbre :refer [info]]
+            [onyx.coordinator.impl :as impl]
             [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
@@ -62,12 +63,13 @@
        (map first)
        (into #{})))
 
-(defn task-completeness [result-db]
-  (let [query '[:find (count ?task) :where [?task :task/complete? false]]
-        result (ffirst (d/q query result-db))]
-    
-    (fact "All tasks were completed"
-          result => nil?)))
+(defn task-completeness [sync]
+  (let [job-nodes (extensions/bucket sync :job)
+        task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
+    (doseq [task-path task-paths]
+      (doseq [task-node (extensions/children sync task-path)]
+        (when-not (impl/completed-task? task-node)
+          (fact (impl/task-complete? sync task-node) => true))))))
 
 (defn sequential-safety [result-db]
   (let [task-ids (sequential-task-ids result-db)
@@ -83,13 +85,12 @@
     (fact "No sequential tasks ever had more than one peer at a time" 
           (every? (partial = 1) result) => true)))
 
-(defn peer-liveness [result-db n-peers]
-  (let [query '[:find ?peer :where
-                [?peer :peer/task]]
-        result (map first (d/q query (d/history result-db)))]
-    
-    (fact "All peers got at least one task"
-          (count result) => n-peers)))
+(defn peer-liveness [sync]
+  (doseq [state-path (extensions/bucket sync :peer-state)]
+    (let [states (extensions/children sync state-path)
+          state-data (map (partial extensions/read-place sync) states)
+          active-states (filter #(= (:state %) :active) state-data)]
+      (fact (count active-states) =not=> zero?))))
 
 (defn peer-fairness [result-db n-peers n-jobs tasks-per-job]
   (let [query '[:find ?peer (count ?task) :where
@@ -125,7 +126,6 @@
         (>!! (:born-peer-ch-head coordinator) (:node peer))
 
         (loop [p payload]
-          (info (:uuid peer))
           (<!! sync-spy)
           (<!! (timeout (gen/geometric (/ 1 (:model/mean-ack-time model)))))
 

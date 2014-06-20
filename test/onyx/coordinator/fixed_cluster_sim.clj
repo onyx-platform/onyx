@@ -129,10 +129,15 @@
 (def sim-db (d/db sim-conn))
 
 #_(facts (sim-utils/task-completeness result-db)
-       (sim-utils/sequential-safety result-db)
-       (sim-utils/peer-fairness result-db n-peers n-jobs tasks-per-job)
-       (sim-utils/peer-liveness result-db n-peers))
+         (sim-utils/sequential-safety result-db)
+         (sim-utils/peer-fairness result-db n-peers n-jobs tasks-per-job)
+         (sim-utils/peer-liveness result-db n-peers))
+
+(facts "All tasks of all jobs are completed"
+       (sim-utils/task-completeness (:sync coordinator)))
+
+(facts "All peers got at least one task"
+       (sim-utils/peer-liveness (:sync coordinator)))
 
 (component/stop components)
-
 
