@@ -209,12 +209,11 @@
 (defn find-incomplete-concurrent-tasks [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
         task-nodes (extensions/children sync task-path)
-        incomplete-tasks (find-incomplete-tasks sync task-nodes)
-        active (find-active-task-ids sync incomplete-tasks)]
+        incomplete-tasks (find-incomplete-tasks sync task-nodes)]
     (filter (fn [task]
               (let [task-data (extensions/read-place sync task)]
                 (= (:task/consumption task-data) :concurrent)))
-            active)))
+            incomplete-tasks)))
 
 (defn sort-tasks-by-peer-count [sync tasks]
   (sort-by (partial n-peers sync) tasks))
