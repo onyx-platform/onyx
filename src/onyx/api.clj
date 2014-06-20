@@ -1,6 +1,6 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [>!!]]
+            [clojure.core.async :refer [chan >!! <!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [info]]
@@ -26,7 +26,9 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (>!! (:planning-ch-head (:coordinator onyx-coord)) job))
+    (let [ch (chan 1)]
+      (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
+      (<!! ch)))
 
   IRegister
   (register-peer [this peer-node]
@@ -41,7 +43,7 @@
   ISubmit
   (submit-job [this job]
     (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
-      (read-string (:body response))))
+      (:job-id (read-string (:body response)))))
 
   IRegister
   (register-peer [this peer-node]

@@ -10,8 +10,10 @@
 
 (defmethod dispatch-request "/submit-job"
   [coordinator request]
-  (let [data (read-string (slurp (:body request)))]
-    (>!! (:planning-ch-head (:coordinator coordinator)) data)))
+  (let [data (read-string (slurp (:body request)))
+        ch (chan 1)]
+    (>!! (:planning-ch-head (:coordinator coordinator)) [data ch])
+    (<!! ch)))
 
 (defmethod dispatch-request "/register-peer"
   [coordinator request]
