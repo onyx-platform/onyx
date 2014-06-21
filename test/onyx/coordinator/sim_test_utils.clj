@@ -41,28 +41,6 @@
       (doseq [tx v]
         (d/transact conn tx)))))
 
-(defn entity-txs [db ent]
-  (map #(nth % 3)
-       (d/q
-        '[:find ?e ?a ?v ?tx ?added
-          :in $ ?e
-          :where
-          [?e ?a ?v ?tx ?added]]
-        (datomic.api/history db)
-        ent)))
-
-(defn sequential-task-ids [db]
-  (->> (d/history db)
-       (d/q '[:find ?task :where [?task :task/consumption :sequential]])
-       (map first)
-       (into #{})))
-
-(defn concurrent-task-ids [db]
-  (->> (d/history db)
-       (d/q '[:find ?task :where [?task :task/consumption :concurrent]])
-       (map first)
-       (into #{})))
-
 (defn task-completeness [sync]
   (let [job-nodes (extensions/bucket sync :job)
         task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
@@ -71,7 +49,7 @@
         (when-not (impl/completed-task? task-node)
           (fact (impl/task-complete? sync task-node) => true))))))
 
-(defn sequential-safety [result-db]
+#_(defn sequential-safety [result-db]
   (let [task-ids (sequential-task-ids result-db)
         task-txs (mapcat (partial entity-txs result-db) task-ids)
         result (mapcat
@@ -92,18 +70,19 @@
           active-states (filter #(= (:state %) :active) state-data)]
       (fact (count active-states) =not=> zero?))))
 
-(defn peer-fairness [result-db n-peers n-jobs tasks-per-job]
-  (let [query '[:find ?peer (count ?task) :where
-                [?peer :peer/task ?task]]
-        result (map second (d/q query (d/history result-db)))
+(defn peer-fairness [sync n-peers n-jobs tasks-per-job]
+  (let [state-paths (extensions/bucket sync :peer-state)
+        state-seqs (map (partial extensions/children sync) state-paths)
+        state-seqs-data (map #(map (partial extensions/read-place sync) %) state-seqs)
+        n-tasks (map #(count (filter (fn [x] (= (:state x) :active)) %)) state-seqs-data)
         mean (/ (* n-jobs tasks-per-job) n-peers)
         confidence 0.75]
-    
+
     (fact "All peers got within 75% of the average number of tasks"
           (every?
            #(and (<= (- mean (* mean confidence)) %)
                  (>= (+ mean (* mean confidence)) %))
-           result)) => true))
+           n-tasks)) => true))
 
 (defn create-peer [model components peer]
   (future

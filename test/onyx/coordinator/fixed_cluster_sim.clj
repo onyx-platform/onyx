@@ -118,26 +118,26 @@
 (sim/create-action-log sim-conn fixed-cluster-sim)
 
 (future
-  (time (mapv (fn [prun] @(:runner prun))
-              (->> #(sim/run-sim-process sim-uri (:db/id fixed-cluster-sim))
-                   (repeatedly (:sim/processCount fixed-cluster-sim))
-                   (into [])))))
+  (mapv (fn [prun] @(:runner prun))
+        (->> #(sim/run-sim-process sim-uri (:db/id fixed-cluster-sim))
+             (repeatedly (:sim/processCount fixed-cluster-sim))
+             (into []))))
 
 (doseq [job-ch job-chs]
   @(onyx.api/await-job-completion* (:sync components) (str (<!! job-ch))))
 
 (def sim-db (d/db sim-conn))
 
-#_(facts (sim-utils/task-completeness result-db)
-         (sim-utils/sequential-safety result-db)
-         (sim-utils/peer-fairness result-db n-peers n-jobs tasks-per-job)
-         (sim-utils/peer-liveness result-db n-peers))
+#_(facts (sim-utils/sequential-safety result-db))
 
 (facts "All tasks of all jobs are completed"
        (sim-utils/task-completeness (:sync coordinator)))
 
 (facts "All peers got at least one task"
        (sim-utils/peer-liveness (:sync coordinator)))
+
+(facts "Tasks are fairly distributed amongst peers"
+       (sim-utils/peer-fairness (:sync coordinator) n-peers n-jobs tasks-per-job))
 
 (component/stop components)
 
