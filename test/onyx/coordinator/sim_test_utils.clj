@@ -87,7 +87,8 @@
 (defn peer-state-transition-correctness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
     (let [states (extensions/children sync state-path)
-          state-data (map (partial extensions/read-place sync) states)]
+          sorted-states (sort states)
+          state-data (map (partial extensions/read-place sync) sorted-states)]
       (dorun
        (map-indexed
         (fn [i state]
