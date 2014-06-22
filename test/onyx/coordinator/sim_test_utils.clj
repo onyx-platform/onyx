@@ -49,12 +49,23 @@
         (when-not (impl/completed-task? task-node)
           (fact (impl/task-complete? sync task-node) => true))))))
 
+(defn peer-stack-sequentially-safe?
+  ([state-stack-nodes]
+     (sequential-safety-test
+      (drop-while #(not= (:state %) :acking) state-stack-nodes) [] nil))
+  ([[node & nodes] ranges start]
+     (cond (seq nodes) ranges
+           (nil? start) (if (= (:state node) :acking)
+                          (recur nodes ranges node)
+                          (recur nodes ranges nil))
+           :else (if (some #{(:state node)} #{:idle :revoked :dead})
+                   (recur nodes (conj ranges [start node]) nil)
+                   (recur nodes ranges nil)))))
+
 (defn sequential-safety [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
-    (let [states (extensions/children sync state-path)
-          state-data (map (partial extensions/read-place sync) states)
-          active-states (filter #(= (:state %) :active) state-data)]
-      )))
+    (let [states (sort (extensions/children sync state-path))
+          state-data (map (partial extensions/read-place sync) states)])))
 
 (defn peer-liveness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
@@ -145,4 +156,5 @@
   (doseq [_ (range (:model/n-peers model))]
     (let [peer (extensions/create (:sync components) :peer)]
       (swap! cluster assoc peer (create-peer model components peer)))))
+
 
