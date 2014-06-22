@@ -128,8 +128,6 @@
 
 (def sim-db (d/db sim-conn))
 
-#_(facts (sim-utils/sequential-safety result-db))
-
 (facts "All tasks of all jobs are completed"
        (sim-utils/task-completeness (:sync coordinator)))
 
@@ -138,6 +136,12 @@
 
 (facts "Tasks are fairly distributed amongst peers"
        (sim-utils/peer-fairness (:sync coordinator) n-peers n-jobs tasks-per-job))
+
+(facts "Peer states only make legal transitions"
+       (sim-utils/peer-state-transition-correctness (:sync coordinator)))
+
+#_(facts "Sequential tasks are only executed by one peer at a time"
+       (sim-utils/sequential-safety (:sync coordinator)))
 
 (component/stop components)
 

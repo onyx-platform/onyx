@@ -49,19 +49,12 @@
         (when-not (impl/completed-task? task-node)
           (fact (impl/task-complete? sync task-node) => true))))))
 
-#_(defn sequential-safety [result-db]
-  (let [task-ids (sequential-task-ids result-db)
-        task-txs (mapcat (partial entity-txs result-db) task-ids)
-        result (mapcat
-                #(let [db (d/as-of result-db %)
-                       query '[:find ?task (count ?peer) :where
-                               [?task :task/consumption :sequential]
-                               [?peer :peer/task ?task]]]
-                   (map second (d/q query db)))
-                task-txs)]
-    
-    (fact "No sequential tasks ever had more than one peer at a time" 
-          (every? (partial = 1) result) => true)))
+(defn sequential-safety [sync]
+  (doseq [state-path (extensions/bucket sync :peer-state)]
+    (let [states (extensions/children sync state-path)
+          state-data (map (partial extensions/read-place sync) states)
+          active-states (filter #(= (:state %) :active) state-data)]
+      )))
 
 (defn peer-liveness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
@@ -83,6 +76,27 @@
            #(and (<= (- mean (* mean confidence)) %)
                  (>= (+ mean (* mean confidence)) %))
            n-tasks)) => true))
+
+(def legal-transitions
+  {:idle #{:acking :dead}
+   :acking #{:active :revoked :dead}
+   :active #{:idle :dead}
+   :revoked #{:dead}
+   :dead #{}})
+
+(defn peer-state-transition-correctness [sync]
+  (doseq [state-path (extensions/bucket sync :peer-state)]
+    (let [states (extensions/children sync state-path)
+          state-data (map (partial extensions/read-place sync) states)]
+      (dorun
+       (map-indexed
+        (fn [i state]
+          (when (< i (dec (count state-data)))
+            (let [current-state (:state state)
+                  next-state (:state (nth state-data (inc i)))]
+              (fact (some #{next-state} (get legal-transitions current-state))
+                    =not=> nil?))))
+        state-data)))))
 
 (defn create-peer [model components peer]
   (future
