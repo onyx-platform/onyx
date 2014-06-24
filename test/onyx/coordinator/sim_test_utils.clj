@@ -68,11 +68,23 @@
              (recur sync nodes ranges start)))))
 
 (defn sequential-safety [sync]
-  (doseq [state-path (extensions/bucket sync :peer-state)]
-    (let [states (sort (extensions/children sync state-path))
-          node-pairs (peer-stack-sequential-ranges sync states)
-          tx-pairs (map (fn [x] (map #(:czxid (:stat (zk/data (:conn sync) %))) x)) node-pairs)]
-      (prn tx-pairs))))
+  (let [paths (extensions/bucket sync :peer-state)]
+    (doseq [state-path paths]
+      (let [states (sort (extensions/children sync state-path))
+            node-pairs (peer-stack-sequential-ranges sync states)
+            range-nodes (map (fn [[a b]]
+                               [(:czxid (:stat (zk/data (:conn sync) a)))
+                                (:czxid (:stat (zk/data (:conn sync) b)))
+                                (:task-node (extensions/read-place sync a))])
+                             node-pairs)
+            other-peers (remove (partial = state-path) paths)]
+        (doseq [other-peer other-peers]
+          (doseq [range-node range-nodes]
+            (doseq [state (sort (extensions/children sync other-peer))]
+              (when (= (:task-node (extensions/read-place sync state)) (nth range-node 2))
+                (let [zxid (:czxid (:stat (zk/data (:conn sync) state)))]
+                  (fact (or (< zxid (first range-node))
+                            (> zxid (second range-node))) => true))))))))))
 
 (defn peer-liveness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
