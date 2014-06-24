@@ -140,7 +140,7 @@
 (facts "Peer states only make legal transitions"
        (sim-utils/peer-state-transition-correctness (:sync coordinator)))
 
-#_(facts "Sequential tasks are only executed by one peer at a time"
+(facts "Sequential tasks are only executed by one peer at a time"
        (sim-utils/sequential-safety (:sync coordinator)))
 
 (component/stop components)
