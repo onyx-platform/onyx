@@ -96,21 +96,25 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}
-           offer-ch-spy (chan 1)]
+           offer-ch-spy (chan 1)
+           job-ch (chan 1)]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
 
        (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} (chan 1)])
+            [{:catalog catalog :workflow workflow} job-ch])
+       
+       (<!! offer-ch-spy)
 
-       (let [job-id (<!! offer-ch-spy)]
+       (let [job-id (<!! job-ch)
+             job-node (extensions/resolve-node sync :job job-id)]
 
          (facts "There is one job"
                 (let [jobs (extensions/bucket sync :job)]
                   (fact (count jobs) => 1)))
 
          (facts "There are three tasks"
-                (let [task-nodes (extensions/bucket-at sync :task job-id)
+                (let [task-nodes (extensions/bucket-at sync :task job-node)
                       tasks (map #(extensions/read-place sync %) task-nodes)]
                   (fact (count task-nodes) => 3)
                   (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})

@@ -262,8 +262,9 @@
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
   (let [prefix (:onyx-id sync)
-        children (or (zk/children (:conn sync) (task-path prefix subpath)) [])]
-    (map #(str (task-path prefix subpath) "/" %) children)))
+        job-id (trailing-id subpath) 
+        children (or (zk/children (:conn sync) (task-path prefix job-id)) [])]
+    (map #(str (task-path prefix job-id) "/" %) children)))
 
 (defmethod extensions/resolve-node [ZooKeeper :peer]
   [sync _ subpath]
@@ -332,13 +333,6 @@
 (defmethod extensions/place-exists? ZooKeeper
   [sync place]
   (boolean (zk/exists (:conn sync) place)))
-
-(defmethod extensions/place-exists-at? [ZooKeeper :task]
-  [sync _ & subpaths]
-  (let [prefix (:onyx-id sync)
-        job-id (first subpaths)
-        task-id (second subpaths)]
-    (extensions/place-exists? sync (task-path prefix job-id task-id))))
 
 (defmethod extensions/version ZooKeeper
   [sync place]

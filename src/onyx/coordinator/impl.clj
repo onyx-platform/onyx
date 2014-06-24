@@ -163,18 +163,19 @@
       (throw (ex-info "Failed to complete task" {:complete? complete? :n n})))))
 
 (defn incomplete-job-ids [sync]
-  (let [job-ids (extensions/bucket sync :job)]
-    (filter
-     (fn [job-id]
-       (let [tasks (extensions/bucket-at sync :task job-id)]
-         (seq
-          (filter
-           (fn [task]
-             (let [completion (str task complete-marker)]
-               (not (extensions/place-exists-at? sync :task job-id completion))))
-           tasks))))
-     job-ids)
-    (sort-by (fn [job-id] (extensions/creation-time sync job-id)) job-ids)))
+  (let [job-nodes (extensions/bucket sync :job)
+        incompletes
+        (filter
+         (fn [job-node]
+           (let [tasks (extensions/bucket-at sync :task job-node)]
+             (seq
+              (filter
+               (fn [task]
+                 (let [completion (str task complete-marker)]
+                   (not (extensions/place-exists? sync completion))))
+               tasks))))
+         job-nodes)]
+    (sort-by (fn [job-node] (extensions/creation-time sync job-node)) incompletes)))
 
 (defn last-offered-job [sync]
   (:content (extensions/dereference sync (extensions/resolve-node sync :job-log))))
