@@ -104,7 +104,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 40)
+(def n-jobs 50)
 
 (def tasks-per-job 3)
 
@@ -128,7 +128,7 @@
     :model/peek-peers 50
     :model/peer-rate 200
     :model/silence-gap 5000
-    :model/mean-ack-time 250
+    :model/mean-ack-time 800
     :model/mean-completion-time 500}])
 
 (def linear-cluster-model
@@ -148,7 +148,7 @@
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
-    (let [pulse (:peer-node (extensions/read-place (:sync components) (:node victim)))]
+    (let [pulse (:pulse-node (extensions/read-place (:sync components) (:node victim)))]
       (extensions/delete (:sync components) pulse)
       (future-cancel (get cluster-val victim))
       (swap! cluster dissoc victim))))

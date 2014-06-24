@@ -157,6 +157,7 @@
             (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
             (extensions/touch-place sync (:node/ack nodes))
             (<!! status-spy)
+
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
