@@ -7,7 +7,8 @@
             [datomic.api :as d]
             [onyx.system :refer [onyx-coordinator]]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.sim-test-utils :as sim-utils]))
+            [onyx.coordinator.sim-test-utils :as sim-utils]
+            [onyx.api]))
 
 (def cluster (atom {}))
 
@@ -147,7 +148,7 @@
   (let [cluster-val @cluster
         n (count cluster-val)
         victim (nth (keys cluster-val) (rand-int n))]
-    (let [pulse (:pulse-node (extensions/read-place (:sync components) victim))]
+    (let [pulse (:peer-node (extensions/read-place (:sync components) (:node victim)))]
       (extensions/delete (:sync components) pulse)
       (future-cancel (get cluster-val victim))
       (swap! cluster dissoc victim))))
