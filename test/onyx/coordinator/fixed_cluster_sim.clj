@@ -120,13 +120,11 @@
 (future
   (mapv (fn [prun] @(:runner prun))
         (->> #(sim/run-sim-process sim-uri (:db/id fixed-cluster-sim))
-             (repeatedly (:sim/processCount fixed-cluster-sim))
-             (into []))))
+             (repeatedly (:sim/processCount fixed-cluster-sim)))
+        (into [])))
 
 (doseq [job-ch job-chs]
   @(onyx.api/await-job-completion* (:sync components) (str (<!! job-ch))))
-
-(def sim-db (d/db sim-conn))
 
 (facts "All tasks of all jobs are completed"
        (sim-utils/task-completeness (:sync coordinator)))
