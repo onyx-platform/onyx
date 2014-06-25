@@ -102,7 +102,7 @@
                                          (catch Exception e
                                            (info e))))
                     :shutdown-fn (fn [] (component/stop v-peer))}]
-          (register-peer coord (:peer-node (:peer v-peer)))
+          (register-peer coord (:node (:peer (:peer v-peer))))
           rets)))
     (range n))))
 

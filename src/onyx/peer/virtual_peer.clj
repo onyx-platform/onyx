@@ -13,15 +13,15 @@
         (when-not (nil? pipeline)
           (component/stop pipeline))
 
-        (cond (nil? v) (extensions/delete sync pulse)
+        (cond (nil? v) (extensions/delete sync (:node pulse))
               (= ch complete-ch) (recur nil)
               (= ch payload-ch)
               (let [payload-node (:path v)
                     payload (extensions/read-place sync payload-node)
                     status-ch (chan 1)]
 
-                (extensions/on-change sync (:status (:nodes payload)) #(>!! status-ch %))
-                (extensions/touch-place sync (:ack (:nodes payload)))
+                (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
+                (extensions/touch-place sync (:node/ack (:nodes payload)))
 
                 (<!! status-ch)
 
@@ -34,42 +34,46 @@
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
-    (let [id (java.util.UUID/randomUUID)]
-      (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
+    (let [peer (extensions/create sync :peer)
+          payload (extensions/create sync :payload)
+          pulse (extensions/create sync :pulse)
+          shutdown (extensions/create sync :shutdown)
 
-      (let [peer (extensions/create sync :peer)
-            payload (extensions/create sync :payload)
-            pulse (extensions/create sync :pulse)
-            shutdown (extensions/create sync :shutdown)
+          payload-ch (chan 1)
+          shutdown-ch (chan 1)
+          status-ch (chan 1)
+          dead-ch (chan)]
 
-            payload-ch (chan 1)
-            shutdown-ch (chan 1)
-            status-ch (chan 1)
-            dead-ch (chan)]
+      (taoensso.timbre/info (format "Starting Virtual Peer %s" (:uuid peer)))
+      
+      (extensions/write-place sync (:node peer)
+                              {:id (:uuid peer)
+                               :peer-node (:node peer)
+                               :pulse-node (:node pulse)
+                               :shutdown-node (:node shutdown)
+                               :payload-node (:node payload)})
+      
+      (extensions/write-place sync (:node pulse) {:id (:uuid peer)})
+      (extensions/write-place sync (:node shutdown) {:id (:uuid peer)})
+      (extensions/on-change sync (:node payload) #(>!! payload-ch %))
+
+      (dire/with-handler! #'payload-loop
+        java.lang.Exception
+        (fn [e & _] (timbre/info e)))
+
+      (assoc component
+        :peer peer
+        :payload payload
+        :pulse pulse
+        :shutdown shutdown
         
-        (extensions/write-place sync peer {:id id :pulse pulse :shutdown shutdown :payload payload})
-        (extensions/write-place sync pulse {:id id})
-        (extensions/write-place sync shutdown {:id id})
-        (extensions/on-change sync payload #(>!! payload-ch %))
+        :payload-ch payload-ch
+        :shutdown-ch shutdown-ch
+        :status-ch status-ch
+        :dead-ch dead-ch
 
-        (dire/with-handler! #'payload-loop
-          java.lang.Exception
-          (fn [e & _] (timbre/info e)))
-
-        (assoc component
-          :id id
-          
-          :peer-node peer
-          :payload-node payload
-          :pulse-node pulse
-          :shutdown-node shutdown
-          
-          :payload-ch payload-ch
-          :shutdown-ch shutdown-ch
-          :status-ch status-ch
-          :dead-ch dead-ch
-
-          :payload-thread (future (payload-loop id sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params))))))
+        :payload-thread (future (payload-loop (:uuid peer) sync queue payload-ch
+                                              shutdown-ch status-ch dead-ch pulse fn-params)))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))

@@ -17,8 +17,8 @@
 
 (defn new-payload [sync peer-node payload-ch]
   (let [peer-contents (extensions/read-place sync peer-node)
-        node (extensions/create sync :payload)
-        updated-contents (assoc peer-contents :payload node)]
+        node (:node (extensions/create sync :payload))
+        updated-contents (assoc peer-contents :payload-node node)]
     (extensions/write-place sync peer-node updated-contents)
     node))
 
@@ -259,21 +259,23 @@
           complete-task-dead-ch (chan)
 
           task (:task/name (:task payload))
-          catalog (read-string (extensions/read-place sync (:catalog (:nodes payload))))
+          catalog (extensions/read-place sync (:node/catalog (:nodes payload)))
+          ingress-queues (:task/ingress-queues (:task payload))
+          ingress-queues (if-not (coll? ingress-queues) (vector ingress-queues) ingress-queues)
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
                          :onyx.core/catalog catalog
                          :onyx.core/task-map (find-task catalog task)
-                         :onyx.core/ingress-queues (:task/ingress-queues (:task payload))
+                         :onyx.core/ingress-queues ingress-queues
                          :onyx.core/egress-queues (:task/egress-queues (:task payload))
-                         :onyx.core/peer-node (:peer (:nodes payload))
-                         :onyx.core/status-node (:status (:nodes payload))
-                         :onyx.core/exhaust-node (:exhaust (:nodes payload))
-                         :onyx.core/seal-node (:seal (:nodes payload))
-                         :onyx.core/completion-node (:completion (:nodes payload))
-                         :onyx.core/workflow (read-string (extensions/read-place sync (:workflow (:nodes payload))))
-                         :onyx.core/peer-version (extensions/version sync (:peer (:nodes payload)))
+                         :onyx.core/peer-node (:node/peer (:nodes payload))
+                         :onyx.core/status-node (:node/status (:nodes payload))
+                         :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
+                         :onyx.core/seal-node (:node/seal (:nodes payload))
+                         :onyx.core/completion-node (:node/completion (:nodes payload))
+                         :onyx.core/workflow (extensions/read-place sync (:node/workflow (:nodes payload)))
+                         :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
                          :onyx.core/params (or (get fn-params task) [])
