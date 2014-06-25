@@ -124,7 +124,6 @@
   (let [ack-data (extensions/read-place sync ack-place)
         state-path (extensions/resolve-node sync :peer-state (:id ack-data))
         peer-state (:content (extensions/dereference sync state-path))]
-    ;; Serialize this.
     (when (and (= (:state peer-state) :acking)
                (= (:task-node ack-data) (:task-node peer-state)))
       (let [state (assoc (dissoc peer-state :task-node :nodes) :state :revoked)]
