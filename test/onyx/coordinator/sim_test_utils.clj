@@ -110,7 +110,8 @@
 (def legal-transitions
   {:idle #{:acking :dead}
    :acking #{:active :revoked :dead}
-   :active #{:idle :dead}
+   :active #{:sealing :idle :dead}
+   :sealing #{:idle :dead}
    :revoked #{:dead}
    :dead #{}})
 

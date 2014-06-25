@@ -4,7 +4,6 @@
             [simulant.sim :as sim]
             [simulant.util :as u]
             [datomic.api :as d]
-            [zookeeper :as zk]
             [taoensso.timbre :refer [info]]
             [onyx.coordinator.sim-test-utils :as sim-utils]
             [onyx.queue.hornetq-utils :as hq-util]
@@ -223,9 +222,6 @@
 
 (facts "Peer states only make legal transitions"
        (sim-utils/peer-state-transition-correctness ozk))
-
-(facts "Sequential tasks are only executed by one peer at a time"
-       (sim-utils/sequential-safety ozk))
 
 (onyx.api/shutdown conn)
 
