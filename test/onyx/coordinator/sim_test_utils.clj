@@ -170,7 +170,10 @@
               (extensions/touch-place sync (:node/completion nodes))
 
               (recur next-payload)))))
-      (catch Exception e (prn "Peer: " e)))))
+      (catch InterruptedException e
+        (prn "Peer intentionally killed"))
+      (catch Exception e
+        (.printStackTrace e)))))
 
 (defn create-peers! [model components cluster]
   (doseq [_ (range (:model/n-peers model))]

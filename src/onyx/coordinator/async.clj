@@ -59,7 +59,6 @@
 (defn offer-task [sync sync-ch ack-cb exhaust-cb complete-cb revoke-cb]
   (loop [[task-node :as task-nodes] (or (serialize sync-ch #(extensions/next-tasks sync)) [])
          [peer :as peers] (or (serialize sync-ch #(extensions/idle-peers sync)) [])]
-    (prn (count peers) "::" (count task-nodes))
     (when (and (seq task-nodes) (seq peers))
       (let [peer-node (:node peer)
             peer-content (:content peer)
