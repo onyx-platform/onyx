@@ -18,14 +18,15 @@
 (defmethod dispatch-request "/register-peer"
   [coordinator request]
   (let [data (read-string (slurp (:body request)))]
-    (>!! (:born-peer-ch-head (:coordinator coordinator)) data)))
+    (>!! (:born-peer-ch-head (:coordinator coordinator)) data)
+    :ok))
 
 (defn handler [coordinator]
   (fn [request]
-    (dispatch-request coordinator request)
-    {:status 200
-     :headers {"content-type" "text/text"}
-     :body "ok"}))
+    (let [resp (dispatch-request coordinator request)]
+      {:status 200
+       :headers {"content-type" "text/text"}
+       :body (pr-str resp)})))
 
 (defrecord CoordinatorServer [opts]
   component/Lifecycle
