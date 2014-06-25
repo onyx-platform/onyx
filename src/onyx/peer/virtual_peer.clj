@@ -76,7 +76,7 @@
                                               shutdown-ch status-ch dead-ch pulse fn-params)))))
 
   (stop [component]
-    (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
+    (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
 
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
