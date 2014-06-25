@@ -127,7 +127,7 @@
     ;; Serialize this.
     (when (and (= (:state peer-state) :acking)
                (= (:task-node ack-data) (:task-node peer-state)))
-      (let [state (assoc (dissoc peer-state :task-node :nodes) :state :dead)]
+      (let [state (assoc (dissoc peer-state :task-node :nodes) :state :revoked)]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
 
 (defmethod extensions/idle-peers ZooKeeper
