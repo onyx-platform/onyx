@@ -339,12 +339,12 @@
        ;; Instant revoke.
        (<!! offer-ch-spy)
 
-       (facts "The peer gets marked as :dead after eviction"
+       (facts "The peer gets marked as :revoked after eviction"
               (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx-id sync)))
                     path (extensions/resolve-node sync :peer-state (first peers))
                     state (:content (extensions/dereference sync path))]
                 (fact (count peers) => 1)
-                (fact (:state state) => :dead)
+                (fact (:state state) => :revoked)
 
                 (facts "The status node gets deleted on sync storage"
                        (let [status-node (:node/status (:nodes state))]
@@ -388,12 +388,12 @@
        (facts "Acking a non-existent node fails"
               (>!! (:ack-ch-head coordinator) {:path (str (java.util.UUID/randomUUID))})
               (let [failure (<!! failure-ch-spy)]
-                (fact (:ch failure) => :serial-fn)))
+                (fact (:ch failure) => :ack)))
 
        (facts "Completing a task that doesn't exist fails"
               (>!! (:completion-ch-head coordinator) {:path "dead path"})
               (let [failure (<!! failure-ch-spy)]
-                (fact (:ch failure) => :complete)))))
+                (fact (:ch failure) => :serial-fn)))))
    {:revoke-delay 50000}))
 
 (facts
@@ -532,7 +532,7 @@
         (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
           (>!! (:completion-ch-head coordinator) {:path node})
           (let [failure (<!! failure-ch-spy)]
-            (fact (:ch failure) => :complete))))
+            (fact (:ch failure) => :serial-fn))))
 
        (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
          (doseq [child (extensions/children sync task-path)]
@@ -542,6 +542,6 @@
               (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
                 (>!! (:completion-ch-head coordinator) {:path node})
                 (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :complete)))))
+                  (fact (:ch failure) => :serial-fn)))))
      {:revoke-delay 50000})))
 

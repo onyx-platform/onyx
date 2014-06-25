@@ -7,8 +7,8 @@
             [datomic.api :as d]
             [onyx.system :refer [onyx-coordinator]]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.log.datomic :as datomic]
-            [onyx.coordinator.sim-test-utils :as sim-utils]))
+            [onyx.coordinator.sim-test-utils :as sim-utils]
+            [onyx.api]))
 
 (def cluster (atom {}))
 
@@ -87,19 +87,14 @@
 (def id (str (java.util.UUID/randomUUID)))
 
 (def system (onyx-coordinator
-             {:datomic-uri (str "datomic:mem://" id)
-              :hornetq-addr "localhost:5445"
+             {:hornetq-addr "localhost:5445"
               :zk-addr "127.0.0.1:2181"
               :onyx-id id
               :revoke-delay 2000}))
 
-(def components (alter-var-root #'system component/start))
+(def components (component/start system))
 
 (def coordinator (:coordinator components))
-
-(def log (:log components))
-
-(def tx-queue (d/tx-report-queue (:conn log)))
 
 (def offer-spy (chan 10000))
 
@@ -120,14 +115,17 @@
 
 (def workflow {:in {:inc :out}})
 
-(def n-jobs 20)
+(def n-jobs 100)
 
 (def tasks-per-job 3)
 
+(def job-chs (map (fn [_] (chan 1)) (range n-jobs)))
+
 (tap (:offer-mult coordinator) offer-spy)
 
-(doseq [_ (range n-jobs)]
-  (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow}))
+(doseq [n (range n-jobs)]
+  (>!! (:planning-ch-head coordinator)
+       [{:catalog catalog :workflow workflow} (nth job-chs n)]))
 
 (doseq [_ (range n-jobs)]
   (<!! offer-spy))
@@ -164,7 +162,7 @@
     (let [cluster-val @cluster
           n (count cluster-val)
           victim (nth (keys cluster-val) (rand-int n))]
-      (let [pulse (:pulse (extensions/read-place (:sync components) victim))]
+      (let [pulse (:pulse-node (extensions/read-place (:sync components) (:node victim)))]
         (extensions/delete (:sync components) pulse)
         (future-cancel (get cluster-val victim))
         (swap! cluster dissoc victim)))
@@ -195,16 +193,19 @@
        (repeatedly (:sim/processCount sine-cluster-sim))
        (into [])))
 
-(sim-utils/block-until-completion! tx-queue (* n-jobs tasks-per-job))
+(doseq [job-ch job-chs]
+  @(onyx.api/await-job-completion* (:sync components) (str (<!! job-ch))))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 
-(def sim-db (d/db sim-conn))
+(facts "All tasks of all jobs are completed"
+       (sim-utils/task-completeness (:sync coordinator)))
 
-(def result-db (d/db (:conn log)))
+(facts "Peer states only make legal transitions"
+       (sim-utils/peer-state-transition-correctness (:sync coordinator)))
 
-(facts (sim-utils/task-completeness result-db)
-       (sim-utils/sequential-safety result-db))
+(facts "Sequential tasks are only executed by one peer at a time"
+       (sim-utils/sequential-safety (:sync coordinator)))
 
-(alter-var-root #'system component/stop)
+(component/stop components)
 

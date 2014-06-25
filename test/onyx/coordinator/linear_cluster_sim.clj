@@ -145,13 +145,16 @@
 
 (defmethod sim/perform-action :action.type/unregister-linear-peer
   [action process]
-  (let [cluster-val @cluster
-        n (count cluster-val)
-        victim (nth (keys cluster-val) (rand-int n))]
-    (let [pulse (:pulse-node (extensions/read-place (:sync components) (:node victim)))]
-      (extensions/delete (:sync components) pulse)
-      (future-cancel (get cluster-val victim))
-      (swap! cluster dissoc victim))))
+  (try
+    (let [cluster-val @cluster
+          n (count cluster-val)
+          victim (nth (keys cluster-val) (rand-int n))]
+      (let [pulse (:pulse-node (extensions/read-place (:sync components) (:node victim)))]
+        (extensions/delete (:sync components) pulse)
+        (future-cancel (get cluster-val victim))
+        (swap! cluster dissoc victim)))
+    (catch Exception e
+      (.printStackTrace e))))
 
 (sim-utils/create-peers! linear-cluster-model components cluster)
 
