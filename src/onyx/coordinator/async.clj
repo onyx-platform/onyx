@@ -18,7 +18,7 @@
   (apply f args))
 
 (defn mark-peer-birth [sync sync-ch peer death-cb]
-  (let [pulse (:pulse-node (extensions/read-place sync peer))]
+  (let [pulse (:pulse-node (extensions/read-node sync peer))]
     (extensions/on-delete sync pulse death-cb)
     (serialize sync-ch extensions/mark-peer-born sync peer)))
 
@@ -40,15 +40,15 @@
     (extensions/plan-job sync job-id tasks catalog workflow)
     job-id))
 
-(defn acknowledge-task [sync sync-ch ack-place]
-  (let [nodes (:nodes (extensions/read-place sync ack-place))]
+(defn acknowledge-task [sync sync-ch ack-node]
+  (let [nodes (:nodes (extensions/read-node sync ack-node))]
     (serialize
      sync-ch
-     #(when (extensions/ack sync ack-place)
-        (extensions/touch-place sync (:node/status nodes))))))
+     #(when (extensions/ack sync ack-node)
+        (extensions/touch-node sync (:node/status nodes))))))
 
 (defn evict-peer [sync sync-ch peer-node]
-  (let [node-data (extensions/read-place sync peer-node)
+  (let [node-data (extensions/read-node sync peer-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))]
     (serialize
      sync-ch
@@ -62,8 +62,8 @@
     (when (and (seq task-nodes) (seq peers))
       (let [peer-node (:node peer)
             peer-content (:content peer)
-            payload-node (:payload-node (extensions/read-place sync (:peer-node peer-content)))
-            task (extensions/read-place sync task-node)
+            payload-node (:payload-node (extensions/read-node sync (:peer-node peer-content)))
+            task (extensions/read-node sync task-node)
             ack (extensions/create sync :ack)
             exhaust (extensions/create sync :exhaust)
             seal (extensions/create sync :seal)
@@ -81,11 +81,11 @@
             snapshot {:id (:id peer-content) :peer-node peer-node
                       :task-node task-node :nodes nodes}]
 
-        (extensions/write-place sync (:node ack) snapshot)
-        (extensions/write-place sync (:node exhaust) snapshot)
-        (extensions/write-place sync (:node seal) snapshot)
-        (extensions/write-place sync (:node complete) snapshot)
-        (extensions/write-place sync (:node status) snapshot)
+        (extensions/write-node sync (:node ack) snapshot)
+        (extensions/write-node sync (:node exhaust) snapshot)
+        (extensions/write-node sync (:node seal) snapshot)
+        (extensions/write-node sync (:node complete) snapshot)
+        (extensions/write-node sync (:node status) snapshot)
 
         (extensions/on-change sync (:node ack) ack-cb)
         (extensions/on-change sync (:node exhaust) exhaust-cb)
@@ -93,7 +93,7 @@
         
         (if (serialize sync-ch #(extensions/mark-offered sync task-node (:id peer-content) nodes))
           (let [node (extensions/resolve-node sync :peer (:id peer-content))]
-            (extensions/write-place sync payload-node {:task task :nodes nodes})
+            (extensions/write-node sync payload-node {:task task :nodes nodes})
             (revoke-cb {:peer-node (:peer-node peer-content) :ack-node (:node ack)})
             (recur (rest task-nodes) (rest peers)))
           (recur task-nodes (rest peers)))))))
@@ -104,25 +104,25 @@
    #(when (extensions/revoke-offer sync ack-node)
       (evict-cb ack-node))))
 
-(defn exhaust-queue [sync sync-ch exhaust-place]
+(defn exhaust-queue [sync sync-ch exhaust-node]
   (serialize
    sync-ch
-   #(extensions/seal-resource? sync exhaust-place)))
+   #(extensions/seal-resource? sync exhaust-node)))
 
-(defn seal-resource [sync seal? seal-place]
-  (extensions/write-place sync seal-place seal?))
+(defn seal-resource [sync seal? seal-node]
+  (extensions/write-node sync seal-node seal?))
 
-(defn complete-task [sync sync-ch complete-place]
+(defn complete-task [sync sync-ch complete-node]
   (serialize
    sync-ch
-   #(if-let [result (extensions/complete sync complete-place)]
+   #(if-let [result (extensions/complete sync complete-node)]
       (when (= (:n-peers result) 1)
-        (extensions/delete sync complete-place)
+        (extensions/delete sync complete-node)
         result)
       false)))
 
 (defn shutdown-peer [sync peer]
-  (let [shutdown (:shutdown (extensions/read-place sync peer))]
+  (let [shutdown (:shutdown (extensions/read-node sync peer))]
     (extensions/delete sync shutdown)))
 
 (defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
@@ -150,8 +150,8 @@
 
 (defn ack-ch-loop [sync sync-ch ack-tail]
   (loop []
-    (when-let [ack-place (:path (<!! ack-tail))]
-      (acknowledge-task sync sync-ch ack-place)
+    (when-let [ack-node (:path (<!! ack-tail))]
+      (acknowledge-task sync sync-ch ack-node)
       (recur))))
 
 (defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
@@ -182,8 +182,8 @@
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
-    (when-let [place (:path (<!! exhaust-tail))]
-      (when-let [result (exhaust-queue sync sync-ch place)]
+    (when-let [node (:path (<!! exhaust-tail))]
+      (when-let [result (exhaust-queue sync sync-ch node)]
         (>!! seal-head result))
       (recur))))
 
@@ -196,8 +196,8 @@
 (defn completion-ch-loop
   [sync sync-ch complete-tail offer-head]
   (loop []
-    (when-let [place (:path (<!! complete-tail))]
-      (when-let [result (complete-task sync sync-ch place)]
+    (when-let [node (:path (<!! complete-tail))]
+      (when-let [result (complete-task sync sync-ch node)]
         (>!! offer-head result))
       (recur))))
 

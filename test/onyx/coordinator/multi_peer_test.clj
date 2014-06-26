@@ -53,7 +53,7 @@
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (extensions/write-place sync (:node peer-node-a)
+       (extensions/write-node sync (:node peer-node-a)
                                {:id (:uuid peer-node-a)
                                 :peer-node (:node peer-node-a)
                                 :pulse-node (:node pulse-node-a)
@@ -61,7 +61,7 @@
                                 :payload-node (:node payload-node-a-1)})
        (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
 
-       (extensions/write-place sync (:node peer-node-b)
+       (extensions/write-node sync (:node peer-node-b)
                                {:id (:uuid peer-node-b)
                                 :peer-node (:node peer-node-b)
                                 :pulse-node (:node pulse-node-b)
@@ -83,8 +83,8 @@
        (<!! sync-spy-b)
 
        (facts "Both payloads are received"
-              (let [payload-a (extensions/read-place sync (:node payload-node-a-1))
-                    payload-b (extensions/read-place sync (:node payload-node-b-1))]
+              (let [payload-a (extensions/read-node sync (:node payload-node-a-1))
+                    payload-b (extensions/read-node sync (:node payload-node-b-1))]
                 (fact payload-a => (comp not nil?))
                 (fact payload-b => (comp not nil?))
                 (fact (not= payload-a payload-b) => true)
@@ -92,8 +92,8 @@
                 (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
                 (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
 
-                (extensions/touch-place sync (:node/ack (:nodes payload-a)))
-                (extensions/touch-place sync (:node/ack (:nodes payload-b)))
+                (extensions/touch-node sync (:node/ack (:nodes payload-a)))
+                (extensions/touch-node sync (:node/ack (:nodes payload-b)))
 
                 (<!! ack-ch-spy)
                 (<!! ack-ch-spy)
@@ -101,7 +101,7 @@
                 (<!! status-spy)
                 (<!! status-spy)
 
-                (extensions/write-place sync (:node peer-node-a)
+                (extensions/write-node sync (:node peer-node-a)
                                         {:id (:uuid peer-node-a)
                                          :peer-node (:node peer-node-a)
                                          :pulse-node (:node pulse-node-a)
@@ -109,7 +109,7 @@
                                          :payload-node (:node payload-node-a-2)})
                 (extensions/on-change sync (:node payload-node-a-2) #(>!! sync-spy-a %))
 
-                (extensions/write-place sync (:node peer-node-b)
+                (extensions/write-node sync (:node peer-node-b)
                                         {:id (:uuid peer-node-b)
                                          :peer-node (:node peer-node-b)
                                          :pulse-node (:node pulse-node-b)
@@ -117,21 +117,21 @@
                                          :payload-node (:node payload-node-b-2)})
                 (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
 
-                (extensions/touch-place sync (:node/completion (:nodes payload-a)))
-                (extensions/touch-place sync (:node/completion (:nodes payload-b)))
+                (extensions/touch-node sync (:node/completion (:nodes payload-a)))
+                (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
                 (<!! offer-ch-spy)
                 (<!! offer-ch-spy)
 
                 (let [[v ch] (alts!! [sync-spy-a sync-spy-b])
-                      nodes (:nodes (extensions/read-place sync (:path v)))]
+                      nodes (:nodes (extensions/read-node sync (:path v)))]
                   (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
-                  (extensions/touch-place sync (:node/ack nodes))
+                  (extensions/touch-node sync (:node/ack nodes))
 
                   (<!! ack-ch-spy)
                   (<!! status-spy)
 
-                  (extensions/touch-place sync (:node/completion nodes))
+                  (extensions/touch-node sync (:node/completion nodes))
                   (<!! offer-ch-spy))
 
                 (facts "All tasks are complete"
@@ -182,7 +182,7 @@
        
        (doseq [[peer pulse shutdown payload sync-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
-         (extensions/write-place sync (:node peer)
+         (extensions/write-node sync (:node peer)
                                  {:id (:uuid peer)
                                   :peer-node (:node peer)
                                   :pulse-node (:node pulse)
@@ -220,17 +220,17 @@
                payload-nodes (map (comp :node/payload :nodes) ackers)]
 
            (doseq [payload-node payload-nodes]
-             (let [payload (extensions/read-place sync payload-node)]
+             (let [payload (extensions/read-node sync payload-node)]
                (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-spy %))
-               (extensions/touch-place sync (:node/ack (:nodes payload)))))
+               (extensions/touch-node sync (:node/ack (:nodes payload)))))
 
            (doseq [_ (range 3)]
              (<!! ack-ch-spy)
              (<!! status-spy))
 
            (doseq [payload-node payload-nodes]
-             (let [payload (extensions/read-place sync payload-node)]
-               (extensions/touch-place sync (:node/completion (:nodes payload)))
+             (let [payload (extensions/read-node sync payload-node)]
+               (extensions/touch-node sync (:node/completion (:nodes payload)))
                (<!! offer-ch-spy)))))
 
        (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))

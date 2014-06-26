@@ -149,7 +149,7 @@
     (let [cluster-val @cluster
           n (count cluster-val)
           victim (nth (keys cluster-val) (rand-int n))]
-      (let [pulse (:pulse-node (extensions/read-place (:sync components) (:node victim)))]
+      (let [pulse (:pulse-node (extensions/read-node (:sync components) (:node victim)))]
         (extensions/delete (:sync components) pulse)
         (future-cancel (get cluster-val victim))
         (swap! cluster dissoc victim)))

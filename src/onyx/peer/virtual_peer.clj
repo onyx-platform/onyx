@@ -17,11 +17,11 @@
               (= ch complete-ch) (recur nil)
               (= ch payload-ch)
               (let [payload-node (:path v)
-                    payload (extensions/read-place sync payload-node)
+                    payload (extensions/read-node sync payload-node)
                     status-ch (chan 1)]
 
                 (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
-                (extensions/touch-place sync (:node/ack (:nodes payload)))
+                (extensions/touch-node sync (:node/ack (:nodes payload)))
 
                 (<!! status-ch)
 
@@ -46,15 +46,15 @@
 
       (taoensso.timbre/info (format "Starting Virtual Peer %s" (:uuid peer)))
       
-      (extensions/write-place sync (:node peer)
+      (extensions/write-node sync (:node peer)
                               {:id (:uuid peer)
                                :peer-node (:node peer)
                                :pulse-node (:node pulse)
                                :shutdown-node (:node shutdown)
                                :payload-node (:node payload)})
       
-      (extensions/write-place sync (:node pulse) {:id (:uuid peer)})
-      (extensions/write-place sync (:node shutdown) {:id (:uuid peer)})
+      (extensions/write-node sync (:node pulse) {:id (:uuid peer)})
+      (extensions/write-node sync (:node shutdown) {:id (:uuid peer)})
       (extensions/on-change sync (:node payload) #(>!! payload-ch %))
 
       (dire/with-handler! #'payload-loop

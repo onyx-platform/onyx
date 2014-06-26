@@ -19,7 +19,7 @@
    :task/egress-queues (or (vals (:egress-queues task)) [])})
 
 (defn task-complete? [sync task-node]
-  (extensions/place-exists? sync (str task-node complete-marker)))
+  (extensions/node-exists? sync (str task-node complete-marker)))
 
 (defn completed-task? [task-node]
   (.endsWith task-node complete-marker))
@@ -61,7 +61,7 @@
 
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
-  (let [peer-data (extensions/read-place sync peer-node)
+  (let [peer-data (extensions/read-node sync peer-node)
         state {:id (:id peer-data) :peer-node (:peer-node peer-data) :state :idle}
         state-path (extensions/resolve-node sync :peer-state (:id state))]
     (if-not (seq (extensions/children sync state-path))
@@ -70,7 +70,7 @@
 
 (defmethod extensions/mark-peer-dead ZooKeeper
   [sync peer-node]
-  (let [node-data (extensions/read-place sync peer-node)
+  (let [node-data (extensions/read-node sync peer-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :dead)]
@@ -83,7 +83,7 @@
 
     (doseq [task tasks]
       (let [data (serialize-task task job-id catalog-node workflow-node)
-            place (:node (extensions/create-at sync :task job-id data))]))
+            node (:node (extensions/create-at sync :task job-id data))]))
     
     (extensions/create sync :job job-id)  
     job-id))
@@ -97,13 +97,13 @@
     (when (and (= (:state peer-state) :idle) (not complete?))
       (let [state (merge peer-state {:state :acking :task-node task-node :nodes nodes})
             next-path (:node (extensions/create-at sync :peer-state (:id peer-state) state))
-            task (extensions/read-place sync task-node)
+            task (extensions/read-node sync task-node)
             job-log-record {:job (:task/job-id task) :task (:task/id task)}]
         (:node (extensions/create sync :job-log job-log-record))))))
 
 (defmethod extensions/ack ZooKeeper
-  [sync ack-place]
-  (let [ack-data (extensions/read-place sync ack-place)
+  [sync ack-node]
+  (let [ack-data (extensions/read-node sync ack-node)
         peer-path (extensions/resolve-node sync :peer-state (:id ack-data))
         peer (extensions/dereference sync peer-path)
         peer-node (:node peer)
@@ -120,8 +120,8 @@
         (throw (ex-info "Failed to acknowledge task" err-val))))))
 
 (defmethod extensions/revoke-offer ZooKeeper
-  [sync ack-place]
-  (let [ack-data (extensions/read-place sync ack-place)
+  [sync ack-node]
+  (let [ack-data (extensions/read-node sync ack-node)
         state-path (extensions/resolve-node sync :peer-state (:id ack-data))
         peer-state (:content (extensions/dereference sync state-path))]
     (when (and (= (:state peer-state) :acking)
@@ -136,8 +136,8 @@
        (filter #(= (:state (:content %)) :idle))))
 
 (defmethod extensions/seal-resource? ZooKeeper
-  [sync exhaust-place]
-  (let [node-data (extensions/read-place sync exhaust-place)
+  [sync exhaust-node]
+  (let [node-data (extensions/read-node sync exhaust-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :sealing)]
@@ -149,7 +149,7 @@
 
 (defmethod extensions/complete ZooKeeper
   [sync complete-node]
-  (let [node-data (extensions/read-place sync complete-node)
+  (let [node-data (extensions/read-node sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         complete? (task-complete? sync (:task-node peer-state))
@@ -175,7 +175,7 @@
               (filter
                (fn [task]
                  (let [completion (str task complete-marker)]
-                   (not (extensions/place-exists? sync completion))))
+                   (not (extensions/node-exists? sync completion))))
                tasks))))
          job-nodes)]
     (sort-by (fn [job-node] (extensions/creation-time sync job-node)) incompletes)))
@@ -191,7 +191,7 @@
          (take (count job-seq)))))
 
 (defn sort-tasks-by-phase [sync tasks]
-  (sort-by (fn [t] (:task/phase (extensions/read-place sync t))) tasks))
+  (sort-by (fn [t] (:task/phase (extensions/read-node sync t))) tasks))
 
 (defn find-incomplete-tasks [sync tasks]
   (filter (fn [task]
@@ -215,7 +215,7 @@
         task-nodes (extensions/children sync task-path)
         incomplete-tasks (find-incomplete-tasks sync task-nodes)]
     (filter (fn [task]
-              (let [task-data (extensions/read-place sync task)]
+              (let [task-data (extensions/read-node sync task)]
                 (= (:task/consumption task-data) :concurrent)))
             incomplete-tasks)))
 

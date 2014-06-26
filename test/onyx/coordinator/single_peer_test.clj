@@ -19,7 +19,7 @@
            offer-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync (:node peer)
+       (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
                                 :pulse-node (:node pulse)
@@ -35,7 +35,7 @@
               (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
                     peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))]
                 (fact (count peers) => 1)
-                (fact (:id (extensions/read-place sync peer-path)) => (:uuid peer))))))))
+                (fact (:id (extensions/read-node sync peer-path)) => (:uuid peer))))))))
 
 (facts
  "peer joins and dies"
@@ -49,7 +49,7 @@
            shutdown-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
-       (extensions/write-place sync (:node peer)
+       (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
                                 :pulse-node (:node pulse)
@@ -67,12 +67,12 @@
        (<!! shutdown-ch-spy)
 
        (fact "There are no peers"
-             (extensions/place-exists? sync (:node pulse)) => false)
+             (extensions/node-exists? sync (:node pulse)) => false)
 
        (fact "The only peer is marked as dead"
              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
                    peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))
-                   peer-id (:id (extensions/read-place sync peer-path))
+                   peer-id (:id (extensions/read-node sync peer-path))
                    state-path (extensions/resolve-node sync :peer-state peer-id)
                    state (:content (extensions/dereference sync state-path))]
                (:state state) => :dead))))))
@@ -114,7 +114,7 @@
 
          (facts "There are three tasks"
                 (let [task-nodes (extensions/bucket-at sync :task job-node)
-                      tasks (map #(extensions/read-place sync %) task-nodes)]
+                      tasks (map #(extensions/read-node sync %) task-nodes)]
                   (fact (count task-nodes) => 3)
                   (fact (into #{} (map :task/name tasks)) => #{:in :inc :out})
 
@@ -148,12 +148,12 @@
          (let [event (<!! sync-spy)]
            (fact (:path event) => payload-node)))
 
-  (let [task (:task (extensions/read-place sync payload-node))
-        state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-place sync peer-node)))
+  (let [task (:task (extensions/read-node sync payload-node))
+        state-path (extensions/resolve-node sync :peer-state (:id (extensions/read-node sync peer-node)))
         state (:content (extensions/dereference sync state-path))]
 
     (fact "It receives the task"
-          (extensions/read-place sync (:task-node state)) => task)
+          (extensions/read-node sync (:task-node state)) => task)
 
     (fact "The peer's state is :acking the task"
           (:state state) => :acking)
@@ -168,11 +168,11 @@
     (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
 
     (facts "Touching the ack node triggers the callback"
-           (extensions/touch-place sync (:node/ack (:nodes state)))
+           (extensions/touch-node sync (:node/ack (:nodes state)))
            (let [event (<!! ack-ch-spy)]
              (fact (:path event) => (:node/ack (:nodes state))))))
 
-  (extensions/write-place sync peer-node {:id id
+  (extensions/write-node sync peer-node {:id id
                                           :peer-node peer-node
                                           :pulse-node pulse-node
                                           :shutdown-node shutdown-node
@@ -183,8 +183,8 @@
   (<!! status-spy)
 
   (facts "Touching the exhaustion node triggers the callback"
-         (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (extensions/touch-place sync (:node/exhaust nodes))
+         (let [nodes (:nodes (extensions/read-node sync payload-node))]
+           (extensions/touch-node sync (:node/exhaust nodes))
            (let [event (<!! seal-ch-spy)]
              (fact (:seal? event) => true)
              (fact (:seal-node event) => (:node/seal nodes)))))
@@ -192,12 +192,12 @@
   (<!! seal-node-spy)
 
   (facts "The resource should be sealed"
-         (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (fact (extensions/read-place sync (:node/seal nodes)) => true)))
+         (let [nodes (:nodes (extensions/read-node sync payload-node))]
+           (fact (extensions/read-node sync (:node/seal nodes)) => true)))
 
   (facts "Touching the completion node triggers the callback"
-         (let [nodes (:nodes (extensions/read-place sync payload-node))]
-           (extensions/touch-place sync (:node/completion nodes))
+         (let [nodes (:nodes (extensions/read-node sync payload-node))]
+           (extensions/touch-node sync (:node/completion nodes))
            (let [event (<!! completion-ch-spy)]
              (fact (:path event) => (:node/completion nodes)))))
 
@@ -244,7 +244,7 @@
        (tap (:seal-mult coordinator) seal-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
 
-       (extensions/write-place sync (:node peer)
+       (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
                                 :pulse-node (:node pulse)
@@ -321,7 +321,7 @@
              
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+       (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                   :peer-node (:node peer)
                                                   :pulse-node (:node pulse)
                                                   :payload-node (:node payload)
@@ -348,7 +348,7 @@
 
                 (facts "The status node gets deleted on sync storage"
                        (let [status-node (:node/status (:nodes state))]
-                         (fact (extensions/read-place sync status-node) => (throws Exception))))))))
+                         (fact (extensions/read-node sync status-node) => (throws Exception))))))))
    {:revoke-delay 0}))
 
 (facts
@@ -365,7 +365,7 @@
            completion-ch-spy (chan 5)
            failure-ch-spy (chan 10)]
 
-       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+       (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                   :peer-node (:node peer)
                                                   :pulse-node (:node pulse)
                                                   :payload-node (:node payload)
@@ -427,7 +427,7 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}]
 
-       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+       (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                   :peer-node (:node peer)
                                                   :pulse-node (:node pulse)
                                                   :payload-node (:node payload)
@@ -454,7 +454,7 @@
            (impl/complete-task sync child)))
 
        (facts "Acking a completed task fails"
-              (let [ack-node (:node/ack (:nodes (extensions/read-place sync (:node payload))))]
+              (let [ack-node (:node/ack (:nodes (extensions/read-node sync (:node payload))))]
                 (>!! (:ack-ch-head coordinator) {:path ack-node})
                 (let [failure (<!! failure-ch-spy)]
                   (fact (:ch failure) => :serial-fn))))
@@ -465,7 +465,7 @@
               state (:content (extensions/dereference sync state-path))]
           (extensions/create-at sync :peer-state (:id state) (assoc state :state :idle)))
 
-        (let [ack-node (:node/ack (:nodes (extensions/read-place sync (:node payload))))]
+        (let [ack-node (:node/ack (:nodes (extensions/read-node sync (:node payload))))]
           (>!! (:ack-ch-head coordinator) {:path ack-node})
           (let [failure (<!! failure-ch-spy)]
             (fact (:ch failure) => :serial-fn)))))
@@ -502,7 +502,7 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}]
 
-       (extensions/write-place sync (:node peer) {:id (:uuid peer)
+       (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                   :peer-node (:node peer)
                                                   :pulse-node (:node pulse)
                                                   :payload-node (:node payload)
@@ -529,7 +529,7 @@
               state (:content (extensions/dereference sync state-path))]
           (extensions/create-at sync :peer-state (:id state) (assoc state :state :idle)))
 
-        (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
+        (let [node (:node/completion (:nodes (extensions/read-node sync (:node payload))))]
           (>!! (:completion-ch-head coordinator) {:path node})
           (let [failure (<!! failure-ch-spy)]
             (fact (:ch failure) => :serial-fn))))
@@ -539,7 +539,7 @@
            (impl/complete-task sync child)))
 
        (facts "Completing a task that's already been completed fails"
-              (let [node (:node/completion (:nodes (extensions/read-place sync (:node payload))))]
+              (let [node (:node/completion (:nodes (extensions/read-node sync (:node payload))))]
                 (>!! (:completion-ch-head coordinator) {:path node})
                 (let [failure (<!! failure-ch-spy)]
                   (fact (:ch failure) => :serial-fn)))))

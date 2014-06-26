@@ -16,10 +16,10 @@
   (extensions/create-tx-session queue))
 
 (defn new-payload [sync peer-node payload-ch]
-  (let [peer-contents (extensions/read-place sync peer-node)
+  (let [peer-contents (extensions/read-node sync peer-node)
         node (:node (extensions/create sync :payload))
         updated-contents (assoc peer-contents :payload-node node)]
-    (extensions/write-place sync peer-node updated-contents)
+    (extensions/write-node sync peer-node updated-contents)
     node))
 
 (defn munge-open-session [event session]
@@ -60,7 +60,7 @@
     (merge event rets)))
 
 (defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
-  (assoc event :onyx.core/commit? (extensions/place-exists? sync status-node)))
+  (assoc event :onyx.core/commit? (extensions/node-exists? sync status-node)))
 
 (defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
   (if commit?
@@ -100,9 +100,9 @@
   [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node] :as event}]
   (let [seal-response-ch (chan)]
     (extensions/on-change sync seal-node #(>!! seal-response-ch %))
-    (extensions/touch-place sync exhaust-node)
+    (extensions/touch-node sync exhaust-node)
     (let [path (:path (<!! seal-response-ch))
-          seal? (extensions/read-place sync path)]
+          seal? (extensions/read-node sync path)]
       (if seal?
         (merge event (l-ext/seal-resource event) {:onyx.core/sealed? true})
         (merge event {:onyx.core/sealed? false})))))
@@ -110,7 +110,7 @@
 (defn munge-complete-task
   [{:keys [onyx.core/sync onyx.core/completion-node onyx.core/completion?] :as event}]
   (when completion?
-    (extensions/touch-place sync completion-node))
+    (extensions/touch-node sync completion-node))
   event)
 
 (defn open-session-loop [read-ch kill-ch pipeline-data dead-ch]
@@ -259,7 +259,7 @@
           complete-task-dead-ch (chan)
 
           task (:task/name (:task payload))
-          catalog (extensions/read-place sync (:node/catalog (:nodes payload)))
+          catalog (extensions/read-node sync (:node/catalog (:nodes payload)))
           ingress-queues (:task/ingress-queues (:task payload))
           ingress-queues (if-not (coll? ingress-queues) (vector ingress-queues) ingress-queues)
 
@@ -274,7 +274,7 @@
                          :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
                          :onyx.core/seal-node (:node/seal (:nodes payload))
                          :onyx.core/completion-node (:node/completion (:nodes payload))
-                         :onyx.core/workflow (extensions/read-place sync (:node/workflow (:nodes payload)))
+                         :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch

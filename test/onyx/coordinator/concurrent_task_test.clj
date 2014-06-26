@@ -43,7 +43,7 @@
        
        (doseq [[peer pulse shutdown payload sync-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
-         (extensions/write-place sync (:node peer)
+         (extensions/write-node sync (:node peer)
                                  {:id (:uuid peer)
                                   :peer-node (:node peer)
                                   :pulse-node (:node pulse)
@@ -79,7 +79,7 @@
          (facts ":inc has two active peers"
                 (->> states
                      (map :task-node)
-                     (map (partial extensions/read-place sync))
+                     (map (partial extensions/read-node sync))
                      (map :task/name)
                      (filter (partial = :inc))
                      (count))

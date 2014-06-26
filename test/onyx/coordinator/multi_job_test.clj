@@ -66,7 +66,7 @@
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (extensions/write-place sync (:node peer-node-a)
+       (extensions/write-node sync (:node peer-node-a)
                                {:id (:uuid peer-node-a)
                                 :peer-node (:node peer-node-a)
                                 :payload-node (:node payload-node-a-1)
@@ -74,7 +74,7 @@
                                 :shutdown-node (:node shutdown-node-a)})
        (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
 
-       (extensions/write-place sync (:node peer-node-b)
+       (extensions/write-node sync (:node peer-node-b)
                                {:id (:uuid peer-node-b)
                                 :peer-node (:node peer-node-b)
                                 :payload-node (:node payload-node-b-1)
@@ -95,24 +95,24 @@
        (<!! sync-spy-a)
        (<!! sync-spy-b)
 
-       (let [payload-a (extensions/read-place sync (:node payload-node-a-1))
-             payload-b (extensions/read-place sync (:node payload-node-b-1))]
+       (let [payload-a (extensions/read-node sync (:node payload-node-a-1))
+             payload-b (extensions/read-node sync (:node payload-node-b-1))]
 
          (facts
           "Payload A is for job A"
-          (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-a
-          (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-a)
+          (extensions/read-node sync (:node/catalog (:nodes payload-a))) => catalog-a
+          (extensions/read-node sync (:node/workflow (:nodes payload-a))) => workflow-a)
 
          (facts
           "Payload B is for job A"
-          (extensions/read-place sync (:node/catalog (:nodes payload-b))) => catalog-a
-          (extensions/read-place sync (:node/workflow (:nodes payload-b))) => workflow-a)
+          (extensions/read-node sync (:node/catalog (:nodes payload-b))) => catalog-a
+          (extensions/read-node sync (:node/workflow (:nodes payload-b))) => workflow-a)
 
          (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
          (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
 
-         (extensions/touch-place sync (:node/ack (:nodes payload-a)))
-         (extensions/touch-place sync (:node/ack (:nodes payload-b)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-a)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-b)))
 
          (<!! ack-ch-spy)
          (<!! ack-ch-spy)
@@ -124,7 +124,7 @@
               [{:catalog catalog-b :workflow workflow-b} (chan 1)])
          (<!! offer-ch-spy)
 
-         (extensions/write-place sync (:node peer-node-a)
+         (extensions/write-node sync (:node peer-node-a)
                                  {:id (:uuid peer-node-a)
                                   :peer-node (:node peer-node-a)
                                   :pulse-node (:node pulse-node-a)
@@ -132,25 +132,25 @@
                                   :shutdown-node (:node shutdown-node-a)})
          
          (extensions/on-change sync (:node payload-node-a-2) #(>!! sync-spy-a %))
-         (extensions/touch-place sync (:node/completion (:nodes payload-a))))
+         (extensions/touch-node sync (:node/completion (:nodes payload-a))))
 
        (<!! offer-ch-spy)
        (<!! sync-spy-a)
 
-       (let [payload-a (extensions/read-place sync (:node payload-node-a-2))]
+       (let [payload-a (extensions/read-node sync (:node payload-node-a-2))]
          (facts
           "Payload A is for job B"
-          (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
-          (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
+          (extensions/read-node sync (:node/catalog (:nodes payload-a))) => catalog-b
+          (extensions/read-node sync (:node/workflow (:nodes payload-a))) => workflow-b)
 
          (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
-         (extensions/touch-place sync (:node/ack (:nodes payload-a)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-a)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-b (extensions/read-place sync (:node payload-node-b-1))]
-         (extensions/write-place sync (:node peer-node-b)
+       (let [payload-b (extensions/read-node sync (:node payload-node-b-1))]
+         (extensions/write-node sync (:node peer-node-b)
                                  {:id (:uuid peer-node-b)
                                   :peer-node (:node peer-node-b)
                                   :pulse-node (:node pulse-node-b)
@@ -158,25 +158,25 @@
                                   :shutdown-node (:node shutdown-node-b)})
          
          (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
-         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
+         (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-b))
 
-       (let [payload-b (extensions/read-place sync (:node payload-node-b-2))]
+       (let [payload-b (extensions/read-node sync (:node payload-node-b-2))]
          (facts
           "Payload B is for job A"
-          (extensions/read-place sync (:node/catalog (:nodes payload-b))) => catalog-a
-          (extensions/read-place sync (:node/workflow (:nodes payload-b))) => workflow-a)
+          (extensions/read-node sync (:node/catalog (:nodes payload-b))) => catalog-a
+          (extensions/read-node sync (:node/workflow (:nodes payload-b))) => workflow-a)
          
          (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
-         (extensions/touch-place sync (:node/ack (:nodes payload-b)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-b)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-a (extensions/read-place sync (:node payload-node-a-2))]
-         (extensions/write-place sync (:node peer-node-a)
+       (let [payload-a (extensions/read-node sync (:node payload-node-a-2))]
+         (extensions/write-node sync (:node peer-node-a)
                                  {:id (:uuid peer-node-a)
                                   :peer-node (:node peer-node-a)
                                   :pulse-node (:node pulse-node-a)
@@ -184,25 +184,25 @@
                                   :payload-node (:node payload-node-a-1)})
          
          (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
-         (extensions/touch-place sync (:node/completion (:nodes payload-a)))
+         (extensions/touch-node sync (:node/completion (:nodes payload-a)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-a))
 
-       (let [payload-a (extensions/read-place sync (:node payload-node-a-1))]
+       (let [payload-a (extensions/read-node sync (:node payload-node-a-1))]
          (facts
           "Payload A is for job B"
-          (extensions/read-place sync (:node/catalog (:nodes payload-a))) => catalog-b
-          (extensions/read-place sync (:node/workflow (:nodes payload-a))) => workflow-b)
+          (extensions/read-node sync (:node/catalog (:nodes payload-a))) => catalog-b
+          (extensions/read-node sync (:node/workflow (:nodes payload-a))) => workflow-b)
 
          (extensions/on-change sync (:node/status (:nodes payload-a)) #(>!! status-spy %))
-         (extensions/touch-place sync (:node/ack (:nodes payload-a)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-a)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-b (extensions/read-place sync (:node payload-node-b-2))]
-         (extensions/write-place sync (:node peer-node-b)
+       (let [payload-b (extensions/read-node sync (:node payload-node-b-2))]
+         (extensions/write-node sync (:node peer-node-b)
                                  {:id (:uuid peer-node-b)
                                   :peer-node (:node peer-node-b)
                                   :pulse-node (:node pulse-node-b)
@@ -210,27 +210,27 @@
                                   :payload-node (:node payload-node-b-1)})
          
          (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
-         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
+         (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! sync-spy-b))
 
-       (let [payload-b (extensions/read-place sync (:node payload-node-b-1))]
+       (let [payload-b (extensions/read-node sync (:node payload-node-b-1))]
          (facts
           "Payload B is for job B"
-          (extensions/read-place sync (:node/catalog (:nodes payload-b))) => catalog-b
-          (extensions/read-place sync (:node/workflow (:nodes payload-b))) => workflow-b)
+          (extensions/read-node sync (:node/catalog (:nodes payload-b))) => catalog-b
+          (extensions/read-node sync (:node/workflow (:nodes payload-b))) => workflow-b)
 
          (extensions/on-change sync (:node/status (:nodes payload-b)) #(>!! status-spy %))
-         (extensions/touch-place sync (:node/ack (:nodes payload-b)))
+         (extensions/touch-node sync (:node/ack (:nodes payload-b)))
 
          (<!! ack-ch-spy)
          (<!! status-spy))
 
-       (let [payload-a (extensions/read-place sync (:node payload-node-a-1))
-             payload-b (extensions/read-place sync (:node payload-node-b-1))]
-         (extensions/touch-place sync (:node/completion (:nodes payload-a)))
-         (extensions/touch-place sync (:node/completion (:nodes payload-b)))
+       (let [payload-a (extensions/read-node sync (:node payload-node-a-1))
+             payload-b (extensions/read-node sync (:node payload-node-b-1))]
+         (extensions/touch-node sync (:node/completion (:nodes payload-a)))
+         (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
          (<!! offer-ch-spy)
          (<!! offer-ch-spy))

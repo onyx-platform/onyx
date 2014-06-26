@@ -54,16 +54,16 @@
   ([sync state-stack-nodes]
      (peer-stack-sequential-ranges
       sync
-      (drop-while #(not= (:state (extensions/read-place sync %)) :acking) state-stack-nodes)
+      (drop-while #(not= (:state (extensions/read-node sync %)) :acking) state-stack-nodes)
       []
       nil))
   ([sync [node & nodes :as stack] ranges start]
      (cond (not (seq stack)) ranges
-           (nil? start) (if (= (:state (extensions/read-place sync node)) :acking)
+           (nil? start) (if (= (:state (extensions/read-node sync node)) :acking)
                           (recur sync nodes ranges node)
                           (recur sync nodes ranges nil))
            :else
-           (if (some #{(:state (extensions/read-place sync node))} #{:idle :revoked :dead})
+           (if (some #{(:state (extensions/read-node sync node))} #{:idle :revoked :dead})
              (recur sync nodes (conj ranges [start node]) nil)
              (recur sync nodes ranges start)))))
 
@@ -75,13 +75,13 @@
             range-nodes (map (fn [[a b]]
                                [(:czxid (:stat (zk/data (:conn sync) a)))
                                 (:czxid (:stat (zk/data (:conn sync) b)))
-                                (:task-node (extensions/read-place sync a))])
+                                (:task-node (extensions/read-node sync a))])
                              node-pairs)
             other-peers (remove (partial = state-path) paths)]
         (doseq [other-peer other-peers]
           (doseq [range-node range-nodes]
             (doseq [state (sort (extensions/children sync other-peer))]
-              (when (= (:task-node (extensions/read-place sync state)) (nth range-node 2))
+              (when (= (:task-node (extensions/read-node sync state)) (nth range-node 2))
                 (let [zxid (:czxid (:stat (zk/data (:conn sync) state)))]
                   (fact (or (< zxid (first range-node))
                             (> zxid (second range-node))) => true))))))))))
@@ -89,14 +89,14 @@
 (defn peer-liveness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
     (let [states (extensions/children sync state-path)
-          state-data (map (partial extensions/read-place sync) states)
+          state-data (map (partial extensions/read-node sync) states)
           active-states (filter #(= (:state %) :active) state-data)]
       (fact (count active-states) =not=> zero?))))
 
 (defn peer-fairness [sync n-peers n-jobs tasks-per-job]
   (let [state-paths (extensions/bucket sync :peer-state)
         state-seqs (map (partial extensions/children sync) state-paths)
-        state-seqs-data (map #(map (partial extensions/read-place sync) %) state-seqs)
+        state-seqs-data (map #(map (partial extensions/read-node sync) %) state-seqs)
         n-tasks (map #(count (filter (fn [x] (= (:state x) :active)) %)) state-seqs-data)
         mean (/ (* n-jobs tasks-per-job) n-peers)
         confidence 0.75]
@@ -119,7 +119,7 @@
   (doseq [state-path (extensions/bucket sync :peer-state)]
     (let [states (extensions/children sync state-path)
           sorted-states (sort states)
-          state-data (map (partial extensions/read-place sync) sorted-states)]
+          state-data (map (partial extensions/read-node sync) sorted-states)]
       (dorun
        (map-indexed
         (fn [i state]
@@ -140,7 +140,7 @@
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
-        (extensions/write-place sync (:node peer)
+        (extensions/write-node sync (:node peer)
                                 {:id (:uuid peer)
                                  :peer-node (:node peer)
                                  :pulse-node (:node pulse)
@@ -154,21 +154,21 @@
           (<!! sync-spy)
           (<!! (timeout (gen/geometric (/ 1 (:model/mean-ack-time model)))))
 
-          (let [nodes (:nodes (extensions/read-place sync (:node p)))]
+          (let [nodes (:nodes (extensions/read-node sync (:node p)))]
             (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
-            (extensions/touch-place sync (:node/ack nodes))
+            (extensions/touch-node sync (:node/ack nodes))
             (<!! status-spy)
 
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
-              (extensions/write-place sync (:node peer) {:id (:uuid peer)
+              (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                          :peer-node (:node peer)
                                                          :pulse-node (:node pulse)
                                                          :shutdown-node (:node shutdown)
                                                          :payload-node (:node next-payload)})
               (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
-              (extensions/touch-place sync (:node/completion nodes))
+              (extensions/touch-node sync (:node/completion nodes))
 
               (recur next-payload)))))
       (catch InterruptedException e
