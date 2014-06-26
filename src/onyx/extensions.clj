@@ -1,34 +1,38 @@
 (ns onyx.extensions
   "Extension interfaces for internally used queues, logs,
-   and distributed coordinators.")
+   and distributed coordination.")
 
-(defmulti mark-peer-born (fn [log place] (type log)))
+(defmulti mark-peer-born (fn [sync place] (type sync)))
 
-(defmulti mark-peer-dead (fn [log place] (type log)))
+(defmulti mark-peer-dead (fn [sync place] (type sync)))
 
-(defmulti mark-offered (fn [log task peer nodes] (type log)))
+(defmulti mark-offered (fn [sync task peer nodes] (type sync)))
 
-(defmulti plan-job (fn [log catalog workflow tasks] (type log)))
+(defmulti plan-job (fn [sync job-id tasks catalog workflow] (type sync)))
 
-(defmulti ack (fn [log place] (type log)))
+(defmulti ack (fn [sync place] (type sync)))
 
-(defmulti seal-resource? (fn [log place] (type log)))
+(defmulti seal-resource? (fn [sync place] (type sync)))
 
-(defmulti revoke-offer (fn [log ack-place] (type log)))
+(defmulti revoke-offer (fn [sync ack-place] (type sync)))
 
-(defmulti complete (fn [log complete-place] (type log)))
+(defmulti complete (fn [sync complete-place] (type sync)))
 
-(defmulti next-tasks (fn [log] (type log)))
+(defmulti next-tasks (fn [sync] (type sync)))
 
-(defmulti nodes (fn [log peer] (type log)))
+(defmulti idle-peers (fn [sync] (type sync)))
 
-(defmulti node-basis (fn [log basis node] (type log)))
+(defmulti create
+  (fn
+    ([sync bucket] [(type sync) bucket])
+    ([sync bucket content] [(type sync) bucket])))
 
-(defmulti node->task (fn [log basis node] (type log)))
+(defmulti create-at
+  (fn
+    ([sync bucket subpath] [(type sync) bucket])
+    ([sync bucket subpath content] [(type sync) bucket])))
 
-(defmulti idle-peers (fn [log] (type log)))
-
-(defmulti create (fn [sync bucket] [(type sync) bucket]))
+(defmulti create-node (fn [sync node] (type sync)))
 
 (defmulti delete (fn [sync place] (type sync)))
 
@@ -38,11 +42,29 @@
 
 (defmulti read-place (fn [sync place] (type sync)))
 
+(defmulti read-place-at (fn [sync place & subpaths] [(type sync) place]))
+
+(defmulti dereference (fn [sync node] (type sync)))
+
+(defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
+
+(defmulti children (fn [sync node] (type sync)))
+
 (defmulti place-exists? (fn [sync place] (type sync)))
+
+(defmulti place-exists-at? (fn [sync bucket & subpaths] [(type sync) bucket]))
+
+(defmulti creation-time (fn [sync node] (type sync)))
+
+(defmulti bucket (fn [sync bucket] [(type sync) bucket]))
+
+(defmulti bucket-at (fn [sync bucket subpath] [(type sync) bucket]))
 
 (defmulti version (fn [sync place] (type sync)))
 
 (defmulti on-change (fn [sync place cb] (type sync)))
+
+(defmulti on-child-change (fn [sync place cb] (type sync)))
 
 (defmulti on-delete (fn [sync place db] (type sync)))
 

@@ -30,7 +30,8 @@
 (defn onyx-internal-task [catalog task-name parent children-names phase]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
-    {:name (:onyx/name element)
+    {:id (java.util.UUID/randomUUID)
+     :name (:onyx/name element)
      :ingress-queues (get (:egress-queues parent) task-name)
      :egress-queues (egress-queues-to-children children)
      :phase phase
@@ -50,7 +51,8 @@
 
 (defmethod extensions/create-io-task :input
   [element parent children phase]
-  {:name (:onyx/name element)
+  {:id (java.util.UUID/randomUUID)
+   :name (:onyx/name element)
    :ingress-queues (str (UUID/randomUUID))
    :egress-queues (egress-queues-to-children children)
    :phase phase
@@ -58,7 +60,8 @@
 
 (defmethod extensions/create-io-task :output
   [element parent children phase]
-  {:name (:onyx/name element)
+  {:id (java.util.UUID/randomUUID)
+   :name (:onyx/name element)
    :ingress-queues (get (:egress-queues parent) (:onyx/name element))
    :egress-queues {:self (str (UUID/randomUUID))}
    :phase phase

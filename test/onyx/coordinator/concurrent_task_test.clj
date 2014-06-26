@@ -2,16 +2,16 @@
   (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan tap alts!! >!! <!!]]
             [com.stuartsierra.component :as component]
-            [datomic.api :as d]
+            [zookeeper :as zk]
             [onyx.coordinator.async :as async]
+            [onyx.sync.zookeeper :as onyx-zk]
             [onyx.extensions :as extensions]
-            [onyx.coordinator.log.datomic :as datomic]
             [onyx.coordinator.sim-test-utils :refer [with-system]]))
 
 (facts
  "plan one job with four peers concurrently"
  (with-system
-   (fn [coordinator sync log]
+   (fn [coordinator sync]
      (let [n 4
            peers (take n (repeatedly (fn [] (extensions/create sync :peer))))
            pulses (take n (repeatedly (fn [] (extensions/create sync :pulse))))
@@ -43,42 +43,46 @@
        
        (doseq [[peer pulse shutdown payload sync-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
-         (extensions/write-place sync peer {:pulse pulse
-                                            :shutdown shutdown
-                                            :payload payload})
-         (extensions/on-change sync payload #(>!! sync-spy %)))
+         (extensions/write-place sync (:node peer)
+                                 {:id (:uuid peer)
+                                  :peer-node (:node peer)
+                                  :pulse-node (:node pulse)
+                                  :shutdown-node (:node shutdown)
+                                  :payload-node (:node payload)})
+         (extensions/on-change sync (:node payload) #(>!! sync-spy %)))
 
        (doseq [peer peers]
-         (>!! (:born-peer-ch-head coordinator) peer))
+         (>!! (:born-peer-ch-head coordinator) (:node peer)))
 
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator) {:catalog catalog :workflow workflow})
+       (>!! (:planning-ch-head coordinator)
+            [{:catalog catalog :workflow workflow} (chan 1)])
        (<!! offer-ch-spy)
 
        (doseq [_ (range n)]
          (alts!! sync-spies))
 
-       (let [db (d/db (:conn log))]
+       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+                         (zk/children (:conn sync))
+                         (map (partial extensions/resolve-node sync :peer-state))
+                         (map (partial extensions/dereference sync))
+                         (map :content))]
          
          (facts "Four peers are :acking"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/status :acking]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 4)))
+                (count (filter (partial = :acking) (map :state states))) => 4)
 
          (facts "No peers are idle"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/status :idle]]
-                      result (or (ffirst (d/q query db)) 0)]
-                  (fact result => zero?)))
+                (count (filter (partial = :idle) (map :state states))) => 0)
 
          (facts ":inc has two active peers"
-                (let [query '[:find (count ?peer) :where
-                              [?peer :peer/task ?task]
-                              [?task :task/name :inc]]
-                      result (ffirst (d/q query db))]
-                  (fact result => 2))))))
+                (->> states
+                     (map :task-node)
+                     (map (partial extensions/read-place sync))
+                     (map :task/name)
+                     (filter (partial = :inc))
+                     (count))
+                => 2))))
    {:revoke-delay 50000}))
 

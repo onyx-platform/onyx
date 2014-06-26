@@ -7,6 +7,7 @@
             [taoensso.timbre :refer [info]]
             [onyx.coordinator.sim-test-utils :as sim-utils]
             [onyx.queue.hornetq-utils :as hq-util]
+            [onyx.sync.zookeeper :as onyx-zk]
             [onyx.api]))
 
 (def cluster (atom []))
@@ -108,11 +109,8 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def datomic (str "datomic:mem://" id))
-
 (def coord-opts
-  {:datomic-uri datomic
-   :hornetq-host hornetq-host
+  {:hornetq-host hornetq-host
    :hornetq-port hornetq-port
    :zk-addr "127.0.0.1:2181"
    :onyx-id id
@@ -166,7 +164,7 @@
     :model/peer-rate 500
     :model/sine-length 40000
     :model/sine-start 5000
-    :model/sine-reps 8}])
+    :model/sine-reps 80}])
 
 (def sine-cluster-model
   (-> @(d/transact sim-conn sine-cluster-model-data)
@@ -216,6 +214,14 @@
 (def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
+
+(def ozk (component/start (onyx-zk/zookeeper "127.0.0.1:2181" id)))
+
+(facts "All tasks of all jobs are completed"
+       (sim-utils/task-completeness ozk))
+
+(facts "Peer states only make legal transitions"
+       (sim-utils/peer-state-transition-correctness ozk))
 
 (onyx.api/shutdown conn)
 

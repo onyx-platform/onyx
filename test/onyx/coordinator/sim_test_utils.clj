@@ -4,25 +4,26 @@
             [clojure.data.generators :as gen]
             [com.stuartsierra.component :as component]
             [datomic.api :as d]
+            [zookeeper :as zk]
+            [taoensso.timbre :refer [info]]
+            [onyx.coordinator.impl :as impl]
             [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
 (defn with-system [f & opts]
   (let [id (str (java.util.UUID/randomUUID))
-        defaults {:datomic-uri (str "datomic:mem://" id)
-                  :hornetq-addr "localhost:5445"
+        defaults {:hornetq-addr "localhost:5445"
                   :zk-addr "127.0.0.1:2181"
                   :onyx-id id
                   :revoke-delay 4000}]
-    (def system (onyx-coordinator (apply merge defaults opts)))
-    (let [components (alter-var-root #'system component/start)
-          coordinator (:coordinator components)
-          sync (:sync components)
-          log (:log components)]
+    (let [system (onyx-coordinator (apply merge defaults opts))
+          live (component/start system)
+          coordinator (:coordinator live)
+          sync (:sync live)]
       (try
-        (f coordinator sync log)
+        (f coordinator sync)
         (finally
-         (alter-var-root #'system component/stop))))))
+         (component/stop live))))))
 
 (defn reset-conn
   "Reset connection to a scratch database. Use memory database if no
@@ -41,69 +42,93 @@
       (doseq [tx v]
         (d/transact conn tx)))))
 
-(defn entity-txs [db ent]
-  (map #(nth % 3)
-       (d/q
-        '[:find ?e ?a ?v ?tx ?added
-          :in $ ?e
-          :where
-          [?e ?a ?v ?tx ?added]]
-        (datomic.api/history db)
-        ent)))
+(defn task-completeness [sync]
+  (let [job-nodes (extensions/bucket sync :job)
+        task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
+    (doseq [task-path task-paths]
+      (doseq [task-node (extensions/children sync task-path)]
+        (when-not (impl/completed-task? task-node)
+          (fact (impl/task-complete? sync task-node) => true))))))
 
-(defn sequential-task-ids [db]
-  (->> (d/history db)
-       (d/q '[:find ?task :where [?task :task/consumption :sequential]])
-       (map first)
-       (into #{})))
+(defn peer-stack-sequential-ranges
+  ([sync state-stack-nodes]
+     (peer-stack-sequential-ranges
+      sync
+      (drop-while #(not= (:state (extensions/read-place sync %)) :acking) state-stack-nodes)
+      []
+      nil))
+  ([sync [node & nodes :as stack] ranges start]
+     (cond (not (seq stack)) ranges
+           (nil? start) (if (= (:state (extensions/read-place sync node)) :acking)
+                          (recur sync nodes ranges node)
+                          (recur sync nodes ranges nil))
+           :else
+           (if (some #{(:state (extensions/read-place sync node))} #{:idle :revoked :dead})
+             (recur sync nodes (conj ranges [start node]) nil)
+             (recur sync nodes ranges start)))))
 
-(defn concurrent-task-ids [db]
-  (->> (d/history db)
-       (d/q '[:find ?task :where [?task :task/consumption :concurrent]])
-       (map first)
-       (into #{})))
+(defn sequential-safety [sync]
+  (let [paths (extensions/bucket sync :peer-state)]
+    (doseq [state-path paths]
+      (let [states (sort (extensions/children sync state-path))
+            node-pairs (peer-stack-sequential-ranges sync states)
+            range-nodes (map (fn [[a b]]
+                               [(:czxid (:stat (zk/data (:conn sync) a)))
+                                (:czxid (:stat (zk/data (:conn sync) b)))
+                                (:task-node (extensions/read-place sync a))])
+                             node-pairs)
+            other-peers (remove (partial = state-path) paths)]
+        (doseq [other-peer other-peers]
+          (doseq [range-node range-nodes]
+            (doseq [state (sort (extensions/children sync other-peer))]
+              (when (= (:task-node (extensions/read-place sync state)) (nth range-node 2))
+                (let [zxid (:czxid (:stat (zk/data (:conn sync) state)))]
+                  (fact (or (< zxid (first range-node))
+                            (> zxid (second range-node))) => true))))))))))
 
-(defn task-completeness [result-db]
-  (let [query '[:find (count ?task) :where [?task :task/complete? false]]
-        result (ffirst (d/q query result-db))]
-    
-    (fact "All tasks were completed"
-          result => nil?)))
+(defn peer-liveness [sync]
+  (doseq [state-path (extensions/bucket sync :peer-state)]
+    (let [states (extensions/children sync state-path)
+          state-data (map (partial extensions/read-place sync) states)
+          active-states (filter #(= (:state %) :active) state-data)]
+      (fact (count active-states) =not=> zero?))))
 
-(defn sequential-safety [result-db]
-  (let [task-ids (sequential-task-ids result-db)
-        task-txs (mapcat (partial entity-txs result-db) task-ids)
-        result (mapcat
-                #(let [db (d/as-of result-db %)
-                       query '[:find ?task (count ?peer) :where
-                               [?task :task/consumption :sequential]
-                               [?peer :peer/task ?task]]]
-                   (map second (d/q query db)))
-                task-txs)]
-    
-    (fact "No sequential tasks ever had more than one peer at a time" 
-          (every? (partial = 1) result) => true)))
-
-(defn peer-liveness [result-db n-peers]
-  (let [query '[:find ?peer :where
-                [?peer :peer/task]]
-        result (map first (d/q query (d/history result-db)))]
-    
-    (fact "All peers got at least one task"
-          (count result) => n-peers)))
-
-(defn peer-fairness [result-db n-peers n-jobs tasks-per-job]
-  (let [query '[:find ?peer (count ?task) :where
-                [?peer :peer/task ?task]]
-        result (map second (d/q query (d/history result-db)))
+(defn peer-fairness [sync n-peers n-jobs tasks-per-job]
+  (let [state-paths (extensions/bucket sync :peer-state)
+        state-seqs (map (partial extensions/children sync) state-paths)
+        state-seqs-data (map #(map (partial extensions/read-place sync) %) state-seqs)
+        n-tasks (map #(count (filter (fn [x] (= (:state x) :active)) %)) state-seqs-data)
         mean (/ (* n-jobs tasks-per-job) n-peers)
         confidence 0.75]
-    
+
     (fact "All peers got within 75% of the average number of tasks"
           (every?
            #(and (<= (- mean (* mean confidence)) %)
                  (>= (+ mean (* mean confidence)) %))
-           result)) => true))
+           n-tasks)) => true))
+
+(def legal-transitions
+  {:idle #{:acking :dead}
+   :acking #{:active :revoked :dead}
+   :active #{:sealing :idle :dead}
+   :sealing #{:idle :dead}
+   :revoked #{:dead}
+   :dead #{}})
+
+(defn peer-state-transition-correctness [sync]
+  (doseq [state-path (extensions/bucket sync :peer-state)]
+    (let [states (extensions/children sync state-path)
+          sorted-states (sort states)
+          state-data (map (partial extensions/read-place sync) sorted-states)]
+      (dorun
+       (map-indexed
+        (fn [i state]
+          (when (< i (dec (count state-data)))
+            (let [current-state (:state state)
+                  next-state (:state (nth state-data (inc i)))]
+              (fact (some #{next-state} (get legal-transitions current-state))
+                    =not=> nil?))))
+        state-data)))))
 
 (defn create-peer [model components peer]
   (future
@@ -115,45 +140,44 @@
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
-        (extensions/write-place sync peer {:pulse pulse
-                                           :shutdown shutdown
-                                           :payload payload})
-        (extensions/on-change sync payload #(>!! sync-spy %))
+        (extensions/write-place sync (:node peer)
+                                {:id (:uuid peer)
+                                 :peer-node (:node peer)
+                                 :pulse-node (:node pulse)
+                                 :shutdown-node (:node shutdown)
+                                 :payload-node (:node payload)})
+        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
         
-        (>!! (:born-peer-ch-head coordinator) peer)
+        (>!! (:born-peer-ch-head coordinator) (:node peer))
 
-        (loop [payload-node payload]
+        (loop [p payload]
           (<!! sync-spy)
           (<!! (timeout (gen/geometric (/ 1 (:model/mean-ack-time model)))))
 
-          (let [nodes (:nodes (extensions/read-place sync payload-node))]
-            (extensions/on-change sync (:status nodes) #(>!! status-spy %))
-            (extensions/touch-place sync (:ack nodes))
+          (let [nodes (:nodes (extensions/read-place sync (:node p)))]
+            (extensions/on-change sync (:node/status nodes) #(>!! status-spy %))
+            (extensions/touch-place sync (:node/ack nodes))
             (<!! status-spy)
+
             (<!! (timeout (gen/geometric (/ 1 (:model/mean-completion-time model)))))
 
             (let [next-payload (extensions/create sync :payload)]
-              (extensions/write-place sync peer {:pulse pulse :payload next-payload})
-              (extensions/on-change sync next-payload #(>!! sync-spy %))
-              (extensions/touch-place sync (:completion nodes))
+              (extensions/write-place sync (:node peer) {:id (:uuid peer)
+                                                         :peer-node (:node peer)
+                                                         :pulse-node (:node pulse)
+                                                         :shutdown-node (:node shutdown)
+                                                         :payload-node (:node next-payload)})
+              (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
+              (extensions/touch-place sync (:node/completion nodes))
 
               (recur next-payload)))))
-      (catch Exception e (prn "Peer: " e)))))
+      (catch InterruptedException e
+        (prn "Peer intentionally killed"))
+      (catch Exception e
+        (.printStackTrace e)))))
 
 (defn create-peers! [model components cluster]
   (doseq [_ (range (:model/n-peers model))]
     (let [peer (extensions/create (:sync components) :peer)]
       (swap! cluster assoc peer (create-peer model components peer)))))
-
-(defn block-until-completion! [tx-queue total-tasks]
-  (loop []
-    (let [tx (.take tx-queue)
-          db (:db-after tx)
-          query '[:find (count ?task) :where [?task :task/complete? true]]
-          result (ffirst (d/q query db))]
-      (prn result)
-      (when-not (= result total-tasks)
-        (recur)))))
-
-
 

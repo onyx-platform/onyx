@@ -58,8 +58,7 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:datomic-uri (str "datomic:mem://" id)
-                 :hornetq-host hornetq-host
+(def coord-opts {:hornetq-host hornetq-host
                  :hornetq-port hornetq-port
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
