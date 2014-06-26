@@ -1,9 +1,10 @@
 (ns ^:no-doc onyx.peer.group
-  (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.peer.transform :as transform]
-            [taoensso.timbre :refer [info]]
-            [dire.core :refer [with-post-hook!]])
-  (:import [java.security MessageDigest]))
+    (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.operation :as operation]
+              [onyx.peer.transform :as transform]
+              [taoensso.timbre :refer [info]]
+              [dire.core :refer [with-post-hook!]])
+    (:import [java.security MessageDigest]))
 
 (def md5 (MessageDigest/getInstance "MD5"))
 
@@ -19,9 +20,7 @@
 
 (defmethod l-ext/inject-lifecycle-resources :grouper
   [_ {:keys [onyx.core/task-map]}]
-  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
-        user-fn (symbol (name (:onyx/fn task-map)))]
-    {:onyx.transform/fn (ns-resolve user-ns user-fn)}))
+  {:onyx.transform/fn (operation/resolve-fn task-map)})
 
 (defmethod l-ext/apply-fn [:grouper nil]
   [event] (apply-fn-shim event))

@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.transform
     (:require [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.queue.hornetq :refer [take-segments]]
               [taoensso.timbre :refer [debug]]
@@ -23,9 +24,6 @@
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
-
-(defn apply-fn [f params segment]
-  ((reduce #(partial %1 %2) f params) segment))
 
 (defn compress-segment [segment]
   {:compressed (.array (fressian/write segment))
@@ -61,7 +59,7 @@
 
 (defn apply-fn-shim
   [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params] :as event}]
-  (let [results (flatten (map (partial apply-fn fn params) decompressed))]
+  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
     (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
@@ -80,9 +78,7 @@
 
 (defmethod l-ext/inject-lifecycle-resources :transformer
   [_ {:keys [onyx.core/task-map]}]
-  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
-        user-fn (symbol (name (:onyx/fn task-map)))]
-    {:onyx.transform/fn (ns-resolve user-ns user-fn)}))
+  {:onyx.transform/fn (operation/resolve-fn task-map)})
 
 (defmethod l-ext/read-batch :default
   [event] (read-batch-shim event))

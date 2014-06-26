@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.aggregate
   (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.peer.operation :as operation]
             [onyx.extensions :as extensions]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.peer.transform :as transformer]
@@ -20,9 +21,7 @@
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
-  (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
-        user-fn (symbol (name (:onyx/fn task-map)))
-        rets
+  (let [rets
         {:onyx.aggregate/queue
          (->> (range n-pipeline-threads)
               (map (fn [x] {:session (extensions/create-tx-session queue)}))
@@ -31,7 +30,7 @@
               (map (fn [x] (assoc x :halting-ch (chan 0)))))
          :onyx.aggregate/read-ch (chan n-pipeline-threads)
          :onyx.core/reserve? true
-         :onyx.transform/fn (ns-resolve user-ns user-fn)}]
+         :onyx.transform/fn (operation/resolve-fn task-map)}]
     (doseq [queue-bundle (:onyx.aggregate/queue rets)]
       (consumer-loop event
                      (:session queue-bundle)
