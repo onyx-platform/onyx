@@ -15,7 +15,6 @@
 (defn create-queue! [config queue-name]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
     (.start session)
@@ -30,7 +29,6 @@
 (defn write! [config queue-name messages echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]   
     
@@ -53,7 +51,6 @@
 (defn write-and-cap! [config queue-name messages echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]   
 
@@ -80,7 +77,6 @@
 (defn read! [config queue-name n echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
@@ -107,7 +103,6 @@
 (defn consume-queue! [config queue-name echo]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)]
 
@@ -134,7 +129,6 @@
 (defn message-count [config queue-name]
   (let [tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setReconnectAttempts locator -1)
         session-factory (.createSessionFactory locator)
         session (.createTransactedSession session-factory)
         query (.queueQuery session (SimpleString. queue-name))]
