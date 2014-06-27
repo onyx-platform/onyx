@@ -62,8 +62,7 @@
   type-and-medium-dispatch)
 
 (defmulti write-batch
-  "Writes segments to the outgoing data source.
-   Must return a map."
+  "Writes segments to the outgoing data source. Must return a map."
   type-and-medium-dispatch)
 
 (defmulti close-temporal-resources
