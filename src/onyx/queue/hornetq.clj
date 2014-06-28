@@ -10,14 +10,14 @@
              [org.hornetq.api.core.client HornetQClient]
              [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(defrecord HornetQClusteredConnection [cluster-name group-address group-port]
+(defrecord HornetQClusteredConnection [cluster-name group-address group-port refresh timeout]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting HornetQ clustered connection")
 
     (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
-          gdc (DiscoveryGroupConfiguration. cluster-name 5000 5000 udp)
+          gdc (DiscoveryGroupConfiguration. cluster-name refresh timeout udp)
           locator (HornetQClient/createServerLocatorWithHA gdc)
           _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
@@ -33,11 +33,13 @@
     
     component))
 
-(defn hornetq [cluster-name group-address group-port]
+(defn hornetq [cluster-name group-address group-port refresh timeout]
   (map->HornetQClusteredConnection
    {:cluster-name cluster-name
     :group-address group-address
-    :group-port group-port}))
+    :group-port group-port
+    :refresh refresh
+    :timeout timeout}))
 
 (defmethod extensions/create-tx-session HornetQClusteredConnection
   [queue]
