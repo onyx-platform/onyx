@@ -5,7 +5,13 @@
 
 (def hornetq-host "localhost")
 
-(def hornetq-port 5445)
+(def hornetq-port 5446)
+
+(def hornetq-cluster-name "onyx-cluster")
+
+(def hornetq-group-address "231.7.7.7")
+
+(def hornetq-group-port 9876)
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
@@ -19,13 +25,15 @@
   (hq-util/create-queue! hq-config out-queue)
 
   (let [id (str (java.util.UUID/randomUUID))
-        coord-opts {:hornetq-host hornetq-host
-                    :hornetq-port hornetq-port
+        coord-opts {:hornetq-cluster-name hornetq-cluster-name
+                    :hornetq-group-address hornetq-group-address
+                    :hornetq-group-port hornetq-group-port
                     :zk-addr "127.0.0.1:2181"
                     :onyx-id id
                     :revoke-delay 5000}
-        peer-opts {:hornetq-host hornetq-host
-                   :hornetq-port hornetq-port
+        peer-opts {:hornetq-cluster-name hornetq-cluster-name
+                   :hornetq-group-address hornetq-group-address
+                   :hornetq-group-port hornetq-group-port
                    :zk-addr "127.0.0.1:2181"
                    :onyx-id id}
         catalog

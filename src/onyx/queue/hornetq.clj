@@ -1,21 +1,24 @@
 (ns ^:no-doc onyx.queue.hornetq
-  (:require [clojure.data.fressian :as fressian]
-            [com.stuartsierra.component :as component]
-            [onyx.extensions :as extensions]
-            [taoensso.timbre :refer [info]])
-  (:import [org.hornetq.api.core.client HornetQClient]
-           [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
-           [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+    (:require [clojure.data.fressian :as fressian]
+              [com.stuartsierra.component :as component]
+              [onyx.extensions :as extensions]
+              [taoensso.timbre :refer [info]])
+    (:import [org.hornetq.api.core TransportConfiguration]
+             [org.hornetq.api.core HornetQQueueExistsException]
+             [org.hornetq.api.core DiscoveryGroupConfiguration]
+             [org.hornetq.api.core UDPBroadcastGroupConfiguration]
+             [org.hornetq.api.core.client HornetQClient]
+             [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(defrecord HornetQ [host port]
+(defrecord HornetQClusteredConnection [cluster-name group-address group-port]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting HornetQ")
+    (taoensso.timbre/info "Starting HornetQ clustered connection")
 
-    (let [config {"host" host "port" port}
-          tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-          locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+    (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
+          gdc (DiscoveryGroupConfiguration. cluster-name 5000 5000 udp)
+          locator (HornetQClient/createServerLocatorWithHA gdc)
           _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
       (assoc component
@@ -23,32 +26,35 @@
         :session-factory session-factory)))
 
   (stop [{:keys [locator session-factory] :as component}]
-    (taoensso.timbre/info "Stopping HornetQ")
+    (taoensso.timbre/info "Stopping HornetQ clustered connection")
 
     (.close session-factory)
     (.close locator)
     
     component))
 
-(defn hornetq [host port]
-  (map->HornetQ {:host host :port port}))
+(defn hornetq [cluster-name group-address group-port]
+  (map->HornetQClusteredConnection
+   {:cluster-name cluster-name
+    :group-address group-address
+    :group-port group-port}))
 
-(defmethod extensions/create-tx-session HornetQ
+(defmethod extensions/create-tx-session HornetQClusteredConnection
   [queue]
   (let [session-factory (:session-factory queue)
         session (.createTransactedSession session-factory)]
     (.start session)
     session))
 
-(defmethod extensions/create-producer HornetQ
+(defmethod extensions/create-producer HornetQClusteredConnection
   [queue session queue-name]
   (.createProducer session queue-name))
 
-(defmethod extensions/create-consumer HornetQ
+(defmethod extensions/create-consumer HornetQClusteredConnection
   [queue session queue-name]
   (.createConsumer session queue-name))
 
-(defmethod extensions/create-queue HornetQ
+(defmethod extensions/create-queue HornetQClusteredConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
         ingress-queue (:ingress-queues task)
@@ -61,7 +67,7 @@
           (info e))))
     (.close session)))
 
-(defmethod extensions/bootstrap-queue HornetQ
+(defmethod extensions/bootstrap-queue HornetQClusteredConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
         producer (extensions/create-producer queue session (:ingress-queues task))]
@@ -70,7 +76,7 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defmethod extensions/produce-message HornetQ
+(defmethod extensions/produce-message HornetQClusteredConnection
   ([queue producer session msg]
      (let [message (.createMessage session true)]
        (.writeBytes (.getBodyBuffer message) msg)
@@ -81,23 +87,23 @@
        (.writeBytes (.getBodyBuffer message) msg)
        (.send producer message))))
 
-(defmethod extensions/consume-message HornetQ
+(defmethod extensions/consume-message HornetQClusteredConnection
   [queue consumer]
   (.receive consumer))
 
-(defmethod extensions/read-message HornetQ
+(defmethod extensions/read-message HornetQClusteredConnection
   [queue message]
   (fressian/read (.toByteBuffer (.getBodyBuffer message))))
 
-(defmethod extensions/ack-message HornetQ
+(defmethod extensions/ack-message HornetQClusteredConnection
   [queue message]
   (.acknowledge message))
 
-(defmethod extensions/commit-tx HornetQ
+(defmethod extensions/commit-tx HornetQClusteredConnection
   [queue session]
   (.commit session))
 
-(defmethod extensions/close-resource HornetQ
+(defmethod extensions/close-resource HornetQClusteredConnection
   [queue resource]
   (.close resource))
 
