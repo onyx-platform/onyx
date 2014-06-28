@@ -87,6 +87,8 @@
 
 (defmulti create-queue (fn [queue task] (type queue)))
 
+(defmulti create-queue-on-session (fn [queue session queue-name] (type queue)))
+
 (defmulti bootstrap-queue (fn [queue task] (type queue)))
 
 (defmulti close-resource (fn [queue resource] (type queue)))

@@ -5,6 +5,7 @@
               [taoensso.timbre :refer [info]])
     (:import [org.hornetq.api.core TransportConfiguration]
              [org.hornetq.api.core HornetQQueueExistsException]
+             [org.hornetq.api.core HornetQNonExistentQueueException]
              [org.hornetq.api.core DiscoveryGroupConfiguration]
              [org.hornetq.api.core UDPBroadcastGroupConfiguration]
              [org.hornetq.api.core.client HornetQClient]
@@ -50,10 +51,12 @@
 
 (defmethod extensions/create-producer HornetQClusteredConnection
   [queue session queue-name]
+  (extensions/create-queue-on-session queue session queue-name)
   (.createProducer session queue-name))
 
 (defmethod extensions/create-consumer HornetQClusteredConnection
   [queue session queue-name]
+  (extensions/create-queue-on-session queue session queue-name)
   (.createConsumer session queue-name))
 
 (defmethod extensions/create-queue HornetQClusteredConnection
@@ -68,6 +71,14 @@
         (catch Exception e
           (info e))))
     (.close session)))
+
+(defmethod extensions/create-queue-on-session HornetQClusteredConnection
+  [queue session queue-name]
+  (try
+    (.createQueue session queue-name queue-name true)
+    (catch HornetQQueueExistsException e)
+    (catch Exception e
+      (info e))))
 
 (defmethod extensions/bootstrap-queue HornetQClusteredConnection
   [queue task]
