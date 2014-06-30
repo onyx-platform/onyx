@@ -1,16 +1,16 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-  (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
-            [com.stuartsierra.component :as component]
-            [dire.core :as dire]
-            [taoensso.timbre :refer [info] :as timbre]
-            [onyx.coordinator.planning :refer [find-task]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.peer.transform :as transform]
-            [onyx.peer.group :as group]
-            [onyx.peer.aggregate :as aggregate]
-            [onyx.extensions :as extensions]
-            [onyx.plugin.hornetq]))
+    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
+              [com.stuartsierra.component :as component]
+              [dire.core :as dire]
+              [taoensso.timbre :refer [info] :as timbre]
+              [onyx.coordinator.planning :refer [find-task]]
+              [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.queue.hornetq :refer [hornetq]]
+              [onyx.peer.transform :as transform]
+              [onyx.peer.group :as group]
+              [onyx.peer.aggregate :as aggregate]
+              [onyx.extensions :as extensions]
+              [onyx.plugin.hornetq]))
 
 (defn create-tx-session [{:keys [onyx.core/queue]}]
   (extensions/create-tx-session queue))
@@ -222,7 +222,7 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Task LifeCycle for" (:task/name (:task payload)))
+    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:task/name (:task payload))))
 
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
@@ -467,7 +467,7 @@
         :pipeline-data pipeline-data)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Task LifeCycle")
+    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:task/name (:task payload))))
 
     (close! (:open-session-kill-ch component))
     (<!! (:open-session-dead-ch component))

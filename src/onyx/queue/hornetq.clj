@@ -65,11 +65,7 @@
         ingress-queue (:ingress-queues task)
         egress-queues (vals (:egress-queues task))]
     (doseq [queue-name (conj egress-queues ingress-queue)]
-      (try
-        (.createQueue session queue-name queue-name true)
-        (catch HornetQQueueExistsException e)
-        (catch Exception e
-          (info e))))
+      (extensions/create-queue-on-session queue session queue-name))
     (.close session)))
 
 (defmethod extensions/create-queue-on-session HornetQClusteredConnection

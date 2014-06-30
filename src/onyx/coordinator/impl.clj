@@ -220,7 +220,7 @@
             incomplete-tasks)))
 
 (defn sort-tasks-by-peer-count [sync tasks]
-  (sort-by (partial n-peers sync) tasks))
+  (sort-by (partial n-peers sync) (sort tasks)))
 
 (defn next-active-task [sync job-node]
   (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-node)]
