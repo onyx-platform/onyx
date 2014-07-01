@@ -2,9 +2,7 @@
   (:require [onyx.extensions :as extensions])
   (:import [java.util UUID]))
 
-(defn only
-  "Like first, but throws unless exactly one item."
-  [coll]
+(defn only [coll]
   (assert (not (next coll)))
   (if-let [result (first coll)]
     result
@@ -14,8 +12,11 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
+(defn onyx-queue-name []
+  (str "onyx." (UUID/randomUUID)))
+
 (defn egress-queues-to-children [elements]
-  (into {} (map #(hash-map (:onyx/name %) (str (UUID/randomUUID))) elements)))
+  (into {} (map #(hash-map (:onyx/name %) (onyx-queue-name)) elements)))
 
 (defmulti create-task
   (fn [catalog task-name parent children-names phase]
@@ -30,7 +31,7 @@
 (defn onyx-internal-task [catalog task-name parent children-names phase]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
-    {:id (java.util.UUID/randomUUID)
+    {:id (UUID/randomUUID)
      :name (:onyx/name element)
      :ingress-queues (get (:egress-queues parent) task-name)
      :egress-queues (egress-queues-to-children children)
@@ -51,19 +52,19 @@
 
 (defmethod extensions/create-io-task :input
   [element parent children phase]
-  {:id (java.util.UUID/randomUUID)
+  {:id (UUID/randomUUID)
    :name (:onyx/name element)
-   :ingress-queues (str (UUID/randomUUID))
+   :ingress-queues (onyx-queue-name)
    :egress-queues (egress-queues-to-children children)
    :phase phase
    :consumption (:onyx/consumption element)})
 
 (defmethod extensions/create-io-task :output
   [element parent children phase]
-  {:id (java.util.UUID/randomUUID)
+  {:id (UUID/randomUUID)
    :name (:onyx/name element)
    :ingress-queues (get (:egress-queues parent) (:onyx/name element))
-   :egress-queues {:self (str (UUID/randomUUID))}
+   :egress-queues {:self (onyx-queue-name)}
    :phase phase
    :consumption (:onyx/consumption element)})
 
