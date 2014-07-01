@@ -83,7 +83,7 @@
                 :hornetq-group-address hornetq-group-address
                 :hornetq-group-port hornetq-group-port
                 :hornetq-refresh-timeout hornetq-refresh-timeout
-                :hornetq-discovery-timeout hornetq-discovery-timeout                
+                :hornetq-discovery-timeout hornetq-discovery-timeout
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 

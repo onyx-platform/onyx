@@ -15,6 +15,16 @@
 
 (def hornetq-port 5445)
 
+(def hornetq-cluster-name "onyx-cluster")
+
+(def hornetq-group-address "231.7.7.7")
+
+(def hornetq-refresh-timeout 5000)
+
+(def hornetq-discovery-timeout 5000)
+
+(def hornetq-group-port 9876)
+
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
 (def onyx-port (+ 10000 (rand-int 10000)))
@@ -64,8 +74,11 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:hornetq-host hornetq-host
-                 :hornetq-port hornetq-port
+(def coord-opts {:hornetq-cluster-name hornetq-cluster-name
+                 :hornetq-group-address hornetq-group-address
+                 :hornetq-group-port hornetq-group-port
+                 :hornetq-refresh-timeout hornetq-refresh-timeout
+                 :hornetq-discovery-timeout hornetq-discovery-timeout
                  :zk-addr "127.0.0.1:2181"
                  :onyx-id id
                  :onyx-port onyx-port
@@ -75,8 +88,11 @@
 
 (def conn (onyx.api/connect (str "onyx:distributed//localhost:" onyx-port "/" id) coord-opts))
 
-(def peer-opts {:hornetq-host hornetq-host
-                :hornetq-port hornetq-port
+(def peer-opts {:hornetq-cluster-name hornetq-cluster-name
+                :hornetq-group-address hornetq-group-address
+                :hornetq-group-port hornetq-group-port
+                :hornetq-refresh-timeout hornetq-refresh-timeout
+                :hornetq-discovery-timeout hornetq-discovery-timeout
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id})
 
