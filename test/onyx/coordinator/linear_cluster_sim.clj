@@ -76,7 +76,11 @@
 (def id (str (java.util.UUID/randomUUID)))
 
 (def system (onyx-coordinator
-             {:hornetq-addr "localhost:5445"
+             {:hornetq-cluster-name "onyx-cluster"
+              :hornetq-group-address "231.7.7.7"
+              :hornetq-group-port 9876
+              :hornetq-refresh-timeout 5000
+              :hornetq-discovery-timeout 5000
               :zk-addr "127.0.0.1:2181"
               :onyx-id id
               :revoke-delay 2000}))
