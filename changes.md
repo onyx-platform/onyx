@@ -1,3 +1,6 @@
+#### 0.3.0
+- HornetQ connects via multicast IP for clustering
+
 #### 0.2.0
 
 - Rename internal API extensions to use "node" instead of "place.
