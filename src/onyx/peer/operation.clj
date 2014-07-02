@@ -11,3 +11,18 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
+(defn on-last-batch
+  [{:keys [onyx.core/decompressed onyx.core/ingress-queues onyx.core/task-map] :as event} f]
+  (cond (= (last decompressed) :done)
+        (let [n-messages (f event)]
+          (assoc event
+            :onyx.core/tail-batch? (= n-messages (count decompressed))
+            :onyx.core/requeue? true
+            :onyx.core/decompressed (or (butlast decompressed) [])))
+        (some #{:done} decompressed)
+        (assoc event
+          :onyx.core/tail-batch? false
+          :onyx.core/requeue? true
+          :onyx.core/decompressed (remove (partial = :done) decompressed))
+        :else
+        (assoc event :onyx.core/tail-batch? false :onyx.core/requeue? false)))

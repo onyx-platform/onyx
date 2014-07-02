@@ -29,14 +29,30 @@
 
 (defmulti read-batch
   "Reads :onyx/batch-size segments off the incoming data source.
-   Must return a map with key :batch and value seq representing
+   Must return a map with key :onyx.core/batch and value seq representing
    the ingested segments."
   type-and-medium-dispatch)
 
 (defmulti decompress-batch
   "Decompresses the ingested segments. Must return a map
-   with key :decompressed and value seq representing the
+   with key :onyx.core/decompressed and value seq representing the
    decompressed segments."
+  type-and-medium-dispatch)
+
+(defmulti strip-sentinel
+  "Checks if the sentinel value is present in the ingested batch
+   and removes it from downstream propagation when found.
+   
+   Only required in batch mode on destructive data sources such as queues.
+   Must return a map with key :onyx.core/requeue? and boolean true if the sentinel
+   should be requeued. Map must also contain :onyx.core/tail-batch? if this is the last
+   batch to be ingested.
+
+   It is sometimes possible to see the sentinel value without
+   seeing the last batch, due to circumstances such as clustered queues with failures.
+
+   Further, onyx.core/decompressed should be stripped of
+   the sentinel value to avoid propagating it to downstream tasks."
   type-and-medium-dispatch)
 
 (defmulti requeue-sentinel
@@ -47,18 +63,18 @@
 
 (defmulti ack-batch
   "Acknowledges the reading of the ingested batch. Must return a map with
-   key :acked and value integer representing the number of segments ack'ed."
+   key :onyx.core/acked and value integer representing the number of segments ack'ed."
   type-and-medium-dispatch)
 
 (defmulti apply-fn
   "Applies a function to the decompressed segments. Must return a map with
-   key :results and value seq representing the application of the function
+   key :onyx.core/results and value seq representing the application of the function
    to the segments."
   type-and-medium-dispatch)
 
 (defmulti compress-batch
   "Compresses the segments that result from function application. Must return
-   key :compressed and value seq representing the compression of the segments."
+   key :onyx.core/compressed and value seq representing the compression of the segments."
   type-and-medium-dispatch)
 
 (defmulti write-batch

@@ -3,7 +3,8 @@
               [com.stuartsierra.component :as component]
               [onyx.extensions :as extensions]
               [taoensso.timbre :refer [info]])
-    (:import [org.hornetq.api.core TransportConfiguration]
+    (:import [org.hornetq.api.core SimpleString]
+             [org.hornetq.api.core TransportConfiguration]
              [org.hornetq.api.core HornetQQueueExistsException]
              [org.hornetq.api.core HornetQNonExistentQueueException]
              [org.hornetq.api.core DiscoveryGroupConfiguration]
@@ -75,6 +76,11 @@
     (catch HornetQQueueExistsException e)
     (catch Exception e
       (info e))))
+
+(defmethod extensions/n-messages-remaining HornetQClusteredConnection
+  [queue session queue-name]
+  (let [query (.queueQuery session (SimpleString. queue-name))]
+    (.getMessageCount query)))
 
 (defmethod extensions/bootstrap-queue HornetQClusteredConnection
   [queue task]

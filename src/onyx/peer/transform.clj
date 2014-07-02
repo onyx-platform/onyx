@@ -7,7 +7,13 @@
               [taoensso.timbre :refer [debug]]
               [dire.core :refer [with-post-hook!]]))
 
-(defn cap-queue [queue queue-names]
+(defn requeue-sentinel [queue session ingress-queues]
+  (doseq [queue-name ingress-queues]
+    (let [p (extensions/create-producer queue session queue-name)]
+      (extensions/produce-message queue p session (.array (fressian/write :done)))
+      (extensions/close-resource queue p))))
+
+(defn seal-queue [queue queue-names]
   (let [session (extensions/create-tx-session queue)]
     (doseq [queue-name queue-names]
       (let [producer (extensions/create-producer queue session queue-name)]
@@ -48,8 +54,15 @@
   (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
     (merge event {:onyx.core/decompressed decompressed-msgs})))
 
-(defn requeue-sentinel-shim [{:keys [onyx.core/queue onyx.core/ingress-queues] :as event}]
-  (cap-queue queue ingress-queues)
+(defn strip-sentinel-shim [event]
+  (operation/on-last-batch
+   event
+   (fn [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues]}]
+     (extensions/n-messages-remaining queue session (first ingress-queues)))))
+
+(defn requeue-sentinel-shim
+  [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
+  (requeue-sentinel queue session ingress-queues)
   (merge event {:onyx.core/requeued? true}))
 
 (defn acknowledge-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
@@ -74,7 +87,7 @@
     (merge event {:onyx.core/producers producers})))
 
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
-  (merge event (cap-queue queue egress-queues)))
+  (merge event (seal-queue queue egress-queues)))
 
 (defmethod l-ext/inject-lifecycle-resources :transformer
   [_ {:keys [onyx.core/task-map]}]
@@ -85,6 +98,9 @@
 
 (defmethod l-ext/decompress-batch :default
   [event] (decompress-batch-shim event))
+
+(defmethod l-ext/strip-sentinel :default
+  [event] (strip-sentinel-shim event))
 
 (defmethod l-ext/requeue-sentinel :default
   [event] (requeue-sentinel-shim event))

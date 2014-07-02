@@ -33,15 +33,12 @@
   (let [rets (l-ext/decompress-batch event)]
     (merge event rets)))
 
-(defn munge-strip-sentinel [{:keys [onyx.core/decompressed] :as event}]
-  (if (= (last decompressed) :done)
-    (assoc event
-      :onyx.core/tail-batch? true
-      :onyx.core/decompressed (or (butlast decompressed) []))
-    (assoc event :onyx.core/tail-batch? false)))
+(defn munge-strip-sentinel [event]
+  (let [rets (l-ext/strip-sentinel event)]
+    (merge event rets)))
 
-(defn munge-requeue-sentinel [{:keys [onyx.core/tail-batch?] :as event}]
-  (if tail-batch?
+(defn munge-requeue-sentinel [{:keys [onyx.core/requeue?] :as event}]
+  (if requeue?
     (let [rets (l-ext/requeue-sentinel event)]
       (merge event rets))
     event))
@@ -553,7 +550,7 @@
 
 (dire/with-post-hook! #'munge-strip-sentinel
   (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
-    (taoensso.timbre/info (format "[%s] Stripped sentinel. %s segments left" id (count decompressed)))))
+    (taoensso.timbre/info (format "[%s] Attempted to strip sentinel. %s segments left" id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-requeue-sentinel
   (fn [{:keys [onyx.core/id onyx.core/tail-batch?]}]

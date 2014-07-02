@@ -2,11 +2,13 @@
   (:require [clojure.data.fressian :as fressian]
             [onyx.coordinator.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.peer.operation :as operation]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
             [taoensso.timbre :refer [debug]])
-  (:import [org.hornetq.api.core.client HornetQClient]
+  (:import [org.hornetq.api.core SimpleString]
+           [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
@@ -47,16 +49,22 @@
 (defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
   (merge event {:onyx.core/decompressed (map decompress-segment batch)}))
 
+(defn strip-sentinel-shim [event]
+  (operation/on-last-batch
+   event
+   (fn [{:keys [onyx.core/task-map hornetq/session]}]
+     (let [queue-name (:hornetq/queue-name task-map)
+           query (.queueQuery session (SimpleString. queue-name))]
+       (.getMessageCount query)))))
+
 (defn requeue-sentinel-shim [{:keys [onyx.core/task-map] :as event}]
   (let [queue-name (:hornetq/queue-name task-map)]
-    (let [session (.createTransactedSession (:hornetq/session-factory event))]
+    (let [session (:hornetq/session event)]
       (let [producer (.createProducer session queue-name)
             message (.createMessage session true)]
         (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
         (.send producer message)
-        (.close producer))
-      (.commit session)
-      (.close session))
+        (.close producer)))
     (merge event {:onyx.core/requeued? true})))
 
 (defn ack-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
@@ -117,6 +125,9 @@
 
 (defmethod l-ext/decompress-batch [:input :hornetq]
   [event] (decompress-batch-shim event))
+
+(defmethod l-ext/strip-sentinel [:input :hornetq]
+  [event] (strip-sentinel-shim event))
 
 (defmethod l-ext/requeue-sentinel [:input :hornetq]
   [event] (requeue-sentinel-shim event))
