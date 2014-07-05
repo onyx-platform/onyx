@@ -24,7 +24,6 @@
     (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
           gdc (DiscoveryGroupConfiguration. cluster-name refresh timeout udp)
           locator (HornetQClient/createServerLocatorWithHA gdc)
-          _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
       (assoc component
         :locator locator

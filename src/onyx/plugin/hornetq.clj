@@ -101,7 +101,6 @@
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)]
     (merge pipeline-data
            {:hornetq/locator locator
@@ -155,7 +154,6 @@
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        _ (.setConsumerWindowSize locator 0)
         session-factory (.createSessionFactory locator)]
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
