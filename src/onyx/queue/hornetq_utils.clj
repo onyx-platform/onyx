@@ -9,6 +9,7 @@
 (defn create-queue [session queue-name]
   (try
     (.createQueue session queue-name queue-name true)
+    (catch HornetQQueueExistsException e)
     (catch Exception e
       (.printStackTrace e))))
 

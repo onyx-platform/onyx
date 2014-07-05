@@ -91,6 +91,8 @@
 
 (defmulti n-messages-remaining (fn [queue session queue-name] (type queue)))
 
+(defmulti n-consumers (fn [queue queue-name] (type queue)))
+
 (defmulti bootstrap-queue (fn [queue task] (type queue)))
 
 (defmulti close-resource (fn [queue resource] (type queue)))
