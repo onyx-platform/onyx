@@ -15,15 +15,29 @@
              [org.hornetq.api.core.management ManagementHelper]
              [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(defrecord HornetQClusteredConnection [cluster-name group-address group-port refresh timeout]
+(defmulti connect-to-locator :hornetq/mode)
+
+(defmethod connect-to-locator :standalone
+  [{:keys [hornetq.standalone/host hornetq.standalone/port]}]
+  (let [config {"host" host "port" port}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)]
+    (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))))
+
+(defmethod connect-to-locator :multicast
+  [{:keys [hornetq.multicast/cluster-name hornetq.multicast/group-address
+           hornetq.multicast/group-port hornetq.multicast/refresh-timeout
+           hornetq.multicast/discovery-timeout]}]
+  (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
+        gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout udp)]
+    (HornetQClient/createServerLocatorWithHA gdc)))
+
+(defrecord HornetQClusteredConnection [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting HornetQ clustered connection")
 
-    (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
-          gdc (DiscoveryGroupConfiguration. cluster-name refresh timeout udp)
-          locator (HornetQClient/createServerLocatorWithHA gdc)
+    (let [locator (connect-to-locator opts)
           session-factory (.createSessionFactory locator)]
       (assoc component
         :locator locator
@@ -37,18 +51,8 @@
     
     component))
 
-(defn hornetq [cluster-name group-address group-port refresh timeout]
-  (map->HornetQClusteredConnection
-   {:cluster-name cluster-name
-    :group-address group-address
-    :group-port group-port
-    :refresh refresh
-    :timeout timeout}))
-
-(defn connect-to-standalone-server [host port]
-  (let [config {"host" host "port" port}
-        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)]
-    (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))))
+(defn hornetq [opts]
+  (map->HornetQClusteredConnection opts))
 
 (defmethod extensions/create-tx-session HornetQClusteredConnection
   [queue]
@@ -104,7 +108,7 @@
           (map (fn [x] (let [[h p] (split x #":")]
                         [(second (split h #"/")) p]))
                (vals result))
-          locators (map (partial apply connect-to-standalone-server) host-port-pairs)
+          locators (map (partial apply connect-standalone) host-port-pairs)
           session-factories (map #(.createSessionFactory %) locators)
           sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
           consumer-counts
