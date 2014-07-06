@@ -95,36 +95,38 @@
 
 (defmethod extensions/n-consumers HornetQClusteredConnection
   [queue queue-name]
-  (let [session (.createSession (:session-factory queue))
-        requestor (ClientRequestor. session "jms.queue.hornetq.management")
-        message (.createMessage session false)
-        attr (format "core.clusterconnection.%s" (:cluster-name queue))]
-    (ManagementHelper/putAttribute message attr "nodes")
-    (.start session)
+  ;; (let [session (.createSession (:session-factory queue))
+  ;;       requestor (ClientRequestor. session "jms.queue.hornetq.management")
+  ;;       message (.createMessage session false)
+  ;;       attr (format "core.clusterconnection.%s" (:cluster-name queue))]
+  ;;   (ManagementHelper/putAttribute message attr "nodes")
+  ;;   (.start session)
 
-    (let [reply (.request requestor message)
-          result (ManagementHelper/getResult reply)
-          host-port-pairs
-          (map (fn [x] (let [[h p] (split x #":")]
-                        [(second (split h #"/")) p]))
-               (vals result))
-          locators (map (partial apply connect-standalone) host-port-pairs)
-          session-factories (map #(.createSessionFactory %) locators)
-          sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
-          consumer-counts
-          (doall
-           (map (fn [s]
-                  (.start s)
-                  (let [query (.queueQuery s (SimpleString. queue-name))
-                        n (.getConsumerCount query)]
-                    (.close s)
-                    n))
-                sessions))]
-      (.close session)
-      (doall (map #(.close %) sessions))
-      (doall (map #(.close %) session-factories))
-      (doall (map #(.close %) locators))
-      (apply + consumer-counts))))
+  ;;   (let [reply (.request requestor message)
+  ;;         result (ManagementHelper/getResult reply)
+  ;;         host-port-pairs
+  ;;         (map (fn [x] (let [[h p] (split x #":")]
+  ;;                       [(second (split h #"/")) p]))
+  ;;              (vals result))
+  ;;         locators (map (partial apply connect-standalone) host-port-pairs)
+  ;;         session-factories (map #(.createSessionFactory %) locators)
+  ;;         sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
+  ;;         consumer-counts
+  ;;         (doall
+  ;;          (map (fn [s]
+  ;;                 (.start s)
+  ;;                 (let [query (.queueQuery s (SimpleString. queue-name))
+  ;;                       n (.getConsumerCount query)]
+  ;;                   (.close s)
+  ;;                   n))
+  ;;               sessions))]
+  ;;     (.close session)
+  ;;     (doall (map #(.close %) sessions))
+  ;;     (doall (map #(.close %) session-factories))
+  ;;     (doall (map #(.close %) locators))
+  ;;     (apply + consumer-counts)))
+  0
+  )
 
 (defmethod extensions/bootstrap-queue HornetQClusteredConnection
   [queue task]
