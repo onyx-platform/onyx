@@ -29,21 +29,23 @@
   (hq-util/create-queue! hq-config out-queue)
 
   (let [id (str (java.util.UUID/randomUUID))
-        coord-opts {:hornetq-cluster-name hornetq-cluster-name
-                    :hornetq-group-address hornetq-group-address
-                    :hornetq-group-port hornetq-group-port
-                    :hornetq-refresh-timeout hornetq-refresh-timeout
-                    :hornetq-discovery-timeout hornetq-discovery-timeout
-                    :zk-addr "127.0.0.1:2181"
-                    :onyx-id id
-                    :revoke-delay 5000}
-        peer-opts {:hornetq-cluster-name hornetq-cluster-name
-                   :hornetq-group-address hornetq-group-address
-                   :hornetq-group-port hornetq-group-port
-                   :hornetq-refresh-timeout hornetq-refresh-timeout
-                   :hornetq-discovery-timeout hornetq-discovery-timeout
-                   :zk-addr "127.0.0.1:2181"
-                   :onyx-id id}
+        coord-opts {:hornetq/mode :multicast
+                    :hornetq.multicast/cluster-name hornetq-cluster-name
+                    :hornetq.multicast/group-address hornetq-group-address
+                    :hornetq.multicast/group-port hornetq-group-port
+                    :hornetq.multicast/refresh-timeout hornetq-refresh-timeout
+                    :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
+                    :zookeeper/address "127.0.0.1:2181"
+                    :onyx/id id
+                    :onyx.coordinator/revoke-delay 5000}
+        peer-opts {:hornetq/mode :multicast
+                   :hornetq.multicast/cluster-name hornetq-cluster-name
+                   :hornetq.multicast/group-address hornetq-group-address
+                   :hornetq.multicast/group-port hornetq-group-port
+                   :hornetq.multicast/refresh-timeout hornetq-refresh-timeout
+                   :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
+                   :zookeeper/address "127.0.0.1:2181"
+                   :onyx/id id}
         catalog
         [{:onyx/name :in
           :onyx/ident :hornetq/read-segments
