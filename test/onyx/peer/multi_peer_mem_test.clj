@@ -76,7 +76,7 @@
                  :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
                  :zookeeper/address "127.0.0.1:2181"
                  :onyx/id id
-                 :onyx/revoke-delay 5000})
+                 :onyx.coordinator/revoke-delay 5000})
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 

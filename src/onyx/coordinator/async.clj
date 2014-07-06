@@ -449,6 +449,6 @@
 
     component))
 
-(defn coordinator [revoke-delay]
+(defn coordinator [{:keys [onyx.coordinator/revoke-delay]}]
   (map->Coordinator {:revoke-delay revoke-delay}))
 

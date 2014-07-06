@@ -55,7 +55,7 @@
                 :hornetq-discovery-timeout hornetq-discovery-timeout                
                 :zk-addr "127.0.0.1:2181"
                 :onyx-id id
-                :fn-params {:add [42]}})
+                :onyx.peer/fn-params {:add [42]}})
 
 (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 

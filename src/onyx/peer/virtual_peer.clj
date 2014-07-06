@@ -94,6 +94,6 @@
     
     component))
 
-(defn virtual-peer [fn-params]
+(defn virtual-peer [{:keys [onyx.peer/fn-params]}]
   (map->VirtualPeer {:fn-params fn-params}))
 

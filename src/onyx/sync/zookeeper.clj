@@ -88,8 +88,8 @@
     (zk/close (:conn component))
     component))
 
-(defn zookeeper [addr onyx-id]
-  (map->ZooKeeper {:addr addr :onyx-id onyx-id}))
+(defn zookeeper [{:keys [zookeeper/address onyx/id]}]
+  (map->ZooKeeper {:addr address :onyx-id id}))
 
 (defn trailing-id [s]
   (last (clojure.string/split s #"/")))

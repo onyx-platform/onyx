@@ -25,26 +25,18 @@
     (component/stop-system this peer-components)))
 
 (defn onyx-coordinator
-  [{:keys [log-file log-config hornetq-cluster-name hornetq-group-address
-           hornetq-group-port hornetq-refresh-timeout hornetq-discovery-timeout
-           zk-addr onyx-id revoke-delay]}]
+  [opts]
   (map->OnyxCoordinator
-   {:logging-config (logging-config/logging-configuration log-file log-config)
-    :sync (component/using (zookeeper zk-addr onyx-id) [:logging-config])
-    :queue (component/using (hornetq hornetq-cluster-name hornetq-group-address
-                                     hornetq-group-port hornetq-refresh-timeout hornetq-discovery-timeout)
-                            [:sync])
-    :coordinator (component/using (coordinator revoke-delay) [:sync :queue])}))
+   {:logging-config (logging-config/logging-configuration opts)
+    :sync (component/using (zookeeper opts) [:logging-config])
+    :queue (component/using (hornetq opts) [:sync])
+    :coordinator (component/using (coordinator opts) [:sync :queue])}))
 
 (defn onyx-peer
-  [{:keys [log-file log-config hornetq-cluster-name hornetq-group-address
-           hornetq-group-port hornetq-refresh-timeout hornetq-discovery-timeout
-           zk-addr onyx-id fn-params]}]
+  [opts]
   (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration log-file log-config)
-    :sync (component/using (zookeeper zk-addr onyx-id) [:logging-config])
-    :queue (component/using (hornetq hornetq-cluster-name hornetq-group-address
-                                     hornetq-group-port hornetq-refresh-timeout hornetq-discovery-timeout)
-                            [:sync])
-    :peer (component/using (virtual-peer fn-params) [:sync :queue])}))
+   {:logging-config (logging-config/logging-configuration opts)
+    :sync (component/using (zookeeper opts) [:logging-config])
+    :queue (component/using (hornetq opts) [:sync])
+    :peer (component/using (virtual-peer opts) [:sync :queue])}))
 
