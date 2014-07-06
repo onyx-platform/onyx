@@ -82,6 +82,7 @@
                  :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
                  :zookeeper/address "127.0.0.1:2181"
                  :onyx/id id
+                 :onyx.coordinator/port onyx-port
                  :onyx.coordinator/revoke-delay 5000})
 
 (def onyx-server (component/start (server/coordinator-server coord-opts)))

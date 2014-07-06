@@ -52,7 +52,7 @@
     component))
 
 (defn hornetq [opts]
-  (map->HornetQClusteredConnection opts))
+  (map->HornetQClusteredConnection {:opts opts}))
 
 (defmethod extensions/create-tx-session HornetQClusteredConnection
   [queue]

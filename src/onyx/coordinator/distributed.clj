@@ -35,7 +35,7 @@
       (taoensso.timbre/info "Starting Coordinator Netty server")
       (assoc component
         :coordinator coordinator
-        :server (jetty/run-jetty (handler coordinator) {:port (:onyx-port opts)
+        :server (jetty/run-jetty (handler coordinator) {:port (:onyx.coordinator/port opts)
                                                         :join? false}))))
   
   (stop [component]
