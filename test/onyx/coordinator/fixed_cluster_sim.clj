@@ -39,15 +39,17 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def system (onyx-coordinator
-             {:hornetq-cluster-name "onyx-cluster"
-              :hornetq-group-address "231.7.7.7"
-              :hornetq-group-port 9876
-              :hornetq-refresh-timeout 5000
-              :hornetq-discovery-timeout 5000
-              :zk-addr "127.0.0.1:2181"
-              :onyx-id id
-              :revoke-delay 500000}))
+(def system
+  (onyx-coordinator
+   {:hornetq/mode :multicast
+    :hornetq.multicast/cluster-name "onyx-cluster"
+    :hornetq.multicast/group-address "231.7.7.7"
+    :hornetq.multicast/group-port 9876
+    :hornetq.multicast/refresh-timeout 5000
+    :hornetq.multicast/discovery-timeout 5000
+    :zookeeper/address "127.0.0.1:2181"
+    :onyx/id id
+    :onyx.coordinator/revoke-delay 500000}))
 
 (def components (component/start system))
 
