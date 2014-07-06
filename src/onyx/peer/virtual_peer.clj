@@ -28,10 +28,10 @@
                 (let [ingress-queues (:task/ingress-queues (:task payload))
                       ingress-queues (if-not (coll? ingress-queues) (vector ingress-queues) ingress-queues)]
 
-                  (when (= (:task/consumption (:task payload)) :sequential)
-                    (while (> (extensions/n-consumers queue (first ingress-queues)) 0)
-                      (timbre/info "[%s] Sequential task currently has queue consumers. Backing off and retrying..." id)
-                      (Thread/sleep 2000)))
+                  ;; (when (= (:task/consumption (:task payload)) :sequential)
+                  ;;   (while (> (extensions/n-consumers queue (first ingress-queues)) 0)
+                  ;;     (timbre/info "[%s] Sequential task currently has queue consumers. Backing off and retrying..." id)
+                  ;;     (Thread/sleep 2000)))
 
                   (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch fn-params)]
                     (recur (component/start new-pipeline)))))

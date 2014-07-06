@@ -176,7 +176,7 @@
 
               (recur next-payload)))))
       (catch InterruptedException e
-        (prn "Peer intentionally killed"))
+        (info "Peer intentionally killed"))
       (catch Exception e
         (.printStackTrace e)))))
 
