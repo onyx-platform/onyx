@@ -232,7 +232,9 @@
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 
-(def ozk (component/start (onyx-zk/zookeeper "127.0.0.1:2181" id)))
+(def ozk (component/start
+          (onyx-zk/zookeeper
+           {:zookeeper/address "127.0.0.1:2181" :onyx/id id})))
 
 (facts "All tasks of all jobs are completed"
        (sim-utils/task-completeness ozk))
