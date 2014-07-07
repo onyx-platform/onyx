@@ -18,6 +18,10 @@
             (with-meta segment {:group (hash-segment group)}))
           (:onyx.core/decompressed event) groups)}))
 
+(defmethod l-ext/start-lifecycle? :grouper
+  [_ event]
+  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
+
 (defmethod l-ext/inject-lifecycle-resources :grouper
   [_ {:keys [onyx.core/task-map]}]
   {:onyx.transform/fn (operation/resolve-fn task-map)})

@@ -89,6 +89,10 @@
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
   (merge event (seal-queue queue egress-queues)))
 
+(defmethod l-ext/start-lifecycle? :transformer
+  [_ event]
+  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
+
 (defmethod l-ext/inject-lifecycle-resources :transformer
   [_ {:keys [onyx.core/task-map]}]
   {:onyx.transform/fn (operation/resolve-fn task-map)})

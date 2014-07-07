@@ -96,6 +96,14 @@
       (.commit session)
       (.close session))))
 
+(defmethod l-ext/start-lifecycle? :hornetq/read-segments
+  [_ {:keys [hornetq/session onyx.core/ingress-queues onyx.core/task-map]}]
+  {:onyx.core/start-lifecycle?
+   (if (= (:task/consumption task-map) :sequential)
+     (let [query (.queueQuery session (SimpleString. (first ingress-queues)))]
+       (zero? (.getConsumerCount query)))
+     true)})
+
 (defmethod l-ext/inject-lifecycle-resources :hornetq/read-segments
   [_ {:keys [onyx.core/task-map] :as pipeline-data}]
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}

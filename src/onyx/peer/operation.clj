@@ -1,4 +1,5 @@
-(ns onyx.peer.operation)
+(ns onyx.peer.operation
+  (:require [onyx.extensions :as extensions]))
 
 (defn apply-fn [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
@@ -26,3 +27,11 @@
           :onyx.core/decompressed (remove (partial = :done) decompressed))
         :else
         (assoc event :onyx.core/tail-batch? false :onyx.core/requeue? false)))
+
+(defn start-lifecycle?
+  [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
+  {:onyx.core/start-lifecycle?
+   (if (= (:task/consumption task-map) :sequential)
+     (zero? (extensions/n-consumers queue (first ingress-queues)))
+     true)})
+

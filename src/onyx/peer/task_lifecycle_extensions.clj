@@ -20,6 +20,14 @@
    event
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
+(defmulti start-lifecycle?
+  "Checks if it's acceptable to start task execution.
+   Must return a map with key :onyx.core/start-lifecycle?
+   and value of type boolean.
+   This operation will be retried after a back-off
+   period."
+  (fn [dispatch-fn event] (dispatch-fn event)))
+
 (defmulti inject-lifecycle-resources
   "Adds keys to the event map. This function is called once
    at the start of each task each for each virtual peer.
@@ -98,6 +106,9 @@
    queue has been exhausted. Only called once globally for a single task."
   type-and-medium-dispatch)
 
+(defn start-lifecycle?* [event]
+  (merge-api-levels inject-lifecycle-resources event))
+
 (defn inject-lifecycle-resources* [event]
   (merge-api-levels inject-lifecycle-resources event))
 
@@ -106,6 +117,9 @@
 
 (defn close-lifecycle-resources* [event]
   (merge-api-levels close-lifecycle-resources event))
+
+(defmethod start-lifecycle? :default
+  [_ event] {:onyx.core/start-lifecycle? true})
 
 (defmethod inject-lifecycle-resources :default
   [_ event] {})

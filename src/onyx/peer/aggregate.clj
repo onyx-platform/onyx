@@ -61,6 +61,10 @@
     (extensions/close-resource queue (:session queue-bundle)))
   event)
 
+(defmethod l-ext/start-lifecycle? :aggregator
+  [_ event]
+  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
+
 (defmethod l-ext/inject-lifecycle-resources :aggregator
   [_ event]
   (inject-pipeline-resource-shim event))

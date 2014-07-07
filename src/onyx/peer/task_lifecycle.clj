@@ -409,6 +409,9 @@
         (fn [& args]
           (>!! (last args) true)))
 
+      (while (not (:onyx.core/start-lifecycle? (l-ext/start-lifecycle?* pipeline-data)))
+        (Thread/sleep 2000))
+
       (assoc component
         :open-session-kill-ch open-session-kill-ch
         :read-batch-ch read-batch-ch
@@ -539,6 +542,11 @@
   (map->TaskLifeCycle {:id id :payload payload :sync sync
                        :queue queue :payload-ch payload-ch
                        :complete-ch complete-ch :fn-params fn-params}))
+
+(dire/with-post-hook! #'block-until-start!
+  (fn [{:keys [onyx.core/id onyx.core/start-lifecycle?]}]
+    (when-not start-lifecycle?
+      (timbre/info "[%s] Sequential task currently has queue consumers. Backing off and retrying..." id))))
 
 (dire/with-post-hook! #'munge-open-session
   (fn [{:keys [onyx.core/id]}]
