@@ -21,11 +21,15 @@
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
 (defmulti start-lifecycle?
-  "Checks if it's acceptable to start task execution.
+  "Sometimes znode ephemerality is not enough to signal that a task
+   can begin executing due to external conditions. Onyx addresses this
+   concern by providing this check just before task execution begin.
+
+   Checks if it's acceptable to start task execution.
    Must return a map with key :onyx.core/start-lifecycle?
    and value of type boolean.
-   This operation will be retried after a back-off
-   period."
+
+   This operation will be retried after a back-off period."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
 (defmulti inject-lifecycle-resources
@@ -107,7 +111,7 @@
   type-and-medium-dispatch)
 
 (defn start-lifecycle?* [event]
-  (merge-api-levels inject-lifecycle-resources event))
+  (merge-api-levels start-lifecycle? event))
 
 (defn inject-lifecycle-resources* [event]
   (merge-api-levels inject-lifecycle-resources event))
