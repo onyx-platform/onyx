@@ -281,7 +281,8 @@
                          :onyx.core/params (or (get fn-params task) [])
                          :onyx.core/queue queue
                          :onyx.core/sync sync}
-          
+
+          pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/sequential-mod queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
       (dire/with-handler! #'open-session-loop

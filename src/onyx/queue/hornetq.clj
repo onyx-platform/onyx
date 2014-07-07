@@ -57,6 +57,18 @@
 (defn hornetq [opts]
   (map->HornetQClusteredConnection {:opts opts}))
 
+(defmethod extensions/sequential-mod HornetQClusteredConnection
+  [queue event]
+  #_(if (= (:onyx/consumption (:onyx.core/task-map event)) :sequential)
+    (do (.close (:session-factory queue))
+        (.close (:locator queue))
+
+        (let [locator (connect-to-locator (:opts queue))]
+          (.setConsumerWindowSize locator 0)
+          (assoc queue :locator locator :session-factory (.createSessionFactory locator))))
+    queue)
+  queue)
+
 (defmethod extensions/create-tx-session HornetQClusteredConnection
   [queue]
   (let [session-factory (:session-factory queue)

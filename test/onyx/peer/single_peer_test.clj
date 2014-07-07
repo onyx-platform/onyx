@@ -51,7 +51,7 @@
           :onyx/ident :hornetq/read-segments
           :onyx/type :input
           :onyx/medium :hornetq
-          :onyx/consumption :concurrent
+          :onyx/consumption :sequential
           :hornetq/queue-name in-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port
@@ -60,14 +60,14 @@
          {:onyx/name :inc
           :onyx/fn :onyx.peer.single-peer-test/my-inc
           :onyx/type :transformer
-          :onyx/consumption :concurrent
+          :onyx/consumption :sequential
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
           :onyx/ident :hornetq/write-segments
           :onyx/type :output
           :onyx/medium :hornetq
-          :onyx/consumption :concurrent
+          :onyx/consumption :sequential
           :hornetq/queue-name out-queue
           :hornetq/host hornetq-host
           :hornetq/port hornetq-port
@@ -91,4 +91,5 @@
 (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 100 10 10)
 (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 1000 100 100)
 (run-job (str (java.util.UUID/randomUUID)) (str (java.util.UUID/randomUUID)) 15000 1320 1000)
+
 

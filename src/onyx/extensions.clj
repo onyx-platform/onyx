@@ -93,6 +93,8 @@
 
 (defmulti n-consumers (fn [queue queue-name] (type queue)))
 
+(defmulti sequential-mod (fn [queue event] (type queue)))
+
 (defmulti bootstrap-queue (fn [queue task] (type queue)))
 
 (defmulti close-resource (fn [queue resource] (type queue)))
