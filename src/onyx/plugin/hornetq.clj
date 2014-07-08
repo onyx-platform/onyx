@@ -110,8 +110,8 @@
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
 
-    ;;(when (= (:onyx/consumption task-map) :sequential))
-    (.setConsumerWindowSize locator 0)
+    (when (= (:onyx/consumption task-map) :sequential)
+      (.setConsumerWindowSize locator 0))
 
     (let [session-factory (.createSessionFactory locator)]
       (merge pipeline-data
@@ -167,8 +167,8 @@
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
 
-    ;;(when (= (:onyx/consumption task-map) :sequential))
-    (.setConsumerWindowSize locator 0)
+    (when (= (:onyx/consumption task-map) :sequential)
+      (.setConsumerWindowSize locator 0))
 
     (let [session-factory (.createSessionFactory locator)]
       {:hornetq/locator locator

@@ -282,6 +282,7 @@
                          :onyx.core/queue queue
                          :onyx.core/sync sync}
 
+          pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
       (dire/with-handler! #'open-session-loop
@@ -411,6 +412,9 @@
       (dire/with-finally! #'complete-task-loop
         (fn [& args]
           (>!! (last args) true)))
+
+      (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
+        (Thread/sleep 2000))
       
       (assoc component
         :open-session-kill-ch open-session-kill-ch
