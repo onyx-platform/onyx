@@ -1,4 +1,4 @@
-(ns onyx.peer.single-peer-test
+(ns onyx.peer.sequential-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
