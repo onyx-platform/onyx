@@ -108,11 +108,15 @@
   [_ {:keys [onyx.core/task-map] :as pipeline-data}]
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        session-factory (.createSessionFactory locator)]
-    (merge pipeline-data
-           {:hornetq/locator locator
-            :hornetq/session-factory session-factory})))
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
+
+    (when (= (:onyx/consumption task-map) :sequential)
+      (.setConsumerWindowSize locator 0))
+
+    (let [session-factory (.createSessionFactory locator)]
+      (merge pipeline-data
+             {:hornetq/locator locator
+              :hornetq/session-factory session-factory}))))
 
 (defmethod l-ext/close-temporal-resources :hornetq/read-segments
   [_ pipeline-data]
@@ -161,10 +165,14 @@
   [_ {:keys [onyx.core/task-map] :as pipeline}]
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
-        session-factory (.createSessionFactory locator)]
-    {:hornetq/locator locator
-     :hornetq/session-factory session-factory}))
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
+
+    (when (= (:onyx/consumption task-map) :sequential)
+      (.setConsumerWindowSize locator 0))
+
+    (let [session-factory (.createSessionFactory locator)]
+      {:hornetq/locator locator
+       :hornetq/session-factory session-factory})))
 
 (defmethod l-ext/close-temporal-resources :hornetq/write-segments
   [_ pipeline-data]
