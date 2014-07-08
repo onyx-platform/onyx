@@ -41,6 +41,7 @@
     (taoensso.timbre/info "Starting HornetQ clustered connection")
 
     (let [locator (connect-to-locator opts)
+          _ (.setConsumerWindowSize locator 0)
           session-factory (.createSessionFactory locator)]
       (assoc component
         :locator locator
