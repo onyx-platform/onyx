@@ -218,7 +218,7 @@
           (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed)))
       (recur))))
 
-(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch fn-params]
+(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -278,7 +278,7 @@
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
-                         :onyx.core/params (or (get fn-params task) [])
+                         :onyx.core/params (or (get (:fn-params opts) task) [])
                          :onyx.core/queue queue
                          :onyx.core/sync sync}
 
@@ -414,7 +414,7 @@
           (>!! (last args) true)))
 
       (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
-        (Thread/sleep 2000))
+        (Thread/sleep (or (:back-off opts) 2000)))
       
       (assoc component
         :open-session-kill-ch open-session-kill-ch
@@ -542,10 +542,10 @@
 
     component))
 
-(defn task-lifecycle [id payload sync queue payload-ch complete-ch fn-params]
+(defn task-lifecycle [id payload sync queue payload-ch complete-ch opts]
   (map->TaskLifeCycle {:id id :payload payload :sync sync
                        :queue queue :payload-ch payload-ch
-                       :complete-ch complete-ch :fn-params fn-params}))
+                       :complete-ch complete-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/start-lifecycle?] :as event}]
