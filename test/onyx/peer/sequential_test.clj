@@ -58,7 +58,7 @@
           :onyx/batch-size batch-size}
 
          {:onyx/name :inc
-          :onyx/fn :onyx.peer.single-peer-test/my-inc
+          :onyx/fn :onyx.peer.sequential-test/my-inc
           :onyx/type :transformer
           :onyx/consumption :sequential
           :onyx/batch-size batch-size}
