@@ -1,5 +1,6 @@
 #### 0.3.0
-- HornetQ connects via multicast IP for clustering
+- HornetQ connects via UDP multicast for clustering
+- A concurrent task with a single virtual peer executing no longer implies sequential message processing
 
 #### 0.2.0
 
