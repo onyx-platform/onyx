@@ -10,6 +10,7 @@
              [org.hornetq.api.core HornetQNonExistentQueueException]
              [org.hornetq.api.core DiscoveryGroupConfiguration]
              [org.hornetq.api.core UDPBroadcastGroupConfiguration]
+             [org.hornetq.api.core JGroupsBroadcastGroupConfiguration]
              [org.hornetq.api.core.client HornetQClient]
              [org.hornetq.api.core.client ClientRequestor]
              [org.hornetq.api.core.management ManagementHelper]
@@ -35,7 +36,10 @@
     (HornetQClient/createServerLocatorWithHA gdc)))
 
 (defmethod connect-to-locator :jgroups
-  [event])
+  [{:keys [hornetq.jgroups/file hornetq.jgroups/channel-name]}]
+  (let [jgroups (JGroupsBroadcastGroupConfiguration. file channel-name)
+        gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout jgroups)]
+    (HornetQClient/createServerLocatorWithHA gdc)))
 
 (defrecord HornetQClusteredConnection [opts]
   component/Lifecycle
