@@ -1,4 +1,4 @@
-(ns onyx.peer.single-peer-test
+(ns onyx.hornetq.standalone-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
@@ -49,7 +49,7 @@
     :onyx/batch-size batch-size}
    
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.single-peer-test/my-inc
+    :onyx/fn :onyx.hornetq.standalone-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
