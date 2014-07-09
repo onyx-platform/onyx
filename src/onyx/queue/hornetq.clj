@@ -36,7 +36,9 @@
     (HornetQClient/createServerLocatorWithHA gdc)))
 
 (defmethod connect-to-locator :jgroups
-  [{:keys [hornetq.jgroups/file hornetq.jgroups/channel-name]}]
+  [{:keys [hornetq.jgroups/cluster-name hornetq.jgroups/refresh-timeout
+           hornetq.jgroups/discovery-timeout hornetq.jgroups/file
+           hornetq.jgroups/channel-name]}]
   (let [jgroups (JGroupsBroadcastGroupConfiguration. file channel-name)
         gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout jgroups)]
     (HornetQClient/createServerLocatorWithHA gdc)))
