@@ -26,13 +26,16 @@
   [{:keys [hornetq.standalone/host hornetq.standalone/port]}]
   (connect-standalone host port))
 
-(defmethod connect-to-locator :multicast
-  [{:keys [hornetq.multicast/cluster-name hornetq.multicast/group-address
-           hornetq.multicast/group-port hornetq.multicast/refresh-timeout
-           hornetq.multicast/discovery-timeout]}]
+(defmethod connect-to-locator :udp
+  [{:keys [hornetq.udp/cluster-name hornetq.udp/group-address
+           hornetq.udp/group-port hornetq.udp/refresh-timeout
+           hornetq.udp/discovery-timeout]}]
   (let [udp (UDPBroadcastGroupConfiguration. group-address group-port nil -1)
         gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout udp)]
     (HornetQClient/createServerLocatorWithHA gdc)))
+
+(defmethod connect-to-locator :jgroups
+  [event])
 
 (defrecord HornetQClusteredConnection [opts]
   component/Lifecycle

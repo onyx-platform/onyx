@@ -41,12 +41,12 @@
 
 (def system
   (onyx-coordinator
-   {:hornetq/mode :multicast
-    :hornetq.multicast/cluster-name "onyx-cluster"
-    :hornetq.multicast/group-address "231.7.7.7"
-    :hornetq.multicast/group-port 9876
-    :hornetq.multicast/refresh-timeout 5000
-    :hornetq.multicast/discovery-timeout 5000
+   {:hornetq/mode :udp
+    :hornetq.udp/cluster-name "onyx-cluster"
+    :hornetq.udp/group-address "231.7.7.7"
+    :hornetq.udp/group-port 9876
+    :hornetq.udp/refresh-timeout 5000
+    :hornetq.udp/discovery-timeout 5000
     :zookeeper/address "127.0.0.1:2181"
     :onyx/id id
     :onyx.coordinator/revoke-delay 500000}))

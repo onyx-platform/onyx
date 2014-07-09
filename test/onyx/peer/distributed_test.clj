@@ -74,12 +74,12 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:hornetq/mode :multicast
-                 :hornetq.multicast/cluster-name hornetq-cluster-name
-                 :hornetq.multicast/group-address hornetq-group-address
-                 :hornetq.multicast/group-port hornetq-group-port
-                 :hornetq.multicast/refresh-timeout hornetq-refresh-timeout
-                 :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
+(def coord-opts {:hornetq/mode :udp
+                 :hornetq.udp/cluster-name hornetq-cluster-name
+                 :hornetq.udp/group-address hornetq-group-address
+                 :hornetq.udp/group-port hornetq-group-port
+                 :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+                 :hornetq.udp/discovery-timeout hornetq-discovery-timeout
                  :zookeeper/address "127.0.0.1:2181"
                  :onyx/id id
                  :onyx.coordinator/port onyx-port
@@ -89,12 +89,12 @@
 
 (def conn (onyx.api/connect (str "onyx:distributed//localhost:" onyx-port "/" id) coord-opts))
 
-(def peer-opts {:hornetq/mode :multicast
-                :hornetq.multicast/cluster-name hornetq-cluster-name
-                :hornetq.multicast/group-address hornetq-group-address
-                :hornetq.multicast/group-port hornetq-group-port
-                :hornetq.multicast/refresh-timeout hornetq-refresh-timeout
-                :hornetq.multicast/discovery-timeout hornetq-discovery-timeout
+(def peer-opts {:hornetq/mode :udp
+                :hornetq.udp/cluster-name hornetq-cluster-name
+                :hornetq.udp/group-address hornetq-group-address
+                :hornetq.udp/group-port hornetq-group-port
+                :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+                :hornetq.udp/discovery-timeout hornetq-discovery-timeout
                 :zookeeper/address "127.0.0.1:2181"
                 :onyx/id id})
 
