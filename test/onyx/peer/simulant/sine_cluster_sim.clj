@@ -30,9 +30,9 @@
 
 (def hornetq-group-address "231.7.7.7")
 
-(def hornetq-refresh-timeout 5000)
+(def hornetq-refresh-timeout 15000)
 
-(def hornetq-discovery-timeout 5000)
+(def hornetq-discovery-timeout 15000)
 
 (def hornetq-group-port 9876)
 
