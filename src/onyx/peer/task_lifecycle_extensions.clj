@@ -1,5 +1,5 @@
 (ns onyx.peer.task-lifecycle-extensions
-  "Public API extensions for implementors of plugins.")
+  "Public API extensions for implementors of task lifecycles.")
 
 (defn name-dispatch [{:keys [onyx.core/task-map]}]
   (:onyx/name task-map))
@@ -39,60 +39,6 @@
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti read-batch
-  "Reads :onyx/batch-size segments off the incoming data source.
-   Must return a map with key :onyx.core/batch and value seq representing
-   the ingested segments."
-  type-and-medium-dispatch)
-
-(defmulti decompress-batch
-  "Decompresses the ingested segments. Must return a map
-   with key :onyx.core/decompressed and value seq representing the
-   decompressed segments."
-  type-and-medium-dispatch)
-
-(defmulti strip-sentinel
-  "Checks if the sentinel value is present in the ingested batch
-   and removes it from downstream propagation when found.
-   
-   Only required in batch mode on destructive data sources such as queues.
-   Must return a map with key :onyx.core/requeue? and boolean true if the sentinel
-   should be requeued. Map must also contain :onyx.core/tail-batch? if this is the last
-   batch to be ingested.
-
-   It is sometimes possible to see the sentinel value without
-   seeing the last batch, due to circumstances such as clustered queues with failures.
-
-   Further, onyx.core/decompressed should be stripped of
-   the sentinel value to avoid propagating it to downstream tasks."
-  type-and-medium-dispatch)
-
-(defmulti requeue-sentinel
-  "Puts the sentinel value back onto the tail of the incoming data source.
-   Only required in batch mode on destructive data sources such as queues.
-   Must return a map with key :requeued? and value boolean."
-  type-and-medium-dispatch)
-
-(defmulti ack-batch
-  "Acknowledges the reading of the ingested batch. Must return a map with
-   key :onyx.core/acked and value integer representing the number of segments ack'ed."
-  type-and-medium-dispatch)
-
-(defmulti apply-fn
-  "Applies a function to the decompressed segments. Must return a map with
-   key :onyx.core/results and value seq representing the application of the function
-   to the segments."
-  type-and-medium-dispatch)
-
-(defmulti compress-batch
-  "Compresses the segments that result from function application. Must return
-   key :onyx.core/compressed and value seq representing the compression of the segments."
-  type-and-medium-dispatch)
-
-(defmulti write-batch
-  "Writes segments to the outgoing data source. Must return a map."
-  type-and-medium-dispatch)
-
 (defmulti close-temporal-resources
   "Closes any resources that were opened during a particular lifecycle run.
    Called once for each lifecycle run. Must return a map."
@@ -103,12 +49,6 @@
    virtual peer. Called once at the end of a task for each virtual peer.
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
-
-(defmulti seal-resource
-  "Closes any resources that remain open during a task being executed.
-   Called once at the end of a task for each virtual peer after the incoming
-   queue has been exhausted. Only called once globally for a single task."
-  type-and-medium-dispatch)
 
 (defn start-lifecycle?* [event]
   (merge-api-levels start-lifecycle? event))

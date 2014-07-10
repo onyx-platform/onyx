@@ -2,6 +2,8 @@
   (:require [clojure.data.fressian :as fressian]
             [onyx.coordinator.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.task-lifecycle]
             [onyx.peer.operation :as operation]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
@@ -131,34 +133,34 @@
   (.close (:hornetq/locator pipeline-data))
   pipeline-data)
 
-(defmethod l-ext/read-batch [:input :hornetq]
+(defmethod p-ext/read-batch [:input :hornetq]
   [event] (read-batch-shim event))
 
-(defmethod l-ext/decompress-batch [:input :hornetq]
+(defmethod p-ext/decompress-batch [:input :hornetq]
   [event] (decompress-batch-shim event))
 
-(defmethod l-ext/strip-sentinel [:input :hornetq]
+(defmethod p-ext/strip-sentinel [:input :hornetq]
   [event] (strip-sentinel-shim event))
 
-(defmethod l-ext/requeue-sentinel [:input :hornetq]
+(defmethod p-ext/requeue-sentinel [:input :hornetq]
   [event] (requeue-sentinel-shim event))
 
-(defmethod l-ext/ack-batch [:input :hornetq]
+(defmethod p-ext/ack-batch [:input :hornetq]
   [event] (ack-batch-shim event))
 
-(defmethod l-ext/apply-fn [:input :hornetq]
+(defmethod p-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
 
-(defmethod l-ext/apply-fn [:output :hornetq]
+(defmethod p-ext/apply-fn [:output :hornetq]
   [event] (apply-fn-out-shim event))
 
-(defmethod l-ext/ack-batch [:output :hornetq]
+(defmethod p-ext/ack-batch [:output :hornetq]
   [event] (ack-batch-shim event))
 
-(defmethod l-ext/compress-batch [:output :hornetq]
+(defmethod p-ext/compress-batch [:output :hornetq]
   [event] (compress-batch-shim event))
 
-(defmethod l-ext/write-batch [:output :hornetq]
+(defmethod p-ext/write-batch [:output :hornetq]
   [event] (write-batch-shim event))
 
 (defmethod l-ext/inject-lifecycle-resources :hornetq/write-segments
@@ -186,7 +188,7 @@
   (.close (:hornetq/locator pipeline-data))
   {})
 
-(defmethod l-ext/seal-resource [:output :hornetq]
+(defmethod p-ext/seal-resource [:output :hornetq]
   [pipeline-data]
   (seal-resource-shim pipeline-data)
   {})

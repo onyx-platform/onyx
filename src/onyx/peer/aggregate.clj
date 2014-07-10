@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.aggregate
   (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]
             [onyx.extensions :as extensions]
             [onyx.queue.hornetq :refer [take-segments]]
@@ -69,7 +70,7 @@
   [_ event]
   (inject-pipeline-resource-shim event))
 
-(defmethod l-ext/read-batch [:aggregator nil]
+(defmethod p-ext/read-batch [:aggregator nil]
   [event]
   (read-batch-shim event))
 

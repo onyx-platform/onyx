@@ -5,6 +5,7 @@
               [taoensso.timbre :refer [info] :as timbre]
               [onyx.coordinator.planning :refer [find-task]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
               [onyx.peer.transform :as transform]
               [onyx.peer.group :as group]
@@ -29,34 +30,34 @@
   (assoc event :onyx.core/session session))
 
 (defn munge-read-batch [event]
-  (let [rets (l-ext/read-batch event)]
+  (let [rets (p-ext/read-batch event)]
     (merge event rets)))
 
 (defn munge-decompress-batch [event]
-  (let [rets (l-ext/decompress-batch event)]
+  (let [rets (p-ext/decompress-batch event)]
     (merge event rets)))
 
 (defn munge-strip-sentinel [event]
-  (let [rets (l-ext/strip-sentinel event)]
+  (let [rets (p-ext/strip-sentinel event)]
     (merge event rets)))
 
 (defn munge-requeue-sentinel [{:keys [onyx.core/requeue?] :as event}]
   (if requeue?
-    (let [rets (l-ext/requeue-sentinel event)]
+    (let [rets (p-ext/requeue-sentinel event)]
       (merge event rets))
     event))
 
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (l-ext/apply-fn event))
+    (merge event (p-ext/apply-fn event))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
-  (let [rets (l-ext/compress-batch event)]
+  (let [rets (p-ext/compress-batch event)]
     (merge event rets)))
 
 (defn munge-write-batch [event]
-  (let [rets (l-ext/write-batch event)]
+  (let [rets (p-ext/write-batch event)]
     (merge event rets)))
 
 (defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
@@ -64,7 +65,7 @@
 
 (defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
   (if commit?
-    (let [rets (l-ext/ack-batch event)]
+    (let [rets (p-ext/ack-batch event)]
       (merge event rets))
     event))
 
@@ -104,7 +105,7 @@
     (let [path (:path (<!! seal-response-ch))
           seal? (extensions/read-node sync path)]
       (if seal?
-        (merge event (l-ext/seal-resource event) {:onyx.core/sealed? true})
+        (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
         (merge event {:onyx.core/sealed? false})))))
 
 (defn munge-complete-task
