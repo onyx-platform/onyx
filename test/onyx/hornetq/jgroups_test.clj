@@ -21,11 +21,11 @@
 
 (def jgroups-file "onyx-jgroups.xml")
 
-(def jgroups-channel "onyx-jgroups-broadcast-channel")
+(def jgroups-channel "onyx-broadcast-channel")
 
 (def hornetq-refresh-timeout 5000)
 
-(def hornetq-discovery-timeout 15000)
+(def hornetq-discovery-timeout 5000)
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
