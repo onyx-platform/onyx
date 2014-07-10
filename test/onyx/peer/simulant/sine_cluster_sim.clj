@@ -24,7 +24,7 @@
 
 (def hornetq-host "localhost")
 
-(def hornetq-port 5445)
+(def hornetq-port 5465)
 
 (def hornetq-cluster-name "onyx-cluster")
 
