@@ -3,7 +3,6 @@
             [onyx.coordinator.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.peer.task-lifecycle]
             [onyx.peer.operation :as operation]
             [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
