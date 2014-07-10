@@ -43,7 +43,11 @@
         gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout jgroups)]
     (HornetQClient/createServerLocatorWithHA gdc)))
 
-(defrecord HornetQClusteredConnection [opts]
+(defn cluster-name [opts]
+  (let [k (first (filter #(= (keyword (name %)) :cluster-name) (keys opts)))]
+    (get opts k)))
+
+(defrecord HornetQConnection [opts]
   component/Lifecycle
 
   (start [component]
@@ -54,7 +58,8 @@
           session-factory (.createSessionFactory locator)]
       (assoc component
         :locator locator
-        :session-factory session-factory)))
+        :session-factory session-factory
+        :cluster-name (cluster-name opts))))
 
   (stop [{:keys [locator session-factory] :as component}]
     (taoensso.timbre/info "Stopping HornetQ clustered connection")
@@ -65,9 +70,9 @@
     component))
 
 (defn hornetq [opts]
-  (map->HornetQClusteredConnection {:opts opts}))
+  (map->HornetQConnection {:opts opts}))
 
-(defmethod extensions/optimize-concurrently HornetQClusteredConnection
+(defmethod extensions/optimize-concurrently HornetQConnection
   [queue event]
   (if (= (:onyx/consumption (:onyx.core/task-map event)) :concurrent)
     (do (.close (:session-factory queue))
@@ -77,24 +82,24 @@
           (assoc queue :locator locator :session-factory (.createSessionFactory locator))))
     queue))
 
-(defmethod extensions/create-tx-session HornetQClusteredConnection
+(defmethod extensions/create-tx-session HornetQConnection
   [queue]
   (let [session-factory (:session-factory queue)
         session (.createTransactedSession session-factory)]
     (.start session)
     session))
 
-(defmethod extensions/create-producer HornetQClusteredConnection
+(defmethod extensions/create-producer HornetQConnection
   [queue session queue-name]
   (extensions/create-queue-on-session queue session queue-name)
   (.createProducer session queue-name))
 
-(defmethod extensions/create-consumer HornetQClusteredConnection
+(defmethod extensions/create-consumer HornetQConnection
   [queue session queue-name]
   (extensions/create-queue-on-session queue session queue-name)
   (.createConsumer session queue-name))
 
-(defmethod extensions/create-queue HornetQClusteredConnection
+(defmethod extensions/create-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
         ingress-queue (:ingress-queues task)
@@ -103,7 +108,7 @@
       (extensions/create-queue-on-session queue session queue-name))
     (.close session)))
 
-(defmethod extensions/create-queue-on-session HornetQClusteredConnection
+(defmethod extensions/create-queue-on-session HornetQConnection
   [queue session queue-name]
   (try
     (.createQueue session queue-name queue-name true)
@@ -111,12 +116,12 @@
     (catch Exception e
       (info e))))
 
-(defmethod extensions/n-messages-remaining HornetQClusteredConnection
+(defmethod extensions/n-messages-remaining HornetQConnection
   [queue session queue-name]
   (let [query (.queueQuery session (SimpleString. queue-name))]
     (.getMessageCount query)))
 
-(defmethod extensions/n-consumers HornetQClusteredConnection
+(defmethod extensions/n-consumers HornetQConnection
   [queue queue-name]
   (let [session (.createSession (:session-factory queue))
         requestor (ClientRequestor. session "jms.queue.hornetq.management")
@@ -149,7 +154,7 @@
       (doall (map #(.close %) locators))
       (apply + consumer-counts))))
 
-(defmethod extensions/bootstrap-queue HornetQClusteredConnection
+(defmethod extensions/bootstrap-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
         producer (extensions/create-producer queue session (:ingress-queues task))]
@@ -158,7 +163,7 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defmethod extensions/produce-message HornetQClusteredConnection
+(defmethod extensions/produce-message HornetQConnection
   ([queue producer session msg]
      (let [message (.createMessage session true)]
        (.writeBytes (.getBodyBuffer message) msg)
@@ -169,23 +174,23 @@
        (.writeBytes (.getBodyBuffer message) msg)
        (.send producer message))))
 
-(defmethod extensions/consume-message HornetQClusteredConnection
+(defmethod extensions/consume-message HornetQConnection
   [queue consumer]
   (.receive consumer))
 
-(defmethod extensions/read-message HornetQClusteredConnection
+(defmethod extensions/read-message HornetQConnection
   [queue message]
   (fressian/read (.toByteBuffer (.getBodyBuffer message))))
 
-(defmethod extensions/ack-message HornetQClusteredConnection
+(defmethod extensions/ack-message HornetQConnection
   [queue message]
   (.acknowledge message))
 
-(defmethod extensions/commit-tx HornetQClusteredConnection
+(defmethod extensions/commit-tx HornetQConnection
   [queue session]
   (.commit session))
 
-(defmethod extensions/close-resource HornetQClusteredConnection
+(defmethod extensions/close-resource HornetQConnection
   [queue resource]
   (.close resource))
 
