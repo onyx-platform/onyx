@@ -42,7 +42,7 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
+    :onyx/consumption :sequential
     :hornetq/queue-name in-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port
@@ -51,14 +51,14 @@
    {:onyx/name :inc
     :onyx/fn :onyx.hornetq.standalone-test/my-inc
     :onyx/type :transformer
-    :onyx/consumption :concurrent
+    :onyx/consumption :sequential
     :onyx/batch-size batch-size}
    
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
+    :onyx/consumption :sequential
     :hornetq/queue-name out-queue
     :hornetq/host hornetq-host
     :hornetq/port hornetq-port

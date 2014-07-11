@@ -2,6 +2,7 @@
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.api]))
 
 (def hornetq-host "localhost")
@@ -50,7 +51,7 @@
                 :zookeeper/address "127.0.0.1:2181"
                 :onyx/id id})
 
-(defmethod l-ext/apply-fn [:input :onyx-memory-test-plugin]
+(defmethod p-ext/apply-fn [:input :onyx-memory-test-plugin]
   [event] {:onyx.core/results [{:n 42}]})
 
 (def catalog
