@@ -16,9 +16,6 @@
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
 
-(defn create-tx-session [{:keys [onyx.core/queue]}]
-  (extensions/create-tx-session queue))
-
 (defn new-payload [sync peer-node payload-ch]
   (let [peer-contents (extensions/read-node sync peer-node)
         node (:node (extensions/create sync :payload))
@@ -26,25 +23,25 @@
     (extensions/write-node sync peer-node updated-contents)
     node))
 
-(defn munge-open-session [event session]
-  (assoc event :onyx.core/session session))
+(defn munge-inject-temporal [event]
+  (let [rets (l-ext/inject-temporal-resources* event)]
+    (if-not (:onyx.core/session rets)
+      (let [session (extensions/create-tx-session (:onyx.core/queue event))]
+        (merge event rets {:onyx.core/session session}))
+      (merge event rets))))
 
 (defn munge-read-batch [event]
-  (let [rets (p-ext/read-batch event)]
-    (merge event rets)))
+  (merge event (p-ext/read-batch event)))
 
 (defn munge-decompress-batch [event]
-  (let [rets (p-ext/decompress-batch event)]
-    (merge event rets)))
+  (merge event (p-ext/decompress-batch event)))
 
 (defn munge-strip-sentinel [event]
-  (let [rets (p-ext/strip-sentinel event)]
-    (merge event rets)))
+  (merge event (p-ext/strip-sentinel event)))
 
 (defn munge-requeue-sentinel [{:keys [onyx.core/requeue?] :as event}]
   (if requeue?
-    (let [rets (p-ext/requeue-sentinel event)]
-      (merge event rets))
+    (merge event (p-ext/requeue-sentinel event))
     event))
 
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
@@ -53,20 +50,17 @@
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
-  (let [rets (p-ext/compress-batch event)]
-    (merge event rets)))
+  (merge event (p-ext/compress-batch event)))
 
 (defn munge-write-batch [event]
-  (let [rets (p-ext/write-batch event)]
-    (merge event rets)))
+  (merge event (p-ext/write-batch event)))
 
 (defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
   (assoc event :onyx.core/commit? (extensions/node-exists? sync status-node)))
 
 (defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
   (if commit?
-    (let [rets (p-ext/ack-batch event)]
-      (merge event rets))
+    (merge event (p-ext/ack-batch event))
     event))
 
 (defn munge-commit-tx
@@ -114,12 +108,11 @@
     (extensions/touch-node sync completion-node))
   event)
 
-(defn open-session-loop [read-ch kill-ch pipeline-data dead-ch]
+(defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
     (when (first (alts!! [kill-ch] :default true))
-      (when-let [session (create-tx-session pipeline-data)]
-        (>!! read-ch (munge-open-session pipeline-data session))
-        (recur)))))
+      (>!! read-ch (munge-inject-temporal pipeline-data))
+      (recur))))
 
 (defn read-batch-loop [read-ch decompress-ch dead-ch]
   (loop []
@@ -286,7 +279,7 @@
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
-      (dire/with-handler! #'open-session-loop
+      (dire/with-handler! #'inject-temporal-loop
         java.lang.Exception
         (fn [e & _] (info e)))
 
@@ -350,7 +343,7 @@
         java.lang.Exception
         (fn [e & _] (info e)))
 
-      (dire/with-finally! #'open-session-loop
+      (dire/with-finally! #'inject-temporal-loop
         (fn [& args]
           (>!! (last args) true)))
 
@@ -452,7 +445,7 @@
         :seal-dead-ch seal-dead-ch
         :complete-task-dead-ch complete-task-dead-ch
         
-        :open-session-loop (thread (open-session-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
+        :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch))
         :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch))
         :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch strip-sentinel-dead-ch))
@@ -553,7 +546,7 @@
     (when-not start-lifecycle?
       (timbre/info (format "[%s] Sequential task currently has queue consumers. Backing off and retrying..." id)))))
 
-(dire/with-post-hook! #'munge-open-session
+(dire/with-post-hook! #'munge-inject-temporal
   (fn [{:keys [onyx.core/id]}]
     (taoensso.timbre/info (format "[%s] Created new tx session" id))))
 

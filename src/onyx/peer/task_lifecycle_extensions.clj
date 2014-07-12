@@ -39,6 +39,12 @@
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
+(defmulti inject-temporal-resources
+  "Adds keys to the event map. This function is called once
+   per pipeline execution per virtual peer. Keys added may
+   be accessed later in the lifecycle. Must return a map."
+  (fn [dispatch-fn event] (dispatch-fn event)))
+
 (defmulti close-temporal-resources
   "Closes any resources that were opened during a particular lifecycle run.
    Called once for each lifecycle run. Must return a map."
@@ -56,6 +62,9 @@
 (defn inject-lifecycle-resources* [event]
   (merge-api-levels inject-lifecycle-resources event))
 
+(defn inject-temporal-resources* [event]
+  (merge-api-levels inject-temporal-resources event))
+
 (defn close-temporal-resources* [event]
   (merge-api-levels close-temporal-resources event))
 
@@ -66,6 +75,9 @@
   [_ event] {:onyx.core/start-lifecycle? true})
 
 (defmethod inject-lifecycle-resources :default
+  [_ event] {})
+
+(defmethod inject-temporal-resources :default
   [_ event] {})
 
 (defmethod close-temporal-resources :default
