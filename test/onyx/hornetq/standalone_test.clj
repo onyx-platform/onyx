@@ -15,17 +15,7 @@
 
 (def hornetq-host "localhost")
 
-(def hornetq-port 5446)
-
-(def hornetq-cluster-name "onyx-cluster")
-
-(def hornetq-group-address "231.7.7.7")
-
-(def hornetq-group-port 9876)
-
-(def hornetq-refresh-timeout 5000)
-
-(def hornetq-discovery-timeout 5000)
+(def hornetq-port 5465)
 
 (def hq-config {"host" hornetq-host "port" hornetq-port})
 
