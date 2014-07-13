@@ -217,7 +217,6 @@
 
       (let [reply (.request requestor message)
             result (ManagementHelper/getResult reply)
-            _ (prn result)
             host-port-pairs (map split-host-str
                                  ["localhost/127.0.0.1:5445"
                                   "localhost/127.0.0.1:5455"
@@ -235,14 +234,12 @@
                       (.close s)
                       {:route pair :consumers c :messages m}))
                   sessions host-port-pairs))]
-        (clojure.pprint/pprint counts)
         (.close session)
         (doall (map #(.close %) sessions))
         (doall (map #(.close %) session-factories))
         (doall (map #(.close %) locators))
         (let [active-queues (filter #(> (:messages %) 0) counts)
               pair (or (:route (first (sort-by :consumers < active-queues))) (first host-port-pairs))
-              _ (prn pair)
               locator (apply connect-standalone pair)
               _ (.setConsumerWindowSize locator 0)
               sf (.createSessionFactory locator)
