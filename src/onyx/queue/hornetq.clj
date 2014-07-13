@@ -47,6 +47,17 @@
   (let [k (first (filter #(= (keyword (name %)) :cluster-name) (keys opts)))]
     (get opts k)))
 
+(defn split-host-str [s]
+  (let [[h p] (split s #":")]
+    [(second (split h #"/")) p]))
+
+(defn initial-connectors [locator]
+  (map
+   (fn [config]
+     (let [params (.getParams config)]
+       [(get params "host") (get params "port")]))
+   (into [] (.getStaticTransportConfigurations locator))))
+
 (defrecord HornetQConnection [opts]
   component/Lifecycle
 
@@ -121,17 +132,6 @@
   [queue session queue-name]
   (let [query (.queueQuery session (SimpleString. queue-name))]
     (.getMessageCount query)))
-
-(defn split-host-str [s]
-  (let [[h p] (split s #":")]
-    [(second (split h #"/")) p]))
-
-(defn initial-connectors [locator]
-  (map
-   (fn [config]
-     (let [params (.getParams config)]
-       [(get params "host") (get params "port")]))
-   (into [] (.getStaticTransportConfigurations locator))))
 
 (defmethod extensions/n-consumers HornetQConnection
   [queue queue-name]
