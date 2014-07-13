@@ -109,7 +109,7 @@
 
 (def data
   (concat
-   (map (fn [_] {:name "Mike" :amount 10}) (range 1500))
+   (map (fn [_] {:name "Mike" :amount 10}) (range 150))
    [{:name "Mike" :amount 10}
     {:name "Mike" :amount 15}
     {:name "Mike" :amount 20}
@@ -138,6 +138,6 @@
   (onyx.api/shutdown conn)
   (catch Exception e (prn e)))
 
-(fact @output => {"Mike" 15045 "Benti" 55 "Dorrene" 70})
+(fact @output => {"Mike" 1545 "Benti" 55 "Dorrene" 70})
 (fact results => [:done])
 

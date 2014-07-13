@@ -78,6 +78,7 @@
     (do (.close (:session-factory queue))
         (.close (:locator queue))
 
+        ;;; Start it up again without a 0 sized consumer window.
         (let [locator (connect-to-locator (:opts queue))]
           (assoc queue :locator locator :session-factory (.createSessionFactory locator))))
     queue))
@@ -199,6 +200,9 @@
 (defmethod extensions/close-resource HornetQConnection
   [queue resource]
   (.close resource))
+
+(defmethod extensions/bind-active-consumer HornetQConnection
+  [queue queue-name])
 
 (defn take-segments
   ([f n] (take-segments f n []))
