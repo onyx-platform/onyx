@@ -99,7 +99,7 @@
 
 (defmulti close-resource (fn [queue resource] (type queue)))
 
-(defmulti bind-active-consumer (fn [queue queue-name] (type queue)))
+(defmulti bind-active-session (fn [queue queue-name] (type queue)))
 
 (defmulti create-io-task
   (fn [element parent children phase]

@@ -25,7 +25,7 @@
   (let [rets
         {:onyx.aggregate/queue
          (->> (range n-pipeline-threads)
-              (map (fn [x] {:session (extensions/create-tx-session queue)}))
+              (map (fn [x] {:session (extensions/bind-active-session queue (first ingress-queues))}))
               (map (fn [x] (assoc x :consumers (map (partial extensions/create-consumer queue (:session x))
                                                    ingress-queues))))
               (map (fn [x] (assoc x :halting-ch (chan 0)))))

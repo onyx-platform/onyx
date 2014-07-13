@@ -122,6 +122,10 @@
   (let [query (.queueQuery session (SimpleString. queue-name))]
     (.getMessageCount query)))
 
+(defn split-host-str [s]
+  (let [[h p] (split s #":")]
+    [(second (split h #"/")) p]))
+
 (defmethod extensions/n-consumers HornetQConnection
   [queue queue-name]
   (if-not (:cluster-name queue)
@@ -139,10 +143,7 @@
 
       (let [reply (.request requestor message)
             result (ManagementHelper/getResult reply)
-            host-port-pairs
-            (map (fn [x] (let [[h p] (split x #":")]
-                          [(second (split h #"/")) p]))
-                 (vals result))
+            host-port-pairs (map split-host-str (vals result))
             locators (map (partial apply connect-standalone) host-port-pairs)
             session-factories (map #(.createSessionFactory %) locators)
             sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
@@ -201,8 +202,53 @@
   [queue resource]
   (.close resource))
 
-(defmethod extensions/bind-active-consumer HornetQConnection
-  [queue queue-name])
+(defmethod extensions/bind-active-session HornetQConnection
+  [queue queue-name]
+  (if-not (:cluster-name queue)
+    (let [session (.createTransactedSession (:session-factory queue))]
+      (.start session)
+      session)
+    (let [session (.createSession (:session-factory queue))
+          requestor (ClientRequestor. session "onyx.queue.hornetq.management")
+          message (.createMessage session false)
+          attr (format "core.clusterconnection.%s" (:cluster-name queue))]
+      (ManagementHelper/putAttribute message attr "nodes")
+      (.start session)
+
+      (let [reply (.request requestor message)
+            result (ManagementHelper/getResult reply)
+            _ (prn result)
+            host-port-pairs (map split-host-str
+                                 ["localhost/127.0.0.1:5445"
+                                  "localhost/127.0.0.1:5455"
+                                  "localhost/127.0.0.1:5475"])
+            locators (map (partial apply connect-standalone) host-port-pairs)
+            session-factories (map #(.createSessionFactory %) locators)
+            sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
+            counts
+            (doall
+             (map (fn [s pair]
+                    (.start s)
+                    (let [query (.queueQuery s (SimpleString. queue-name))
+                          c (.getConsumerCount query)
+                          m (.getMessageCount query)]
+                      (.close s)
+                      {:route pair :consumers c :messages m}))
+                  sessions host-port-pairs))]
+        (clojure.pprint/pprint counts)
+        (.close session)
+        (doall (map #(.close %) sessions))
+        (doall (map #(.close %) session-factories))
+        (doall (map #(.close %) locators))
+        (let [active-queues (filter #(> (:messages %) 0) counts)
+              pair (or (:route (first (sort-by :consumers < active-queues))) (first host-port-pairs))
+              _ (prn pair)
+              locator (apply connect-standalone pair)
+              _ (.setConsumerWindowSize locator 0)
+              sf (.createSessionFactory locator)
+              s (.createTransactedSession sf)]
+          (.start s)
+          s)))))
 
 (defn take-segments
   ([f n] (take-segments f n []))
