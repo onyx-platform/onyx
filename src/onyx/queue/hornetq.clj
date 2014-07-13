@@ -126,6 +126,13 @@
   (let [[h p] (split s #":")]
     [(second (split h #"/")) p]))
 
+(defn initial-connectors [locator]
+  (map
+   (fn [config]
+     (let [params (.getParams config)]
+       [(get params "host") (get params "port")]))
+   (into [] (.getStaticTransportConfigurations locator))))
+
 (defmethod extensions/n-consumers HornetQConnection
   [queue queue-name]
   (if-not (:cluster-name queue)
@@ -144,6 +151,7 @@
       (let [reply (.request requestor message)
             result (ManagementHelper/getResult reply)
             host-port-pairs (map split-host-str (vals result))
+            host-port-pairs (into #{} (concat host-port-pairs (initial-connectors (:locator queue))))
             locators (map (partial apply connect-standalone) host-port-pairs)
             session-factories (map #(.createSessionFactory %) locators)
             sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
@@ -217,10 +225,8 @@
 
       (let [reply (.request requestor message)
             result (ManagementHelper/getResult reply)
-            host-port-pairs (map split-host-str
-                                 ["localhost/127.0.0.1:5445"
-                                  "localhost/127.0.0.1:5455"
-                                  "localhost/127.0.0.1:5475"])
+            host-port-pairs (map split-host-str (vals result))
+            host-port-pairs (into #{} (concat host-port-pairs (initial-connectors (:locator queue))))
             locators (map (partial apply connect-standalone) host-port-pairs)
             session-factories (map #(.createSessionFactory %) locators)
             sessions (map (fn [sf] (let [s (.createSession sf)] (.start s) s)) session-factories)
