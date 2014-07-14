@@ -3,7 +3,7 @@
             [clojure.core.async :refer [chan >!! <!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
-            [taoensso.timbre :refer [info]]
+            [taoensso.timbre :refer [warn]]
             [onyx.coordinator.impl :as impl]
             [onyx.system :as system]
             [onyx.extensions :as extensions]))
@@ -39,6 +39,18 @@
           true
           (do (<!! ch)
               (recur)))))))
+
+(defn try-start-peer* [v-peer opts]
+  (loop []
+    (let [rets
+          (try
+            (component/start v-peer)
+            (catch Exception e
+              (warn e)
+              (warn "Starting virtual peer failed, backing off and retrying...")
+              (Thread/sleep (or (:onyx.peer/retry-start-interval opts) 2000))
+              nil))]
+      (or rets (recur)))))
 
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
@@ -97,10 +109,11 @@
   (doall
    (map
     (fn [_]
-      (let [v-peer (component/start (system/onyx-peer config))]
-        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer))
-                                         (catch Exception e
-                                           (info e))))
+      (let [v-peer (try-start-peer* (system/onyx-peer config) config)]
+        (let [rets {:runner (future
+                              (try @(:payload-thread (:peer v-peer))
+                                   (catch Exception e
+                                     (warn e))))
                     :shutdown-fn (fn [] (component/stop v-peer))}]
           (register-peer coord (:node (:peer (:peer v-peer))))
           rets)))
