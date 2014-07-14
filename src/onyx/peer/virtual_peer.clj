@@ -7,10 +7,11 @@
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]))
 
 (defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse opts]
-  (let [complete-ch (chan 1)]
+  (let [complete-ch (chan 1)
+        err-ch (chan 1)]
     (loop [pipeline nil]
-      (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
-        (when-not (nil? pipeline)
+      (when-let [[v ch] (alts!! [shutdown-ch err-ch complete-ch payload-ch] :priority true)]
+        (when (and (not (nil? pipeline)) (not= ch err-ch))
           (component/stop pipeline))
 
         (cond (nil? v) (extensions/delete sync (:node pulse))
@@ -26,8 +27,7 @@
                 (<!! status-ch)
 
                 (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch opts)]
-                  (recur (component/start new-pipeline))))
-              :else (recur nil))))
+                  (recur (component/start new-pipeline)))))))
     (>!! dead-ch true)))
 
 (defrecord VirtualPeer [opts]
