@@ -88,10 +88,11 @@
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
 
+    (extensions/delete (:sync component) (:node (:pulse component)))
+
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
     (close! (:status-ch component))
-
     
     (<!! (:dead-close-tail-ch component))
 
