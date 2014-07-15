@@ -110,12 +110,13 @@
 
                              (let [restart-ch (:dead-restart-tail-ch (:peer live))
                                    [v ch] (alts!! [stop-ch restart-ch] :priority true)]
-                               (when (= ch stop-ch)
+                               (if (= ch stop-ch)
                                  (try
                                    (component/stop live)
                                    (catch Exception e
                                      (warn e)
-                                     :stopped)))))
+                                     :stopped))
+                                 (throw (ex-info "Peer failed" {})))))
                            (catch Exception e
                              (warn e)
                              (warn "Virtual peer failed, backing off and rebooting...")
