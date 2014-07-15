@@ -106,8 +106,8 @@
                    (let [rets
                          (try
                            (let [live (component/start v-peer)]
-;;                             (register-peer coord (:node (:peer (:peer v-peer))))
-                             
+                             (register-peer coord (:node (:peer (:peer v-peer))))
+
                              (let [restart-ch (:dead-restart-tail-ch (:peer live))
                                    [v ch] (alts!! [stop-ch restart-ch] :priority true)]
                                (when (= ch stop-ch)

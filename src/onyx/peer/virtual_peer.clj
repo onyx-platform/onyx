@@ -26,7 +26,7 @@
 
                 (<!! status-ch)
 
-                (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch opts)]
+                (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch err-ch opts)]
                   (recur (component/start new-pipeline)))))))
     (>!! dead-ch true)))
 
