@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-  (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
+  (:require [clojure.core.async :refer [chan mult tap alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :as timbre]
             [dire.core :as dire]
@@ -42,7 +42,14 @@
           payload-ch (chan 1)
           shutdown-ch (chan 1)
           status-ch (chan 1)
-          dead-ch (chan)]
+          
+          dead-head-ch (chan 0)
+          dead-close-tail-ch (chan 0)
+          dead-restart-tail-ch (chan 0)
+          dead-mult (mult dead-head-ch)]
+
+      (tap dead-mult dead-close-tail-ch)
+      (tap dead-mult dead-restart-tail-ch)
 
       (taoensso.timbre/info (format "Starting Virtual Peer %s" (:uuid peer)))
       
@@ -70,10 +77,13 @@
         :payload-ch payload-ch
         :shutdown-ch shutdown-ch
         :status-ch status-ch
-        :dead-ch dead-ch
+        :dead-head-ch dead-head-ch
+
+        :dead-close-tail-ch dead-close-tail-ch
+        :dead-restart-tail-ch dead-restart-tail-ch
 
         :payload-thread (future (payload-loop (:uuid peer) sync queue payload-ch
-                                              shutdown-ch status-ch dead-ch pulse opts)))))
+                                              shutdown-ch status-ch dead-head-ch pulse opts)))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
@@ -82,7 +92,10 @@
     (close! (:shutdown-ch component))
     (close! (:status-ch component))
 
-    (<!! (:dead-ch component))
+    
+    (<!! (:dead-close-tail-ch component))
+
+    (close! (:dead-head-ch component))
     
     component))
 
