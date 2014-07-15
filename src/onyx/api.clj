@@ -1,6 +1,6 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan >!! <!!]]
+            [clojure.core.async :refer [chan alts!! >!! <!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [warn]]
@@ -39,18 +39,6 @@
           true
           (do (<!! ch)
               (recur)))))))
-
-(defn try-start-peer* [v-peer opts]
-  (loop []
-    (let [rets
-          (try
-            (component/start v-peer)
-            (catch Exception e
-              (warn e)
-              (warn "Starting virtual peer failed, backing off and retrying...")
-              (Thread/sleep (or (:onyx.peer/retry-start-interval opts) 2000))
-              nil))]
-      (or rets (recur)))))
 
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
@@ -102,20 +90,35 @@
   (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
 
 (defn start-peers
-  "Launches a number of virtual peers. Starts n
-   (the number of peers to launch) threads, one for each virtual peer.
-   Takes a coordinator type to connect to and a virtual peer configuration."
+  "Launches n virtual peers. Starts a payload thread for each vpeer.
+   Takes a coordinator type to connect to and a virtual peer configuration.
+   Each peer may be stopped by invoking the fn returned by :shutdown-fn."
   [coord n config]
   (doall
    (map
     (fn [_]
-      (let [v-peer (try-start-peer* (system/onyx-peer config) config)]
-        (let [rets {:runner (future
-                              (try @(:payload-thread (:peer v-peer))
-                                   (catch Exception e
-                                     (warn e))))
-                    :shutdown-fn (fn [] (component/stop v-peer))}]
-          (register-peer coord (:node (:peer (:peer v-peer))))
+      (let [stop-ch (chan)]
+        (let [v-peer (system/onyx-peer config)
+              rets
+              {:runner
+               (future
+                 (loop []
+                   (let [rets
+                         (try
+                           (let [live (component/start v-peer)]
+;;                             (register-peer coord (:node (:peer (:peer v-peer))))
+                             
+                             (let [restart-ch (:dead-restart-tail-ch (:peer live))
+                                   [v ch] (alts!! [stop-ch restart-ch] :priority true)]
+                               (when (= ch stop-ch)
+                                 (component/stop live))))
+                           (catch Exception e
+                             (warn e)
+                             (warn "Virtual peer failed, backing off and rebooting...")
+                             (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
+                             nil))]
+                     (or rets (recur)))))
+               :shutdown-fn (fn [] (>!! stop-ch true))}] 
           rets)))
     (range n))))
 
