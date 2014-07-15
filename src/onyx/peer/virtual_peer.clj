@@ -16,6 +16,7 @@
 
         (cond (nil? v) (extensions/delete sync (:node pulse))
               (= ch complete-ch) (recur nil)
+              (= ch shutdown-ch) (recur nil)
               (= ch payload-ch)
               (let [payload-node (:path v)
                     payload (extensions/read-node sync payload-node)
