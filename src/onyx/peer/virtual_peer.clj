@@ -4,7 +4,14 @@
             [taoensso.timbre :as timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]))
+
+(defn force-close-pipeline! [pipeline]
+  (try
+    (l-ext/close-lifecycle-resources* (:pipeline-data pipeline))
+    (catch Exception e
+      (timbre/warn e))))
 
 (defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse opts]
   (let [complete-ch (chan 1)
@@ -17,6 +24,7 @@
         (cond (nil? v) (extensions/delete sync (:node pulse))
               (= ch complete-ch) (recur nil)
               (= ch shutdown-ch) (recur nil)
+              (= ch err-ch) (force-close-pipeline! pipeline)
               (= ch payload-ch)
               (let [payload-node (:path v)
                     payload (extensions/read-node sync payload-node)
