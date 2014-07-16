@@ -116,7 +116,11 @@
                                    (catch Exception e
                                      (warn e)
                                      :stopped))
-                                 (throw (ex-info "Peer failed" {})))))
+                                 (try (component/stop live)
+                                      nil
+                                      (catch Exception e
+                                        (warn e)
+                                        :stopped)))))
                            (catch Exception e
                              (warn e)
                              (warn "Virtual peer failed, backing off and rebooting...")
