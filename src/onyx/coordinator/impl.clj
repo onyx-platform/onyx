@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.coordinator.impl
     (:require [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info] :as timbre]
+              [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
               [onyx.sync.zookeeper])
     (:import [onyx.sync.zookeeper ZooKeeper]))
@@ -165,7 +165,6 @@
         
         ;; Peer may have died just after completion, hence n may be 0
         (complete-task sync (:task-node peer-state))
-        (info "Successfully completed " (:task-node peer-state))
         (extensions/write-node sync cooldown-down {:completed? true})
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-down {:completed? true})
