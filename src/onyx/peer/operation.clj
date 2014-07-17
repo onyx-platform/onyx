@@ -1,5 +1,6 @@
 (ns onyx.peer.operation
-  (:require [onyx.extensions :as extensions]))
+  (:require [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
 (defn apply-fn [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
@@ -12,12 +13,32 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
+(defn dead-peers [states task-node]
+  (filter
+   (fn [state]
+     (and (= (:task-node (:content state)) task-node)
+          (= (:state (:content state)) :dead)))
+   states))
+
+(defn previously-sealing? [sync state]
+  (let [previous-node (extensions/previous-node sync (:node state))]
+    (= (:state (extensions/read-node sync previous-node)) :sealing)))
+
+(defn n-seal-failures [sync task-node]
+  (let [peers (extensions/bucket sync :peer-state)
+        states (map (partial extensions/dereference sync) peers)
+        dead (dead-peers states task-node)]
+    (count (filter (partial previously-sealing? sync) dead))))
+
 (defn on-last-batch
-  [{:keys [onyx.core/decompressed onyx.core/ingress-queues onyx.core/task-map] :as event} f]
+  [{:keys [onyx.core/sync onyx.core/decompressed onyx.core/ingress-queues
+           onyx.core/task-map] :as event} f]
   (cond (= (last decompressed) :done)
-        (let [n-messages (f event)]
+        (let [n-messages (f event)
+              max-failures (n-seal-failures sync (:onyx.core/task-node event))]
           (assoc event
-            :onyx.core/tail-batch? (= n-messages (count decompressed))
+            :onyx.core/tail-batch? (or (= n-messages (count decompressed))
+                                       (<= n-messages (inc max-failures)))
             :onyx.core/requeue? true
             :onyx.core/decompressed (or (butlast decompressed) [])))
         (some #{:done} decompressed)

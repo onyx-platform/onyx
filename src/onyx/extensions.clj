@@ -46,6 +46,8 @@
 
 (defmulti dereference (fn [sync node] (type sync)))
 
+(defmulti previous-node (fn [sync node] (type sync)))
+
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
 (defmulti children (fn [sync node] (type sync)))

@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.coordinator.impl
     (:require [com.stuartsierra.component :as component]
-              [taoensso.timbre]
+              [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
               [onyx.sync.zookeeper])
     (:import [onyx.sync.zookeeper ZooKeeper]))
@@ -82,8 +82,8 @@
         workflow-node (:node (extensions/create-at sync :workflow job-id workflow))]
 
     (doseq [task tasks]
-      (let [data (serialize-task task job-id catalog-node workflow-node)
-            node (:node (extensions/create-at sync :task job-id data))]))
+      (let [data (serialize-task task job-id catalog-node workflow-node)]
+        (extensions/create-at sync :task job-id data)))
     
     (extensions/create sync :job job-id)  
     job-id))

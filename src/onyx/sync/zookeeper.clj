@@ -330,6 +330,17 @@
       (let [path  (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
 
+(defmethod extensions/previous-node ZooKeeper
+  [sync node]
+  (let [id (util/extract-id node)
+        prev-id (dec id)
+        ;;; Handle decrementing across orders of magnitude and not losing a 0.
+        prev-str (if (< (count (str prev-id)) (count (str id)))
+                   (str "0" prev-id)
+                   (str prev-id))]
+    ;;; Avoid overwriting anything else in the path by prefixing "state-"
+    (clojure.string/replace node (str "state-" id) (str "state-" prev-str))))
+
 (defmethod extensions/node-exists? ZooKeeper
   [sync node]
   (boolean (zk/exists (:conn sync) node)))

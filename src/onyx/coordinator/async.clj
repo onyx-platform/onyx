@@ -77,7 +77,8 @@
                    :node/completion (:node complete)
                    :node/status (:node status)
                    :node/catalog (:task/catalog-node task)
-                   :node/workflow (:task/workflow-node task)}
+                   :node/workflow (:task/workflow-node task)
+                   :node/task task-node}
             snapshot {:id (:id peer-content) :peer-node peer-node
                       :task-node task-node :nodes nodes}]
 

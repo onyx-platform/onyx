@@ -268,6 +268,7 @@
                          :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
                          :onyx.core/seal-node (:node/seal (:nodes payload))
                          :onyx.core/completion-node (:node/completion (:nodes payload))
+                         :onyx.core/task-node (:node/task (:nodes payload))
                          :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
