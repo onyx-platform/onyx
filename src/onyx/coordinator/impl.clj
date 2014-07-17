@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.coordinator.impl
     (:require [com.stuartsierra.component :as component]
-              [taoensso.timbre :as timbre]
+              [taoensso.timbre :refer [info] :as timbre]
               [onyx.extensions :as extensions]
               [onyx.sync.zookeeper])
     (:import [onyx.sync.zookeeper ZooKeeper]))
@@ -144,11 +144,13 @@
     (extensions/create-at sync :peer-state (:id peer-state) state)
     (let [n-active (n-active-peers sync (:task-node peer-state))
           n (n-peers sync (:task-node peer-state))]
-      {:seal? (or (= n 1) (zero? n-active))
-       :seal-node (:node/seal (:nodes peer-state))})))
+      ;;; Peer may have died before this event is executed, hence the 0.
+      {:seal? (or (<= n 1) (zero? n-active))
+       :seal-node (:node/seal (:nodes peer-state))
+       :exhaust-node (:node/exhaust (:nodes peer-state))})))
 
 (defmethod extensions/complete ZooKeeper
-  [sync complete-node]
+  [sync complete-node cooldown-down cb]
   (let [node-data (extensions/read-node sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
@@ -160,10 +162,14 @@
                  (= (:state peer-state) :sealing)))
       (let [state (assoc (dissoc peer-state :task-node :nodes) :state :idle)]
         (extensions/create-at sync :peer-state (:id node-data) state)
-        (when (= n 1)
-          (complete-task sync (:task-node peer-state)))
+        
+        ;; Peer may have died just after completion, hence n may be 0
+        (complete-task sync (:task-node peer-state))
+        (info "Successfully completed " (:task-node peer-state))
+        (extensions/write-node sync cooldown-down {:completed? true})
         {:n-peers n :peer-state peer-state})
-      (throw (ex-info "Failed to complete task" {:complete? complete? :n n})))))
+      (do (extensions/write-node sync cooldown-down {:completed? true})
+          (throw (ex-info "Failed to complete task" {:complete? complete? :n n}))))))
 
 (defn incomplete-job-ids [sync]
   (let [job-nodes (extensions/bucket sync :job)

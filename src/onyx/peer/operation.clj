@@ -40,7 +40,7 @@
             :onyx.core/tail-batch? (or (= n-messages (count decompressed))
                                        (<= n-messages (inc max-failures)))
             :onyx.core/requeue? true
-            :onyx.core/decompressed (or (butlast decompressed) [])))
+            :onyx.core/decompressed (remove (partial = :done) decompressed)))
         (some #{:done} decompressed)
         (assoc event
           :onyx.core/tail-batch? false

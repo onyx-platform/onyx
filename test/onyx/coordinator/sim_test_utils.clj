@@ -116,7 +116,7 @@
   {:idle #{:acking :dead}
    :acking #{:active :revoked :dead}
    :active #{:sealing :idle :dead}
-   :sealing #{:idle :dead}
+   :sealing #{:idle :sealing :dead}
    :revoked #{:dead}
    :dead #{}})
 

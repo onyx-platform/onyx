@@ -16,7 +16,7 @@
 
 (defmulti revoke-offer (fn [sync ack-node] (type sync)))
 
-(defmulti complete (fn [sync complete-node] (type sync)))
+(defmulti complete (fn [sync complete-node cooldown-node cb] (type sync)))
 
 (defmulti next-tasks (fn [sync] (type sync)))
 

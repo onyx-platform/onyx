@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread timeout]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info] :as timbre]
@@ -88,7 +88,7 @@
   (if (= (extensions/version sync peer-node) peer-version)
     (let [node (new-payload sync peer-node payload-ch)]
       (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :onyx.core/new-payload-node node :onyx.core/completion? true))
+      (assoc event :onyx.core/new-payload-node node))
     event))
 
 (defn munge-seal-resource
@@ -96,17 +96,29 @@
   (let [seal-response-ch (chan)]
     (extensions/on-change sync seal-node #(>!! seal-response-ch %))
     (extensions/touch-node sync exhaust-node)
-    (let [path (:path (<!! seal-response-ch))
-          seal? (extensions/read-node sync path)]
-      (if seal?
-        (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
-        (merge event {:onyx.core/sealed? false})))))
+    (let [[v ch] (alts!! [(timeout 500) seal-response-ch])]
+      (if (nil? v)
+        (merge event {:onyx.core/sealed? false})
+        (let [path (:path v)
+              seal? (extensions/read-node sync path)]
+          (if seal?
+            (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
+            (merge event {:onyx.core/sealed? false})))))))
 
 (defn munge-complete-task
-  [{:keys [onyx.core/sync onyx.core/completion-node onyx.core/completion?] :as event}]
-  (when completion?
-    (extensions/touch-node sync completion-node))
-  event)
+  [{:keys [onyx.core/sync onyx.core/completion-node
+           onyx.core/cooldown-node onyx.core/sealed?] :as event}]
+  (if sealed?
+    (let [complete-response-ch (chan)]
+      (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
+      (extensions/touch-node sync completion-node)
+      (let [[v ch] (alts!! [(timeout 500) complete-response-ch])]
+        (if (nil? v)
+          (merge event {:onyx.core/complete-success? false})
+          (let [path (:path v)
+                result (extensions/read-node sync path)]
+            (assoc event :onyx.core/complete-success? (:completed? result))))))
+    (assoc event :onyx.core/complete-success? false)))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -198,7 +210,7 @@
 (defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
   (loop []
     (when-let [event (<!! seal-ch)]
-      (if (:onyx.core/completion? event)
+      (if (:onyx.core/tail-batch? event)
         (>!! internal-complete-ch (munge-seal-resource event))
         (>!! internal-complete-ch event))
       (recur))))
@@ -207,9 +219,9 @@
   (loop []
     (when-let [event (<!! complete-ch)]
       (when (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
-        (munge-complete-task event)
-        (when (:onyx.core/completion? event)
-          (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed)))
+        (let [event (munge-complete-task event)]
+          (when (:onyx.core/complete-success? event)
+            (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed))))
       (recur))))
 
 (defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch opts]
@@ -268,6 +280,7 @@
                          :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
                          :onyx.core/seal-node (:node/seal (:nodes payload))
                          :onyx.core/completion-node (:node/completion (:nodes payload))
+                         :onyx.core/cooldown-node (:node/cooldown (:nodes payload))
                          :onyx.core/task-node (:node/task (:nodes payload))
                          :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))

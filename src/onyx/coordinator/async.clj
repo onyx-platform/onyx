@@ -68,6 +68,7 @@
             exhaust (extensions/create sync :exhaust)
             seal (extensions/create sync :seal)
             complete (extensions/create sync :completion)
+            cooldown (extensions/create sync :cooldown)
             status (extensions/create sync :status)
             nodes {:node/peer (:peer-node peer-content)
                    :node/payload payload-node
@@ -75,6 +76,7 @@
                    :node/exhaust (:node exhaust)
                    :node/seal (:node seal)
                    :node/completion (:node complete)
+                   :node/cooldown (:node cooldown)
                    :node/status (:node status)
                    :node/catalog (:task/catalog-node task)
                    :node/workflow (:task/workflow-node task)
@@ -110,17 +112,21 @@
    sync-ch
    #(extensions/seal-resource? sync exhaust-node)))
 
-(defn seal-resource [sync seal? seal-node]
+(defn seal-resource [sync seal? seal-node exhaust-node exhaust-head]
+  (when-not seal?
+    (extensions/on-change sync exhaust-node #(>!! exhaust-head %)))
   (extensions/write-node sync seal-node seal?))
 
-(defn complete-task [sync sync-ch complete-node]
+(defn complete-task [sync sync-ch complete-node cb]
   (serialize
    sync-ch
-   #(if-let [result (extensions/complete sync complete-node)]
-      (when (= (:n-peers result) 1)
-        (extensions/delete sync complete-node)
-        result)
-      false)))
+   #(let [nodes (:nodes (extensions/read-node sync complete-node))
+          cooldown-node (:node/cooldown nodes)]
+      (if-let [result (extensions/complete sync complete-node cooldown-node cb)]
+        (when (= (:n-peers result) 1)
+          (extensions/delete sync complete-node)
+          result)
+        false))))
 
 (defn shutdown-peer [sync peer]
   (let [shutdown (:shutdown (extensions/read-node sync peer))]
@@ -188,17 +194,20 @@
         (>!! seal-head result))
       (recur))))
 
-(defn seal-resource-loop [sync seal-tail]
+(defn seal-resource-loop [sync seal-tail exhaust-head]
   (loop []
     (when-let [result (<!! seal-tail)]
-      (seal-resource sync (:seal? result) (:seal-node result))
+      (seal-resource
+       sync
+       (:seal? result) (:seal-node result)
+       (:exhaust-node result) exhaust-head)
       (recur))))
 
 (defn completion-ch-loop
-  [sync sync-ch complete-tail offer-head]
+  [sync sync-ch complete-tail offer-head complete-head]
   (loop []
     (when-let [node (:path (<!! complete-tail))]
-      (when-let [result (complete-task sync sync-ch node)]
+      (when-let [result (complete-task sync sync-ch node #(>!! complete-head %))]
         (>!! offer-head result))
       (recur))))
 
@@ -424,8 +433,8 @@
         :evict-thread (thread (evict-ch-loop sync sync-ch evict-ch-tail offer-ch-head shutdown-ch-head))
         :offer-revoke-thread (thread (offer-revoke-ch-loop sync sync-ch offer-revoke-ch-tail evict-ch-head))
         :exhaust-thread (thread (exhaust-queue-loop sync sync-ch exhaust-ch-tail seal-ch-head))
-        :seal-thread (thread (seal-resource-loop sync seal-ch-tail))
-        :completion-thread (thread (completion-ch-loop sync sync-ch completion-ch-tail offer-ch-head))
+        :seal-thread (thread (seal-resource-loop sync seal-ch-tail exhaust-ch-head))
+        :completion-thread (thread (completion-ch-loop sync sync-ch completion-ch-tail offer-ch-head completion-ch-head))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
         :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
         :offer-thread (thread (offer-ch-loop sync sync-ch revoke-delay offer-ch-tail ack-ch-head

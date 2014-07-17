@@ -36,6 +36,9 @@
 (defn completion-path [prefix]
   (str root-path "/" prefix "/completion"))
 
+(defn cooldown-path [prefix]
+  (str root-path "/" prefix "/cooldown"))
+
 (defn status-path [prefix]
   (str root-path "/" prefix "/status"))
 
@@ -74,6 +77,7 @@
       (zk/create conn (exhaust-path prefix) :persistent? true)
       (zk/create conn (seal-path prefix) :persistent? true)
       (zk/create conn (completion-path prefix) :persistent? true)
+      (zk/create conn (cooldown-path prefix) :persistent? true)
       (zk/create conn (status-path prefix) :persistent? true)
       (zk/create conn (catalog-path prefix) :persistent? true)
       (zk/create conn (workflow-path prefix) :persistent? true)
@@ -153,6 +157,14 @@
   (let [prefix (:onyx-id sync)
         uuid (UUID/randomUUID)
         node (str (completion-path prefix) "/" uuid)]
+    (zk/create (:conn sync) node :persistent? true)
+    {:node node :uuid uuid}))
+
+(defmethod extensions/create [ZooKeeper :cooldown]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        uuid (UUID/randomUUID)
+        node (str (cooldown-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
     {:node node :uuid uuid}))
 
