@@ -123,7 +123,7 @@
    #(let [nodes (:nodes (extensions/read-node sync complete-node))
           cooldown-node (:node/cooldown nodes)]
       (if-let [result (extensions/complete sync complete-node cooldown-node cb)]
-        (when (= (:n-peers result) 1)
+        (when (<= (:n-peers result) 1)
           (extensions/delete sync complete-node)
           result)
         false))))
