@@ -151,7 +151,7 @@
         
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-down {:completed? true})
-          {:n-peers n :peer-state peer-state}))))
+          (throw (ex-info "Failed to complete task" {:complete? complete? :n n}))))))
 
 (defn incomplete-job-ids [sync]
   (let [job-nodes (extensions/bucket sync :job)
