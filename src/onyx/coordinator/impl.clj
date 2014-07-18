@@ -132,7 +132,6 @@
   (let [node-data (extensions/read-node sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
-        _ (when (nil? (:task-node peer-state)) (prn peer-state) )
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node peer-state) #{:acking :active})]
     (if (or (= (:state peer-state) :active)
@@ -151,7 +150,7 @@
         
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-down {:completed? true})
-          (throw (ex-info "Failed to complete task" {:complete? complete? :n n}))))))
+          (throw (ex-info "Failed to complete task" {:completed? complete? :n n}))))))
 
 (defn incomplete-job-ids [sync]
   (let [job-nodes (extensions/bucket sync :job)
