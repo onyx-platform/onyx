@@ -88,25 +88,45 @@
   (if (= (extensions/version sync peer-node) peer-version)
     (let [node (new-payload sync peer-node payload-ch)]
       (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :onyx.core/new-payload-node node :onyx.core/completion? true))
+      (assoc event :onyx.core/new-payload-node node))
     event))
 
 (defn munge-seal-resource
-  [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node] :as event}]
-  (let [seal-response-ch (chan)]
-    (extensions/on-change sync seal-node #(>!! seal-response-ch %))
-    (extensions/touch-node sync exhaust-node)
-    (let [path (:path (<!! seal-response-ch))
-          seal? (extensions/read-node sync path)]
-      (if seal?
-        (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
-        (merge event {:onyx.core/sealed? false})))))
+  [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node
+           onyx.core/blocked?] :as event}]
+  (if (:try-seal? @blocked?)
+    (merge event {:onyx.core/sealed? false})
+    (let [seal-response-ch (chan)]
+      (extensions/on-change sync seal-node #(>!! seal-response-ch %))
+      (extensions/touch-node sync exhaust-node)
+      (let [response (<!! seal-response-ch)]
+        (let [path (:path response)
+              seal? (extensions/read-node sync path)]
+          (if seal?
+            (do (swap! blocked? assoc :try-seal? true :seal? true)
+                (merge event
+                       (p-ext/seal-resource event)
+                       {:onyx.core/sealed? true}))
+            (do (swap! blocked? assoc :try-seal? true :seal? false)
+                (merge event {:onyx.core/sealed? false}))))))))
 
 (defn munge-complete-task
-  [{:keys [onyx.core/sync onyx.core/completion-node onyx.core/completion?] :as event}]
-  (when completion?
-    (extensions/touch-node sync completion-node))
-  event)
+  [{:keys [onyx.core/sync onyx.core/completion-node
+           onyx.core/cooldown-node onyx.core/blocked? onyx.core/sealed?]
+    :as event}]
+  (let [state @blocked?]
+    (if (or (:complete? state) (not (:try-seal? state)))
+      (assoc event :onyx.core/complete-success? false)
+      (let [complete-response-ch (chan)]
+        (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
+        (extensions/touch-node sync completion-node)
+        (let [response (<!! complete-response-ch)]
+          (let [path (:path response)
+                result (extensions/read-node sync path)]
+            (if (:completed? result)
+              (do (swap! blocked? assoc :complete? true)
+                  (merge event {:onyx.core/complete-success? true}))
+              (merge event {:onyx.core/complete-success? true}))))))))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -198,7 +218,7 @@
 (defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
   (loop []
     (when-let [event (<!! seal-ch)]
-      (if (:onyx.core/completion? event)
+      (if (:onyx.core/tail-batch? event)
         (>!! internal-complete-ch (munge-seal-resource event))
         (>!! internal-complete-ch event))
       (recur))))
@@ -207,9 +227,9 @@
   (loop []
     (when-let [event (<!! complete-ch)]
       (when (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
-        (munge-complete-task event)
-        (when (:onyx.core/completion? event)
-          (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed)))
+        (let [event (munge-complete-task event)]
+          (when (:onyx.core/complete-success? event)
+            (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
 (defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch err-ch opts]
@@ -268,13 +288,16 @@
                          :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
                          :onyx.core/seal-node (:node/seal (:nodes payload))
                          :onyx.core/completion-node (:node/completion (:nodes payload))
+                         :onyx.core/cooldown-node (:node/cooldown (:nodes payload))
+                         :onyx.core/task-node (:node/task (:nodes payload))
                          :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
                          :onyx.core/params (or (get (:fn-params opts) task) [])
                          :onyx.core/queue queue
-                         :onyx.core/sync sync}
+                         :onyx.core/sync sync
+                         :onyx.core/blocked? (atom {:try-seal? false :seal? false :complete? false})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]

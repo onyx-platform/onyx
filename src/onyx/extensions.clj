@@ -16,7 +16,7 @@
 
 (defmulti revoke-offer (fn [sync ack-node] (type sync)))
 
-(defmulti complete (fn [sync complete-node] (type sync)))
+(defmulti complete (fn [sync complete-node cooldown-node cb] (type sync)))
 
 (defmulti next-tasks (fn [sync] (type sync)))
 
@@ -45,6 +45,8 @@
 (defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
 
 (defmulti dereference (fn [sync node] (type sync)))
+
+(defmulti previous-node (fn [sync node] (type sync)))
 
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 

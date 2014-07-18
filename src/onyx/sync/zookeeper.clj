@@ -36,6 +36,9 @@
 (defn completion-path [prefix]
   (str root-path "/" prefix "/completion"))
 
+(defn cooldown-path [prefix]
+  (str root-path "/" prefix "/cooldown"))
+
 (defn status-path [prefix]
   (str root-path "/" prefix "/status"))
 
@@ -74,6 +77,7 @@
       (zk/create conn (exhaust-path prefix) :persistent? true)
       (zk/create conn (seal-path prefix) :persistent? true)
       (zk/create conn (completion-path prefix) :persistent? true)
+      (zk/create conn (cooldown-path prefix) :persistent? true)
       (zk/create conn (status-path prefix) :persistent? true)
       (zk/create conn (catalog-path prefix) :persistent? true)
       (zk/create conn (workflow-path prefix) :persistent? true)
@@ -153,6 +157,14 @@
   (let [prefix (:onyx-id sync)
         uuid (UUID/randomUUID)
         node (str (completion-path prefix) "/" uuid)]
+    (zk/create (:conn sync) node :persistent? true)
+    {:node node :uuid uuid}))
+
+(defmethod extensions/create [ZooKeeper :cooldown]
+  [sync _]
+  (let [prefix (:onyx-id sync)
+        uuid (UUID/randomUUID)
+        node (str (cooldown-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
     {:node node :uuid uuid}))
 
@@ -329,6 +341,17 @@
     (when (seq sorted-children)
       (let [path  (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
+
+(defmethod extensions/previous-node ZooKeeper
+  [sync node]
+  (let [id (util/extract-id node)
+        prev-id (dec id)
+        ;;; Handle decrementing across orders of magnitude and not losing a 0.
+        prev-str (if (< (count (str prev-id)) (count (str id)))
+                   (str "0" prev-id)
+                   (str prev-id))]
+    ;;; Avoid overwriting anything else in the path by prefixing "state-"
+    (clojure.string/replace node (str "state-" id) (str "state-" prev-str))))
 
 (defmethod extensions/node-exists? ZooKeeper
   [sync node]
