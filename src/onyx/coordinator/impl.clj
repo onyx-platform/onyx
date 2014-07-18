@@ -27,37 +27,15 @@
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
 
-(defn n-active-peers [sync task-node]
+(defn n-peers [sync task-node states]
   (let [peers (extensions/bucket sync :peer-state)]
     (count
      (filter
       (fn [peer]
         (let [state (:content (extensions/dereference sync peer))]
           (and (= (:task-node state) task-node)
-               (= (:state state) :active))))
+               (some #{(:state state)} states))))
       peers))))
-
-(defn n-sealing-peers [sync task-node]
-  (let [peers (extensions/bucket sync :peer-state)]
-    (count
-     (filter
-      (fn [peer]
-        (let [state (:content (extensions/dereference sync peer))]
-          (and (= (:task-node state) task-node)
-               (= (:state state) :sealing))))
-      peers))))
-
-(defn n-peers [sync task-node]
-  (let [peers (extensions/bucket sync :peer-state)
-        states (map :content (map (partial extensions/dereference sync) peers))]
-    (count
-     (filter
-      (fn [state]
-        (and (= (:task-node state) task-node)
-             (or (= (:state state) :acking)
-                 (= (:state state) :sealing)
-                 (= (:state state) :active))))
-      states))))
 
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
@@ -142,9 +120,9 @@
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :sealing)]
     (extensions/create-at sync :peer-state (:id peer-state) state)
-    (let [n-active (n-active-peers sync (:task-node peer-state))
-          n (n-peers sync (:task-node peer-state))]
-      ;;; Peer may have died before this event is executed, hence the 0.
+    (let [n-active (n-peers sync (:task-node peer-state) #{:active})
+          n (n-peers sync (:task-node peer-state) #{:acking :active :sealing})]
+      ;; Peer may have died before this event is executed, hence the 0.
       {:seal? (or (<= n 1) (zero? n-active))
        :seal-node (:node/seal (:nodes peer-state))
        :exhaust-node (:node/exhaust (:nodes peer-state))})))
@@ -155,17 +133,19 @@
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         complete? (task-complete? sync (:task-node peer-state))
-        n (n-peers sync (:task-node peer-state))]
+        n (n-peers sync (:task-node peer-state) #{:acking :active})]
     (if (and (not complete?)
-             (= (:task-node node-data) (:task-node peer-state))
              (or (= (:state peer-state) :active)
-                 (= (:state peer-state) :sealing)))
+                 (= (:state peer-state) :sealing)
+                 (= (:state peer-state) :dead)))
       (let [state (assoc (dissoc peer-state :task-node :nodes) :state :idle)]
         (extensions/create-at sync :peer-state (:id node-data) state)
-        
+
         ;; Peer may have died just after completion, hence n may be 0
-        (complete-task sync (:task-node peer-state))
-        (extensions/write-node sync cooldown-down {:completed? true})
+        (when (<= n 1)
+          (complete-task sync (:task-node peer-state)))
+        (extensions/write-node sync cooldown-down {:completed? (<= n 1)})
+
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-down {:completed? true})
           (throw (ex-info "Failed to complete task" {:complete? complete? :n n}))))))
@@ -205,7 +185,7 @@
           tasks))
 
 (defn find-active-task-ids [sync tasks]
-  (filter (fn [task] (>= (n-peers sync task) 1)) tasks))
+  (filter (fn [task] (>= (n-peers sync task #{:active :acking :sealing}) 1)) tasks))
 
 (defn next-inactive-task [sync job-node]
   (let [task-path (extensions/resolve-node sync :task job-node)
@@ -225,7 +205,7 @@
             incomplete-tasks)))
 
 (defn sort-tasks-by-peer-count [sync tasks]
-  (sort-by (partial n-peers sync) (sort tasks)))
+  (sort-by #(n-peers sync % #{:active :acking :sealing}) (sort tasks)))
 
 (defn next-active-task [sync job-node]
   (let [incomplete-tasks (find-incomplete-concurrent-tasks sync job-node)]

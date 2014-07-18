@@ -161,8 +161,8 @@
     (fact "The payload node contains the other node paths"
           (fact (into #{} (keys (:nodes state)))
                 => #{:node/payload :node/ack :node/completion
-                     :node/status :node/catalog :node/workflow
-                     :node/peer :node/exhaust :node/seal}))
+                     :node/status :node/catalog :node/workflow :node/task
+                     :node/peer :node/exhaust :node/seal :node/cooldown}))
 
     (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
     (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
