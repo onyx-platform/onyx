@@ -229,7 +229,7 @@
       (when (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
         (let [event (munge-complete-task event)]
           (when (:onyx.core/complete-success? event)
-            (>!! (:onyx.core/complete-ch event) :onyx.core/task-completed))))
+            (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
 (defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch opts]
