@@ -56,9 +56,9 @@
           shutdown-ch (chan 1)
           status-ch (chan 1)
           
-          dead-head-ch (chan 0)
-          dead-close-tail-ch (chan 0)
-          dead-restart-tail-ch (chan 0)
+          dead-head-ch (chan 1)
+          dead-close-tail-ch (chan 1)
+          dead-restart-tail-ch (chan 1)
           dead-mult (mult dead-head-ch)]
 
       (tap dead-mult dead-close-tail-ch)

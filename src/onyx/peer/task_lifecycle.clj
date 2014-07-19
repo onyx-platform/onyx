@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread go]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn] :as timbre]
@@ -306,97 +306,97 @@
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'read-batch-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'decompress-batch-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'strip-sentinel-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'requeue-sentinel-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'apply-fn-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'compress-batch-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'write-batch-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'status-check-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'ack-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'close-resources-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
       
       (dire/with-handler! #'close-temporal-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'reset-payload-node-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'seal-resource-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-handler! #'complete-task-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
-          (>!! err-ch true)))
+          (go (>!! err-ch true))))
 
       (dire/with-finally! #'inject-temporal-loop
         (fn [& args]
