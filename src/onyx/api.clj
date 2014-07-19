@@ -97,37 +97,37 @@
   (doall
    (map
     (fn [_]
-      (let [stop-ch (chan)]
-        (let [v-peer (system/onyx-peer config)
-              rets
-              {:runner
-               (future
-                 (loop []
-                   (let [rets
-                         (try
-                           (let [live (component/start v-peer)]
-                             (register-peer coord (:node (:peer (:peer live))))
+      (let [stop-ch (chan)
+            v-peer (system/onyx-peer config)]
+        {:runner
+         (future
+           (loop []
+             (let [rets
+                   (try
+                     (let [live (component/start v-peer)]
+                       (register-peer coord (:node (:peer (:peer live))))
 
-                             (let [restart-ch (:dead-restart-tail-ch (:peer live))
-                                   [v ch] (alts!! [stop-ch restart-ch] :priority true)]
-                               (if (= ch stop-ch)
-                                 (try
-                                   (component/stop live)
-                                   (catch Exception e
-                                     (warn e)
-                                     :stopped))
-                                 (try (component/stop live)
-                                      nil
-                                      (catch Exception e
-                                        (warn e)
-                                        :stopped)))))
-                           (catch Exception e
-                             (warn e)
-                             (warn "Virtual peer failed, backing off and rebooting...")
-                             (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                             nil))]
-                     (or rets (recur)))))
-               :shutdown-fn (fn [] (>!! stop-ch true))}] 
-          rets)))
+                       (let [restart-ch (:dead-restart-tail-ch (:peer live))
+                             [v ch] (alts!! [stop-ch restart-ch] :priority true)]
+                         (if (= ch stop-ch)
+                           (try
+                             (component/stop live)
+                             :stopped
+                             (catch Exception e
+                               (warn e)
+                               :stopped))
+                           (try
+                             (component/stop live)
+                             nil
+                             (catch Exception e
+                               (warn e)
+                               :stopped)))))
+                     (catch Exception e
+                       (warn e)
+                       (warn "Virtual peer failed, backing off and rebooting...")
+                       (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
+                       nil))]
+               (or rets (recur)))))
+         :shutdown-fn (fn [] (>!! stop-ch true))}))
     (range n))))
 

@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan mult tap alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :as timbre]
+            [taoensso.timbre :refer [warn] :as timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -14,30 +14,34 @@
       (timbre/warn e))))
 
 (defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse opts]
-  (let [complete-ch (chan 1)
-        err-ch (chan 1)]
-    (loop [pipeline nil]
-      (when-let [[v ch] (alts!! [shutdown-ch err-ch complete-ch payload-ch] :priority true)]
-        (when (and (not (nil? pipeline)) (not= ch err-ch))
-          (component/stop pipeline))
+  (try
+    (let [complete-ch (chan 1)
+          err-ch (chan 1)]
+      (loop [pipeline nil]
+        (when-let [[v ch] (alts!! [shutdown-ch err-ch complete-ch payload-ch] :priority true)]
+          (when (and (not (nil? pipeline)) (not= ch err-ch))
+            (component/stop pipeline))
 
-        (cond (nil? v) (extensions/delete sync (:node pulse))
-              (= ch complete-ch) (recur nil)
-              (= ch shutdown-ch) (recur nil)
-              (= ch err-ch) (force-close-pipeline! pipeline)
-              (= ch payload-ch)
-              (let [payload-node (:path v)
-                    payload (extensions/read-node sync payload-node)
-                    status-ch (chan 1)]
+          (cond (nil? v) (extensions/delete sync (:node pulse))
+                (= ch complete-ch) (recur nil)
+                (= ch shutdown-ch) (recur nil)
+                (= ch err-ch) (force-close-pipeline! pipeline)
+                (= ch payload-ch)
+                (let [payload-node (:path v)
+                      payload (extensions/read-node sync payload-node)
+                      status-ch (chan 1)]
 
-                (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
-                (extensions/touch-node sync (:node/ack (:nodes payload)))
+                  (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
+                  (extensions/touch-node sync (:node/ack (:nodes payload)))
 
-                (<!! status-ch)
+                  (<!! status-ch)
 
-                (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch err-ch opts)]
-                  (recur (component/start new-pipeline)))))))
-    (>!! dead-ch true)))
+                  (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch err-ch opts)]
+                    (recur (component/start new-pipeline))))))))
+    (catch Exception e
+      (warn e))
+    (finally
+     (>!! dead-ch true))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle
@@ -96,8 +100,6 @@
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
-
-    (extensions/delete (:sync component) (:node (:pulse component)))
 
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
