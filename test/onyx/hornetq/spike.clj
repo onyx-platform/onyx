@@ -1,28 +1,100 @@
-(ns onyx.hornetq.spike
-  (:import [org.hornetq.api.core TransportConfiguration]
-           [org.hornetq.api.core.client ClientConsumer]
-           [org.hornetq.api.core.client ClientMessage]
-           [org.hornetq.api.core.client ClientProducer]
-           [org.hornetq.api.core.client ClientSession]
-           [org.hornetq.api.core.client ClientSessionFactory]
-           [org.hornetq.api.core.client HornetQClient]
-           [org.hornetq.api.core.client ServerLocator]
-           [org.hornetq.core.config Configuration]
-           [org.hornetq.core.config.impl ConfigurationImpl]
-           [org.hornetq.core.remoting.impl.invm InVMAcceptorFactory]
-           [org.hornetq.core.remoting.impl.invm InVMConnectorFactory]
-           [org.hornetq.core.server HornetQServer]
-           [org.hornetq.core.server HornetQServers]
-           [org.hornetq.core.server.embedded EmbeddedHornetQ]))
+(ns onyx.hornetq.vm-test
+  (:require [midje.sweet :refer :all]
+            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.api]))
 
-(def server (EmbeddedHornetQ.))
-(.setConfigResourcePath server)
+(def n-messages 2600)
 
-(.start server)
+(def batch-size 1320)
 
-(def tc (TransportConfiguration. (.getName InVMConnectorFactory)))
-(def locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc])))
+(def echo 100)
 
-(def sf (.createSessionFactory locator))
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
+
+(def catalog
+  [{:onyx/name :in
+    :onyx/ident :mem/read-segments
+    :onyx/type :input
+    :onyx/medium :memory
+    :onyx/consumption :concurrent
+    :onyx/bootstrap? true
+    :onyx/batch-size batch-size}
+   
+   {:onyx/name :inc
+    :onyx/fn :onyx.hornetq.vm-test/my-inc
+    :onyx/type :transformer
+    :onyx/consumption :concurrent
+    :onyx/batch-size batch-size}
+   
+   {:onyx/name :out
+    :onyx/ident :mem/write-segments
+    :onyx/type :output
+    :onyx/medium :memory
+    :onyx/consumption :concurrent
+    :onyx/batch-size batch-size}])
+
+(def workflow {:in {:inc :out}})
+
+(def input (map (fn [x] {:n x}) (range n-messages)))
+
+(def output (atom []))
+
+(defmethod p-ext/apply-fn [:input :memory]
+  [event] {:onyx.core/results input})
+
+(defmethod p-ext/apply-fn [:output :memory]
+  [{:keys [onyx.core/decompressed]}]
+  {:onyx.core/results decompressed})
+
+(defmethod p-ext/compress-batch [:output :memory]
+  [{:keys [onyx.core/results]}]
+  {:onyx.core/compressed results})
+
+(defmethod p-ext/write-batch [:output :memory]
+  [{:keys [onyx.core/compressed]}]
+  (doseq [segment compressed]
+    (swap! output conj segment))
+  {})
+
+(defmethod p-ext/seal-resource [:output :memory]
+  [_]
+  (swap! output conj :done)
+  {})
+
+(def id (str (java.util.UUID/randomUUID)))
+
+(def coord-opts {:hornetq/mode :vm
+                 :hornetq/server? true
+                 :zookeeper/address "127.0.0.1:2181"
+                 :onyx/id id
+                 :onyx.coordinator/revoke-delay 5000})
+
+(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+
+(def peer-opts {:hornetq/mode :vm
+                :zookeeper/address "127.0.0.1:2181"
+                :onyx/id id})
+
+(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+
+(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
 
+
+#_(try
+  ;; (dorun (map deref (map :runner v-peers)))
+  (finally
+   (doseq [v-peer v-peers]
+     (try
+       ((:shutdown-fn v-peer))
+       (catch Exception e (prn e))))
+   (try
+     (onyx.api/shutdown conn)
+     (catch Exception e (prn e)))))
+
+#_(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast @output)) => expected)
+  (fact (last @output) => :done))
+
+(count @output)
