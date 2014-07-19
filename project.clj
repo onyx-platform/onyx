@@ -8,7 +8,9 @@
                  [org.clojure/data.generators "0.1.2"]
                  [org.clojure/data.fressian "0.2.0"
                   :exclusions [org.fressian/fressian]]
+                 [org.hornetq/hornetq-commons "2.4.0.Final"]
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
+                 [org.hornetq/hornetq-server "2.4.0.Final"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.datomic/datomic-free "0.9.4755"
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
