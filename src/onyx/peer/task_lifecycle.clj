@@ -2,7 +2,7 @@
     (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
-              [taoensso.timbre :refer [info warn] :as timbre]
+              [taoensso.timbre :refer [info] :as timbre]
               [onyx.coordinator.planning :refer [find-task]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -232,7 +232,7 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch err-ch opts]
+(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -304,99 +304,67 @@
 
       (dire/with-handler! #'inject-temporal-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'read-batch-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'decompress-batch-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'strip-sentinel-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'requeue-sentinel-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'apply-fn-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'compress-batch-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'write-batch-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'status-check-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'ack-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'close-resources-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
       
       (dire/with-handler! #'close-temporal-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'reset-payload-node-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'seal-resource-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-handler! #'complete-task-loop
         java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (>!! err-ch true)))
+        (fn [e & _] (info e)))
 
       (dire/with-finally! #'inject-temporal-loop
         (fn [& args]
@@ -591,10 +559,10 @@
 
     component))
 
-(defn task-lifecycle [id payload sync queue payload-ch complete-ch err-ch opts]
+(defn task-lifecycle [id payload sync queue payload-ch complete-ch opts]
   (map->TaskLifeCycle {:id id :payload payload :sync sync
                        :queue queue :payload-ch payload-ch
-                       :complete-ch complete-ch :err-ch err-ch :opts opts}))
+                       :complete-ch complete-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/start-lifecycle?] :as event}]

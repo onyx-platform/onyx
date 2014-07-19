@@ -1,9 +1,9 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan alts!! >!! <!!]]
+            [clojure.core.async :refer [chan >!! <!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
-            [taoensso.timbre :refer [warn]]
+            [taoensso.timbre :refer [info]]
             [onyx.coordinator.impl :as impl]
             [onyx.system :as system]
             [onyx.extensions :as extensions]))
@@ -31,14 +31,14 @@
   (future
     (loop []
       (let [ch (chan 1)
-            task-path (extensions/resolve-node sync :task job-id)]
+            task-path (extensions/resolve-node sync :task job-id)
+            task-nodes (extensions/bucket-at sync :task job-id)
+            task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
         (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
-        (let [task-nodes (extensions/bucket-at sync :task job-id)
-              task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
-          (if (every? (partial impl/task-complete? sync) task-nodes)
-            true
-            (do (<!! ch)
-                (recur))))))))
+        (if (every? (partial impl/task-complete? sync) task-nodes)
+          true
+          (do (<!! ch)
+              (recur)))))))
 
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
@@ -90,44 +90,19 @@
   (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
 
 (defn start-peers
-  "Launches n virtual peers. Starts a payload thread for each vpeer.
-   Takes a coordinator type to connect to and a virtual peer configuration.
-   Each peer may be stopped by invoking the fn returned by :shutdown-fn."
+  "Launches a number of virtual peers. Starts n
+   (the number of peers to launch) threads, one for each virtual peer.
+   Takes a coordinator type to connect to and a virtual peer configuration."
   [coord n config]
   (doall
    (map
     (fn [_]
-      (let [stop-ch (chan)]
-        (let [v-peer (system/onyx-peer config)
-              rets
-              {:runner
-               (future
-                 (loop []
-                   (let [rets
-                         (try
-                           (let [live (component/start v-peer)]
-                             (register-peer coord (:node (:peer (:peer live))))
-
-                             (let [restart-ch (:dead-restart-tail-ch (:peer live))
-                                   [v ch] (alts!! [stop-ch restart-ch] :priority true)]
-                               (if (= ch stop-ch)
-                                 (try
-                                   (component/stop live)
-                                   (catch Exception e
-                                     (warn e)
-                                     :stopped))
-                                 (try (component/stop live)
-                                      nil
-                                      (catch Exception e
-                                        (warn e)
-                                        :stopped)))))
-                           (catch Exception e
-                             (warn e)
-                             (warn "Virtual peer failed, backing off and rebooting...")
-                             (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                             nil))]
-                     (or rets (recur)))))
-               :shutdown-fn (fn [] (>!! stop-ch true))}] 
+      (let [v-peer (component/start (system/onyx-peer config))]
+        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer))
+                                         (catch Exception e
+                                           (info e))))
+                    :shutdown-fn (fn [] (component/stop v-peer))}]
+          (register-peer coord (:node (:peer (:peer v-peer))))
           rets)))
     (range n))))
 

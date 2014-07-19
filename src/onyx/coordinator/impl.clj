@@ -91,7 +91,7 @@
              (= (:task-node ack-data) (:task-node peer-state))
              (not complete?))
       (let [state (assoc peer-state :state :active)]
-        (:node (extensions/create-at sync :peer-state (:id peer-state) state)))
+        (extensions/create-at sync :peer-state (:id peer-state) state))
       (let [err-val {:complete? complete? :state (:state peer-state)
                      :ack-task (:task-node ack-data) :peer-task (:task-node peer-state)
                      :peer-node peer-node}]
@@ -104,7 +104,7 @@
         peer-state (:content (extensions/dereference sync state-path))]
     (when (and (= (:state peer-state) :acking)
                (= (:task-node ack-data) (:task-node peer-state)))
-      (let [state (assoc (dissoc peer-state :task-node :nodes) :state :revoked)]
+      (let [state (assoc peer-state :state :revoked)]
         (:node (extensions/create-at sync :peer-state (:id peer-state) state))))))
 
 (defmethod extensions/idle-peers ZooKeeper
@@ -132,7 +132,6 @@
   (let [node-data (extensions/read-node sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
-        _ (when (nil? (:task-node peer-state)) (prn peer-state) )
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (:task-node peer-state) #{:acking :active})]
     (if (or (= (:state peer-state) :active)
@@ -151,7 +150,7 @@
         
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-down {:completed? true})
-          (throw (ex-info "Failed to complete task" {:complete? complete? :n n}))))))
+          {:n-peers n :peer-state peer-state}))))
 
 (defn incomplete-job-ids [sync]
   (let [job-nodes (extensions/bucket sync :job)

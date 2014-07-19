@@ -110,5 +110,7 @@
 (onyx.api/shutdown conn)
 (component/stop onyx-server)
 
-(fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done))
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
