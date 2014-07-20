@@ -318,6 +318,49 @@
   [sync _ content]
   (create-log-entry sync shutdown-log-path content))
 
+(defn checkpoint-log [sync f n]
+  (prn "Fill me out"))
+
+(defmethod extensions/checkpoint [ZooKeeper :born-log]
+  [sync _ n]
+  (checkpoint-log sync born-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :death-log]
+  [sync _ n]
+  (checkpoint-log sync death-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :planning-log]
+  [sync _ n]
+  (checkpoint-log sync planning-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :ack-log]
+  [sync _ n]
+  (checkpoint-log sync ack-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :evict-log]
+  [sync _ n]
+  (checkpoint-log sync evict-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :offer-log]
+  [sync _ n]
+  (checkpoint-log sync offer-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :revoke-log]
+  [sync _ n]
+  (checkpoint-log sync revoke-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :seal-log]
+  [sync _ n]
+  (checkpoint-log sync seal-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :complete-log]
+  [sync _ n]
+  (checkpoint-log sync complete-log-path n))
+
+(defmethod extensions/checkpoint [ZooKeeper :shutdown-log]
+  [sync _ n]
+  (checkpoint-log sync shutdown-log-path n))
+
 (defmethod extensions/create-node ZooKeeper
   [sync node]
   (zk/create (:conn sync) node :persistent? true))

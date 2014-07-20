@@ -70,6 +70,8 @@
 
 (defmulti on-delete (fn [sync node db] (type sync)))
 
+(defmulti checkpoint (fn [sync bucket n] (type sync)))
+
 (defmulti create-tx-session (fn [queue] (type queue)))
 
 (defmulti create-consumer (fn [queue session queue-name] (type queue)))
