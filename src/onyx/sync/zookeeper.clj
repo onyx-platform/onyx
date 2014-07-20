@@ -61,8 +61,6 @@
 (defn job-log-path [prefix]
   (str root-path "/" prefix "/job-log"))
 
-
-
 (defn born-log-path [prefix]
   (str root-path "/" prefix "/coordinator/born-log"))
 
@@ -96,14 +94,12 @@
 (defn shutdown-log-path [prefix]
   (str root-path "/" prefix "/coordinator/shutdown-log"))
 
-
 (defrecord ZooKeeper [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper")
-    (let [server (when (:zookeeper/server? opts)
-                   (TestingServer. (:zookeeper.server/port opts)))
+    (let [server (when (:zookeeper/server? opts) (TestingServer. (:zookeeper.server/port opts)))
           conn (zk/connect (:zookeeper/address opts))
           prefix (:onyx/id opts)]
       (zk/create conn root-path :persistent? true)
@@ -123,6 +119,18 @@
       (zk/create conn (shutdown-path prefix) :persistent? true)
       (zk/create conn (job-path prefix) :persistent? true)
       (zk/create conn (job-log-path prefix) :persistent? true)
+
+      (zk/create-all conn (born-log-path) :persistent? true)
+      (zk/create-all conn (death-log-path) :persistent? true)
+      (zk/create-all conn (planning-log-path) :persistent? true)
+      (zk/create-all conn (ack-log-path) :persistent? true)
+      (zk/create-all conn (evict-log-path) :persistent? true)
+      (zk/create-all conn (offer-log-path) :persistent? true)
+      (zk/create-all conn (revoke-log-path) :persistent? true)
+      (zk/create-all conn (exhaust-log-path) :persistent? true)
+      (zk/create-all conn (seal-log-path) :persistent? true)
+      (zk/create-all conn (complete-log-path) :persistent? true)
+      (zk/create-all conn (shutdown-log-path) :persistent? true)
 
       (assoc component :server server :conn conn :prefix (:onyx/id opts))))
 
