@@ -14,9 +14,16 @@
              [org.hornetq.api.core.client HornetQClient]
              [org.hornetq.api.core.client ClientRequestor]
              [org.hornetq.api.core.management ManagementHelper]
-             [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+             [org.hornetq.core.config.impl ConfigurationImpl]
+             [org.hornetq.core.remoting.impl.invm InVMAcceptorFactory]
+             [org.hornetq.core.remoting.impl.invm InVMConnectorFactory]
+             [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]
+             [org.hornetq.core.server JournalType]
+             [org.hornetq.core.server HornetQServers]))
 
 (defmulti connect-to-locator :hornetq/mode)
+
+(defmulti start-server :hornetq/mode)
 
 (defn connect-standalone [host port]
   (let [config {"host" host "port" port}
@@ -26,6 +33,11 @@
 (defmethod connect-to-locator :standalone
   [{:keys [hornetq.standalone/host hornetq.standalone/port]}]
   (connect-standalone host port))
+
+(defmethod connect-to-locator :vm
+  [_]
+  (let [tc (TransportConfiguration. (.getName InVMConnectorFactory))]
+    (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))))
 
 (defmethod connect-to-locator :udp
   [{:keys [hornetq.udp/cluster-name hornetq.udp/group-address
@@ -42,6 +54,24 @@
   (let [jgroups (JGroupsBroadcastGroupConfiguration. file channel-name)
         gdc (DiscoveryGroupConfiguration. cluster-name refresh-timeout discovery-timeout jgroups)]
     (HornetQClient/createServerLocatorWithHA gdc)))
+
+(defmethod start-server :vm
+  [_]
+  (let [tc (TransportConfiguration. (.getName InVMAcceptorFactory))
+        config
+        (doto (ConfigurationImpl.)
+          (.setJournalDirectory "/tmp/journal")
+          (.setJournalType (JournalType/NIO))
+          (.setPersistenceEnabled true)
+          (.setSecurityEnabled false))]
+    (.add (.getAcceptorConfigurations config) tc)
+
+    (let [server (HornetQServers/newHornetQServer config)]
+      (.start server)
+      server)))
+
+(defmethod start-server :default
+  [_] nil)
 
 (defn cluster-name [opts]
   (let [k (first (filter #(= (keyword (name %)) :cluster-name) (keys opts)))]
@@ -62,18 +92,22 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting HornetQ clustered connection")
+    (taoensso.timbre/info "Starting HornetQ connection")
 
-    (let [locator (connect-to-locator opts)
-          _ (.setConsumerWindowSize locator 0)
+    (let [server (when (:hornetq/server? opts) (start-server opts))
+          locator (doto (connect-to-locator opts) (.setConsumerWindowSize 0))
           session-factory (.createSessionFactory locator)]
       (assoc component
+        :server server
         :locator locator
         :session-factory session-factory
         :cluster-name (cluster-name opts))))
 
-  (stop [{:keys [locator session-factory] :as component}]
-    (taoensso.timbre/info "Stopping HornetQ clustered connection")
+  (stop [{:keys [server locator session-factory] :as component}]
+    (taoensso.timbre/info "Stopping HornetQ connection")
+
+    (when server
+      (.stop server))
 
     (.close session-factory)
     (.close locator)
