@@ -272,6 +272,52 @@
         data (serialize-edn content)]
     {:node (zk/create (:conn sync) node :data data :persistent? true :sequential? true)}))
 
+(defn create-log-entry [sync f content]
+  (let [prefix (:onyx/id (:opts sync))
+        node (str (f prefix) "/log-entry-")]
+    {:node (zk/create-all (:conn sync) node :persistent? true :sequential? true)}
+    content))
+
+(defmethod extensions/create [ZooKeeper :born-log]
+  [sync _ content]
+  (create-log-entry sync born-log-path content))
+
+(defmethod extensions/create [ZooKeeper :death-log]
+  [sync _ content]
+  (create-log-entry sync death-log-path content))
+
+(defmethod extensions/create [ZooKeeper :planning-log]
+  [sync _ content]
+  (create-log-entry sync planning-log-path content))
+
+(defmethod extensions/create [ZooKeeper :ack-log]
+  [sync _ content]
+  (create-log-entry sync ack-log-path content))
+
+(defmethod extensions/create [ZooKeeper :evict-log]
+  [sync _ content]
+  (create-log-entry sync evict-log-path content))
+
+(defmethod extensions/create [ZooKeeper :offer-log]
+  [sync _ content]
+  (create-log-entry sync offer-log-path content))
+
+(defmethod extensions/create [ZooKeeper :revoke-log]
+  [sync _ content]
+  (create-log-entry sync revoke-log-path content))
+
+(defmethod extensions/create [ZooKeeper :seal-log]
+  [sync _ content]
+  (create-log-entry sync seal-log-path content))
+
+(defmethod extensions/create [ZooKeeper :complete-log]
+  [sync _ content]
+  (create-log-entry sync complete-log-path content))
+
+(defmethod extensions/create [ZooKeeper :shutdown-log]
+  [sync _ content]
+  (create-log-entry sync shutdown-log-path content))
+
 (defmethod extensions/create-node ZooKeeper
   [sync node]
   (zk/create (:conn sync) node :persistent? true))
