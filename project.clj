@@ -11,6 +11,7 @@
                  [org.hornetq/hornetq-commons "2.4.0.Final"]
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
                  [org.hornetq/hornetq-server "2.4.0.Final"]
+                 [org.apache.curator/curator-test "2.6.0"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.datomic/datomic-free "0.9.4755"
                   :exclusions [com.fasterxml.jackson.core/jackson-core]]

@@ -5,7 +5,8 @@
             [onyx.extensions :as extensions]
             [zookeeper :as zk]
             [zookeeper.util :as util])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [org.apache.curator.test TestingServer]))
 
 (def root-path "/onyx")
 
@@ -60,13 +61,15 @@
 (defn task-path [prefix subpath]
   (str root-path "/" prefix "/task/" subpath))
 
-(defrecord ZooKeeper [addr onyx-id]
+(defrecord ZooKeeper [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper")
-    (let [conn (zk/connect addr)
-          prefix onyx-id]
+    (let [server (when (:zookeeper/server? opts)
+                   (TestingServer. (:zookeeper.server/port opts)))
+          conn (zk/connect (:zookeeper/address opts))
+          prefix (:onyx/id opts)]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path prefix) :persistent? true)
       (zk/create conn (peer-path prefix) :persistent? true)
@@ -85,15 +88,19 @@
       (zk/create conn (job-path prefix) :persistent? true)
       (zk/create conn (job-log-path prefix) :persistent? true)
 
-      (assoc component :conn conn :prefix onyx-id)))
+      (assoc component :server server :conn conn :prefix (:onyx/id opts))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper")
     (zk/close (:conn component))
+
+    (when (:server component)
+      (.stop (:server component)))
+
     component))
 
-(defn zookeeper [{:keys [zookeeper/address onyx/id]}]
-  (map->ZooKeeper {:addr address :onyx-id id}))
+(defn zookeeper [opts]
+  (map->ZooKeeper {:opts opts}))
 
 (defn trailing-id [s]
   (last (clojure.string/split s #"/")))
@@ -106,7 +113,7 @@
 
 (defmethod extensions/create [ZooKeeper :peer]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (peer-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -114,7 +121,7 @@
 
 (defmethod extensions/create [ZooKeeper :pulse]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (pulse-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? false)
@@ -122,7 +129,7 @@
 
 (defmethod extensions/create [ZooKeeper :payload]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (payload-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -130,7 +137,7 @@
 
 (defmethod extensions/create [ZooKeeper :ack]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (ack-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -138,7 +145,7 @@
 
 (defmethod extensions/create [ZooKeeper :exhaust]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (exhaust-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -146,7 +153,7 @@
 
 (defmethod extensions/create [ZooKeeper :seal]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (seal-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -154,7 +161,7 @@
 
 (defmethod extensions/create [ZooKeeper :completion]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (completion-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -162,7 +169,7 @@
 
 (defmethod extensions/create [ZooKeeper :cooldown]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (cooldown-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -170,7 +177,7 @@
 
 (defmethod extensions/create [ZooKeeper :status]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (status-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -178,7 +185,7 @@
 
 (defmethod extensions/create [ZooKeeper :catalog]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (catalog-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -186,7 +193,7 @@
 
 (defmethod extensions/create [ZooKeeper :workflow]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (workflow-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -194,7 +201,7 @@
 
 (defmethod extensions/create [ZooKeeper :shutdown]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (shutdown-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
@@ -202,7 +209,7 @@
 
 (defmethod extensions/create [ZooKeeper :task]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         uuid (UUID/randomUUID)
         node (str (task-path prefix uuid) "/task-")]
     {:node (zk/create-all (:conn sync) node :persistent? true :sequential? true)
@@ -210,13 +217,13 @@
 
 (defmethod extensions/create [ZooKeeper :job]
   [sync _ subpath]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         node (str (job-path prefix) "/" subpath)]
     {:node (zk/create (:conn sync) node :persistent? true)}))
 
 (defmethod extensions/create [ZooKeeper :job-log]
   [sync _ content]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         node (str (job-log-path prefix) "/offer-")
         data (serialize-edn content)]
     {:node (zk/create (:conn sync) node :data data :persistent? true :sequential? true)}))
@@ -227,80 +234,80 @@
 
 (defmethod extensions/create-at [ZooKeeper :peer-state]
   [sync _ subpath content]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         node (str (peer-state-path prefix) "/" subpath "/state-")
         data (serialize-edn content)]
     {:node (zk/create-all (:conn sync) node :data data :persistent? true :sequential? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :workflow]
   [sync _ job-id content]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         data (serialize-edn content)
         node (str (workflow-path prefix) "/" job-id)]
     {:node (zk/create (:conn sync) node :data data :persistent? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :catalog]
   [sync _ job-id content]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         data (serialize-edn content)
         node (str (catalog-path prefix) "/" job-id)]
     {:node (zk/create (:conn sync) node :data data :persistent? true)}))
 
 (defmethod extensions/create-at [ZooKeeper :task]
   [sync _ subpath content]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         data (serialize-edn content)
         node (str (task-path prefix subpath) "/task-")]
     {:node (zk/create-all (:conn sync) node :data data :persistent? true :sequential? true)}))
 
 (defmethod extensions/bucket [ZooKeeper :peer-state]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         children (or (zk/children (:conn sync) (peer-state-path prefix)) [])]
     (map #(str (peer-state-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         children (or (zk/children (:conn sync) (job-path prefix)) [])]
     (map #(str (job-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job-log]
   [sync _]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         children (or (zk/children (:conn sync) (job-log-path prefix)) [])]
     (map #(str (job-log-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         job-id (trailing-id subpath) 
         children (or (zk/children (:conn sync) (task-path prefix job-id)) [])]
     (map #(str (task-path prefix job-id) "/" %) children)))
 
 (defmethod extensions/resolve-node [ZooKeeper :peer]
   [sync _ subpath]
-  (let [prefix (:onyx-id sync)]
+  (let [prefix (:onyx/id (:opts sync))]
     (str (peer-path prefix) "/" subpath)))
 
 (defmethod extensions/resolve-node [ZooKeeper :peer-state]
   [sync _ subpath & more]
-  (let [prefix (:onyx-id sync)]
+  (let [prefix (:onyx/id (:opts sync))]
     (str (peer-state-path prefix) "/" subpath)))
 
 (defmethod extensions/resolve-node [ZooKeeper :job-log]
   [sync _ & more]
-  (let [prefix (:onyx-id sync)]
+  (let [prefix (:onyx/id (:opts sync))]
     (job-log-path prefix)))
 
 (defmethod extensions/resolve-node [ZooKeeper :job]
   [sync _ job-id & more]
-  (let [prefix (:onyx-id sync)]
+  (let [prefix (:onyx/id (:opts sync))]
     (str (job-path prefix) "/" job-id)))
 
 (defmethod extensions/resolve-node [ZooKeeper :task]
   [sync _ job-node & more]
-  (let [prefix (:onyx-id sync)]
+  (let [prefix (:onyx/id (:opts sync))]
     (task-path prefix (trailing-id job-node))))
 
 (defmethod extensions/children ZooKeeper
@@ -328,14 +335,14 @@
 
 (defmethod extensions/read-node-at [ZooKeeper :task]
   [sync _ & subpaths]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         job-id (first subpaths)
         task-id (second subpaths)]
     (extensions/read-node sync (str (task-path prefix job-id) "/" task-id))))
 
 (defmethod extensions/dereference ZooKeeper
   [sync node]
-  (let [prefix (:onyx-id sync)
+  (let [prefix (:onyx/id (:opts sync))
         children (or (zk/children (:conn sync) node) [])
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)

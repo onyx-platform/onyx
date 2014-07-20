@@ -66,6 +66,8 @@
 
 (def coord-opts {:hornetq/mode :vm
                  :hornetq/server? true
+                 :zookeeper/server? true
+                 :zookeeper.server/port 2181
                  :zookeeper/address "127.0.0.1:2181"
                  :onyx/id id
                  :onyx.coordinator/revoke-delay 5000})
@@ -89,13 +91,13 @@
 
 @p
 
-(doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
-
-(onyx.api/shutdown conn)
-
 (let [results @output
       expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
+
+(doseq [v-peer v-peers]
+  ((:shutdown-fn v-peer)))
+
+(onyx.api/shutdown conn)
 

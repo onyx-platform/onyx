@@ -64,7 +64,7 @@
        (doseq [_ (range n)]
          (alts!! sync-spies))
 
-       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+       (let [states (->> (onyx-zk/peer-state-path (:onyx/id (:opts sync)))
                          (zk/children (:conn sync))
                          (map (partial extensions/resolve-node sync :peer-state))
                          (map (partial extensions/dereference sync))
