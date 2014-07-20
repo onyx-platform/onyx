@@ -32,8 +32,8 @@
        (<!! offer-ch-spy)
 
        (facts "There is one peer"
-              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
-                    peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))]
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx/id (:opts sync))))
+                    peer-path (str (onyx-zk/peer-path (:onyx/id (:opts sync))) "/" (first peers))]
                 (fact (count peers) => 1)
                 (fact (:id (extensions/read-node sync peer-path)) => (:uuid peer))))))))
 
@@ -70,8 +70,8 @@
              (extensions/node-exists? sync (:node pulse)) => false)
 
        (fact "The only peer is marked as dead"
-             (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
-                   peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))
+             (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx/id (:opts sync))))
+                   peer-path (str (onyx-zk/peer-path (:onyx/id (:opts sync))) "/" (first peers))
                    peer-id (:id (extensions/read-node sync peer-path))
                    state-path (extensions/resolve-node sync :peer-state peer-id)
                    state (:content (extensions/dereference sync state-path))]
@@ -340,7 +340,7 @@
        (<!! offer-ch-spy)
 
        (facts "The peer gets marked as :revoked after eviction"
-              (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx-id sync)))
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx/id (:opts sync))))
                     path (extensions/resolve-node sync :peer-state (first peers))
                     state (:content (extensions/dereference sync path))]
                 (fact (count peers) => 1)
@@ -449,7 +449,7 @@
        (<!! sync-spy)
 
        ;;; Complete all the tasks.
-       (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
+       (let [task-path (onyx-zk/task-path (:onyx/id (:opts sync)) (<!! job-ch))]
          (doseq [child (extensions/children sync task-path)]
            (impl/complete-task sync child)))
 
