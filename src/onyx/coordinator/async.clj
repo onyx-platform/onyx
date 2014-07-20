@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.coordinator.async
     (:require [clojure.core.async :refer [chan thread mult tap timeout close! >!! <!!]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info]]
+              [taoensso.timbre :refer [info warn]]
               [dire.core :as dire]
               [onyx.extensions :as extensions]
               [onyx.coordinator.planning :as planning]
@@ -229,12 +229,8 @@
 (defn failure-ch-loop [failure-tail]
   (loop []
     (when-let [failure (<!! failure-tail)]
-      (info (:e failure) (:ch failure))
+      (warn (:e failure) (:ch failure))
       (recur))))
-
-(defn log-if-not-interrupted [e & _]
-  (if-not (instance? java.lang.InterruptedException e)
-    (info e)))
 
 (defrecord Coordinator []
   component/Lifecycle
@@ -360,40 +356,40 @@
           false))
 
       (dire/with-handler! #'sync-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'born-peer-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'dead-peer-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'planning-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'ack-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'evict-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'offer-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'offer-revoke-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'exhaust-queue-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'seal-resource-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'completion-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (dire/with-handler! #'shutdown-ch-loop
-        java.lang.Exception log-if-not-interrupted)
+        java.lang.Exception (fn [e & _] (warn e)))
 
       (assoc component
         :sync-ch sync-ch

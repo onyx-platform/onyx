@@ -37,7 +37,6 @@
                (some #{(:state state)} states))))
       peers))))
 
-
 ;;; Exception needs to go away, just pass if its already there.
 ;;; Make it legal to go from :idle -> :idle, not a problem since
 ;;; writes are serial.
@@ -58,7 +57,6 @@
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :dead)]
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
-
 
 ;;; Ensure "tasks" always has the same order.
 ;;; Ensure that node creation is idempotent.

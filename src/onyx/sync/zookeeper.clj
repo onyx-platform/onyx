@@ -55,11 +55,47 @@
 (defn job-path [prefix]
   (str root-path "/" prefix "/job"))
 
+(defn task-path [prefix subpath]
+  (str root-path "/" prefix "/task/" subpath))
+
 (defn job-log-path [prefix]
   (str root-path "/" prefix "/job-log"))
 
-(defn task-path [prefix subpath]
-  (str root-path "/" prefix "/task/" subpath))
+
+
+(defn born-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/born-log"))
+
+(defn death-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/death-log"))
+
+(defn planning-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/planning-log"))
+
+(defn ack-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/ack-log"))
+
+(defn evict-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/evict-log"))
+
+(defn offer-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/offer-log"))
+
+(defn revoke-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/revoke-log"))
+
+(defn exhaust-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/exhaust-log"))
+
+(defn seal-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/seal-log"))
+
+(defn complete-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/complete-log"))
+
+(defn shutdown-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/shutdown-log"))
+
 
 (defrecord ZooKeeper [opts]
   component/Lifecycle
