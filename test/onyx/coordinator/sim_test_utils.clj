@@ -113,12 +113,12 @@
            n-tasks)) => true))
 
 (def legal-transitions
-  {:idle #{:acking :dead}
-   :acking #{:active :revoked :dead}
-   :active #{:sealing :idle :dead}
-   :sealing #{:idle :dead}
-   :revoked #{:dead}
-   :dead #{}})
+  {:idle #{:idle :acking :dead}
+   :acking #{:acking :active :revoked :dead}
+   :active #{:active :sealing :idle :dead}
+   :sealing #{:sealing :idle :dead}
+   :revoked #{:revoked :dead}
+   :dead #{:dead}})
 
 (defn peer-state-transition-correctness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]

@@ -75,6 +75,7 @@
     job-id))
 
 ;;; job-log-record can't be written twice
+;;; Allow :acking -> :acking
 (defmethod extensions/mark-offered ZooKeeper
   [sync task-node peer-id nodes]
   (let [peer-state-path (extensions/resolve-node sync :peer-state peer-id)
