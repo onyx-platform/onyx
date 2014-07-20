@@ -89,13 +89,13 @@
 
 @p
 
-(let [results @output
-      expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
-
 (doseq [v-peer v-peers]
   ((:shutdown-fn v-peer)))
 
 (onyx.api/shutdown conn)
+
+(let [results @output
+      expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
