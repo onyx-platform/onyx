@@ -94,6 +94,9 @@
 (defn shutdown-log-path [prefix]
   (str root-path "/" prefix "/coordinator/shutdown-log"))
 
+(defn with-checkpoint-path [path]
+  (str path "/checkpoint"))
+
 (defrecord ZooKeeper [opts]
   component/Lifecycle
 
@@ -131,6 +134,18 @@
       (zk/create-all conn (seal-log-path) :persistent? true)
       (zk/create-all conn (complete-log-path) :persistent? true)
       (zk/create-all conn (shutdown-log-path) :persistent? true)
+
+      (zk/create conn (with-checkpoint-path (born-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (death-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (planning-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (ack-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (evict-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (offer-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (revoke-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (exhaust-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (seal-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (complete-log-path)) :persistent? true)
+      (zk/create conn (with-checkpoint-path (shutdown-log-path)) :persistent? true)
 
       (assoc component :server server :conn conn :prefix (:onyx/id opts))))
 
@@ -319,7 +334,9 @@
   (create-log-entry sync shutdown-log-path content))
 
 (defn checkpoint-log [sync f n]
-  (prn "Fill me out"))
+  (let [checkpoint (str (f) "/checkpoint")
+        cp (extensions/read-node sync checkpoint)]
+    (extensions/write-node sync checkpoint (inc (or cp 0)))))
 
 (defmethod extensions/checkpoint [ZooKeeper :born-log]
   [sync _ n]
