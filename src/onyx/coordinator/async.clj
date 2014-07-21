@@ -135,7 +135,7 @@
   (loop []
     (when-let [_ (<!! born-tail)]
       (let [checkpoint (extensions/read-checkpoint sync :born-log)
-            peer (extensions/log-entry-at sync :born-log checkpoint)]
+            peer (extensions/next-log-entry sync :born-log checkpoint)]
         (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
           (extensions/create sync :offer-log peer)
           (extensions/checkpoint sync :born-log)
