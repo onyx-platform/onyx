@@ -70,11 +70,11 @@
 
 (defmulti on-delete (fn [sync node db] (type sync)))
 
-(defmulti read-checkpoint (fn [sync bucket] [(type sync) bucket]))
+(defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
 
-(defmulti checkpoint (fn [sync bucket n] [(type sync) bucket]))
+(defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
 
-(defmulti next-log-entry (fn [sync bucket n] [(type sync) bucket]))
+(defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))
 
 (defmulti create-tx-session (fn [queue] (type queue)))
 

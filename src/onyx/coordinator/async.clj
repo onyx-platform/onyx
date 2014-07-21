@@ -134,11 +134,11 @@
 (defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
   (loop []
     (when-let [_ (<!! born-tail)]
-      (let [checkpoint (extensions/read-checkpoint sync :born-log)
-            peer (extensions/next-log-entry sync :born-log checkpoint)]
+      (let [offset (extensions/next-offset sync :born-log)
+            peer (extensions/log-entry-at sync :born-log offset)]
         (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
           (extensions/create sync :offer-log peer)
-          (extensions/checkpoint sync :born-log)
+          (extensions/checkpoint sync :born-log offset)
           (>!! offer-head true))
         (recur)))))
 
