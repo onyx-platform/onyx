@@ -10,6 +10,9 @@
 
 (def root-path "/onyx")
 
+;; Log starts at 0, so the first checkpoint will increment from -1 to 0.
+(def log-start-offset -1)
+
 (defn prefix-path [prefix]
   (str root-path "/" prefix))
 
@@ -94,9 +97,6 @@
 (defn shutdown-log-path [prefix]
   (str root-path "/" prefix "/coordinator/shutdown-log"))
 
-(defn with-checkpoint-path [path]
-  (str path "/checkpoint"))
-
 (defrecord ZooKeeper [opts]
   component/Lifecycle
 
@@ -134,18 +134,6 @@
       (zk/create-all conn (seal-log-path) :persistent? true)
       (zk/create-all conn (complete-log-path) :persistent? true)
       (zk/create-all conn (shutdown-log-path) :persistent? true)
-
-      (zk/create conn (with-checkpoint-path (born-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (death-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (planning-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (ack-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (evict-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (offer-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (revoke-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (exhaust-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (seal-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (complete-log-path)) :persistent? true)
-      (zk/create conn (with-checkpoint-path (shutdown-log-path)) :persistent? true)
 
       (assoc component :server server :conn conn :prefix (:onyx/id opts))))
 
@@ -333,50 +321,139 @@
   [sync _ content]
   (create-log-entry sync shutdown-log-path content))
 
-(defn checkpoint-log [sync f n]
-  (let [checkpoint (str (f) "/checkpoint")
-        cp (extensions/read-node sync checkpoint)]
-    (extensions/write-node sync checkpoint (inc (or cp 0)))))
+(defn read-checkpoint [sync path]
+  (or (extensions/read-node sync path) log-start-offset))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :born-log]
+  [sync _]
+  (read-checkpoint sync (born-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :death-log]
+  [sync _]
+  (read-checkpoint sync (death-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :planning-log]
+  [sync _]
+  (read-checkpoint sync (planning-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :ack-log]
+  [sync _]
+  (read-checkpoint sync (ack-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :evict-log]
+  [sync _]
+  (read-checkpoint sync (evict-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :offer-log]
+  [sync _]
+  (read-checkpoint sync (offer-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :revoke-log]
+  [sync _]
+  (read-checkpoint sync (revoke-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :seal-log]
+  [sync _]
+  (read-checkpoint sync (seal-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :complete-log]
+  [sync _]
+  (read-checkpoint sync (complete-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/read-checkpoint [ZooKeeper :shutdown-log]
+  [sync _]
+  (read-checkpoint sync (shutdown-log-path (:onyx/id (:opts sync)))))
+
+(defn checkpoint-log [sync path n]
+  (let [cp (extensions/read-node sync path)]
+    (extensions/write-node sync path (inc (or cp log-start-offset)))))
 
 (defmethod extensions/checkpoint [ZooKeeper :born-log]
   [sync _ n]
-  (checkpoint-log sync born-log-path n))
+  (checkpoint-log sync (born-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :death-log]
   [sync _ n]
-  (checkpoint-log sync death-log-path n))
+  (checkpoint-log sync (death-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :planning-log]
   [sync _ n]
-  (checkpoint-log sync planning-log-path n))
+  (checkpoint-log sync (planning-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :ack-log]
   [sync _ n]
-  (checkpoint-log sync ack-log-path n))
+  (checkpoint-log sync (ack-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :evict-log]
   [sync _ n]
-  (checkpoint-log sync evict-log-path n))
+  (checkpoint-log sync (evict-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :offer-log]
   [sync _ n]
-  (checkpoint-log sync offer-log-path n))
+  (checkpoint-log sync (offer-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :revoke-log]
   [sync _ n]
-  (checkpoint-log sync revoke-log-path n))
+  (checkpoint-log sync (revoke-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :seal-log]
   [sync _ n]
-  (checkpoint-log sync seal-log-path n))
+  (checkpoint-log sync (seal-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :complete-log]
   [sync _ n]
-  (checkpoint-log sync complete-log-path n))
+  (checkpoint-log sync (complete-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/checkpoint [ZooKeeper :shutdown-log]
   [sync _ n]
-  (checkpoint-log sync shutdown-log-path n))
+  (checkpoint-log sync (shutdown-log-path (:onyx/id (:opts sync))) n))
+
+(defn read-log-entry [sync path n]
+  (let [children (or (zk/children (:conn sync) path) [])
+        sorted-children (util/sort-sequential-nodes children)]
+    (when (seq sorted-children)
+      (let [path (str path "/" (nth sorted-children n))]
+        (extensions/read-node sync path)))))
+
+(defmethod extensions/log-entry-at [ZooKeeper :born-log]
+  [sync _ n]
+  (read-log-entry sync (born-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :death-log]
+  [sync _ n]
+  (read-log-entry sync (death-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :planning-log]
+  [sync _ n]
+  (read-log-entry sync (planning-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :ack-log]
+  [sync _ n]
+  (read-log-entry sync (ack-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :evict-log]
+  [sync _ n]
+  (read-log-entry sync (evict-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :offer-log]
+  [sync _ n]
+  (read-log-entry sync (offer-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :revoke-log]
+  [sync _ n]
+  (read-log-entry sync (revoke-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :seal-log]
+  [sync _ n]
+  (read-log-entry sync (seal-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :complete-log]
+  [sync _ n]
+  (read-log-entry sync (complete-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :shutdown-log]
+  [sync _ n]
+  (read-log-entry sync (shutdown-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/create-node ZooKeeper
   [sync node]

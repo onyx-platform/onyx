@@ -55,7 +55,8 @@
 
   IRegister
   (register-peer [this peer-node]
-    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
+    (extensions/create (:sync onyx-coord) :born-log peer-node)
+    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) true))
 
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
