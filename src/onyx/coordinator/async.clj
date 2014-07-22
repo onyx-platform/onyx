@@ -5,6 +5,7 @@
               [dire.core :as dire]
               [onyx.extensions :as extensions]
               [onyx.coordinator.planning :as planning]
+              [onyx.coordinator.repair :as r]
               [onyx.coordinator.impl]))
 
 (def ch-capacity 10000)
@@ -276,8 +277,8 @@
           exhaust-ch-head (chan ch-capacity)
           seal-ch-head (chan ch-capacity)
           completion-ch-head (chan ch-capacity)
-          failure-ch-head (chan ch-capacity)
           shutdown-ch-head (chan ch-capacity)
+          failure-ch-head (chan ch-capacity)
 
           planning-ch-tail (chan ch-capacity)
           born-peer-ch-tail (chan ch-capacity)
@@ -289,8 +290,8 @@
           exhaust-ch-tail (chan ch-capacity)
           seal-ch-tail (chan ch-capacity)
           completion-ch-tail (chan ch-capacity)
-          failure-ch-tail (chan ch-capacity)
           shutdown-ch-tail (chan ch-capacity)
+          failure-ch-tail (chan ch-capacity)
 
           planning-mult (mult planning-ch-head)
           born-peer-mult (mult born-peer-ch-head)
@@ -302,8 +303,8 @@
           exhaust-mult (mult exhaust-ch-head)
           seal-mult (mult seal-ch-head)
           completion-mult (mult completion-ch-head)
-          failure-mult (mult failure-ch-head)
-          shutdown-mult (mult shutdown-ch-head)]
+          shutdown-mult (mult shutdown-ch-head)
+          failure-mult (mult failure-ch-head)]
       
       (tap planning-mult planning-ch-tail)
       (tap born-peer-mult born-peer-ch-tail)
@@ -315,8 +316,8 @@
       (tap exhaust-mult exhaust-ch-tail)
       (tap seal-mult seal-ch-tail)
       (tap completion-mult completion-ch-tail)
-      (tap failure-mult failure-ch-tail)
       (tap shutdown-mult shutdown-ch-tail)
+      (tap failure-mult failure-ch-tail)
 
       (dire/with-handler! #'apply-serial-fn
         java.lang.Exception
@@ -418,6 +419,18 @@
       (dire/with-handler! #'shutdown-ch-loop
         java.lang.Exception (fn [e & _] (warn e)))
 
+      (r/repair-planning-messages!)
+      (r/repair-birth-messages!)
+      (r/repair-death-messages!)
+      (r/repair-evict-messages!)
+      (r/repair-offer-messages!)
+      (r/repair-revoke-messages!)
+      (r/repair-ack-messages! sync #(>!! ack-ch-head %))
+      (r/repair-exhaust-messages!)
+      (r/repair-seal-meessages!)
+      (r/repair-completion-messages!)
+      (r/repair-shutdown-messages!)
+
       (assoc component
         :sync-ch sync-ch
         
@@ -431,8 +444,8 @@
         :exhaust-ch-head exhaust-ch-head
         :seal-ch-head seal-ch-head
         :completion-ch-head completion-ch-head
-        :failure-ch-head failure-ch-head
         :shutdown-ch-head shutdown-ch-head
+        :failure-ch-head failure-ch-head
 
         :planning-mult planning-mult
         :born-peer-mult born-peer-mult
@@ -444,8 +457,8 @@
         :exhaust-mult exhaust-mult
         :seal-mult seal-mult
         :completion-mult completion-mult
-        :failure-mult failure-mult
         :shutdown-mult shutdown-mult
+        :failure-mult failure-mult
 
         :sync-thread (thread (sync-ch-loop sync sync-ch))
         :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head))
@@ -476,8 +489,8 @@
     (close! (:exhaust-ch-head component))
     (close! (:seal-ch-head component))
     (close! (:completion-ch-head component))
-    (close! (:failure-ch-head component))
     (close! (:shutdown-ch-head component))
+    (close! (:failure-ch-head component))
 
     component))
 

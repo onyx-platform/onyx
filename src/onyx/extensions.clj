@@ -40,9 +40,13 @@
 
 (defmulti touch-node (fn [sync node] (type sync)))
 
+(defmulti touched? (fn [sync bucket node] [(type sync) bucket]))
+
 (defmulti read-node (fn [sync node] (type sync)))
 
 (defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
+
+(defmulti list-nodes (fn [sync bucket] [(type sync) bucket]))
 
 (defmulti dereference (fn [sync node] (type sync)))
 

@@ -553,6 +553,15 @@
     (zk/set-data (:conn sync) node (:data contents)
                  (:version (:stat contents)))))
 
+(defmethod extensions/touched? [ZooKeeper :ack]
+  [sync node]
+  (let [contents (zk/data (:conn sync) node)]
+    (> (:version (:stat contents)) 1)))
+
+(defmethod extensions/list-nodes [ZooKeeper :ack]
+  [sync _]
+  (extensions/children sync (ack-path (:onyx/id (:opts sync)))))
+
 (defmethod extensions/read-node ZooKeeper
   [sync node]
   (let [data (:data (zk/data (:conn sync) node))]
