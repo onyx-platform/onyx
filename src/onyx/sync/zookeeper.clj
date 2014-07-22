@@ -61,7 +61,7 @@
 (defn task-path [prefix subpath]
   (str root-path "/" prefix "/task/" subpath))
 
-(defn plan-path [prefix subpath]
+(defn plan-path [prefix]
   (str root-path "/" prefix "/plan"))
 
 (defn job-log-path [prefix]
@@ -363,6 +363,10 @@
   [sync _]
   (next-offset sync (revoke-log-path (:onyx/id (:opts sync)))))
 
+(defmethod extensions/next-offset [ZooKeeper :exhaust-log]
+  [sync _]
+  (next-offset sync (exhaust-log-path (:onyx/id (:opts sync)))))
+
 (defmethod extensions/next-offset [ZooKeeper :seal-log]
   [sync _]
   (next-offset sync (seal-log-path (:onyx/id (:opts sync)))))
@@ -449,6 +453,10 @@
 (defmethod extensions/log-entry-at [ZooKeeper :revoke-log]
   [sync _ n]
   (read-log-entry-at sync (revoke-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :exhaust-log]
+  [sync _ n]
+  (read-log-entry-at sync (exhaust-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/log-entry-at [ZooKeeper :seal-log]
   [sync _ n]
