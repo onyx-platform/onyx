@@ -133,7 +133,7 @@
 
 (defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
   (loop []
-    (when-let [_ (<!! born-tail)]
+    (when (<!! born-tail)
       (let [offset (extensions/next-offset sync :born-log)
             peer (extensions/log-entry-at sync :born-log offset)]
         (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
@@ -142,13 +142,19 @@
           (>!! offer-head true))
         (recur)))))
 
+;;; todo - create log entry to lead into this loop
 (defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
   (loop []
-    (when-let [peer-node (<!! dead-tail)]
-      (when (mark-peer-death sync sync-ch peer-node)
-        (>!! evict-head peer-node)
-        (>!! offer-head peer-node))
-      (recur))))
+    (when (<!! dead-tail)
+      (let [offset (extensions/next-offset sync :death-log)
+            peer-node (extensions/log-entry-at sync :death-log offset)]
+        (when (mark-peer-death sync sync-ch peer-node)
+          (extensions/create sync :evict-log peer-node)
+          (extensions/create sync :offer-log peer-node)
+          (extensions/checkpoint sync :death-log offset)
+          (>!! evict-head peer-node)
+          (>!! offer-head peer-node))
+        (recur)))))
 
 (defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
@@ -166,29 +172,39 @@
 
 (defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
   (loop []
-    (when-let [node (<!! evict-tail)]
-      (evict-peer sync sync-ch node)
-      (>!! shutdown-head node)
-      (>!! offer-head node)
-      (recur))))
+    (when (<!! evict-tail)
+      (let [offset (extensions/next-offset sync :evict-log)
+            node (extensions/log-entry-at sync :evict-log offset)]
+        (evict-peer sync sync-ch node)
+        (extensions/create sync :shutdown-log node)
+        (extensions/create sync :offer-log node)
+        (extensions/checkpoint sync :evict-log offset)
+        (>!! shutdown-head node)
+        (>!! offer-head node)
+        (recur)))))
 
 (defn offer-ch-loop
   [sync sync-ch revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
   (loop []
-    (when-let [event (<!! offer-tail)]
-      (offer-task sync sync-ch
-                  #(>!! ack-head %)
-                  #(>!! exhaust-head %)
-                  #(>!! complete-head %)
-                  #(thread (<!! (timeout revoke-delay))
-                           (>!! revoke-head %)))
-      (recur))))
+    (when (<!! offer-tail)
+      (let [offset (extensions/next-offset sync :offer-log)]
+        (offer-task sync sync-ch
+                    #(>!! ack-head %)
+                    #(>!! exhaust-head %)
+                    #(>!! complete-head %)
+                    #(thread (<!! (timeout revoke-delay))
+                             (>!! revoke-head %)))
+        (extensions/checkpoint sync :offer-log offset)
+        (recur)))))
 
 (defn offer-revoke-ch-loop [sync sync-ch offer-revoke-tail evict-head]
   (loop []
-    (when-let [{:keys [peer-node ack-node]} (<!! offer-revoke-tail)]
-      (revoke-offer sync sync-ch peer-node ack-node #(>!! evict-head %))
-      (recur))))
+    (when (<!! offer-revoke-tail)
+      (let [offset (extensions/next-offset sync :revoke-log)
+            {:keys [peer-node ack-node]} (extensions/log-entry-at sync :revoke-log offset)]
+        (revoke-offer sync sync-ch peer-node ack-node #(>!! evict-head %))
+        (extensions/checkpoint sync :revoke-log offset)
+        (recur)))))
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
@@ -199,12 +215,15 @@
 
 (defn seal-resource-loop [sync seal-tail exhaust-head]
   (loop []
-    (when-let [result (<!! seal-tail)]
-      (seal-resource
-       sync
-       (:seal? result) (:seal-node result)
-       (:exhaust-node result) exhaust-head)
-      (recur))))
+    (when (<!! seal-tail)
+      (let [offset (extensions/next-offset sync :seal-log)
+            result (extensions/log-entry-at sync :seal-log offset)]
+        (seal-resource
+         sync
+         (:seal? result) (:seal-node result)
+         (:exhaust-node result) exhaust-head)
+        (extensions/checkpoint sync :seal-log offset)
+        (recur)))))
 
 (defn completion-ch-loop
   [sync sync-ch complete-tail offer-head complete-head]
