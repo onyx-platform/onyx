@@ -258,6 +258,14 @@
     (zk/create (:conn sync) node :persistent? true)
     {:node node :uuid uuid}))
 
+(defmethod extensions/create [ZooKeeper :plan]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        uuid (UUID/randomUUID)
+        node (str (plan-path prefix) "/" uuid)]
+    (zk/create (:conn sync) node :persistent? true)
+    {:node node :uuid uuid}))
+
 (defmethod extensions/create [ZooKeeper :task]
   [sync _]
   (let [prefix (:onyx/id (:opts sync))
@@ -270,12 +278,6 @@
   [sync _ subpath]
   (let [prefix (:onyx/id (:opts sync))
         node (str (job-path prefix) "/" subpath)]
-    {:node (zk/create (:conn sync) node :persistent? true)}))
-
-(defmethod extensions/create [ZooKeeper :plan]
-  [sync _ subpath]
-  (let [prefix (:onyx/id (:opts sync))
-        node (str (plan-path prefix) "/" subpath)]
     {:node (zk/create (:conn sync) node :persistent? true)}))
 
 (defmethod extensions/create [ZooKeeper :job-log]

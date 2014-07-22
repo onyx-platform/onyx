@@ -11,12 +11,12 @@
 
 (defmethod dispatch-request "/submit-job"
   [coordinator request]
-  (let [data (read-string (slurp (:body request)))
+  (let [job (read-string (slurp (:body request)))
         ch (chan 1)
         node (extensions/create (:sync coordinator) :plan)
         cb #(>!! ch (extensions/read-node (:sync coordinator) (:path %)))]
-    (extensions/on-change (:node node) cb)
-    (extensions/create (:sync coordinator) :planning-log data)
+    (extensions/on-change (:sync coordinator) (:node node) cb)
+    (extensions/create (:sync coordinator) :planning-log {:job job :node (:node node)})
     (>!! (:planning-ch-head (:coordinator coordinator)) true)
     (<!! ch)))
 

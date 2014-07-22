@@ -48,8 +48,8 @@
     (let [ch (chan 1)
           node (extensions/create (:sync onyx-coord) :plan)
           cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
-      (extensions/on-change (:node node) cb)
-      (extensions/create (:sync onyx-coord) :planning-log job)
+      (extensions/on-change (:sync onyx-coord) (:node node) cb)
+      (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
       (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
       (<!! ch)))
 

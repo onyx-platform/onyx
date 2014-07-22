@@ -215,7 +215,8 @@
   (loop []
     (when-let [node (:path (<!! exhaust-tail))]
       (when-let [result (exhaust-queue sync sync-ch node)]
-        (>!! seal-head result))
+        (extensions/create sync :seal-log result)
+        (>!! seal-head true))
       (recur))))
 
 (defn seal-resource-loop [sync seal-tail exhaust-head]
