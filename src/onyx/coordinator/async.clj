@@ -146,16 +146,13 @@
 ;;; todo - create log entry to lead into this loop
 (defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
   (loop []
-    (when (<!! dead-tail)
-      (let [offset (extensions/next-offset sync :death-log)
-            peer-node (extensions/log-entry-at sync :death-log offset)]
-        (when (mark-peer-death sync sync-ch peer-node)
-          (extensions/create sync :evict-log peer-node)
-          (extensions/create sync :offer-log peer-node)
-          (extensions/checkpoint sync :death-log offset)
-          (>!! evict-head peer-node)
-          (>!! offer-head peer-node))
-        (recur)))))
+    (when-let [peer-node (<!! dead-tail)]
+      (when (mark-peer-death sync sync-ch peer-node)
+        (extensions/create sync :evict-log peer-node)
+        (extensions/create sync :offer-log peer-node)
+        (>!! evict-head peer-node)
+        (>!! offer-head peer-node))
+      (recur))))
 
 (defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
