@@ -46,6 +46,7 @@
   ISubmit
   (submit-job [this job]
     (let [ch (chan 1)]
+      ;; todo - make a log entry
       (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
       (<!! ch)))
 

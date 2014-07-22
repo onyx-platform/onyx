@@ -12,6 +12,7 @@
   [coordinator request]
   (let [data (read-string (slurp (:body request)))
         ch (chan 1)]
+    ;; todo - make a log entry
     (>!! (:planning-ch-head (:coordinator coordinator)) [data ch])
     (<!! ch)))
 

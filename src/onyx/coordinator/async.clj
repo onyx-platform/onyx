@@ -158,9 +158,13 @@
 
 (defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
-    (when-let [[job ch] (<!! planning-tail)]
-      (let [job-id (plan-job sync queue job)]
-        (>!! ch job-id)
+    (when (<!! planning-tail)
+      (let [offset (extensions/next-offset sync :planning-log)
+            {:keys [job node]} (extensions/log-entry-at sync :planning-log offset)
+            job-id (plan-job sync queue job)]
+        (extensions/write-node sync node job-id)
+        (extensions/create sync :offer-log job-id)
+        (extensions/checkpoint sync :planning-log offset)
         (>!! offer-head job-id)
         (recur)))))
 
