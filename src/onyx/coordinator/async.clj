@@ -422,14 +422,14 @@
       (r/repair-planning-messages!)
       (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
       (r/repair-death-messages!)
-      (r/repair-evict-messages!)
-      (r/repair-offer-messages!)
-      (r/repair-revoke-messages!)
+      (r/repair-evict-messages! sync #(>!! evict-ch-head %))
+      (r/repair-offer-messages! sync #(>!! offer-ch-head %))
+      (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))
       (r/repair-ack-messages! sync #(>!! ack-ch-head %))
-      (r/repair-exhaust-messages!)
-      (r/repair-seal-meessages!)
+      (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
+      (r/repair-seal-meessages! sync #(>!! seal-ch-head %))
       (r/repair-completion-messages!)
-      (r/repair-shutdown-messages!)
+      (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
 
       (assoc component
         :sync-ch sync-ch

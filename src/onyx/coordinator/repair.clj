@@ -1,27 +1,29 @@
 (ns ^:no-doc onyx.coordinator.repair
     (:require [onyx.extensions :as extensions]))
 
-(defn repair-planning-messages! []
-  )
-
-(defn repair-birth-messages! [sync cb]
+(defn fast-forward-log [sync cb bucket]
   (loop []
-    (let [offset (extensions/next-offset sync :born-log)]
-      (when-let [entry (extensions/log-entry-at sync :born-log offset)]
+    (let [offset (extensions/next-offset sync bucket)]
+      (when-let [entry (extensions/log-entry-at sync bucket offset)]
         (cb entry)
         (recur)))))
+
+(defn repair-planning-messages! [])
+
+(defn repair-birth-messages! [sync cb]
+  (fast-forward-log sync :born-log cb))
 
 (defn repair-death-messages! []
   )
 
-(defn repair-evict-messages! []
-  )
+(defn repair-evict-messages! [sync cb]
+  (fast-forward-log sync :evict-log cb))
 
-(defn repair-offer-messages! []
-  )
+(defn repair-offer-messages! [sync cb]
+  (fast-forward-log sync :offer-log cb))
 
-(defn repair-revoke-messages! []
-  )
+(defn repair-revoke-messages! [sync cb]
+  (fast-forward-log sync :revoke-log cb))
 
 (defn repair-ack-messages! [sync cb]
   (doseq [node (extensions/list-nodes sync :ack)]
@@ -33,15 +35,15 @@
       (when (= (:state peer-state) :acking)
         (extensions/ack sync node)))))
 
-(defn repair-exhaust-messages! []
-  )
+(defn repair-exhaust-messages! [sync cb]
+  (fast-forward-log sync :exhaust-log cb))
 
-(defn repair-seal-meessages! []
-  )
+(defn repair-seal-meessages! [sync cb]
+  (fast-forward-log sync :seal-log cb))
 
 (defn repair-completion-messages! []
   )
 
-(defn repair-shutdown-messages! []
-  )
+(defn repair-shutdown-messages! [sync cb]
+  (fast-forward-log sync :shutdown-log cb))
 
