@@ -562,6 +562,10 @@
   [sync _]
   (extensions/children sync (ack-path (:onyx/id (:opts sync)))))
 
+(defmethod extensions/list-nodes [ZooKeeper :completion]
+  [sync _]
+  (extensions/children sync (completion-path (:onyx/id (:opts sync)))))
+
 (defmethod extensions/read-node ZooKeeper
   [sync node]
   (let [data (:data (zk/data (:conn sync) node))]

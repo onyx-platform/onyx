@@ -428,7 +428,7 @@
       (r/repair-ack-messages! sync #(>!! ack-ch-head %))
       (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
       (r/repair-seal-meessages! sync #(>!! seal-ch-head %))
-      (r/repair-completion-messages!)
+      (r/repair-completion-messages! sync #(>!! completion-ch-head %))
       (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
 
       (assoc component
