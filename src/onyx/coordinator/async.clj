@@ -421,7 +421,6 @@
 
       (r/repair-planning-messages!)
       (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
-      (r/repair-death-messages!)
       (r/repair-evict-messages! sync #(>!! evict-ch-head %))
       (r/repair-offer-messages! sync #(>!! offer-ch-head %))
       (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))

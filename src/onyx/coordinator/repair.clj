@@ -23,9 +23,6 @@
 (defn repair-birth-messages! [sync cb]
   (fast-forward-log sync :born-log cb))
 
-(defn repair-death-messages! []
-  )
-
 (defn repair-evict-messages! [sync cb]
   (fast-forward-log sync :evict-log cb))
 
