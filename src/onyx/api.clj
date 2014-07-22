@@ -45,9 +45,12 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (let [ch (chan 1)]
-      ;; todo - make a log entry
-      (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
+    (let [ch (chan 1)
+          node (extensions/create (:sync onyx-coord) :plan)
+          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
+      (extensions/on-change (:node node) cb)
+      (extensions/create (:sync onyx-coord) :planning-log job)
+      (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
       (<!! ch)))
 
   IAwait

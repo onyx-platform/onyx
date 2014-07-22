@@ -61,6 +61,9 @@
 (defn task-path [prefix subpath]
   (str root-path "/" prefix "/task/" subpath))
 
+(defn plan-path [prefix subpath]
+  (str root-path "/" prefix "/plan"))
+
 (defn job-log-path [prefix]
   (str root-path "/" prefix "/job-log"))
 
@@ -120,6 +123,7 @@
       (zk/create conn (catalog-path prefix) :persistent? true)
       (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
+      (zk/create conn (plan-path prefix) :persistent? true)
       (zk/create conn (job-path prefix) :persistent? true)
       (zk/create conn (job-log-path prefix) :persistent? true)
 
@@ -266,6 +270,12 @@
   [sync _ subpath]
   (let [prefix (:onyx/id (:opts sync))
         node (str (job-path prefix) "/" subpath)]
+    {:node (zk/create (:conn sync) node :persistent? true)}))
+
+(defmethod extensions/create [ZooKeeper :plan]
+  [sync _ subpath]
+  (let [prefix (:onyx/id (:opts sync))
+        node (str (plan-path prefix) "/" subpath)]
     {:node (zk/create (:conn sync) node :persistent? true)}))
 
 (defmethod extensions/create [ZooKeeper :job-log]

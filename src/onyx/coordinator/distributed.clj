@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]          
             [taoensso.timbre :as timbre]
             [ring.adapter.jetty :as jetty]
+            [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
 (defmulti dispatch-request
@@ -11,15 +12,19 @@
 (defmethod dispatch-request "/submit-job"
   [coordinator request]
   (let [data (read-string (slurp (:body request)))
-        ch (chan 1)]
-    ;; todo - make a log entry
-    (>!! (:planning-ch-head (:coordinator coordinator)) [data ch])
+        ch (chan 1)
+        node (extensions/create (:sync coordinator) :plan)
+        cb #(>!! ch (extensions/read-node (:sync coordinator) (:path %)))]
+    (extensions/on-change (:node node) cb)
+    (extensions/create (:sync coordinator) :planning-log data)
+    (>!! (:planning-ch-head (:coordinator coordinator)) true)
     (<!! ch)))
 
 (defmethod dispatch-request "/register-peer"
   [coordinator request]
   (let [data (read-string (slurp (:body request)))]
-    (>!! (:born-peer-ch-head (:coordinator coordinator)) data)
+    (extensions/create (:sync coordinator) :born-log data)
+    (>!! (:born-peer-ch-head (:coordinator coordinator)) true)
     :ok))
 
 (defn handler [coordinator]
