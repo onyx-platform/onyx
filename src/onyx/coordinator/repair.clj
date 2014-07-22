@@ -4,8 +4,12 @@
 (defn repair-planning-messages! []
   )
 
-(defn repair-birth-messages! []
-  )
+(defn repair-birth-messages! [sync cb]
+  (loop []
+    (let [offset (extensions/next-offset sync :born-log)]
+      (when-let [entry (extensions/log-entry-at sync :born-log offset)]
+        (cb entry)
+        (recur)))))
 
 (defn repair-death-messages! []
   )

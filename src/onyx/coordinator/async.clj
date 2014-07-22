@@ -420,7 +420,7 @@
         java.lang.Exception (fn [e & _] (warn e)))
 
       (r/repair-planning-messages!)
-      (r/repair-birth-messages!)
+      (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
       (r/repair-death-messages!)
       (r/repair-evict-messages!)
       (r/repair-offer-messages!)
