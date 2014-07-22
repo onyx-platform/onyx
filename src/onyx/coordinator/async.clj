@@ -419,7 +419,7 @@
       (dire/with-handler! #'shutdown-ch-loop
         java.lang.Exception (fn [e & _] (warn e)))
 
-      (r/repair-planning-messages!)
+      (r/repair-planning-messages! sync #(>!! planning-ch-head %))
       (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
       (r/repair-evict-messages! sync #(>!! evict-ch-head %))
       (r/repair-offer-messages! sync #(>!! offer-ch-head %))

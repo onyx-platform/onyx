@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.coordinator.repair
     (:require [onyx.extensions :as extensions]))
 
-(defn fast-forward-log [sync cb bucket]
+(defn fast-forward-log [sync bucket cb]
   (loop []
     (let [offset (extensions/next-offset sync bucket)]
       (when-let [entry (extensions/log-entry-at sync bucket offset)]
@@ -18,7 +18,8 @@
       (when (= (:state peer-state) matching-state)
         (cb node)))))
 
-(defn repair-planning-messages! [])
+(defn repair-planning-messages! [sync cb]
+  (fast-forward-log sync :planning-log cb))
 
 (defn repair-birth-messages! [sync cb]
   (fast-forward-log sync :born-log cb))
