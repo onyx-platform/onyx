@@ -127,7 +127,7 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! hq-config out-queue 1 1))
+(def results (hq-util/consume-queue! hq-config out-queue 1))
 
 (doseq [v-peer v-peers]
   (try

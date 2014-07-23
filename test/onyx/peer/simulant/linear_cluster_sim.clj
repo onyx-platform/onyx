@@ -215,7 +215,7 @@
        (repeatedly (:sim/processCount linear-cluster-sim))
        (into [])))
 
-(def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
+(def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 
