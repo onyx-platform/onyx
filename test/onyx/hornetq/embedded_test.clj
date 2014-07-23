@@ -1,4 +1,4 @@
-(ns onyx.hornetq.vm-test
+(ns onyx.hornetq.embedded-test
   (:require [midje.sweet :refer :all]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.api]))
@@ -8,6 +8,16 @@
 (def batch-size 1320)
 
 (def echo 100)
+
+(def hornetq-cluster-name "onyx-cluster")
+
+(def hornetq-group-address "231.7.7.7")
+
+(def hornetq-group-port 9876)
+
+(def hornetq-refresh-timeout 5000)
+
+(def hornetq-discovery-timeout 5000)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -22,7 +32,7 @@
     :onyx/batch-size batch-size}
    
    {:onyx/name :inc
-    :onyx/fn :onyx.hornetq.vm-test/my-inc
+    :onyx/fn :onyx.hornetq.embedded-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
@@ -64,19 +74,32 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:hornetq/mode :vm
+(def hq-servers ["hornetq/server1" "hornetq/server2" "hornetq/server3"])
+
+(def coord-opts {:hornetq/mode :udp
                  :hornetq/server? true
-                 :hornetq.server/type :vm
-                 :zookeeper/address "127.0.0.1:2182"
+                 :hornetq.udp/cluster-name hornetq-cluster-name
+                 :hornetq.udp/group-address hornetq-group-address
+                 :hornetq.udp/group-port hornetq-group-port
+                 :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+                 :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+                 :hornetq.server/type :embedded
+                 :hornetq.embedded/config hq-servers
+                 :zookeeper/address "127.0.0.1:2185"
                  :zookeeper/server? true
-                 :zookeeper.server/port 2182
+                 :zookeeper.server/port 2185
                  :onyx/id id
                  :onyx.coordinator/revoke-delay 5000})
 
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
-(def peer-opts {:hornetq/mode :vm
-                :zookeeper/address "127.0.0.1:2182"
+(def peer-opts {:hornetq/mode :udp
+                :hornetq.udp/cluster-name hornetq-cluster-name
+                :hornetq.udp/group-address hornetq-group-address
+                :hornetq.udp/group-port hornetq-group-port
+                :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+                :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+                :zookeeper/address "127.0.0.1:2185"
                 :onyx/id id})
 
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))

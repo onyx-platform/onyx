@@ -1,0 +1,53 @@
+<configuration xmlns="urn:hornetq"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="urn:hornetq /schema/hornetq-jms.xsd">
+
+   <connection-factory name="NettyXAConnectionFactory">
+      <xa>true</xa>
+      <connectors>
+         <connector-ref connector-name="netty-udp-connector"/>
+      </connectors>
+      <entries>
+         <entry name="/XAConnectionFactory"/>
+      </entries>
+   </connection-factory>
+   
+   <connection-factory name="NettyConnectionFactory">
+      <xa>false</xa>
+      <connectors>
+         <connector-ref connector-name="netty-udp-connector"/>
+      </connectors>
+      <entries>
+         <entry name="/ConnectionFactory"/>
+      </entries>
+   </connection-factory>
+   
+   <connection-factory name="NettyThroughputConnectionFactory">
+      <xa>true</xa>
+      <connectors>
+         <connector-ref connector-name="netty-throughput-udp-connector"/>
+      </connectors>
+      <entries>
+         <entry name="/XAThroughputConnectionFactory"/>
+      </entries>
+   </connection-factory>
+   
+   <connection-factory name="NettyThroughputConnectionFactory">
+      <xa>false</xa>
+      <connectors>
+         <connector-ref connector-name="netty-throughput-udp-connector"/>
+      </connectors>
+      <entries>
+         <entry name="/ThroughputConnectionFactory"/>
+      </entries>
+   </connection-factory>
+
+   <queue name="DLQ">
+      <entry name="/queue/DLQ"/>
+   </queue>
+   
+   <queue name="ExpiryQueue">
+      <entry name="/queue/ExpiryQueue"/>
+   </queue>
+
+</configuration>
