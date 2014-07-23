@@ -255,5 +255,5 @@
               (<!! offer-ch-spy)
               (<!! offer-ch-spy))))
    
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

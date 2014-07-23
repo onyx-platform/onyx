@@ -144,7 +144,7 @@
                        (doseq [state-path (extensions/bucket sync :peer-state)]
                          (let [state (extensions/dereference sync state-path)]
                            (fact (:state (:content state)) => :idle))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 
 (facts
  "plan one job with four peers"
@@ -247,5 +247,5 @@
                   (doseq [task-node (extensions/children sync task-path)]
                     (when-not (impl/completed-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

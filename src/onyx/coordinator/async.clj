@@ -103,6 +103,7 @@
           (recur task-nodes (rest peers)))))))
 
 (defn revoke-offer [sync sync-ch peer-node ack-node evict-cb]
+  (extensions/create sync :evict-log peer-node)
   (serialize
    sync-ch
    #(when (extensions/revoke-offer sync ack-node)
@@ -140,7 +141,7 @@
         (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
           (extensions/create sync :offer-log peer)
           (extensions/checkpoint sync :born-log offset)
-          (>!! offer-head true))
+          (>!! offer-head peer))
         (recur)))))
 
 ;;; todo - create log entry to lead into this loop
@@ -214,7 +215,7 @@
     (when-let [node (:path (<!! exhaust-tail))]
       (when-let [result (exhaust-queue sync sync-ch node)]
         (extensions/create sync :seal-log result)
-        (>!! seal-head true))
+        (>!! seal-head result))
       (recur))))
 
 (defn seal-resource-loop [sync seal-tail exhaust-head]

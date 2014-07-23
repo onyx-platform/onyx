@@ -84,5 +84,5 @@
                      (filter (partial = :inc))
                      (count))
                 => 2))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 
