@@ -93,7 +93,7 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
+(def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (try
   ;; (dorun (map deref (map :runner v-peers)))
