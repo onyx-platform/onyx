@@ -8,10 +8,10 @@
   (:import [java.util UUID]
            [org.apache.curator.test TestingServer]))
 
-(def root-path "/onyx")
-
 ;; Log starts at 0, so the first checkpoint will increment from -1 to 0.
 (def log-start-offset -1)
+
+(def root-path "/onyx")
 
 (defn prefix-path [prefix]
   (str root-path "/" prefix))
@@ -63,6 +63,9 @@
 
 (defn plan-path [prefix]
   (str root-path "/" prefix "/plan"))
+
+(defn election-path [prefix]
+  (str root-path "/" prefix "/election"))
 
 (defn job-log-path [prefix]
   (str root-path "/" prefix "/job-log"))
@@ -124,6 +127,7 @@
       (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
       (zk/create conn (plan-path prefix) :persistent? true)
+      (zk/create conn (election-path prefix) :persistent? true)
       (zk/create conn (job-path prefix) :persistent? true)
       (zk/create conn (job-log-path prefix) :persistent? true)
 
@@ -265,6 +269,13 @@
         node (str (plan-path prefix) "/" uuid)]
     (zk/create (:conn sync) node :persistent? true)
     {:node node :uuid uuid}))
+
+(defmethod extensions/create [ZooKeeper :election]
+  [sync _ content]
+  (let [prefix (:onyx/id (:opts sync))
+        node (str (job-log-path prefix) "/proposal-")
+        data (serialize-edn content)]
+    {:node (zk/create (:conn sync) node :data data :persistent? false :sequential? true)}))
 
 (defmethod extensions/create [ZooKeeper :task]
   [sync _]

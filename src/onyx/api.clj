@@ -67,14 +67,16 @@
 
 ;; A coordinator runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
-(deftype HttpCoordinator [uri]
+(deftype HttpCoordinator [opts]
   ISubmit
   (submit-job [this job]
+    ;;;;;; Look up coordinator server addr in ZK ;;;;;;;;;;;
     (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
       (:job-id (read-string (:body response)))))
 
   IRegister
   (register-peer [this peer-node]
+    ;;;;;; Look up coordinator server addr in ZK ;;;;;;;;;;;
     (let [response (post (str "http://" uri "/register-peer") {:body (pr-str peer-node)})]
       (read-string (:body response))))
 
@@ -82,8 +84,9 @@
   (shutdown [this]))
 
 (defmulti connect
-  "Establish a communication channel with the coordinator."
-  (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
+  "Establish a communication channel with the coordinator.
+   kw can be :memory or :distributed."
+  (fn [kw opts] kw))
 
 (defmethod connect :memory
   [uri opts]
@@ -92,7 +95,7 @@
 
 (defmethod connect :distributed
   [uri opts]
-  (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
+  (HttpCoordinator. opts))
 
 (defn start-peers
   "Launches n virtual peers. Starts a payload thread for each vpeer.

@@ -264,6 +264,7 @@
 
   (start [{:keys [sync queue revoke-delay] :as component}]
     (info "Starting Coordinator")
+    
     (let [sync-ch (chan 0)
 
           planning-ch-head (chan ch-capacity)

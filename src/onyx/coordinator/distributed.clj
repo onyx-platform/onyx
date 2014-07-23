@@ -4,6 +4,7 @@
             [taoensso.timbre :as timbre]
             [ring.adapter.jetty :as jetty]
             [onyx.extensions :as extensions]
+            [onyx.coordinator.election :as election]
             [onyx.system :refer [onyx-coordinator]]))
 
 (defmulti dispatch-request
@@ -39,6 +40,12 @@
   (start [component]
     (let [coordinator (component/start (onyx-coordinator opts))]
       (taoensso.timbre/info "Starting Coordinator Netty server")
+
+      (election/block-until-leader!
+       (:sync component)
+       {:host (:onyx.coordinator/host opts)
+        :port (:onyx.coordinator/port opts)})
+      
       (assoc component
         :coordinator coordinator
         :server (jetty/run-jetty (handler coordinator) {:port (:onyx.coordinator/port opts)
