@@ -103,10 +103,10 @@
           (recur task-nodes (rest peers)))))))
 
 (defn revoke-offer [sync sync-ch peer-node ack-node evict-cb]
-  (extensions/create sync :evict-log peer-node)
   (serialize
    sync-ch
    #(when (extensions/revoke-offer sync ack-node)
+      (extensions/create sync :evict-log peer-node)
       (evict-cb ack-node))))
 
 (defn exhaust-queue [sync sync-ch exhaust-node]
@@ -144,7 +144,6 @@
           (>!! offer-head peer))
         (recur)))))
 
-;;; todo - create log entry to lead into this loop
 (defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
   (loop []
     (when-let [peer-node (<!! dead-tail)]
@@ -244,14 +243,14 @@
       (shutdown-peer sync peer)
       (recur))))
 
-(defn sync-ch-loop [sync sync-ch]
+(defn sync-ch-loop [sync sync-ch failure-ch]
   (loop []
     (when-let [[p f args] (<!! sync-ch)]
       (try
         (deliver p (apply-serial-fn f args))
         (catch Exception e
-          (deliver p nil)
-          (throw e)))
+          (>!! failure-ch {:ch sync-ch :e e})
+          (deliver p nil)))
       (recur))))
 
 (defn failure-ch-loop [failure-tail]
@@ -459,7 +458,7 @@
         :shutdown-mult shutdown-mult
         :failure-mult failure-mult
 
-        :sync-thread (thread (sync-ch-loop sync sync-ch))
+        :sync-thread (thread (sync-ch-loop sync sync-ch failure-ch-head))
         :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head))
         :dead-peer-thread (thread (dead-peer-ch-loop sync sync-ch dead-peer-ch-tail evict-ch-head offer-ch-head))
         :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))

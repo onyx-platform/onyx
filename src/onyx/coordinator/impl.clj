@@ -37,9 +37,6 @@
                (some #{(:state state)} states))))
       peers))))
 
-;;; Exception needs to go away, just pass if its already there.
-;;; Make it legal to go from :idle -> :idle, not a problem since
-;;; writes are serial.
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
   (let [peer-data (extensions/read-node sync peer-node)
@@ -49,7 +46,6 @@
       (:node (extensions/create-at sync :peer-state (:id peer-data) state))
       (throw (ex-info "Tried to add a duplicate peer" {:peer-node peer-node})))))
 
-;;; Make it legal to go from :dead -> :dead.
 (defmethod extensions/mark-peer-dead ZooKeeper
   [sync peer-node]
   (let [node-data (extensions/read-node sync peer-node)
@@ -58,8 +54,6 @@
         state (assoc peer-state :state :dead)]
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
 
-;;; Ensure "tasks" always has the same order.
-;;; Ensure that node creation is idempotent.
 (defmethod extensions/plan-job ZooKeeper
   [sync job-id tasks catalog workflow]
   (let [catalog-node (:node (extensions/create-at sync :catalog job-id catalog))
@@ -72,8 +66,6 @@
     (extensions/create sync :job job-id)  
     job-id))
 
-;;; job-log-record can't be written twice
-;;; Allow :acking -> :acking
 (defmethod extensions/mark-offered ZooKeeper
   [sync task-node peer-id nodes]
   (let [peer-state-path (extensions/resolve-node sync :peer-state peer-id)
@@ -87,9 +79,6 @@
             job-log-record {:job (:task/job-id task) :task (:task/id task)}]
         (:node (extensions/create sync :job-log job-log-record))))))
 
-;;; Allow :active -> :active peer state transition
-;;; Exception can stay, it will just be thrown even though the peer acked
-;;; on the last available coordinator.
 (defmethod extensions/ack ZooKeeper
   [sync ack-node]
   (let [ack-data (extensions/read-node sync ack-node)
@@ -108,7 +97,6 @@
                      :peer-node peer-node}]
         (throw (ex-info "Failed to acknowledge task" err-val))))))
 
-;;; Allow :revoked -> :revoked
 (defmethod extensions/revoke-offer ZooKeeper
   [sync ack-node]
   (let [ack-data (extensions/read-node sync ack-node)
@@ -125,7 +113,6 @@
        (map (partial extensions/dereference sync))
        (filter #(= (:state (:content %)) :idle))))
 
-;;; Allow :sealing -> :sealing
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-node]
   (let [node-data (extensions/read-node sync exhaust-node)
@@ -140,8 +127,6 @@
        :seal-node (:node/seal (:nodes peer-state))
        :exhaust-node (:node/exhaust (:nodes peer-state))})))
 
-;;; Result should be computed the same as the first time, so its okay
-;;; to rewrite the cooldown node, and even add another listener.
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-down cb]
   (let [node-data (extensions/read-node sync complete-node)
