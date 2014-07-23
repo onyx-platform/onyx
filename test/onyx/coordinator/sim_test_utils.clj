@@ -145,6 +145,7 @@
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
+        
         (extensions/write-node sync (:node peer)
                                 {:id (:uuid peer)
                                  :peer-node (:node peer)
@@ -152,8 +153,9 @@
                                  :shutdown-node (:node shutdown)
                                  :payload-node (:node payload)})
         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+        (extensions/create sync :born-log (:node peer))
         
-        (>!! (:born-peer-ch-head coordinator) (:node peer))
+        (>!! (:born-peer-ch-head coordinator) true)
 
         (loop [p payload]
           (<!! sync-spy)
