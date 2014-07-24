@@ -78,10 +78,9 @@
   (doall
    (map
     (fn [path]
-      (let [full-path (str path "/hornetq-configuration.xml")]
-        (doto (EmbeddedHornetQ.)
-          (.setConfigResourcePath (str (clojure.java.io/resource full-path)))
-          (.start))))
+      (doto (EmbeddedHornetQ.)
+        (.setConfigResourcePath (str (clojure.java.io/resource path)))
+        (.start)))
     (:hornetq.embedded/config opts))))
 
 (defmethod start-server :default

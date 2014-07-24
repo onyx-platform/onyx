@@ -9,6 +9,13 @@
 
 (def echo 100)
 
+(def id (str (java.util.UUID/randomUUID)))
+
+(def hq-servers
+  ["hornetq/clustered-1.xml"
+   "hornetq/clustered-2.xml"
+   "hornetq/clustered-3.xml"])
+
 (def hornetq-cluster-name "onyx-cluster")
 
 (def hornetq-group-address "231.7.7.7")
@@ -71,10 +78,6 @@
   [_]
   (swap! output conj :done)
   {})
-
-(def id (str (java.util.UUID/randomUUID)))
-
-(def hq-servers ["hornetq/server1" "hornetq/server2" "hornetq/server3"])
 
 (def coord-opts {:hornetq/mode :udp
                  :hornetq/server? true
