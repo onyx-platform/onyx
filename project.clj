@@ -5,6 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                 [org.clojure/tools.nrepl "0.2.3"]
                  [org.clojure/data.generators "0.1.2"]
                  [org.clojure/data.fressian "0.2.0"
                   :exclusions [org.fressian/fressian]]
@@ -22,8 +23,8 @@
                  [clj-http "0.9.1"]
                  [ring "1.2.2" :exclusions [joda-time]]
                  [dire "0.5.1"]]
-  :profiles {:dev {:dependencies [[midje "1.6.2"]]
-                   :plugins [[lein-midje "3.1.3"]
+  :profiles {:dev {:dependencies [[midje "1.6.3"]]
+                   :plugins [[lein-midje "3.1.1"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})
 
