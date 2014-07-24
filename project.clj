@@ -24,5 +24,6 @@
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.2"]]
                    :plugins [[lein-midje "3.1.3"]
-                             [codox "0.8.8"]]}})
+                             [codox "0.8.8"]]}
+             :circle-ci {:jvm-opts ["-Xmx4g"]}})
 
