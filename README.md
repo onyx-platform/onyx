@@ -574,3 +574,244 @@ The virtual peer process is extensively pipelined, providing asynchrony between 
 - `close-temporal-resources`
 
 - `close-lifecycle-resources`
+
+- `seal-resource`
+
+#### ZooKeeper Data
+
+### Official Plugin Listing
+
+- [`onyx-hornetq`](https://gist.github.com/MichaelDrogalis/3072a553274348943716)
+- [`onyx-datomic`](https://gist.github.com/MichaelDrogalis/afe1e1b75639aea968c3)
+- [`onyx-sql`](https://gist.github.com/MichaelDrogalis/dadb7e6f0adbbc64d67c)
+- [`onyx-core-async`](https://gist.github.com/MichaelDrogalis/82be0601f222290c5c63)
+
+### Reliability Guaruntees
+
+### Performance Tuning
+
+- Put the HornetQ journal on its own physical volume
+- Ensure that HornetQ is running on Linux with AIO enabled
+- Put the ZooKeeper jornal on its own physical volume
+- Adjust the number of virtual peers started on each physical node to avoid underworking or pinning the processors.
+- For small segments, batch multiple segments into a single segment, and treat each new segment as a rolled up batch.
+- Use HornetQ's `batch-delay` configuration to increase throughput, at the cost of heightened latency.
+
+### Contributing
+
+
+#### Commit rights
+
+Anyone who has a patch accepted to the Onyx repository may request commit rights on the GitHub project.
+
+#### Running the tests
+
+Run the tests with:
+
+```bash
+lein midje
+```
+
+The full test suite is a battery of about 2,500 assertions. Onyx will echo the facts being checked to standard out and log to a file called `onyx.log` in the root of the repository. Both HornetQ and ZooKeeper must be running locally on ports `5445` and `2181` respectively (the default ports).
+
+The test suite requires one or more ZooKeeper instances and a HornetQ cluster to be running. At least 2 HornetQ servers must run in the cluster in UDP multicast mode. Certain tests force virtual peer failure to tease out race conditions.
+
+### Environment Set up
+
+The following instructions will help you get set up to run Onyx your environment of choice. Onyx is designed to be run in a development environment as close to production as possible without much hassle.
+
+#### Dependencies
+
+- Java 7+
+- Clojure 1.6.0
+- HornetQ 2.4.0
+- ZooKeeper 3.4.5+
+
+#### Development Environment
+
+###### ZooKeeper
+
+There's a pretty good [installation guide for ZooKeeper here](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html). No special configuration is needed. A single ZooKeeper node should be all you need for development purposes.
+
+###### HornetQ
+
+A single, standalone HornetQ server will often suffice for development purposes. The following will guide you through configuring HornetQ for standalone mode.
+
+- [Download HornetQ 2.4.0-Final here](http://hornetq.jboss.org/downloads). Grab the .tar.gz.
+- Untar the downloaded file.
+- HornetQ's security settings are generally not needed for setting up a development environment. In `config/stand-alone/non-clustered/hornetq-configuration.xml`, delete the `security-settings` block. Further, add the following node under `<configuration>`:
+
+```xml
+<security-enabled>false</security-enabled>
+```
+
+- HornetQ's management facilities are used inside of Onyx. In In `config/stand-alone/non-clustered/hornetq-configuration.xml`, add the following as a node under `<configuration>`:
+
+```xml
+<management-address>jms.queue.hornetq.management</management-address>
+```
+
+- Make the following adjustments to `<address-settings>` in `config/stand-alone/non-clustered/hornetq-configuration.xml`:
+
+```xml
+<address-settings>
+    ...
+    <address-setting match="#">
+        .... more settings here ....
+        <dead-letter-address>jms.queue.DLQ</dead-letter-address>
+        <expiry-address>jms.queue.ExpiryQueue</expiry-address>
+        <redelivery-delay>0</redelivery-delay>
+        <max-size-bytes>104857600</max-size-bytes>
+        <page-size-bytes>10485760</page-size-bytes>
+        <redistribution-delay>100</redistribution-delay>
+        <address-full-policy>PAGE</address-full-policy>
+    </address-setting>
+</address-settings>
+```
+
+#### Production Environment
+
+###### ZooKeeper
+
+I recommend running ZooKeeper in either a 3 or 5 node cluster in a production environment. There are no particular set up instructions other than that all potentional coordinators and virtual peers must be able to talk to ZooKeeper. I also recommend running the ZooKeeper cluster via [Exhibitor](https://github.com/Netflix/exhibitor).
+
+###### HornetQ
+
+In a production environment, it's critical to run HornetQ server's in a cluster. Without having a cluster of nodes in place, a fault on the machine housing the HornetQ server becomes a single point of failure. There are 2 options for running HornetQ as a cluster - TCP via JGroups, or UDP via multicast. **Be aware that many cloud providers such as AWS do not allow UDP multicast**. It's annoying, but this constraint is placed on many software packages, and this is not specific to Onyx.
+
+*Node-specific configuration*
+
+For each HornetQ node in the cluster, be sure to change the following values *if* the servers will be running on the same machine:
+
+In `config/stand-alone/clustered/hornetq-beans.xml`:
+
+`<property name="port">${jnp.port:11124}</property>`
+`<property name="rmiPort">${jnp.rmiPort:12124}</property>`
+
+```<param key="host"  value="${hornetq.remoting.netty.host:localhost}"/>```
+```<param key="port"  value="${hornetq.remoting.netty.port:5447}"/>```
+
+```<param key="host"  value="${hornetq.remoting.netty.host:localhost}"/>```
+```<param key="port"  value="${hornetq.remoting.netty.port:5447}"/>```
+
+```<param key="host"  value="${hornetq.remoting.netty.host:localhost}"/>```
+```<param key="port"  value="${hornetq.remoting.netty.batch.port:5457}"/>```
+
+*Common Set up*
+
+- Regardless of whether you use JGroups or UDP multicast, configure each node with the instructions for the development environment - production configuration is an extensions of development configuration.
+
+- Regardless of whether you use JGroups or UDP multicast, add the following node under `<configurable>` to **one** node in your HornetQ cluster:
+
+```xml
+<grouping-handler name="onyx-grouping-handler">
+  <type>LOCAL</type>
+    <address>onyx</address>
+  <timeout>5000</timeout>
+</grouping-handler>
+```
+
+For all other nodes **excluding the previous node**, add the following node under `<configuration>`:
+
+```xml
+<grouping-handler name="onyx-grouping-handler">
+  <type>REMOTE</type>
+    <address>onyx</address>
+  <timeout>5000</timeout>
+</grouping-handler>
+```
+
+*UDP Multicast*
+
+On each HornetQ server, add the following nodes under `<configuration>` to in `config/stand-alone/non-clustered/hornetq-configuration.xml`:
+
+```xml
+<broadcast-groups>
+  <broadcast-group name="onyx-udp-broadcast-group">
+    <group-address>231.7.7.7</group-address>
+    <group-port>9876</group-port>
+    <broadcast-period>5000</broadcast-period>
+    <connector-ref>netty</connector-ref>
+  </broadcast-group>
+</broadcast-groups>
+```
+
+```xml
+<discovery-groups>
+  <discovery-group name="onyx-udp-discovery-group">
+    <group-address>231.7.7.7</group-address>
+    <group-port>9876</group-port>
+    <refresh-timeout>10000</refresh-timeout>
+  </discovery-group>
+</discovery-groups>
+```
+
+```xml
+<cluster-connections>
+  <cluster-connection name="onyx-cluster">
+    <address>onyx</address>
+    <connector-ref>netty</connector-ref>
+    <forward-when-no-consumers>false</forward-when-no-consumers>
+    <discovery-group-ref discovery-group-name="onyx-udp-discovery-group"/>
+  </cluster-connection>
+</cluster-connections>
+```
+
+*JGroups*
+
+On each HornetQ server, add the following nodes under `<configuration>` to in `config/stand-alone/non-clustered/hornetq-configuration.xml`:
+
+```xml
+<broadcast-groups>
+  c<broadcast-group name="onyx-jgroups-broadcast-group">
+    <broadcast-period>5000</broadcast-period>
+    <jgroups-file>onyx-jgroups.xml</jgroups-file>
+    <jgroups-channel>onyx-broadcast-channel</jgroups-channel>
+    <connector-ref>netty</connector-ref>
+  </broadcast-group>
+</broadcast-groups>
+```
+
+```xml
+<discovery-groups>
+  <discovery-group name="onyx-jgroups-discovery-group">
+    <jgroups-file>onyx-jgroups.xml</jgroups-file>
+    <jgroups-channel>onyx-broadcast-channel</jgroups-channel>
+    <refresh-timeout>10000</refresh-timeout>
+  </discovery-group>
+</discovery-groups>
+```
+
+```xml
+<cluster-connections>
+  <cluster-connection name="onyx-cluster">
+    <address>onyx</address>
+    <connector-ref>netty</connector-ref>
+    <forward-when-no-consumers>false</forward-when-no-consumers>
+    <discovery-group-ref discovery-group-name="onyx-jgroups-discovery-group"/>
+  </cluster-connection>
+</cluster-connections>
+```
+
+Add the following file for JGroups configuration:
+
+Replicate the local grouping node.
+
+
+========================================================================================
+
+There are a few gotcha's in running a HornetQ cluster that I'll attempt to save you from:
+
+- 
+
+#### Branching
+
+Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on master or feature branches and forked into a major.minor.x branch when it's time to cut a new release. Pull requests into the master branch are welcome.
+
+
+#### The Author
+
+This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogalis), an independent software consultant.
+
+#### License
+
