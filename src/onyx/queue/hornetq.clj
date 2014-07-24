@@ -19,11 +19,14 @@
              [org.hornetq.core.remoting.impl.invm InVMConnectorFactory]
              [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]
              [org.hornetq.core.server JournalType]
-             [org.hornetq.core.server HornetQServers]))
+             [org.hornetq.core.server HornetQServers]
+             [org.hornetq.core.server.embedded EmbeddedHornetQ]))
 
 (defmulti connect-to-locator :hornetq/mode)
 
-(defmulti start-server :hornetq/mode)
+(defmulti start-server :hornetq.server/type)
+
+(defmulti stop-server (comp :opts :hornetq.server/type))
 
 (defn connect-standalone [host port]
   (let [config {"host" host "port" port}
@@ -70,7 +73,29 @@
       (.start server)
       server)))
 
+(defmethod start-server :embedded
+  [opts]
+  (doall
+   (map
+    (fn [path]
+      (doto (EmbeddedHornetQ.)
+        (.setConfigResourcePath (str (clojure.java.io/resource path)))
+        (.start)))
+    (:hornetq.embedded/config opts))))
+
 (defmethod start-server :default
+  [_] nil)
+
+(defmethod stop-server :vm
+  [component]
+  (.stop (:server component)))
+
+(defmethod stop-server :embedded
+  [component]
+  (doseq [server (:server component)]
+    (.stop server)))
+
+(defmethod stop-server :default
   [_] nil)
 
 (defn cluster-name [opts]
@@ -94,21 +119,22 @@
   (start [component]
     (taoensso.timbre/info "Starting HornetQ connection")
 
-    (let [server (when (:hornetq/server? opts) (start-server opts))
-          locator (doto (connect-to-locator opts) (.setConsumerWindowSize 0))
-          session-factory (.createSessionFactory locator)]
-      (assoc component
-        :server server
-        :locator locator
-        :session-factory session-factory
-        :cluster-name (cluster-name opts))))
+    (try
+      (let [server (start-server opts)
+            locator (doto (connect-to-locator opts) (.setConsumerWindowSize 0))
+            session-factory (.createSessionFactory locator)]
+        (assoc component
+          :server server
+          :locator locator
+          :session-factory session-factory
+          :cluster-name (cluster-name opts)))
+      (catch Exception e
+        (.printStackTrace e))))
 
   (stop [{:keys [server locator session-factory] :as component}]
     (taoensso.timbre/info "Stopping HornetQ connection")
 
-    (when server
-      (.stop server))
-
+    (stop-server opts)
     (.close session-factory)
     (.close locator)
     

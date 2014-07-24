@@ -7,7 +7,7 @@
 
   (start [component]
     (if config
-      (timbre/set-config! config)
+      (timbre/set-config! [] config)
       (do
         (timbre/set-config! [:appenders :standard-out :enabled?] false)
         (timbre/set-config! [:appenders :spit :enabled?] true)
