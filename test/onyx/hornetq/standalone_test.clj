@@ -3,6 +3,8 @@
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
 (def n-messages 15000)
 
 (def batch-size 1320)
@@ -13,16 +15,8 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def (:host (:non-clustered (:hornetq config))) "localhost")
-
-(def (:port (:non-clustered (:hornetq config))) 5465)
-
-(def hq-config {"host" (:host (:non-clustered (:hornetq config))) "port" (:port (:non-clustered (:hornetq config)))})
-
-(hq-util/create-queue! hq-config in-queue)
-(hq-util/create-queue! hq-config out-queue)
-
-(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
+                "port" (:port (:non-clustered (:hornetq config)))})
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -58,22 +52,33 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:hornetq/mode :standalone
-                 :hornetq.standalone/host (:host (:non-clustered (:hornetq config)))
-                 :hornetq.standalone/port (:port (:non-clustered (:hornetq config)))
-                 :zookeeper/address "127.0.0.1:2181"
-                 :onyx/id id
-                 :onyx.coordinator/revoke-delay 5000})
-
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def coord-opts
+  {:hornetq/mode :standalone
+   :hornetq/server? true
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config ["hornetq/non-clustered-1.xml"]
+   :hornetq.standalone/host (:host (:non-clustered (:hornetq config)))
+   :hornetq.standalone/port (:port (:non-clustered (:hornetq config)))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id id
+   :onyx.coordinator/revoke-delay 5000})
 
 (def peer-opts {:hornetq/mode :standalone
                 :hornetq.standalone/host (:host (:non-clustered (:hornetq config)))
                 :hornetq.standalone/port (:port (:non-clustered (:hornetq config)))
-                :zookeeper/address "127.0.0.1:2181"
+                :zookeeper/address (:address (:zookeeper config))
                 :onyx/id id})
 
+(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
+
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
+(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
