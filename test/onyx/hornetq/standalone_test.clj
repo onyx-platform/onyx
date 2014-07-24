@@ -13,11 +13,11 @@
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def hornetq-host "localhost")
+(def (:host (:non-clustered (:hornetq config))) "localhost")
 
-(def hornetq-port 5465)
+(def (:port (:non-clustered (:hornetq config))) 5465)
 
-(def hq-config {"host" hornetq-host "port" hornetq-port})
+(def hq-config {"host" (:host (:non-clustered (:hornetq config))) "port" (:port (:non-clustered (:hornetq config)))})
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -34,8 +34,8 @@
     :onyx/medium :hornetq
     :onyx/consumption :sequential
     :hornetq/queue-name in-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}
    
    {:onyx/name :inc
@@ -50,8 +50,8 @@
     :onyx/medium :hornetq
     :onyx/consumption :sequential
     :hornetq/queue-name out-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
@@ -59,8 +59,8 @@
 (def id (str (java.util.UUID/randomUUID)))
 
 (def coord-opts {:hornetq/mode :standalone
-                 :hornetq.standalone/host hornetq-host
-                 :hornetq.standalone/port hornetq-port
+                 :hornetq.standalone/host (:host (:non-clustered (:hornetq config)))
+                 :hornetq.standalone/port (:port (:non-clustered (:hornetq config)))
                  :zookeeper/address "127.0.0.1:2181"
                  :onyx/id id
                  :onyx.coordinator/revoke-delay 5000})
@@ -68,8 +68,8 @@
 (def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
 (def peer-opts {:hornetq/mode :standalone
-                :hornetq.standalone/host hornetq-host
-                :hornetq.standalone/port hornetq-port
+                :hornetq.standalone/host (:host (:non-clustered (:hornetq config)))
+                :hornetq.standalone/port (:port (:non-clustered (:hornetq config)))
                 :zookeeper/address "127.0.0.1:2181"
                 :onyx/id id})
 
