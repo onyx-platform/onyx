@@ -1,5 +1,19 @@
 ### Environment set up
 
+  - Development environment
+    - in-VM configuration
+  - Test environment
+    - Embedded configuration
+  - Production environment
+    - Link to the HornetQ documentation
+    - chef-onyx
+    - manual set-up
+    - replicating grouping node
+    - replication all nodes
+
+
+
+
 In order to host a coordinator or peer on a node, Java 7+ must be installed.
 Additionally, a ZooKeeper and HornetQ connection need to be available to all the nodes in the cluster.
 See below for the set up each of these services.
@@ -43,3 +57,5 @@ See `chef-onyx`.
 ##### ZooKeeper
 
 There's a pretty good [installation guide for ZooKeeper here](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html). No special configuration is needed.
+
+
