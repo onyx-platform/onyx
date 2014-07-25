@@ -6,7 +6,7 @@ Onyx ships with three distinct APIs to accomodate different needs. A description
 
 The Connection API is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
 
-#### `connect`
+##### `connect`
 
 Connects the calling thread to the Coordinator. Connection returned is used for submitting jobs and starting peers.
 
