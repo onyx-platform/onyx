@@ -4,7 +4,7 @@ Onyx ships with three distinct APIs to accomodate different needs. A description
 
 ### Connection API
 
-The Connection API is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
+The [Connection API](https://github.com/MichaelDrogalis/onyx/blob/user-guide/src/onyx/api.clj) is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
 
 ##### `connect`
 
