@@ -38,17 +38,23 @@ Onyx provides hooks for user-level modification of this map both before the task
 
 ##### `inject-lifecycle-resources`
 
+Adds data once to the start of a peer's task execution. This data can be accessed in every iteration of the pipeline.
+
 ##### `inject-temporal-resources`
+
+Adds data to each iteration of the pipeline per peer task execution. Called at the rstart of each pipeline.
 
 ##### `close-temporal-resources`
 
+Hook for closing out any stateful data injected into the pipeline. Called once at the end of each iteration.
+
 ##### `close-lifecycle-resources`
+
+Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called whether or not the task succeeded or failed for some reason.
 
 ### Peer Pipeline API
 
 The virtual peer process is extensively pipelined, providing asynchrony between each lifecycle function. Hence, each virtual peer allocates at least 11 threads. Each function may be extended for new behavior. The [Peer Pipeline API](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/src/onyx/peer/pipeline_extensions.clj) allows you to latch on.
-
-##### `inject-lifecycle-resources`
 
 ##### `read-batch`
 
