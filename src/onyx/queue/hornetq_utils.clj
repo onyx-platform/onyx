@@ -86,7 +86,8 @@
       (.start session)
       (doseq [k (range n)]
         (when (zero? (mod k echo))
-          (info (format "Read %s segments" k)))
+          (info (format "Read %s segments" k))
+          (.commit session))
         (let [message (.receive consumer)]
           (when message
             (.acknowledge message)
@@ -112,7 +113,8 @@
       (.start session)
       (while (not= (last @results) :done)
         (when (zero? (mod (count @results) echo))
-          (info (format "Read %s segments" (count @results))))
+          (info (format "Read %s segments" (count @results)))
+          (.commit session))
         (let [message (.receive consumer)]
           (when message
             (.acknowledge message)

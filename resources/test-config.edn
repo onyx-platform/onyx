@@ -1,0 +1,14 @@
+{:hornetq {:configs ["hornetq/clustered-1.xml"
+                     "hornetq/clustered-2.xml"
+                     "hornetq/clustered-3.xml"
+                     "hornetq/non-clustered-1.xml"]
+           :non-clustered {:host "localhost"
+                           :port 5465}
+           :cluster-name "onyx-cluster"
+           :group-address "231.7.7.7"
+           :group-port 9876
+           :refresh-timeout 5000
+           :discovery-timeout 5000}
+ :zookeeper {:address "127.0.0.1:2185"
+             :spawn-port 2185}}
+

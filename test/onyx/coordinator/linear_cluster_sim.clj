@@ -10,6 +10,8 @@
             [onyx.coordinator.sim-test-utils :as sim-utils]
             [onyx.api]))
 
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
 (def cluster (atom {}))
 
 (defn create-birth [executor t]
@@ -78,12 +80,17 @@
 (def system
   (onyx-coordinator
    {:hornetq/mode :udp
-    :hornetq.udp/cluster-name "onyx-cluster"
-    :hornetq.udp/group-address "231.7.7.7"
-    :hornetq.udp/group-port 9876
-    :hornetq.udp/refresh-timeout 5000
-    :hornetq.udp/discovery-timeout 5000
-    :zookeeper/address "127.0.0.1:2181"
+    :hornetq/server? true
+    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+    :hornetq.udp/group-address (:group-address (:hornetq config))
+    :hornetq.udp/group-port (:group-port (:hornetq config))
+    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+    :hornetq.server/type :embedded
+    :hornetq.embedded/config (:configs (:hornetq config))
+    :zookeeper/address (:address (:zookeeper config))
+    :zookeeper/server? true
+    :zookeeper.server/port (:spawn-port (:zookeeper config))
     :onyx/id id
     :onyx.coordinator/revoke-delay 2000}))
 

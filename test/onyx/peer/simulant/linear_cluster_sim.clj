@@ -22,26 +22,10 @@
 
 (def echo 1000)
 
-(def hornetq-host "localhost")
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def hornetq-port 5465)
-
-(def hornetq-cluster-name "onyx-cluster")
-
-(def hornetq-group-address "231.7.7.7")
-
-(def hornetq-refresh-timeout 15000)
-
-(def hornetq-discovery-timeout 15000)
-
-(def hornetq-group-port 9876)
-
-(def hq-config {"host" hornetq-host "port" hornetq-port})
-
-(hq-util/create-queue! hq-config in-queue)
-(hq-util/create-queue! hq-config out-queue)
-
-(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
+                "port" (:port (:non-clustered (:hornetq config)))})
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -109,24 +93,33 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def coord-opts {:hornetq/mode :udp
-                 :hornetq.udp/cluster-name hornetq-cluster-name
-                 :hornetq.udp/group-address hornetq-group-address
-                 :hornetq.udp/group-port hornetq-group-port
-                 :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                 :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                 :zookeeper/address "127.0.0.1:2181"
-                 :onyx/id id
-                 :onyx.coordinator/revoke-delay 2000})
+(def coord-opts
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id id
+   :onyx.coordinator/revoke-delay 2000})
 
-(def peer-opts {:hornetq/mode :udp
-                :hornetq.udp/cluster-name hornetq-cluster-name
-                :hornetq.udp/group-address hornetq-group-address
-                :hornetq.udp/group-port hornetq-group-port
-                :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                :zookeeper/address "127.0.0.1:2181"
-                :onyx/id id})
+(def peer-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :onyx/id id})
+
+(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
 
 (def catalog
   [{:onyx/name :in
@@ -135,8 +128,8 @@
     :onyx/medium :hornetq
     :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}
 
    {:onyx/name :inc
@@ -151,13 +144,16 @@
     :onyx/medium :hornetq
     :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
+(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
@@ -221,7 +217,7 @@
 
 (def ozk (component/start
           (onyx-zk/zookeeper
-           {:zookeeper/address "127.0.0.1:2181" :onyx/id id})))
+           {:zookeeper/address (:address (:zookeeper config)) :onyx/id id})))
 
 (facts "All tasks of all jobs are completed"
        (sim-utils/task-completeness ozk))
