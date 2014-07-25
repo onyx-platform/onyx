@@ -43,7 +43,7 @@
 
 (defn onyx-coordinator-connection
   [opts]
-  (map->OnyxCoordinator
+  (map->OnyxCoordinatorConnection
    {:logging-config (logging-config/logging-configuration opts)
     :sync (component/using (zookeeper opts) [:logging-config])}))
 

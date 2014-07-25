@@ -273,7 +273,7 @@
 (defmethod extensions/create [ZooKeeper :election]
   [sync _ content]
   (let [prefix (:onyx/id (:opts sync))
-        node (str (job-log-path prefix) "/proposal-")
+        node (str (election-path prefix) "/proposal-")
         data (serialize-edn content)]
     {:node (zk/create (:conn sync) node :data data :persistent? false :sequential? true)}))
 
@@ -615,29 +615,38 @@
         children (or (zk/children (:conn sync) node) [])
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)
-      (let [path  (str node "/" (last sorted-children))]
+      (let [path (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
 
-(defmethod extensions/previous-node ZooKeeper
-  [sync node]
+(defn previous-node [node node-prefix]
   (let [id (util/extract-id node)
-        prev-id (dec id)
-        ;;; Handle decrementing across orders of magnitude and not losing a 0.
-        prev-str (if (< (count (str prev-id)) (count (str id)))
-                   (str "0" prev-id)
-                   (str prev-id))]
-    ;;; Avoid overwriting anything else in the path by prefixing "state-"
-    (clojure.string/replace node (str "state-" id) (str "state-" prev-str))))
+        prev-id (dec id)]
+    (when (>= prev-id 0)
+      ;; Handle decrementing across orders of magnitude and not losing a 0.
+      (let [prev-str (if (< (count (str prev-id)) (count (str id)))
+                       (str "0" prev-id)
+                       (str prev-id))]
+        ;; Avoid overwriting anything else in the path except the znode itself
+        (clojure.string/replace node (str node-prefix id) (str node-prefix prev-str))))))
+
+(defmethod extensions/previous-node [ZooKeeper :peer-state]
+  [sync _ node]
+  (previous-node node "state-"))
+
+(defmethod extensions/previous-node [ZooKeeper :election]
+  [sync _ node]
+  (previous-node node "proposal-"))
 
 (defmethod extensions/smallest? [ZooKeeper :election]
   [sync bucket node]
-  (= node (extensions/leader sync bucket node)))
+  (= node (extensions/leader sync bucket)))
 
 (defmethod extensions/leader [ZooKeeper :election]
   [sync _]
   (let [prefix (:onyx/id (:opts sync))
-        children (or (zk/children (:conn sync) (election-path prefix)) [])]
-    (first (util/sort-sequential-nodes children))))
+        children (or (zk/children (:conn sync) (election-path prefix)) [])
+        leader (first (util/sort-sequential-nodes children))]
+    (str (election-path prefix) "/" leader)))
 
 (defmethod extensions/node-exists? ZooKeeper
   [sync node]

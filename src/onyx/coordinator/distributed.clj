@@ -45,7 +45,7 @@
        (:sync coordinator)
        {:host (:onyx.coordinator/host opts)
         :port (:onyx.coordinator/port opts)})
-      
+
       (assoc component
         :coordinator coordinator
         :server (jetty/run-jetty (handler coordinator) {:port (:onyx.coordinator/port opts)

@@ -99,8 +99,10 @@
 
 (defmethod connect :distributed
   [kw opts]
-  (let [c (system/onyx-coordinator-connection opts)]
-    (HttpCoordinator. c)))
+  ;; Disallow duplicate Zookeeper hosting - causes a port collision
+  (let [opts (dissoc opts :zookeeper/server?)
+        c (system/onyx-coordinator-connection opts)]
+    (HttpCoordinator. (component/start c))))
 
 (defn start-peers
   "Launches n virtual peers. Starts a payload thread for each vpeer.
