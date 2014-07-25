@@ -31,9 +31,9 @@ Available on Clojars:
 [com.mdrogalis/onyx "0.3.0"]
 ```
 
-### Get Me Started ASAP! [0.3.0]
+### Get Me Started ASAP! `[0.3.0]`
 
-### Full length documentation [0.3.0]
+### Full length documentation `[0.3.0]`
 
 - [What is it?](doc/user-guide/what-is-it.md)
 - [What does it offer?](doc/user-guide/what-does-it-offer.md)
