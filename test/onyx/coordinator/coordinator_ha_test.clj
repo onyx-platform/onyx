@@ -71,7 +71,7 @@
    :onyx.coordinator/port onyx-port-2
    :onyx.coordinator/revoke-delay 5000})
 
-(def onyx-server-2 (d/start-distributed-coordinator coord-opts-2))
+(def onyx-server-2 (future (d/start-distributed-coordinator coord-opts-2)))
 
 (def conn (onyx.api/connect :distributed coord-opts))
 

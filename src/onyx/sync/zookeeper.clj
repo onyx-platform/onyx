@@ -619,13 +619,13 @@
         {:node path :content (extensions/read-node sync path)}))))
 
 (defn previous-node [sync node path]
-  (let [children (or (zk/children (:conn sync) node) [])
+  (let [children (or (zk/children (:conn sync) path) [])
         sorted-children (util/sort-sequential-nodes children)
         sorted-children (map #(str path "/" %) sorted-children)]
     (prn sorted-children)
     (prn node)
     (let [position (.indexOf sorted-children node)]
-      (when (> position -1)
+      (when (> position 0)
         (nth sorted-children (dec position))))))
 
 (defmethod extensions/previous-node [ZooKeeper :peer-state]
