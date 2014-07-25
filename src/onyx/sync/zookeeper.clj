@@ -618,24 +618,23 @@
       (let [path (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
 
-(defn previous-node [node node-prefix]
-  (let [id (util/extract-id node)
-        prev-id (dec id)]
-    (when (>= prev-id 0)
-      ;; Handle decrementing across orders of magnitude and not losing a 0.
-      (let [prev-str (if (< (count (str prev-id)) (count (str id)))
-                       (str "0" prev-id)
-                       (str prev-id))]
-        ;; Avoid overwriting anything else in the path except the znode itself
-        (clojure.string/replace node (str node-prefix id) (str node-prefix prev-str))))))
+(defn previous-node [sync node path]
+  (let [children (or (zk/children (:conn sync) node) [])
+        sorted-children (util/sort-sequential-nodes children)
+        sorted-children (map #(str path "/" %) sorted-children)]
+    (prn sorted-children)
+    (prn node)
+    (let [position (.indexOf sorted-children node)]
+      (when (> position -1)
+        (nth sorted-children (dec position))))))
 
 (defmethod extensions/previous-node [ZooKeeper :peer-state]
   [sync _ node]
-  (previous-node node "state-"))
+  (previous-node sync node (peer-state-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/previous-node [ZooKeeper :election]
   [sync _ node]
-  (previous-node node "proposal-"))
+  (previous-node sync node (election-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/smallest? [ZooKeeper :election]
   [sync bucket node]

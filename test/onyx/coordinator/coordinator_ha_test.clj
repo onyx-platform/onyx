@@ -6,7 +6,7 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def n-messages 15000)
+(def n-messages 60000)
 
 (def batch-size 1320)
 
@@ -53,6 +53,26 @@
 
 (def onyx-server (d/start-distributed-coordinator coord-opts))
 
+(def onyx-port-2 (+ 10000 (rand-int 10000)))
+
+(def coord-opts-2
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :onyx/id id
+   :onyx.coordinator/host "localhost"
+   :onyx.coordinator/port onyx-port-2
+   :onyx.coordinator/revoke-delay 5000})
+
+(def onyx-server-2 (d/start-distributed-coordinator coord-opts-2))
+
 (def conn (onyx.api/connect :distributed coord-opts))
 
 (hq-util/create-queue! hq-config in-queue)
@@ -95,6 +115,10 @@
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
+
+;;; Kill the server and let the stand-by take over
+t(Thread/sleep 15000)
+(d/stop-distributed-coordinator onyx-server)
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
