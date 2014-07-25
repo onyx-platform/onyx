@@ -52,12 +52,6 @@ In your peer boot-up namespace:
 |`:hornetq/host`         | `string`  | The hostname of the HornetQ server to connect to
 |`:hornetq/port`         | `integer` | The port of the HornetQ server to connect to
 
-#### Examples
-
-##### Reading from HornetQ
-
-##### Writing to HornetQ
-
 #### Contributing
 
 Pull requests into the master branch are welcomed.
