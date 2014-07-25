@@ -67,17 +67,21 @@
 
 ;; A coordinator runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
-(deftype HttpCoordinator [opts]
+(deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
-    ;;;;;; Look up coordinator server addr in ZK ;;;;;;;;;;;
-    (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/submit-job" (:host data) (:port data))
+          response (post uri {:body (pr-str job)})]
       (:job-id (read-string (:body response)))))
 
   IRegister
   (register-peer [this peer-node]
-    ;;;;;; Look up coordinator server addr in ZK ;;;;;;;;;;;
-    (let [response (post (str "http://" uri "/register-peer") {:body (pr-str peer-node)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/register-peer" (:host data) (:port data))
+          response (post uri {:body (pr-str peer-node)})]
       (read-string (:body response))))
 
   IShutdown
@@ -89,13 +93,14 @@
   (fn [kw opts] kw))
 
 (defmethod connect :memory
-  [uri opts]
+  [kw opts]
   (let [c (system/onyx-coordinator opts)]
     (InMemoryCoordinator. (component/start c))))
 
 (defmethod connect :distributed
-  [uri opts]
-  (HttpCoordinator. opts))
+  [kw opts]
+  (let [c (system/onyx-coordinator-connection opts)]
+    (HttpCoordinator. c)))
 
 (defn start-peers
   "Launches n virtual peers. Starts a payload thread for each vpeer.

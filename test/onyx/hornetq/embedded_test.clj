@@ -94,7 +94,7 @@
                  :onyx/id id
                  :onyx.coordinator/revoke-delay 5000})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def conn (onyx.api/connect :memory coord-opts))
 
 (def peer-opts {:hornetq/mode :udp
                 :hornetq.udp/cluster-name hornetq-cluster-name

@@ -629,6 +629,16 @@
     ;;; Avoid overwriting anything else in the path by prefixing "state-"
     (clojure.string/replace node (str "state-" id) (str "state-" prev-str))))
 
+(defmethod extensions/smallest? [ZooKeeper :election]
+  [sync bucket node]
+  (= node (extensions/leader sync bucket node)))
+
+(defmethod extensions/leader [ZooKeeper :election]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        children (or (zk/children (:conn sync) (election-path prefix)) [])]
+    (first (util/sort-sequential-nodes children))))
+
 (defmethod extensions/node-exists? ZooKeeper
   [sync node]
   (boolean (zk/exists (:conn sync) node)))

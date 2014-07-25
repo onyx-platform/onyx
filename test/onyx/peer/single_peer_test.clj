@@ -46,7 +46,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :onyx/id id})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def conn (onyx.api/connect :memory coord-opts))
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -84,30 +84,6 @@
     :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
-
-<<<<<<< HEAD
-(def id (str (java.util.UUID/randomUUID)))
-
-(def coord-opts {:hornetq/mode :udp
-                 :hornetq.udp/cluster-name hornetq-cluster-name
-                 :hornetq.udp/group-address hornetq-group-address
-                 :hornetq.udp/group-port hornetq-group-port
-                 :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                 :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                 :zookeeper/address "127.0.0.1:2181"
-                 :onyx/id id
-                 :onyx.coordinator/revoke-delay 5000})
-
-(def conn (onyx.api/connect :memory coord-opts))
-
-(def peer-opts {:hornetq/mode :udp
-                :hornetq.udp/cluster-name hornetq-cluster-name
-                :hornetq.udp/group-address hornetq-group-address
-                :hornetq.udp/group-port hornetq-group-port
-                :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                :zookeeper/address "127.0.0.1:2181"
-                :onyx/id id})
 
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
 

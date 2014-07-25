@@ -45,7 +45,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :onyx/id id})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def conn (onyx.api/connect :memory coord-opts))
 
 (hq-util/create-queue! hq-config out-queue)
 

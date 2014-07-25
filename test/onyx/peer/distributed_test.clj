@@ -53,7 +53,7 @@
 
 (def onyx-server (component/start (server/coordinator-server coord-opts)))
 
-(def conn (onyx.api/connect (str "onyx:distributed//localhost:" onyx-port "/" id) coord-opts))
+(def conn (onyx.api/connect :distributed coord-opts))
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -110,8 +110,6 @@
                  :onyx.coordinator/revoke-delay 5000})
 
 (def onyx-server (component/start (server/coordinator-server coord-opts)))
-
-(def conn (onyx.api/connect (str "onyx:distributed//localhost:" onyx-port "/" id) coord-opts))
 
 (def peer-opts {:hornetq/mode :udp
                 :hornetq.udp/cluster-name hornetq-cluster-name

@@ -8,6 +8,8 @@
 
 (def coordinator-components [:logging-config :sync :queue :coordinator])
 
+(def connection-components [:logging-config :sync])
+
 (def peer-components [:logging-config :sync :queue :peer])
 
 (defrecord OnyxCoordinator [logging-config sync queue]
@@ -16,6 +18,13 @@
     (component/start-system this coordinator-components))
   (stop [this]
     (component/stop-system this coordinator-components)))
+
+(defrecord OnyxCoordinatorConnection [logging-config sync]
+  component/Lifecycle
+  (start [this]
+    (component/start-system this connection-components))
+  (stop [this]
+    (component/stop-system this connection-components)))
 
 (defrecord OnyxPeer [logging-config sync queue]
   component/Lifecycle
@@ -31,6 +40,12 @@
     :sync (component/using (zookeeper opts) [:logging-config])
     :queue (component/using (hornetq opts) [:sync])
     :coordinator (component/using (coordinator opts) [:sync :queue])}))
+
+(defn onyx-coordinator-connection
+  [opts]
+  (map->OnyxCoordinator
+   {:logging-config (logging-config/logging-configuration opts)
+    :sync (component/using (zookeeper opts) [:logging-config])}))
 
 (defn onyx-peer
   [opts]

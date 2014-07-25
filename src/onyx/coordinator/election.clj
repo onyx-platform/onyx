@@ -6,11 +6,11 @@
   (let [node (:node (extensions/create sync :election content))]
     (loop []
       (let [ch (chan)
-            predecessor (extensions/predecessor sync node)]
+            predecessor (extensions/previous-node sync node)]
         (extensions/on-delete sync predecessor #(>!! ch))
     
         (<!! ch)
         (let [children (extensions/children sync :election)]
-          (when-not (extensions/smallest? sync node)
+          (when-not (extensions/smallest? sync :election node)
             (recur)))))))
 

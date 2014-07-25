@@ -52,6 +52,10 @@
 
 (defmulti previous-node (fn [sync node] (type sync)))
 
+(defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
+
+(defmulti leader (fn [sync bucket node] [(type sync) bucket]))
+
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
 (defmulti children (fn [sync node] (type sync)))
