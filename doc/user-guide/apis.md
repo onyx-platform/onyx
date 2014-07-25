@@ -4,17 +4,31 @@ Onyx ships with three distinct APIs to accomodate different needs. A description
 
 ### Connection API
 
+The Connection API is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
+
 - `connect`
+
+Connects the calling thread to the Coordinator. Connection returned is used for submitting jobs and starting peers.
 
 - `start-peers`
 
+Starts N virtual peer pipelines and registers them with the Coordinator for task execution.
+
 - `register-peer`
+
+Informs the Coordinator of a new peer. Used by other API functions, and probably not something you'd want to use directly.
 
 - `submit-job`
 
+Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog` and `:workflow`.
+
 - `await-job-completion`
 
+Given a job ID, blocks the calling thread until the job is complete.
+
 - `shutdown`
+
+Spins down a connection to a Coordinator.
 
 ### Task Lifecycle API
 
