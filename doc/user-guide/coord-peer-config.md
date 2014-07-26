@@ -65,6 +65,13 @@ True to spin up a ZooKeeper server inside the Coordinator for convenience.
 
 #### Embedded Configuration
 
+| key name                                      | type      |
+|-----------------------------------------------|-----------|
+|`:hornetq.embedded/config hq-servers`          |  `seq`    |
+
+##### `:hornetq.embedded/config hq-servers`
+
+A sequence of strings, each representing a HornetQ configuration file on the classpath.
 
 ### Peer
 
