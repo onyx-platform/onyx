@@ -46,7 +46,7 @@ Available on Clojars:
 
 ### Need help?
 
-#### Google Groups
+Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
 
 ### Contributing
 
