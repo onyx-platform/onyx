@@ -81,10 +81,10 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 
 #### Base Configuration
 
-| key name                        | type       |
-|---------------------------------|------------|
-|`:onyx.peer/retry-start-interval`| `int`      |
-|`:onyx.peer/sequential-back-off` | `int`      |
+| key name                        | type       | default|
+|---------------------------------|------------|--------|
+|`:onyx.peer/retry-start-interval`| `int`      | 2000   |
+|`:onyx.peer/sequential-back-off` | `int`      | 2000   |
 
 ##### `:onyx.peer/retry-start-interval`
 
