@@ -1,12 +1,12 @@
 ## Environment
 
-In this section, we'll discuss what you need to test up a develop, testing, and production environment.
-
+In this chapter, we'll discuss what you need to test up a develop, testing, and production environment.
 
 ### Development Environment
 
 #### Dependencies
 
+- Java 7+
 - Clojure 1.6
 
 #### Explanation
@@ -58,9 +58,69 @@ Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're n
 (def conn (onyx.api/connect :memory coord-opts))
 ```
 
+### Test Environment
 
-  - Development environment
-    - in-VM configuration
+#### Dependencies
+
+- Java 7+
+- Clojure 1.6
+
+#### Explanation
+
+For the most part, you're going to want to write your tests using the options described in the development environment. In the in-memory machine starts up much faster, so you'll get more develoment cycles. One thing you're unable to simulate with that set up, though, is running an actual HornetQ cluster as the underlying messaging system. It's critical to be able to have this if you want to test idempotency of your workflow, or you're using functionality like grouping that behaves a bit differently with a HornetQ cluster.
+
+To handle this, Onyx ships with an embedded option for HornetQ. Embeddeding HornetQ means spinning up one or more servers inside the application. This allows you to run a cluster without having to configure HornetQ outside your project. We use embedded HornetQ for the Onyx test suite for this reason.
+
+#### HornetQ
+
+##### Coordinator Launch of Embedded HornetQ
+
+To launch one or more embedded HornetQ nodes, pass `:hornetq/server? true` to the Coordinator options, and specify `:hornetq.server/type :embedded` in the options, too. Finally, embedded servers need a real configuration files to operate. Pass `:hornetq.embedded/config <config file 1, config file 2, ...>` to these options as well. The config file names must be available on the classpath.
+
+To jump past writing these configuration files, you can use [the configuration files that Onyx uses in the test suite](https://github.com/MichaelDrogalis/onyx/tree/master/resources/hornetq).
+
+To connect to the Coordinator to HornetQ, use the normal means as if it were a live cluster. See the example below for the options that the test suite uses.
+
+##### Peer Connection to Embedded HornetQ
+
+Embedded HornetQ is invisible to the peer. Simply connect via the normal means as if it were a live cluster. See the example below:
+
+#### Example
+
+Here's an example of using both HornetQ in embedded mode. Notice that we're running ZooKeeper in-memory for convenience:
+
+```clojure
+(def coord-opts
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config ["hornetq/clustered-1.xml" "hornetq/clustered-2.xml" "hornetq/clustered-3.xml"]
+   :zookeeper/address "127.0.0.1:2185"
+   :zookeeper/server? true
+   :zookeeper.server/port 2185
+   :onyx/id id
+   :onyx.coordinator/revoke-delay 5000})
+
+(def peer-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   :zookeeper/address "127.0.0.1:2185"
+   :onyx/id id})
+
+(def conn (onyx.api/connect :memory coord-opts))
+```
+
+
+
   - Test environment
     - Embedded configuration
   - Production environment
@@ -69,52 +129,4 @@ Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're n
     - manual set-up
     - replicating grouping node
     - replication all nodes
-
-
-
-
-In order to host a coordinator or peer on a node, Java 7+ must be installed.
-Additionally, a ZooKeeper and HornetQ connection need to be available to all the nodes in the cluster.
-See below for the set up each of these services.
-
-#### Chef Recipe
-
-See `chef-onyx`.
-
-#### Manual set up
-
-##### HornetQ 2.4.0-Final
-
-- [Download HornetQ 2.4.0-Final here](http://hornetq.jboss.org/downloads). Grab the .tar.gz.
-- Untar the downloaded file.
-- Make the following adjustments to `config/stand-alone/non-clustered/hornetq-configuration.xml` `security-settings`. We need to enable permission to create and destroy durable queues:
-
-```xml
-<security-settings>
-    <security-setting match="#">
-        <permission type="createNonDurableQueue" roles="guest"/>
-        <permission type="deleteNonDurableQueue" roles="guest"/>
-        <permission type="createDurableQueue" roles="guest"/>
-        <permission type="deleteDurableQueue" roles="guest"/>
-        <permission type="consume" roles="guest"/>
-        <permission type="send" roles="guest"/>
-    </security-setting>
-</security-settings>
-```
-
-- Make the following adjustment to `config/stand-alone/non-clustered/hornetq-configuration.xml`. We need to make HornetQ page messages to disk by default:
-
-```xml
-<address-settings>
-    <address-setting match="#">
-        .... more settings here ....
-        <address-full-policy>PAGE</address-full-policy>
-    </address-setting>
-</address-settings>
-```
-
-##### ZooKeeper
-
-There's a pretty good [installation guide for ZooKeeper here](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html). No special configuration is needed.
-
 
