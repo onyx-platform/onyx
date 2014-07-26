@@ -17,7 +17,7 @@ Available on Clojars:
 [com.mdrogalis/onyx "0.3.0"]
 ```
 
-### Get Me Started ASAP!
+### Quick Start Guide
 
 ### Full length documentation 0.3.0
 
