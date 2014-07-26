@@ -60,16 +60,9 @@ Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're n
 
 ### Production Environment
 
-Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster, a 3-5 node ZooKeeper cluster, and at least one back-up Coordinator, in addition to the original.
+Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster, a 3-5 node ZooKeeper cluster, and at least one back-up Coordinator in addition to the primary Coordinator. I don't recommend running HornetQ in either VM or embedded mode for production as this hurts fault tolerancy significantly. Instead, [download HornetQ 2.4.0-final](http://hornetq.jboss.org/downloads) and configure each server. Stand each server up by running the typical `bin/run.sh` command.
 
-  - Production environment
-    - Link to the HornetQ documentation
-    - chef-onyx
-    - manual set-up
-    - replicating grouping node
-    - replication all nodes
-    - Coordinator
-
+Quick side note when you're standing up HornetQ servers - you might be tempted to copy and paste the entire HornetQ directory to make new nodes in the cluster. That's fine, but remember to *never* copy the `data` directory. The cluster will be super wonky if you do!
 
 #### Dependencies
 
@@ -106,70 +99,17 @@ Note that if you're looking to run Onyx inside a cloud provider like AWS, you're
 
 ###### Example
 
-Let's zoom in on [this HornetQ configuration file](https://github.com/MichaelDrogalis/onyx/blob/master/resources/hornetq/clustered-1.xml).
+Let's have a look at the three node cluster that the Onyx test suite uses.
 
-Set up the broadcast group:
+- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-1.xml)
+- [Node 2 Configutation](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-2.xml)
+- [Node 3 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-3.xml)
 
-```xml
-<broadcast-groups>
-  <broadcast-group name="onyx-udp-broadcast-group">
-    <group-address>231.7.7.7</group-address>
-    <group-port>9876</group-port>
-    <broadcast-period>5000</broadcast-period>
-    <connector-ref>netty-udp-connector</connector-ref>
-  </broadcast-group>
-</broadcast-groups>
-```
+There are a few things to take note of, but otherwise you can and should reuse these configuration files for your own cluster. It'll save you a lot of leg work in understanding HornetQ:
 
-Set up the discovery group:
-```xml
-<discovery-groups>
-   <discovery-group name="onyx-udp-discovery-group">
-      <group-address>231.7.7.7</group-address>
-      <group-port>9876</group-port>
-      <refresh-timeout>10000</refresh-timeout>
-   </discovery-group>
-</discovery-groups>
-```
-
-Set up the cluster configuration:
-```xml
-<cluster-connections>
-   <cluster-connection name="onyx-cluster">
-      <address>onyx</address>
-      <connector-ref>netty-udp-connector</connector-ref>
-      <forward-when-no-consumers>false</forward-when-no-consumers>
-      <discovery-group-ref discovery-group-name="onyx-udp-discovery-group"/>
-   </cluster-connection>
-</cluster-connections>
-```
-
-Use the following on *only one* HornetQ node's configuration:
-```xml
-<grouping-handler name="onyx">
-   <type>LOCAL</type>
-   <address>onyx</address>
-   <timeout>5000</timeout>
-   <group-timeout>-1</group-timeout>
-   <reaper-period>30000</reaper-period>
-</grouping-handler>
-```
-
-On all other nodes, use the following configuration:
-```xml
-<grouping-handler name="onyx">
-   <type>REMOTE</type>
-   <address>onyx</address>
-   <timeout>5000</timeout>
-</grouping-handler>
-```
-
-You might notice this creates a single point of failure - which we'll fix with a stand-by later on. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
-
-We also disable security and add a management address. I presume you're running Onyx inside a trusted, closed network:
-```xml
-<management-address>onyx.queue.hornetq.management</management-address>
-<security-enabled>false</security-enabled>
+- Note that the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you won't want the ports to collide.
+- In all nodes, security is turned off via `<security-enabled>false</security-enabled>`. I presume you're running Onyx in a closed, trusted environment.
+- In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix with a stand-by later on. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
 ```
 
 Configure both the Coordinator and peer with the details to dynamically discover other HornetQ nodes.
@@ -196,6 +136,15 @@ Configure both the Coordinator and peer with the details to dynamically discover
 ##### HornetQ JGroups clustering mode
 
 ###### Example
+
+
+
+    - replicating grouping node
+    - replication all nodes
+    - Coordinator
+
+
+
 
 ### Test Environment
 
