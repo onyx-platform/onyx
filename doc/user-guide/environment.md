@@ -33,7 +33,7 @@ Since we're presumably using a single Coordinator in development mode, this is t
 
 ##### Peer Connection to In-Memory ZooKeeper
 
-Add `:zookeeper/address "127.0.0.1:<my port>" to the peer options as usual. In-memory Zookeeper is completely opaque to the peer.
+Add `:zookeeper/address "127.0.0.1:<my port>"` to the peer options as usual. In-memory Zookeeper is completely opaque to the peer.
 
 #### Example
 
