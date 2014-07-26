@@ -109,7 +109,7 @@ There are a few things to take note of, but otherwise you can and should reuse t
 
 - Note that the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you won't want the ports to collide.
 - In all nodes, security is turned off via `<security-enabled>false</security-enabled>`. I presume you're running Onyx in a closed, trusted environment.
-- In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix with a stand-by later on. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
+- In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix later on in the Fault Tolerancy Tuning section. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
 
 Configure both the Coordinator and peer with the details to dynamically discover other HornetQ nodes.
 
@@ -120,7 +120,8 @@ Configure both the Coordinator and peer with the details to dynamically discover
    :hornetq.udp/group-address hornetq-group-address
    :hornetq.udp/group-port hornetq-group-port
    :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-   :hornetq.udp/discovery-timeout hornetq-discovery-timeout})
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   ...})
 
 (def peer-opts
   {:hornetq/mode :udp
@@ -137,13 +138,13 @@ Configure both the Coordinator and peer with the details to dynamically discover
 ###### Example
 
 
+##### Fault Tolerancy Tuning
 
-    - replicating grouping node
-    - replication all nodes
-    - Coordinator
+Onyx uses HornetQ to construct data pipelines that offer exactly-once execution semantics. By doing this, Onyx moves messages between queues on each node in the HornetQ cluster. We run the risk of losing a HornetQ node, and hence losing all of the messages on that box. To defend against this happening, it's typical to create at least one HornetQ replica per HornetQ server in the cluster. There are a lot of ways that you can accomplish this, and it's very much worth your time to read [all of the failover options that HornetQ offers](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e11342). The trade-offs are yours to make.
 
+Remember to always provide a replica for the node running the Local grouping handler! Losing this box in an under-replicated scenario will disallow Onyx from doing grouping operations.
 
-
+Finally, see the chapter on running multiple Coordinators for high availability. You should always have a stand-by ready to jump in in the case of failure of the primary.
 
 ### Test Environment
 
