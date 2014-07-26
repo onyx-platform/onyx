@@ -58,20 +58,33 @@ The virtual peer process is extensively pipelined, providing asynchrony between 
 
 ##### `read-batch`
 
+Reads multiple segments off the previous element in the workflow.
+
 ##### `decompress-batch`
+
+Decompresses the batch that was received. Internally, Onyx uses Fressian for compression.
 
 ##### `requeue-sentinel`
 
+If applicable for your data source, send the sentinel back to the input source when it's found to not block future iterations of the pipeline.
+
 ##### `ack-batch`
+
+Acknowledges the batch of read segments.
 
 ##### `apply-fn`
 
+Applies the function for this task to the incoming segments.
+
 ##### `compress-batch`
+
+Compresses the batch to send. Internally, Onyx uses Fressian for compression.
 
 ##### `write-batch`
 
-##### `close-temporal-resources`
-
-##### `close-lifecycle-resources`
+Writes the batch with the function applied to the output stream.
 
 ##### `seal-resource`
+
+Called by one peer exactly once (subsequent calls occur if the sealing peer fails) when the task is completing. Used internally to propagate the sentinel downstream.
+
