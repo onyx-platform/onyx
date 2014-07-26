@@ -81,9 +81,16 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 
 #### Base Configuration
 
-| key name          | type       | choices
-|-------------------|------------|----------
-|`onyx/id`
-|`:onyx.peer/retry-start-interval`
-|`:onyx.peer/sequential-back-off`
+| key name                        | type       |
+|---------------------------------|------------|
+|`:onyx.peer/retry-start-interval`| `int`      |
+|`:onyx.peer/sequential-back-off` | `int`      |
+
+##### `:onyx.peer/retry-start-interval`
+
+Number of ms to wait before trying to reboot a virtual peer after failure.
+
+##### `:onyx.peer/sequential-back-off`
+
+Number of ms to wait before retrying to execute a sequential task in the presence of other queue consumers.
 
