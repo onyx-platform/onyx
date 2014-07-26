@@ -135,8 +135,16 @@ Configure both the Coordinator and peer with the details to dynamically discover
 
 ##### HornetQ JGroups clustering mode
 
+Another option for running HornetQ in clustered mode is to use JGroups. You're going to want to use JGroups if you're running on AWS due to their multicast restrictions. JGroups uses TCP and shared storage, such as S3, for peer discovery.
+
 ###### Example
 
+Let's look at a single HornetQ node's configuration. The same advice in the UDP section with respect to replicating the grouping handler applies here:
+
+- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/jgroups-clustered-1.xml)
+- [JGroups file for Node 1](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/onyx-jgroups.xml)
+
+Note: You can see the JGroups local storage being configured in the `FILE_PING` tag. I'd recommend using the S3 discovery mechanism if you're running in AWS.
 
 ##### Fault Tolerancy Tuning
 
