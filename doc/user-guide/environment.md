@@ -58,6 +58,145 @@ Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're n
 (def conn (onyx.api/connect :memory coord-opts))
 ```
 
+### Production Environment
+
+Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster, a 3-5 node ZooKeeper cluster, and at least one back-up Coordinator, in addition to the original.
+
+  - Production environment
+    - Link to the HornetQ documentation
+    - chef-onyx
+    - manual set-up
+    - replicating grouping node
+    - replication all nodes
+    - Coordinator
+
+
+#### Dependencies
+
+- Java 7+
+- Clojure 1.6
+- HornetQ 2.4.0-Final
+- ZooKeeper 3.4.5+
+
+#### Explanation
+
+There are a lot of options for how to run HornetQ in the cloud. If you want an educated understand of all of them, I recommend [the HornetQ 2.4.0-Final documentation](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/). 
+
+##### ZooKeeper clustering
+
+Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems. See [this link](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html) for getting set up. I won't go into detail since this is particular common set up.
+
+###### Example
+
+Notice that all we're doing is extending the address string to include more host:port pairs. Do the same for
+the Coordinator.
+
+```clojure
+(def peer-opts
+  {...
+   :zookeeper/address "10.132.8.150:2181,10.132.8.151:2181,10.132.8.152:2181"
+   ...})
+```
+
+##### HornetQ UDP multicast clustering mode
+
+One option for running a HornetQ cluster is to use UDP multicast for dynamic peer discovery. This is the route that the Onyx suite takes. You can consult the tests and configuration files in the resource path. We'll break down the options below for better understanding.
+
+Note that if you're looking to run Onyx inside a cloud provider like AWS, you're going to need to use JGroups. Cloud providers typically don't allow UDP multicast. This is a requirement that a lot of clustered services face.
+
+###### Example
+
+Let's zoom in on [this HornetQ configuration file](https://github.com/MichaelDrogalis/onyx/blob/master/resources/hornetq/clustered-1.xml).
+
+Set up the broadcast group:
+
+```xml
+<broadcast-groups>
+  <broadcast-group name="onyx-udp-broadcast-group">
+    <group-address>231.7.7.7</group-address>
+    <group-port>9876</group-port>
+    <broadcast-period>5000</broadcast-period>
+    <connector-ref>netty-udp-connector</connector-ref>
+  </broadcast-group>
+</broadcast-groups>
+```
+
+Set up the discovery group:
+```xml
+<discovery-groups>
+   <discovery-group name="onyx-udp-discovery-group">
+      <group-address>231.7.7.7</group-address>
+      <group-port>9876</group-port>
+      <refresh-timeout>10000</refresh-timeout>
+   </discovery-group>
+</discovery-groups>
+```
+
+Set up the cluster configuration:
+```xml
+<cluster-connections>
+   <cluster-connection name="onyx-cluster">
+      <address>onyx</address>
+      <connector-ref>netty-udp-connector</connector-ref>
+      <forward-when-no-consumers>false</forward-when-no-consumers>
+      <discovery-group-ref discovery-group-name="onyx-udp-discovery-group"/>
+   </cluster-connection>
+</cluster-connections>
+```
+
+Use the following on *only one* HornetQ node's configuration:
+```xml
+<grouping-handler name="onyx">
+   <type>LOCAL</type>
+   <address>onyx</address>
+   <timeout>5000</timeout>
+   <group-timeout>-1</group-timeout>
+   <reaper-period>30000</reaper-period>
+</grouping-handler>
+```
+
+On all other nodes, use the following configuration:
+```xml
+<grouping-handler name="onyx">
+   <type>REMOTE</type>
+   <address>onyx</address>
+   <timeout>5000</timeout>
+</grouping-handler>
+```
+
+You might notice this creates a single point of failure - which we'll fix with a stand-by later on. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
+
+We also disable security and add a management address. I presume you're running Onyx inside a trusted, closed network:
+```xml
+<management-address>onyx.queue.hornetq.management</management-address>
+<security-enabled>false</security-enabled>
+```
+
+Configure both the Coordinator and peer with the details to dynamically discover other HornetQ nodes.
+
+```clojure
+(def coord-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout})
+
+(def peer-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   ...})
+```
+
+##### HornetQ JGroups clustering mode
+
+###### Example
+
 ### Test Environment
 
 #### Dependencies
@@ -121,12 +260,4 @@ Here's an example of using both HornetQ in embedded mode. Notice that we're runn
 
 
 
-  - Test environment
-    - Embedded configuration
-  - Production environment
-    - Link to the HornetQ documentation
-    - chef-onyx
-    - manual set-up
-    - replicating grouping node
-    - replication all nodes
 
