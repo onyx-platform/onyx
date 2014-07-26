@@ -44,7 +44,24 @@ True to spin up a ZooKeeper server inside the Coordinator for convenience.
 
 #### UDP Configuration
 
+| key name                       | type       |
+|--------------------------------|------------|
+|`:hornetq.udp/cluster-name`     |  `string`  |
+|`:hornetq.udp/group-address`    |  `string`  |
+|`:hornetq.udp/group-port`       |  `int`     |
+|`:hornetq.udp/refresh-timeout`  |  `int`     |
+|`:hornetq.udp/discovery-timeout`|  `int`     |
+
+
 #### JGroups Configuration
+
+| key name                                      | type      |
+|-----------------------------------------------|-----------|
+|`:hornetq.udp/cluster-name`                    |  `string` |
+|`:hornetq.jgroups/file jgroups-file`           |  `string` |
+|`:hornetq.jgroups/channel-name jgroups-channel`|  `string` |
+|`:hornetq.udp/refresh-timeout`                 |  `int`    |
+|`:hornetq.udp/discovery-timeout`               |  `int`    |
 
 #### Embedded Configuration
 
