@@ -1,3 +1,28 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [Coordination and Peer Configuration](#coordination-and-peer-configuration)
+  - [Coordinator & Peer](#coordinator-&-peer)
+    - [Base Configuration](#base-configuration)
+    - [`:hornetq/mode`](#hornetqmode)
+    - [UDP Configuration](#udp-configuration)
+    - [JGroups Configuration](#jgroups-configuration)
+  - [Coordinator Only](#coordinator-only)
+      - [`:onyx.coordinator/revoke-delay`](#onyxcoordinatorrevoke-delay)
+      - [`:onyx.coordinator/port`](#onyxcoordinatorport)
+      - [`:hornetq/server`](#hornetqserver)
+      - [`:hornetq.server/type`](#hornetqservertype)
+      - [`:zookeeper/server`](#zookeeperserver)
+    - [Embedded Configuration](#embedded-configuration)
+      - [`:hornetq.embedded/config hq-servers`](#hornetqembeddedconfig-hq-servers)
+  - [Peer Only](#peer-only)
+    - [Base Configuration](#base-configuration-1)
+      - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
+      - [`:onyx.peer/sequential-back-off`](#onyxpeersequential-back-off)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Coordination and Peer Configuration
 
 The chapter describes the options available to configure both the Coordinator and Virtual Peers.

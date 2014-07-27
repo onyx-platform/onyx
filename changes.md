@@ -1,3 +1,12 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [0.3.0](#030)
+- [0.2.0](#020)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 #### 0.3.0
 - Coordinator can be made highly available via stand-by coordinators
 - HornetQ connection via UDP multicast for clustering
