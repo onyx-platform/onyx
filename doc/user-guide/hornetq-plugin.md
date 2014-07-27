@@ -2,6 +2,20 @@
 
 Onyx plugin providing read and write facilities for HornetQ non-clustered.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [onyx-hornetq](#onyx-hornetq)
+    - [Installation](#installation)
+    - [Catalog entries](#catalog-entries)
+      - [read-segments](#read-segments)
+      - [write-segments](#write-segments)
+    - [Attributes](#attributes)
+    - [Contributing](#contributing)
+    - [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 #### Installation
 
 This plugin is shipped by Onyx itself, so there's nothing extra to include in your project file.

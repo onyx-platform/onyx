@@ -1,5 +1,16 @@
 ## Architecture
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Architecture](#architecture)
+  - [Onyx Coordinator](#onyx-coordinator)
+  - [ZooKeeper Cluster](#zookeeper-cluster)
+  - [Onyx Virtual Peer Cluster](#onyx-virtual-peer-cluster)
+  - [HornetQ cluster](#hornetq-cluster)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ![Architecture](http://i.imgur.com/zRbA47X.png)
 
 ### Onyx Coordinator

@@ -1,3 +1,11 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Plugins](#plugins)
+  - [Bootstrapping](#bootstrapping)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Plugins
 
 Plugins are a particularly straightforward concept in Onyx. They serve to either get data in or out of HornetQ. See the README.md of the project for a list of offical Onyx plugins.

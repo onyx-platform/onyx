@@ -1,5 +1,25 @@
 ## Concepts
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Concepts](#concepts)
+  - [Terminology](#terminology)
+    - [Task](#task)
+    - [Workflow](#workflow)
+    - [Catalog](#catalog)
+    - [Segment](#segment)
+    - [Transformer](#transformer)
+    - [Grouper](#grouper)
+    - [Aggregator](#aggregator)
+    - [Plugin](#plugin)
+    - [Sentinel](#sentinel)
+    - [Coordinator](#coordinator)
+    - [Peer](#peer)
+    - [Virtual Peer](#virtual-peer)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ### Terminology
 
 #### Task

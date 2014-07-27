@@ -2,6 +2,17 @@
 
 This chapter details a few tips for getting your Onyx cluster to run as fast as possible.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Performance Tuning](#performance-tuning)
+  - [HornetQ Tuning](#hornetq-tuning)
+  - [ZooKeeper](#zookeeper)
+  - [Onyx](#onyx)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+
 ### HornetQ Tuning
 
 HornetQ is the number one thing that needs to be tuned correctly go to fast with Onyx. See the section in the [HornetQ docs on performance tuning](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#perf-tuning).
