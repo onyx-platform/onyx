@@ -2,6 +2,36 @@
 
 Onyx ships with three distinct APIs to accomodate different needs. A description of each follows.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [APIs](#apis)
+  - [Connection API](#connection-api)
+      - [`connect`](#connect)
+      - [`start-peers`](#start-peers)
+      - [`register-peer`](#register-peer)
+      - [`submit-job`](#submit-job)
+      - [`await-job-completion`](#await-job-completion)
+      - [`shutdown`](#shutdown)
+  - [Task Lifecycle API](#task-lifecycle-api)
+      - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
+      - [`inject-temporal-resources`](#inject-temporal-resources)
+      - [`close-temporal-resources`](#close-temporal-resources)
+      - [`close-lifecycle-resources`](#close-lifecycle-resources)
+  - [Peer Pipeline API](#peer-pipeline-api)
+      - [`read-batch`](#read-batch)
+      - [`decompress-batch`](#decompress-batch)
+      - [`requeue-sentinel`](#requeue-sentinel)
+      - [`ack-batch`](#ack-batch)
+      - [`apply-fn`](#apply-fn)
+      - [`compress-batch`](#compress-batch)
+      - [`write-batch`](#write-batch)
+      - [`seal-resource`](#seal-resource)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+
 ### Connection API
 
 The [Connection API](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/src/onyx/api.clj) is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
