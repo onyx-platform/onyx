@@ -4,7 +4,7 @@ In a production environment, you'll want at least one additional Coordinator sta
 
 ### Launching Another Coordinator
 
-To launch a secondary Coordinator, configure the options with the same `:onyx/id` as the primary Coordinator. If you're running another Coordinator on the same box, be sure to use a different port than the original. Starting up a secondary Coordinator should *block* the calling through until the seconary becomes the primary.
+To launch a secondary Coordinator, configure the options with the same `:onyx/id` as the primary Coordinator. If you're running another Coordinator on the same box, be sure to use a different port than the original. Starting up a secondary Coordinator should *block* the calling through until the seconary becomes the primary. Interally, Onyx is using ZooKeeper's leader election recipe to watch for failures and perform recovery.
 
 Example:
 
