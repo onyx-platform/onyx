@@ -21,7 +21,6 @@ Available on Clojars:
 
 ### Full length documentation 0.3.0
 
-- Table of Contents
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
