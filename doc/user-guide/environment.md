@@ -4,7 +4,6 @@ In this chapter, we'll discuss what you need to test up a develop, testing, and 
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
 - [Environment](#environment)
   - [Development Environment](#development-environment)

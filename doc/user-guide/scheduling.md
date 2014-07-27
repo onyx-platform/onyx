@@ -1,5 +1,9 @@
 ## Scheduling
 
+### Job Priority
+
+Onyx uses round-robin to pick which job to search for open tasks next. When a task is found, it's given to a peer for execution. If a job doesn't have any open tasks, it's skipped for the next job in the sequence. Exact order depends on the order that the jobs were received.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
@@ -9,10 +13,6 @@
     - [Minimum Number of Virtual Peers](#minimum-number-of-virtual-peers)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-### Job Priority
-
-Onyx uses round-robin to pick which job to search for open tasks next. When a task is found, it's given to a peer for execution. If a job doesn't have any open tasks, it's skipped for the next job in the sequence. Exact order depends on the order that the jobs were received.
 
 ### Task Scheduling and Peer Allocation
 
