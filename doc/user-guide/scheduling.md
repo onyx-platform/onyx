@@ -1,14 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Scheduling](#scheduling)
-  - [Job Priority](#job-priority)
-  - [Task Scheduling and Peer Allocation](#task-scheduling-and-peer-allocation)
-    - [Minimum Number of Virtual Peers](#minimum-number-of-virtual-peers)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Scheduling
 
 ### Job Priority

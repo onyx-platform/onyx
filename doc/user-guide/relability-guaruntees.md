@@ -1,13 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Reliability Guarantees](#reliability-guarantees)
-  - [Transactions](#transactions)
-  - [Replication](#replication)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Reliability Guarantees
 
 This chapter discusses the reliability features that you can expect out of Onyx. These features are tunable and require the developer to make trade-offs.

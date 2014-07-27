@@ -1,14 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Constraints](#constraints)
-  - [Plugins Only](#plugins-only)
-  - [Maps Only](#maps-only)
-  - [Deployment On You](#deployment-on-you)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Constraints
 
 There are a few things that are strikingly different between Onyx and other compute platforms. I'd like to spell them out clearly here.

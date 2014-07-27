@@ -1,38 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Environment](#environment)
-  - [Development Environment](#development-environment)
-    - [Dependencies](#dependencies)
-    - [Explanation](#explanation)
-    - [HornetQ](#hornetq)
-      - [Coordinator Launch of In-VM HornetQ](#coordinator-launch-of-in-vm-hornetq)
-      - [Peer Connection to In-VM HornetQ](#peer-connection-to-in-vm-hornetq)
-    - [ZooKeeper](#zookeeper)
-      - [Coordinator Launch of In-Memory ZooKeeper](#coordinator-launch-of-in-memory-zookeeper)
-      - [Peer Connection to In-Memory ZooKeeper](#peer-connection-to-in-memory-zookeeper)
-    - [Example](#example)
-  - [Production Environment](#production-environment)
-    - [Dependencies](#dependencies-1)
-    - [Explanation](#explanation-1)
-      - [ZooKeeper clustering](#zookeeper-clustering)
-        - [Example](#example-1)
-      - [HornetQ UDP multicast clustering mode](#hornetq-udp-multicast-clustering-mode)
-        - [Example](#example-2)
-      - [HornetQ JGroups clustering mode](#hornetq-jgroups-clustering-mode)
-        - [Example](#example-3)
-      - [Fault Tolerancy Tuning](#fault-tolerancy-tuning)
-  - [Test Environment](#test-environment)
-    - [Dependencies](#dependencies-2)
-    - [Explanation](#explanation-2)
-    - [HornetQ](#hornetq-1)
-      - [Coordinator Launch of Embedded HornetQ](#coordinator-launch-of-embedded-hornetq)
-      - [Peer Connection to Embedded HornetQ](#peer-connection-to-embedded-hornetq)
-    - [Example](#example-4)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Environment
 
 In this chapter, we'll discuss what you need to test up a develop, testing, and production environment.

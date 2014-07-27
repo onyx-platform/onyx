@@ -1,12 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Coordinator High Availability](#coordinator-high-availability)
-  - [Launching Another Coordinator](#launching-another-coordinator)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Coordinator High Availability
 
 In a production environment, you'll want at least one additional Coordinator standing by to take over in case of primary failure.

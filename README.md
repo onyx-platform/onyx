@@ -1,23 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Onyx](#onyx)
-  - [What is it?](#what-is-it)
-  - [Installation](#installation)
-  - [Quick Start Guide](#quick-start-guide)
-  - [Full length documentation 0.3.0](#full-length-documentation-030)
-  - [Official plugin listing](#official-plugin-listing)
-  - [Need help?](#need-help)
-  - [Contributing](#contributing)
-    - [Branching](#branching)
-    - [Commit rights](#commit-rights)
-    - [Contributor list](#contributor-list)
-  - [Author](#author)
-  - [License](#license)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Onyx
 
 ### What is it?
