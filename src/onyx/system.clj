@@ -25,15 +25,6 @@
     (rethrow-component
      #(component/stop-system this coordinator-components))))
 
-(defrecord OnyxCoordinatorConnection [logging-config sync]
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this connection-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this connection-components))))
-
 (defrecord OnyxPeer [logging-config sync queue]
   component/Lifecycle
   (start [this]
