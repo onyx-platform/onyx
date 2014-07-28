@@ -1,5 +1,3 @@
-### Terminology
-
 ## Concepts
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
@@ -21,6 +19,8 @@
     - [Virtual Peer](#virtual-peer)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+### Terminology
 
 #### Task
 
