@@ -66,6 +66,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 #### Contributor list
 
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
+- [Owen Jones](https://github.com/owengalenjones)
 
 ### Author
 
