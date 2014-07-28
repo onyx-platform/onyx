@@ -34,7 +34,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Plugins](doc/user-guide/plugins.md)
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
 - [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
-- [Reliability Gauruntees](doc/user-guide/relability-guaruntees.md)
+- [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Coordinator High Availability](doc/user-guide/coordinator-ha.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
