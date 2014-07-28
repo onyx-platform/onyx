@@ -136,4 +136,4 @@ A Peer is a node in the cluster responsible for processing data. A "peer" genera
 
 #### Virtual Peer
 
-A Virtual Peer refers to a single peer process running on a single physical machine. The Coordinator often does not need to know which virtual peers belong to which physical machines, so parallelism can be increased by treating all virtual peers equally.
+A Virtual Peer refers to a single peer process running on a single physical machine. The Coordinator often does not need to know which virtual peers belong to which physical machines, so parallelism can be increased by treating all virtual peers equally. A single Virtual Peer executes at most one task at a time.
