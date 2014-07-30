@@ -11,7 +11,7 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-![Architecture](http://i.imgur.com/zRbA47X.png)
+![Architecture](http://i.imgur.com/ZfNfLb7.png)
 
 ### Onyx Coordinator
 
