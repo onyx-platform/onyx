@@ -1,7 +1,6 @@
 (ns onyx.coordinator.coordinator-ha-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.coordinator.distributed :as d]
             [onyx.api]))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
@@ -51,7 +50,7 @@
    :zookeeper/address "localhost:2181"
    :onyx/id id})
 
-(def onyx-server (d/start-distributed-coordinator coord-opts))
+(def onyx-server (onyx.api/start-distributed-coordinator coord-opts))
 
 (def onyx-port-2 (+ 10000 (rand-int 10000)))
 
@@ -71,7 +70,7 @@
    :onyx.coordinator/port onyx-port-2
    :onyx.coordinator/revoke-delay 5000})
 
-(def onyx-server-2 (future (d/start-distributed-coordinator coord-opts-2)))
+(def onyx-server-2 (future (onyx.api/start-distributed-coordinator coord-opts-2)))
 
 (def conn (onyx.api/connect :distributed coord-opts))
 
@@ -117,7 +116,7 @@
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
 (Thread/sleep 10000)
-(d/stop-distributed-coordinator onyx-server)
+(onyx.api/stop-distributed-coordinator onyx-server)
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
@@ -125,7 +124,7 @@
   ((:shutdown-fn v-peer)))
 
 (onyx.api/shutdown conn)
-(d/stop-distributed-coordinator onyx-server)
+(onyx.api/stop-distributed-coordinator onyx-server)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
