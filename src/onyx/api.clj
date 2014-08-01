@@ -65,7 +65,7 @@
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
-;; A coordinator runs remotely. Peers communicate with the
+;; Connect to a coordinator that runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
 (deftype HttpCoordinator [conn]
   ISubmit
@@ -89,7 +89,8 @@
       (read-string (:body response))))
 
   IShutdown
-  (shutdown [this]))
+  (shutdown [this]
+    (component/stop conn)))
 
 (defmulti connect
   "Establish a communication channel with the coordinator.
@@ -149,4 +150,10 @@
                (or rets (recur)))))
          :shutdown-fn (fn [] (>!! stop-ch true))}))
     (range n))))
+
+(defn start-distributed-coordinator [opts]
+  (component/start (system/onyx-ha-coordinator opts)))
+
+(defn stop-distributed-coordinator [coordinator]
+  (component/stop coordinator))
 

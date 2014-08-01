@@ -52,7 +52,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :onyx/id id})
 
-(def onyx-server (component/start (server/coordinator-server coord-opts)))
+(def onyx-server (onyx.api/start-distributed-coordinator coord-opts))
 
 (def conn (onyx.api/connect :distributed coord-opts))
 
@@ -105,7 +105,7 @@
   ((:shutdown-fn v-peer)))
 
 (onyx.api/shutdown conn)
-(component/stop onyx-server)
+(onyx.api/stop-distributed-coordinator onyx-server)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)

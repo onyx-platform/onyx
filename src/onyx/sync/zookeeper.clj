@@ -111,7 +111,6 @@
     (let [server (when (:zookeeper/server? opts) (TestingServer. (:zookeeper.server/port opts)))
           conn (zk/connect (:zookeeper/address opts))
           prefix (:onyx/id opts)]
-      (prn "Connecting to ZK with " (:zookeeper/address opts))
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path prefix) :persistent? true)
       (zk/create conn (peer-path prefix) :persistent? true)
@@ -609,7 +608,6 @@
 
 (defmethod extensions/list-nodes [ZooKeeper :seal]
   [sync _]
-  (prn "Seal path is: " (seal-path (:onyx/id (:opts sync))))
   (extensions/children sync (seal-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/list-nodes [ZooKeeper :completion]

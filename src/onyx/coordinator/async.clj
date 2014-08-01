@@ -136,12 +136,12 @@
 (defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
   (loop []
     (when (<!! born-tail)
-      (let [offset (extensions/next-offset sync :born-log)
-            peer (extensions/log-entry-at sync :born-log offset)]
-        (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
-          (extensions/create sync :offer-log peer)
-          (extensions/checkpoint sync :born-log offset)
-          (>!! offer-head peer))
+      (let [offset (extensions/next-offset sync :born-log)]
+        (when-let [peer (extensions/log-entry-at sync :born-log offset)]
+          (when (mark-peer-birth sync sync-ch peer (fn [_] (>!! dead-head peer)))
+            (extensions/create sync :offer-log peer)
+            (extensions/checkpoint sync :born-log offset)
+            (>!! offer-head peer)))
         (recur)))))
 
 (defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
@@ -157,13 +157,14 @@
 (defn planning-ch-loop [sync queue planning-tail offer-head]
   (loop []
     (when (<!! planning-tail)
-      (let [offset (extensions/next-offset sync :planning-log)
-            {:keys [job node]} (extensions/log-entry-at sync :planning-log offset)
-            job-id (plan-job sync queue job)]
-        (extensions/write-node sync node job-id)
-        (extensions/create sync :offer-log job-id)
-        (extensions/checkpoint sync :planning-log offset)
-        (>!! offer-head job-id)
+      (let [offset (extensions/next-offset sync :planning-log)]
+        (when-let [{:keys [job node]}
+                   (extensions/log-entry-at sync :planning-log offset)]
+          (let [job-id (plan-job sync queue job)]
+            (extensions/write-node sync node job-id)
+            (extensions/create sync :offer-log job-id)
+            (extensions/checkpoint sync :planning-log offset)
+            (>!! offer-head job-id)))
         (recur)))))
 
 (defn ack-ch-loop [sync sync-ch ack-tail]
@@ -175,18 +176,19 @@
 (defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
   (loop []
     (when (<!! evict-tail)
-      (let [offset (extensions/next-offset sync :evict-log)
-            node (extensions/log-entry-at sync :evict-log offset)]
-        (evict-peer sync sync-ch node)
-        (extensions/create sync :shutdown-log node)
-        (extensions/create sync :offer-log node)
-        (extensions/checkpoint sync :evict-log offset)
-        (>!! shutdown-head node)
-        (>!! offer-head node)
-        (recur)))))
+      (let [offset (extensions/next-offset sync :evict-log)]
+        (when-let [node (extensions/log-entry-at sync :evict-log offset)]
+          (evict-peer sync sync-ch node)
+          (extensions/create sync :shutdown-log node)
+          (extensions/create sync :offer-log node)
+          (extensions/checkpoint sync :evict-log offset)
+          (>!! shutdown-head node)
+          (>!! offer-head node)))
+      (recur))))
 
 (defn offer-ch-loop
-  [sync sync-ch revoke-delay offer-tail ack-head exhaust-head complete-head revoke-head]
+  [sync sync-ch revoke-delay offer-tail ack-head exhaust-head
+   complete-head revoke-head]
   (loop []
     (when (<!! offer-tail)
       (let [offset (extensions/next-offset sync :offer-log)]
@@ -203,10 +205,11 @@
 (defn offer-revoke-ch-loop [sync sync-ch offer-revoke-tail evict-head]
   (loop []
     (when (<!! offer-revoke-tail)
-      (let [offset (extensions/next-offset sync :revoke-log)
-            {:keys [peer-node ack-node]} (extensions/log-entry-at sync :revoke-log offset)]
-        (revoke-offer sync sync-ch peer-node ack-node #(>!! evict-head %))
-        (extensions/checkpoint sync :revoke-log offset)
+      (let [offset (extensions/next-offset sync :revoke-log)]
+        (when-let [{:keys [peer-node ack-node]}
+                   (extensions/log-entry-at sync :revoke-log offset)]
+          (revoke-offer sync sync-ch peer-node ack-node #(>!! evict-head %))
+          (extensions/checkpoint sync :revoke-log offset))
         (recur)))))
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
@@ -220,13 +223,13 @@
 (defn seal-resource-loop [sync seal-tail exhaust-head]
   (loop []
     (when (<!! seal-tail)
-      (let [offset (extensions/next-offset sync :seal-log)
-            result (extensions/log-entry-at sync :seal-log offset)]
-        (seal-resource
-         sync
-         (:seal? result) (:seal-node result)
-         (:exhaust-node result) exhaust-head)
-        (extensions/checkpoint sync :seal-log offset)
+      (let [offset (extensions/next-offset sync :seal-log)]
+        (when-let [result (extensions/log-entry-at sync :seal-log offset)]
+          (seal-resource
+           sync
+           (:seal? result) (:seal-node result)
+           (:exhaust-node result) exhaust-head)
+          (extensions/checkpoint sync :seal-log offset))
         (recur)))))
 
 (defn completion-ch-loop
