@@ -41,7 +41,7 @@
     (let [coordinator (component/start (onyx-coordinator opts))]
       (taoensso.timbre/info "Starting Coordinator Netty server")
       
-      #_(election/block-until-leader!
+      (election/block-until-leader!
        (:sync coordinator)
        {:host (:onyx.coordinator/host opts)
         :port (:onyx.coordinator/port opts)})

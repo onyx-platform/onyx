@@ -111,6 +111,7 @@
     (let [server (when (:zookeeper/server? opts) (TestingServer. (:zookeeper.server/port opts)))
           conn (zk/connect (:zookeeper/address opts))
           prefix (:onyx/id opts)]
+      (prn "Connecting to ZK with " (:zookeeper/address opts))
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path prefix) :persistent? true)
       (zk/create conn (peer-path prefix) :persistent? true)
@@ -345,6 +346,9 @@
   [sync _ content]
   (create-log-entry sync shutdown-log-path content))
 
+(defmethod extensions/speculate-offset ZooKeeper
+  [sync offset] (inc offset))
+
 (defn next-offset [sync path]
   (inc (or (extensions/read-node sync path) log-start-offset)))
 
@@ -435,7 +439,7 @@
 (defn read-log-entry-at [sync path n]
   (let [children (or (zk/children (:conn sync) path) [])
         sorted-children (util/sort-sequential-nodes children)]
-    (when (seq sorted-children)
+    (when (and (seq sorted-children) (< n (count sorted-children)))
       (let [full-path (str path "/" (nth sorted-children n))]
         (extensions/read-node sync full-path)))))
 
@@ -521,6 +525,12 @@
         children (or (zk/children (:conn sync) (peer-state-path prefix)) [])]
     (map #(str (peer-state-path prefix) "/" %) children)))
 
+(defmethod extensions/bucket [ZooKeeper :election]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        children (or (zk/children (:conn sync) (election-path prefix)) [])]
+    (map #(str (election-path prefix) "/" %) children)))
+
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
   (let [prefix (:onyx/id (:opts sync))
@@ -585,13 +595,22 @@
                  (:version (:stat contents)))))
 
 (defmethod extensions/touched? [ZooKeeper :ack]
-  [sync node]
-  (let [contents (zk/data (:conn sync) node)]
-    (> (:version (:stat contents)) 1)))
+  [sync bucket node] (> (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :seal]
+  [sync bucket node] (> (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :completion]
+  [sync bucket node] (> (extensions/version sync node) 1))
 
 (defmethod extensions/list-nodes [ZooKeeper :ack]
   [sync _]
   (extensions/children sync (ack-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/list-nodes [ZooKeeper :seal]
+  [sync _]
+  (prn "Seal path is: " (seal-path (:onyx/id (:opts sync))))
+  (extensions/children sync (seal-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/list-nodes [ZooKeeper :completion]
   [sync _]

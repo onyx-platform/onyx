@@ -80,6 +80,8 @@
 
 (defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
 
+(defmulti speculate-offset (fn [sync offset] (type sync)))
+
 (defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
 
 (defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))

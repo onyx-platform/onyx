@@ -71,7 +71,9 @@
   ISubmit
   (submit-job [this job]
     (let [leader (extensions/leader (:sync conn) :election)
+;;          _ (prn "Submit leader: " leader)
           data (extensions/read-node (:sync conn) leader)
+;;          _ (prn "Leader Data is: " data)
           uri (format "http://%s:%s/submit-job" (:host data) (:port data))
           response (post uri {:body (pr-str job)})]
       (:job-id (read-string (:body response)))))
@@ -79,7 +81,9 @@
   IRegister
   (register-peer [this peer-node]
     (let [leader (extensions/leader (:sync conn) :election)
+;;          _ (prn "Reg leader: " leader)
           data (extensions/read-node (:sync conn) leader)
+;;          _ (prn "Reg Data is: " data)
           uri (format "http://%s:%s/register-peer" (:host data) (:port data))
           response (post uri {:body (pr-str peer-node)})]
       (read-string (:body response))))
