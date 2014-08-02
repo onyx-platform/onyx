@@ -1,9 +1,24 @@
 (ns onyx.coordinator.coordinator-ha-test
   (:require [midje.sweet :refer :all]
+            [zookeeper ]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.api]))
+            [onyx.api])
+  (:import [org.apache.curator.test TestingServer]
+           [org.hornetq.core.server.embedded EmbeddedHornetQ]))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
+;; Need to run ZK and HQ away from the Coordinator because the
+;; Coordinator will start and stop these services as it
+;; comes on and offline.
+;;(def zk-server (TestingServer. (:spawn-port (:zookeeper config))))
+
+(def hq-server
+  (doto (EmbeddedHornetQ.)
+    (.setConfigResourcePath
+     (str (clojure.java.io/resource
+           (first (:configs (:hornetq config))))))
+    (.start)))
 
 (def n-messages 2000)
 
@@ -22,18 +37,15 @@
 (def onyx-port (+ 10000 (rand-int 10000)))
 
 (def hq-config {"host" "localhost"
-                "port" 5455})
+                "port" 5445})
 
 (def coord-opts
   {:hornetq/mode :udp
-;;   :hornetq/server? true
    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
    :hornetq.udp/group-address (:group-address (:hornetq config))
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-;;   :hornetq.server/type :embedded
-;;   :hornetq.embedded/config (:configs (:hornetq config))
    :zookeeper/address "localhost:2181"
    :onyx/id id
    :onyx.coordinator/host "localhost"
@@ -56,14 +68,11 @@
 
 (def coord-opts-2
   {:hornetq/mode :udp
-;;   :hornetq/server? true
    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
    :hornetq.udp/group-address (:group-address (:hornetq config))
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-;;   :hornetq.server/type :embedded
-;;   :hornetq.embedded/config (:configs (:hornetq config))
    :zookeeper/address "localhost:2181"
    :onyx/id id
    :onyx.coordinator/host "localhost"
@@ -90,7 +99,7 @@
     :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
     :hornetq/host "localhost"
-    :hornetq/port 5455
+    :hornetq/port 5445
     :onyx/batch-size batch-size}
    
    {:onyx/name :inc
@@ -106,7 +115,7 @@
     :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host "localhost"
-    :hornetq/port 5455
+    :hornetq/port 5445
     :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
@@ -126,7 +135,11 @@
 (onyx.api/shutdown conn)
 (onyx.api/stop-distributed-coordinator onyx-server)
 
+(.stop hq-server)
+;;(.stop zk-server)
+
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
+
 

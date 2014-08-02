@@ -215,7 +215,6 @@
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
     (when-let [x (<!! exhaust-tail)]
-      (prn "Exhaust loop found: " x)
       (when-let [node (:path x)]
         (when-let [result (exhaust-queue sync sync-ch node)]
           (extensions/create sync :seal-log result)
