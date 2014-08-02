@@ -63,7 +63,7 @@
           :hornetq/host (:host (:non-clustered (:hornetq config)))
           :hornetq/port (:port (:non-clustered (:hornetq config)))
           :onyx/batch-size batch-size}]
-        conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts)
+        conn (onyx.api/connect :memory coord-opts)
         v-peers (onyx.api/start-peers conn 1 peer-opts)]
 
     (hq-util/create-queue! hq-config in-queue)
