@@ -27,7 +27,7 @@
       (when (:id node-data)
         (let [state-path (extensions/resolve-node sync :peer-state (:id node-data))
               peer-state (:content (extensions/dereference sync state-path))]
-          (prn (format "State is %s and touched is %s" (:state peer-state) (extensions/touched? sync bucket node)))
+          (prn (format "Touched is %s" (extensions/touched? sync bucket node)))
           (when (extensions/touched? sync bucket node)
             (prn "Calling back to: " node)
             (cb node))))))
@@ -55,9 +55,9 @@
 (defn repair-exhaust-messages! [sync cb]
   (fast-forward-log sync :exhaust-log cb))
 
-(defn repair-seal-messages! [sync cb]
-  (fast-forward-log sync :seal-log cb)
-  (fast-forward-triggers sync :seal cb))
+(defn repair-seal-messages! [sync seal-cb exhaust-cb]
+  (fast-forward-triggers sync :exhaust seal-cb)
+  (fast-forward-log sync :seal-log exhaust-cb))
 
 (defn repair-completion-messages! [sync cb]
   (fast-forward-triggers sync :completion cb))

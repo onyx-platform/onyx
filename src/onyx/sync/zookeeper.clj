@@ -594,17 +594,24 @@
                  (:version (:stat contents)))))
 
 (defmethod extensions/touched? [ZooKeeper :ack]
-  [sync bucket node] (> (extensions/version sync node) 1))
+  [sync bucket node] (>= (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :exhaust]
+  [sync bucket node] (>= (extensions/version sync node) 1))
 
 (defmethod extensions/touched? [ZooKeeper :seal]
-  [sync bucket node] (> (extensions/version sync node) 1))
+  [sync bucket node] (>= (extensions/version sync node) 1))
 
 (defmethod extensions/touched? [ZooKeeper :completion]
-  [sync bucket node] (> (extensions/version sync node) 1))
+  [sync bucket node] (>= (extensions/version sync node) 1))
 
 (defmethod extensions/list-nodes [ZooKeeper :ack]
   [sync _]
   (extensions/children sync (ack-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/list-nodes [ZooKeeper :exhaust]
+  [sync _]
+  (extensions/children sync (exhaust-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/list-nodes [ZooKeeper :seal]
   [sync _]

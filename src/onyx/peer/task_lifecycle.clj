@@ -99,6 +99,7 @@
     (let [seal-response-ch (chan)]
       (timbre/info "Blocking call on seal")
       (extensions/on-change sync seal-node #(>!! seal-response-ch %))
+      (prn "Touching: " exhaust-node)
       (extensions/touch-node sync exhaust-node)
       (let [response (<!! seal-response-ch)]
         (timbre/info "Unblocked call for seal")

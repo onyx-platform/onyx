@@ -430,7 +430,7 @@
         (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))
         (r/repair-ack-messages! sync #(>!! ack-ch-head %))
         (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
-        (r/repair-seal-messages! sync #(>!! seal-ch-head %))
+        (r/repair-seal-messages! sync #(>!! seal-ch-head %) #(>!! exhaust-ch-head %))
         (r/repair-completion-messages! sync #(>!! completion-ch-head %))
         (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
         (catch Exception e
