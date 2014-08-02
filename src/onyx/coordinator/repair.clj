@@ -59,8 +59,8 @@
   (fast-forward-triggers sync :exhaust exhaust-cb exhaust-ff-cb)
   (fast-forward-log sync :seal-log seal-cb))
 
-(defn repair-completion-messages! [sync cb]
-  (fast-forward-triggers sync :completion cb))
+(defn repair-completion-messages! [sync cb ff-cb]
+  (fast-forward-triggers sync :completion cb ff-cb))
 
 (defn repair-shutdown-messages! [sync cb]
   (fast-forward-log sync :shutdown-log cb))

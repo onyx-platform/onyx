@@ -436,7 +436,9 @@
                                  #(>!! seal-ch-head %)
                                  #(>!! exhaust-ch-head %)
                                  #(>!! exhaust-ch-head {:path %}))
-;;        (r/repair-completion-messages! sync #(>!! completion-ch-head %))
+        (r/repair-completion-messages! sync
+                                       #(>!! completion-ch-head %)
+                                       #(>!! completion-ch-head {:path %}))
         (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
         (catch Exception e
           (warn e "Failure in repairing")))
