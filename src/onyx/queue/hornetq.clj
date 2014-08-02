@@ -63,7 +63,7 @@
   (let [tc (TransportConfiguration. (.getName InVMAcceptorFactory))
         config
         (doto (ConfigurationImpl.)
-          (.setJournalDirectory "/tmp/journal")
+          (.setJournalDirectory "target/journal")
           (.setJournalType (JournalType/NIO))
           (.setPersistenceEnabled true)
           (.setSecurityEnabled false))]

@@ -67,16 +67,16 @@
 (def coord-opts {:hornetq/mode :vm
                  :hornetq/server? true
                  :hornetq.server/type :vm
-                 :zookeeper/address "127.0.0.1:2182"
+                 :zookeeper/address "127.0.0.1:2185"
                  :zookeeper/server? true
-                 :zookeeper.server/port 2182
+                 :zookeeper.server/port 2185
                  :onyx/id id
                  :onyx.coordinator/revoke-delay 5000})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def conn (onyx.api/connect :memory coord-opts))
 
 (def peer-opts {:hornetq/mode :vm
-                :zookeeper/address "127.0.0.1:2182"
+                :zookeeper/address "127.0.0.1:2185"
                 :onyx/id id})
 
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))

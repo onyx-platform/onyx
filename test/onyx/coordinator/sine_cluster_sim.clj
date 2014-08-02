@@ -137,8 +137,12 @@
 (tap (:offer-mult coordinator) offer-spy)
 
 (doseq [n (range n-jobs)]
-  (>!! (:planning-ch-head coordinator)
-       [{:catalog catalog :workflow workflow} (nth job-chs n)]))
+  (let [node (extensions/create (:sync components) :plan)]
+    (extensions/on-change (:sync components) (:node node) #(>!! (nth job-chs n) %))
+    (extensions/create (:sync components) :planning-log
+                       {:job {:workflow workflow :catalog catalog}
+                        :node (:node node)})
+    (>!! (:planning-ch-head coordinator) true)))
 
 (doseq [_ (range n-jobs)]
   (<!! offer-spy))
@@ -207,7 +211,8 @@
        (into [])))
 
 (doseq [job-ch job-chs]
-  @(onyx.api/await-job-completion* (:sync components) (str (<!! job-ch))))
+  (let [id (extensions/read-node (:sync components) (:path (<!! job-ch)))]
+    @(onyx.api/await-job-completion* (:sync components) (str id))))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 

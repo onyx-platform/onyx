@@ -8,6 +8,9 @@
   (:import [java.util UUID]
            [org.apache.curator.test TestingServer]))
 
+;; Log starts at 0, so the first checkpoint will increment from -1 to 0.
+(def log-start-offset -1)
+
 (def root-path "/onyx")
 
 (defn prefix-path [prefix]
@@ -55,19 +58,57 @@
 (defn job-path [prefix]
   (str root-path "/" prefix "/job"))
 
+(defn task-path [prefix subpath]
+  (str root-path "/" prefix "/task/" subpath))
+
+(defn plan-path [prefix]
+  (str root-path "/" prefix "/plan"))
+
+(defn election-path [prefix]
+  (str root-path "/" prefix "/election"))
+
 (defn job-log-path [prefix]
   (str root-path "/" prefix "/job-log"))
 
-(defn task-path [prefix subpath]
-  (str root-path "/" prefix "/task/" subpath))
+(defn born-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/born-log"))
+
+(defn death-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/death-log"))
+
+(defn planning-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/planning-log"))
+
+(defn ack-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/ack-log"))
+
+(defn evict-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/evict-log"))
+
+(defn offer-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/offer-log"))
+
+(defn revoke-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/revoke-log"))
+
+(defn exhaust-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/exhaust-log"))
+
+(defn seal-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/seal-log"))
+
+(defn complete-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/complete-log"))
+
+(defn shutdown-log-path [prefix]
+  (str root-path "/" prefix "/coordinator/shutdown-log"))
 
 (defrecord ZooKeeper [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper")
-    (let [server (when (:zookeeper/server? opts)
-                   (TestingServer. (:zookeeper.server/port opts)))
+    (let [server (when (:zookeeper/server? opts) (TestingServer. (:zookeeper.server/port opts)))
           conn (zk/connect (:zookeeper/address opts))
           prefix (:onyx/id opts)]
       (zk/create conn root-path :persistent? true)
@@ -85,8 +126,22 @@
       (zk/create conn (catalog-path prefix) :persistent? true)
       (zk/create conn (workflow-path prefix) :persistent? true)
       (zk/create conn (shutdown-path prefix) :persistent? true)
+      (zk/create conn (plan-path prefix) :persistent? true)
+      (zk/create conn (election-path prefix) :persistent? true)
       (zk/create conn (job-path prefix) :persistent? true)
       (zk/create conn (job-log-path prefix) :persistent? true)
+
+      (zk/create-all conn (born-log-path prefix) :persistent? true)
+      (zk/create-all conn (death-log-path prefix) :persistent? true)
+      (zk/create-all conn (planning-log-path prefix) :persistent? true)
+      (zk/create-all conn (ack-log-path prefix) :persistent? true)
+      (zk/create-all conn (evict-log-path prefix) :persistent? true)
+      (zk/create-all conn (offer-log-path prefix) :persistent? true)
+      (zk/create-all conn (revoke-log-path prefix) :persistent? true)
+      (zk/create-all conn (exhaust-log-path prefix) :persistent? true)
+      (zk/create-all conn (seal-log-path prefix) :persistent? true)
+      (zk/create-all conn (complete-log-path prefix) :persistent? true)
+      (zk/create-all conn (shutdown-log-path prefix) :persistent? true)
 
       (assoc component :server server :conn conn :prefix (:onyx/id opts))))
 
@@ -207,6 +262,21 @@
     (zk/create (:conn sync) node :persistent? true)
     {:node node :uuid uuid}))
 
+(defmethod extensions/create [ZooKeeper :plan]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        uuid (UUID/randomUUID)
+        node (str (plan-path prefix) "/" uuid)]
+    (zk/create (:conn sync) node :persistent? true)
+    {:node node :uuid uuid}))
+
+(defmethod extensions/create [ZooKeeper :election]
+  [sync _ content]
+  (let [prefix (:onyx/id (:opts sync))
+        node (str (election-path prefix) "/proposal-")
+        data (serialize-edn content)]
+    {:node (zk/create (:conn sync) node :data data :persistent? false :sequential? true)}))
+
 (defmethod extensions/create [ZooKeeper :task]
   [sync _]
   (let [prefix (:onyx/id (:opts sync))
@@ -227,6 +297,194 @@
         node (str (job-log-path prefix) "/offer-")
         data (serialize-edn content)]
     {:node (zk/create (:conn sync) node :data data :persistent? true :sequential? true)}))
+
+(defn create-log-entry [sync f content]
+  (let [prefix (:onyx/id (:opts sync))
+        node (str (f prefix) "/log-entry-")
+        data (serialize-edn content)]
+    {:node (zk/create-all (:conn sync) node :persistent? true :sequential? true :data data)}
+    content))
+
+(defmethod extensions/create [ZooKeeper :born-log]
+  [sync _ content]
+  (create-log-entry sync born-log-path content))
+
+(defmethod extensions/create [ZooKeeper :death-log]
+  [sync _ content]
+  (create-log-entry sync death-log-path content))
+
+(defmethod extensions/create [ZooKeeper :planning-log]
+  [sync _ content]
+  (create-log-entry sync planning-log-path content))
+
+(defmethod extensions/create [ZooKeeper :ack-log]
+  [sync _ content]
+  (create-log-entry sync ack-log-path content))
+
+(defmethod extensions/create [ZooKeeper :evict-log]
+  [sync _ content]
+  (create-log-entry sync evict-log-path content))
+
+(defmethod extensions/create [ZooKeeper :offer-log]
+  [sync _ content]
+  (create-log-entry sync offer-log-path content))
+
+(defmethod extensions/create [ZooKeeper :revoke-log]
+  [sync _ content]
+  (create-log-entry sync revoke-log-path content))
+
+(defmethod extensions/create [ZooKeeper :seal-log]
+  [sync _ content]
+  (create-log-entry sync seal-log-path content))
+
+(defmethod extensions/create [ZooKeeper :complete-log]
+  [sync _ content]
+  (create-log-entry sync complete-log-path content))
+
+(defmethod extensions/create [ZooKeeper :shutdown-log]
+  [sync _ content]
+  (create-log-entry sync shutdown-log-path content))
+
+(defmethod extensions/speculate-offset ZooKeeper
+  [sync offset] (inc offset))
+
+(defn next-offset [sync path]
+  (inc (or (extensions/read-node sync path) log-start-offset)))
+
+(defmethod extensions/next-offset [ZooKeeper :born-log]
+  [sync _]
+  (next-offset sync (born-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :death-log]
+  [sync _]
+  (next-offset sync (death-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :planning-log]
+  [sync _]
+  (next-offset sync (planning-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :ack-log]
+  [sync _]
+  (next-offset sync (ack-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :evict-log]
+  [sync _]
+  (next-offset sync (evict-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :offer-log]
+  [sync _]
+  (next-offset sync (offer-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :revoke-log]
+  [sync _]
+  (next-offset sync (revoke-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :exhaust-log]
+  [sync _]
+  (next-offset sync (exhaust-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :seal-log]
+  [sync _]
+  (next-offset sync (seal-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :complete-log]
+  [sync _]
+  (next-offset sync (complete-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/next-offset [ZooKeeper :shutdown-log]
+  [sync _]
+  (next-offset sync (shutdown-log-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/checkpoint [ZooKeeper :born-log]
+  [sync _ n]
+  (extensions/write-node sync (born-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :death-log]
+  [sync _ n]
+  (extensions/write-node sync (death-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :planning-log]
+  [sync _ n]
+  (extensions/write-node sync (planning-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :ack-log]
+  [sync _ n]
+  (extensions/write-node sync (ack-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :evict-log]
+  [sync _ n]
+  (extensions/write-node sync (evict-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :offer-log]
+  [sync _ n]
+  (extensions/write-node sync (offer-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :revoke-log]
+  [sync _ n]
+  (extensions/write-node sync (revoke-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :seal-log]
+  [sync _ n]
+  (extensions/write-node sync (seal-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :complete-log]
+  [sync _ n]
+  (extensions/write-node sync (complete-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/checkpoint [ZooKeeper :shutdown-log]
+  [sync _ n]
+  (extensions/write-node sync (shutdown-log-path (:onyx/id (:opts sync))) n))
+
+(defn read-log-entry-at [sync path n]
+  (let [children (or (zk/children (:conn sync) path) [])
+        sorted-children (util/sort-sequential-nodes children)]
+    (when (and (seq sorted-children) (< n (count sorted-children)))
+      (let [full-path (str path "/" (nth sorted-children n))]
+        (extensions/read-node sync full-path)))))
+
+(defmethod extensions/log-entry-at [ZooKeeper :born-log]
+  [sync _ n]
+  (read-log-entry-at sync (born-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :death-log]
+  [sync _ n]
+  (read-log-entry-at sync (death-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :planning-log]
+  [sync _ n]
+  (read-log-entry-at sync (planning-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :ack-log]
+  [sync _ n]
+  (read-log-entry-at sync (ack-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :evict-log]
+  [sync _ n]
+  (read-log-entry-at sync (evict-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :offer-log]
+  [sync _ n]
+  (read-log-entry-at sync (offer-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :revoke-log]
+  [sync _ n]
+  (read-log-entry-at sync (revoke-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :exhaust-log]
+  [sync _ n]
+  (read-log-entry-at sync (exhaust-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :seal-log]
+  [sync _ n]
+  (read-log-entry-at sync (seal-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :complete-log]
+  [sync _ n]
+  (read-log-entry-at sync (complete-log-path (:onyx/id (:opts sync))) n))
+
+(defmethod extensions/log-entry-at [ZooKeeper :shutdown-log]
+  [sync _ n]
+  (read-log-entry-at sync (shutdown-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/create-node ZooKeeper
   [sync node]
@@ -265,6 +523,12 @@
   (let [prefix (:onyx/id (:opts sync))
         children (or (zk/children (:conn sync) (peer-state-path prefix)) [])]
     (map #(str (peer-state-path prefix) "/" %) children)))
+
+(defmethod extensions/bucket [ZooKeeper :election]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        children (or (zk/children (:conn sync) (election-path prefix)) [])]
+    (map #(str (election-path prefix) "/" %) children)))
 
 (defmethod extensions/bucket [ZooKeeper :job]
   [sync _]
@@ -329,9 +593,38 @@
     (zk/set-data (:conn sync) node (:data contents)
                  (:version (:stat contents)))))
 
+(defmethod extensions/touched? [ZooKeeper :ack]
+  [sync bucket node] (>= (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :exhaust]
+  [sync bucket node] (>= (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :seal]
+  [sync bucket node] (>= (extensions/version sync node) 1))
+
+(defmethod extensions/touched? [ZooKeeper :completion]
+  [sync bucket node] (>= (extensions/version sync node) 1))
+
+(defmethod extensions/list-nodes [ZooKeeper :ack]
+  [sync _]
+  (extensions/children sync (ack-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/list-nodes [ZooKeeper :exhaust]
+  [sync _]
+  (extensions/children sync (exhaust-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/list-nodes [ZooKeeper :seal]
+  [sync _]
+  (extensions/children sync (seal-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/list-nodes [ZooKeeper :completion]
+  [sync _]
+  (extensions/children sync (completion-path (:onyx/id (:opts sync)))))
+
 (defmethod extensions/read-node ZooKeeper
   [sync node]
-  (deserialize-edn (:data (zk/data (:conn sync) node))))
+  (let [data (:data (zk/data (:conn sync) node))]
+    (when data (deserialize-edn data))))
 
 (defmethod extensions/read-node-at [ZooKeeper :task]
   [sync _ & subpaths]
@@ -346,19 +639,35 @@
         children (or (zk/children (:conn sync) node) [])
         sorted-children (util/sort-sequential-nodes children)]
     (when (seq sorted-children)
-      (let [path  (str node "/" (last sorted-children))]
+      (let [path (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
 
-(defmethod extensions/previous-node ZooKeeper
-  [sync node]
-  (let [id (util/extract-id node)
-        prev-id (dec id)
-        ;;; Handle decrementing across orders of magnitude and not losing a 0.
-        prev-str (if (< (count (str prev-id)) (count (str id)))
-                   (str "0" prev-id)
-                   (str prev-id))]
-    ;;; Avoid overwriting anything else in the path by prefixing "state-"
-    (clojure.string/replace node (str "state-" id) (str "state-" prev-str))))
+(defn previous-node [sync node path]
+  (let [children (or (zk/children (:conn sync) path) [])
+        sorted-children (util/sort-sequential-nodes children)
+        sorted-children (map #(str path "/" %) sorted-children)]
+    (let [position (.indexOf sorted-children node)]
+      (when (> position 0)
+        (nth sorted-children (dec position))))))
+
+(defmethod extensions/previous-node [ZooKeeper :peer-state]
+  [sync _ node]
+  (previous-node sync node (peer-state-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/previous-node [ZooKeeper :election]
+  [sync _ node]
+  (previous-node sync node (election-path (:onyx/id (:opts sync)))))
+
+(defmethod extensions/smallest? [ZooKeeper :election]
+  [sync bucket node]
+  (= node (extensions/leader sync bucket)))
+
+(defmethod extensions/leader [ZooKeeper :election]
+  [sync _]
+  (let [prefix (:onyx/id (:opts sync))
+        children (or (zk/children (:conn sync) (election-path prefix)) [])
+        leader (first (util/sort-sequential-nodes children))]
+    (str (election-path prefix) "/" leader)))
 
 (defmethod extensions/node-exists? ZooKeeper
   [sync node]

@@ -141,7 +141,7 @@
         (when-not (= (:state peer-state) :dead)
           (extensions/create-at sync :peer-state (:id node-data) state))
 
-        ;; Peer may have died just after completion, hence n may be 0
+        ;; Peer may have died just after completion, n may again be 0
         (if (and (<= n 1) (not complete?))
           (do (complete-task sync (:task-node peer-state))
               (extensions/write-node sync cooldown-down {:completed? true}))

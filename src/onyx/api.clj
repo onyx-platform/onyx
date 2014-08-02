@@ -45,8 +45,12 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (let [ch (chan 1)]
-      (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
+    (let [ch (chan 1)
+          node (extensions/create (:sync onyx-coord) :plan)
+          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
+      (extensions/on-change (:sync onyx-coord) (:node node) cb)
+      (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
+      (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
       (<!! ch)))
 
   IAwait
@@ -55,39 +59,51 @@
 
   IRegister
   (register-peer [this peer-node]
-    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
+    (extensions/create (:sync onyx-coord) :born-log peer-node)
+    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) true))
 
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
-;; A coordinator runs remotely. Peers communicate with the
+;; Connect to a coordinator that runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
-(deftype HttpCoordinator [uri]
+(deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
-    (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/submit-job" (:host data) (:port data))
+          response (post uri {:body (pr-str job)})]
       (:job-id (read-string (:body response)))))
 
   IRegister
   (register-peer [this peer-node]
-    (let [response (post (str "http://" uri "/register-peer") {:body (pr-str peer-node)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/register-peer" (:host data) (:port data))
+          response (post uri {:body (pr-str peer-node)})]
       (read-string (:body response))))
 
   IShutdown
-  (shutdown [this]))
+  (shutdown [this]
+    (component/stop conn)))
 
 (defmulti connect
-  "Establish a communication channel with the coordinator."
-  (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
+  "Establish a communication channel with the coordinator.
+   kw can be :memory or :distributed."
+  (fn [kw opts] kw))
 
 (defmethod connect :memory
-  [uri opts]
+  [kw opts]
   (let [c (system/onyx-coordinator opts)]
     (InMemoryCoordinator. (component/start c))))
 
 (defmethod connect :distributed
-  [uri opts]
-  (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
+  [kw opts]
+  ;; Disallow duplicate Zookeeper hosting - causes a port collision
+  (let [opts (dissoc opts :zookeeper/server?)
+        c (system/onyx-coordinator-connection opts)]
+    (HttpCoordinator. (component/start c))))
 
 (defn start-peers
   "Launches n virtual peers. Starts a payload thread for each vpeer.
@@ -130,4 +146,10 @@
                (or rets (recur)))))
          :shutdown-fn (fn [] (>!! stop-ch true))}))
     (range n))))
+
+(defn start-distributed-coordinator [opts]
+  (component/start (system/onyx-ha-coordinator opts)))
+
+(defn stop-distributed-coordinator [coordinator]
+  (component/stop coordinator))
 

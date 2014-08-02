@@ -120,12 +120,12 @@
            n-tasks)) => true))
 
 (def legal-transitions
-  {:idle #{:acking :dead}
-   :acking #{:active :revoked :dead}
-   :active #{:sealing :idle :dead}
-   :sealing #{:idle :dead}
-   :revoked #{:dead}
-   :dead #{}})
+  {:idle #{:idle :acking :dead}
+   :acking #{:acking :active :revoked :dead}
+   :active #{:active :sealing :idle :dead}
+   :sealing #{:sealing :idle :dead}
+   :revoked #{:revoked :dead}
+   :dead #{:dead}})
 
 (defn peer-state-transition-correctness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
@@ -152,6 +152,7 @@
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
             status-spy (chan 1)]
+        
         (extensions/write-node sync (:node peer)
                                 {:id (:uuid peer)
                                  :peer-node (:node peer)
@@ -159,8 +160,9 @@
                                  :shutdown-node (:node shutdown)
                                  :payload-node (:node payload)})
         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+        (extensions/create sync :born-log (:node peer))
         
-        (>!! (:born-peer-ch-head coordinator) (:node peer))
+        (>!! (:born-peer-ch-head coordinator) true)
 
         (loop [p payload]
           (<!! sync-spy)

@@ -40,13 +40,21 @@
 
 (defmulti touch-node (fn [sync node] (type sync)))
 
+(defmulti touched? (fn [sync bucket node] [(type sync) bucket]))
+
 (defmulti read-node (fn [sync node] (type sync)))
 
 (defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
 
+(defmulti list-nodes (fn [sync bucket] [(type sync) bucket]))
+
 (defmulti dereference (fn [sync node] (type sync)))
 
-(defmulti previous-node (fn [sync node] (type sync)))
+(defmulti previous-node (fn [sync bucket node] [(type sync) bucket]))
+
+(defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
+
+(defmulti leader (fn [sync bucket] [(type sync) bucket]))
 
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
@@ -69,6 +77,14 @@
 (defmulti on-child-change (fn [sync node cb] (type sync)))
 
 (defmulti on-delete (fn [sync node db] (type sync)))
+
+(defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
+
+(defmulti speculate-offset (fn [sync offset] (type sync)))
+
+(defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
+
+(defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))
 
 (defmulti create-tx-session (fn [queue] (type queue)))
 

@@ -65,7 +65,7 @@
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
-
+       
        (extensions/write-node sync (:node peer-node-a)
                                {:id (:uuid peer-node-a)
                                 :peer-node (:node peer-node-a)
@@ -82,14 +82,21 @@
                                 :shutdown-node (:node shutdown-node-b)})
        (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-b))
+       
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog-a :workflow workflow-a} (chan 1)])
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow-a :catalog catalog-a}
+         :node (:node (extensions/create sync :plan))})
+
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
        
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (<!! sync-spy-a)
@@ -120,8 +127,12 @@
          (<!! status-spy)
          (<!! status-spy)
 
-         (>!! (:planning-ch-head coordinator)
-              [{:catalog catalog-b :workflow workflow-b} (chan 1)])
+         (extensions/create
+          sync :planning-log
+          {:job {:workflow workflow-b :catalog catalog-b}
+           :node (:node (extensions/create sync :plan))})
+         
+         (>!! (:planning-ch-head coordinator) true)
          (<!! offer-ch-spy)
 
          (extensions/write-node sync (:node peer-node-a)
@@ -255,5 +266,5 @@
               (<!! offer-ch-spy)
               (<!! offer-ch-spy))))
    
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

@@ -71,7 +71,7 @@
                 :zookeeper/address (:address (:zookeeper config))
                 :onyx/id id})
 
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
+(def conn (onyx.api/connect :memory coord-opts))
 
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
 

@@ -34,6 +34,8 @@
            offer-ch-spy (chan 10)
            status-spy (chan 2)
            job-ch (chan 1)
+
+           node (extensions/create sync :plan)
            
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -69,14 +71,22 @@
                                 :payload-node (:node payload-node-b-1)})
        (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
+       (extensions/create sync :born-log (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-b))
+       
+       (>!! (:born-peer-ch-head coordinator) true)
+       (>!! (:born-peer-ch-head coordinator) true)
 
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node node) #(>!! job-ch %))
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node node)})
+       
+       (>!! (:planning-ch-head coordinator) true)
 
        (<!! offer-ch-spy)
        (<!! sync-spy-a)
@@ -135,7 +145,8 @@
                   (<!! offer-ch-spy))
 
                 (facts "All tasks are complete"
-                       (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
+                       (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
+                             task-path (extensions/resolve-node sync :task (str job-id))]
                          (doseq [task-node (extensions/children sync task-path)]
                            (when-not (impl/completed-task? task-node)
                              (fact (impl/task-complete? sync task-node) => true)))))
@@ -144,7 +155,7 @@
                        (doseq [state-path (extensions/bucket sync :peer-state)]
                          (let [state (extensions/dereference sync state-path)]
                            (fact (:state (:content state)) => :idle))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 
 (facts
  "plan one job with four peers"
@@ -161,6 +172,8 @@
            offer-ch-spy (chan (* n 5))
            ack-ch-spy (chan (* n 5))
            job-ch (chan 1)
+
+           node (extensions/create sync :plan)
 
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -188,16 +201,22 @@
                                   :pulse-node (:node pulse)
                                   :shutdown-node (:node shutdown)
                                   :payload-node (:node payload)})
-         (extensions/on-change sync (:node payload) #(>!! sync-spy %)))
+         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+         (extensions/create sync :born-log (:node peer)))
 
        (doseq [peer peers]
-         (>!! (:born-peer-ch-head coordinator) (:node peer)))
+         (>!! (:born-peer-ch-head coordinator) true))
 
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node node) #(>!! job-ch %))
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node node)})
+       
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (alts!! sync-spies)
@@ -243,9 +262,10 @@
                 (count (filter (partial = :idle) (map :state states))) => 4)
 
          (facts "All three tasks are complete"
-                (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
+                (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
+                      task-path (extensions/resolve-node sync :task (str job-id))]
                   (doseq [task-node (extensions/children sync task-path)]
                     (when-not (impl/completed-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

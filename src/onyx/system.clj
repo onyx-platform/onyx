@@ -1,22 +1,33 @@
 (ns onyx.system
   (:require [com.stuartsierra.component :as component]
             [onyx.coordinator.async :refer [coordinator]]
+            [onyx.coordinator.election :refer [election]]
+            [onyx.coordinator.distributed :refer [coordinator-server]]
             [onyx.sync.zookeeper :refer [zookeeper]]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.logging-configuration :as logging-config]))
 
-(def coordinator-components [:logging-config :sync :queue :coordinator])
+(def coordinator-components
+  [:logging-config :sync :queue :coordinator])
 
-(def peer-components [:logging-config :sync :queue :peer])
+(def ha-coordinator-components
+  [:logging-config :sync :queue :election :coordinator :server])
+
+(def connection-components
+  [:logging-config :sync])
+
+(def peer-components
+  [:logging-config :sync :queue :peer])
 
 (defn rethrow-component [f]
   (try
     (f)
     (catch Exception e
+      (.printStackTrace e)
       (throw (.getCause e)))))
 
-(defrecord OnyxCoordinator [logging-config sync queue]
+(defrecord OnyxCoordinator []
   component/Lifecycle
   (start [this]
     (rethrow-component
@@ -25,7 +36,25 @@
     (rethrow-component
      #(component/stop-system this coordinator-components))))
 
-(defrecord OnyxPeer [logging-config sync queue]
+(defrecord OnyxHACoordinator []
+  component/Lifecycle
+  (start [this]
+    (rethrow-component
+     #(component/start-system this ha-coordinator-components)))
+  (stop [this]
+    (rethrow-component
+     #(component/stop-system this ha-coordinator-components))))
+
+(defrecord OnyxCoordinatorConnection []
+  component/Lifecycle
+  (start [this]
+    (rethrow-component
+     #(component/start-system this connection-components)))
+  (stop [this]
+    (rethrow-component
+     #(component/stop-system this connection-components))))
+
+(defrecord OnyxPeer []
   component/Lifecycle
   (start [this]
     (rethrow-component
@@ -41,6 +70,22 @@
     :sync (component/using (zookeeper opts) [:logging-config])
     :queue (component/using (hornetq opts) [:sync])
     :coordinator (component/using (coordinator opts) [:sync :queue])}))
+
+(defn onyx-ha-coordinator
+  [opts]
+  (map->OnyxHACoordinator
+   {:logging-config (logging-config/logging-configuration opts)
+    :sync (component/using (zookeeper opts) [:logging-config])
+    :queue (component/using (hornetq opts) [:sync])
+    :election (component/using (election opts) [:sync :queue])
+    :coordinator (component/using (coordinator opts) [:sync :queue :election])
+    :server (component/using (coordinator-server opts) [:coordinator])}))
+
+(defn onyx-coordinator-connection
+  [opts]
+  (map->OnyxCoordinatorConnection
+   {:logging-config (logging-config/logging-configuration opts)
+    :sync (component/using (zookeeper opts) [:logging-config])}))
 
 (defn onyx-peer
   [opts]
