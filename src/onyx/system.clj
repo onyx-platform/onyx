@@ -36,6 +36,7 @@
     (rethrow-component
      #(component/stop-system this coordinator-components))))
 
+<<<<<<< HEAD
 (defrecord OnyxHACoordinator []
   component/Lifecycle
   (start [this]
