@@ -115,6 +115,7 @@
 
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-node]
+;;  (prn "Node is: " exhaust-node)
   (let [node-data (extensions/read-node sync exhaust-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))

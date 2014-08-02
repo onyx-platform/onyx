@@ -214,11 +214,13 @@
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
-    (when-let [node (:path (<!! exhaust-tail))]
-      (when-let [result (exhaust-queue sync sync-ch node)]
-        (extensions/create sync :seal-log result)
-        (>!! seal-head result))
-      (recur))))
+    (when-let [x (<!! exhaust-tail)]
+      (prn "Exhaust loop found: " x)
+      (when-let [node (:path x)]
+        (when-let [result (exhaust-queue sync sync-ch node)]
+          (extensions/create sync :seal-log result)
+          (>!! seal-head result))
+        (recur)))))
 
 (defn seal-resource-loop [sync seal-tail exhaust-head]
   (loop []
@@ -428,10 +430,13 @@
         (r/repair-evict-messages! sync #(>!! evict-ch-head %))
         (r/repair-offer-messages! sync #(>!! offer-ch-head %))
         (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))
-        (r/repair-ack-messages! sync #(>!! ack-ch-head %))
-        (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
-        (r/repair-seal-messages! sync #(>!! seal-ch-head %) #(>!! exhaust-ch-head %))
-        (r/repair-completion-messages! sync #(>!! completion-ch-head %))
+;;        (r/repair-ack-messages! sync #(>!! ack-ch-head %))
+;;        (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
+        (r/repair-seal-messages! sync
+                                 #(>!! seal-ch-head %)
+                                 #(>!! exhaust-ch-head %)
+                                 #(>!! exhaust-ch-head {:path %}))
+;;        (r/repair-completion-messages! sync #(>!! completion-ch-head %))
         (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
         (catch Exception e
           (warn e "Failure in repairing")))

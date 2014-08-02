@@ -17,7 +17,7 @@
   (prn (format "===== Done ====="))
   (println))
 
-(defn fast-forward-triggers [sync bucket cb]
+(defn fast-forward-triggers [sync bucket cb ff-cb]
   (prn (format "===== Phase Trigger fast forward [%s] ======" bucket))
   (doseq [node (extensions/list-nodes sync bucket)]
     (prn (format "[%s] Trying to fast forward trigger %s" bucket node))
@@ -30,7 +30,7 @@
           (prn (format "Touched is %s" (extensions/touched? sync bucket node)))
           (when (extensions/touched? sync bucket node)
             (prn "Calling back to: " node)
-            (cb node))))))
+            (ff-cb node))))))
   (prn (format "===== Done ====="))
   (println))
 
@@ -55,9 +55,9 @@
 (defn repair-exhaust-messages! [sync cb]
   (fast-forward-log sync :exhaust-log cb))
 
-(defn repair-seal-messages! [sync seal-cb exhaust-cb]
-  (fast-forward-triggers sync :exhaust seal-cb)
-  (fast-forward-log sync :seal-log exhaust-cb))
+(defn repair-seal-messages! [sync seal-cb exhaust-cb exhaust-ff-cb]
+  (fast-forward-triggers sync :exhaust exhaust-cb exhaust-ff-cb)
+  (fast-forward-log sync :seal-log seal-cb))
 
 (defn repair-completion-messages! [sync cb]
   (fast-forward-triggers sync :completion cb))
