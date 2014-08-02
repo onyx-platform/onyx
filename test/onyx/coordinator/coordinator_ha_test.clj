@@ -11,7 +11,7 @@
 ;; Need to run ZK and HQ away from the Coordinator because the
 ;; Coordinator will start and stop these services as it
 ;; comes on and offline.
-;;(def zk-server (TestingServer. (:spawn-port (:zookeeper config))))
+(def zk-server (TestingServer. (:spawn-port (:zookeeper config))))
 
 (def hq-server
   (doto (EmbeddedHornetQ.)
@@ -27,8 +27,6 @@
 (def echo 1000)
 
 (def id (str (java.util.UUID/randomUUID)))
-
-(prn "ID is: " id)
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -46,7 +44,7 @@
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :zookeeper/address "localhost:2181"
+   :zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.coordinator/host "localhost"
    :onyx.coordinator/port onyx-port
@@ -59,7 +57,7 @@
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :zookeeper/address "localhost:2181"
+   :zookeeper/address (:address (:zookeeper config))
    :onyx/id id})
 
 (def onyx-server (onyx.api/start-distributed-coordinator coord-opts))
@@ -73,7 +71,7 @@
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :zookeeper/address "localhost:2181"
+   :zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.coordinator/host "localhost"
    :onyx.coordinator/port onyx-port-2
@@ -124,8 +122,13 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(Thread/sleep 10000)
+(Thread/sleep 7000)
 (onyx.api/stop-distributed-coordinator onyx-server)
+
+(def onyx-server (future (onyx.api/start-distributed-coordinator coord-opts)))
+(Thread/sleep 7000)
+
+(onyx.api/stop-distributed-coordinator onyx-server-2)
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
@@ -136,7 +139,7 @@
 (onyx.api/stop-distributed-coordinator onyx-server)
 
 (.stop hq-server)
-;;(.stop zk-server)
+(.stop zk-server)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)

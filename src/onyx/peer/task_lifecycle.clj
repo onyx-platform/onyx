@@ -97,12 +97,9 @@
   (if (:try-seal? @blocked?)
     (merge event {:onyx.core/sealed? false})
     (let [seal-response-ch (chan)]
-      (timbre/info "Blocking call on seal")
       (extensions/on-change sync seal-node #(>!! seal-response-ch %))
-      (prn "Touching: " exhaust-node)
       (extensions/touch-node sync exhaust-node)
       (let [response (<!! seal-response-ch)]
-        (timbre/info "Unblocked call for seal")
         (let [path (:path response)
               seal? (extensions/read-node sync path)]
           (if seal?
@@ -121,11 +118,9 @@
     (if (or (:complete? state) (not (:try-seal? state)))
       (assoc event :onyx.core/complete-success? false)
       (let [complete-response-ch (chan)]
-        (timbre/info "Blocking call on complete")
         (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
         (extensions/touch-node sync completion-node)
         (let [response (<!! complete-response-ch)]
-          (timbre/info "Unblocked call on complete")
           (let [path (:path response)
                 result (extensions/read-node sync path)]
             (if (:completed? result)
