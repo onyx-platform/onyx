@@ -9,7 +9,7 @@
     (let [node (:node (extensions/create sync :election content))]
       (loop []
         (let [ch (chan)
-              predecessor (extensions/previous-node sync :election node)]
+              predecessor (extensions/previous-node sync node)]
           (when predecessor
             (extensions/on-delete sync predecessor #(>!! ch (:path %)))
             (<!! ch)

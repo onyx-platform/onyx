@@ -642,21 +642,18 @@
       (let [path (str node "/" (last sorted-children))]
         {:node path :content (extensions/read-node sync path)}))))
 
-(defn previous-node [sync node path]
-  (let [children (or (zk/children (:conn sync) path) [])
+(defn parent [node]
+  (clojure.string/join "/" (butlast (clojure.string/split node))))
+
+(defmethod extensions/previous-node ZooKeeper
+  [sync node]
+  (let [parent-node (parent node)
+        children (or (zk/children (:conn sync) parent-node) [])
         sorted-children (util/sort-sequential-nodes children)
-        sorted-children (map #(str path "/" %) sorted-children)]
+        sorted-children (map #(str parent-node "/" %) sorted-children)]
     (let [position (.indexOf sorted-children node)]
       (when (> position 0)
         (nth sorted-children (dec position))))))
-
-(defmethod extensions/previous-node [ZooKeeper :peer-state]
-  [sync _ node]
-  (previous-node sync node (peer-state-path (:onyx/id (:opts sync)))))
-
-(defmethod extensions/previous-node [ZooKeeper :election]
-  [sync _ node]
-  (previous-node sync node (election-path (:onyx/id (:opts sync)))))
 
 (defmethod extensions/smallest? [ZooKeeper :election]
   [sync bucket node]

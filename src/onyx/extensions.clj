@@ -50,7 +50,7 @@
 
 (defmulti dereference (fn [sync node] (type sync)))
 
-(defmulti previous-node (fn [sync bucket node] [(type sync) bucket]))
+(defmulti previous-node (fn [sync node] (type sync)))
 
 (defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
 

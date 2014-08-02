@@ -21,7 +21,7 @@
    states))
 
 (defn previously-sealing? [sync state]
-  (let [previous-node (extensions/previous-node sync :peer-state (:node state))]
+  (let [previous-node (extensions/previous-node sync (:node state))]
     (= (:state (extensions/read-node sync previous-node)) :sealing)))
 
 (defn n-seal-failures [sync task-node]
