@@ -17,7 +17,11 @@
   (prn (format "===== Done ====="))
   (println))
 
-(defn fast-forward-triggers [sync bucket cb ff-cb]
+(defn fast-forward-triggers
+  "Add watches back to ZooKeeper. Adds the normal callbacks on nodes that
+   haven't yet been touched, and calls ff-cb (fastforward-callback) on
+   nodes that have been touched while the Coordinator was offline."
+  [sync bucket cb ff-cb]
   (prn (format "===== Phase Trigger fast forward [%s] ======" bucket))
   (doseq [node (extensions/list-nodes sync bucket)]
     (prn (format "[%s] Trying to fast forward trigger %s" bucket node))
@@ -49,14 +53,13 @@
 (defn repair-revoke-messages! [sync cb]
   (fast-forward-log sync :revoke-log cb))
 
-(defn repair-ack-messages! [sync cb]
-  (fast-forward-triggers sync :ack cb))
+(defn repair-ack-messages! [sync cb ff-cb]
+  (fast-forward-triggers sync :ack cb ff-cb))
 
-(defn repair-exhaust-messages! [sync cb]
-  (fast-forward-log sync :exhaust-log cb))
+(defn repair-exhaust-messages! [sync cb ff-cb]
+  (fast-forward-triggers sync :exhaust cb ff-cb))
 
-(defn repair-seal-messages! [sync seal-cb exhaust-cb exhaust-ff-cb]
-  (fast-forward-triggers sync :exhaust exhaust-cb exhaust-ff-cb)
+(defn repair-seal-messages! [sync seal-cb]
   (fast-forward-log sync :seal-log seal-cb))
 
 (defn repair-completion-messages! [sync cb ff-cb]

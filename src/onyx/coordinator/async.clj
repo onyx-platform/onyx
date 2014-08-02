@@ -424,24 +424,22 @@
       (dire/with-handler! #'shutdown-ch-loop
         java.lang.Exception (fn [e & _] (warn e)))
 
-      (try
-        (r/repair-planning-messages! sync #(>!! planning-ch-head %))
-        (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
-        (r/repair-evict-messages! sync #(>!! evict-ch-head %))
-        (r/repair-offer-messages! sync #(>!! offer-ch-head %))
-        (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))
-;;        (r/repair-ack-messages! sync #(>!! ack-ch-head %))
-;;        (r/repair-exhaust-messages! sync #(>!! exhaust-ch-head %))
-        (r/repair-seal-messages! sync
-                                 #(>!! seal-ch-head %)
-                                 #(>!! exhaust-ch-head %)
-                                 #(>!! exhaust-ch-head {:path %}))
-        (r/repair-completion-messages! sync
-                                       #(>!! completion-ch-head %)
-                                       #(>!! completion-ch-head {:path %}))
-        (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
-        (catch Exception e
-          (warn e "Failure in repairing")))
+      (r/repair-planning-messages! sync #(>!! planning-ch-head %))
+      (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
+      (r/repair-evict-messages! sync #(>!! evict-ch-head %))
+      (r/repair-offer-messages! sync #(>!! offer-ch-head %))
+      (r/repair-revoke-messages! sync #(>!! offer-revoke-ch-head %))
+      (r/repair-ack-messages! sync
+                              #(>!! ack-ch-head %)
+                              #(>!! ack-ch-head {:path %}))
+      (r/repair-exhaust-messages! sync
+                                  #(>!! exhaust-ch-head %)
+                                  #(>!! exhaust-ch-head {:path %}))
+      (r/repair-seal-messages! sync #(>!! seal-ch-head %))
+      (r/repair-completion-messages! sync
+                                     #(>!! completion-ch-head %)
+                                     #(>!! completion-ch-head {:path %}))
+      (r/repair-shutdown-messages! sync #(>!! shutdown-ch-head %))
 
       (assoc component
         :sync-ch sync-ch
