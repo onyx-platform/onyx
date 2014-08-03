@@ -214,12 +214,11 @@
 
 (defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
   (loop []
-    (when-let [x (<!! exhaust-tail)]
-      (when-let [node (:path x)]
-        (when-let [result (exhaust-queue sync sync-ch node)]
-          (extensions/create sync :seal-log result)
-          (>!! seal-head result))
-        (recur)))))
+    (when-let [node (:path (<!! exhaust-tail))]
+      (when-let [result (exhaust-queue sync sync-ch node)]
+        (extensions/create sync :seal-log result)
+        (>!! seal-head result))
+      (recur))))
 
 (defn seal-resource-loop [sync seal-tail exhaust-head]
   (loop []

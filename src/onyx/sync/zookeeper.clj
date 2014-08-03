@@ -643,7 +643,7 @@
         {:node path :content (extensions/read-node sync path)}))))
 
 (defn parent [node]
-  (clojure.string/join "/" (butlast (clojure.string/split node))))
+  (clojure.string/join "/" (butlast (clojure.string/split node #"/"))))
 
 (defmethod extensions/previous-node ZooKeeper
   [sync node]

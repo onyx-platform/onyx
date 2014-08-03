@@ -128,7 +128,7 @@
        :exhaust-node (:node/exhaust (:nodes peer-state))})))
 
 (defmethod extensions/complete ZooKeeper
-  [sync complete-node cooldown-down cb]
+  [sync complete-node cooldown-node cb]
   (let [node-data (extensions/read-node sync complete-node)
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
@@ -144,12 +144,12 @@
         ;; Peer may have died just after completion, n may again be 0
         (if (and (<= n 1) (not complete?))
           (do (complete-task sync (:task-node peer-state))
-              (extensions/write-node sync cooldown-down {:completed? true}))
+              (extensions/write-node sync cooldown-node {:completed? true}))
           (do (extensions/on-change sync complete-node cb)
-              (extensions/write-node sync cooldown-down {:completed? false})))
+              (extensions/write-node sync cooldown-node {:completed? false})))
         
         {:n-peers n :peer-state peer-state})
-      (do (extensions/write-node sync cooldown-down {:completed? true})
+      (do (extensions/write-node sync cooldown-node {:completed? true})
           {:n-peers n :peer-state peer-state}))))
 
 (defn incomplete-job-ids [sync]
