@@ -35,13 +35,17 @@
     
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [n (range (count messages))]
-        (when (zero? (mod n echo))
-          (info (format "Wrote %s segments" n))
-          (.commit session))
-        (let [message (.createMessage session true)]
-          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
-          (.send producer message)))
+
+      (doall
+       (map-indexed
+        (fn [i x]
+          (when (zero? (mod i echo))
+            (info (format "Wrote %s segments" i))
+            (.commit session))
+          (let [message (.createMessage session true)]
+            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.send producer message)))
+        messages))
 
       (.commit session)
       (.close producer)
@@ -57,13 +61,17 @@
 
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [n (range (count messages))]
-        (when (zero? (mod n echo))
-          (info (format "Wrote %s segments" n))
-          (.commit session))
-        (let [message (.createMessage session true)]
-          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
-          (.send producer message)))
+
+      (doall
+       (map-indexed
+        (fn [i x]
+          (when (zero? (mod i echo))
+            (info (format "Wrote %s segments" i))
+            (.commit session))
+          (let [message (.createMessage session true)]
+            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.send producer message)))
+        messages))
 
       (let [sentinel (.createMessage session true)]
         (.writeBytes (.getBodyBuffer sentinel) (.array (fressian/write :done)))
