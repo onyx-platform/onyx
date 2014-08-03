@@ -124,8 +124,8 @@
           n (n-peers sync (:task-node peer-state) #{:acking :active :sealing})]
       ;; Peer may have died before this event is executed, hence the 0.
       {:seal? (or (<= n 1) (zero? n-active))
-       :seal-node (:node/seal (:nodes peer-state))
-       :exhaust-node (:node/exhaust (:nodes peer-state))})))
+       :seal-node (:node/seal (:nodes node-data))
+       :exhaust-node (:node/exhaust (:nodes node-data))})))
 
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-node cb]

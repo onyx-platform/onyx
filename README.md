@@ -23,6 +23,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### Full length documentation 0.3.0
 
+- Background
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
