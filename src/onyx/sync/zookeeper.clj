@@ -603,7 +603,7 @@
   [sync bucket node] (>= (extensions/version sync node) 1))
 
 (defmethod extensions/touched? [ZooKeeper :completion]
-  [sync bucket node] (>= (extensions/version sync node) 1))
+  [sync bucket node] (> (extensions/version sync node) 1))
 
 (defmethod extensions/list-nodes [ZooKeeper :ack]
   [sync _]
