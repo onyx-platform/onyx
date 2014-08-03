@@ -119,14 +119,17 @@
     (let [consumer (.createConsumer session queue-name)
           results (atom [])]
       (.start session)
-      (while (not= (last @results) :done)
-        (when (zero? (mod (count @results) echo))
-          (info (format "Read %s segments" (count @results)))
-          (.commit session))
-        (let [message (.receive consumer)]
-          (when message
-            (.acknowledge message)
-            (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))
+      (loop [last-message nil]
+        (when (not= last-message :done)
+          (when (zero? (mod (count @results) echo))
+            (info (format "Read %s segments" (count @results)))
+            (.commit session))
+          (let [message (.receive consumer)]
+            (when message
+              (let [decompressed (fressian/read (.toByteBuffer (.getBodyBuffer message)))]
+                (.acknowledge message)
+                (swap! results conj decompressed)
+                (recur decompressed))))))
 
       (info "Done reading")
       (.commit session)
