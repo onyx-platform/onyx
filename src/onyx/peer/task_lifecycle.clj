@@ -94,7 +94,7 @@
 (defn munge-seal-resource
   [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node
            onyx.core/pipeline-state] :as event}]
-  (if (:try-seal? @pipeline-state)
+  (if (:tried-to-seal? @pipeline-state)
     (merge event {:onyx.core/sealed? false})
     (let [seal-response-ch (chan)]
       (extensions/on-change sync seal-node #(>!! seal-response-ch %))
@@ -102,20 +102,17 @@
       (let [response (<!! seal-response-ch)]
         (let [path (:path response)
               seal? (extensions/read-node sync path)]
+          (swap! pipeline-state assoc :tried-to-seal? true)
           (if seal?
-            (do (swap! pipeline-state assoc :try-seal? true)
-                (merge event
-                       (p-ext/seal-resource event)
-                       {:onyx.core/sealed? true}))
-            (do (swap! pipeline-state assoc :try-seal? true)
-                (merge event {:onyx.core/sealed? false}))))))))
+            (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
+            (merge event {:onyx.core/sealed? false})))))))
 
 (defn munge-complete-task
   [{:keys [onyx.core/sync onyx.core/completion-node
            onyx.core/cooldown-node onyx.core/pipeline-state onyx.core/sealed?]
     :as event}]
   (let [state @pipeline-state]
-    (if (or (:complete? state) (not (:try-seal? state)))
+    (if (or (:complete? state) (not (:tried-to-seal? state)))
       (assoc event :onyx.core/complete-success? false)
       (let [complete-response-ch (chan)]
         (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
@@ -297,7 +294,7 @@
                          :onyx.core/params (or (get (:fn-params opts) task) [])
                          :onyx.core/queue queue
                          :onyx.core/sync sync
-                         :onyx.core/pipeline-state (atom {:try-seal? false :complete? false})}
+                         :onyx.core/pipeline-state (atom {:tried-to-seal? false :complete? false})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
