@@ -2,9 +2,9 @@
   (:require [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
             [taoensso.timbre]
-            [onyx.extensions :as extensions]
             [zookeeper :as zk]
-            [zookeeper.util :as util])
+            [zookeeper.util :as util]
+            [onyx.extensions :as extensions])
   (:import [java.util UUID]
            [org.apache.curator.test TestingServer]))
 
@@ -17,91 +17,91 @@
   (str root-path "/" prefix))
 
 (defn peer-path [prefix]
-  (str root-path "/" prefix "/peer"))
+  (str (prefix-path prefix) "/peer"))
 
 (defn peer-state-path [prefix]
-  (str root-path "/" prefix "/peer-state"))
+  (str (prefix-path prefix) "/peer-state"))
 
 (defn pulse-path [prefix]
-  (str root-path "/" prefix "/pulse"))
+  (str (prefix-path prefix) "/pulse"))
 
 (defn payload-path [prefix]
-  (str root-path "/" prefix "/payload"))
+  (str (prefix-path prefix) "/payload"))
 
 (defn ack-path [prefix]
-  (str root-path "/" prefix "/ack"))
+  (str (prefix-path prefix) "/ack"))
 
 (defn exhaust-path [prefix]
-  (str root-path "/" prefix "/exhaust"))
+  (str (prefix-path prefix) "/exhaust"))
 
 (defn seal-path [prefix]
-  (str root-path "/" prefix "/seal"))
+  (str (prefix-path prefix) "/seal"))
 
 (defn completion-path [prefix]
-  (str root-path "/" prefix "/completion"))
+  (str (prefix-path prefix) "/completion"))
 
 (defn cooldown-path [prefix]
-  (str root-path "/" prefix "/cooldown"))
+  (str (prefix-path prefix) "/cooldown"))
 
 (defn status-path [prefix]
-  (str root-path "/" prefix "/status"))
+  (str (prefix-path prefix) "/status"))
 
 (defn catalog-path [prefix]
-  (str root-path "/" prefix "/catalog"))
+  (str (prefix-path prefix) "/catalog"))
 
 (defn workflow-path [prefix]
-  (str root-path "/" prefix "/workflow"))
+  (str (prefix-path prefix) "/workflow"))
 
 (defn shutdown-path [prefix]
-  (str root-path "/" prefix "/shutdown"))
+  (str (prefix-path prefix) "/shutdown"))
 
 (defn job-path [prefix]
-  (str root-path "/" prefix "/job"))
+  (str (prefix-path prefix) "/job"))
 
 (defn task-path [prefix subpath]
-  (str root-path "/" prefix "/task/" subpath))
+  (str (prefix-path prefix) "/task/" subpath))
 
 (defn plan-path [prefix]
-  (str root-path "/" prefix "/plan"))
+  (str (prefix-path prefix) "/plan"))
 
 (defn election-path [prefix]
-  (str root-path "/" prefix "/election"))
+  (str (prefix-path prefix) "/election"))
 
 (defn job-log-path [prefix]
-  (str root-path "/" prefix "/job-log"))
+  (str (prefix-path prefix) "/job-log"))
 
 (defn born-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/born-log"))
+  (str (prefix-path prefix) "/coordinator/born-log"))
 
 (defn death-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/death-log"))
+  (str (prefix-path prefix) "/coordinator/death-log"))
 
 (defn planning-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/planning-log"))
+  (str (prefix-path prefix) "/coordinator/planning-log"))
 
 (defn ack-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/ack-log"))
+  (str (prefix-path prefix) "/coordinator/ack-log"))
 
 (defn evict-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/evict-log"))
+  (str (prefix-path prefix) "/coordinator/evict-log"))
 
 (defn offer-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/offer-log"))
+  (str (prefix-path prefix) "/coordinator/offer-log"))
 
 (defn revoke-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/revoke-log"))
+  (str (prefix-path prefix) "/coordinator/revoke-log"))
 
 (defn exhaust-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/exhaust-log"))
+  (str (prefix-path prefix) "/coordinator/exhaust-log"))
 
 (defn seal-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/seal-log"))
+  (str (prefix-path prefix) "/coordinator/seal-log"))
 
 (defn complete-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/complete-log"))
+  (str (prefix-path prefix) "/coordinator/complete-log"))
 
 (defn shutdown-log-path [prefix]
-  (str root-path "/" prefix "/coordinator/shutdown-log"))
+  (str (prefix-path prefix) "/coordinator/shutdown-log"))
 
 (defrecord ZooKeeper [opts]
   component/Lifecycle
@@ -157,7 +157,7 @@
 (defn zookeeper [opts]
   (map->ZooKeeper {:opts opts}))
 
-(defn trailing-id [s]
+(defn leaf [s]
   (last (clojure.string/split s #"/")))
 
 (defn serialize-edn [x]
@@ -545,7 +545,7 @@
 (defmethod extensions/bucket-at [ZooKeeper :task]
   [sync _ subpath]
   (let [prefix (:onyx/id (:opts sync))
-        job-id (trailing-id subpath) 
+        job-id (leaf subpath) 
         children (or (zk/children (:conn sync) (task-path prefix job-id)) [])]
     (map #(str (task-path prefix job-id) "/" %) children)))
 
@@ -572,7 +572,7 @@
 (defmethod extensions/resolve-node [ZooKeeper :task]
   [sync _ job-node & more]
   (let [prefix (:onyx/id (:opts sync))]
-    (task-path prefix (trailing-id job-node))))
+    (task-path prefix (leaf job-node))))
 
 (defmethod extensions/children ZooKeeper
   [sync node]
