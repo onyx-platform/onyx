@@ -115,8 +115,7 @@
    #(extensions/seal-resource? sync exhaust-node)))
 
 (defn seal-resource [sync seal? seal-node exhaust-node exhaust-head]
-  (when-not seal?
-    (extensions/on-change sync exhaust-node #(>!! exhaust-head %)))
+  (extensions/on-change sync exhaust-node #(>!! exhaust-head %))
   (extensions/write-node sync seal-node seal?))
 
 (defn complete-task [sync sync-ch complete-node cb]
