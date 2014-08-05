@@ -119,18 +119,16 @@
         task-node (:task-node node-data)
         n (n-peers sync state-bucket task-node #{:acking :active :waiting :sealing})
         n-waiting (n-peers sync state-bucket task-node #{:waiting})
-        n-sealing (n-peers sync state-bucket task-node #{:sealing})
-        state-path (extensions/resolve-node sync :peer-state (:id node-data))
-        peer-state (:content (extensions/dereference sync state-path))
-        state (if (and (= n-waiting (dec n)) (zero? n-sealing))
-                (assoc peer-state :state :sealing)
-                (assoc peer-state :state :waiting))]
-    (when (and (not= (:state peer-state) state)
-               (and (= state :waiting) (= (:state peer-state) :sealing)))
-      (extensions/create-at sync :peer-state (:id node-data) state))
-    {:seal? (= (:state state) :sealing)
-     :seal-node (:node/seal (:nodes node-data))
-     :exhaust-node (:node/exhaust (:nodes node-data))}))
+        n-sealing (n-peers sync state-bucket task-node #{:sealing})]
+    (let [state-path (extensions/resolve-node sync :peer-state (:id node-data))
+          peer-state (:content (extensions/dereference sync state-path))
+          state (if (and (= n-waiting (dec n)) (zero? n-sealing))
+                  (assoc peer-state :state :sealing)
+                  (assoc peer-state :state :waiting))]
+      (extensions/create-at sync :peer-state (:id node-data) state)
+      {:seal? (= (:state state) :sealing)
+       :seal-node (:node/seal (:nodes node-data))
+       :exhaust-node (:node/exhaust (:nodes node-data))})))
 
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-node cb]
