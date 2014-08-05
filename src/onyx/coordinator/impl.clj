@@ -119,16 +119,19 @@
         task-node (:task-node node-data)
         n (n-peers sync state-bucket task-node #{:acking :active :waiting :sealing})
         n-waiting (n-peers sync state-bucket task-node #{:waiting})
-        n-sealing (n-peers sync state-bucket task-node #{:sealing})]
-    (let [state-path (extensions/resolve-node sync :peer-state (:id node-data))
-          peer-state (:content (extensions/dereference sync state-path))
-          state (if (and (= n-waiting (dec n)) (zero? n-sealing))
-                  (assoc peer-state :state :sealing)
-                  (assoc peer-state :state :waiting))]
-      (extensions/create-at sync :peer-state (:id node-data) state)
-      {:seal? (= (:state state) :sealing)
-       :seal-node (:node/seal (:nodes node-data))
-       :exhaust-node (:node/exhaust (:nodes node-data))})))
+        n-sealing (n-peers sync state-bucket task-node #{:sealing})
+        state-path (extensions/resolve-node sync :peer-state (:id node-data))
+        peer-state (:content (extensions/dereference sync state-path))
+        same-task? (= (:task-node peer-state) (:task-node node-data))
+        matching-state? (some #{(:state peer-state)} #{:active :waiting :sealing})
+        state (if (and (= n-waiting (dec n)) (zero? n-sealing))
+                (assoc peer-state :state :sealing)
+                (assoc peer-state :state :waiting))]
+    (when (and (not= (:state peer-state) :sealing) same-task? matching-state?)
+      (extensions/create-at sync :peer-state (:id node-data) state))
+    {:seal? (boolean (and (= (:state state) :sealing) same-task? matching-state?))
+     :seal-node (:node/seal (:nodes node-data))
+     :exhaust-node (:node/exhaust (:nodes node-data))}))
 
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-node cb]
@@ -138,9 +141,10 @@
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (extensions/bucket sync :peer-state)
                    (:task-node peer-state) #{:acking :active})]
-    (if (or (= (:state peer-state) :active)
-            (= (:state peer-state) :sealing)
-            (= (:state peer-state) :dead))
+    (if (and (or (= (:state peer-state) :active)
+                 (= (:state peer-state) :sealing)
+                 (= (:state peer-state) :dead))
+             (= (:task-node peer-state) (:task-node node-data)))
       (let [state (assoc peer-state :state :idle)]
         (when-not (= (:state peer-state) :dead)
           (extensions/create-at sync :peer-state (:id node-data) state))
