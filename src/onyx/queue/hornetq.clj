@@ -76,7 +76,7 @@
 (defmethod start-server :embedded
   [opts]
   (doall
-   (map
+   (pmap
     (fn [path]
       (doto (EmbeddedHornetQ.)
         (.setConfigResourcePath (str (clojure.java.io/resource path)))
@@ -119,17 +119,14 @@
   (start [component]
     (taoensso.timbre/info "Starting HornetQ connection")
 
-    (try
-      (let [server (start-server opts)
-            locator (doto (connect-to-locator opts) (.setConsumerWindowSize 0))
-            session-factory (.createSessionFactory locator)]
-        (assoc component
-          :server server
-          :locator locator
-          :session-factory session-factory
-          :cluster-name (cluster-name opts)))
-      (catch Exception e
-        (.printStackTrace e))))
+    (let [server (start-server opts)
+          locator (doto (connect-to-locator opts) (.setConsumerWindowSize 0))
+          session-factory (.createSessionFactory locator)]
+      (assoc component
+        :server server
+        :locator locator
+        :session-factory session-factory
+        :cluster-name (cluster-name opts))))
 
   (stop [{:keys [server locator session-factory] :as component}]
     (taoensso.timbre/info "Stopping HornetQ connection")
