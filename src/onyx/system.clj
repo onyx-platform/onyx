@@ -67,16 +67,16 @@
   [opts]
   (map->OnyxCoordinator
    {:logging-config (logging-config/logging-configuration opts)
-    :sync (component/using (zookeeper opts) [:logging-config])
-    :queue (component/using (hornetq opts) [:sync])
+    :queue (component/using (hornetq opts) [:logging-config])
+    :sync (component/using (zookeeper opts) [:queue :logging-config])
     :coordinator (component/using (coordinator opts) [:sync :queue])}))
 
 (defn onyx-ha-coordinator
   [opts]
   (map->OnyxHACoordinator
    {:logging-config (logging-config/logging-configuration opts)
-    :sync (component/using (zookeeper opts) [:logging-config])
-    :queue (component/using (hornetq opts) [:sync])
+    :queue (component/using (hornetq opts) [:logging-config])
+    :sync (component/using (zookeeper opts) [:queue :logging-config])
     :election (component/using (election opts) [:sync :queue])
     :coordinator (component/using (coordinator opts) [:sync :queue :election])
     :server (component/using (coordinator-server opts) [:coordinator])}))
@@ -91,7 +91,7 @@
   [opts]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration opts)
-    :sync (component/using (zookeeper opts) [:logging-config])
-    :queue (component/using (hornetq opts) [:sync])
+    :queue (component/using (hornetq opts) [:logging-config])
+    :sync (component/using (zookeeper opts) [:queue :logging-config])
     :peer (component/using (virtual-peer opts) [:sync :queue])}))
 
