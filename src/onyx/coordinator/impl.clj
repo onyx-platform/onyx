@@ -127,7 +127,10 @@
         state (if (and (= n-waiting (dec n)) (zero? n-sealing))
                 (assoc peer-state :state :sealing)
                 (assoc peer-state :state :waiting))]
-    (when (and (not= (:state peer-state) :sealing) same-task? matching-state?)
+    (when (and (not= (:state peer-state) :sealing)
+               (not= (:state peer-state) (:state state))
+               same-task?
+               matching-state?)
       (extensions/create-at sync :peer-state (:id node-data) state))
     {:seal? (boolean (and (= (:state state) :sealing) same-task? matching-state?))
      :seal-node (:node/seal (:nodes node-data))

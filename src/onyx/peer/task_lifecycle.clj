@@ -113,7 +113,7 @@
            onyx.core/cooldown-node onyx.core/pipeline-state onyx.core/sealed?]
     :as event}]
   (let [state @pipeline-state]
-    (if (or (:complete? state) (not (:tried-to-seal? state)))
+    (if (or (:complete? state) (not (:tried-to-seal? state)) (not (:sealer? state)))
       (assoc event :onyx.core/complete-success? false)
       (let [complete-response-ch (chan)]
         (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
