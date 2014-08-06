@@ -94,26 +94,27 @@
 (defn munge-seal-resource
   [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node
            onyx.core/pipeline-state] :as event}]
-  (if (:sealer? @pipeline-state)
-    (merge event {:onyx.core/sealed? false})
-    (let [seal-response-ch (chan)]
-      (extensions/on-change sync seal-node #(>!! seal-response-ch %))
-      (extensions/touch-node sync exhaust-node)
-      (let [response (<!! seal-response-ch)]
-        (let [path (:path response)
-              seal? (extensions/read-node sync path)]
-          (if seal?
-            (do (swap! pipeline-state assoc :tried-to-seal? true :sealer? true)
-                (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true}))
-            (do (swap! pipeline-state assoc :tried-to-seal? true)
-                (merge event {:onyx.core/sealed? false}))))))))
+  (let [state @pipeline-state]
+    (if (or (:sealer? state) (:sealed? state))
+      (merge event {:onyx.core/sealed? false})
+      (let [seal-response-ch (chan)]
+        (extensions/on-change sync seal-node #(>!! seal-response-ch %))
+        (extensions/touch-node sync exhaust-node)
+        (let [response (<!! seal-response-ch)]
+          (let [path (:path response)
+                {:keys [seal? sealed?]} (extensions/read-node sync path)]
+            (if (and seal? (not sealed?))
+              (do (swap! pipeline-state assoc :tried-to-seal? true :sealer? true :sealed? sealed?)
+                  (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true}))
+              (do (swap! pipeline-state assoc :tried-to-seal? true :sealed? sealed?)
+                  (merge event {:onyx.core/sealed? false})))))))))
 
 (defn munge-complete-task
   [{:keys [onyx.core/sync onyx.core/completion-node
            onyx.core/cooldown-node onyx.core/pipeline-state onyx.core/sealed?]
     :as event}]
   (let [state @pipeline-state]
-    (if (or (:complete? state) (not (:tried-to-seal? state)) (not (:sealer? state)))
+    (if (or (not (:sealer? state)) (:complete? state))
       (assoc event :onyx.core/complete-success? false)
       (let [complete-response-ch (chan)]
         (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))

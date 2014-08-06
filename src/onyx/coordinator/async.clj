@@ -114,9 +114,9 @@
    sync-ch
    #(extensions/seal-resource? sync exhaust-node)))
 
-(defn seal-resource [sync seal? seal-node exhaust-node exhaust-head]
+(defn seal-resource [sync seal? sealed? seal-node exhaust-node exhaust-head]
   (extensions/on-change sync exhaust-node #(>!! exhaust-head %))
-  (extensions/write-node sync seal-node seal?))
+  (extensions/write-node sync seal-node {:seal? seal? :sealed? sealed?}))
 
 (defn complete-task [sync sync-ch complete-node cb]
   (serialize
@@ -226,7 +226,7 @@
         (when-let [result (extensions/log-entry-at sync :seal-log offset)]
           (seal-resource
            sync
-           (:seal? result) (:seal-node result)
+           (:seal? result) (:sealed? result) (:seal-node result)
            (:exhaust-node result) exhaust-head)
           (extensions/checkpoint sync :seal-log offset))
         (recur)))))

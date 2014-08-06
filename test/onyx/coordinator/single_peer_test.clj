@@ -200,7 +200,7 @@
 
   (facts "The resource should be sealed"
          (let [nodes (:nodes (extensions/read-node sync payload-node))]
-           (fact (extensions/read-node sync (:node/seal nodes)) => true)))
+           (fact (:seal? (extensions/read-node sync (:node/seal nodes))) => true)))
 
   (facts "Touching the completion node triggers the callback"
          (let [nodes (:nodes (extensions/read-node sync payload-node))]
