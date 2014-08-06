@@ -225,13 +225,13 @@
 (facts "Peer states only make legal transitions"
        (sim-utils/peer-state-transition-correctness ozk))
 
-(onyx.api/shutdown conn)
-
 (doseq [peer @cluster]
   (try
     ((:shutdown-fn peer))
     (catch Exception e
       (.printStackTrace e))))
+
+(onyx.api/shutdown conn)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
