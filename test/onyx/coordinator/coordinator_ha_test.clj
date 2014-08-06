@@ -145,4 +145,3 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-
