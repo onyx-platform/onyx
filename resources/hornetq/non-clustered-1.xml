@@ -2,15 +2,15 @@
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:schemaLocation="urn:hornetq /schema/hornetq-configuration.xsd">
 
-   <paging-directory>${data.dir:../data-5465}/paging</paging-directory>
+   <paging-directory>data/5465/paging</paging-directory>
    
-   <bindings-directory>${data.dir:../data-5465}/bindings</bindings-directory>
+   <bindings-directory>data/5465/bindings</bindings-directory>
    
-   <journal-directory>${data.dir:../data-5465}/journal</journal-directory>
+   <journal-directory>data/5465/journal</journal-directory>
    
    <journal-min-files>10</journal-min-files>
    
-   <large-messages-directory>${data.dir:../data-5465}/large-messages</large-messages-directory>
+   <large-messages-directory>data/5465/large-messages</large-messages-directory>
    
    <connectors>
       <connector name="netty">
