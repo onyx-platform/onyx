@@ -37,10 +37,10 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
 - [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Coordinator High Availability](doc/user-guide/coordinator-ha.md)
+- [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
-- Implementation Notes
 
 ### Official plugin listing
 
