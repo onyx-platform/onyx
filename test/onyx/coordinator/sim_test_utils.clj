@@ -154,7 +154,8 @@
             pulse (extensions/create sync :pulse)
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
-            status-spy (chan 1)]
+            status-spy (chan 1)
+            seal-spy (chan 1)]
         
         (extensions/write-node sync (:node peer)
                                 {:id (:uuid peer)
@@ -180,10 +181,15 @@
 
             (let [next-payload (extensions/create sync :payload)]
               (extensions/write-node sync (:node peer) {:id (:uuid peer)
-                                                         :peer-node (:node peer)
-                                                         :pulse-node (:node pulse)
-                                                         :shutdown-node (:node shutdown)
-                                                         :payload-node (:node next-payload)})
+                                                        :peer-node (:node peer)
+                                                        :pulse-node (:node pulse)
+                                                        :shutdown-node (:node shutdown)
+                                                        :payload-node (:node next-payload)})
+
+              (extensions/on-change sync (:node/seal nodes) #(>!! seal-spy %))
+              (extensions/touch-node sync (:node/exhaust nodes))
+              (<!! seal-spy)
+              
               (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
               (extensions/touch-node sync (:node/completion nodes))
 
