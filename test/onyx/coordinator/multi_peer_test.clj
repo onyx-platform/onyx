@@ -30,6 +30,10 @@
 
            sync-spy-a (chan 1)
            sync-spy-b (chan 1)
+
+           seal-spy-a (chan 1)
+           seal-spy-b (chan 1)
+
            ack-ch-spy (chan 2)
            offer-ch-spy (chan 10)
            status-spy (chan 2)
@@ -127,6 +131,14 @@
                                          :payload-node (:node payload-node-b-2)})
                 (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
 
+                (extensions/on-change sync (:node/seal (:nodes payload-a)) #(>!! seal-spy-a %))
+                (extensions/touch-node sync (:node/exhaust (:nodes payload-a)))
+                (<!! seal-spy-a)
+
+                (extensions/on-change sync (:node/seal (:nodes payload-b)) #(>!! seal-spy-b %))
+                (extensions/touch-node sync (:node/exhaust (:nodes payload-b)))
+                (<!! seal-spy-b)
+
                 (extensions/touch-node sync (:node/completion (:nodes payload-a)))
                 (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
@@ -140,6 +152,10 @@
 
                   (<!! ack-ch-spy)
                   (<!! status-spy)
+
+                  (extensions/on-change sync (:node/seal nodes) #(>!! seal-spy-a %))
+                  (extensions/touch-node sync (:node/exhaust nodes))
+                  (<!! seal-spy-a)
 
                   (extensions/touch-node sync (:node/completion nodes))
                   (<!! offer-ch-spy))
@@ -167,6 +183,7 @@
            shutdowns (take n (repeatedly (fn [] (extensions/create sync :shutdown))))
            payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
            sync-spies (take n (repeatedly (fn [] (chan 1))))
+           seal-spies (take n (repeatedly (fn [] (chan 1))))
            
            status-spy (chan (* n 5))
            offer-ch-spy (chan (* n 5))
@@ -193,7 +210,7 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
        
-       (doseq [[peer pulse shutdown payload sync-spy]
+       (doseq [[peer pulse shutdown payload sync-spy seal-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
          (extensions/write-node sync (:node peer)
                                  {:id (:uuid peer)
@@ -249,6 +266,10 @@
 
            (doseq [payload-node payload-nodes]
              (let [payload (extensions/read-node sync payload-node)]
+               (extensions/on-change sync (:node/seal (:nodes payload)) #(>!! (first seal-spies) %))
+               (extensions/touch-node sync (:node/exhaust (:nodes payload)))
+               (<!! (first seal-spies))
+
                (extensions/touch-node sync (:node/completion (:nodes payload)))
                (<!! offer-ch-spy)))))
 
