@@ -40,6 +40,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
+- Implementation Notes
 
 ### Official plugin listing
 
@@ -51,6 +52,10 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 ### Need help?
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
+
+### Running the tests
+
+A simple `lein midje` will run the full suite.
 
 ### Contributing
 
