@@ -123,7 +123,7 @@
   {:idle #{:idle :acking :dead}
    :acking #{:acking :active :revoked :dead}
    :active #{:active :waiting :sealing :idle :dead}
-   :waiting #{:waiting :sealing :dead}
+   :waiting #{:waiting :sealing :idle :dead}
    :sealing #{:sealing :idle :dead}
    :revoked #{:revoked :dead}
    :dead #{:dead}})
@@ -139,8 +139,10 @@
           (when (< i (dec (count state-data)))
             (let [current-state (:state state)
                   next-state (:state (nth state-data (inc i)))]
-              (fact (some #{next-state} (get legal-transitions current-state))
-                    =not=> nil?))))
+              (when-not (fact (some #{next-state}
+                                    (get legal-transitions current-state))
+                              =not=> nil?)
+                (prn current-state "->" next-state)))))
         state-data)))))
 
 (defn create-peer [model components peer]

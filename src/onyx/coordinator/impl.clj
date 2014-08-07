@@ -45,6 +45,14 @@
         (assoc :waiting (get counts :waiting 0))
         (assoc :sealing (get counts :sealing 0)))))
 
+(defn release-waiting-nodes! [sync task-node]
+  (doseq [peer (extensions/bucket sync :peer-state)]
+    (let [content (:content (extensions/dereference sync peer))]
+      (when (and (= task-node (:task-node content))
+                 (= (:state content) :waiting))
+        (let [status (assoc content :state :idle)]
+          (extensions/create-at sync :peer-state (:id content) status))))))
+
 (defmethod extensions/mark-peer-born ZooKeeper
   [sync peer-node]
   (let [peer-data (extensions/read-node sync peer-node)
@@ -60,6 +68,8 @@
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         state (assoc peer-state :state :dead)]
+    (when (and (:task-node peer-state) (= (:state peer-state) :sealing))
+      (release-waiting-nodes! sync (:task-node peer-state)))
     (:node (extensions/create-at sync :peer-state (:id peer-state) state))))
 
 (defmethod extensions/plan-job ZooKeeper
@@ -150,14 +160,6 @@
      :sealed? complete?
      :seal-node (:node/seal (:nodes node-data))
      :exhaust-node (:node/exhaust (:nodes node-data))}))
-
-(defn release-waiting-nodes! [sync task-node]
-  (doseq [peer (extensions/bucket sync :peer-state)]
-    (let [content (:content (extensions/dereference sync peer))]
-      (when (and (= task-node (:task-node content))
-                 (= (:state content) :waiting))
-        (let [status (assoc content :state :idle)]
-          (extensions/create-at sync :peer-state (:id content) status))))))
   
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-node cb]
