@@ -5,7 +5,7 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def n-messages 15000)
+(def n-messages 100000)
 
 (def batch-size 1320)
 
@@ -85,7 +85,7 @@
 
 (def workflow {:in {:inc :out}})
 
-(def v-peers (onyx.api/start-peers conn 6 peer-opts))
+(def v-peers (onyx.api/start-peers conn 10 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 

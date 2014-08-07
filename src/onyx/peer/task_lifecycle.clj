@@ -24,11 +24,12 @@
     node))
 
 (defn munge-inject-temporal [event]
-  (let [rets (l-ext/inject-temporal-resources* event)]
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
+        rets (l-ext/inject-temporal-resources* event)]
     (if-not (:onyx.core/session rets)
       (let [session (extensions/create-tx-session (:onyx.core/queue event))]
-        (merge event rets {:onyx.core/session session}))
-      (merge event rets))))
+        (merge event rets cycle-params {:onyx.core/session session}))
+      (merge event cycle-params rets))))
 
 (defn munge-read-batch [event]
   (merge event (p-ext/read-batch event)))
@@ -95,7 +96,7 @@
   [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node
            onyx.core/pipeline-state] :as event}]
   (let [state @pipeline-state]
-    (if (or (:sealer? state) (:sealed? state))
+    (if (:tried-to-seal? state)
       (merge event {:onyx.core/sealed? false})
       (let [seal-response-ch (chan)]
         (extensions/on-change sync seal-node #(>!! seal-response-ch %))
@@ -103,29 +104,26 @@
         (let [response (<!! seal-response-ch)]
           (let [path (:path response)
                 {:keys [seal? sealed?]} (extensions/read-node sync path)]
-            (if (and seal? (not sealed?))
-              (do (swap! pipeline-state assoc :tried-to-seal? true :sealer? true :sealed? sealed?)
-                  (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true}))
-              (do (swap! pipeline-state assoc :tried-to-seal? true :sealed? sealed?)
-                  (merge event {:onyx.core/sealed? false})))))))))
+            (swap! pipeline-state assoc :tried-to-seal? true)
+            (if seal?
+              (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
+              (merge event {:onyx.core/sealed? true}))))))))
 
 (defn munge-complete-task
   [{:keys [onyx.core/sync onyx.core/completion-node
            onyx.core/cooldown-node onyx.core/pipeline-state onyx.core/sealed?]
     :as event}]
   (let [state @pipeline-state]
-    (if (or (not (:sealer? state)) (:complete? state))
-      (assoc event :onyx.core/complete-success? false)
-      (let [complete-response-ch (chan)]
-        (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
-        (extensions/touch-node sync completion-node)
-        (let [response (<!! complete-response-ch)]
-          (let [path (:path response)
-                result (extensions/read-node sync path)]
-            (if (:completed? result)
-              (do (swap! pipeline-state assoc :complete? true)
-                  (merge event {:onyx.core/complete-success? true}))
-              (merge event {:onyx.core/complete-success? true}))))))))
+    (let [complete-response-ch (chan)]
+      (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
+      (extensions/touch-node sync completion-node)
+      (let [response (<!! complete-response-ch)]
+        (let [path (:path response)
+              result (extensions/read-node sync path)]
+          (if (:completed? result)
+            (do (swap! pipeline-state assoc :complete? true)
+                (merge event {:onyx.core/complete-success? true}))
+            (merge event {:onyx.core/complete-success? true})))))))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -225,7 +223,9 @@
 (defn complete-task-loop [complete-ch dead-ch]
   (loop []
     (when-let [event (<!! complete-ch)]
-      (when (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
+      (when (and (:onyx.core/tail-batch? event)
+                 (:onyx.core/commit? event)
+                 (:onyx.core/sealed? event))
         (let [event (munge-complete-task event)]
           (when (:onyx.core/complete-success? event)
             (>!! (:onyx.core/complete-ch event) true))))
@@ -596,67 +596,67 @@
                        :complete-ch complete-ch :err-ch err-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
-  (fn [{:keys [onyx.core/id onyx.core/start-lifecycle?] :as event}]
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
     (when-not start-lifecycle?
-      (timbre/info (format "[%s] Sequential task currently has queue consumers. Backing off and retrying..." id)))))
+      (timbre/info (format "[%s / %s] Sequential task currently has queue consumers. Backing off and retrying..." id lifecycle-id)))))
 
 (dire/with-post-hook! #'munge-inject-temporal
-  (fn [{:keys [onyx.core/id]}]
-    (taoensso.timbre/info (format "[%s] Created new tx session" id))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Created new tx session" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-read-batch
-  (fn [{:keys [onyx.core/id onyx.core/batch]}]
-    (taoensso.timbre/info (format "[%s] Read %s segments" id (count batch)))))
+  (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
 (dire/with-post-hook! #'munge-strip-sentinel
-  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
-    (taoensso.timbre/info (format "[%s] Attempted to strip sentinel. %s segments left" id (count decompressed)))))
+  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Attempted to strip sentinel. %s segments left" id lifecycle-id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-requeue-sentinel
-  (fn [{:keys [onyx.core/id onyx.core/tail-batch?]}]
-    (taoensso.timbre/info (format "[%s] Requeued sentinel value" id))))
+  (fn [{:keys [onyx.core/id onyx.core/tail-batch? onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Requeued sentinel value" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-decompress-batch
-  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch]}]
-    (taoensso.timbre/info (format "[%s] Decompressed %s segments" id (count decompressed)))))
+  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-apply-fn
-  (fn [{:keys [onyx.core/id onyx.core/results]}]
-    (taoensso.timbre/info (format "[%s] Applied fn to %s segments" id (count results)))))
+  (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
 
 (dire/with-post-hook! #'munge-compress-batch
-  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
-    (taoensso.timbre/info (format "[%s] Compressed %s segments" id (count compressed)))))
+  (fn [{:keys [onyx.core/id onyx.core/compressed onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Compressed %s segments" id lifecycle-id (count compressed)))))
 
 (dire/with-post-hook! #'munge-write-batch
-  (fn [{:keys [onyx.core/id]}]
-    (taoensso.timbre/info (format "[%s] Wrote batch" id))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Wrote batch" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-status-check
-  (fn [{:keys [onyx.core/id onyx.core/status-node]}]
-    (taoensso.timbre/info (format "[%s] Checked the status node" id))))
+  (fn [{:keys [onyx.core/id onyx.core/status-node onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Checked the status node" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-ack
-  (fn [{:keys [onyx.core/id onyx.core/acked]}]
-    (taoensso.timbre/info (format "[%s] Acked %s segments" id acked))))
+  (fn [{:keys [onyx.core/id onyx.core/acked onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Acked %s segments" id lifecycle-id acked))))
 
 (dire/with-post-hook! #'munge-commit-tx
-  (fn [{:keys [onyx.core/id onyx.core/commit?]}]
-    (taoensso.timbre/info (format "[%s] Committed transaction? %s" id commit?))))
+  (fn [{:keys [onyx.core/id onyx.core/commit? onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Committed transaction? %s" id lifecycle-id commit?))))
 
 (dire/with-post-hook! #'munge-close-resources
-  (fn [{:keys [onyx.core/id]}]
-    (taoensso.timbre/info (format "[%s] Closed resources" id))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Closed resources" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-close-temporal-resources
-  (fn [{:keys [onyx.core/id]}]
-    (taoensso.timbre/info (format "[%s] Closed temporal plugin resources" id))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-seal-resource
-  (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed?]}]
-    (taoensso.timbre/info (format "[%s] Sealing resource for %s? %s" id task sealed?))))
+  (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed? onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
 
 (dire/with-post-hook! #'munge-complete-task
-  (fn [{:keys [onyx.core/id]}]
-    (taoensso.timbre/info (format "[%s] Completing task" id))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+    (taoensso.timbre/info (format "[%s / %s] Completing task" id lifecycle-id))))
 

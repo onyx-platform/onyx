@@ -124,18 +124,25 @@
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
         same-task? (= (:task-node peer-state) task-node)
-        state (if (and (>= n-waiting (dec n)) (zero? n-sealing))
+        complete? (task-complete? sync task-node)
+        state (if (and (>= n-waiting (dec n))
+                       (zero? n-sealing)
+                       (= (:state peer-state) :active))
                 (assoc peer-state :state :sealing)
                 (assoc peer-state :state :waiting))]
+
     (when (and same-task?
                (and (not (and (= (:state peer-state) :sealing)
                               (= (:state state) :waiting)))
                     (not (= (:state peer-state) (:state state)))))
-      (extensions/create-at sync :peer-state (:id node-data) state))
+      (when-not (and (= (:state state) :sealing) complete?)
+        (extensions/create-at sync :peer-state (:id node-data) state)))
+
     {:seal? (boolean (and (or (= (:state peer-state) :sealing)
                               (= (:state state) :sealing))
-                          same-task?))
-     :sealed? (task-complete? sync task-node)
+                          same-task?
+                          (not complete?)))
+     :sealed? complete?
      :seal-node (:node/seal (:nodes node-data))
      :exhaust-node (:node/exhaust (:nodes node-data))}))
 
@@ -147,8 +154,7 @@
         complete? (task-complete? sync (:task-node peer-state))
         n (n-peers sync (extensions/bucket sync :peer-state)
                    (:task-node peer-state) #{:acking :active})]
-    (if (and (or (= (:state peer-state) :active)
-                 (= (:state peer-state) :sealing)
+    (if (and (or (= (:state peer-state) :sealing)
                  (= (:state peer-state) :dead))
              (= (:task-node peer-state) (:task-node node-data)))
       (let [state (assoc peer-state :state :idle)]
@@ -160,10 +166,11 @@
           (do (complete-task sync (:task-node peer-state))
               (extensions/write-node sync cooldown-node {:completed? true}))
           (do (extensions/on-change sync complete-node cb)
-              (extensions/write-node sync cooldown-node {:completed? false})))
+              (extensions/write-node sync cooldown-node {:completed? true})))
         
         {:n-peers n :peer-state peer-state})
-      (do (extensions/write-node sync cooldown-node {:completed? true})
+      (do (extensions/create-at sync :peer-state (:id node-data) (assoc peer-state :state :idle))
+          (extensions/write-node sync cooldown-node {:completed? true})
           {:n-peers n :peer-state peer-state}))))
 
 (defn incomplete-job-ids [sync]
