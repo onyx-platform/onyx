@@ -124,14 +124,12 @@
 (defmethod extensions/seal-resource? ZooKeeper
   [sync exhaust-node]
   (let [node-data (extensions/read-node sync exhaust-node)
-        state-bucket (extensions/bucket sync :peer-state)
-        task-node (:task-node node-data)
-        peers (n-peers sync task-node)
+        peers (n-peers sync (:task-node node-data))
         n (+ (:acking peers) (:active peers) (:waiting peers) (:sealing peers))
         state-path (extensions/resolve-node sync :peer-state (:id node-data))
         peer-state (:content (extensions/dereference sync state-path))
-        same-task? (= (:task-node peer-state) task-node)
-        complete? (task-complete? sync task-node)
+        same-task? (= (:task-node peer-state) (:task-node node-data))
+        complete? (task-complete? sync (:task-node node-data))
         state (if (and (>= (:waiting peers) (dec n))
                        (zero? (:sealing peers))
                        (= (:state peer-state) :active))
@@ -141,9 +139,9 @@
     (when (and same-task?
                (and (not (and (= (:state peer-state) :sealing)
                               (= (:state state) :waiting)))
-                    (not (= (:state peer-state) (:state state)))))
-      (when-not (and (= (:state state) :sealing) complete?)
-        (extensions/create-at sync :peer-state (:id node-data) state)))
+                    (not (= (:state peer-state) (:state state))))
+               (not (and (= (:state state) :sealing) complete?)))
+      (extensions/create-at sync :peer-state (:id node-data) state))
 
     {:seal? (boolean (and (or (= (:state peer-state) :sealing)
                               (= (:state state) :sealing))
@@ -153,6 +151,14 @@
      :seal-node (:node/seal (:nodes node-data))
      :exhaust-node (:node/exhaust (:nodes node-data))}))
 
+(defn release-waiting-nodes! [sync task-node]
+  (doseq [peer (extensions/bucket sync :peer-state)]
+    (let [content (:content (extensions/dereference sync peer))]
+      (when (and (= task-node (:task-node content))
+                 (= (:state content) :waiting))
+        (let [status (assoc content :state :idle)]
+          (extensions/create-at sync :peer-state (:id content) status))))))
+  
 (defmethod extensions/complete ZooKeeper
   [sync complete-node cooldown-node cb]
   (let [node-data (extensions/read-node sync complete-node)
@@ -161,23 +167,20 @@
         complete? (task-complete? sync (:task-node peer-state))
         peers (n-peers sync (:task-node peer-state))
         n (+ (:acking peers) (:active peers))]
-    (if (and (or (= (:state peer-state) :sealing)
-                 (= (:state peer-state) :dead))
+
+    (if (and (some #{(:state peer-state)} #{:sealing :dead})
              (= (:task-node peer-state) (:task-node node-data)))
       (let [state (assoc peer-state :state :idle)]
-        (when-not (= (:state peer-state) :dead)
+        (when (= (:state peer-state) :sealing)
           (extensions/create-at sync :peer-state (:id node-data) state))
 
-        ;; Peer may have died just after completion, n may again be 0
-        (if (and (<= n 1) (not complete?))
-          (do (complete-task sync (:task-node peer-state))
-              (extensions/write-node sync cooldown-node {:completed? true}))
-          (do (extensions/on-change sync complete-node cb)
-              (extensions/write-node sync cooldown-node {:completed? true})))
+        (when (and (zero? n) (not complete?))
+          (release-waiting-nodes! sync (:task-node peer-state))
+          (complete-task sync (:task-node peer-state))
+          (extensions/write-node sync cooldown-node {:completed? true}))
         
         {:n-peers n :peer-state peer-state})
-      (do (extensions/create-at sync :peer-state (:id node-data) (assoc peer-state :state :idle))
-          (extensions/write-node sync cooldown-node {:completed? true})
+      (do (extensions/write-node sync cooldown-node {:completed? true})
           {:n-peers n :peer-state peer-state}))))
 
 (defn incomplete-job-ids [sync]

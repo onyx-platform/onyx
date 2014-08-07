@@ -103,7 +103,7 @@
         (extensions/touch-node sync exhaust-node)
         (let [response (<!! seal-response-ch)]
           (let [path (:path response)
-                {:keys [seal? sealed?]} (extensions/read-node sync path)]
+                {:keys [seal?]} (extensions/read-node sync path)]
             (swap! pipeline-state assoc :tried-to-seal? true)
             (if seal?
               (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
@@ -120,10 +120,7 @@
       (let [response (<!! complete-response-ch)]
         (let [path (:path response)
               result (extensions/read-node sync path)]
-          (if (:completed? result)
-            (do (swap! pipeline-state assoc :complete? true)
-                (merge event {:onyx.core/complete-success? true}))
-            (merge event {:onyx.core/complete-success? true})))))))
+          (merge event {:onyx.core/complete-success? true}))))))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -296,7 +293,7 @@
                          :onyx.core/params (or (get (:fn-params opts) task) [])
                          :onyx.core/queue queue
                          :onyx.core/sync sync
-                         :onyx.core/pipeline-state (atom {:tried-to-seal? false :sealer? false :complete? false})}
+                         :onyx.core/pipeline-state (atom {:tried-to-seal? false})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
