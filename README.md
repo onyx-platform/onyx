@@ -25,6 +25,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
+- [Hardware]()
 - [APIs](doc/user-guide/apis.md)
 - [Constraints](doc/user-guide/constraints.md)
 - [Architecture](doc/user-guide/architecture.md)
