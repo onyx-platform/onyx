@@ -1,9 +1,9 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan >!! <!!]]
+            [clojure.core.async :refer [chan alts!! >!! <!!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
-            [taoensso.timbre :refer [info]]
+            [taoensso.timbre :refer [warn]]
             [onyx.coordinator.impl :as impl]
             [onyx.system :as system]
             [onyx.extensions :as extensions]))
@@ -31,22 +31,26 @@
   (future
     (loop []
       (let [ch (chan 1)
-            task-path (extensions/resolve-node sync :task job-id)
-            task-nodes (extensions/bucket-at sync :task job-id)
-            task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
+            task-path (extensions/resolve-node sync :task job-id)]
         (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
-        (if (every? (partial impl/task-complete? sync) task-nodes)
-          true
-          (do (<!! ch)
-              (recur)))))))
+        (let [task-nodes (extensions/bucket-at sync :task job-id)
+              task-nodes (filter #(not (impl/completed-task? %)) task-nodes)]
+          (if (every? (partial impl/task-complete? sync) task-nodes)
+            true
+            (do (<!! ch)
+                (recur))))))))
 
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (let [ch (chan 1)]
-      (>!! (:planning-ch-head (:coordinator onyx-coord)) [job ch])
+    (let [ch (chan 1)
+          node (extensions/create (:sync onyx-coord) :plan)
+          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
+      (extensions/on-change (:sync onyx-coord) (:node node) cb)
+      (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
+      (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
       (<!! ch)))
 
   IAwait
@@ -55,54 +59,97 @@
 
   IRegister
   (register-peer [this peer-node]
-    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) peer-node))
+    (extensions/create (:sync onyx-coord) :born-log peer-node)
+    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) true))
 
   IShutdown
   (shutdown [this] (component/stop onyx-coord)))
 
-;; A coordinator runs remotely. Peers communicate with the
+;; Connect to a coordinator that runs remotely. Peers communicate with the
 ;; coordinator by submitting HTTP requests and parsing the responses.
-(deftype HttpCoordinator [uri]
+(deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
-    (let [response (post (str "http://" uri "/submit-job") {:body (pr-str job)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/submit-job" (:host data) (:port data))
+          response (post uri {:body (pr-str job)})]
       (:job-id (read-string (:body response)))))
 
   IRegister
   (register-peer [this peer-node]
-    (let [response (post (str "http://" uri "/register-peer") {:body (pr-str peer-node)})]
+    (let [leader (extensions/leader (:sync conn) :election)
+          data (extensions/read-node (:sync conn) leader)
+          uri (format "http://%s:%s/register-peer" (:host data) (:port data))
+          response (post uri {:body (pr-str peer-node)})]
       (read-string (:body response))))
 
   IShutdown
-  (shutdown [this]))
+  (shutdown [this]
+    (component/stop conn)))
 
 (defmulti connect
-  "Establish a communication channel with the coordinator."
-  (fn [uri opts] (keyword (first (split (second (split uri #":")) #"//")))))
+  "Establish a communication channel with the coordinator.
+   kw can be :memory or :distributed."
+  (fn [kw opts] kw))
 
 (defmethod connect :memory
-  [uri opts]
+  [kw opts]
   (let [c (system/onyx-coordinator opts)]
     (InMemoryCoordinator. (component/start c))))
 
 (defmethod connect :distributed
-  [uri opts]
-  (HttpCoordinator. (first (split (second (split uri #"//")) #"/"))))
+  [kw opts]
+  ;; Disallow duplicate Zookeeper hosting - causes a port collision
+  (let [opts (dissoc opts :zookeeper/server?)
+        c (system/onyx-coordinator-connection opts)]
+    (HttpCoordinator. (component/start c))))
 
 (defn start-peers
-  "Launches a number of virtual peers. Starts n
-   (the number of peers to launch) threads, one for each virtual peer.
-   Takes a coordinator type to connect to and a virtual peer configuration."
+  "Launches n virtual peers. Starts a payload thread for each vpeer.
+   Takes a coordinator type to connect to and a virtual peer configuration.
+   Each peer may be stopped by invoking the fn returned by :shutdown-fn."
   [coord n config]
   (doall
    (map
     (fn [_]
-      (let [v-peer (component/start (system/onyx-peer config))]
-        (let [rets {:runner (future (try @(:payload-thread (:peer v-peer))
-                                         (catch Exception e
-                                           (info e))))
-                    :shutdown-fn (fn [] (component/stop v-peer))}]
-          (register-peer coord (:node (:peer (:peer v-peer))))
-          rets)))
+      (let [stop-ch (chan)
+            v-peer (system/onyx-peer config)]
+        {:runner
+         (future
+           (loop []
+             (let [rets
+                   (try
+                     (let [live (component/start v-peer)]
+                       (register-peer coord (:node (:peer (:peer live))))
+
+                       (let [restart-ch (:dead-restart-tail-ch (:peer live))
+                             [v ch] (alts!! [stop-ch restart-ch] :priority true)]
+                         (if (= ch stop-ch)
+                           (try
+                             (component/stop live)
+                             :stopped
+                             (catch Exception e
+                               (warn e)
+                               :stopped))
+                           (try
+                             (component/stop live)
+                             nil
+                             (catch Exception e
+                               (warn e)
+                               :stopped)))))
+                     (catch Exception e
+                       (warn e)
+                       (warn "Virtual peer failed, backing off and rebooting...")
+                       (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
+                       nil))]
+               (or rets (recur)))))
+         :shutdown-fn (fn [] (>!! stop-ch true))}))
     (range n))))
+
+(defn start-distributed-coordinator [opts]
+  (component/start (system/onyx-ha-coordinator opts)))
+
+(defn stop-distributed-coordinator [coordinator]
+  (component/stop coordinator))
 

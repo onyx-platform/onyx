@@ -30,10 +30,16 @@
 
            sync-spy-a (chan 1)
            sync-spy-b (chan 1)
+
+           seal-spy-a (chan 1)
+           seal-spy-b (chan 1)
+
            ack-ch-spy (chan 2)
            offer-ch-spy (chan 10)
            status-spy (chan 2)
            job-ch (chan 1)
+
+           node (extensions/create sync :plan)
            
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -69,14 +75,22 @@
                                 :payload-node (:node payload-node-b-1)})
        (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
+       (extensions/create sync :born-log (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-b))
+       
+       (>!! (:born-peer-ch-head coordinator) true)
+       (>!! (:born-peer-ch-head coordinator) true)
 
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node node) #(>!! job-ch %))
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node node)})
+       
+       (>!! (:planning-ch-head coordinator) true)
 
        (<!! offer-ch-spy)
        (<!! sync-spy-a)
@@ -117,6 +131,14 @@
                                          :payload-node (:node payload-node-b-2)})
                 (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
 
+                (extensions/on-change sync (:node/seal (:nodes payload-a)) #(>!! seal-spy-a %))
+                (extensions/touch-node sync (:node/exhaust (:nodes payload-a)))
+                (<!! seal-spy-a)
+
+                (extensions/on-change sync (:node/seal (:nodes payload-b)) #(>!! seal-spy-b %))
+                (extensions/touch-node sync (:node/exhaust (:nodes payload-b)))
+                (<!! seal-spy-b)
+
                 (extensions/touch-node sync (:node/completion (:nodes payload-a)))
                 (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
@@ -131,11 +153,16 @@
                   (<!! ack-ch-spy)
                   (<!! status-spy)
 
+                  (extensions/on-change sync (:node/seal nodes) #(>!! seal-spy-a %))
+                  (extensions/touch-node sync (:node/exhaust nodes))
+                  (<!! seal-spy-a)
+
                   (extensions/touch-node sync (:node/completion nodes))
                   (<!! offer-ch-spy))
 
                 (facts "All tasks are complete"
-                       (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
+                       (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
+                             task-path (extensions/resolve-node sync :task (str job-id))]
                          (doseq [task-node (extensions/children sync task-path)]
                            (when-not (impl/completed-task? task-node)
                              (fact (impl/task-complete? sync task-node) => true)))))
@@ -144,7 +171,7 @@
                        (doseq [state-path (extensions/bucket sync :peer-state)]
                          (let [state (extensions/dereference sync state-path)]
                            (fact (:state (:content state)) => :idle))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 
 (facts
  "plan one job with four peers"
@@ -156,11 +183,14 @@
            shutdowns (take n (repeatedly (fn [] (extensions/create sync :shutdown))))
            payloads (take n (repeatedly (fn [] (extensions/create sync :payload))))
            sync-spies (take n (repeatedly (fn [] (chan 1))))
+           seal-spies (take n (repeatedly (fn [] (chan 1))))
            
            status-spy (chan (* n 5))
            offer-ch-spy (chan (* n 5))
            ack-ch-spy (chan (* n 5))
            job-ch (chan 1)
+
+           node (extensions/create sync :plan)
 
            catalog [{:onyx/name :in
                      :onyx/type :input
@@ -180,7 +210,7 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
        
-       (doseq [[peer pulse shutdown payload sync-spy]
+       (doseq [[peer pulse shutdown payload sync-spy seal-spy]
                (map vector peers pulses shutdowns payloads sync-spies)]
          (extensions/write-node sync (:node peer)
                                  {:id (:uuid peer)
@@ -188,23 +218,29 @@
                                   :pulse-node (:node pulse)
                                   :shutdown-node (:node shutdown)
                                   :payload-node (:node payload)})
-         (extensions/on-change sync (:node payload) #(>!! sync-spy %)))
+         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+         (extensions/create sync :born-log (:node peer)))
 
        (doseq [peer peers]
-         (>!! (:born-peer-ch-head coordinator) (:node peer)))
+         (>!! (:born-peer-ch-head coordinator) true))
 
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node node) #(>!! job-ch %))
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node node)})
+       
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (alts!! sync-spies)
        (alts!! sync-spies)
        (alts!! sync-spies)
 
-       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+       (let [states (->> (onyx-zk/peer-state-path (:onyx/id (:opts sync)))
                          (zk/children (:conn sync))
                          (map (partial extensions/resolve-node sync :peer-state))
                          (map (partial extensions/dereference sync))
@@ -230,10 +266,14 @@
 
            (doseq [payload-node payload-nodes]
              (let [payload (extensions/read-node sync payload-node)]
+               (extensions/on-change sync (:node/seal (:nodes payload)) #(>!! (first seal-spies) %))
+               (extensions/touch-node sync (:node/exhaust (:nodes payload)))
+               (<!! (first seal-spies))
+
                (extensions/touch-node sync (:node/completion (:nodes payload)))
                (<!! offer-ch-spy)))))
 
-       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+       (let [states (->> (onyx-zk/peer-state-path (:onyx/id (:opts sync)))
                          (zk/children (:conn sync))
                          (map (partial extensions/resolve-node sync :peer-state))
                          (map (partial extensions/dereference sync))
@@ -243,9 +283,10 @@
                 (count (filter (partial = :idle) (map :state states))) => 4)
 
          (facts "All three tasks are complete"
-                (let [task-path (extensions/resolve-node sync :task (str (<!! job-ch)))]
+                (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
+                      task-path (extensions/resolve-node sync :task (str job-id))]
                   (doseq [task-node (extensions/children sync task-path)]
                     (when-not (impl/completed-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

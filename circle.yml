@@ -1,0 +1,4 @@
+test:
+  override:
+    - lein midje:
+        timeout: 600

@@ -9,6 +9,7 @@
 (defn create-queue [session queue-name]
   (try
     (.createQueue session queue-name queue-name true)
+    (catch HornetQQueueExistsException e)
     (catch Exception e
       (.printStackTrace e))))
 
@@ -34,13 +35,17 @@
     
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [n (range (count messages))]
-        (when (zero? (mod n echo))
-          (info (format "Wrote %s segments" n))
-          (.commit session))
-        (let [message (.createMessage session true)]
-          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
-          (.send producer message)))
+
+      (doall
+       (map-indexed
+        (fn [i x]
+          (when (zero? (mod i echo))
+            (info (format "Wrote %s segments" i))
+            (.commit session))
+          (let [message (.createMessage session true)]
+            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.send producer message)))
+        messages))
 
       (.commit session)
       (.close producer)
@@ -56,13 +61,17 @@
 
     (let [producer (.createProducer session queue-name)]
       (.start session)
-      (doseq [n (range (count messages))]
-        (when (zero? (mod n echo))
-          (info (format "Wrote %s segments" n))
-          (.commit session))
-        (let [message (.createMessage session true)]
-          (.writeBytes (.getBodyBuffer message) (.array (fressian/write (nth messages n))))
-          (.send producer message)))
+
+      (doall
+       (map-indexed
+        (fn [i x]
+          (when (zero? (mod i echo))
+            (info (format "Wrote %s segments" i))
+            (.commit session))
+          (let [message (.createMessage session true)]
+            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.send producer message)))
+        messages))
 
       (let [sentinel (.createMessage session true)]
         (.writeBytes (.getBodyBuffer sentinel) (.array (fressian/write :done)))
@@ -85,7 +94,8 @@
       (.start session)
       (doseq [k (range n)]
         (when (zero? (mod k echo))
-          (info (format "Read %s segments" k)))
+          (info (format "Read %s segments" k))
+          (.commit session))
         (let [message (.receive consumer)]
           (when message
             (.acknowledge message)
@@ -109,13 +119,17 @@
     (let [consumer (.createConsumer session queue-name)
           results (atom [])]
       (.start session)
-      (while (not= (last @results) :done)
-        (when (zero? (mod (count @results) echo))
-          (info (format "Read %s segments" (count @results))))
-        (let [message (.receive consumer)]
-          (when message
-            (.acknowledge message)
-            (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))
+      (loop [last-message nil]
+        (when (not= last-message :done)
+          (when (zero? (mod (count @results) echo))
+            (info (format "Read %s segments" (count @results)))
+            (.commit session))
+          (let [message (.receive consumer)]
+            (when message
+              (let [decompressed (fressian/read (.toByteBuffer (.getBodyBuffer message)))]
+                (.acknowledge message)
+                (swap! results conj decompressed)
+                (recur decompressed))))))
 
       (info "Done reading")
       (.commit session)

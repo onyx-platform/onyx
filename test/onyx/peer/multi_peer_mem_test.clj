@@ -3,21 +3,50 @@
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
-(def n-messages 15000)
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
+(def n-messages 100000)
 
 (def batch-size 1320)
 
 (def echo 1000)
 
+(def id (str (java.util.UUID/randomUUID)))
+
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
-(def hornetq-host "localhost")
+(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
+                "port" (:port (:non-clustered (:hornetq config)))})
 
-(def hornetq-port 5445)
+(def coord-opts
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id id
+   :onyx.coordinator/revoke-delay 5000})
 
-(def hq-config {"host" hornetq-host "port" hornetq-port})
+(def peer-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :onyx/id id})
+
+(def conn (onyx.api/connect :memory coord-opts))
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -34,8 +63,8 @@
     :onyx/medium :hornetq
     :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}
    
    {:onyx/name :inc
@@ -50,32 +79,17 @@
     :onyx/medium :hornetq
     :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
-    :hornetq/host hornetq-host
-    :hornetq/port hornetq-port
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}])
 
 (def workflow {:in {:inc :out}})
 
-(def id (str (java.util.UUID/randomUUID)))
-
-(def coord-opts {:hornetq-host hornetq-host
-                 :hornetq-port hornetq-port
-                 :zk-addr "127.0.0.1:2181"
-                 :onyx-id id
-                 :revoke-delay 5000})
-
-(def conn (onyx.api/connect (str "onyx:memory//localhost/" id) coord-opts))
-
-(def peer-opts {:hornetq-host hornetq-host
-                :hornetq-port hornetq-port
-                :zk-addr "127.0.0.1:2181"
-                :onyx-id id})
-
-(def v-peers (onyx.api/start-peers conn 6 peer-opts))
+(def v-peers (onyx.api/start-peers conn 10 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (hq-util/read! hq-config out-queue (inc n-messages) echo))
+(def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (try
   ;; (dorun (map deref (map :runner v-peers)))
@@ -91,4 +105,5 @@
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
+
 

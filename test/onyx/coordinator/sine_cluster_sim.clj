@@ -10,6 +10,8 @@
             [onyx.coordinator.sim-test-utils :as sim-utils]
             [onyx.api]))
 
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
 (def cluster (atom {}))
 
 (defn create-multi-births [executor t k]
@@ -86,11 +88,22 @@
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def system (onyx-coordinator
-             {:hornetq-addr "localhost:5445"
-              :zk-addr "127.0.0.1:2181"
-              :onyx-id id
-              :revoke-delay 2000}))
+(def system
+  (onyx-coordinator
+   {:hornetq/mode :udp
+    :hornetq/server? true
+    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+    :hornetq.udp/group-address (:group-address (:hornetq config))
+    :hornetq.udp/group-port (:group-port (:hornetq config))
+    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+    :hornetq.server/type :embedded
+    :hornetq.embedded/config (:configs (:hornetq config))
+    :zookeeper/address (:address (:zookeeper config))
+    :zookeeper/server? true
+    :zookeeper.server/port (:spawn-port (:zookeeper config))
+    :onyx/id id
+    :onyx.coordinator/revoke-delay 2000}))
 
 (def components (component/start system))
 
@@ -124,8 +137,12 @@
 (tap (:offer-mult coordinator) offer-spy)
 
 (doseq [n (range n-jobs)]
-  (>!! (:planning-ch-head coordinator)
-       [{:catalog catalog :workflow workflow} (nth job-chs n)]))
+  (let [node (extensions/create (:sync components) :plan)]
+    (extensions/on-change (:sync components) (:node node) #(>!! (nth job-chs n) %))
+    (extensions/create (:sync components) :planning-log
+                       {:job {:workflow workflow :catalog catalog}
+                        :node (:node node)})
+    (>!! (:planning-ch-head coordinator) true)))
 
 (doseq [_ (range n-jobs)]
   (<!! offer-spy))
@@ -194,7 +211,8 @@
        (into [])))
 
 (doseq [job-ch job-chs]
-  @(onyx.api/await-job-completion* (:sync components) (str (<!! job-ch))))
+  (let [id (extensions/read-node (:sync components) (:path (<!! job-ch)))]
+    @(onyx.api/await-job-completion* (:sync components) (str id))))
 
 (doseq [prun pruns] (future-cancel (:runner prun)))
 

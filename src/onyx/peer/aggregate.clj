@@ -1,12 +1,13 @@
 (ns ^:no-doc onyx.peer.aggregate
-  (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.peer.operation :as operation]
-            [onyx.extensions :as extensions]
-            [onyx.queue.hornetq :refer [take-segments]]
-            [onyx.peer.transform :as transformer]
-            [taoensso.timbre :refer [debug]]
-            [dire.core :refer [with-post-hook!]]))
+    (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
+              [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.pipeline-extensions :as p-ext]
+              [onyx.peer.operation :as operation]
+              [onyx.extensions :as extensions]
+              [onyx.queue.hornetq :refer [take-segments]]
+              [onyx.peer.transform :as transformer]
+              [taoensso.timbre :refer [debug]]
+              [dire.core :refer [with-post-hook!]]))
 
 (def n-pipeline-threads 1)
 
@@ -24,7 +25,7 @@
   (let [rets
         {:onyx.aggregate/queue
          (->> (range n-pipeline-threads)
-              (map (fn [x] {:session (extensions/create-tx-session queue)}))
+              (map (fn [x] {:session (extensions/bind-active-session queue (first ingress-queues))}))
               (map (fn [x] (assoc x :consumers (map (partial extensions/create-consumer queue (:session x))
                                                    ingress-queues))))
               (map (fn [x] (assoc x :halting-ch (chan 0)))))
@@ -39,19 +40,23 @@
                      (:onyx.aggregate/read-ch rets)))
     (merge event rets)))
 
+(defn inject-temporal-resource-shim
+  [event]
+  ;;; To make HornetQ clustered grouping work for Onyx's semantics,
+  ;;; only one session can be alive. Open a fake and redefine it later
+  ;;; in the pipeline.
+  {:onyx.core/session :placeholder})
+
 (defn read-batch-shim [event]
   (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
     (merge event
            {:onyx.core/session session
             :onyx.core/batch msgs
-            :onyx.aggregate/halting-ch halting-ch
-            :onyx.aggregate/session-origin (:onyx.core/session event)})))
+            :onyx.aggregate/halting-ch halting-ch})))
 
 (defn close-temporal-resources-shim [event]
   (>!! (:onyx.aggregate/halting-ch event) true)
-  (merge event (extensions/close-resource
-                (:onyx.core/queue event)
-                (:onyx.aggregate/session-origin event))))
+  event)
 
 (defn close-pipeline-resources-shim [{:keys [onyx.core/queue] :as event}]
   (close! (:onyx.aggregate/read-ch event))
@@ -61,11 +66,19 @@
     (extensions/close-resource queue (:session queue-bundle)))
   event)
 
+(defmethod l-ext/start-lifecycle? :aggregator
+  [_ event]
+  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
+
 (defmethod l-ext/inject-lifecycle-resources :aggregator
   [_ event]
   (inject-pipeline-resource-shim event))
 
-(defmethod l-ext/read-batch [:aggregator nil]
+(defmethod l-ext/inject-temporal-resources :aggregator
+  [_ event]
+  (inject-temporal-resource-shim event))
+
+(defmethod p-ext/read-batch [:aggregator nil]
   [event]
   (read-batch-shim event))
 
@@ -82,6 +95,10 @@
 (with-post-hook! #'inject-pipeline-resource-shim
   (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Injecting resources" id))))
+
+(with-post-hook! #'inject-temporal-resource-shim
+  (fn [{:keys [onyx.core/id]}]
+    (debug (format "[%s] Injecting temporal resources" id))))
 
 (with-post-hook! #'read-batch-shim
   (fn [{:keys [onyx.core/id onyx.core/batch]}]

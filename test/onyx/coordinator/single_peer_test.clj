@@ -19,6 +19,7 @@
            offer-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
+       (extensions/create sync :born-log (:node peer))
        (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
@@ -28,12 +29,12 @@
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
              
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (facts "There is one peer"
-              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
-                    peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))]
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx/id (:opts sync))))
+                    peer-path (str (onyx-zk/peer-path (:onyx/id (:opts sync))) "/" (first peers))]
                 (fact (count peers) => 1)
                 (fact (:id (extensions/read-node sync peer-path)) => (:uuid peer))))))))
 
@@ -49,6 +50,7 @@
            shutdown-ch-spy (chan 1)
            failure-ch-spy (chan 1)]
 
+       (extensions/create sync :born-log (:node peer))
        (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
@@ -60,7 +62,7 @@
        (tap (:shutdown-mult coordinator) shutdown-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
              
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
        (extensions/delete sync (:node pulse))
        (<!! evict-ch-spy)
@@ -70,8 +72,8 @@
              (extensions/node-exists? sync (:node pulse)) => false)
 
        (fact "The only peer is marked as dead"
-             (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx-id sync)))
-                   peer-path (str (onyx-zk/peer-path (:onyx-id sync)) "/" (first peers))
+             (let [peers (zk/children (:conn sync) (onyx-zk/peer-path (:onyx/id (:opts sync))))
+                   peer-path (str (onyx-zk/peer-path (:onyx/id (:opts sync))) "/" (first peers))
                    peer-id (:id (extensions/read-node sync peer-path))
                    state-path (extensions/resolve-node sync :peer-state peer-id)
                    state (:content (extensions/dereference sync state-path))]
@@ -96,12 +98,17 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}
            offer-ch-spy (chan 1)
-           job-ch (chan 1)]
+           job-ch (chan 1)
+           node (extensions/create sync :plan)
+           cb #(>!! job-ch (extensions/read-node sync (:path %)))]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node node) cb)
+       (extensions/create sync :planning-log
+                          {:job {:workflow workflow :catalog catalog}
+                           :node (:node node)})
+       (>!! (:planning-ch-head coordinator) true)
        
        (<!! offer-ch-spy)
 
@@ -161,8 +168,8 @@
     (fact "The payload node contains the other node paths"
           (fact (into #{} (keys (:nodes state)))
                 => #{:node/payload :node/ack :node/completion
-                     :node/status :node/catalog :node/workflow
-                     :node/peer :node/exhaust :node/seal}))
+                     :node/status :node/catalog :node/workflow :node/task
+                     :node/peer :node/exhaust :node/seal :node/cooldown}))
 
     (extensions/on-change sync (:node/status (:nodes state)) #(>!! status-spy %))
     (extensions/on-change sync (:node/seal (:nodes state)) #(>!! seal-node-spy %))
@@ -193,7 +200,7 @@
 
   (facts "The resource should be sealed"
          (let [nodes (:nodes (extensions/read-node sync payload-node))]
-           (fact (extensions/read-node sync (:node/seal nodes)) => true)))
+           (fact (:seal? (extensions/read-node sync (:node/seal nodes))) => true)))
 
   (facts "Touching the completion node triggers the callback"
          (let [nodes (:nodes (extensions/read-node sync payload-node))]
@@ -244,6 +251,13 @@
        (tap (:seal-mult coordinator) seal-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
 
+       (extensions/create sync :born-log (:node peer))
+
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node (extensions/create sync :plan))})
+       
        (extensions/write-node sync (:node peer)
                                {:id (:uuid peer)
                                 :peer-node (:node peer)
@@ -253,9 +267,8 @@
 
        (extensions/on-change sync (:node in-payload) #(>!! sync-spy %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} (chan 1)])
+       (>!! (:born-peer-ch-head coordinator) true)
+       (>!! (:planning-ch-head coordinator) true)
 
        (<!! offer-ch-spy)
        (<!! offer-ch-spy)
@@ -290,7 +303,7 @@
             :task-name :out
             :payload-node (:node out-payload)
             :next-payload-node (:node future-payload))))))
-   {:revoke-delay 500000}))
+   {:onyx.coordinator/revoke-delay 500000}))
 
 (facts
  "evicting one peer"
@@ -321,6 +334,7 @@
              
        (tap (:offer-mult coordinator) offer-ch-spy)
 
+       (extensions/create sync :born-log (:node peer))
        (extensions/write-node sync (:node peer) {:id (:uuid peer)
                                                   :peer-node (:node peer)
                                                   :pulse-node (:node pulse)
@@ -329,10 +343,14 @@
        
        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} (chan 1)])
+
+       (extensions/create sync :planning-log
+                          {:job {:workflow workflow :catalog catalog}
+                           :node (:node (extensions/create sync :plan))})
+       
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
        (<!! sync-spy)
 
@@ -340,7 +358,7 @@
        (<!! offer-ch-spy)
 
        (facts "The peer gets marked as :revoked after eviction"
-              (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx-id sync)))
+              (let [peers (zk/children (:conn sync) (onyx-zk/peer-state-path (:onyx/id (:opts sync))))
                     path (extensions/resolve-node sync :peer-state (first peers))
                     state (:content (extensions/dereference sync path))]
                 (fact (count peers) => 1)
@@ -349,10 +367,10 @@
                 (facts "The status node gets deleted on sync storage"
                        (let [status-node (:node/status (:nodes state))]
                          (fact (extensions/read-node sync status-node) => (throws Exception))))))))
-   {:revoke-delay 0}))
+   {:onyx.coordinator/revoke-delay 0}))
 
 (facts
- "Peer error cases"
+ "Idempotency cases"
  (with-system
    (fn [coordinator sync]
      (let [peer (extensions/create sync :peer)
@@ -365,11 +383,13 @@
            completion-ch-spy (chan 5)
            failure-ch-spy (chan 10)]
 
-       (extensions/write-node sync (:node peer) {:id (:uuid peer)
-                                                  :peer-node (:node peer)
-                                                  :pulse-node (:node pulse)
-                                                  :payload-node (:node payload)
-                                                  :shutdown-node (:node shutdown)})
+       (extensions/create sync :born-log (:node peer))
+       (extensions/write-node sync (:node peer)
+                              {:id (:uuid peer)
+                               :peer-node (:node peer)
+                               :pulse-node (:node pulse)
+                               :payload-node (:node payload)
+                               :shutdown-node (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
@@ -377,11 +397,12 @@
        (tap (:completion-mult coordinator) completion-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (facts "Adding a duplicate peer fails"
-              (>!! (:born-peer-ch-head coordinator) (:node peer))
+              (extensions/create sync :born-log (:node peer))
+              (>!! (:born-peer-ch-head coordinator) true)
               (let [failure (<!! failure-ch-spy)]
                 (fact (:ch failure) => :serial-fn)))
 
@@ -394,7 +415,7 @@
               (>!! (:completion-ch-head coordinator) {:path "dead path"})
               (let [failure (<!! failure-ch-spy)]
                 (fact (:ch failure) => :serial-fn)))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 
 (facts
  "Acking error cases"
@@ -404,6 +425,7 @@
            pulse (extensions/create sync :pulse)
            shutdown (extensions/create sync :shutdown)
            payload (extensions/create sync :payload)
+           job (extensions/create sync :plan)
            offer-ch-spy (chan 5)
            sync-spy (chan 1)
            ack-ch-spy (chan 5)
@@ -427,29 +449,36 @@
                      :hornetq/queue-name "out-queue"}]
            workflow {:in {:inc :out}}]
 
-       (extensions/write-node sync (:node peer) {:id (:uuid peer)
-                                                  :peer-node (:node peer)
-                                                  :pulse-node (:node pulse)
-                                                  :payload-node (:node payload)
-                                                  :shutdown-node (:node shutdown)})
+       (extensions/create sync :born-log (:node peer))
+       (extensions/write-node sync (:node peer)
+                              {:id (:uuid peer)
+                               :peer-node (:node peer)
+                               :pulse-node (:node pulse)
+                               :payload-node (:node payload)
+                               :shutdown-node (:node shutdown)})
              
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:completion-mult coordinator) completion-ch-spy)
        (tap (:failure-mult coordinator) failure-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
+       (extensions/on-change sync (:node job) #(>!! job-ch %))
+       (extensions/create sync :planning-log
+                          {:job {:workflow workflow :catalog catalog}
+                           :node (:node job)})
+
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (extensions/on-change sync (:node payload) #(>!! sync-spy %))
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
+       (>!! (:born-peer-ch-head coordinator) true)
        
        (<!! offer-ch-spy)
        (<!! sync-spy)
 
        ;;; Complete all the tasks.
-       (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
+       (let [job-node (extensions/read-node sync (:path (<!! job-ch)))
+             task-path (onyx-zk/task-path (:onyx/id (:opts sync)) job-node)]
          (doseq [child (extensions/children sync task-path)]
            (impl/complete-task sync child)))
 
@@ -469,79 +498,5 @@
           (>!! (:ack-ch-head coordinator) {:path ack-node})
           (let [failure (<!! failure-ch-spy)]
             (fact (:ch failure) => :serial-fn)))))
-   {:revoke-delay 50000})))
-
-(facts
- "Completion error cases"
- (with-system
-   (fn [coordinator sync]
-     (let [peer (extensions/create sync :peer)
-           pulse (extensions/create sync :pulse)
-           shutdown (extensions/create sync :shutdown)
-           payload (extensions/create sync :payload)
-           offer-ch-spy (chan 5)
-           sync-spy (chan 1)
-           ack-ch-spy (chan 5)
-           evict-ch-spy (chan 5)
-           completion-ch-spy (chan 5)
-           failure-ch-spy (chan 10)
-           job-ch (chan 1)
-
-           catalog [{:onyx/name :in
-                     :onyx/type :input
-                     :onyx/medium :hornetq
-                     :onyx/consumption :sequential
-                     :hornetq/queue-name "in-queue"}
-                    {:onyx/name :inc
-                     :onyx/type :transformer
-                     :onyx/consumption :sequential}
-                    {:onyx/name :out
-                     :onyx/type :output
-                     :onyx/medium :hornetq
-                     :onyx/consumption :sequential
-                     :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
-
-       (extensions/write-node sync (:node peer) {:id (:uuid peer)
-                                                  :peer-node (:node peer)
-                                                  :pulse-node (:node pulse)
-                                                  :payload-node (:node payload)
-                                                  :shutdown-node (:node shutdown)})
-             
-       (tap (:offer-mult coordinator) offer-ch-spy)
-       (tap (:ack-mult coordinator) ack-ch-spy)
-       (tap (:completion-mult coordinator) completion-ch-spy)
-       (tap (:failure-mult coordinator) failure-ch-spy)
-
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} job-ch])
-       (<!! offer-ch-spy)
-
-       (extensions/on-change sync (:node payload) #(>!! sync-spy %))
-       (>!! (:born-peer-ch-head coordinator) (:node peer))
-       
-       (<!! offer-ch-spy)
-       (<!! sync-spy)
-
-       (facts
-        "Completing a task from an idle peer fails"
-        (let [state-path (extensions/resolve-node sync :peer-state (:uuid peer))
-              state (:content (extensions/dereference sync state-path))]
-          (extensions/create-at sync :peer-state (:id state) (assoc state :state :idle)))
-
-        (let [node (:node/completion (:nodes (extensions/read-node sync (:node payload))))]
-          (>!! (:completion-ch-head coordinator) {:path node})
-          (let [failure (<!! failure-ch-spy)]
-            (fact (:ch failure) => :serial-fn))))
-
-       (let [task-path (onyx-zk/task-path (:onyx-id sync) (<!! job-ch))]
-         (doseq [child (extensions/children sync task-path)]
-           (impl/complete-task sync child)))
-
-       (facts "Completing a task that's already been completed fails"
-              (let [node (:node/completion (:nodes (extensions/read-node sync (:node payload))))]
-                (>!! (:completion-ch-head coordinator) {:path node})
-                (let [failure (<!! failure-ch-spy)]
-                  (fact (:ch failure) => :serial-fn)))))
-     {:revoke-delay 50000})))
+   {:onyx.coordinator/revoke-delay 50000})))
 

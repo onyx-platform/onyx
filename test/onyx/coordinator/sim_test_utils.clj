@@ -10,12 +10,24 @@
             [onyx.extensions :as extensions]
             [onyx.system :refer [onyx-coordinator]]))
 
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
 (defn with-system [f & opts]
   (let [id (str (java.util.UUID/randomUUID))
-        defaults {:hornetq-addr "localhost:5445"
-                  :zk-addr "127.0.0.1:2181"
-                  :onyx-id id
-                  :revoke-delay 4000}]
+        defaults {:hornetq/mode :udp
+                  :hornetq/server? true
+                  :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+                  :hornetq.udp/group-address (:group-address (:hornetq config))
+                  :hornetq.udp/group-port (:group-port (:hornetq config))
+                  :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+                  :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+                  :hornetq.server/type :embedded
+                  :hornetq.embedded/config (:configs (:hornetq config))
+                  :zookeeper/address (:address (:zookeeper config))
+                  :zookeeper/server? true
+                  :zookeeper.server/port (:spawn-port (:zookeeper config))                  
+                  :onyx/id id
+                  :onyx.coordinator/revoke-delay 4000}]
     (let [system (onyx-coordinator (apply merge defaults opts))
           live (component/start system)
           coordinator (:coordinator live)
@@ -108,12 +120,13 @@
            n-tasks)) => true))
 
 (def legal-transitions
-  {:idle #{:acking :dead}
-   :acking #{:active :revoked :dead}
-   :active #{:sealing :idle :dead}
-   :sealing #{:idle :dead}
-   :revoked #{:dead}
-   :dead #{}})
+  {:idle #{:idle :acking :dead}
+   :acking #{:acking :active :revoked :dead}
+   :active #{:active :waiting :sealing :idle :dead}
+   :waiting #{:waiting :sealing :idle :dead}
+   :sealing #{:sealing :idle :dead}
+   :revoked #{:revoked :dead}
+   :dead #{:dead}})
 
 (defn peer-state-transition-correctness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
@@ -126,8 +139,10 @@
           (when (< i (dec (count state-data)))
             (let [current-state (:state state)
                   next-state (:state (nth state-data (inc i)))]
-              (fact (some #{next-state} (get legal-transitions current-state))
-                    =not=> nil?))))
+              (when-not (fact (some #{next-state}
+                                    (get legal-transitions current-state))
+                              =not=> nil?)
+                (prn current-state "->" next-state)))))
         state-data)))))
 
 (defn create-peer [model components peer]
@@ -139,7 +154,9 @@
             pulse (extensions/create sync :pulse)
             shutdown (extensions/create sync :shutdown)
             sync-spy (chan 1)
-            status-spy (chan 1)]
+            status-spy (chan 1)
+            seal-spy (chan 1)]
+        
         (extensions/write-node sync (:node peer)
                                 {:id (:uuid peer)
                                  :peer-node (:node peer)
@@ -147,8 +164,9 @@
                                  :shutdown-node (:node shutdown)
                                  :payload-node (:node payload)})
         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+        (extensions/create sync :born-log (:node peer))
         
-        (>!! (:born-peer-ch-head coordinator) (:node peer))
+        (>!! (:born-peer-ch-head coordinator) true)
 
         (loop [p payload]
           (<!! sync-spy)
@@ -163,16 +181,21 @@
 
             (let [next-payload (extensions/create sync :payload)]
               (extensions/write-node sync (:node peer) {:id (:uuid peer)
-                                                         :peer-node (:node peer)
-                                                         :pulse-node (:node pulse)
-                                                         :shutdown-node (:node shutdown)
-                                                         :payload-node (:node next-payload)})
+                                                        :peer-node (:node peer)
+                                                        :pulse-node (:node pulse)
+                                                        :shutdown-node (:node shutdown)
+                                                        :payload-node (:node next-payload)})
+
+              (extensions/on-change sync (:node/seal nodes) #(>!! seal-spy %))
+              (extensions/touch-node sync (:node/exhaust nodes))
+              (<!! seal-spy)
+              
               (extensions/on-change sync (:node next-payload) #(>!! sync-spy %))
               (extensions/touch-node sync (:node/completion nodes))
 
               (recur next-payload)))))
       (catch InterruptedException e
-        (prn "Peer intentionally killed"))
+        (info "Peer intentionally killed"))
       (catch Exception e
         (.printStackTrace e)))))
 

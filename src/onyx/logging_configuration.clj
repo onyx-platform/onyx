@@ -7,7 +7,7 @@
 
   (start [component]
     (if config
-      (timbre/set-config! config)
+      (timbre/set-config! [] config)
       (do
         (timbre/set-config! [:appenders :standard-out :enabled?] false)
         (timbre/set-config! [:appenders :spit :enabled?] true)
@@ -21,7 +21,6 @@
     (info "Stopping Logging Configuration")
     component))
 
-(defn logging-configuration
-  ([file] (logging-configuration file nil))
-  ([file config] (map->LoggingConfiguration {:file (or file "onyx.log") :config config})))
+(defn logging-configuration [{:keys [onyx.log/file onyx.log/config]}]
+  (map->LoggingConfiguration {:file (or file "onyx.log") :config config}))
 

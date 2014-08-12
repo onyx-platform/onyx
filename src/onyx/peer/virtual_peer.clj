@@ -1,36 +1,49 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-  (:require [clojure.core.async :refer [chan alts!! >!! <!! close!]]
+  (:require [clojure.core.async :refer [chan mult tap alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :as timbre]
+            [taoensso.timbre :refer [warn] :as timbre]
             [dire.core :as dire]
             [onyx.extensions :as extensions]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]))
 
-(defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse fn-params]
-  (let [complete-ch (chan 1)]
-    (loop [pipeline nil]
-      (when-let [[v ch] (alts!! [shutdown-ch complete-ch payload-ch] :priority true)]
-        (when-not (nil? pipeline)
-          (component/stop pipeline))
+(defn force-close-pipeline! [pipeline]
+  (try
+    (l-ext/close-lifecycle-resources* (:pipeline-data pipeline))
+    (catch Exception e
+      (timbre/warn e))))
 
-        (cond (nil? v) (extensions/delete sync (:node pulse))
-              (= ch complete-ch) (recur nil)
-              (= ch payload-ch)
-              (let [payload-node (:path v)
-                    payload (extensions/read-node sync payload-node)
-                    status-ch (chan 1)]
+(defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse opts]
+  (try
+    (let [complete-ch (chan 1)
+          err-ch (chan 1)]
+      (loop [pipeline nil]
+        (when-let [[v ch] (alts!! [shutdown-ch err-ch complete-ch payload-ch] :priority true)]
+          (when (and (not (nil? pipeline)) (not= ch err-ch))
+            (component/stop pipeline))
 
-                (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
-                (extensions/touch-node sync (:node/ack (:nodes payload)))
+          (cond (nil? v) (extensions/delete sync (:node pulse))
+                (= ch complete-ch) (recur nil)
+                (= ch shutdown-ch) (recur nil)
+                (= ch err-ch) (force-close-pipeline! pipeline)
+                (= ch payload-ch)
+                (let [payload-node (:path v)
+                      payload (extensions/read-node sync payload-node)
+                      status-ch (chan 1)]
 
-                (<!! status-ch)
+                  (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
+                  (extensions/touch-node sync (:node/ack (:nodes payload)))
 
-                (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch fn-params)]
-                  (recur (component/start new-pipeline))))
-              :else (recur nil))))
-    (>!! dead-ch true)))
+                  (<!! status-ch)
 
-(defrecord VirtualPeer [fn-params]
+                  (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch err-ch opts)]
+                    (recur (component/start new-pipeline))))))))
+    (catch Exception e
+      (warn e))
+    (finally
+     (>!! dead-ch true))))
+
+(defrecord VirtualPeer [opts]
   component/Lifecycle
 
   (start [{:keys [sync queue] :as component}]
@@ -42,7 +55,14 @@
           payload-ch (chan 1)
           shutdown-ch (chan 1)
           status-ch (chan 1)
-          dead-ch (chan)]
+          
+          dead-head-ch (chan 1)
+          dead-close-tail-ch (chan 1)
+          dead-restart-tail-ch (chan 1)
+          dead-mult (mult dead-head-ch)]
+
+      (tap dead-mult dead-close-tail-ch)
+      (tap dead-mult dead-restart-tail-ch)
 
       (taoensso.timbre/info (format "Starting Virtual Peer %s" (:uuid peer)))
       
@@ -70,10 +90,13 @@
         :payload-ch payload-ch
         :shutdown-ch shutdown-ch
         :status-ch status-ch
-        :dead-ch dead-ch
+        :dead-head-ch dead-head-ch
+
+        :dead-close-tail-ch dead-close-tail-ch
+        :dead-restart-tail-ch dead-restart-tail-ch
 
         :payload-thread (future (payload-loop (:uuid peer) sync queue payload-ch
-                                              shutdown-ch status-ch dead-ch pulse fn-params)))))
+                                              shutdown-ch status-ch dead-head-ch pulse opts)))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
@@ -81,11 +104,13 @@
     (close! (:payload-ch component))
     (close! (:shutdown-ch component))
     (close! (:status-ch component))
+    
+    (<!! (:dead-close-tail-ch component))
 
-    (<!! (:dead-ch component))
+    (close! (:dead-head-ch component))
     
     component))
 
-(defn virtual-peer [fn-params]
-  (map->VirtualPeer {:fn-params fn-params}))
+(defn virtual-peer [{:keys [onyx.peer/fn-params onyx.peer/sequential-back-off]}]
+  (map->VirtualPeer {:opts {:fn-params fn-params :back-off sequential-back-off}}))
 

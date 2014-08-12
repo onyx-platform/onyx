@@ -28,6 +28,10 @@
 
            sync-spy-a (chan 1)
            sync-spy-b (chan 1)
+
+           seal-spy-a (chan 1)
+           seal-spy-b (chan 1)
+           
            ack-ch-spy (chan 2)
            offer-ch-spy (chan 10)
            status-spy (chan 2)
@@ -65,7 +69,7 @@
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
-
+       
        (extensions/write-node sync (:node peer-node-a)
                                {:id (:uuid peer-node-a)
                                 :peer-node (:node peer-node-a)
@@ -82,14 +86,21 @@
                                 :shutdown-node (:node shutdown-node-b)})
        (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
 
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-a))
+       (extensions/create sync :born-log (:node peer-node-b))
+       
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog-a :workflow workflow-a} (chan 1)])
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow-a :catalog catalog-a}
+         :node (:node (extensions/create sync :plan))})
+
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
        
-       (>!! (:born-peer-ch-head coordinator) (:node peer-node-b))
+       (>!! (:born-peer-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (<!! sync-spy-a)
@@ -120,8 +131,12 @@
          (<!! status-spy)
          (<!! status-spy)
 
-         (>!! (:planning-ch-head coordinator)
-              [{:catalog catalog-b :workflow workflow-b} (chan 1)])
+         (extensions/create
+          sync :planning-log
+          {:job {:workflow workflow-b :catalog catalog-b}
+           :node (:node (extensions/create sync :plan))})
+         
+         (>!! (:planning-ch-head coordinator) true)
          (<!! offer-ch-spy)
 
          (extensions/write-node sync (:node peer-node-a)
@@ -130,7 +145,11 @@
                                   :pulse-node (:node pulse-node-a)
                                   :payload-node (:node payload-node-a-2)
                                   :shutdown-node (:node shutdown-node-a)})
-         
+
+         (extensions/on-change sync (:node/seal (:nodes payload-a)) #(>!! seal-spy-a %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-a)))
+         (<!! seal-spy-a)
+
          (extensions/on-change sync (:node payload-node-a-2) #(>!! sync-spy-a %))
          (extensions/touch-node sync (:node/completion (:nodes payload-a))))
 
@@ -156,7 +175,11 @@
                                   :pulse-node (:node pulse-node-b)
                                   :payload-node (:node payload-node-b-2)
                                   :shutdown-node (:node shutdown-node-b)})
-         
+
+         (extensions/on-change sync (:node/seal (:nodes payload-b)) #(>!! seal-spy-b %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-b)))
+         (<!! seal-spy-b)
+
          (extensions/on-change sync (:node payload-node-b-2) #(>!! sync-spy-b %))
          (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
@@ -182,7 +205,11 @@
                                   :pulse-node (:node pulse-node-a)
                                   :shutdown-node (:node shutdown-node-a)
                                   :payload-node (:node payload-node-a-1)})
-         
+
+         (extensions/on-change sync (:node/seal (:nodes payload-a)) #(>!! seal-spy-a %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-a)))
+         (<!! seal-spy-a)
+
          (extensions/on-change sync (:node payload-node-a-1) #(>!! sync-spy-a %))
          (extensions/touch-node sync (:node/completion (:nodes payload-a)))
 
@@ -208,7 +235,11 @@
                                   :pulse-node (:node pulse-node-b)
                                   :shutdown-node (:node shutdown-node-b)
                                   :payload-node (:node payload-node-b-1)})
-         
+
+         (extensions/on-change sync (:node/seal (:nodes payload-b)) #(>!! seal-spy-b %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-b)))
+         (<!! seal-spy-b)
+
          (extensions/on-change sync (:node payload-node-b-1) #(>!! sync-spy-b %))
          (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
@@ -229,6 +260,15 @@
 
        (let [payload-a (extensions/read-node sync (:node payload-node-a-1))
              payload-b (extensions/read-node sync (:node payload-node-b-1))]
+
+         (extensions/on-change sync (:node/seal (:nodes payload-a)) #(>!! seal-spy-a %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-a)))
+         (<!! seal-spy-a)
+
+         (extensions/on-change sync (:node/seal (:nodes payload-b)) #(>!! seal-spy-b %))
+         (extensions/touch-node sync (:node/exhaust (:nodes payload-b)))
+         (<!! seal-spy-b)
+
          (extensions/touch-node sync (:node/completion (:nodes payload-a)))
          (extensions/touch-node sync (:node/completion (:nodes payload-b)))
 
@@ -255,5 +295,5 @@
               (<!! offer-ch-spy)
               (<!! offer-ch-spy))))
    
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

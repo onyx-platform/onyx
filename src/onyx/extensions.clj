@@ -16,7 +16,7 @@
 
 (defmulti revoke-offer (fn [sync ack-node] (type sync)))
 
-(defmulti complete (fn [sync complete-node] (type sync)))
+(defmulti complete (fn [sync complete-node cooldown-node cb] (type sync)))
 
 (defmulti next-tasks (fn [sync] (type sync)))
 
@@ -40,11 +40,21 @@
 
 (defmulti touch-node (fn [sync node] (type sync)))
 
+(defmulti touched? (fn [sync bucket node] [(type sync) bucket]))
+
 (defmulti read-node (fn [sync node] (type sync)))
 
 (defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
 
+(defmulti list-nodes (fn [sync bucket] [(type sync) bucket]))
+
 (defmulti dereference (fn [sync node] (type sync)))
+
+(defmulti previous-node (fn [sync node] (type sync)))
+
+(defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
+
+(defmulti leader (fn [sync bucket] [(type sync) bucket]))
 
 (defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
 
@@ -68,6 +78,14 @@
 
 (defmulti on-delete (fn [sync node db] (type sync)))
 
+(defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
+
+(defmulti speculate-offset (fn [sync offset] (type sync)))
+
+(defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
+
+(defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))
+
 (defmulti create-tx-session (fn [queue] (type queue)))
 
 (defmulti create-consumer (fn [queue session queue-name] (type queue)))
@@ -87,9 +105,19 @@
 
 (defmulti create-queue (fn [queue task] (type queue)))
 
+(defmulti create-queue-on-session (fn [queue session queue-name] (type queue)))
+
+(defmulti n-messages-remaining (fn [queue session queue-name] (type queue)))
+
+(defmulti n-consumers (fn [queue queue-name] (type queue)))
+
+(defmulti optimize-concurrently (fn [queue event] (type queue)))
+
 (defmulti bootstrap-queue (fn [queue task] (type queue)))
 
 (defmulti close-resource (fn [queue resource] (type queue)))
+
+(defmulti bind-active-session (fn [queue queue-name] (type queue)))
 
 (defmulti create-io-task
   (fn [element parent children phase]

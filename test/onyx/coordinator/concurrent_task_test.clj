@@ -49,22 +49,27 @@
                                   :pulse-node (:node pulse)
                                   :shutdown-node (:node shutdown)
                                   :payload-node (:node payload)})
-         (extensions/on-change sync (:node payload) #(>!! sync-spy %)))
+         (extensions/on-change sync (:node payload) #(>!! sync-spy %))
+         (extensions/create sync :born-log (:node peer)))
 
        (doseq [peer peers]
-         (>!! (:born-peer-ch-head coordinator) (:node peer)))
+         (>!! (:born-peer-ch-head coordinator) true))
 
        (doseq [_ (range n)]
          (<!! offer-ch-spy))
 
-       (>!! (:planning-ch-head coordinator)
-            [{:catalog catalog :workflow workflow} (chan 1)])
+       (extensions/create
+        sync :planning-log
+        {:job {:workflow workflow :catalog catalog}
+         :node (:node (extensions/create sync :plan))})
+       
+       (>!! (:planning-ch-head coordinator) true)
        (<!! offer-ch-spy)
 
        (doseq [_ (range n)]
          (alts!! sync-spies))
 
-       (let [states (->> (onyx-zk/peer-state-path (:onyx-id sync))
+       (let [states (->> (onyx-zk/peer-state-path (:onyx/id (:opts sync)))
                          (zk/children (:conn sync))
                          (map (partial extensions/resolve-node sync :peer-state))
                          (map (partial extensions/dereference sync))
@@ -84,5 +89,5 @@
                      (filter (partial = :inc))
                      (count))
                 => 2))))
-   {:revoke-delay 50000}))
+   {:onyx.coordinator/revoke-delay 50000}))
 

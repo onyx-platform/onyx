@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.peer.group
     (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
               [onyx.peer.transform :as transform]
               [taoensso.timbre :refer [info]]
@@ -18,11 +19,15 @@
             (with-meta segment {:group (hash-segment group)}))
           (:onyx.core/decompressed event) groups)}))
 
+(defmethod l-ext/start-lifecycle? :grouper
+  [_ event]
+  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
+
 (defmethod l-ext/inject-lifecycle-resources :grouper
   [_ {:keys [onyx.core/task-map]}]
   {:onyx.transform/fn (operation/resolve-fn task-map)})
 
-(defmethod l-ext/apply-fn [:grouper nil]
+(defmethod p-ext/apply-fn [:grouper nil]
   [event] (apply-fn-shim event))
 
 (with-post-hook! #'apply-fn-shim
