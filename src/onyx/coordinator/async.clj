@@ -194,9 +194,12 @@
                     #(>!! ack-head %)
                     #(>!! exhaust-head %)
                     #(>!! complete-head %)
-                    #(thread (<!! (timeout revoke-delay))
-                             (extensions/create sync :revoke-log %)
-                             (>!! revoke-head %)))
+                    #(thread
+                      (try
+                        (<!! (timeout revoke-delay))
+                        (extensions/create sync :revoke-log %)
+                        (>!! revoke-head %)
+                        (catch Exception e))))
         (extensions/checkpoint sync :offer-log offset)
         (recur)))))
 
