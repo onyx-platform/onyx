@@ -526,6 +526,18 @@
         :shutdown-mult shutdown-mult
         :failure-mult failure-mult
 
+        :planning-ch-tail planning-ch-tail
+        :born-peer-ch-tail born-peer-ch-tail
+        :dead-peer-ch-tail dead-peer-ch-tail
+        :evict-ch-tail evict-ch-tail
+        :offer-ch-tail offer-ch-tail
+        :offer-revoke-ch-tail offer-revoke-ch-tail
+        :ack-ch-tail ack-ch-tail
+        :exhaust-ch-tail exhaust-ch-tail
+        :seal-ch-tail seal-ch-tail
+        :completion-ch-tail completion-ch-tail
+        :shutdown-ch-tail shutdown-ch-tail
+
         :sync-thread (thread (sync-ch-loop sync sync-ch failure-ch-head))
         :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head born-peer-dead-ch))
         :dead-peer-thread (thread (dead-peer-ch-loop sync sync-ch dead-peer-ch-tail evict-ch-head offer-ch-head dead-peer-dead-ch))
@@ -544,7 +556,6 @@
   (stop [component]
     (info "Stopping Coordinator")
 
-    (close! (:sync-ch component))
     (close! (:born-peer-ch-head component))
     (close! (:dead-peer-ch-head component))
     (close! (:planning-ch-head component))
@@ -556,7 +567,18 @@
     (close! (:seal-ch-head component))
     (close! (:completion-ch-head component))
     (close! (:shutdown-ch-head component))
-    (close! (:failure-ch-head component))
+
+    (close! (:born-peer-ch-tail component))
+    (close! (:dead-peer-ch-tail component))
+    (close! (:planning-ch-tail component))
+    (close! (:evict-ch-tail component))
+    (close! (:offer-ch-tail component))
+    (close! (:offer-revoke-ch-tail component))
+    (close! (:ack-ch-tail component))
+    (close! (:exhaust-ch-tail component))
+    (close! (:seal-ch-tail component))
+    (close! (:completion-ch-tail component))
+    (close! (:shutdown-ch-tail component))
 
     (<!! (:planning-dead-ch component))
     (<!! (:born-peer-dead-ch component))
@@ -581,6 +603,10 @@
     (close! (:seal-dead-ch component))
     (close! (:completion-dead-ch component))
     (close! (:shutdown-dead-ch component))
+
+    ;; Need to close these last so the others can close cleanly.
+    (close! (:sync-ch component))
+    (close! (:failure-ch-head component))
 
     component))
 
