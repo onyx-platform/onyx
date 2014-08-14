@@ -1,4 +1,4 @@
 test:
   override:
-    - lein with-profile circle-ci midje:
+    - lein with-profile dev,circle-ci midje:
         timeout: 600
