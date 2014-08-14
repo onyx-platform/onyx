@@ -1,4 +1,4 @@
 test:
   override:
-    - lein with-profile dev,circle-ci midje:
+    - lein with-profile dev,circle-ci midje onyx.peer.*:
         timeout: 600
