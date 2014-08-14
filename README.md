@@ -25,6 +25,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
+- [Hardware](doc/user-guide/hardware.md)
 - [APIs](doc/user-guide/apis.md)
 - [Constraints](doc/user-guide/constraints.md)
 - [Architecture](doc/user-guide/architecture.md)
@@ -53,7 +54,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Running the tests
 
-A simple `lein midje` will run the full suite.
+A simple `lein midje` will run the full suite, which takes about 15 minutes on my quad-core MacBook Pro. Expect a long, 5-10 minute pause during the coordinator tests as it's being completely slammed with requests and checked for correctness. The pause is waiting for the Coordinator to catch up and close out cleanly.
 
 ### Contributing
 

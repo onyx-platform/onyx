@@ -147,6 +147,7 @@
                 (assoc peer-state :state :waiting))]
 
     (when (and same-task?
+               (not= (:state peer-state) :dead)
                (and (not (and (= (:state peer-state) :sealing)
                               (= (:state state) :waiting)))
                     (not (= (:state peer-state) (:state state))))

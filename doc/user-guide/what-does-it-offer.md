@@ -12,7 +12,7 @@ In this chapter, I'll enumerate and explain the reasons that I built Onyx.
     - [Plain Clojure Functions](#plain-clojure-functions)
     - [Testing Without Mocking](#testing-without-mocking)
     - [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
-    - [Transactional, Exactly-Once Semantics](#transactional-exactly-once-semantics)
+    - [TransactionalSemantics](#transactional-semantics)
     - [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
     - [Aspect Orientation](#aspect-orientation)
     - [AOT Nothing](#aot-nothing)
@@ -46,9 +46,9 @@ In general, your design is in trouble when you've reached for `with-redefs` or s
 
 I think it's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peer's to spin up their own parameters at boot-up time. See [the tests](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
 
-#### Transactional, Exactly-Once Semantics
+#### Transactional Semantics
 
-Inside of the pipelines that Onyx lays, data needs to be moved around between nodes in the HornetQ cluster. Onyx uses transactions to move that data - meaning we gain exactly-once execution semantics. Onyx won't replay batches after they're been committed to storage. Note that pre-commit failure will cause the entire batch to be replayed, just as a database transaction might partially execute and rollback in the face of failure.
+Inside of the pipelines that Onyx lays, data needs to be moved around between nodes in the HornetQ cluster. Onyx uses transactions to move that data - meaning we gain exactly-once-per-transaction execution semantics. Onyx won't replay batches after they're been committed to storage. Note that pre-commit failure will cause the entire batch to be replayed, just as a database transaction might partially execute and rollback in the face of failure.
 
 #### Transparent Code Reuse for Batch and Streaming
 

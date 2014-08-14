@@ -131,7 +131,7 @@
   (let [shutdown (:shutdown (extensions/read-node sync peer))]
     (extensions/delete sync shutdown)))
 
-(defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head]
+(defn born-peer-ch-loop [sync sync-ch born-tail offer-head dead-head dead-ch]
   (loop []
     (when (<!! born-tail)
       (let [offset (extensions/next-offset sync :born-log)]
@@ -142,7 +142,7 @@
             (>!! offer-head peer)))
         (recur)))))
 
-(defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head]
+(defn dead-peer-ch-loop [sync sync-ch dead-tail evict-head offer-head dead-ch]
   (loop []
     (when-let [peer-node (<!! dead-tail)]
       (when (mark-peer-death sync sync-ch peer-node)
@@ -152,7 +152,7 @@
         (>!! offer-head peer-node))
       (recur))))
 
-(defn planning-ch-loop [sync queue planning-tail offer-head]
+(defn planning-ch-loop [sync queue planning-tail offer-head dead-ch]
   (loop []
     (when (<!! planning-tail)
       (let [offset (extensions/next-offset sync :planning-log)]
@@ -165,13 +165,13 @@
             (>!! offer-head job-id)))
         (recur)))))
 
-(defn ack-ch-loop [sync sync-ch ack-tail]
+(defn ack-ch-loop [sync sync-ch ack-tail dead-ch]
   (loop []
     (when-let [ack-node (:path (<!! ack-tail))]
       (acknowledge-task sync sync-ch ack-node)
       (recur))))
 
-(defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head]
+(defn evict-ch-loop [sync sync-ch evict-tail offer-head shutdown-head dead-ch]
   (loop []
     (when (<!! evict-tail)
       (let [offset (extensions/next-offset sync :evict-log)]
@@ -186,7 +186,7 @@
 
 (defn offer-ch-loop
   [sync sync-ch revoke-delay offer-tail ack-head exhaust-head
-   complete-head revoke-head]
+   complete-head revoke-head dead-ch]
   (loop []
     (when (<!! offer-tail)
       (let [offset (extensions/next-offset sync :offer-log)]
@@ -194,13 +194,16 @@
                     #(>!! ack-head %)
                     #(>!! exhaust-head %)
                     #(>!! complete-head %)
-                    #(thread (<!! (timeout revoke-delay))
-                             (extensions/create sync :revoke-log %)
-                             (>!! revoke-head %)))
+                    #(thread
+                      (try
+                        (<!! (timeout revoke-delay))
+                        (extensions/create sync :revoke-log %)
+                        (>!! revoke-head %)
+                        (catch Exception e))))
         (extensions/checkpoint sync :offer-log offset)
         (recur)))))
 
-(defn offer-revoke-ch-loop [sync sync-ch offer-revoke-tail evict-head]
+(defn offer-revoke-ch-loop [sync sync-ch offer-revoke-tail evict-head dead-ch]
   (loop []
     (when (<!! offer-revoke-tail)
       (let [offset (extensions/next-offset sync :revoke-log)]
@@ -210,7 +213,7 @@
           (extensions/checkpoint sync :revoke-log offset))
         (recur)))))
 
-(defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head]
+(defn exhaust-queue-loop [sync sync-ch exhaust-tail seal-head dead-ch]
   (loop []
     (when-let [node (:path (<!! exhaust-tail))]
       (when-let [result (exhaust-queue sync sync-ch node)]
@@ -218,7 +221,7 @@
         (>!! seal-head result))
       (recur))))
 
-(defn seal-resource-loop [sync seal-tail exhaust-head]
+(defn seal-resource-loop [sync seal-tail exhaust-head dead-ch]
   (loop []
     (when (<!! seal-tail)
       (let [offset (extensions/next-offset sync :seal-log)]
@@ -231,14 +234,14 @@
         (recur)))))
 
 (defn completion-ch-loop
-  [sync sync-ch complete-tail offer-head complete-head]
+  [sync sync-ch complete-tail offer-head complete-head dead-ch]
   (loop []
     (when-let [node (:path (<!! complete-tail))]
       (when-let [result (complete-task sync sync-ch node #(>!! complete-head %))]
         (>!! offer-head result))
       (recur))))
 
-(defn shutdown-ch-loop [sync shutdown-tail]
+(defn shutdown-ch-loop [sync shutdown-tail dead-ch]
   (loop []
     (when-let [peer (<!! shutdown-tail)]
       (shutdown-peer sync peer)
@@ -305,8 +308,20 @@
           seal-mult (mult seal-ch-head)
           completion-mult (mult completion-ch-head)
           shutdown-mult (mult shutdown-ch-head)
-          failure-mult (mult failure-ch-head)]
-      
+          failure-mult (mult failure-ch-head)
+
+          planning-dead-ch (chan)
+          born-peer-dead-ch (chan)
+          dead-peer-dead-ch (chan)
+          evict-dead-ch (chan)
+          offer-dead-ch (chan)
+          offer-revoke-dead-ch (chan)
+          ack-dead-ch (chan)
+          exhaust-dead-ch (chan)
+          seal-dead-ch (chan)
+          completion-dead-ch (chan)
+          shutdown-dead-ch (chan)]
+
       (tap planning-mult planning-ch-tail)
       (tap born-peer-mult born-peer-ch-tail)
       (tap dead-peer-mult dead-peer-ch-tail)
@@ -420,6 +435,39 @@
       (dire/with-handler! #'shutdown-ch-loop
         java.lang.Exception (fn [e & _] (warn e)))
 
+      (dire/with-finally! #'born-peer-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'dead-peer-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'planning-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'ack-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'evict-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'offer-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'offer-revoke-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'exhaust-queue-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'seal-resource-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'completion-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
+      (dire/with-finally! #'shutdown-ch-loop
+        (fn [& args] (>!! (last args) true)))
+
       (r/repair-planning-messages! sync #(>!! planning-ch-head %))
       (r/repair-birth-messages! sync #(>!! born-peer-ch-head %))
       (r/repair-evict-messages! sync #(>!! evict-ch-head %))
@@ -453,6 +501,18 @@
         :shutdown-ch-head shutdown-ch-head
         :failure-ch-head failure-ch-head
 
+        :planning-dead-ch planning-dead-ch
+        :born-peer-dead-ch born-peer-dead-ch
+        :dead-peer-dead-ch dead-peer-dead-ch
+        :evict-dead-ch evict-dead-ch
+        :offer-dead-ch offer-dead-ch
+        :offer-revoke-dead-ch offer-revoke-dead-ch
+        :ack-dead-ch ack-dead-ch
+        :exhaust-dead-ch exhaust-dead-ch
+        :seal-dead-ch seal-dead-ch
+        :completion-dead-ch completion-dead-ch
+        :shutdown-dead-ch shutdown-dead-ch
+
         :planning-mult planning-mult
         :born-peer-mult born-peer-mult
         :dead-peer-mult dead-peer-mult
@@ -466,25 +526,36 @@
         :shutdown-mult shutdown-mult
         :failure-mult failure-mult
 
+        :planning-ch-tail planning-ch-tail
+        :born-peer-ch-tail born-peer-ch-tail
+        :dead-peer-ch-tail dead-peer-ch-tail
+        :evict-ch-tail evict-ch-tail
+        :offer-ch-tail offer-ch-tail
+        :offer-revoke-ch-tail offer-revoke-ch-tail
+        :ack-ch-tail ack-ch-tail
+        :exhaust-ch-tail exhaust-ch-tail
+        :seal-ch-tail seal-ch-tail
+        :completion-ch-tail completion-ch-tail
+        :shutdown-ch-tail shutdown-ch-tail
+
         :sync-thread (thread (sync-ch-loop sync sync-ch failure-ch-head))
-        :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head))
-        :dead-peer-thread (thread (dead-peer-ch-loop sync sync-ch dead-peer-ch-tail evict-ch-head offer-ch-head))
-        :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head))
-        :ack-thread (thread (ack-ch-loop sync sync-ch ack-ch-tail))
-        :evict-thread (thread (evict-ch-loop sync sync-ch evict-ch-tail offer-ch-head shutdown-ch-head))
-        :offer-revoke-thread (thread (offer-revoke-ch-loop sync sync-ch offer-revoke-ch-tail evict-ch-head))
-        :exhaust-thread (thread (exhaust-queue-loop sync sync-ch exhaust-ch-tail seal-ch-head))
-        :seal-thread (thread (seal-resource-loop sync seal-ch-tail exhaust-ch-head))
-        :completion-thread (thread (completion-ch-loop sync sync-ch completion-ch-tail offer-ch-head completion-ch-head))
+        :born-peer-thread (thread (born-peer-ch-loop sync sync-ch born-peer-ch-tail offer-ch-head dead-peer-ch-head born-peer-dead-ch))
+        :dead-peer-thread (thread (dead-peer-ch-loop sync sync-ch dead-peer-ch-tail evict-ch-head offer-ch-head dead-peer-dead-ch))
+        :planning-thread (thread (planning-ch-loop sync queue planning-ch-tail offer-ch-head planning-dead-ch))
+        :ack-thread (thread (ack-ch-loop sync sync-ch ack-ch-tail ack-dead-ch))
+        :evict-thread (thread (evict-ch-loop sync sync-ch evict-ch-tail offer-ch-head shutdown-ch-head evict-dead-ch))
+        :offer-revoke-thread (thread (offer-revoke-ch-loop sync sync-ch offer-revoke-ch-tail evict-ch-head offer-revoke-dead-ch))
+        :exhaust-thread (thread (exhaust-queue-loop sync sync-ch exhaust-ch-tail seal-ch-head exhaust-dead-ch))
+        :seal-thread (thread (seal-resource-loop sync seal-ch-tail exhaust-ch-head seal-dead-ch))
+        :completion-thread (thread (completion-ch-loop sync sync-ch completion-ch-tail offer-ch-head completion-ch-head completion-dead-ch))
         :failure-thread (thread (failure-ch-loop failure-ch-tail))
-        :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail))
+        :shutdown-thread (thread (shutdown-ch-loop sync shutdown-ch-tail shutdown-dead-ch))
         :offer-thread (thread (offer-ch-loop sync sync-ch revoke-delay offer-ch-tail ack-ch-head
-                                             exhaust-ch-head completion-ch-head offer-revoke-ch-head)))))
+                                             exhaust-ch-head completion-ch-head offer-revoke-ch-head offer-dead-ch)))))
 
   (stop [component]
     (info "Stopping Coordinator")
 
-    (close! (:sync-ch component))
     (close! (:born-peer-ch-head component))
     (close! (:dead-peer-ch-head component))
     (close! (:planning-ch-head component))
@@ -496,6 +567,45 @@
     (close! (:seal-ch-head component))
     (close! (:completion-ch-head component))
     (close! (:shutdown-ch-head component))
+
+    (close! (:born-peer-ch-tail component))
+    (close! (:dead-peer-ch-tail component))
+    (close! (:planning-ch-tail component))
+    (close! (:evict-ch-tail component))
+    (close! (:offer-ch-tail component))
+    (close! (:offer-revoke-ch-tail component))
+    (close! (:ack-ch-tail component))
+    (close! (:exhaust-ch-tail component))
+    (close! (:seal-ch-tail component))
+    (close! (:completion-ch-tail component))
+    (close! (:shutdown-ch-tail component))
+
+    (<!! (:planning-dead-ch component))
+    (<!! (:born-peer-dead-ch component))
+    (<!! (:dead-peer-dead-ch component))
+    (<!! (:evict-dead-ch component))
+    (<!! (:offer-dead-ch component))
+    (<!! (:offer-revoke-dead-ch component))
+    (<!! (:ack-dead-ch component))
+    (<!! (:exhaust-dead-ch component))
+    (<!! (:seal-dead-ch component))
+    (<!! (:completion-dead-ch component))
+    (<!! (:shutdown-dead-ch component))
+
+    (close! (:planning-dead-ch component))
+    (close! (:born-peer-dead-ch component))
+    (close! (:dead-peer-dead-ch component))
+    (close! (:evict-dead-ch component))
+    (close! (:offer-dead-ch component))
+    (close! (:offer-revoke-dead-ch component))
+    (close! (:ack-dead-ch component))
+    (close! (:exhaust-dead-ch component))
+    (close! (:seal-dead-ch component))
+    (close! (:completion-dead-ch component))
+    (close! (:shutdown-dead-ch component))
+
+    ;; Need to close these last so the others can close cleanly.
+    (close! (:sync-ch component))
     (close! (:failure-ch-head component))
 
     component))

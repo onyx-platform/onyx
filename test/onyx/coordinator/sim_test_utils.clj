@@ -93,10 +93,12 @@
         (doseq [other-peer other-peers]
           (doseq [range-node range-nodes]
             (doseq [state (sort (extensions/children sync other-peer))]
-              (when (= (:task-node (extensions/read-node sync state)) (nth range-node 2))
-                (let [zxid (:czxid (:stat (zk/data (:conn sync) state)))]
-                  (fact (or (< zxid (first range-node))
-                            (> zxid (second range-node))) => true))))))))))
+              (let [status (extensions/read-node sync state)]
+                (when (= (:task-node status) (nth range-node 2))
+                  (let [zxid (:czxid (:stat (zk/data (:conn sync) state)))]
+                    (when-not (= (:state status) :dead)
+                      (fact (or (< zxid (first range-node))
+                                (> zxid (second range-node))) => true))))))))))))
 
 (defn peer-liveness [sync]
   (doseq [state-path (extensions/bucket sync :peer-state)]
