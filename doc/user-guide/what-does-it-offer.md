@@ -48,7 +48,7 @@ I think it's particularly telling that many compute frameworks don't offer an ea
 
 #### Transactional Semantics
 
-Inside of the pipelines that Onyx lays, data needs to be moved around between nodes in the HornetQ cluster. Onyx uses transactions to move that data - meaning we gain exactly-once-per-transaction execution semantics. Onyx won't replay batches after they're been committed to storage. Note that pre-commit failure will cause the entire batch to be replayed, just as a database transaction might partially execute and rollback in the face of failure.
+Inside of the pipelines that Onyx lays, data needs to be moved around between nodes in the HornetQ cluster. Onyx uses transactions to move that data - meaning we gain transactional execution semantics. Onyx won't replay batches after they're been committed to storage. Note that pre-commit failure will cause the entire batch to be replayed, just as a database transaction might partially execute and rollback in the face of failure.
 
 #### Transparent Code Reuse for Batch and Streaming
 

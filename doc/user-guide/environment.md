@@ -204,7 +204,7 @@ Configure both the Coordinator and peer with the details to dynamically discover
 
 ##### Fault Tolerancy Tuning
 
-Onyx uses HornetQ to construct data pipelines that offer exactly-once execution semantics. By doing this, Onyx moves messages between queues on each node in the HornetQ cluster. We run the risk of losing a HornetQ node, and hence losing all of the messages on that box. To defend against this happening, it's typical to create at least one HornetQ replica per HornetQ server in the cluster. There are a lot of ways that you can accomplish this, and it's very much worth your time to read [all of the failover options that HornetQ offers](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e11342). The trade-offs are yours to make.
+Onyx uses HornetQ to construct data pipelines that offer transactional execution semantics. By doing this, Onyx moves messages between queues on each node in the HornetQ cluster. We run the risk of losing a HornetQ node, and hence losing all of the messages on that box. To defend against this happening, it's typical to create at least one HornetQ replica per HornetQ server in the cluster. There are a lot of ways that you can accomplish this, and it's very much worth your time to read [all of the failover options that HornetQ offers](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e11342). The trade-offs are yours to make.
 
 Remember to always provide a replica for the node running the Local grouping handler! Losing this box in an under-replicated scenario will disallow Onyx from doing grouping operations.
 
