@@ -9,6 +9,15 @@
 - enabled by hardware advances in the last 10 years
 - Competes against Storm, Cascading, Map/Reduce, Dryad, Apache Sqoop, Twitter Crane, etc
 
+### What would I use this for?
+
+- Realtime event stream processing
+- Continuous computation 
+- Extract, transform, load
+- Data transformation à la map-reduce
+- Data cleaning
+- Data ingestion and storage medium transfer
+
 ### Installation
 
 Available on Clojars:
