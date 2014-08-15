@@ -7,4 +7,6 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-None so far! 
+##### What does Onyx use internall for compression by default?
+
+Unless otherwise overriden in the Peer Pipeline API, Onyx will use [Fressian](https://github.com/Datomic/fressian).
