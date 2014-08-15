@@ -19,7 +19,7 @@ Available on Clojars:
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
 ### User Guide 0.3.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
