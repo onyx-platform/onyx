@@ -21,7 +21,7 @@ Available on Clojars:
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter).
 
-### Full length documentation 0.3.0
+### User Guide 0.3.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -72,6 +72,14 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
 - [Owen Jones](https://github.com/owengalenjones)
+
+#### Project Maturity
+
+Onyx is **not** a battle-tested framework compared to Storm or Cascading. Please keep this in mind when considering taking it to production. That being said, the test suite uses simulation testing to create exceptionally bad data center network partitions, and checks against a number of correctness criteria afterwards. Community effort will help a create deal on this front.
+
+#### Performance Benchmarks
+
+At the time of writing this, I do not have any performance benchmarks to publish. Creating a correct, useful benchmark is extremely difficult. I'm working on it - hang tight.
 
 ### Author
 
