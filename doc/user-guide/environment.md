@@ -51,7 +51,7 @@ One of the primary design goals of Onyx is to make the development environment a
 
 ##### Coordinator Launch of In-VM HornetQ
 
-To launch an In-VM HornetQ server, pass `hornetq/server? true` to the coordinator options, and specify `:hornetq.server/type :vm` in the options too. This will run the server as part of the Coordinator. Since we're presumably using a single Coordinator in development mode, this is the ideal entity to also start up the server.
+To launch an In-VM HornetQ server, pass `hornetq/mode :vm` and `hornetq/server? true` to the coordinator options, and specify `:hornetq.server/type :vm` in the options too. This will run the server as part of the Coordinator. Since we're presumably using a single Coordinator in development mode, this is the ideal entity to also start up the server.
 
 ##### Peer Connection to In-VM HornetQ
 
