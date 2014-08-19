@@ -1,4 +1,4 @@
-## Onyx
+## ![Logo](http://i.imgur.com/AnCtaAP.png?1) Onyx
 
 ### What is it?
 
