@@ -1,14 +1,19 @@
 ## Plugins
 
-Plugins are a particularly straightforward concept in Onyx. They serve to either get data in or out of HornetQ. See the README.md of the project for a list of offical Onyx plugins.
+Plugins serve as an abstract to compose mechanisms for getting data into and out of HornetQ. See the README.md of the project for a list of offical Onyx plugins, or keep reading to roll your own.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Plugins](#plugins)
+  - [Interfaces](#interfaces)
   - [Bootstrapping](#bootstrapping)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+### Interfaces
+
+In order to implement a plugin, a number of multimethods need to be extended from the [Pipeline Extensions API](). Reader plugins will want to implement one or more of `read-batch`, `decompress-batch`, `strip-sentinel`, `requeue-sentinel`,  `ack-batch`, and `apply-fn`. Writer plugins will want to implement one or more of `apply-fn`, `compress-batch`, `write-batch`, and `seal-resource`. See the docstrings for instructions on implementation.
 
 ### Bootstrapping
 
