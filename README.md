@@ -23,14 +23,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.3.0"]
+[com.mdrogalis/onyx "0.3.1"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.3.0
+### User Guide 0.3.1
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
