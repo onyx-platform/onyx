@@ -1,3 +1,7 @@
+#### 0.3.1
+
+- Performance improvement by eliminating superfluous decompression.
+
 #### 0.3.0
 - Coordinator can be made highly available via stand-by coordinators
 - HornetQ connection via UDP multicast for clustering

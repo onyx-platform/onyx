@@ -13,6 +13,7 @@ Onyx ships with three distinct APIs to accomodate different needs. A description
       - [`await-job-completion`](#await-job-completion)
       - [`shutdown`](#shutdown)
   - [Task Lifecycle API](#task-lifecycle-api)
+      - [`start-lifecycle?`](#start-lifecycle?)
       - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
       - [`inject-temporal-resources`](#inject-temporal-resources)
       - [`close-temporal-resources`](#close-temporal-resources)
@@ -60,9 +61,16 @@ Spins down a connection to a Coordinator.
 
 ### Task Lifecycle API
 
-Each time a virtual peer receives a task from the coordinator to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/src/onyx/peer/task_lifecycle_extensions.clj) facilitaties this flow.
+Each time a virtual peer receives a task from the coordinator to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/src/onyx/peer/task_lifecycle_extensions.clj) fascilitates this flow.
 
 Onyx provides hooks for user-level modification of this map both before the task begins executing, before each segment batch begins, after each segment batch is completed, and after the task is completed. See below for a description of each. Each of these functions allows dispatch based on the name, identity, type, and type/medium combination of a task. Map merge prescendence happens in this exact order, allowing you to override behavior specified by a plugin, or Onyx itself.
+
+##### `start-lifeycle?`
+
+Just before beginning the task, this function is called to check whether the peer is ready to begin. For reasons external
+to Onyx, the peer might need to block and wait for another event. This function must return a map with key
+`:onyx.core/start-lifecycle?` and a boolean value. If true, the task will begin executing. If false, the peer will back off
+for `:onyx.peer/retry-start-interval` before recalling `start-lifecycle?`.
 
 ##### `inject-lifecycle-resources`
 

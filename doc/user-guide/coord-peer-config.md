@@ -23,6 +23,8 @@ The chapter describes the options available to configure both the Coordinator an
     - [Base Configuration](#base-configuration-1)
       - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
       - [`:onyx.peer/sequential-back-off`](#onyxpeersequential-back-off)
+  - [Coordinator Full Example](#coordinator-full-example)
+  - [Peer Full Example](#peer-full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -65,6 +67,7 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 | key name          | type       | choices    | optional?                         |
 |-------------------|------------|------------|-----------------------------------|
 |`:onyx.coordinator/revoke-delay`|  `int`     |                                   |
+|`:onyx.coordinator/host`        |  `string`  | Optional for in-memory coordinator|
 |`:onyx.coordinator/port`        |  `int`     | Optional for in-memory coordinator|
 |`:hornetq/server?`              |  `boolean` | Yes                               |
 |`:hornetq.server/type`          |  `keyword` |                                   |
@@ -107,8 +110,9 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 
 | key name                        | type       | default|
 |---------------------------------|------------|--------|
-|`:onyx.peer/retry-start-interval`| `int`      | 2000   |
-|`:onyx.peer/sequential-back-off` | `int`      | 2000   |
+|`:onyx.peer/retry-start-interval`| `int`      | `2000` |
+|`:onyx.peer/sequential-back-off` | `int`      | `2000` |
+|`:onyx.peer/fn-params`           | `map`      | `{}`   |
 
 ##### `:onyx.peer/retry-start-interval`
 
@@ -118,3 +122,47 @@ Number of ms to wait before trying to reboot a virtual peer after failure.
 
 Number of ms to wait before retrying to execute a sequential task in the presence of other queue consumers.
 
+##### `onyx.peer/fn-params`
+
+A map of keywords to vectors. Keywords represent task names, vectors represent the first parameters to apply
+to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
+underlying `:add` with `(f 42 <segment>)`.
+
+### Coordinator Full Example
+
+```clojure
+(def coord-opts
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name "onyx-cluster"
+   :hornetq.udp/group-address "231.7.7.7"
+   :hornetq.udp/group-port 9876
+   :hornetq.udp/refresh-timeout 5000
+   :hornetq.udp/discovery-timeout 5000
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config ["hornetq/clustered-1.xml" "hornetq/clustered-2.xml"]
+   :zookeeper/address "127.0.0.1:2181"
+   :zookeeper/server? true
+   :zookeeper.server/port "2181"
+   :onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
+   :onyx.coordinator/host "localhost"
+   :onyx.coordinator/port "12345"
+   :onyx.coordinator/revoke-delay 5000})
+```
+
+### Peer Full Example
+
+```clojure
+(def peer-opts
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name "onyx-cluster"
+   :hornetq.udp/group-address "231.7.7.7"
+   :hornetq.udp/group-port 9876
+   :hornetq.udp/refresh-timeout 5000
+   :hornetq.udp/discovery-timeout 5000
+   :zookeeper/address "127.0.0.1:2181"
+   :onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
+   :onyx.peer/retry-start-interval 2000
+   :onyx.peer/sequential-back-off 2000
+   :onyx.peer/fn-params {:add [42]}})
+```

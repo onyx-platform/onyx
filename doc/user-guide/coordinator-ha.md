@@ -32,5 +32,5 @@ Example:
    :onyx.coordinator/port 54321})
 
 ;; Blocks!
-(def onyx-server (d/start-distributed-coordinator coord-opts-2))
+(def onyx-server-2 (d/start-distributed-coordinator coord-opts-2))
 ```
