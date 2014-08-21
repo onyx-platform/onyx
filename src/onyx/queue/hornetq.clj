@@ -311,15 +311,17 @@
           s)))))
 
 (defn take-segments
-  ([f n] (take-segments f n []))
-  ([f n rets]
+  ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
+  ;; match, hashCode() doesn't work as expected.
+  ([f n] (take-segments f n [] (.limit (fressian/write :done) 32)))
+  ([f n rets ba]
      (if (= n (count rets))
        rets
        (let [segment (f)]
          (if (nil? segment)
            rets
-           (let [decompressed (fressian/read (.toByteBuffer (.getBodyBufferCopy segment)))]
-             (if (= :done decompressed)
+           (let [m (.toByteBuffer (.getBodyBufferCopy segment))]
+             (if (= m ba)
                (conj rets segment)
-               (recur f n (conj rets segment)))))))))
+               (recur f n (conj rets segment) ba))))))))
 
