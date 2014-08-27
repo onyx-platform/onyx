@@ -55,6 +55,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
 - [`onyx-sql`](https://github.com/MichaelDrogalis/onyx-sql)
+- [`onyx-kafka`](https://github.com/MichaelDrogalis/onyx-kafka)
 - [`onyx-core-async`](https://github.com/MichaelDrogalis/onyx-core-async)
 
 ### Need help?
