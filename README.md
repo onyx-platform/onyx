@@ -58,6 +58,8 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [`onyx-kafka`](https://github.com/MichaelDrogalis/onyx-kafka)
 - [`onyx-core-async`](https://github.com/MichaelDrogalis/onyx-core-async)
 
+Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
+
 ### Need help?
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
