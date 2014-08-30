@@ -140,7 +140,8 @@
                                  (warn e)
                                  :stopped)))
                            (finally
-                            (>!! v true)))))
+                            (when (= ch stop-ch)
+                              (>!! v true))))))
                      (catch Exception e
                        (warn e)
                        (warn "Virtual peer failed, backing off and rebooting...")
