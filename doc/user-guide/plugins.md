@@ -8,6 +8,7 @@ Plugins serve as an abstract to compose mechanisms for getting data into and out
 - [Plugins](#plugins)
   - [Interfaces](#interfaces)
   - [Bootstrapping](#bootstrapping)
+  - [Templates](#templates)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -21,3 +22,6 @@ Sometimes, it's adventageous for a plugin to figure out what segments to push in
 
 This sort of dynamic behavior is accomplished via bootstrapping. By setting `:onyx/bootstrap?` to `true`, Onyx will enqueue a single segment (which should be ignored), followed by the sentinel. In the `apply-fn` function of the Pipeline extentions, you can perform a computation to dynamically generate segments to be passed downstream.
 
+### Templates
+
+To help move past the boilerplate of creating new plugins, use Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin) to generate a template.
