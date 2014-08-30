@@ -125,26 +125,33 @@
 
                        (let [restart-ch (:dead-restart-tail-ch (:peer live))
                              [v ch] (alts!! [stop-ch restart-ch] :priority true)]
-                         (if (= ch stop-ch)
-                           (try
-                             (component/stop live)
-                             :stopped
-                             (catch Exception e
-                               (warn e)
-                               :stopped))
-                           (try
-                             (component/stop live)
-                             nil
-                             (catch Exception e
-                               (warn e)
-                               :stopped)))))
+                         (try
+                           (if (= ch stop-ch)
+                             (try
+                               (component/stop live)
+                               :stopped
+                               (catch Exception e
+                                 (warn e)
+                                 :stopped))
+                             (try
+                               (component/stop live)
+                               nil
+                               (catch Exception e
+                                 (warn e)
+                                 :stopped)))
+                           (finally
+                            (when (= ch stop-ch)
+                              (>!! v true))))))
                      (catch Exception e
                        (warn e)
                        (warn "Virtual peer failed, backing off and rebooting...")
                        (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
                        nil))]
                (or rets (recur)))))
-         :shutdown-fn (fn [] (>!! stop-ch true))}))
+         :shutdown-fn (fn []
+                        (let [ack-ch (chan)]
+                          (>!! stop-ch ack-ch)
+                          (<!! ack-ch)))}))
     (range n))))
 
 (defn start-distributed-coordinator [opts]

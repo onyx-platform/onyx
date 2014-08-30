@@ -55,7 +55,10 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
 - [`onyx-sql`](https://github.com/MichaelDrogalis/onyx-sql)
+- [`onyx-kafka`](https://github.com/MichaelDrogalis/onyx-kafka)
 - [`onyx-core-async`](https://github.com/MichaelDrogalis/onyx-core-async)
+
+Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
 ### Need help?
 
@@ -84,9 +87,9 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 
 #### Project Maturity
 
-Onyx is **not** a battle-tested framework compared to Storm or Cascading. Please keep this in mind when considering taking it to production. That being said, the test suite uses simulation testing to create exceptionally bad data center network partitions, and checks against a number of correctness criteria afterwards. Community effort will help a create deal on this front.
+Onyx is **not** a battle-tested framework compared to Storm or Cascading. Please keep this in mind when considering taking it to production. That being said, the test suite uses simulation testing to create exceptionally bad data center network partitions, and checks against a number of correctness criteria afterwards. Community effort will help a great deal on this front.
 
-I should note that nearly all inter-cluster communication happens via HornetQ. HornetQ *is* a battle tested queueing platform from the JBoss stack that has been in production for many years. This does give Onyx a significant leg up on reliability.
+It's worth noting that nearly all inter-cluster communication happens via HornetQ. HornetQ *is* a battle tested queueing platform from the JBoss stack that has been in production for many years. This does give Onyx a significant leg up on reliability.
 
 #### Performance Benchmarks
 
