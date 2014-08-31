@@ -1,3 +1,7 @@
+#### 0.3.2
+
+- Made peer shutdown function synchronous.
+
 #### 0.3.1
 
 - Performance improvement by eliminating superfluous decompression.
