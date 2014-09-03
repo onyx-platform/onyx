@@ -99,6 +99,12 @@ At the time of writing this, I do not have any performance benchmarks to publish
 
 This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogalis), an independent software consultant. Get in touch (mjd3089.at.rit.edu) to work together.
 
+### Donate
+
+If you'd like to kick a donation my way, I'd be thrilled.
+
+<script data-gratipay-username="MichaelDrogalis" data-gratipay-widget="button" src="//gttp.co/v1.js"></script>
+
 ### License
 
 Copyright © 2014 Michael Drogalis
