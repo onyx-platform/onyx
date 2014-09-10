@@ -72,9 +72,12 @@
   (merge event {:onyx.core/acked (count batch)}))
 
 (defn apply-fn-shim
-  [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params] :as event}]
-  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
-    (merge event {:onyx.core/results results})))
+  [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params
+           onyx.core/task-map] :as event}]
+  (if (:onyx/transduce? task-map)
+    (merge event {:onyx.core/results (sequence (apply fn params) decompressed)})
+    (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
+      (merge event {:onyx.core/results results}))))
 
 (defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
   (let [compressed-msgs (map compress-segment results)]
