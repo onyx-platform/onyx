@@ -64,6 +64,10 @@ Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
 
+### Want the logo?
+
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.3.x/resources/logo).
+
 ### Running the tests
 
 A simple `lein midje` will run the full suite, which takes about 15 minutes on my quad-core MacBook Pro. Expect a long, 5-10 minute pause during the coordinator tests as it's being completely slammed with requests and checked for correctness. The pause is waiting for the Coordinator to catch up and close out cleanly.
