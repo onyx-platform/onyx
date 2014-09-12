@@ -1,3 +1,7 @@
+#### 0.4.0
+
+- Transducer support for transformer functions.
+
 #### 0.3.2
 
 - Made peer shutdown function synchronous.
