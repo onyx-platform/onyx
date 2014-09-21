@@ -53,6 +53,8 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### Official plugin listing
 
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.3.2` goes with `onyx` version `0.3.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.3.2.1`).
+
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
 - [`onyx-sql`](https://github.com/MichaelDrogalis/onyx-sql)
