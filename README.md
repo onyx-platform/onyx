@@ -41,6 +41,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Coordinator and Peer Configuration](doc/user-guide/coord-peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
+- [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
 - [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
