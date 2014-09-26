@@ -52,6 +52,10 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
+### API Docs 0.3.2
+
+Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
+
 ### Official plugin listing
 
 Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.3.2` goes with `onyx` version `0.3.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.3.2.1`).
