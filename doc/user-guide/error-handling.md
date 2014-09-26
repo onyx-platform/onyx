@@ -6,7 +6,7 @@ This chapter describes what options the developer when an error occurs while a v
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Error Handling](#error-handling)
-  - [Infinite Retry](#infinite-segment)
+  - [Infinite Retry](#infinite-retry)
   - [Bounded Retry](#bounded-retry)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
