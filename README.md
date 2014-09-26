@@ -41,6 +41,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Coordinator and Peer Configuration](doc/user-guide/coord-peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
+- [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
 - [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
@@ -51,7 +52,13 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
+### API Docs 0.3.2
+
+Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
+
 ### Official plugin listing
+
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.3.2` goes with `onyx` version `0.3.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.3.2.1`).
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
@@ -64,6 +71,10 @@ Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.
 ### Need help?
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
+
+### Want the logo?
+
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.3.x/resources/logo).
 
 ### Running the tests
 
@@ -85,6 +96,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
 - [Owen Jones](https://github.com/owengalenjones)
+- [Bruce Durling](https://github.com/otfrom)
 
 #### Project Maturity
 
