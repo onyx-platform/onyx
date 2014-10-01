@@ -13,7 +13,7 @@ In this chapter, we'll outline the hardware that should be used in an Onyx produ
 
 ### Solid State Drives
 
-Each of the nodes running a HornetQ server should be backed with an SSD. If possibly, place the HornetQ journal on a dedicated drive for maximum performance. You don't need to break the bank of these drives, they're not where you want to place your money. If running on AWS, ensure that you have enough IOPS provisioned to keep up with the load. You can investigate this with the `iostat` command.
+Each of the nodes running a HornetQ server should be backed with an SSD. If possibly, place the HornetQ journal on a dedicated drive for maximum performance. You don't need to break the bank for these drives, they're not where you want to place your money. If running on AWS, ensure that you have enough IOPS provisioned to keep up with the load. You can investigate this with the `iostat` command.
 
 ### 10 Gigabit Ethernet Connection
 
