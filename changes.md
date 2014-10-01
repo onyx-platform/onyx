@@ -1,3 +1,7 @@
+#### 0.3.3
+
+- Fixes a scenario where a virtual peer can deadlock on task completion. (#18)
+
 #### 0.3.2
 
 - Made peer shutdown function synchronous.
