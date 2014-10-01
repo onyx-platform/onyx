@@ -96,6 +96,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
 - [Owen Jones](https://github.com/owengalenjones)
 - [Bruce Durling](https://github.com/otfrom)
+- [Malcolm Sparks](https://github.com/malcolmsparks)
 
 #### Project Maturity
 
