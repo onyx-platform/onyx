@@ -23,14 +23,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.3.2"]
+[com.mdrogalis/onyx "0.4.0-SNAPSHOT"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.3.2
+### User Guide 0.4.0-SNAPSHOT
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -52,13 +52,13 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.3.2
+### API Docs 0.4.0-SNAPSHOT
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.3.2` goes with `onyx` version `0.3.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.3.2.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.4.0` goes with `onyx` version `0.4.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.4.0.1`).
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
