@@ -179,9 +179,9 @@
 
         (when (and (zero? n) (not complete?))
           (release-waiting-nodes! sync (:task-node peer-state))
-          (complete-task sync (:task-node peer-state))
-          (extensions/write-node sync cooldown-node {:completed? true}))
+          (complete-task sync (:task-node peer-state)))
         
+        (extensions/write-node sync cooldown-node {:completed? complete?})
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-node {:completed? true})
           {:n-peers n :peer-state peer-state}))))
