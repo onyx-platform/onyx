@@ -310,6 +310,9 @@
           (.start s)
           s)))))
 
+(defmethod extensions/producer->queue-name HornetQConnection
+  [queue producer] (.toString (.getAddress producer)))
+
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
   ;; match, hashCode() doesn't work as expected.

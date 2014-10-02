@@ -16,7 +16,8 @@
    :task/phase (:phase task)
    :task/consumption (:consumption task)
    :task/ingress-queues (:ingress-queues task)
-   :task/egress-queues (or (vals (:egress-queues task)) [])})
+   :task/egress-queues (or (vals (:egress-queues task)) [])
+   :task/children-links (:egress-queues task)})
 
 (defn task-complete? [sync task-node]
   (extensions/node-exists? sync (str task-node complete-marker)))

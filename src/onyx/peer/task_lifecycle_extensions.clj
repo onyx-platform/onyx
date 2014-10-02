@@ -1,5 +1,6 @@
 (ns onyx.peer.task-lifecycle-extensions
-  "Public API extensions for implementors of task lifecycles.")
+  "Public API extensions for implementors of task lifecycles."
+  (:require [onyx.peer.pipeline-extensions :as p-ext]))
 
 (defn name-dispatch [{:keys [onyx.core/task-map]}]
   (:onyx/name task-map))
@@ -8,10 +9,10 @@
   (:onyx/ident task-map))
 
 (defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
-  [(:onyx/type task-map) (:onyx/medium task-map)])
+  [(p-ext/task-type task-map) (:onyx/medium task-map)])
 
 (defn type-dispatch [{:keys [onyx.core/task-map]}]
-  (:onyx/type task-map))
+  (p-ext/task-type task-map))
 
 (defn merge-api-levels [f event]
   (reduce

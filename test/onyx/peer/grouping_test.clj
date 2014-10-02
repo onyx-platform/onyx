@@ -5,7 +5,7 @@
             [onyx.api]
             [taoensso.timbre :refer [info]]))
 
-(def output (atom nil))
+(def output (atom []))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
@@ -49,9 +49,6 @@
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
 
-(defn group-by-name [{:keys [name] :as segment}]
-  name)
-
 (defmethod l-ext/inject-lifecycle-resources
   :onyx.peer.grouping-test/sum-balance
   [_ event]
@@ -62,14 +59,15 @@
 (defmethod l-ext/close-lifecycle-resources
   :onyx.peer.grouping-test/sum-balance
   [_ {:keys [test/balance]}]
-  (reset! output @balance)
+  (swap! output conj @balance)
   {})
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
+;  (prn "I have: " @state)
   [])
 
-(def workflow {:in {:group-by-name {:sum-balance :out}}})
+(def workflow {:in {:sum-balance :out}})
 
 (def catalog
   [{:onyx/name :in
@@ -82,16 +80,11 @@
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size 1000}
 
-   {:onyx/name :group-by-name
-    :onyx/fn :onyx.peer.grouping-test/group-by-name
-    :onyx/type :grouper
-    :onyx/consumption :concurrent
-    :onyx/batch-size 1000}
-
    {:onyx/name :sum-balance
     :onyx/ident :onyx.peer.grouping-test/sum-balance
     :onyx/fn :onyx.peer.grouping-test/sum-balance
-    :onyx/type :aggregator
+    :onyx/type :transformer
+    :onyx/group-by-key :name
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}
    
@@ -108,18 +101,21 @@
 (def data
   (concat
    (map (fn [_] {:name "Mike" :amount 10}) (range 150))
-   [{:name "Mike" :amount 10}
-    {:name "Mike" :amount 15}
-    {:name "Mike" :amount 20}
-
-    {:name "Dorrene" :amount 30}
-    {:name "Dorrene" :amount 40}
-
-    {:name "Benti" :amount 55}]))
+   (map (fn [_] {:name "Dorrene" :amount 10}) (range 150))
+   (map (fn [_] {:name "Benti" :amount 10}) (range 150))
+   (map (fn [_] {:name "John" :amount 10}) (range 150))
+   (map (fn [_] {:name "Shannon" :amount 10}) (range 150))
+   (map (fn [_] {:name "Kristen" :amount 10}) (range 150))
+   (map (fn [_] {:name "Benti" :amount 10}) (range 150))
+   (map (fn [_] {:name "Mike" :amount 10}) (range 150))
+   (map (fn [_] {:name "Steven" :amount 10}) (range 150))
+   (map (fn [_] {:name "Dorrene" :amount 10}) (range 150))
+   (map (fn [_] {:name "John" :amount 10}) (range 150))
+   (map (fn [_] {:name "Shannon" :amount 10}) (range 150))))
 
 (hq-util/write-and-cap! hq-config in-queue data 100)
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def v-peers (onyx.api/start-peers conn 9 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
@@ -134,6 +130,13 @@
   (onyx.api/shutdown conn)
   (catch Exception e (prn e)))
 
-(fact @output => {"Mike" 1545 "Benti" 55 "Dorrene" 70})
+(def out-val @output)
+
+;;; Scan the key set, dropping any nils. Count the distinct keys.
+;;; Do the same for the right hand side of the expression, but turn it into a set.
+;;; If there's the same number of elements, then the grouping was mutually exclusive.
+(fact (count (filter identity (mapcat keys out-val))) =>
+      (count (into #{} (filter identity (mapcat keys out-val)))))
+
 (fact results => [:done])
 

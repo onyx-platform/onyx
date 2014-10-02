@@ -2,11 +2,15 @@
     (:require [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
+              [onyx.queue.hornetq :refer [take-segments]]
+              [onyx.coordinator.planning :refer [find-task]]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
-              [onyx.queue.hornetq :refer [take-segments]]
               [taoensso.timbre :refer [debug]]
-              [dire.core :refer [with-post-hook!]]))
+              [dire.core :refer [with-post-hook!]])
+    (:import [java.security MessageDigest]))
+
+(def md5 (MessageDigest/getInstance "MD5"))
 
 (defn requeue-sentinel [queue session ingress-queues]
   (doseq [queue-name ingress-queues]
@@ -32,16 +36,27 @@
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
 
-(defn compress-segment [segment]
-  {:compressed (.array (fressian/write segment))
-   :group (:group (meta segment))})
+(defn hash-segment [segment]
+  (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8"))))
 
-(defn write-batch [queue session producers msgs]
+(defn group-message [segment catalog task]
+  (when-let [k (:onyx/group-by-key (find-task catalog task))]
+    (hash-segment (get segment k))))
+
+(defn compress-segment [next-tasks catalog segment]
+  {:compressed (.array (fressian/write segment))
+   :hash-group (reduce (fn [groups t]
+                         (assoc groups t (group-message segment catalog t)))
+                       {} next-tasks)})
+
+(defn write-batch [queue session producers msgs catalog queue-name->task]
   (dorun
    (for [p producers msg msgs]
-     (if-let [group (:group msg)]
-       (extensions/produce-message queue p session (:compressed msg) group)
-       (extensions/produce-message queue p session (:compressed msg)))))
+     (let [queue-name (extensions/producer->queue-name queue p)
+           task (get queue-name->task queue-name)]
+       (if-let [group (get (:hash-group msg) task)]
+         (extensions/produce-message queue p session (:compressed msg) group)
+         (extensions/produce-message queue p session (:compressed msg))))))
   {:onyx.core/written? true})
 
 (defn read-batch-shim
@@ -79,15 +94,18 @@
     (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
       (merge event {:onyx.core/results results}))))
 
-(defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
-  (let [compressed-msgs (map compress-segment results)]
+(defn compress-batch-shim
+  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
+  (let [next-tasks (keys (:task/children-links serialized-task))
+        compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defn write-batch-shim
-  [{:keys [onyx.core/queue onyx.core/egress-queues
-           onyx.core/session onyx.core/compressed] :as event}]
-  (let [producers (map (partial extensions/create-producer queue session) egress-queues)
-        batch (write-batch queue session producers compressed)]
+  [{:keys [onyx.core/queue onyx.core/egress-queues onyx.core/serialized-task
+           onyx.core/catalog onyx.core/session onyx.core/compressed] :as event}]
+  (let [queue-name->task (clojure.set/map-invert (:task/children-links serialized-task))
+        producers (map (partial extensions/create-producer queue session) egress-queues)
+        batch (write-batch queue session producers compressed catalog queue-name->task)]
     (merge event {:onyx.core/producers producers})))
 
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]

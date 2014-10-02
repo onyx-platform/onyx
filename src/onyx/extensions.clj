@@ -119,6 +119,8 @@
 
 (defmulti bind-active-session (fn [queue queue-name] (type queue)))
 
+(defmulti producer->queue-name (fn [queue queue-name] (type queue)))
+
 (defmulti create-io-task
   (fn [element parent children phase]
     (:onyx/type element)))

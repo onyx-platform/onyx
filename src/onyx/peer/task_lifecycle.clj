@@ -8,7 +8,6 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
               [onyx.peer.transform :as transform]
-              [onyx.peer.group :as group]
               [onyx.peer.aggregate :as aggregate]
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
@@ -277,6 +276,7 @@
                          :onyx.core/task task
                          :onyx.core/catalog catalog
                          :onyx.core/task-map (find-task catalog task)
+                         :onyx.core/serialized-task (:task payload)
                          :onyx.core/ingress-queues ingress-queues
                          :onyx.core/egress-queues (:task/egress-queues (:task payload))
                          :onyx.core/peer-node (:node/peer (:nodes payload))

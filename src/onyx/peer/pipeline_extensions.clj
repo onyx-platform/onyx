@@ -1,8 +1,13 @@
 (ns onyx.peer.pipeline-extensions
   "Public API extensions for the virtual peer data pipeline.")
 
+(defn task-type [task-map]
+  (if (or (:onyx/group-by-key task-map) (:onyx/group-by-fn task-map))
+    :aggregator
+    (:onyx/type task-map)))
+
 (defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
-  [(:onyx/type task-map) (:onyx/medium task-map)])
+  [(task-type task-map) (:onyx/medium task-map)])
 
 (defmulti read-batch
   "Reads :onyx/batch-size segments off the incoming data source.
