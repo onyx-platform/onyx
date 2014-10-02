@@ -64,7 +64,6 @@
 
 (defn sum-balance [state {:keys [name amount] :as segment}]
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
-;  (prn "I have: " @state)
   [])
 
 (def workflow {:in {:sum-balance :out}})
