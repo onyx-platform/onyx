@@ -1,6 +1,6 @@
 #### 0.3.3
 
-- Fixes a scenario where a virtual peer can deadlock on task completion. (#18)
+- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/MichaelDrogalis/onyx/issues/18)
 
 #### 0.3.2
 
