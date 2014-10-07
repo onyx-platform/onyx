@@ -11,8 +11,6 @@
     (:import [java.util UUID]
              [java.security MessageDigest]))
 
-(def md5 (MessageDigest/getInstance "MD5"))
-
 (defn requeue-sentinel [queue session ingress-queues uuid]
   (doseq [queue-name ingress-queues]
     (let [p (extensions/create-producer queue session queue-name)]
@@ -38,7 +36,8 @@
   (extensions/read-message queue message))
 
 (defn hash-segment [segment]
-  (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8"))))
+  (let [md5 (MessageDigest/getInstance "MD5")]
+    (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8")))))
 
 (defn group-message [segment catalog task]
   (when-let [k (:onyx/group-by-key (find-task catalog task))]
