@@ -1,5 +1,6 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
+            [onyx.coordinator.impl :as impl]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-fn [f params segment]
@@ -13,41 +14,48 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn dead-peers [states task-node]
-  (filter
-   (fn [state]
-     (and (= (:task-node (:content state)) task-node)
-          (= (:state (:content state)) :dead)))
-   states))
+(defn vote-for-sentinel-leader [sync task-node uuid]
+  (extensions/create-node sync (str task-node impl/sentinel-marker) {:uuid uuid}))
 
-(defn previously-sealing? [sync state]
-  (let [previous-node (extensions/previous-node sync (:node state))]
-    (= (:state (extensions/read-node sync previous-node)) :sealing)))
-
-(defn n-seal-failures [sync task-node]
-  (let [peers (extensions/bucket sync :peer-state)
-        states (map (partial extensions/dereference sync) peers)
-        dead (dead-peers states task-node)]
-    (count (filter (partial previously-sealing? sync) dead))))
+(defn filter-sentinels [decompressed]
+  (remove (partial = :done) decompressed))
 
 (defn on-last-batch
-  [{:keys [onyx.core/sync onyx.core/decompressed onyx.core/ingress-queues
-           onyx.core/task-map] :as event} f]
-  (cond (= (last decompressed) :done)
-        (let [n-messages (f event)
-              max-failures (n-seal-failures sync (:onyx.core/task-node event))]
-          (assoc event
-            :onyx.core/tail-batch? (or (= n-messages (count decompressed))
-                                       (<= n-messages (inc max-failures)))
-            :onyx.core/requeue? true
-            :onyx.core/decompressed (remove (partial = :done) decompressed)))
-        (some #{:done} decompressed)
-        (assoc event
-          :onyx.core/tail-batch? false
-          :onyx.core/requeue? true
-          :onyx.core/decompressed (remove (partial = :done) decompressed))
-        :else
-        (assoc event :onyx.core/tail-batch? false :onyx.core/requeue? false)))
+  [{:keys [onyx.core/sync onyx.core/queue onyx.core/decompressed
+           onyx.core/pipeline-state onyx.core/task-node] :as event} f]
+  (if (= (last decompressed) :done)
+    (if (= (:onyx/type (:onyx.core/task-map event)) :input)
+      {:onyx.core/tail-batch? (= (f event) (count decompressed))
+       :onyx.core/requeue? true
+       :onyx.core/decompressed (filter-sentinels decompressed)}
+      (let [uuid (extensions/message-uuid queue (last (:onyx.core/batch event)))
+            filtered-segments (filter-sentinels decompressed)
+            n-messages (f event)
+            state @pipeline-state]
+        (if uuid
+          (if-not (:learned-sentinel state)
+            (do (vote-for-sentinel-leader sync task-node uuid)
+                (let [learned (:uuid (extensions/read-node sync (str task-node impl/sentinel-marker)))]
+                  (swap! pipeline-state assoc :learned-sentinel learned)
+                  (if (= learned uuid)
+                    {:onyx.core/tail-batch? (= n-messages (count decompressed))
+                     :onyx.core/requeue? true
+                     :onyx.core/decompressed filtered-segments}
+                    {:onyx.core/tail-batch? false
+                     :onyx.core/requeue? false
+                     :onyx.core/decompressed filtered-segments})))
+            (if (= (:learned-sentinel state) uuid)
+              {:onyx.core/tail-batch? (= n-messages (count decompressed))
+               :onyx.core/requeue? true
+               :onyx.core/decompressed filtered-segments}
+              {:onyx.core/tail-batch? false
+               :onyx.core/requeue? false
+               :onyx.core/decompressed filtered-segments}))
+          {:onyx.core/tail-batch? false
+           :onyx.core/requeue? true
+           :onyx.core/decompressed filtered-segments})))
+    {:onyx.core/tail-batch? false
+     :onyx.core/requeue? false}))
 
 (defn start-lifecycle?
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]

@@ -32,7 +32,10 @@
     ([sync bucket subpath] [(type sync) bucket])
     ([sync bucket subpath content] [(type sync) bucket])))
 
-(defmulti create-node (fn [sync node] (type sync)))
+(defmulti create-node
+  (fn
+    ([sync node] (type sync))
+    ([sync node contents] (type sync))))
 
 (defmulti delete (fn [sync node] (type sync)))
 
@@ -95,6 +98,8 @@
 (defmulti consume-message (fn [queue consumer] (type queue)))
 
 (defmulti read-message (fn [queue message] (type queue)))
+
+(defmulti message-uuid (fn [queue message] (type queue)))
 
 (defmulti ack-message (fn [queue message] (type queue)))
 

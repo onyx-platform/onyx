@@ -8,14 +8,15 @@
               [onyx.extensions :as extensions]
               [taoensso.timbre :refer [debug]]
               [dire.core :refer [with-post-hook!]])
-    (:import [java.security MessageDigest]))
+    (:import [java.util UUID]
+             [java.security MessageDigest]))
 
 (def md5 (MessageDigest/getInstance "MD5"))
 
-(defn requeue-sentinel [queue session ingress-queues]
+(defn requeue-sentinel [queue session ingress-queues uuid]
   (doseq [queue-name ingress-queues]
     (let [p (extensions/create-producer queue session queue-name)]
-      (extensions/produce-message queue p session (.array (fressian/write :done)))
+      (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
       (extensions/close-resource queue p))))
 
 (defn seal-queue [queue queue-names]
@@ -55,7 +56,7 @@
      (let [queue-name (extensions/producer->queue-name queue p)
            task (get queue-name->task queue-name)]
        (if-let [group (get (:hash-group msg) task)]
-         (extensions/produce-message queue p session (:compressed msg) group)
+         (extensions/produce-message queue p session (:compressed msg) {:group group})
          (extensions/produce-message queue p session (:compressed msg))))))
   {:onyx.core/written? true})
 
@@ -78,7 +79,9 @@
 
 (defn requeue-sentinel-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
-  (requeue-sentinel queue session ingress-queues)
+  (let [uuid (or (extensions/message-uuid queue (last (:onyx.core/batch event)))
+                 (UUID/randomUUID))]
+    (requeue-sentinel queue session ingress-queues uuid))
   (merge event {:onyx.core/requeued? true}))
 
 (defn acknowledge-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]

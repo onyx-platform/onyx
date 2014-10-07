@@ -164,7 +164,7 @@
                        (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
                              task-path (extensions/resolve-node sync :task (str job-id))]
                          (doseq [task-node (extensions/children sync task-path)]
-                           (when-not (impl/completed-task? task-node)
+                           (when-not (impl/metadata-task? task-node)
                              (fact (impl/task-complete? sync task-node) => true)))))
 
                 (facts "All peers are idle"
@@ -286,7 +286,7 @@
                 (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
                       task-path (extensions/resolve-node sync :task (str job-id))]
                   (doseq [task-node (extensions/children sync task-path)]
-                    (when-not (impl/completed-task? task-node)
+                    (when-not (impl/metadata-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))
    {:onyx.coordinator/revoke-delay 50000}))
 
