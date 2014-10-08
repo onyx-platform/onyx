@@ -1,4 +1,4 @@
-(ns onyx.peer.grouping-test
+(ns onyx.peer.fn-grouping-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -50,14 +50,14 @@
 (hq-util/create-queue! hq-config out-queue)
 
 (defmethod l-ext/inject-lifecycle-resources
-  :onyx.peer.grouping-test/sum-balance
+  :onyx.peer.fn-grouping-test/sum-balance
   [_ event]
   (let [balance (atom {})]
     {:onyx.core/params [balance]
      :test/balance balance}))
 
 (defmethod l-ext/close-lifecycle-resources
-  :onyx.peer.grouping-test/sum-balance
+  :onyx.peer.fn-grouping-test/sum-balance
   [_ {:keys [test/balance]}]
   (swap! output conj @balance)
   {})
@@ -65,6 +65,9 @@
 (defn sum-balance [state {:keys [name amount] :as segment}]
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
   [])
+
+(defn group-by-name [{:keys [name]}]
+  name)
 
 (def workflow {:in {:sum-balance :out}})
 
@@ -80,10 +83,10 @@
     :onyx/batch-size 1000}
 
    {:onyx/name :sum-balance
-    :onyx/ident :onyx.peer.grouping-test/sum-balance
-    :onyx/fn :onyx.peer.grouping-test/sum-balance
+    :onyx/ident :onyx.peer.fn-grouping-test/sum-balance
+    :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
     :onyx/type :transformer
-    :onyx/group-by-key :name
+    :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}
    

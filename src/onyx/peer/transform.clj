@@ -35,13 +35,16 @@
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
 
-(defn hash-segment [segment]
+(defn hash-value [x]
   (let [md5 (MessageDigest/getInstance "MD5")]
-    (apply str (.digest md5 (.getBytes (pr-str segment) "UTF-8")))))
+    (apply str (.digest md5 (.getBytes (pr-str x) "UTF-8")))))
 
 (defn group-message [segment catalog task]
-  (when-let [k (:onyx/group-by-key (find-task catalog task))]
-    (hash-segment (get segment k))))
+  (let [t (find-task catalog task)]
+    (if-let [k (:onyx/group-by-key t)]
+      (hash-value (get segment k))
+      (when-let [f (:onyx/group-by-fn t)]
+        (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
 (defn compress-segment [next-tasks catalog segment]
   {:compressed (.array (fressian/write segment))
