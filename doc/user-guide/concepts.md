@@ -10,8 +10,6 @@
     - [Catalog](#catalog)
     - [Segment](#segment)
     - [Transformer](#transformer)
-    - [Grouper](#grouper)
-    - [Aggregator](#aggregator)
     - [Plugin](#plugin)
     - [Sentinel](#sentinel)
     - [Coordinator](#coordinator)
@@ -109,14 +107,6 @@ A segment is the smallest unit of data in Onyx. Segments are required to be Cloj
 #### Transformer
 
 A transformer is a function that receives segments and emits segments for further processing.
-
-#### Grouper
-
-A grouper is a function that takes a segment as an argument and emits a value. All segments with the same emitted value are routed to the same node in the cluster on the next task.
-
-#### Aggregator
-
-An aggregator is a function that receives segments with the same grouping value. Aggregators must immediately follow groupers. If a node performing aggregation is partitioned from the cluster during execution, the remaining, unprocessed segments are routed to another node in the cluster.
 
 #### Plugin
 
