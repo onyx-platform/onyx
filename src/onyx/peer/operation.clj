@@ -25,9 +25,10 @@
            onyx.core/pipeline-state onyx.core/task-node] :as event} f]
   (if (= (last decompressed) :done)
     (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-      {:onyx.core/tail-batch? (= (f event) (count decompressed))
-       :onyx.core/requeue? true
-       :onyx.core/decompressed (filter-sentinels decompressed)}
+      (let [n-messages (f event)]
+        {:onyx.core/tail-batch? (= n-messages (count decompressed))
+         :onyx.core/requeue? true
+         :onyx.core/decompressed (filter-sentinels decompressed)})
       (let [uuid (extensions/message-uuid queue (last (:onyx.core/batch event)))
             filtered-segments (filter-sentinels decompressed)
             n-messages (f event)
