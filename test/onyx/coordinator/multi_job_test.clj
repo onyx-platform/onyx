@@ -281,8 +281,8 @@
               task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
           (doseq [task-path task-paths]
             (doseq [task-node (extensions/children sync task-path)]
-              (when-not (impl/completed-task? task-node)
-                (fact (impl/task-complete? sync task-node) => true))))))
+              (when-not (impl/metadata-task? task-node)
+                (fact (impl/metadata-complete? sync task-node) => true))))))
 
        (facts "All peers are idle"
               (doseq [state-path (extensions/bucket sync :peer-state)]

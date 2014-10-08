@@ -15,7 +15,7 @@
   (go (loop []
         (let [consumer (first consumers)
               f #(extensions/consume-message (:onyx.core/queue event) consumer)
-              msgs (doall (take-segments f (:onyx/batch-size (:task-map event))))]
+              msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
         (when (<! halting-ch)
           (recur)))))

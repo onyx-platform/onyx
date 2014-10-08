@@ -7,6 +7,8 @@
 
 (def complete-marker ".complete")
 
+(def sentinel-marker ".sentinel")
+
 (defn serialize-task [task job-id catalog-node workflow-node]
   {:task/id (:id task)
    :task/job-id job-id
@@ -16,13 +18,15 @@
    :task/phase (:phase task)
    :task/consumption (:consumption task)
    :task/ingress-queues (:ingress-queues task)
-   :task/egress-queues (or (vals (:egress-queues task)) [])})
+   :task/egress-queues (or (vals (:egress-queues task)) [])
+   :task/children-links (:egress-queues task)})
 
 (defn task-complete? [sync task-node]
   (extensions/node-exists? sync (str task-node complete-marker)))
 
-(defn completed-task? [task-node]
-  (.endsWith task-node complete-marker))
+(defn metadata-task? [task-node]
+  (or (.endsWith task-node complete-marker)
+      (.endsWith task-node sentinel-marker)))
 
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
@@ -216,7 +220,7 @@
 
 (defn find-incomplete-tasks [sync tasks]
   (filter (fn [task]
-            (and (not (completed-task? task))
+            (and (not (metadata-task? task))
                  (not (task-complete? sync task))))
           tasks))
 

@@ -59,7 +59,7 @@
         task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
     (doseq [task-path task-paths]
       (doseq [task-node (extensions/children sync task-path)]
-        (when-not (impl/completed-task? task-node)
+        (when-not (impl/metadata-task? task-node)
           (fact (impl/task-complete? sync task-node) => true))))))
 
 (defn peer-stack-sequential-ranges
