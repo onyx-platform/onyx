@@ -214,6 +214,10 @@ Time flows from top to bottom.
 
 ![1 Peer dies acking](img/1-peer-dies-acking.png)
 
+#### 1 Peer - dies while acking
+
+![1 Peer dies active](img/1-peer-dies-active.png)
+
 ### Segment Transportation
 
 #### HornetQ Single Server
