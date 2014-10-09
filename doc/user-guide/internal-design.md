@@ -1,3 +1,7 @@
+## Internal Design
+
+This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
@@ -31,10 +35,6 @@
     - [Sentinel Reduction](#sentinel-reduction)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-## Internal Design
-
-This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system.
 
 ### High Level Components
 
