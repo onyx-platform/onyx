@@ -1,6 +1,6 @@
 ## Internal Design
 
-This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a proof or iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad.
+This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a proof nor an iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -52,7 +52,7 @@ A Virtual Peer refers to a single peer process running on a single physical mach
 
 #### ZooKeeper
 
-Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes care of things like CAS, consensus, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers communicate with the Coordinator.
+Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes care of things like CAS, consensus, leader election, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers communicate with the Coordinator.
 
 #### HornetQ
 
@@ -60,7 +60,69 @@ HornetQ is employed for shuttling segments between virtual peers for processing.
 
 ### Cross Entity Communication
 
-#### ZNodes
+ZooKeeper is used to facilitate communication between the Coordinator and each virtual peer. Onyx expects to use the `/onyx` path in ZooKeeper without interference. The structure of this directory looks like the following tree:
+
+- `/onyx`
+  - `/<deployment UUID>`
+    - `/peer`
+      - `/<UUID>`
+    - `/status`
+      - `/<UUID>`
+    - `/task`
+      - `/<UUID>`
+    - `/ack`
+      - `/<UUID>`
+    - `/catalog`
+      - `/<UUID>`
+    - `/job-log`
+      - `/offer-<sequential id>`
+    - `/job`
+      - `/<UUID>`
+    - `/payload`
+      - `/<UUID>`
+    - `/pulse`
+      - `/<UUID>`
+    - `/completion`
+      - `/<UUID>`
+    - `/cooldown`
+      - `/<UUID>`
+    - `/workflow`
+      - `/<UUID>`
+    - `/election`
+      - `/proposal-<sequential id>`
+    - `/plan`
+      - `/<UUID>`
+    - `/seal`
+      - `/<UUID>`
+    - `/exhaust`
+      - `/<UUID>`
+    - `/coordinator`
+      - `/revoke-log`
+        - `/log-entry-<sequential id>`
+      - `/born-log`
+        - `/log-entry-<sequential id>`
+      - `/seal-log`
+        - `/log-entry-<sequential id>`
+      - `/ack-log`
+        - `/log-entry-<sequential id>`
+      - `/death-log`
+        - `/log-entry-<sequential id>`
+      - `/evict-log`
+        - `/log-entry-<sequential id>`
+      - `/offer-log`
+        - `/log-entry-<sequential id>`
+      - `/shutdown-log`
+        - `/log-entry-<sequential id>`
+      - `/exhaust-log`
+        - `/log-entry-<sequential id>`
+      - `/planning-log`
+        - `/log-entry-<sequential id>`
+      - `/complete-log`
+        - `/log-entry-<sequential id>`
+    - `/peer-state`
+      - `/<UUID>`
+    - `/shutdown`
+      - `/<UUID>`
 
 
 ### Virtual Peer States
