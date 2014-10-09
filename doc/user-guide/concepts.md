@@ -118,7 +118,7 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Coordinator
 
-The Coordinator is single node in the cluster responsible for doing distributed coordinator. This node can be made highly available through traditional heart beat techniques as Datomic's transactor does.
+The Coordinator is single node in the cluster responsible for doing distributed coordination. This node can be made highly available through traditional heart beat techniques as Datomic's transactor does.
 
 #### Peer
 
