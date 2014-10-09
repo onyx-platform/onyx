@@ -63,42 +63,42 @@ HornetQ is employed for shuttling segments between virtual peers for processing.
 ZooKeeper is used to facilitate communication between the Coordinator and each virtual peer. Onyx expects to use the `/onyx` path in ZooKeeper without interference. The structure of this directory looks like the following tree (descriptions in-line):
 
 - `/onyx`
-  - `/<deployment UUID>`   # `:onyx/id` in Coordinator and Peer
+  - `/<deployment UUID>` # `:onyx/id` in Coordinator and Peer
     - `/peer`
-      - `/<UUID>`
+      - `/<UUID>` # composite node, pointers to other znodes
     - `/status`
-      - `/<UUID>`
+      - `/<UUID>` # presence signifies that peer should continue to commit to HornetQ
     - `/task`
       - `/<UUID>`
-        - `/task-<sequential-id>`
-        - `/task-<sequential-id>.complete`
+        - `/task-<sequential-id>` # composite node, pointers to znodes about this task
+        - `/task-<sequential-id>.complete` # marker node, signifies that task is complete
     - `/ack`
-      - `/<UUID>`
+      - `/<UUID>` # peer touches this znode to acknowledge task acceptance
     - `/catalog`
-      - `/<UUID>`
+      - `/<UUID>` # data node for the catalog
     - `/job-log`
-      - `/offer-<sequential id>`
+      - `/offer-<sequential id>` # durable log of job IDs to do round-robin job dispersal
     - `/job`
-      - `/<UUID>`
+      - `/<UUID>` # composite node, pointers to other znodes about this job
     - `/payload`
-      - `/<UUID>`
+      - `/<UUID>` # composite node, pointers to other znodes about this payload for a task
     - `/pulse`
-      - `/<UUID>`
+      - `/<UUID>` # ephemeral node for a peer to signify that it is still online
     - `/completion`
-      - `/<UUID>`
+      - `/<UUID>` # peer touches this znode to signal that its finished with its task
     - `/cooldown`
-      - `/<UUID>`
+      - `/<UUID>` # peer listens on this node for response from Coordinator about completion
     - `/workflow`
-      - `/<UUID>`
+      - `/<UUID>` # data node for the workflow
     - `/election`
-      - `/proposal-<sequential id>`
+      - `/proposal-<sequential id>` # leader election nodes for stand-by Coordinators
     - `/plan`
-      - `/<UUID>`
+      - `/<UUID>` # Durable log of jobs to submit to the Coordinator
     - `/seal`
-      - `/<UUID>`
+      - `/<UUID>` # Peer touches this node to signal that it can seal the next queue
     - `/exhaust`
-      - `/<UUID>`
-    - `/coordinator`
+      - `/<UUID>` # Peer listens to this node for response from Coordinator about sealing
+    - `/coordinator` # Durable log entries of all the prior actions for fault tolerance
       - `/revoke-log`
         - `/log-entry-<sequential id>`
       - `/born-log`
@@ -123,8 +123,9 @@ ZooKeeper is used to facilitate communication between the Coordinator and each v
         - `/log-entry-<sequential id>`
     - `/peer-state`
       - `/<UUID>`
+        - `/state-<sequential id>` # Data node for state of the peer
     - `/shutdown`
-      - `/<UUID>`
+      - `/<UUID>` # Peer listens to this node, shuts down on trigger
 
 ### Virtual Peer States
 
