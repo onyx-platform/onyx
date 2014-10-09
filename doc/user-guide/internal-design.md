@@ -2,19 +2,6 @@
 
 This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-- [Internal Design](#internal-design)
-  - [High Level Components](#high-level-components)
-      - [Coordinator](#connect)
-      - [Peer](#peer)
-      - [Virtual Peer](#virtual-peer)
-      - [ZooKeeper](#zookeeper)
-      - [HornetQ](#hornetq)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-
 ### High Level Components
 
 #### Coordinator
@@ -26,4 +13,53 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 #### ZooKeeper
 
 #### HornetQ
+
+### Cross Entity Communication
+
+#### ZNodes
+
+
+### Virtual Peer States
+
+#### Description
+
+
+#### State Transitions
+
+
+#### Transition Circumstances
+
+
+### Coordinator Event Handling
+
+#### Serial Execution
+
+#### Fault Tolerant Logging
+
+#### Timeouts
+
+### Coordinator/Virtual Peer Interaction
+
+### Segment Transportation
+
+#### HornetQ Single Server
+
+#### HornetQ Cluster
+
+<Symetric clustering, session per thread, message offloading, load balancing>
+
+### Virtual Peer Task Execution
+
+#### Phases of Execution
+
+#### Pipelining
+
+#### Local State
+
+### Sentinel Values in a Distributed Setting
+
+#### Sentinel-in-the-Middle
+
+#### Sentinel Reduction
+
 
