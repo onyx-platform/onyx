@@ -202,13 +202,17 @@ This section captures the interactions between the Coordinator and a peer under 
 
 Time flows from top to bottom.
 
-#### 1 Peer, Happy Path
+#### 1 Peer - happy path
 
 ![1 Peer 1 Task](img/1-peer-1-task.png)
 
-#### 1 Peer Times Out Acking
+#### 1 Peer - times out while acking
 
-![1 Peer Times out](img/1-peer-times-out.png)
+![1 Peer times out](img/1-peer-times-out.png)
+
+#### 1 Peer - dies while acking
+
+![1 Peer dies acking](img/1-peer-dies-acking.png)
 
 ### Segment Transportation
 
