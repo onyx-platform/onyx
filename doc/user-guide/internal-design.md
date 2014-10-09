@@ -138,16 +138,48 @@ The peer states are:
 - `:idle` - Peer is not allocated to a task
 - `:acking` - Peer is deciding whether it wants to accept a task given to it by the Coordinator
 - `:active` - Peer is executing a task
-- `:waiting` - Peer has finished executing a task, but other peers are still finishing the same task. Cannot yet be reallocated to `:idle`.
+- `:waiting` - Peer has finished executing a task, but other peers are still finishing the same task. Cannot yet be reallocated to `:idle`, otherwise peer would continuously be allocated and removed from the same task.
 - `:sealing` - Peer is propagating the sentinel onto the task's egress queues.
 - `:revoked` - Peer has had its task taken away from it. Peer will shortly be killed off by the Coordinator.
 - `:dead` - Peer has crashed, and may not receive any more tasks.
 
 #### State Transitions
 
+Peer states transition to new states. The transitions are specified below.
 
-#### Transition Circumstances
+- An `:idle` peer may transition to:
+  - `:acking`: Peer is given a task by the Coordinator
+  - `:dead`: Peer crashes
+  - `:idle`: Stand-by Coordinator wakes up and replays log entries
 
+- An `:acking` peer may transition to:
+  - `:active`: Peer acknowledges a task from the Coordinator
+  - `:revoked`: Peer fails to acknowledge a task before the Coordinator times out
+  - `:dead`: Peer crashes
+  - `:acking`: Stand-by Coordinator wakes up and replays log entries
+
+- An `:active` peer may transition to:
+  - `:sealing`: Peer reads the sentinel from an ingress queue, and the ingress queue is depleted
+  - `:waiting`: Peer reades the sentinel value from an ingress queue, and the ingress queue is depleted, but other peers are `:acking` or `:active`.
+  - `:dead`: Peer crashes
+  - `:active`: Stand-by Coordinator wakes up and replays log entries
+
+- A `:waiting` peer may transition to:
+  - `:idle`: Other peers completing the same task finish or crash
+  - `:dead`: Peer crashes
+  - `:waiting`: Stand-by Coordinator wakes up and replays log entries
+
+- A `:sealing` peer may transition to:
+  - `:idle`: Peer tells Coordinate that the task is complete, and no other peers are `:acking` or `:active` on the same task
+  - `:dead`: Peer crashes
+  - `:sealing`: Stand-by Coordinator wakes up and replays log entries
+
+- A `:revoked` peer may transition to:
+  - `:dead`: Peer crashes or Coordinator manually kills off peer
+  - `:revoked`: Stand-by Coordinator wakes up and replays log entries
+
+- A `:dead` peer may transition to:
+  - `:dead`: Stand-by Coordinator wakes up and replays log entries
 
 ### Coordinator Event Handling
 
