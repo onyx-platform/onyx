@@ -1,6 +1,6 @@
 ## Internal Design
 
-This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system.
+This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a proof or iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -8,7 +8,7 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 - [Internal Design](#internal-design)
   - [High Level Components](#high-level-components)
     - [Coordinator](#coordinator)
-    - [Peeer](#peeer)
+    - [Peer](#peer)
     - [Virtual Peer](#virtual-peer)
     - [ZooKeeper](#zookeeper)
     - [HornetQ](#hornetq)
@@ -40,13 +40,23 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 
 #### Coordinator
 
-#### Peeer
+The Coordinator is single node in the cluster responsible for doing distributed coordination. It receives jobs from Onyx clients, assigns work to peers, and handles peer failure.
+
+#### Peer
+
+A Peer is a node in the cluster responsible for processing data. It is similar to Storm's Worker node. A peer generally refers to a physical machine, though in the documentation, "peer" and "virtual peer" are often used interchangeably.
 
 #### Virtual Peer
 
+A Virtual Peer refers to a single peer process running on a single physical machine. Each virtual peer spawns about 15 threads to support itself since it is a pipelined process. The Coordinator sees all virtual peers as equal, whether they are on the same physical peer or not. Virtual peers *never* communicate with each other - they only communicate with the Coordinator.
+
 #### ZooKeeper
 
+Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes care of things like CAS, consensus, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers communicate with the Coordinator.
+
 #### HornetQ
+
+HornetQ is employed for shuttling segments between virtual peers for processing. HornetQ is a queueing platform from the JBoss stack. HornetQ queues can cluster for scalability.
 
 ### Cross Entity Communication
 
