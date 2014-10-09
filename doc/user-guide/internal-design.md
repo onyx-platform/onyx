@@ -290,6 +290,14 @@ During client side load balancing, messages can be read in a variety of ways. Be
 
 ![Client side load balacing](img/client-side-load-balancing.png)
 
+#### Message Dispersal Under Failure
+
+As long as a HornetQ consumer is connected to a queue on a HornetQ server, it will be included in the round-robin message load balancing. If, however, the consumer disconnects and there are no other consumers, that queues messages are sent to another queue in the cluster. This prevents consumers on other queues being starved if they cannot access the messages on a machine with no open consumers. The messages are stacked on the back of other queues, again in a load balanced fashion:
+
+![Peer failure reorder](img/peer-failure-reorder.png)
+
+
+
 ### Virtual Peer Task Execution
 
 #### Phases of Execution
