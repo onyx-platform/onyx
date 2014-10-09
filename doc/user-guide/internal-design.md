@@ -1,6 +1,6 @@
 ## Internal Design
 
-This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a proof nor an iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad.
+This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a formal proof nor an iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -226,7 +226,21 @@ Time flows from top to bottom.
 
 ![1 Peer dies completing](img/1-peer-dies-completing.png)
 
+#### 2 Peers - 1 waits
 
+![1 Peer waits](img/2-peers-1-waits.png)
+
+#### 2 Peers - 1 joins while sealing
+
+![1 Peer joins sealing](img/2-peers-1-joins-while-sealing.png)
+
+#### 2 Peers - 1 joins late and dies
+
+![1 Peer joins and dies](img/2-peers-1-joins-late.png)
+
+#### 2 Peers - 1 dies while sealing
+
+![1 Peer dies sealing](img/2-peers-1-dies-sealing.png)
 
 ### Segment Transportation
 
