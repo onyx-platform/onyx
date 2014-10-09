@@ -191,7 +191,7 @@ Peer states transition to new states. The transitions are specified below.
 
 ### Coordinator/Virtual Peer Interaction
 
-This section captures the interactions between the Coordinator and a peer under a variety of interesting circumstances.
+This section captures the interactions between the Coordinator and a peer under a variety of interesting circumstances. In particular, I try to show how Onyx is able to recover in the face of crashed peers at very specific points in time.
 
 #### Notation
 
@@ -202,9 +202,13 @@ This section captures the interactions between the Coordinator and a peer under 
 
 Time flows from top to bottom.
 
-- 1 Peer, Happy Path
+#### 1 Peer, Happy Path
 
 ![1 Peer 1 Task](img/1-peer-1-task.png)
+
+#### 1 Peer Times Out Acking
+
+![1 Peer Times out](img/1-peer-times-out.png)
 
 ### Segment Transportation
 
