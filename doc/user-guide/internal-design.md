@@ -222,6 +222,11 @@ Time flows from top to bottom.
 
 ![1 Peer dies sealing](img/1-peer-dies-sealing.png)
 
+#### 1 Peer - dies while completing
+
+![1 Peer dies completing](img/1-peer-dies-completing.png)
+
+
 
 ### Segment Transportation
 
