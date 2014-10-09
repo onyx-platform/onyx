@@ -260,11 +260,35 @@ Time flows from top to bottom.
 
 ### Segment Transportation
 
+Onyx uses HornetQ to move segments between virtual peers. HornetQ queue's are constructed between every link in a workflow.
+
+For example, `{:in {:inc :out}}` is transformed into the following queueing topology:
+
+`<queue> <- in -> <queue> <- inc -> <queue> <- out -> <queue>`
+
+All tasks have exactly one ingress queue, and at least one egress queue. Each egress queue is an ingress queue to the next task, if there is a next task.
+
 #### HornetQ Single Server
+
+Using a single HornetQ server, we are garunteed ordering of messages. Peers connect to the HornetQ server and consume messages.
 
 #### HornetQ Cluster
 
-<Symetric clustering, session per thread, message offloading, load balancing>
+In order to scale, we need a *cluster* of queues between each link the workflow. Using one queue would limit the network bandwidth to move data. HornetQ itself implements clustering, and some useful facts to know are:
+
+- Each server in the cluster holds *its own* queue that participates in the cluster.
+- Servers use *symetric* clustering. Every HornetQ server knows about every other HornetQ server.
+- Producing messages onto a clustered queue will load balance them round-robin across all queues in the cluster.
+- Consuming messages from a clustered queue will read them round-robin from all queues in the cluster.
+- Producing and consuming messages happens in the context of a transaction.
+- Transactions happen in the context of a HornetQ *session*.
+- A session may be only manipulated by one thread at a time.
+
+#### Client Side Load Balancing
+
+During client side load balancing, messages can be read in a variety of ways. Below, we see a peer reading off of two HornetQ servers. Messages can be read starting at either server, causing at least two different streams of messages to be read. Round robin isn't a promise, though. The network may hiccup, and we might see messages in a completely jumbled up stream. Note, though, that individual queue messages are consistently ordered.
+
+![Client side load balacing](client-side-load-balancing)
 
 ### Virtual Peer Task Execution
 
