@@ -38,6 +38,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [APIs](doc/user-guide/apis.md)
 - [Constraints](doc/user-guide/constraints.md)
 - [Architecture](doc/user-guide/architecture.md)
+- [Internal Design](doc/user-guide/internal-design.md)
 - [Coordinator and Peer Configuration](doc/user-guide/coord-peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
