@@ -288,7 +288,7 @@ In order to scale, we need a *cluster* of queues between each link the workflow.
 
 During client side load balancing, messages can be read in a variety of ways. Below, we see a peer reading off of two HornetQ servers. Messages can be read starting at either server, causing at least two different streams of messages to be read. Round robin isn't a promise, though. The network may hiccup, and we might see messages in a completely jumbled up stream. Note, though, that individual queue messages are consistently ordered.
 
-![Client side load balacing](client-side-load-balancing)
+![Client side load balacing](img/client-side-load-balancing.png)
 
 ### Virtual Peer Task Execution
 
