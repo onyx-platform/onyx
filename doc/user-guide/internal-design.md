@@ -298,11 +298,33 @@ As long as a HornetQ consumer is connected to a queue on a HornetQ server, it wi
 
 ### Virtual Peer Task Execution
 
+One virtual peer may be executing at most executing one task. This section describes what activies the peer carries out during execution.
+
 #### Phases of Execution
+
+- Inject resources: Creates HornetQ session and opens transaction
+- Read message batch: consumers messages off of HornetQ
+- Decompress message batch: Uses Fressian's reader to obtain EDN maps of segments
+- Strip sentinel: removes sentinel from decompressed batch if present
+- Requeue sentine: Requeues the sentinel on the ingress queue if it is the leader
+- Apply function: Apply fns to batches of segments
+- Compress message batch: Uses Fressian's writer to compress segments to bytes
+- Write message batch: Writes messages to HornetQ
+- Status check: Consults with ZooKeeper about this peer's liveness
+- Ack message batch: Acknowledges received messages from HornetQ
+- Commit transaction: Commits the transaction to HornetQ
+- Close resources: Closes open connections and sockets
+- Reset payload: Rotates the znode this virtual peer is listening on for new tasks
+- Seal egress queue: If this virtual peer is allowed, propagates the sentinel to the egress queues
+- Update local listeners: Rotates listeners for ZooKeeper for the next task
 
 #### Pipelining
 
+HornetQ sessions are *not* thread safe, but Onyx plays the same game that Datomic's transactor does. Virtual peer processes are extensively pipelined - about 15 threads in length. HornetQ sessions are created at the head of the pipeline and passed through each section of the pipeline. Each thread is responsible for exactly one of the activies described above. Hence, performance can be increased while maintaining the safety that no more than one thread is operating on a HornetQ session at a given time. The pipeline is constructed with core.async channels.
+
 #### Local State
+
+Each virtual peer has one atom that it uses for local state. It is a map that has a key for whether it has ever asked the Coordinator to seal, and a key for what the sentinel leader is. The latter is used as a local cache, whereas the former is used to avoid deadlock. Virtual peers can ask to seal exactly once. The Coordinator will ignore subsequent requests to seal. Since this process is pipelined, we need a way to convey this information *backwards* through the pipeline. The shared atom accomplishes this.
 
 ### Sentinel Values in a Distributed Setting
 
