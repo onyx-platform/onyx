@@ -62,7 +62,6 @@ HornetQ is employed for shuttling segments between virtual peers for processing.
 
 ZooKeeper is used to facilitate communication between the Coordinator and each virtual peer. Onyx expects to use the `/onyx` path in ZooKeeper without interference. The structure of this directory looks like the following tree (descriptions in-line):
 
-```
 - `/onyx`
   - `/<deployment UUID>`   # `:onyx/id` in Coordinator and Peer
     - `/peer`
@@ -126,7 +125,6 @@ ZooKeeper is used to facilitate communication between the Coordinator and each v
       - `/<UUID>`
     - `/shutdown`
       - `/<UUID>`
-```
 
 ### Virtual Peer States
 
