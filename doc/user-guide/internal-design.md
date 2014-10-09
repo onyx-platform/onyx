@@ -296,8 +296,6 @@ As long as a HornetQ consumer is connected to a queue on a HornetQ server, it wi
 
 ![Peer failure reorder](img/peer-failure-reorder.png)
 
-
-
 ### Virtual Peer Task Execution
 
 #### Phases of Execution
@@ -311,5 +309,7 @@ As long as a HornetQ consumer is connected to a queue on a HornetQ server, it wi
 #### Sentinel-in-the-Middle
 
 #### Sentinel Reduction
+
+![Election](img/election.png)
 
 
