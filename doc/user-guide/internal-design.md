@@ -191,6 +191,21 @@ Peer states transition to new states. The transitions are specified below.
 
 ### Coordinator/Virtual Peer Interaction
 
+This section captures the interactions between the Coordinator and a peer under a variety of interesting circumstances.
+
+#### Notation
+
+- "/": Right-way black-slash indicates blocking. No forward progress happens until the next message is received.
+- "C": Coordinator
+- "P", "P1", "P2": Peers
+- "Green box": Peer state as known by the Coordinator
+
+Time flows from top to bottom.
+
+- 1 Peer, Happy Path
+
+![1 Peer 1 Task](img/1-peer-1-task.png)
+
 ### Segment Transportation
 
 #### HornetQ Single Server
