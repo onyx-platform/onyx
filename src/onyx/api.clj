@@ -52,7 +52,7 @@
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
                                 flatten-workflow 
-                                (filter (complement (set (map :onyx/name catalog))))
+                                (remove (set (map :onyx/name catalog)))
                                 seq)]
     (throw (Exception. (str "Catalog is missing :onyx/name values " 
                             "for the following workflow keywords: " 
