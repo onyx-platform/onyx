@@ -1,3 +1,7 @@
+#### 0.3.4
+
+- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
+
 #### 0.3.3
 
 - Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/MichaelDrogalis/onyx/issues/18)
