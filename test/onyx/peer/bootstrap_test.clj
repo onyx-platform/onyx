@@ -76,6 +76,63 @@
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size 5}])
 
+(def illegal-catalog ["not" "a" "catalog"])
+
+(def illegal-input-catalog
+  [{:onyx/name :in-bootstrapped
+    :onyx/type :input 
+    :onyx/consumption :concurrent
+    :onyx/bootstrap? true
+    :onyx/batch-size 2}])
+
+(def illegal-output-catalog
+  [{:onyx/name :in-bootstrapped
+    :onyx/type :output 
+    :onyx/consumption :concurrent
+    :onyx/bootstrap? true
+    :onyx/batch-size 2}])
+
+(def illegal-transformer-catalog
+   [{:onyx/name :inc 
+    :onyx/type :transformer
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
+(def illegal-grouper-catalog
+   [{:onyx/name :inc 
+    :onyx/type :grouper
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
+(def illegal-aggregator-catalog
+   [{:onyx/name :inc 
+    :onyx/type :aggregator
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
+(def incomplete-catalog
+  [{:onyx/name :in-bootstrapped
+    :onyx/type :input
+    :onyx/medium :onyx-memory-test-plugin
+    :onyx/consumption :concurrent
+    :onyx/bootstrap? true
+    :onyx/batch-size 2}])
+
+
+(fact (onyx.api/submit-job conn {:catalog illegal-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog illegal-input-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog illegal-output-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog illegal-transformer-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog illegal-grouper-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog illegal-aggregator-catalog :workflow workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog incomplete-catalog :workflow workflow}) => (throws Exception))
+
 (def v-peers (onyx.api/start-peers conn 1 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
