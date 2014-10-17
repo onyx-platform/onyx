@@ -89,6 +89,7 @@
 (deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
+    (validate-workflow-names job)
     (let [leader (extensions/leader (:sync conn) :election)
           data (extensions/read-node (:sync conn) leader)
           uri (format "http://%s:%s/submit-job" (:host data) (:port data))
