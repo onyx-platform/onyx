@@ -6,7 +6,8 @@
             [taoensso.timbre :refer [warn]]
             [onyx.coordinator.impl :as impl]
             [onyx.system :as system]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.validation :as validator]))
 
 (defprotocol ISubmit
   "Protocol for sending a job to the coordinator for execution."
@@ -40,30 +41,12 @@
             (do (<!! ch)
                 (recur))))))))
 
-(defn flatten-workflow [workflow]
-  (concat (keys workflow)
-          (mapcat (fn [v]
-                    (if (map? v)
-                      (flatten-workflow v)
-                      (list v)))
-            (vals workflow))))
-
-
-(defn validate-workflow-names [{:keys [workflow catalog]}]
-  (when-let [missing-names (->> workflow
-                                flatten-workflow 
-                                (remove (set (map :onyx/name catalog)))
-                                seq)]
-    (throw (Exception. (str "Catalog is missing :onyx/name values " 
-                            "for the following workflow keywords: " 
-                            (apply str (interpose ", " missing-names)))))))
-
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (validate-workflow-names job)
+    (validator/validate-job job)
     (let [ch (chan 1)
           node (extensions/create (:sync onyx-coord) :plan)
           cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
@@ -89,7 +72,7 @@
 (deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
-    (validate-workflow-names job)
+    (validator/validate-job job)
     (let [leader (extensions/leader (:sync conn) :election)
           data (extensions/read-node (:sync conn) leader)
           uri (format "http://%s:%s/submit-job" (:host data) (:port data))
