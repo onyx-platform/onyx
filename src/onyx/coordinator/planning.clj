@@ -1,5 +1,6 @@
 (ns onyx.coordinator.planning
-  (:require [onyx.extensions :as extensions])
+  (:require [com.stuartsierra.dependency :as dep]
+            [onyx.extensions :as extensions])
   (:import [java.util UUID]))
 
 (defn only [coll]
@@ -15,76 +16,78 @@
 (defn onyx-queue-name []
   (str "onyx." (UUID/randomUUID)))
 
-(defn egress-queues-to-children [elements]
+(defn ingress-queues-from-parents [parents task-name]
+  (into {} (map #(hash-map (:name %) (get (:egress-queues %) task-name)) parents)))
+
+(defn egress-queues-from-children [elements]
   (into {} (map #(hash-map (:onyx/name %) (onyx-queue-name)) elements)))
 
 (defmulti create-task
-  (fn [catalog task-name parent children-names phase]
+  (fn [catalog task-name parents children-names]
     (:onyx/type (find-task catalog task-name))))
 
 (defmethod create-task :default
-  [catalog task-name parent children-names phase]
+  [catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
-    (extensions/create-io-task element parent children phase)))
+    (extensions/create-io-task element parents children)))
 
-(defn onyx-internal-task [catalog task-name parent children-names phase]
+(defn onyx-function-task [catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
     {:id (UUID/randomUUID)
      :name (:onyx/name element)
-     :ingress-queues (get (:egress-queues parent) task-name)
-     :egress-queues (egress-queues-to-children children)
-     :phase phase
+     :ingress-queues (ingress-queues-from-parents parents task-name)
+     :egress-queues (egress-queues-from-children children)
      :consumption (:onyx/consumption element)}))
 
 (defmethod create-task :transformer
-  [catalog task-name parent children-names phase]
-  (onyx-internal-task catalog task-name parent children-names phase))
+  [catalog task-name parents children-names]
+  (onyx-function-task catalog task-name parents children-names))
 
 (defmethod create-task :grouper
-  [catalog task-name parent children-names phase]
-  (onyx-internal-task catalog task-name parent children-names phase))
+  [catalog task-name parents children-names]
+  (onyx-function-task catalog task-name parents children-names))
 
 (defmethod create-task :aggregator
-  [catalog task-name parent children-names phase]
-  (onyx-internal-task catalog task-name parent children-names phase))
+  [catalog task-name parents children-names]
+  (onyx-function-task catalog task-name parents children-names))
 
 (defmethod extensions/create-io-task :input
-  [element parent children phase]
+  [element parent children]
   {:id (UUID/randomUUID)
    :name (:onyx/name element)
    :ingress-queues (onyx-queue-name)
-   :egress-queues (egress-queues-to-children children)
-   :phase phase
+   :egress-queues (egress-queues-from-children children)
    :consumption (:onyx/consumption element)})
 
 (defmethod extensions/create-io-task :output
-  [element parent children phase]
-  {:id (UUID/randomUUID)
-   :name (:onyx/name element)
-   :ingress-queues (get (:egress-queues parent) (:onyx/name element))
-   :egress-queues {:self (onyx-queue-name)}
-   :phase phase
-   :consumption (:onyx/consumption element)})
+  [element parents children]
+  (let [task-name (:onyx/name element)]
+    {:id (UUID/randomUUID)
+     :name (:onyx/name element)
+     :ingress-queues (ingress-queues-from-parents parents task-name)
+     :egress-queues {:self (onyx-queue-name)}
+     :consumption (:onyx/consumption element)}))
 
-(defn children [tree]
-  (if (map? tree)
-    (keys tree)
-    (vector tree)))
+(defn to-dependency-graph [workflow]
+  (reduce (fn [g edge]
+            (apply dep/depend g (reverse edge)))
+          (dep/graph) workflow))
 
-(defn discover-tasks
-  ([catalog workflow] (distinct (discover-tasks catalog workflow [] nil 1)))
-  ([catalog workflow tasks parent phase]
-     (if (keyword? workflow) (conj tasks (create-task catalog workflow parent [] phase))
-         (let [roots (keys workflow)]
-           (mapcat
-            (fn [root]
-              (let [child-tree (get workflow root)
-                    root-task (create-task catalog root parent (children child-tree) phase)
-                    new-tasks (conj tasks root-task)]
-                (discover-tasks catalog child-tree new-tasks root-task (inc phase))))
-            roots)))))
+(defn discover-tasks [catalog workflow]
+  (let [dag (to-dependency-graph workflow)
+        sorted-dag (dep/topo-sort dag)]
+    (map-indexed
+     #(assoc %2 :phase %1)
+     (reduce
+      (fn [tasks element]
+        (let [parents (dep/immediate-dependencies dag element)
+              children (dep/immediate-dependents dag element)
+              parent-entries (filter #(some #{(:name %)} parents) tasks)]
+          (conj tasks (create-task catalog element parent-entries children))))
+      []
+      sorted-dag))))
 
 (defn unpack-map-workflow
   ([workflow] (unpack-map-workflow workflow []))

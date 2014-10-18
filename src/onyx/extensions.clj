@@ -127,6 +127,6 @@
 (defmulti producer->queue-name (fn [queue queue-name] (type queue)))
 
 (defmulti create-io-task
-  (fn [element parent children phase]
+  (fn [element parents children]
     (:onyx/type element)))
 

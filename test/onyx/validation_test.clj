@@ -86,6 +86,10 @@
 
 (fact (onyx.api/submit-job conn {:catalog incomplete-catalog :workflow workflow}) => (throws Exception))
 
+(try
+  (onyx.api/shutdown conn)
+  (catch Exception e (prn e)))
+
 (fact (unpack-map-workflow {:a :b}) => [[:a :b]])
 (fact (unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
 (fact (unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
@@ -100,43 +104,57 @@
            [:g :h]})
 
 (let [catalog
-      [{:onyx/name :in
-        :onyx/ident :hornetq/read-segments
+      [{:onyx/name :a
         :onyx/type :input
         :onyx/medium :hornetq
         :onyx/consumption :concurrent}
 
-       {:onyx/name :inc
-        :onyx/fn :onyx.peer.single-peer-test/my-inc
+       {:onyx/name :b
+        :onyx/type :input
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :c
         :onyx/type :transformer
         :onyx/consumption :concurrent}
 
-       {:onyx/name :out
-        :onyx/ident :hornetq/write-segments
+       {:onyx/name :d
+        :onyx/type :transformer
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :e
+        :onyx/type :transformer
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :f
+        :onyx/type :transformer
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :g
         :onyx/type :output
         :onyx/medium :hornetq
         :onyx/consumption :concurrent}]
-      workflow {:in {:inc :out}}
+      workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
       tasks (onyx.coordinator.planning/discover-tasks catalog workflow)
-      in (first (filter (fn [t] (= (:name t) :in)) tasks))
-      inc (first (filter (fn [t] (= (:name t) :inc)) tasks))
-      out (first (filter (fn [t] (= (:name t) :out)) tasks))]
 
-  (fact "There are 3 tasks"
-        (count tasks) => 3)
+      [a b c d e f g :as sorted-tasks]
+      (reduce (fn [all next]
+                (conj all (first (filter #(= (:name %) next) tasks))))
+              [] [:a :b :c :d :e :f :g])]
 
-  (facts ":in comes first, then :inc, then :out"
-         (fact (:phase in) => 1)
-         (fact (:phase inc) => 2)
-         (fact (:phase out) => 3))
+  (fact "There are 7 tasks"
+        (count tasks) => 7)
 
-  (fact ":in's egress queue to :inc is :inc's ingress queue"
-        (:inc (:egress-queues in)) => (:ingress-queues inc))
+  (fact "The tasks are topologically sorted into phases"
+        (map :phase sorted-tasks) => (range 7))
 
-  (fact ":inc's egress queue to :out is :out's ingress queue"
-        (:out (:egress-queues inc)) => (:ingress-queues out))
+  (fact (:f (:egress-queues a)) => (:a (:ingress-queues f)))
+  (fact (:c (:egress-queues b)) => (:b (:ingress-queues c)))
+  (fact (:d (:egress-queues c)) => (:c (:ingress-queues d)))
+  (fact (:e (:egress-queues d)) => (:d (:ingress-queues e)))
+  (fact (:f (:egress-queues e)) => (:e (:ingress-queues f)))
+  (fact (:g (:egress-queues f)) => (:f (:ingress-queues g)))
 
-  (fact ":in has an ingress queue" (:ingress-queues in) =not=> nil?)
-
-  (fact ":out has an egress queue" (:egress-queues out) =not=> empty?))
+  (fact ":a has an ingress queue" (:ingress-queues a) =not=> nil?)
+  (fact ":b has an ingress queue" (:ingress-queues b) =not=> nil?)
+  (fact ":g has an egress queue" (:egress-queues g) =not=> empty?))
 

@@ -12,6 +12,7 @@
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
                  [org.hornetq/hornetq-server "2.4.0.Final"]
                  [org.apache.curator/curator-test "2.6.0"]
+                 [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
                  [javax.servlet/servlet-api "2.5"]
