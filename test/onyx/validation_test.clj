@@ -3,6 +3,7 @@
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.coordinator.planning :refer [unpack-map-workflow]]
             [onyx.api]))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
@@ -84,4 +85,17 @@
 (fact (onyx.api/submit-job conn {:catalog illegal-aggregator-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog incomplete-catalog :workflow workflow}) => (throws Exception))
+
+(fact (unpack-map-workflow {:a :b}) => [[:a :b]])
+(fact (unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
+(fact (unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
+(fact (unpack-map-workflow {:a {:b :c :d :e}}) => [[:a :b] [:a :d] [:b :c] [:d :e]])
+
+(fact (into #{} (unpack-map-workflow {:a {:b :c} :d {:e :f :g :h}}))
+      => #{[:a :b]
+           [:b :c]
+           [:d :e]
+           [:d :g]
+           [:e :f]
+           [:g :h]})
 
