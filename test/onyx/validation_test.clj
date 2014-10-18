@@ -99,3 +99,44 @@
            [:e :f]
            [:g :h]})
 
+(let [catalog
+      [{:onyx/name :in
+        :onyx/ident :hornetq/read-segments
+        :onyx/type :input
+        :onyx/medium :hornetq
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :inc
+        :onyx/fn :onyx.peer.single-peer-test/my-inc
+        :onyx/type :transformer
+        :onyx/consumption :concurrent}
+
+       {:onyx/name :out
+        :onyx/ident :hornetq/write-segments
+        :onyx/type :output
+        :onyx/medium :hornetq
+        :onyx/consumption :concurrent}]
+      workflow {:in {:inc :out}}
+      tasks (onyx.coordinator.planning/discover-tasks catalog workflow)
+      in (first (filter (fn [t] (= (:name t) :in)) tasks))
+      inc (first (filter (fn [t] (= (:name t) :inc)) tasks))
+      out (first (filter (fn [t] (= (:name t) :out)) tasks))]
+
+  (fact "There are 3 tasks"
+        (count tasks) => 3)
+
+  (facts ":in comes first, then :inc, then :out"
+         (fact (:phase in) => 1)
+         (fact (:phase inc) => 2)
+         (fact (:phase out) => 3))
+
+  (fact ":in's egress queue to :inc is :inc's ingress queue"
+        (:inc (:egress-queues in)) => (:ingress-queues inc))
+
+  (fact ":inc's egress queue to :out is :out's ingress queue"
+        (:out (:egress-queues inc)) => (:ingress-queues out))
+
+  (fact ":in has an ingress queue" (:ingress-queues in) =not=> nil?)
+
+  (fact ":out has an egress queue" (:egress-queues out) =not=> empty?))
+
