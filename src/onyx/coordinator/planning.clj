@@ -57,7 +57,7 @@
   [element parent children]
   {:id (UUID/randomUUID)
    :name (:onyx/name element)
-   :ingress-queues (onyx-queue-name)
+   :ingress-queues {:self (onyx-queue-name)}
    :egress-queues (egress-queues-from-children children)
    :consumption (:onyx/consumption element)})
 
