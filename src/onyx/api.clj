@@ -6,7 +6,8 @@
             [taoensso.timbre :refer [warn]]
             [onyx.coordinator.impl :as impl]
             [onyx.system :as system]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.validation :as validator]))
 
 (defprotocol ISubmit
   "Protocol for sending a job to the coordinator for execution."
@@ -45,6 +46,7 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
+    (validator/validate-job job)
     (let [ch (chan 1)
           node (extensions/create (:sync onyx-coord) :plan)
           cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
@@ -70,6 +72,7 @@
 (deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
+    (validator/validate-job job)
     (let [leader (extensions/leader (:sync conn) :election)
           data (extensions/read-node (:sync conn) leader)
           uri (format "http://%s:%s/submit-job" (:host data) (:port data))

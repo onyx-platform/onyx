@@ -4,9 +4,14 @@
 - Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation.
 - Fix for peer live lock on task completion. [#23](https://github.com/MichaelDrogalis/onyx/issues/23)
 
+#### 0.3.4
+
+- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
+- `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/MichaelDrogalis/onyx/issues/3)
+
 #### 0.3.3
 
-- Fixes a scenario where a virtual peer can deadlock on task completion. (#18)
+- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/MichaelDrogalis/onyx/issues/18)
 
 #### 0.3.2
 
