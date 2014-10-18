@@ -41,6 +41,11 @@
             (do (<!! ch)
                 (recur))))))))
 
+(defn unpack-workflow [workflow]
+  (if (map? workflow)
+    (onyx.coordinator.planning/unpack-map-workflow workflow)
+    workflow))
+
 ;; A coordinator that runs strictly in memory. Peers communicate with
 ;; the coordinator by directly accessing its channels.
 (deftype InMemoryCoordinator [onyx-coord]
@@ -49,7 +54,8 @@
     (validator/validate-job job)
     (let [ch (chan 1)
           node (extensions/create (:sync onyx-coord) :plan)
-          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
+          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))
+          job (update-in job [:workflow] unpack-workflow)]
       (extensions/on-change (:sync onyx-coord) (:node node) cb)
       (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
       (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
@@ -73,7 +79,8 @@
   ISubmit
   (submit-job [this job]
     (validator/validate-job job)
-    (let [leader (extensions/leader (:sync conn) :election)
+    (let [job (update-in job [:workflow] unpack-workflow)
+          leader (extensions/leader (:sync conn) :election)
           data (extensions/read-node (:sync conn) leader)
           uri (format "http://%s:%s/submit-job" (:host data) (:port data))
           response (post uri {:body (pr-str job)})]
