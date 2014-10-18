@@ -171,9 +171,9 @@
 (defmethod extensions/create-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        ingress-queue (:ingress-queues task)
+        ingress-queue (vals (:ingress-queues task))
         egress-queues (vals (:egress-queues task))]
-    (doseq [queue-name (conj egress-queues ingress-queue)]
+    (doseq [queue-name (concat egress-queues ingress-queue)]
       (extensions/create-queue-on-session queue session queue-name))
     (.close session)))
 
