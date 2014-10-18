@@ -12,7 +12,7 @@
              [java.security MessageDigest]))
 
 (defn requeue-sentinel [queue session ingress-queues uuid]
-  (doseq [queue-name ingress-queues]
+  (doseq [queue-name (vals ingress-queues)]
     (let [p (extensions/create-producer queue session queue-name)]
       (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
       (extensions/close-resource queue p))))
@@ -28,7 +28,7 @@
 
 (defn read-batch [queue consumers task-map]
   ;; Multi-consumer not yet implemented.
-  (let [consumer (first consumers)
+  (let [consumer (first (vals consumers))
         f #(extensions/consume-message queue consumer)]
     (doall (take-segments f (:onyx/batch-size task-map)))))
 
@@ -65,7 +65,8 @@
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
            onyx.core/catalog onyx.core/task-map] :as event}]
-  (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
+  (let [consumer-f (partial extensions/create-consumer queue session)
+        consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} ingress-queues)
         batch (read-batch queue consumers task-map)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
@@ -77,7 +78,7 @@
   (operation/on-last-batch
    event
    (fn [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues]}]
-     (extensions/n-messages-remaining queue session (first ingress-queues)))))
+     (extensions/n-messages-remaining queue session (first (vals ingress-queues))))))
 
 (defn requeue-sentinel-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
