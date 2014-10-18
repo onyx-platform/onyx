@@ -270,7 +270,6 @@
           task (:task/name (:task payload))
           catalog (extensions/read-node sync (:node/catalog (:nodes payload)))
           ingress-queues (:task/ingress-queues (:task payload))
-          ingress-queues (if-not (coll? ingress-queues) (vector ingress-queues) ingress-queues)
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
