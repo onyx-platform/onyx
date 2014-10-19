@@ -14,8 +14,11 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn vote-for-sentinel-leader [sync task-node uuid]
-  (extensions/create-node sync (str task-node impl/sentinel-marker) {:uuid uuid}))
+(defn sentinel-node [task-node input]
+  (str task-node (impl/tag-sentinel-node input)))
+
+(defn vote-for-sentinel-leader [sync task-node input uuid]
+  (extensions/create-node sync (sentinel-node task-node input) {:uuid uuid}))
 
 (defn filter-sentinels [decompressed]
   (remove (partial = :done) decompressed))
@@ -35,8 +38,9 @@
             state @pipeline-state]
         (if uuid
           (if-not (:learned-sentinel state)
-            (do (vote-for-sentinel-leader sync task-node uuid)
-                (let [learned (:uuid (extensions/read-node sync (str task-node impl/sentinel-marker)))]
+            (do (vote-for-sentinel-leader sync task-node (:input (last (:onyx.core/batch event))) uuid)
+                (let [node (sentinel-node task-node (:input (last (:onyx.core/batch event))))
+                      learned (:uuid (extensions/read-node sync node))]
                   (swap! pipeline-state assoc :learned-sentinel learned)
                   (if (= learned uuid)
                     {:onyx.core/tail-batch? (= n-messages (count decompressed))
