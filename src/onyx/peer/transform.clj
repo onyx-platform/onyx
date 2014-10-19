@@ -35,24 +35,26 @@
       (extensions/close-resource queue consumer)))
 
 (defn read-batch [queue consumers task-map]
-  (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
-        reader-threads (doall (map (fn [ch [input consumer]]
-                                     (reader-thread queue ch input consumer))
-                                   reader-chs consumers))
-        read-f #(first (alts!! reader-chs))
-        segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
+  (if-not (empty? consumers)
+    (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
+          reader-threads (doall (map (fn [ch [input consumer]]
+                                       (reader-thread queue ch input consumer))
+                                     reader-chs consumers))
+          read-f #(first (alts!! reader-chs))
+          segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
     ;;; Ack each of the segments. Closing a consumer with unacked tasks will send
     ;;; all the tasks back onto the queue.
-    (doseq [segment segments]
-      (extensions/ack-message queue (:message segment)))
+      (doseq [segment segments]
+        (extensions/ack-message queue (:message segment)))
 
     ;;; Close each consumer. If any consumers are left open with unacked messages,
     ;;; the next round of reading will skip the messages that the consumers are hanging
     ;;; onto - hence breaking the sequential reads for task that require it.
-    (doseq [consumer (vals consumers)]
-      (extensions/close-resource queue consumer))
-    segments))
+      (doseq [consumer (vals consumers)]
+        (extensions/close-resource queue consumer))
+      segments)
+    []))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
@@ -87,8 +89,10 @@
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
            onyx.core/catalog onyx.core/task-map] :as event}]
-  (let [consumer-f (partial extensions/create-consumer queue session)
-        consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} ingress-queues)
+  (let [learned (keys (:learned-sentinel @(:onyx.core/pipeline-state event)))
+        consumer-f (partial extensions/create-consumer queue session)
+        uncached (into {} (remove (fn [[t _]] (some #{t} learned)) ingress-queues))
+        consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} uncached)
         batch (read-batch queue consumers task-map)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
