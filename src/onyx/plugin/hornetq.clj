@@ -99,7 +99,7 @@
   [_ {:keys [hornetq/session onyx.core/ingress-queues onyx.core/task-map]}]
   {:onyx.core/start-lifecycle?
    (if (= (:task/consumption task-map) :sequential)
-     (let [query (.queueQuery session (SimpleString. (first (vals ingress-queues))))]
+     (let [query (.queueQuery session (SimpleString. (:hornetq/queue-name task-map)))]
        (zero? (.getConsumerCount query)))
      true)})
 

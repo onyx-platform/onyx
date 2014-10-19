@@ -66,6 +66,6 @@
 (defn start-lifecycle?
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   (if (= (:onyx/consumption task-map) :sequential)
-    (zero? (extensions/n-consumers queue (first ingress-queues)))
+    (every? zero? (map #(extensions/n-consumers queue %) (vals ingress-queues)))
     true))
 
