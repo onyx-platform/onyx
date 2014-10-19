@@ -329,18 +329,20 @@
 (defmethod extensions/producer->queue-name HornetQConnection
   [queue producer] (.toString (.getAddress producer)))
 
+(def sentinel-byte-array (.limit (fressian/write :done) 32))
+
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
   ;; match, hashCode() doesn't work as expected.
-  ([f n] (take-segments f n [] (.limit (fressian/write :done) 32)))
-  ([f n rets ba]
+  ([f n] (take-segments f n []))
+  ([f n rets]
      (if (= n (count rets))
        rets
        (let [segment (f)]
          (if (nil? segment)
            rets
            (let [m (.toByteBuffer (.getBodyBufferCopy segment))]
-             (if (= m ba)
+             (if (= m sentinel-byte-array)
                (conj rets segment)
-               (recur f n (conj rets segment) ba))))))))
+               (recur f n (conj rets segment)))))))))
 

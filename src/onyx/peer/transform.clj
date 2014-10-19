@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.peer.transform
-    (:require [clojure.data.fressian :as fressian]
+    (:require [clojure.core.async :refer [chan >! go alts!!]]
+              [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [take-segments]]
@@ -26,11 +27,31 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
+(defn reader-thread [queue reader-ch consumer]
+  (go (loop []
+        (let [segment (extensions/consume-message queue consumer)]
+          (when segment
+            (>! reader-ch segment)
+            (recur))))
+      (extensions/close-resource queue consumer)))
+
 (defn read-batch [queue consumers task-map]
-  ;; Multi-consumer not yet implemented.
-  (let [consumer (first (vals consumers))
-        f #(extensions/consume-message queue consumer)]
-    (doall (take-segments f (:onyx/batch-size task-map)))))
+  (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
+        reader-threads (doall (map #(reader-thread queue %1 %2) reader-chs (vals consumers)))
+        read-f #(first (alts!! reader-chs))
+        segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
+
+    ;;; Ack each of the segments. Closing a consumer with unacked tasks will send
+    ;;; all the tasks back onto the queue.
+    (doseq [segment segments]
+      (extensions/ack-message queue segment))
+
+    ;;; Close each consumer. If any consumers are left open with unacked messages,
+    ;;; the next round of reading will skip the messages that the consumers are hanging
+    ;;; onto - hence breaking the sequential reads for task that require it.
+    (doseq [consumer (vals consumers)]
+      (extensions/close-resource queue consumer))
+    segments))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
