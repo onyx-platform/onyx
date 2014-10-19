@@ -279,7 +279,7 @@
                          :onyx.core/params (or (get (:fn-params opts) task) [])
                          :onyx.core/queue queue
                          :onyx.core/sync sync
-                         :onyx.core/pipeline-state (atom {:tried-to-seal? false})}
+                         :onyx.core/pipeline-state (atom {})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]

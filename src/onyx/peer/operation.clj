@@ -34,14 +34,15 @@
          :onyx.core/decompressed (filter-sentinels decompressed)})
       (let [uuid (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
             filtered-segments (filter-sentinels decompressed)
+            input (:input (last (:onyx.core/batch event)))
             n-messages (f event)
             state @pipeline-state]
         (if uuid
-          (if-not (:learned-sentinel state)
-            (do (vote-for-sentinel-leader sync task-node (:input (last (:onyx.core/batch event))) uuid)
-                (let [node (sentinel-node task-node (:input (last (:onyx.core/batch event))))
+          (if-not (get-in state [:learned-sentinel input])
+            (do (vote-for-sentinel-leader sync task-node input uuid)
+                (let [node (sentinel-node task-node input)
                       learned (:uuid (extensions/read-node sync node))]
-                  (swap! pipeline-state assoc :learned-sentinel learned)
+                  (swap! pipeline-state assoc-in [:learned-sentinel input] learned)
                   (if (= learned uuid)
                     {:onyx.core/tail-batch? (= n-messages (count decompressed))
                      :onyx.core/requeue? true
@@ -49,7 +50,7 @@
                     {:onyx.core/tail-batch? false
                      :onyx.core/requeue? false
                      :onyx.core/decompressed filtered-segments})))
-            (if (= (:learned-sentinel state) uuid)
+            (if (= (get-in state [:learned-sentinel input]) uuid)
               {:onyx.core/tail-batch? (= n-messages (count decompressed))
                :onyx.core/requeue? true
                :onyx.core/decompressed filtered-segments}
