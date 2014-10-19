@@ -25,6 +25,7 @@
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
   (let [session (extensions/bind-active-session queue (first (vals ingress-queues)))
+        learned (keys (:learned-sentinel @(:onyx.core/pipeline-state event)))
         uncached (into {} (remove (fn [[t _]] (some #{t} learned)) ingress-queues))
         consumers (map (fn [[task queue-name]]
                          {:input task
