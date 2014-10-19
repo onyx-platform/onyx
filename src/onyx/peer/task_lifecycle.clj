@@ -72,7 +72,6 @@
   [{:keys [onyx.core/queue onyx.core/session onyx.core/producers
            onyx.core/consumers onyx.core/reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
-  (doseq [consumer (vals consumers)] (extensions/close-resource queue consumer))
   (when-not reserve?
     (extensions/close-resource queue session))
   (assoc event :onyx.core/closed? true))
