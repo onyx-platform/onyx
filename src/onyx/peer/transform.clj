@@ -12,11 +12,10 @@
     (:import [java.util UUID]
              [java.security MessageDigest]))
 
-(defn requeue-sentinel [queue session ingress-queues uuid]
-  (doseq [queue-name (vals ingress-queues)]
-    (let [p (extensions/create-producer queue session queue-name)]
-      (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
-      (extensions/close-resource queue p))))
+(defn requeue-sentinel [queue session queue-name uuid]
+  (let [p (extensions/create-producer queue session queue-name)]
+    (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
+    (extensions/close-resource queue p)))
 
 (defn seal-queue [queue queue-names]
   (let [session (extensions/create-tx-session queue)]
@@ -101,13 +100,17 @@
   (operation/on-last-batch
    event
    (fn [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues]}]
-     (extensions/n-messages-remaining queue session (first (vals ingress-queues))))))
+     (let [task-name (:input (last (:onyx.core/batch event)))
+           queue-name (get ingress-queues task-name)]
+       (extensions/n-messages-remaining queue session queue-name)))))
 
 (defn requeue-sentinel-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
   (let [uuid (or (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
                  (UUID/randomUUID))]
-    (requeue-sentinel queue session ingress-queues uuid))
+    (let [task-name (:input (last (:onyx.core/batch event)))
+          queue-name (get ingress-queues task-name)]
+      (requeue-sentinel queue session queue-name uuid)))
   (merge event {:onyx.core/requeued? true}))
 
 (defn apply-fn-shim
