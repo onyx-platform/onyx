@@ -25,10 +25,11 @@
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
   (let [session (extensions/bind-active-session queue (first (vals ingress-queues)))
+        uncached (into {} (remove (fn [[t _]] (some #{t} learned)) ingress-queues))
         consumers (map (fn [[task queue-name]]
                          {:input task
                           :consumer (extensions/create-consumer queue session queue-name)})
-                       ingress-queues)
+                       uncached)
         halting-ch (chan 0)
         read-ch (chan 1)
         rets
