@@ -6,38 +6,41 @@
               [onyx.extensions :as extensions]
               [onyx.queue.hornetq :refer [take-segments]]
               [onyx.peer.transform :as transformer]
-              [taoensso.timbre :refer [debug]]
+              [taoensso.timbre :refer [debug fatal]]
               [dire.core :refer [with-post-hook!]]))
 
-(def n-pipeline-threads 1)
-
-(defn consumer-loop [event session consumers halting-ch session-ch]
-  (go (loop []
-        (let [consumer (first consumers)
-              f #(extensions/consume-message (:onyx.core/queue event) consumer)
-              msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
-          (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
-        (when (<! halting-ch)
-          (recur)))))
+(defn consumer-loop [event session input consumer halting-ch session-ch]
+  (go
+   (try
+     (loop []
+       (let [f (fn [] {:input input
+                      :message (extensions/consume-message (:onyx.core/queue event) consumer)})
+             msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
+         (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
+       (when (<! halting-ch)
+         (recur)))
+     (catch Exception e
+       (fatal e)))))
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
-  (let [rets
+  (let [session (extensions/bind-active-session queue (first (vals ingress-queues)))
+        consumers (map (fn [[task queue-name]]
+                         {:input task
+                          :consumer (extensions/create-consumer queue session queue-name)})
+                       ingress-queues)
+        halting-ch (chan 0)
+        read-ch (chan 1)
+        rets
         {:onyx.aggregate/queue
-         (->> (range n-pipeline-threads)
-              (map (fn [x] {:session (extensions/bind-active-session queue (first ingress-queues))}))
-              (map (fn [x] (assoc x :consumers (map (partial extensions/create-consumer queue (:session x))
-                                                   ingress-queues))))
-              (map (fn [x] (assoc x :halting-ch (chan 0)))))
-         :onyx.aggregate/read-ch (chan n-pipeline-threads)
+         {:session session
+          :consumers consumers
+          :halting-ch halting-ch}
+         :onyx.aggregate/read-ch read-ch
          :onyx.core/reserve? true
          :onyx.transform/fn (operation/resolve-fn task-map)}]
-    (doseq [queue-bundle (:onyx.aggregate/queue rets)]
-      (consumer-loop event
-                     (:session queue-bundle)
-                     (:consumers queue-bundle)
-                     (:halting-ch queue-bundle)
-                     (:onyx.aggregate/read-ch rets)))
+    (doseq [c consumers]
+      (consumer-loop event session (:input c) (:consumer c) halting-ch read-ch))
     (merge event rets)))
 
 (defn inject-temporal-resource-shim
@@ -47,8 +50,10 @@
   ;;; in the pipeline.
   {:onyx.core/session :placeholder})
 
-(defn read-batch-shim [event]
+(defn read-batch-shim [{:keys [onyx.core/queue] :as event}]
   (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
+    (doseq [msg msgs]
+      (extensions/ack-message queue (:message msg)))
     (merge event
            {:onyx.core/session session
             :onyx.core/batch msgs
@@ -60,10 +65,12 @@
 
 (defn close-pipeline-resources-shim [{:keys [onyx.core/queue] :as event}]
   (close! (:onyx.aggregate/read-ch event))
-  (doseq [queue-bundle (:onyx.aggregate/queue event)]
-    (close! (:halting-ch queue-bundle))
-    (doseq [c (:consumers queue-bundle)] (extensions/close-resource queue c))
-    (extensions/close-resource queue (:session queue-bundle)))
+  (close! (:halting-ch (:onyx.aggregate/queue event)))
+
+  (doseq [c (:consumers (:onyx.aggregate/queue event))]
+    (extensions/close-resource queue (:consumer c)))
+
+  (extensions/close-resource queue (:session (:onyx.aggregate/queue event)))
   event)
 
 (defmethod l-ext/start-lifecycle? :aggregator
