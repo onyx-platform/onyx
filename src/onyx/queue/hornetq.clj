@@ -230,7 +230,7 @@
 (defmethod extensions/bootstrap-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        producer (extensions/create-producer queue session (:ingress-queues task))]
+        producer (extensions/create-producer queue session (:self (:ingress-queues task)))]
     (extensions/produce-message queue producer session (.array (fressian/write {})))
     (extensions/produce-message queue producer session (.array (fressian/write :done)))
     (extensions/commit-tx queue session)
