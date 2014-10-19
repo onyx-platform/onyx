@@ -18,10 +18,10 @@
         queue-name (:hornetq/queue-name task)
         consumer (.createConsumer session queue-name)]
     (.start session)
-    (let [f #(.receive consumer)
+    (let [f (fn [] {:message (.receive consumer)})
           rets (take-segments f (:onyx/batch-size task))]
-      (doseq [message rets]
-        (extensions/ack-message queue message))
+      (doseq [segment rets]
+        (extensions/ack-message queue (:message segment)))
       {:onyx.core/batch (or rets [])
        :hornetq/session session
        :hornetq/consumer consumer})))
@@ -50,7 +50,8 @@
   (merge event (read-batch queue (:hornetq/session-factory event) task-map)))
 
 (defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
-  (merge event {:onyx.core/decompressed (map decompress-segment batch)}))
+  (let [decompressed (map (comp decompress-segment :message) batch)]
+    (merge event {:onyx.core/decompressed decompressed})))
 
 (defn strip-sentinel-shim [event]
   (operation/on-last-batch

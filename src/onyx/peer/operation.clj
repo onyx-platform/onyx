@@ -29,7 +29,7 @@
         {:onyx.core/tail-batch? (= n-messages (count decompressed))
          :onyx.core/requeue? true
          :onyx.core/decompressed (filter-sentinels decompressed)})
-      (let [uuid (extensions/message-uuid queue (last (:onyx.core/batch event)))
+      (let [uuid (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
             filtered-segments (filter-sentinels decompressed)
             n-messages (f event)
             state @pipeline-state]

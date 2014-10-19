@@ -341,7 +341,7 @@
        (let [segment (f)]
          (if (nil? segment)
            rets
-           (let [m (.toByteBuffer (.getBodyBufferCopy segment))]
+           (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
              (if (= m sentinel-byte-array)
                (conj rets segment)
                (recur f n (conj rets segment)))))))))

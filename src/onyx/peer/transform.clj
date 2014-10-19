@@ -27,24 +27,26 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defn reader-thread [queue reader-ch consumer]
+(defn reader-thread [queue reader-ch input consumer]
   (go (loop []
         (let [segment (extensions/consume-message queue consumer)]
           (when segment
-            (>! reader-ch segment)
+            (>! reader-ch {:input input :message segment})
             (recur))))
       (extensions/close-resource queue consumer)))
 
 (defn read-batch [queue consumers task-map]
   (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
-        reader-threads (doall (map #(reader-thread queue %1 %2) reader-chs (vals consumers)))
+        reader-threads (doall (map (fn [ch [input consumer]]
+                                     (reader-thread queue ch input consumer))
+                                   reader-chs consumers))
         read-f #(first (alts!! reader-chs))
         segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
     ;;; Ack each of the segments. Closing a consumer with unacked tasks will send
     ;;; all the tasks back onto the queue.
     (doseq [segment segments]
-      (extensions/ack-message queue segment))
+      (extensions/ack-message queue (:message segment)))
 
     ;;; Close each consumer. If any consumers are left open with unacked messages,
     ;;; the next round of reading will skip the messages that the consumers are hanging
@@ -92,7 +94,7 @@
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
 (defn decompress-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
+  (let [decompressed-msgs (map (partial decompress-segment queue) (map :message batch))]
     (merge event {:onyx.core/decompressed decompressed-msgs})))
 
 (defn strip-sentinel-shim [event]
@@ -103,7 +105,7 @@
 
 (defn requeue-sentinel-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
-  (let [uuid (or (extensions/message-uuid queue (last (:onyx.core/batch event)))
+  (let [uuid (or (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
                  (UUID/randomUUID))]
     (requeue-sentinel queue session ingress-queues uuid))
   (merge event {:onyx.core/requeued? true}))
