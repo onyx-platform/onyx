@@ -58,11 +58,6 @@
 (defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
   (assoc event :onyx.core/commit? (extensions/node-exists? sync status-node)))
 
-(defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
-  (if commit?
-    (merge event (p-ext/ack-batch event))
-    event))
-
 (defn munge-commit-tx
   [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
   (if commit?
@@ -169,16 +164,10 @@
       (>!! status-check-ch (munge-write-batch event))
       (recur))))
 
-(defn status-check-loop [status-ch ack-ch dead-ch]
+(defn status-check-loop [status-ch commit-ch dead-ch]
   (loop []
     (when-let [event (<!! status-ch)]
-      (>!! ack-ch (munge-status-check event))
-      (recur))))
-
-(defn ack-loop [ack-ch commit-ch dead-ch]
-  (loop []
-    (when-let [event (<!! ack-ch)]
-      (>!! commit-ch (munge-ack event))
+      (>!! commit-ch (munge-status-check event))
       (recur))))
 
 (defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
@@ -242,7 +231,6 @@
           compress-batch-ch (chan 0)
           write-batch-ch (chan 0)
           status-check-ch (chan 0)
-          ack-ch (chan 0)
           commit-tx-ch (chan 0)
           close-resources-ch (chan 0)
           close-temporal-ch (chan 0)
@@ -259,7 +247,6 @@
           compress-batch-dead-ch (chan)
           write-batch-dead-ch (chan)
           status-check-dead-ch (chan)
-          ack-dead-ch (chan)
           commit-tx-dead-ch (chan)
           close-resources-dead-ch (chan)
           close-temporal-dead-ch (chan)
@@ -351,12 +338,6 @@
           (warn e)
           (go (>!! err-ch true))))
 
-      (dire/with-handler! #'ack-loop
-        java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (go (>!! err-ch true))))
-
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception
         (fn [e & _]
@@ -429,10 +410,6 @@
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'ack-loop
-        (fn [& args]
-          (>!! (last args) true)))
-
       (dire/with-finally! #'commit-tx-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -470,7 +447,6 @@
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
         :status-check-ch status-check-ch
-        :ack-ch ack-ch
         :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
         :close-temporal-ch close-temporal-ch
@@ -487,7 +463,6 @@
         :compress-batch-dead-ch compress-batch-dead-ch
         :write-batch-dead-ch write-batch-dead-ch
         :status-check-dead-ch status-check-dead-ch
-        :ack-dead-ch ack-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
         :close-temporal-dead-ch close-temporal-dead-ch
@@ -503,8 +478,7 @@
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch))
         :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch ack-ch status-check-dead-ch))
-        :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
+        :status-check-loop (thread (status-check-loop status-check-ch commit-tx-ch status-check-dead-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
         :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
@@ -544,9 +518,6 @@
     (close! (:status-check-ch component))
     (<!! (:status-check-dead-ch component))
 
-    (close! (:ack-ch component))
-    (<!! (:ack-dead-ch component))
-
     (close! (:commit-tx-ch component))
     (<!! (:commit-tx-dead-ch component))
 
@@ -574,7 +545,6 @@
     (close! (:compress-batch-dead-ch component))
     (close! (:write-batch-dead-ch component))
     (close! (:status-check-dead-ch component))
-    (close! (:ack-dead-ch component))
     (close! (:commit-tx-dead-ch component))
     (close! (:close-resources-dead-ch component))
     (close! (:close-temporal-dead-ch component))
@@ -631,10 +601,6 @@
 (dire/with-post-hook! #'munge-status-check
   (fn [{:keys [onyx.core/id onyx.core/status-node onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Checked the status node" id lifecycle-id))))
-
-(dire/with-post-hook! #'munge-ack
-  (fn [{:keys [onyx.core/id onyx.core/acked onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Acked %s segments" id lifecycle-id acked))))
 
 (dire/with-post-hook! #'munge-commit-tx
   (fn [{:keys [onyx.core/id onyx.core/commit? onyx.core/lifecycle-id]}]

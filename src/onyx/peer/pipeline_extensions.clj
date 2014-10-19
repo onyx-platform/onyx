@@ -43,11 +43,6 @@
    Must return a map with key :requeued? and value boolean."
   type-and-medium-dispatch)
 
-(defmulti ack-batch
-  "Acknowledges the reading of the ingested batch. Must return a map with
-   key :onyx.core/acked and value integer representing the number of segments ack'ed."
-  type-and-medium-dispatch)
-
 (defmulti apply-fn
   "Applies a function to the decompressed segments. Must return a map with
    key :onyx.core/results and value seq representing the application of the function

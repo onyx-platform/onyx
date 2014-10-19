@@ -66,13 +66,13 @@
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :inc
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :transformer
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output

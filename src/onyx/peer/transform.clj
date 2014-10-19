@@ -108,11 +108,6 @@
     (requeue-sentinel queue session ingress-queues uuid))
   (merge event {:onyx.core/requeued? true}))
 
-(defn acknowledge-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  (doseq [message batch]
-    (extensions/ack-message queue message))
-  (merge event {:onyx.core/acked (count batch)}))
-
 (defn apply-fn-shim
   [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params
            onyx.core/task-map] :as event}]
@@ -158,9 +153,6 @@
 (defmethod p-ext/requeue-sentinel :default
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch :default
-  [event] (acknowledge-batch-shim event))
-
 (defmethod p-ext/apply-fn :default
   [event] (apply-fn-shim event))
 
@@ -184,10 +176,6 @@
 (with-post-hook! #'requeue-sentinel-shim
   (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Requeued sentinel value" id))))
-
-(with-post-hook! #'acknowledge-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/acked]}]
-    (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-shim
   (fn [{:keys [onyx.core/id onyx.core/results]}]
