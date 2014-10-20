@@ -46,7 +46,11 @@
             (do (vote-for-sentinel-leader sync task-node input uuid)
                 (let [node (sentinel-node task-node input)
                       learned (:uuid (extensions/read-node sync node))]
-                  (swap! pipeline-state assoc-in [:learned-sentinel input] learned)
+                  (swap! pipeline-state
+                         (fn [v]
+                           (-> v
+                               (assoc-in [:learned-sentinel input] learned)
+                               (assoc-in [:drained-inputs input] (= n-messages (count decompressed))))))
                   (if (= learned uuid)
                     {:onyx.core/tail-batch? (and (= n-messages (count decompressed))
                                                  (learned-all-sentinels? event state))

@@ -89,9 +89,9 @@
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
            onyx.core/catalog onyx.core/task-map] :as event}]
-  (let [learned (keys (:learned-sentinel @(:onyx.core/pipeline-state event)))
+  (let [learned (:drained-inputs @(:onyx.core/pipeline-state event))
         consumer-f (partial extensions/create-consumer queue session)
-        uncached (into {} (remove (fn [[t _]] (some #{t} learned)) ingress-queues))
+        uncached (into {} (remove (fn [[t _]] (get learned t)) ingress-queues))
         consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} uncached)
         batch (read-batch queue consumers task-map)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
