@@ -26,31 +26,31 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defn reader-thread [queue reader-ch input consumer]
-  (go (loop []
-        (let [segment (extensions/consume-message queue consumer)]
-          (when segment
-            (>! reader-ch {:input input :message segment})
-            (recur))))
-      (extensions/close-resource queue consumer)))
+(defn reader-thread [event queue reader-ch input consumer]
+  (go
+   (loop []
+     (let [segment (extensions/consume-message queue consumer)]
+       (when segment
+         (>! reader-ch {:input input :message segment})
+         (recur))))))
 
-(defn read-batch [queue consumers task-map]
+(defn read-batch [queue consumers task-map event]
   (if-not (empty? consumers)
     (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
           reader-threads (doall (map (fn [ch [input consumer]]
-                                       (reader-thread queue ch input consumer))
+                                       (reader-thread event queue ch input consumer))
                                      reader-chs consumers))
-          read-f #(first (alts!! reader-chs))
+          read-f #(first (alts!! (conj reader-chs (clojure.core.async/timeout 500))))
           segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
-    ;;; Ack each of the segments. Closing a consumer with unacked tasks will send
-    ;;; all the tasks back onto the queue.
+      ;; Ack each of the segments. Closing a consumer with unacked tasks will send
+      ;; all the tasks back onto the queue.
       (doseq [segment segments]
         (extensions/ack-message queue (:message segment)))
 
-    ;;; Close each consumer. If any consumers are left open with unacked messages,
-    ;;; the next round of reading will skip the messages that the consumers are hanging
-    ;;; onto - hence breaking the sequential reads for task that require it.
+      ;; Close each consumer. If any consumers are left open with unacked messages,
+      ;; the next round of reading will skip the messages that the consumers are hanging
+      ;; onto - hence breaking the sequential reads for task that require it.
       (doseq [consumer (vals consumers)]
         (extensions/close-resource queue consumer))
       segments)
@@ -89,11 +89,11 @@
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
            onyx.core/catalog onyx.core/task-map] :as event}]
-  (let [learned (:drained-inputs @(:onyx.core/pipeline-state event))
+  (let [drained (:drained-inputs @(:onyx.core/pipeline-state event))
         consumer-f (partial extensions/create-consumer queue session)
-        uncached (into {} (remove (fn [[t _]] (get learned t)) ingress-queues))
+        uncached (into {} (remove (fn [[t _]] (get drained t)) ingress-queues))
         consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} uncached)
-        batch (read-batch queue consumers task-map)]
+        batch (read-batch queue consumers task-map event)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
 (defn decompress-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
