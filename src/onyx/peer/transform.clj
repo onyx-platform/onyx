@@ -40,7 +40,7 @@
           reader-threads (doall (map (fn [ch [input consumer]]
                                        (reader-thread event queue ch input consumer))
                                      reader-chs consumers))
-          read-f #(first (alts!! (conj reader-chs (clojure.core.async/timeout 500))))
+          read-f #(first (alts!! (conj reader-chs (clojure.core.async/timeout 200))))
           segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
       ;; Ack each of the segments. Closing a consumer with unacked tasks will send
