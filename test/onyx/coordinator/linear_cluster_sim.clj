@@ -115,7 +115,7 @@
     :onyx/medium :hornetq
     :hornetq/queue-name "out-queue"}])
 
-(def workflow {:in {:inc :out}})
+(def workflow [[:in :inc] [:inc :out]])
 
 (def n-jobs 60)
 
