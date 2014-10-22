@@ -63,9 +63,9 @@
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "out-queue"}]
-           
-           workflow-a {:in-a {:inc-a :out-a}}
-           workflow-b {:in-b {:inc-b :out-b}}]
+
+           workflow-a [[:in-a :inc-a] [:inc-a :out-a]]
+           workflow-b [[:in-b :inc-b] [:inc-b :out-b]]]
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
@@ -282,7 +282,7 @@
           (doseq [task-path task-paths]
             (doseq [task-node (extensions/children sync task-path)]
               (when-not (impl/metadata-task? task-node)
-                (fact (impl/metadata-complete? sync task-node) => true))))))
+                (fact (impl/task-complete? sync task-node) => true))))))
 
        (facts "All peers are idle"
               (doseq [state-path (extensions/bucket sync :peer-state)]
