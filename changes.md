@@ -2,6 +2,7 @@
 
 - Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
 - `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/MichaelDrogalis/onyx/issues/3)
+- Fix HornetQ ipv6 multicast socket bind issue when running on hosts with ipv6 interfaces.
 
 #### 0.3.3
 
