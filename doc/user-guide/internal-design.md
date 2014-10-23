@@ -303,7 +303,7 @@ One virtual peer may be executing at most executing one task. This section descr
 #### Phases of Execution
 
 - Inject resources: Creates HornetQ session and opens transaction
-- Read message batch: consumers messages off of HornetQ
+- Read message batch: consumes and acknowledges messages off of HornetQ
 - Decompress message batch: Uses Fressian's reader to obtain EDN maps of segments
 - Strip sentinel: removes sentinel from decompressed batch if present
 - Requeue sentine: Requeues the sentinel on the ingress queue if it is the leader
@@ -311,7 +311,6 @@ One virtual peer may be executing at most executing one task. This section descr
 - Compress message batch: Uses Fressian's writer to compress segments to bytes
 - Write message batch: Writes messages to HornetQ
 - Status check: Consults with ZooKeeper about this peer's liveness
-- Ack message batch: Acknowledges received messages from HornetQ
 - Commit transaction: Commits the transaction to HornetQ
 - Close resources: Closes open connections and sockets
 - Reset payload: Rotates the znode this virtual peer is listening on for new tasks
