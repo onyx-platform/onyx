@@ -2,6 +2,7 @@
 
 - Transducer support for transformer functions.
 - Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation.
+- Support for directed, acylic graphs as workflows. [#26](https://github.com/MichaelDrogalis/onyx/issues/26)
 - Fix for peer live lock on task completion. [#23](https://github.com/MichaelDrogalis/onyx/issues/23)
 
 #### 0.3.4
