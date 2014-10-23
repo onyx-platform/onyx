@@ -26,9 +26,13 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 #### Workflow
 
-A workflow is a Clojure map representing a multi-rooted, acyclic tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything inbetween must name a function. Elements of a workflow must be Clojure keywords.
+A workflow is the structural specification of an Onyx program. It's purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acylic graph.
 
-Examples:
+In the case of a tree, the workflow is a Clojure map representing a multi-rooted, acyclic tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything inbetween must name a function. Elements of a workflow must be Clojure keywords.
+
+In the case of a directed acylic graph, the workflow is a Clojure vector of vectors. The inner vectors contain exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge between from the first node to the second.
+
+Tree Examples:
 
 ```clojure
 ;;;    in
@@ -61,6 +65,43 @@ Examples:
            :processing-2 :output-2}
  :input-2 {:processing-2 :output-1
            :processing-1 :output-2}
+```
+
+DAG Examples:
+
+```clojure
+;;;    in
+;;;    |
+;;; increment
+;;;    |
+;;;  output
+[[:in :increment] [:increment :out]]
+```
+
+```clojure
+;;;            input
+;;;             /\
+;;; processing-1 processing-2
+;;;     |             |
+;;;  output-1      output-2
+
+[[:input :processing-1]
+ [:input :processing-2]
+ [:processing-1 :output-1]
+ [:processing-2 :output-2]]
+```
+
+```clojure
+;;;            input
+;;;             /\
+;;; processing-1 processing-2
+;;;         \      /
+;;;          output
+
+[[:input :processing-1]
+ [:input :processing-2]
+ [:processing-1 :output]
+ [:processing-2 :output]]
 ```
 
 #### Catalog
@@ -127,3 +168,4 @@ A Peer is a node in the cluster responsible for processing data. A "peer" genera
 #### Virtual Peer
 
 A Virtual Peer refers to a single peer process running on a single physical machine. The Coordinator often does not need to know which virtual peers belong to which physical machines, so parallelism can be increased by treating all virtual peers equally. A single Virtual Peer executes at most one task at a time.
+
