@@ -51,15 +51,15 @@
 (deftype InMemoryCoordinator [onyx-coord]
   ISubmit
   (submit-job [this job]
-    (validator/validate-job job)
-    (let [ch (chan 1)
-          node (extensions/create (:sync onyx-coord) :plan)
-          cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))
-          job (update-in job [:workflow] unpack-workflow)]
-      (extensions/on-change (:sync onyx-coord) (:node node) cb)
-      (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
-      (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
-      (<!! ch)))
+    (let [job (update-in job [:workflow] unpack-workflow)]
+      (validator/validate-job job)
+      (let [ch (chan 1)
+            node (extensions/create (:sync onyx-coord) :plan)
+            cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
+        (extensions/on-change (:sync onyx-coord) (:node node) cb)
+        (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
+        (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
+        (<!! ch))))
 
   IAwait
   (await-job-completion [this job-id]
@@ -78,13 +78,13 @@
 (deftype HttpCoordinator [conn]
   ISubmit
   (submit-job [this job]
-    (validator/validate-job job)
-    (let [job (update-in job [:workflow] unpack-workflow)
-          leader (extensions/leader (:sync conn) :election)
-          data (extensions/read-node (:sync conn) leader)
-          uri (format "http://%s:%s/submit-job" (:host data) (:port data))
-          response (post uri {:body (pr-str job)})]
-      (:job-id (read-string (:body response)))))
+    (let [job (update-in job [:workflow] unpack-workflow)]
+      (validator/validate-job job)
+      (let [leader (extensions/leader (:sync conn) :election)
+            data (extensions/read-node (:sync conn) leader)
+            uri (format "http://%s:%s/submit-job" (:host data) (:port data))
+            response (post uri {:body (pr-str job)})]
+        (:job-id (read-string (:body response))))))
 
   IRegister
   (register-peer [this peer-node]
