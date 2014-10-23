@@ -30,7 +30,7 @@
 
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
-   :workflow (schema/pred seq? 'seq?)})
+   :workflow (schema/pred vector? 'vector?)})
 
 (defn validate-job
   [job]

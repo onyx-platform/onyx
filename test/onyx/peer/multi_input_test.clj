@@ -104,10 +104,11 @@
      :onyx/batch-size batch-size}]))
 
 (def workflow
-  (concat
-   [[:inc :out]]
-   (map (fn [a] [(keyword (str "in-" a)) :inc])
-        (range 1 (inc k-inputs)))))
+  (vec
+   (concat
+    [[:inc :out]]
+    (map (fn [a] [(keyword (str "in-" a)) :inc])
+         (range 1 (inc k-inputs))))))
 
 (def v-peers (onyx.api/start-peers conn 6 peer-opts))
 
