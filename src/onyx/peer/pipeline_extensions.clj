@@ -12,7 +12,10 @@
 (defmulti read-batch
   "Reads :onyx/batch-size segments off the incoming data source.
    Must return a map with key :onyx.core/batch and value seq representing
-   the ingested segments."
+   the ingested segments. The seq must be maps of two keys:
+
+   - :input - A keyword representing the task that the message came from
+   - :message - The consumed message"
   type-and-medium-dispatch)
 
 (defmulti decompress-batch
