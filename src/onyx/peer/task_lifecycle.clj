@@ -30,8 +30,10 @@
         (merge event rets cycle-params {:onyx.core/session session}))
       (merge event cycle-params rets))))
 
-(defn munge-read-batch [event]
-  (merge event (p-ext/read-batch event)))
+(defn munge-read-batch [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
+  (let [commit? (extensions/node-exists? sync status-node)
+        event (assoc event :onyx.core/commit? commit?)]
+    (merge event (p-ext/read-batch event))))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
@@ -61,9 +63,9 @@
 (defn munge-commit-tx
   [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
   (if commit?
-    (do (extensions/commit-tx queue session)
-        (assoc event :onyx.core/committed true))
-    event))
+    (extensions/commit-tx queue session)
+    (extensions/rollback-tx queue session))
+  (merge event {:onyx.core/committed commit?}))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))

@@ -279,6 +279,10 @@
   [queue session]
   (.commit session))
 
+(defmethod extensions/rollback-tx HornetQConnection
+  [queue session]
+  (.rollback session))
+
 (defmethod extensions/close-resource HornetQConnection
   [queue resource]
   (.close resource))

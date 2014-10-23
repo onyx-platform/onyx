@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.transform
-    (:require [clojure.core.async :refer [chan >! go alts!!]]
+    (:require [clojure.core.async :refer [chan >! go alts!! close!]]
               [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -28,11 +28,14 @@
 
 (defn reader-thread [event queue reader-ch input consumer]
   (go
-   (loop []
-     (let [segment (extensions/consume-message queue consumer)]
-       (when segment
-         (>! reader-ch {:input input :message segment})
-         (recur))))))
+   (try
+    (loop []
+      (let [segment (extensions/consume-message queue consumer)]
+        (when segment
+          (>! reader-ch {:input input :message segment})
+          (recur))))
+    (finally
+     (close! reader-ch)))))
 
 (defn read-batch [queue consumers task-map event]
   (if-not (empty? consumers)

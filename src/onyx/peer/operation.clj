@@ -56,7 +56,9 @@
                              (fn [v]
                                (-> v
                                    (assoc-in [:learned-sentinel input] learned)
-                                   (assoc-in [:drained-inputs input] (= n-messages (count decompressed))))))]
+                                   (assoc-in [:drained-inputs input]
+                                             (and (= n-messages (count decompressed))
+                                                  (= learned uuid))))))]
                   (if (= learned uuid)
                     {:onyx.core/tail-batch? (and (learned-all-sentinels? event successor)
                                                  (drained-all-inputs? event successor))
@@ -65,7 +67,9 @@
                     {:onyx.core/tail-batch? false
                      :onyx.core/requeue? false
                      :onyx.core/decompressed filtered-segments})))
-            (let [successor (swap! pipeline-state assoc-in [:drained-inputs input] (= n-messages (count decompressed)))]
+            (let [successor (swap! pipeline-state assoc-in [:drained-inputs input]
+                                   (and (= n-messages (count decompressed))
+                                        (= (= (get-in state [:learned-sentinel input]) uuid))))]
                 (if (= (get-in state [:learned-sentinel input]) uuid)
                   {:onyx.core/tail-batch? (and (learned-all-sentinels? event successor)
                                                (drained-all-inputs? event successor))

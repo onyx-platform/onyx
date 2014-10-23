@@ -109,7 +109,7 @@
    (map (fn [a] [(keyword (str "in-" a)) :inc])
         (range 1 (inc k-inputs)))))
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def v-peers (onyx.api/start-peers conn 6 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
