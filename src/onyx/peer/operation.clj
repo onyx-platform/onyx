@@ -32,20 +32,6 @@
     (= (into #{} drained-inputs)
        (into #{} (keys (:onyx.core/ingress-queues event))))))
 
-;; (defn dump [event uuid n-messages decompressed input state]
-;;   (prn "==")
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (:onyx.core/ingress-queues event))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (:onyx.core/task event))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" uuid)
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" n-messages)
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (count decompressed))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (last (:onyx.core/batch event)))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" state)
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (learned-all-sentinels? event state))
-;;   (prn (:onyx.core/id event) "/" (:onyx.core/lifecycle-id event) "::" (drained-all-inputs? event state))
-;;   (prn "=="))
-
 (defn on-last-batch
   [{:keys [onyx.core/sync onyx.core/queue onyx.core/decompressed
            onyx.core/pipeline-state onyx.core/task-node] :as event} f]
