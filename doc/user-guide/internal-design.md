@@ -310,7 +310,6 @@ One virtual peer may be executing at most executing one task. This section descr
 - Apply function: Apply fns to batches of segments
 - Compress message batch: Uses Fressian's writer to compress segments to bytes
 - Write message batch: Writes messages to HornetQ
-- Status check: Consults with ZooKeeper about this peer's liveness
 - Commit transaction: Commits the transaction to HornetQ
 - Close resources: Closes open connections and sockets
 - Reset payload: Rotates the znode this virtual peer is listening on for new tasks

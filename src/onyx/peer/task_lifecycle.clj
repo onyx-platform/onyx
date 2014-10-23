@@ -57,9 +57,6 @@
 (defn munge-write-batch [event]
   (merge event (p-ext/write-batch event)))
 
-(defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
-  (assoc event :onyx.core/commit? (extensions/node-exists? sync status-node)))
-
 (defn munge-commit-tx
   [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
   (if commit?
@@ -159,16 +156,10 @@
       (>!! write-batch-ch (munge-compress-batch event))
       (recur))))
 
-(defn write-batch-loop [write-ch status-check-ch dead-ch]
+(defn write-batch-loop [write-ch commit-ch dead-ch]
   (loop []
     (when-let [event (<!! write-ch)]
-      (>!! status-check-ch (munge-write-batch event))
-      (recur))))
-
-(defn status-check-loop [status-ch commit-ch dead-ch]
-  (loop []
-    (when-let [event (<!! status-ch)]
-      (>!! commit-ch (munge-status-check event))
+      (>!! commit-ch (munge-write-batch event))
       (recur))))
 
 (defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
@@ -231,7 +222,6 @@
           apply-fn-ch (chan 0)
           compress-batch-ch (chan 0)
           write-batch-ch (chan 0)
-          status-check-ch (chan 0)
           commit-tx-ch (chan 0)
           close-resources-ch (chan 0)
           close-temporal-ch (chan 0)
@@ -247,7 +237,6 @@
           apply-fn-dead-ch (chan)
           compress-batch-dead-ch (chan)
           write-batch-dead-ch (chan)
-          status-check-dead-ch (chan)
           commit-tx-dead-ch (chan)
           close-resources-dead-ch (chan)
           close-temporal-dead-ch (chan)
@@ -333,12 +322,6 @@
           (warn e)
           (go (>!! err-ch true))))
 
-      (dire/with-handler! #'status-check-loop
-        java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (go (>!! err-ch true))))
-
       (dire/with-handler! #'commit-tx-loop
         java.lang.Exception
         (fn [e & _]
@@ -407,10 +390,6 @@
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'status-check-loop
-        (fn [& args]
-          (>!! (last args) true)))
-
       (dire/with-finally! #'commit-tx-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -447,7 +426,6 @@
         :apply-fn-ch apply-fn-ch
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
-        :status-check-ch status-check-ch
         :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
         :close-temporal-ch close-temporal-ch
@@ -463,7 +441,6 @@
         :apply-fn-dead-ch apply-fn-dead-ch
         :compress-batch-dead-ch compress-batch-dead-ch
         :write-batch-dead-ch write-batch-dead-ch
-        :status-check-dead-ch status-check-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
         :close-temporal-dead-ch close-temporal-dead-ch
@@ -478,8 +455,7 @@
         :requeue-sentinel-loop (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch))
-        :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch commit-tx-ch status-check-dead-ch))
+        :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
         :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
@@ -516,9 +492,6 @@
     (close! (:write-batch-ch component))
     (<!! (:write-batch-dead-ch component))
 
-    (close! (:status-check-ch component))
-    (<!! (:status-check-dead-ch component))
-
     (close! (:commit-tx-ch component))
     (<!! (:commit-tx-dead-ch component))
 
@@ -545,7 +518,6 @@
     (close! (:apply-fn-dead-ch component))
     (close! (:compress-batch-dead-ch component))
     (close! (:write-batch-dead-ch component))
-    (close! (:status-check-dead-ch component))
     (close! (:commit-tx-dead-ch component))
     (close! (:close-resources-dead-ch component))
     (close! (:close-temporal-dead-ch component))
@@ -598,10 +570,6 @@
 (dire/with-post-hook! #'munge-write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Wrote batch" id lifecycle-id))))
-
-(dire/with-post-hook! #'munge-status-check
-  (fn [{:keys [onyx.core/id onyx.core/status-node onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Checked the status node" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-commit-tx
   (fn [{:keys [onyx.core/id onyx.core/commit? onyx.core/lifecycle-id]}]
