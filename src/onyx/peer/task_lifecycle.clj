@@ -9,6 +9,7 @@
               [onyx.queue.hornetq :refer [hornetq]]
               [onyx.peer.transform :as transform]
               [onyx.peer.aggregate :as aggregate]
+              [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
 
@@ -117,7 +118,10 @@
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
     (when (first (alts!! [kill-ch] :default true))
-      (>!! read-ch (munge-inject-temporal pipeline-data))
+      (let [state @(:onyx.core/pipeline-state pipeline-data)]
+        (when (operation/drained-all-inputs? pipeline-data state)
+          (Thread/sleep (:onyx.core/drained-back-off pipeline-data)))
+        (>!! read-ch (munge-inject-temporal pipeline-data)))
       (recur))))
 
 (defn read-batch-loop [read-ch decompress-ch dead-ch]
@@ -267,6 +271,7 @@
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
                          :onyx.core/params (or (get (:fn-params opts) task) [])
+                         :onyx.core/drained-back-off (or (:drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/sync sync
                          :onyx.core/pipeline-state (atom {})}

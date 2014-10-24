@@ -112,6 +112,7 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 |---------------------------------|------------|--------|
 |`:onyx.peer/retry-start-interval`| `int`      | `2000` |
 |`:onyx.peer/sequential-back-off` | `int`      | `2000` |
+|`:onyx.peer/drained-back-off`    | `int`      | `400`  |
 |`:onyx.peer/fn-params`           | `map`      | `{}`   |
 
 ##### `:onyx.peer/retry-start-interval`
@@ -121,6 +122,10 @@ Number of ms to wait before trying to reboot a virtual peer after failure.
 ##### `:onyx.peer/sequential-back-off`
 
 Number of ms to wait before retrying to execute a sequential task in the presence of other queue consumers.
+
+##### `:onyx.peer/drained-back-off`
+
+Number of ms to wait before executing peer pipeline run if all ingress queues have been exhausted.
 
 ##### `onyx.peer/fn-params`
 
