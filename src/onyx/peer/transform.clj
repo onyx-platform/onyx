@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.peer.transform
-    (:require [clojure.data.fressian :as fressian]
+    (:require [clojure.core.async :refer [chan >! go alts!! close!]]
+              [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [take-segments]]
@@ -11,11 +12,10 @@
     (:import [java.util UUID]
              [java.security MessageDigest]))
 
-(defn requeue-sentinel [queue session ingress-queues uuid]
-  (doseq [queue-name ingress-queues]
-    (let [p (extensions/create-producer queue session queue-name)]
-      (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
-      (extensions/close-resource queue p))))
+(defn requeue-sentinel [queue session queue-name uuid]
+  (let [p (extensions/create-producer queue session queue-name)]
+    (extensions/produce-message queue p session (.array (fressian/write :done)) {:uuid uuid})
+    (extensions/close-resource queue p)))
 
 (defn seal-queue [queue queue-names]
   (let [session (extensions/create-tx-session queue)]
@@ -26,11 +26,38 @@
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
 
-(defn read-batch [queue consumers task-map]
-  ;; Multi-consumer not yet implemented.
-  (let [consumer (first consumers)
-        f #(extensions/consume-message queue consumer)]
-    (doall (take-segments f (:onyx/batch-size task-map)))))
+(defn reader-thread [event queue reader-ch input consumer]
+  (go
+   (try
+    (loop []
+      (let [segment (extensions/consume-message queue consumer)]
+        (when segment
+          (>! reader-ch {:input input :message segment})
+          (recur))))
+    (finally
+     (close! reader-ch)))))
+
+(defn read-batch [queue consumers task-map event]
+  (if-not (empty? consumers)
+    (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
+          reader-threads (doall (map (fn [ch [input consumer]]
+                                       (reader-thread event queue ch input consumer))
+                                     reader-chs consumers))
+          read-f #(first (alts!! (conj reader-chs (clojure.core.async/timeout 200))))
+          segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
+
+      ;; Ack each of the segments. Closing a consumer with unacked tasks will send
+      ;; all the tasks back onto the queue.
+      (doseq [segment segments]
+        (extensions/ack-message queue (:message segment)))
+
+      ;; Close each consumer. If any consumers are left open with unacked messages,
+      ;; the next round of reading will skip the messages that the consumers are hanging
+      ;; onto - hence breaking the sequential reads for task that require it.
+      (doseq [consumer (vals consumers)]
+        (extensions/close-resource queue consumer))
+      segments)
+    []))
 
 (defn decompress-segment [queue message]
   (extensions/read-message queue message))
@@ -65,31 +92,33 @@
 (defn read-batch-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues
            onyx.core/catalog onyx.core/task-map] :as event}]
-  (let [consumers (map (partial extensions/create-consumer queue session) ingress-queues)
-        batch (read-batch queue consumers task-map)]
+  (let [drained (:drained-inputs @(:onyx.core/pipeline-state event))
+        consumer-f (partial extensions/create-consumer queue session)
+        uncached (into {} (remove (fn [[t _]] (get drained t)) ingress-queues))
+        consumers (reduce-kv (fn [all k v] (assoc all k (consumer-f v))) {} uncached)
+        batch (read-batch queue consumers task-map event)]
     (merge event {:onyx.core/batch batch :onyx.core/consumers consumers})))
 
 (defn decompress-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  (let [decompressed-msgs (map (partial decompress-segment queue) batch)]
+  (let [decompressed-msgs (map (partial decompress-segment queue) (map :message batch))]
     (merge event {:onyx.core/decompressed decompressed-msgs})))
 
 (defn strip-sentinel-shim [event]
   (operation/on-last-batch
    event
    (fn [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues]}]
-     (extensions/n-messages-remaining queue session (first ingress-queues)))))
+     (let [task-name (:input (last (:onyx.core/batch event)))
+           queue-name (get ingress-queues task-name)]
+       (extensions/n-messages-remaining queue session queue-name)))))
 
 (defn requeue-sentinel-shim
   [{:keys [onyx.core/queue onyx.core/session onyx.core/ingress-queues] :as event}]
-  (let [uuid (or (extensions/message-uuid queue (last (:onyx.core/batch event)))
+  (let [uuid (or (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
                  (UUID/randomUUID))]
-    (requeue-sentinel queue session ingress-queues uuid))
+    (let [task-name (:input (last (:onyx.core/batch event)))
+          queue-name (get ingress-queues task-name)]
+      (requeue-sentinel queue session queue-name uuid)))
   (merge event {:onyx.core/requeued? true}))
-
-(defn acknowledge-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  (doseq [message batch]
-    (extensions/ack-message queue message))
-  (merge event {:onyx.core/acked (count batch)}))
 
 (defn apply-fn-shim
   [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params
@@ -136,9 +165,6 @@
 (defmethod p-ext/requeue-sentinel :default
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch :default
-  [event] (acknowledge-batch-shim event))
-
 (defmethod p-ext/apply-fn :default
   [event] (apply-fn-shim event))
 
@@ -162,10 +188,6 @@
 (with-post-hook! #'requeue-sentinel-shim
   (fn [{:keys [onyx.core/id]}]
     (debug (format "[%s] Requeued sentinel value" id))))
-
-(with-post-hook! #'acknowledge-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/acked]}]
-    (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-shim
   (fn [{:keys [onyx.core/id onyx.core/results]}]

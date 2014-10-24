@@ -19,17 +19,9 @@
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)))
 
-(defn flatten-workflow [workflow]
-  (concat (keys workflow)
-          (mapcat (fn [v]
-                    (if (map? v)
-                      (flatten-workflow v)
-                      (list v)))
-            (vals workflow))))
-
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
-                                flatten-workflow
+                                (mapcat identity)
                                 (remove (set (map :onyx/name catalog)))
                                 seq)]
     (throw (Exception. (str "Catalog is missing :onyx/name values "
@@ -38,10 +30,11 @@
 
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
-   :workflow (schema/pred map? 'map?)})
+   :workflow (schema/pred vector? 'vector?)})
 
 (defn validate-job
   [job]
   (schema/validate job-validator job)
   (validate-catalog (:catalog job))
   (validate-workflow-names job))
+

@@ -14,11 +14,23 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn vote-for-sentinel-leader [sync task-node uuid]
-  (extensions/create-node sync (str task-node impl/sentinel-marker) {:uuid uuid}))
+(defn sentinel-node [task-node input]
+  (str task-node (impl/tag-sentinel-node input)))
+
+(defn vote-for-sentinel-leader [sync task-node input uuid]
+  (extensions/create-node sync (sentinel-node task-node input) {:uuid uuid}))
 
 (defn filter-sentinels [decompressed]
   (remove (partial = :done) decompressed))
+
+(defn learned-all-sentinels? [event state]
+  (= (into #{} (keys (:learned-sentinel state)))
+     (into #{} (keys (:onyx.core/ingress-queues event)))))
+
+(defn drained-all-inputs? [event state]
+  (let [drained-inputs (keys (into {} (filter second (:drained-inputs state))))]
+    (= (into #{} drained-inputs)
+       (into #{} (keys (:onyx.core/ingress-queues event))))))
 
 (defn on-last-batch
   [{:keys [onyx.core/sync onyx.core/queue onyx.core/decompressed
@@ -29,29 +41,43 @@
         {:onyx.core/tail-batch? (= n-messages (count decompressed))
          :onyx.core/requeue? true
          :onyx.core/decompressed (filter-sentinels decompressed)})
-      (let [uuid (extensions/message-uuid queue (last (:onyx.core/batch event)))
+      (let [uuid (extensions/message-uuid queue (:message (last (:onyx.core/batch event))))
             filtered-segments (filter-sentinels decompressed)
+            input (:input (last (:onyx.core/batch event)))
             n-messages (f event)
             state @pipeline-state]
         (if uuid
-          (if-not (:learned-sentinel state)
-            (do (vote-for-sentinel-leader sync task-node uuid)
-                (let [learned (:uuid (extensions/read-node sync (str task-node impl/sentinel-marker)))]
-                  (swap! pipeline-state assoc :learned-sentinel learned)
+          (if-not (get-in state [:learned-sentinel input])
+            (do (vote-for-sentinel-leader sync task-node input uuid)
+                (let [node (sentinel-node task-node input)
+                      learned (:uuid (extensions/read-node sync node))
+                      successor
+                      (swap! pipeline-state
+                             (fn [v]
+                               (-> v
+                                   (assoc-in [:learned-sentinel input] learned)
+                                   (assoc-in [:drained-inputs input]
+                                             (and (= n-messages (count decompressed))
+                                                  (= learned uuid))))))]
                   (if (= learned uuid)
-                    {:onyx.core/tail-batch? (= n-messages (count decompressed))
+                    {:onyx.core/tail-batch? (and (learned-all-sentinels? event successor)
+                                                 (drained-all-inputs? event successor))
                      :onyx.core/requeue? true
                      :onyx.core/decompressed filtered-segments}
                     {:onyx.core/tail-batch? false
                      :onyx.core/requeue? false
                      :onyx.core/decompressed filtered-segments})))
-            (if (= (:learned-sentinel state) uuid)
-              {:onyx.core/tail-batch? (= n-messages (count decompressed))
-               :onyx.core/requeue? true
-               :onyx.core/decompressed filtered-segments}
-              {:onyx.core/tail-batch? false
-               :onyx.core/requeue? false
-               :onyx.core/decompressed filtered-segments}))
+            (let [successor (swap! pipeline-state assoc-in [:drained-inputs input]
+                                   (and (= n-messages (count decompressed))
+                                        (= (= (get-in state [:learned-sentinel input]) uuid))))]
+                (if (= (get-in state [:learned-sentinel input]) uuid)
+                  {:onyx.core/tail-batch? (and (learned-all-sentinels? event successor)
+                                               (drained-all-inputs? event successor))
+                   :onyx.core/requeue? true
+                   :onyx.core/decompressed filtered-segments}
+                  {:onyx.core/tail-batch? false
+                   :onyx.core/requeue? false
+                   :onyx.core/decompressed filtered-segments})))
           {:onyx.core/tail-batch? false
            :onyx.core/requeue? true
            :onyx.core/decompressed filtered-segments})))
@@ -61,6 +87,6 @@
 (defn start-lifecycle?
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   (if (= (:onyx/consumption task-map) :sequential)
-    (zero? (extensions/n-consumers queue (first ingress-queues)))
+    (every? zero? (map #(extensions/n-consumers queue %) (vals ingress-queues)))
     true))
 

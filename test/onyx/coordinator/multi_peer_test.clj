@@ -54,7 +54,7 @@
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
+           workflow [[:in :inc] [:inc :out]]]
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
@@ -205,7 +205,7 @@
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
+           workflow [[:in :inc] [:inc :out]]]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)

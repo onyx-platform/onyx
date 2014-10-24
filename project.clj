@@ -3,7 +3,11 @@
   :url "https://github.com/MichaelDrogalis/onyx"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.7.0-alpha2"]
+  :repositories {"sonatype-snapshots"
+                 {:url "http://oss.sonatype.org/content/repositories/snapshots"
+                  :snapshots true
+                  :releases {:checksum :fail :update :always}}}
+  :dependencies [[org.clojure/clojure "1.7.0-master-SNAPSHOT"]
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [org.clojure/data.generators "0.1.2"]
                  [org.clojure/data.fressian "0.2.0"
@@ -12,6 +16,7 @@
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
                  [org.hornetq/hornetq-server "2.4.0.Final"]
                  [org.apache.curator/curator-test "2.6.0"]
+                 [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
                  [javax.servlet/servlet-api "2.5"]

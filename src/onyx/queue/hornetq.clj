@@ -171,9 +171,9 @@
 (defmethod extensions/create-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        ingress-queue (:ingress-queues task)
+        ingress-queue (vals (:ingress-queues task))
         egress-queues (vals (:egress-queues task))]
-    (doseq [queue-name (conj egress-queues ingress-queue)]
+    (doseq [queue-name (concat egress-queues ingress-queue)]
       (extensions/create-queue-on-session queue session queue-name))
     (.close session)))
 
@@ -230,7 +230,7 @@
 (defmethod extensions/bootstrap-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        producer (extensions/create-producer queue session (:ingress-queues task))]
+        producer (extensions/create-producer queue session (:self (:ingress-queues task)))]
     (extensions/produce-message queue producer session (.array (fressian/write {})))
     (extensions/produce-message queue producer session (.array (fressian/write :done)))
     (extensions/commit-tx queue session)
@@ -278,6 +278,10 @@
 (defmethod extensions/commit-tx HornetQConnection
   [queue session]
   (.commit session))
+
+(defmethod extensions/rollback-tx HornetQConnection
+  [queue session]
+  (.rollback session))
 
 (defmethod extensions/close-resource HornetQConnection
   [queue resource]
@@ -329,18 +333,20 @@
 (defmethod extensions/producer->queue-name HornetQConnection
   [queue producer] (.toString (.getAddress producer)))
 
+(def sentinel-byte-array (.limit (fressian/write :done) 32))
+
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
   ;; match, hashCode() doesn't work as expected.
-  ([f n] (take-segments f n [] (.limit (fressian/write :done) 32)))
-  ([f n rets ba]
+  ([f n] (take-segments f n []))
+  ([f n rets]
      (if (= n (count rets))
        rets
        (let [segment (f)]
          (if (nil? segment)
            rets
-           (let [m (.toByteBuffer (.getBodyBufferCopy segment))]
-             (if (= m ba)
+           (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
+             (if (= m sentinel-byte-array)
                (conj rets segment)
-               (recur f n (conj rets segment) ba))))))))
+               (recur f n (conj rets segment)))))))))
 

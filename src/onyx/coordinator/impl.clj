@@ -9,6 +9,9 @@
 
 (def sentinel-marker ".sentinel")
 
+(defn tag-sentinel-node [queue-name]
+  (format ".%s-%s" queue-name sentinel-marker))
+
 (defn serialize-task [task job-id catalog-node workflow-node]
   {:task/id (:id task)
    :task/job-id job-id

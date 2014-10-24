@@ -108,6 +108,8 @@
 
 (defmulti commit-tx (fn [queue session] (type queue)))
 
+(defmulti rollback-tx (fn [queue session] (type queue)))
+
 (defmulti create-queue (fn [queue task] (type queue)))
 
 (defmulti create-queue-on-session (fn [queue session queue-name] (type queue)))
@@ -127,6 +129,6 @@
 (defmulti producer->queue-name (fn [queue queue-name] (type queue)))
 
 (defmulti create-io-task
-  (fn [element parent children phase]
+  (fn [element parents children]
     (:onyx/type element)))
 
