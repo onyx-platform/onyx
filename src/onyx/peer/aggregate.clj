@@ -19,8 +19,8 @@
          (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
        (when (<! halting-ch)
          (recur)))
-     (catch Exception e
-       (fatal e)))))
+     (finally
+      (close! session-ch)))))
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
