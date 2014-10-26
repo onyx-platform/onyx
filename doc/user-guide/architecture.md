@@ -15,7 +15,7 @@
 
 ### Onyx Coordinator
 
-Onyx uses a single node to do distributed coordination across the cluster. This node is accepts new compute peers, watches for faults in peers, accepts jobs, and balances workloads. It’s fault tolerant by writing all data to ZooKeeper. This node can be made highly available by using traditional heartbeat techniques. It plays a similar role to Storm’s Nimbus.
+Onyx uses a single node to do distributed coordination across the cluster. This node accepts new compute peers, watches for faults in peers, accepts jobs, and balances workloads. It’s fault tolerant by writing all data to ZooKeeper. This node can be made highly available by using traditional heartbeat techniques. It plays a similar role to Storm’s Nimbus.
 
 ### ZooKeeper Cluster
 
