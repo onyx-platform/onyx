@@ -177,31 +177,3 @@
 (defmethod p-ext/seal-resource :default
   [event] (seal-resource-shim event))
 
-(with-post-hook! #'read-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/consumers]}]
-    (debug (format "[%s] Read batch of %s segments" id (count batch)))))
-
-(with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
-    (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
-
-(with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Requeued sentinel value" id))))
-
-(with-post-hook! #'apply-fn-shim
-  (fn [{:keys [onyx.core/id onyx.core/results]}]
-    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
-
-(with-post-hook! #'compress-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
-    (debug (format "[%s] Compressed %s segments" id (count compressed)))))
-
-(with-post-hook! #'write-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/producers]}]
-    (debug (format "[%s] Wrote batch to %s outputs" id (count producers)))))
-
-(with-post-hook! #'seal-resource-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Sealing resource" id))))
-

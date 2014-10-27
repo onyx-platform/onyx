@@ -13,8 +13,10 @@
   (go
    (try
      (loop []
-       (let [f (fn [] {:input input
-                      :message (extensions/consume-message (:onyx.core/queue event) consumer)})
+       (let [f
+             (fn []
+               {:input input
+                :message (extensions/consume-message (:onyx.core/queue event) consumer)})
              msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
          (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
        (when (<! halting-ch)
@@ -24,24 +26,24 @@
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
-  (let [session (extensions/bind-active-session queue (first (vals ingress-queues)))
-        drained (:drained-inputs @(:onyx.core/pipeline-state event))
+  (let [
         consumers (map (fn [[task queue-name]]
-                         {:input task
-                          :consumer (extensions/create-consumer queue session queue-name)})
+                         (let [session (extensions/bind-active-session queue queue-name)]
+                           {:input task
+                            :session session
+                            :consumer (extensions/create-consumer queue session queue-name)}))
                        ingress-queues)
         halting-ch (chan 0)
         read-ch (chan 1)
         rets
         {:onyx.aggregate/queue
-         {:session session
-          :consumers consumers
+         {:consumers consumers
           :halting-ch halting-ch}
          :onyx.aggregate/read-ch read-ch
          :onyx.core/reserve? true
          :onyx.transform/fn (operation/resolve-fn task-map)}]
     (doseq [c consumers]
-      (consumer-loop event session (:input c) (:consumer c) halting-ch read-ch))
+      (consumer-loop event (:session c) (:input c) (:consumer c) halting-ch read-ch))
     (merge event rets)))
 
 (defn inject-temporal-resource-shim
@@ -69,9 +71,8 @@
   (close! (:halting-ch (:onyx.aggregate/queue event)))
 
   (doseq [c (:consumers (:onyx.aggregate/queue event))]
-    (extensions/close-resource queue (:consumer c)))
-
-  (extensions/close-resource queue (:session (:onyx.aggregate/queue event)))
+    (extensions/close-resource queue (:consumer c))
+    (extensions/close-resource queue (:session c)))
   event)
 
 (defmethod l-ext/start-lifecycle? :aggregator
@@ -99,24 +100,4 @@
   [_ event]
   (close-pipeline-resources-shim event)
   {})
-
-(with-post-hook! #'inject-pipeline-resource-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Injecting resources" id))))
-
-(with-post-hook! #'inject-temporal-resource-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Injecting temporal resources" id))))
-
-(with-post-hook! #'read-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/batch]}]
-    (debug (format "[%s] Read batch of %s segments" id (count batch)))))
-
-(with-post-hook! #'close-temporal-resources-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Closing temporal resources" id))))
-
-(with-post-hook! #'close-pipeline-resources-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Closing pipeline resources" id))))
 
