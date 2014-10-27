@@ -135,9 +135,9 @@ Note that if you're looking to run Onyx inside a cloud provider like AWS, you're
 
 Let's have a look at the three node cluster that the Onyx test suite uses.
 
-- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-1.xml)
-- [Node 2 Configutation](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-2.xml)
-- [Node 3 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/clustered-3.xml)
+- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/resources/hornetq/clustered-1.xml)
+- [Node 2 Configutation](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/resources/hornetq/clustered-2.xml)
+- [Node 3 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/resources/hornetq/clustered-3.xml)
 
 There are a few things to take note of, but otherwise you can and should reuse these configuration files for your own cluster. It'll save you a lot of leg work in understanding HornetQ:
 
@@ -175,8 +175,8 @@ Another option for running HornetQ in clustered mode is to use JGroups. You're g
 
 Let's look at a single HornetQ node's configuration. The same advice in the UDP section with respect to replicating the grouping handler applies here:
 
-- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/hornetq/jgroups-clustered-1.xml)
-- [JGroups file for Node 1](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/resources/onyx-jgroups.xml)
+- [Node 1 Configuration](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/resources/hornetq/jgroups-clustered-1.xml)
+- [JGroups file for Node 1](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/resources/onyx-jgroups.xml)
 
 Note: You can see the JGroups local storage being configured in the `FILE_PING` tag. I'd recommend using the S3 discovery mechanism if you're running in AWS.
 

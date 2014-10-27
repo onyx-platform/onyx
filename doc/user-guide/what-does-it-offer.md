@@ -44,7 +44,7 @@ In general, your design is in trouble when you've reached for `with-redefs` or s
 
 #### Easy Parameterization of Workflows
 
-I think it's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peer's to spin up their own parameters at boot-up time. See [the tests](https://github.com/MichaelDrogalis/onyx/blob/0.3.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
+I think it's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peer's to spin up their own parameters at boot-up time. See [the tests](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
 
 #### Transactional Semantics
 
