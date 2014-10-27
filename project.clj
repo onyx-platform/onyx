@@ -7,6 +7,7 @@
                  {:url "http://oss.sonatype.org/content/repositories/snapshots"
                   :snapshots true
                   :releases {:checksum :fail :update :always}}}
+  :jvm-opts ["-Xmx4g" "-Djava.net.preferIPv4Stack=true"]
   :dependencies [[org.clojure/clojure "1.7.0-master-SNAPSHOT"]
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [org.clojure/data.generators "0.1.2"]
@@ -32,6 +33,6 @@
                                   [org.clojure/tools.nrepl "0.2.3"]]
                    :plugins [[lein-midje "3.1.1"]
                              [codox "0.8.8"]]}
-             :circle-ci {:jvm-opts ["-Xmx4g"]}}
+             :circle-ci {:jvm-opts ["-Xmx4g" "-Djava.net.preferIPv4Stack=true"]}}
   :codox {:output-dir "doc/api"})
 
