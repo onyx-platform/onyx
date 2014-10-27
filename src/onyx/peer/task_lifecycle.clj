@@ -7,7 +7,7 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
-              [onyx.peer.transform :as transform]
+              [onyx.peer.function :as function]
               [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]

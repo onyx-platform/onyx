@@ -6,12 +6,12 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Functions](#functions)
-  - [Transformation](#transformation)
+  - [Functional Transformation](#functional-transformation)
   - [Grouping & Aggregation](#grouping-&-aggregation)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-#### Transformation
+#### Functional Transformation
 
 A Function is a construct that takes a segment as a parameter and outputs a segment or a seq of segments. Functions are meant to literally transform a single unit of data in a functional manner. The following is an example of a function:
 

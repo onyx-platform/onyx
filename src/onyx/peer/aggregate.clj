@@ -5,7 +5,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.queue.hornetq :refer [take-segments]]
-              [onyx.peer.transform :as function]
+              [onyx.peer.function :as function]
               [taoensso.timbre :refer [debug fatal]]
               [dire.core :refer [with-post-hook!]]))
 
@@ -41,7 +41,7 @@
           :halting-ch halting-ch}
          :onyx.aggregate/read-ch read-ch
          :onyx.core/reserve? true
-         :onyx.transform/fn (operation/resolve-fn task-map)}]
+         :onyx.function/fn (operation/resolve-fn task-map)}]
     (doseq [c consumers]
       (consumer-loop event (:session c) (:input c) (:consumer c) halting-ch read-ch))
     (merge event rets)))
