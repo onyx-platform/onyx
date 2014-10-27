@@ -123,10 +123,8 @@
 (defn apply-fn-shim
   [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
            onyx.core/task-map] :as event}]
-  (if (:onyx/transduce? task-map)
-    (merge event {:onyx.core/results (sequence (apply fn params) decompressed)})
-    (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
-      (merge event {:onyx.core/results results}))))
+  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
+    (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
