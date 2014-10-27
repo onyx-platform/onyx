@@ -31,4 +31,4 @@ Each virtual peer is allowed to be active on at most one task in an Onyx workflo
 
 A cluster of HornetQ nodes carries out the responsibility of moving data between virtual peers. When a job is submitted to the coordinator, a tree­walk is performed on the workflow. Queues are constructed out of the edges of the tree, and this information is persisted to the log. This enables every peer to receive a task and also know where to consume data from and where to produce it to.
 
-Fault tolerance is achieved using HornetQ transacted sessions. As with most systems of this nature, transformation functions should be idempotent as data segments will be replayed if they were consumed from a queue and the transaction was not committed.
+Fault tolerance is achieved using HornetQ transacted sessions. As with most systems of this nature, Functions should be idempotent as data segments will be replayed if they were consumed from a queue and the transaction was not committed.

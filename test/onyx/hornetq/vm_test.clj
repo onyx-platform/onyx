@@ -23,7 +23,7 @@
    
    {:onyx/name :inc
     :onyx/fn :onyx.hornetq.vm-test/my-inc
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
    

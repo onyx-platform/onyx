@@ -42,7 +42,7 @@
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
                       {:onyx/name :inc-a
-                       :onyx/type :transformer
+                       :onyx/type :function
                        :onyx/consumption :sequential}
                       {:onyx/name :out-a
                        :onyx/type :output
@@ -56,7 +56,7 @@
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
                       {:onyx/name :inc-b
-                       :onyx/type :transformer
+                       :onyx/type :function
                        :onyx/consumption :sequential}
                       {:onyx/name :out-b
                        :onyx/type :output

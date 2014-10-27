@@ -73,7 +73,7 @@
    
    {:onyx/name :inc
     :onyx/fn :onyx.peer.transducers-test/x-form
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/transduce? true
     :onyx/batch-size batch-size}

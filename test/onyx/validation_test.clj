@@ -46,9 +46,9 @@
     :onyx/bootstrap? true
     :onyx/batch-size 2}])
 
-(def illegal-transformer-catalog
+(def illegal-function-catalog
    [{:onyx/name :inc
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
 
@@ -78,7 +78,7 @@
 
 (fact (onyx.api/submit-job conn {:catalog illegal-output-catalog :workflow workflow}) => (throws Exception))
 
-(fact (onyx.api/submit-job conn {:catalog illegal-transformer-catalog :workflow workflow}) => (throws Exception))
+(fact (onyx.api/submit-job conn {:catalog illegal-function-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog illegal-grouper-catalog :workflow workflow}) => (throws Exception))
 
@@ -114,19 +114,19 @@
         :onyx/consumption :concurrent}
 
        {:onyx/name :c
-        :onyx/type :transformer
+        :onyx/type :function
         :onyx/consumption :concurrent}
 
        {:onyx/name :d
-        :onyx/type :transformer
+        :onyx/type :function
         :onyx/consumption :concurrent}
 
        {:onyx/name :e
-        :onyx/type :transformer
+        :onyx/type :function
         :onyx/consumption :concurrent}
 
        {:onyx/name :f
-        :onyx/type :transformer
+        :onyx/type :function
         :onyx/consumption :concurrent}
 
        {:onyx/name :g
