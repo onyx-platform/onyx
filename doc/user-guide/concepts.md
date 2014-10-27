@@ -147,7 +147,7 @@ A segment is the smallest unit of data in Onyx. Segments are required to be Cloj
 
 #### Function
 
-A function is a function that receives segments and emits segments for further processing.
+A function is a construct that receives segments and emits segments for further processing. It literally translate down to a Clojure function.
 
 #### Plugin
 
