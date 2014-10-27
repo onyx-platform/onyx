@@ -34,7 +34,7 @@
    
    {:onyx/name :inc
     :onyx/fn :onyx.hornetq.standalone-test/my-inc
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :sequential
     :onyx/batch-size batch-size}
    

@@ -36,7 +36,7 @@ Macros are a tremendously powerful tool, but are often inappropriate for end-use
 
 #### Plain Clojure Functions
 
-To the same point above, we want plain Clojure functions to be the building blocks for application logic. Onyx's transformers, groupers, and aggregator functions can be tested directly without any special test runner.
+To the same point above, we want plain Clojure functions to be the building blocks for application logic. Onyx's functions can be tested directly without any special test runner.
 
 #### Testing Without Mocking
 

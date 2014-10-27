@@ -11,7 +11,7 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
     - [All maps in the vector must have these keys](#all-maps-in-the-vector-must-have-these-keys)
     - [All maps may optionally have these keys](#all-maps-may-optionally-have-these-keys)
     - [Maps with `:onyx/type` set to `:input` or `:output` must have these keys](#maps-with-onyxtype-set-to-input-or-output-must-have-these-keys)
-    - [Maps with `:onyx/type` set to `:transformer` must have these keys](#maps-with-onyx-type-set-to-transformer-must-have-these-keys)
+    - [Maps with `:onyx/type` set to `:function` must have these keys](#maps-with-onyx-type-set-to-function-must-have-these-keys)
   - [ZooKeeper](#zookeeper)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -34,7 +34,7 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/name`       | `keyword`  | `any`
-|`:onyx/type`       | `keyword`  | `:input`, `:output`, `:transformer`
+|`:onyx/type`       | `keyword`  | `:input`, `:output`, `:function`
 |`:onyx/consumption`| `keyword`  | `:sequential`, `:concurrent`
 |`:onyx/batch-size` | `integer`  | `>= 0`
 
@@ -50,13 +50,13 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 |-------------------|------------|----------
 |`:onyx/medium`     | `keyword`  | `any`
 
-#### Maps with `:onyx/type` set to `:transformer` must have these keys
+#### Maps with `:onyx/type` set to `:function` must have these keys
 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/fn`         | `keyword`  | `any`
 
-#### Maps with `:onyx/type` set to `:transformer` may optionally have these keys
+#### Maps with `:onyx/type` set to `:function` may optionally have these keys
 
 | key name           | type       | choices
 |--------------------|------------|----------

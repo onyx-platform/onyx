@@ -41,7 +41,7 @@
      :egress-queues (egress-queues-from-children children)
      :consumption (:onyx/consumption element)}))
 
-(defmethod create-task :transformer
+(defmethod create-task :function
   [catalog task-name parents children-names]
   (onyx-function-task catalog task-name parents children-names))
 

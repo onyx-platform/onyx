@@ -13,7 +13,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 
 #### Transformation
 
-A Transformer is a function that takes a segment as a parameter and outputs a segment or a seq of segments. Transformers are meant to literally transform a single unit of data in a functional manner. The following is an example of a transformer:
+A Function is a function that takes a segment as a parameter and outputs a segment or a seq of segments. Functions are meant to literally transform a single unit of data in a functional manner. The following is an example of a function:
 
 ```clojure
 (defn my-inc [{:keys [n] :as segment}]
@@ -30,7 +30,7 @@ To group by a key in a segment, use `:onyx/group-by-key` in the catalog entry:
 {:onyx/name :sum-balance
  :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
  :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
- :onyx/type :transformer
+ :onyx/type :function
  :onyx/group-by-key :name
  :onyx/consumption :concurrent
  :onyx/batch-size 1000}
@@ -42,7 +42,7 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 {:onyx/name :sum-balance
  :onyx/ident :onyx.peer.fn-grouping-test/sum-balance
  :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
- :onyx/type :transformer
+ :onyx/type :function
  :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
  :onyx/consumption :concurrent
  :onyx/batch-size 1000}

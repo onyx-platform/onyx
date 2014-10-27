@@ -5,7 +5,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.queue.hornetq :refer [take-segments]]
-              [onyx.peer.transform :as transformer]
+              [onyx.peer.transform :as function]
               [taoensso.timbre :refer [debug fatal]]
               [dire.core :refer [with-post-hook!]]))
 

@@ -89,7 +89,7 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/type :output
@@ -236,7 +236,7 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/type :output
@@ -314,7 +314,7 @@
                      :onyx/medium :hornetq
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/consumption :sequential
@@ -439,7 +439,7 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/type :output

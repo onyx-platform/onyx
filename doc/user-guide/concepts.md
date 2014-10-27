@@ -9,7 +9,7 @@
     - [Workflow](#workflow)
     - [Catalog](#catalog)
     - [Segment](#segment)
-    - [Transformer](#transformer)
+    - [Function](#function)
     - [Plugin](#plugin)
     - [Sentinel](#sentinel)
     - [Coordinator](#coordinator)
@@ -124,7 +124,7 @@ Example:
 
 {:onyx/name :inc
  :onyx/fn :onyx.peer.multi-peer-mem-test/my-inc
- :onyx/type :transformer
+ :onyx/type :function
  :onyx/consumption :concurrent
  :onyx/batch-size batch-size
  :onyx/doc "A function to increment integers"}
@@ -145,9 +145,9 @@ Example:
 
 A segment is the smallest unit of data in Onyx. Segments are required to be Clojure maps. They represent the data flowing through the cluster.
 
-#### Transformer
+#### Function
 
-A transformer is a function that receives segments and emits segments for further processing.
+A function is a function that receives segments and emits segments for further processing.
 
 #### Plugin
 
