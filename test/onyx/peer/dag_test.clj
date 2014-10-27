@@ -6,11 +6,11 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def n-queued-messages 25)
+(def n-queued-messages 15000)
 
-(def batch-size 50)
+(def batch-size 1320)
 
-(def echo 5)
+(def echo 1000)
 
 (def id (str (java.util.UUID/randomUUID)))
 
@@ -219,7 +219,7 @@
    [:I :L]
    [:D :G]])
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def v-peers (onyx.api/start-peers conn 6 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
