@@ -69,13 +69,17 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
+### Release Notes
+
+You can find [the release notes here](doc/release-notes/0.4.0.md).
+
 ### Need help?
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.3.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.4.x/resources/logo).
 
 ### Running the tests
 

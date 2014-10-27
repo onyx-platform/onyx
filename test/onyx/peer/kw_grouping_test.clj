@@ -82,7 +82,7 @@
    {:onyx/name :sum-balance
     :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/group-by-key :name
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}

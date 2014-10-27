@@ -103,7 +103,7 @@
    
    {:onyx/name :join-person
     :onyx/fn :onyx.peer.join-test/join-person
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/group-by-key :id
     :onyx/batch-size batch-size}

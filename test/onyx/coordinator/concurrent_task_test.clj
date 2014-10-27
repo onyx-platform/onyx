@@ -29,7 +29,7 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :concurrent}
                     {:onyx/name :out
                      :onyx/type :output

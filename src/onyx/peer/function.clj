@@ -1,4 +1,4 @@
-(ns ^:no-doc onyx.peer.transform
+(ns ^:no-doc onyx.peer.function
     (:require [clojure.core.async :refer [chan >! go alts!! close!]]
               [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -121,12 +121,10 @@
   (merge event {:onyx.core/requeued? true}))
 
 (defn apply-fn-shim
-  [{:keys [onyx.core/decompressed onyx.transform/fn onyx.core/params
+  [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
            onyx.core/task-map] :as event}]
-  (if (:onyx/transduce? task-map)
-    (merge event {:onyx.core/results (sequence (apply fn params) decompressed)})
-    (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
-      (merge event {:onyx.core/results results}))))
+  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
+    (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
@@ -145,13 +143,13 @@
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
   (merge event (seal-queue queue egress-queues)))
 
-(defmethod l-ext/start-lifecycle? :transformer
+(defmethod l-ext/start-lifecycle? :function
   [_ event]
   {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
 
-(defmethod l-ext/inject-lifecycle-resources :transformer
+(defmethod l-ext/inject-lifecycle-resources :function
   [_ {:keys [onyx.core/task-map]}]
-  {:onyx.transform/fn (operation/resolve-fn task-map)})
+  {:onyx.function/fn (operation/resolve-fn task-map)})
 
 (defmethod p-ext/read-batch :default
   [event] (read-batch-shim event))
