@@ -55,12 +55,16 @@
 
 (defn read-batch-shim [{:keys [onyx.core/queue] :as event}]
   (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
-    (doseq [msg msgs]
-      (extensions/ack-message queue (:message msg)))
     (merge event
            {:onyx.core/session session
             :onyx.core/batch msgs
             :onyx.aggregate/halting-ch halting-ch})))
+
+(defn write-batch-shim [event]
+  (let [results (function/write-batch-shim event)]
+    (doseq [msg (:onyx.core/batch results)]
+      (extensions/ack-message (:onyx.core/queue event) (:message msg)))
+    results))
 
 (defn close-temporal-resources-shim [event]
   (>!! (:onyx.aggregate/halting-ch event) true)
@@ -90,6 +94,9 @@
 (defmethod p-ext/read-batch [:aggregator nil]
   [event]
   (read-batch-shim event))
+
+(defmethod p-ext/write-batch [:aggregator nil]
+  [event] (write-batch-shim event))
 
 (defmethod l-ext/close-temporal-resources :aggregator
   [_ event]
