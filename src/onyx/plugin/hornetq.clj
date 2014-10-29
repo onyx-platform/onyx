@@ -16,11 +16,12 @@
 (defn read-batch [queue session-factory task]
   (let [session (.createTransactedSession session-factory)
         queue-name (:hornetq/queue-name task)
-        consumer (.createConsumer session queue-name)]
+        consumer (.createConsumer session queue-name)
+        timeout (or (:onyx/batch-timeout task) 1000)]
     (.start session)
-    (let [f (fn [] {:message (.receive consumer 1000)})
-          rets (take-segments f (:onyx/batch-size task))
-          rets (filter (fn [m] (not (nil? (:message m)))) rets)]
+    (let [f (fn [] {:message (.receive consumer timeout)})
+          rets (filter (comp not nil? :message)
+                       (take-segments f (:onyx/batch-size task)))]
       (doseq [segment rets]
         (extensions/ack-message queue (:message segment)))
       {:onyx.core/batch (or rets [])

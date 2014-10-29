@@ -39,11 +39,12 @@
 
 (defn read-batch [queue consumers task-map event]
   (if-not (empty? consumers)
-    (let [reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
+    (let [timeout-ms (or (:onyx/batch-timeout task-map) 1000)
+          reader-chs (map (fn [_] (chan (:onyx/batch-size task-map))) (vals consumers))
           reader-threads (doall (map (fn [ch [input consumer]]
                                        (reader-thread event queue ch input consumer))
                                      reader-chs consumers))
-          read-f #(first (alts!! (conj reader-chs (timeout 1000))))
+          read-f #(first (alts!! (conj reader-chs (timeout timeout-ms))))
           segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
       ;; Ack each of the segments. Closing a consumer with unacked tasks will send

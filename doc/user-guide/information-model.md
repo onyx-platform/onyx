@@ -31,12 +31,13 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 
 #### All maps in the vector must have these keys
 
-| key name          | type       | choices
-|-------------------|------------|----------
-|`:onyx/name`       | `keyword`  | `any`
-|`:onyx/type`       | `keyword`  | `:input`, `:output`, `:function`
-|`:onyx/consumption`| `keyword`  | `:sequential`, `:concurrent`
-|`:onyx/batch-size` | `integer`  | `>= 0`
+| key name             | type       | choices                          | default
+|----------------------|------------|----------------------------------|--------
+|`:onyx/name`          | `keyword`  | `any`                            |
+|`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
+|`:onyx/consumption`   | `keyword`  | `:sequential`, `:concurrent`     |
+|`:onyx/batch-size`    | `integer`  | `>= 0`                           |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`                           | 1000
 
 #### All maps may optionally have these keys
 
