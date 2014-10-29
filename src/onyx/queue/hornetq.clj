@@ -343,7 +343,7 @@
      (if (= n (count rets))
        rets
        (let [segment (f)]
-         (if (nil? segment)
+         (if (nil? (:message segment))
            rets
            (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
              (if (= m sentinel-byte-array)

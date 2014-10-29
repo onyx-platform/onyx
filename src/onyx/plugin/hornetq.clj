@@ -18,8 +18,9 @@
         queue-name (:hornetq/queue-name task)
         consumer (.createConsumer session queue-name)]
     (.start session)
-    (let [f (fn [] {:message (.receive consumer)})
-          rets (take-segments f (:onyx/batch-size task))]
+    (let [f (fn [] {:message (.receive consumer 1000)})
+          rets (take-segments f (:onyx/batch-size task))
+          rets (filter (fn [m] (not (nil? (:message m)))) rets)]
       (doseq [segment rets]
         (extensions/ack-message queue (:message segment)))
       {:onyx.core/batch (or rets [])

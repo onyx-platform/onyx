@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.function
-    (:require [clojure.core.async :refer [chan >! go alts!! close!]]
+    (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
               [clojure.data.fressian :as fressian]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -43,7 +43,7 @@
           reader-threads (doall (map (fn [ch [input consumer]]
                                        (reader-thread event queue ch input consumer))
                                      reader-chs consumers))
-          read-f #(first (alts!! (conj reader-chs (clojure.core.async/timeout 200))))
+          read-f #(first (alts!! (conj reader-chs (timeout 1000))))
           segments (doall (take-segments read-f (:onyx/batch-size task-map)))]
 
       ;; Ack each of the segments. Closing a consumer with unacked tasks will send
