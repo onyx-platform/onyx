@@ -23,14 +23,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.4.0-SNAPSHOT"]
+[com.mdrogalis/onyx "0.4.0"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.4.0-SNAPSHOT
+### User Guide 0.4.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -53,7 +53,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.4.0-SNAPSHOT
+### API Docs 0.4.0
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
