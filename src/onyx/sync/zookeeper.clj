@@ -487,8 +487,9 @@
   (read-log-entry-at sync (shutdown-log-path (:onyx/id (:opts sync))) n))
 
 (defmethod extensions/create-node ZooKeeper
-  [sync node]
-  (zk/create (:conn sync) node :persistent? true))
+  ([sync node] (zk/create (:conn sync) node :persistent? true))
+  ([sync node contents]
+     (zk/create (:conn sync) node :data (serialize-edn contents) :persistent? true)))
 
 (defmethod extensions/create-at [ZooKeeper :peer-state]
   [sync _ subpath content]

@@ -32,7 +32,10 @@
     ([sync bucket subpath] [(type sync) bucket])
     ([sync bucket subpath content] [(type sync) bucket])))
 
-(defmulti create-node (fn [sync node] (type sync)))
+(defmulti create-node
+  (fn
+    ([sync node] (type sync))
+    ([sync node contents] (type sync))))
 
 (defmulti delete (fn [sync node] (type sync)))
 
@@ -96,12 +99,16 @@
 
 (defmulti read-message (fn [queue message] (type queue)))
 
+(defmulti message-uuid (fn [queue message] (type queue)))
+
 (defmulti ack-message (fn [queue message] (type queue)))
 
 (defmulti produce-message (fn ([queue producer session msg] (type queue))
                             ([queue producer session msg group] (type queue))))
 
 (defmulti commit-tx (fn [queue session] (type queue)))
+
+(defmulti rollback-tx (fn [queue session] (type queue)))
 
 (defmulti create-queue (fn [queue task] (type queue)))
 
@@ -119,7 +126,9 @@
 
 (defmulti bind-active-session (fn [queue queue-name] (type queue)))
 
+(defmulti producer->queue-name (fn [queue queue-name] (type queue)))
+
 (defmulti create-io-task
-  (fn [element parent children phase]
+  (fn [element parents children]
     (:onyx/type element)))
 

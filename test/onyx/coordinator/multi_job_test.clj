@@ -42,7 +42,7 @@
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
                       {:onyx/name :inc-a
-                       :onyx/type :transformer
+                       :onyx/type :function
                        :onyx/consumption :sequential}
                       {:onyx/name :out-a
                        :onyx/type :output
@@ -56,16 +56,16 @@
                        :onyx/consumption :sequential
                        :hornetq/queue-name "in-queue"}
                       {:onyx/name :inc-b
-                       :onyx/type :transformer
+                       :onyx/type :function
                        :onyx/consumption :sequential}
                       {:onyx/name :out-b
                        :onyx/type :output
                        :onyx/medium :hornetq
                        :onyx/consumption :sequential
                        :hornetq/queue-name "out-queue"}]
-           
-           workflow-a {:in-a {:inc-a :out-a}}
-           workflow-b {:in-b {:inc-b :out-b}}]
+
+           workflow-a [[:in-a :inc-a] [:inc-a :out-a]]
+           workflow-b [[:in-b :inc-b] [:inc-b :out-b]]]
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
@@ -281,7 +281,7 @@
               task-paths (map #(extensions/resolve-node sync :task %) job-nodes)]
           (doseq [task-path task-paths]
             (doseq [task-node (extensions/children sync task-path)]
-              (when-not (impl/completed-task? task-node)
+              (when-not (impl/metadata-task? task-node)
                 (fact (impl/task-complete? sync task-node) => true))))))
 
        (facts "All peers are idle"

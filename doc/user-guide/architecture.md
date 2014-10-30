@@ -15,7 +15,7 @@
 
 ### Onyx Coordinator
 
-Onyx uses a single node to do distributed coordination across the cluster. This node is accepts new compute peers, watches for faults in peers, accepts jobs, and balances workloads. It’s fault tolerant by writing all data to ZooKeeper. This node can be made highly available by using traditional heartbeat techniques. It plays a similar role to Storm’s Nimbus.
+Onyx uses a single node to do distributed coordination across the cluster. This node accepts new compute peers, watches for faults in peers, accepts jobs, and balances workloads. It’s fault tolerant by writing all data to ZooKeeper. This node can be made highly available by using traditional heartbeat techniques. It plays a similar role to Storm’s Nimbus.
 
 ### ZooKeeper Cluster
 
@@ -31,4 +31,4 @@ Each virtual peer is allowed to be active on at most one task in an Onyx workflo
 
 A cluster of HornetQ nodes carries out the responsibility of moving data between virtual peers. When a job is submitted to the coordinator, a tree­walk is performed on the workflow. Queues are constructed out of the edges of the tree, and this information is persisted to the log. This enables every peer to receive a task and also know where to consume data from and where to produce it to.
 
-Fault tolerance is achieved using HornetQ transacted sessions. As with most systems of this nature, transformation functions should be idempotent as data segments will be replayed if they were consumed from a queue and the transaction was not committed.
+Fault tolerance is achieved using HornetQ transacted sessions. As with most systems of this nature, Functions should be idempotent as data segments will be replayed if they were consumed from a queue and the transaction was not committed.

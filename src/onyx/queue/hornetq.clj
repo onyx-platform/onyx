@@ -171,9 +171,9 @@
 (defmethod extensions/create-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        ingress-queue (:ingress-queues task)
+        ingress-queue (vals (:ingress-queues task))
         egress-queues (vals (:egress-queues task))]
-    (doseq [queue-name (conj egress-queues ingress-queue)]
+    (doseq [queue-name (concat egress-queues ingress-queue)]
       (extensions/create-queue-on-session queue session queue-name))
     (.close session)))
 
@@ -230,20 +230,32 @@
 (defmethod extensions/bootstrap-queue HornetQConnection
   [queue task]
   (let [session (extensions/create-tx-session queue)
-        producer (extensions/create-producer queue session (:ingress-queues task))]
+        producer (extensions/create-producer queue session (:self (:ingress-queues task)))]
     (extensions/produce-message queue producer session (.array (fressian/write {})))
     (extensions/produce-message queue producer session (.array (fressian/write :done)))
     (extensions/commit-tx queue session)
     (extensions/close-resource queue session)))
+
+(def key->property
+  {:group "_HQ_GROUP_ID"
+   :uuid "_ONYX_UUID"})
+
+(def key->put-fn
+  {:group #(.putStringProperty %1 (:group key->property) (str %2))
+   :uuid #(.putStringProperty %1 (:uuid key->property) (str %2))})
+
+(defn add-properties [m opts]
+  (doseq [[k v] opts]
+    ((get key->put-fn k) m v))
+  m)
 
 (defmethod extensions/produce-message HornetQConnection
   ([queue producer session msg]
      (let [message (.createMessage session true)]
        (.writeBytes (.getBodyBuffer message) msg)
        (.send producer message)))
-  ([queue producer session msg group]
-     (let [message (.createMessage session true)]
-       (.putStringProperty message "_HQ_GROUP_ID" group)
+  ([queue producer session msg opts]
+     (let [message (add-properties (.createMessage session true) opts)]
        (.writeBytes (.getBodyBuffer message) msg)
        (.send producer message))))
 
@@ -255,6 +267,10 @@
   [queue message]
   (fressian/read (.toByteBuffer (.getBodyBuffer message))))
 
+(defmethod extensions/message-uuid HornetQConnection
+  [queue message]
+  (.getStringProperty message (:uuid key->property)))
+
 (defmethod extensions/ack-message HornetQConnection
   [queue message]
   (.acknowledge message))
@@ -262,6 +278,10 @@
 (defmethod extensions/commit-tx HornetQConnection
   [queue session]
   (.commit session))
+
+(defmethod extensions/rollback-tx HornetQConnection
+  [queue session]
+  (.rollback session))
 
 (defmethod extensions/close-resource HornetQConnection
   [queue resource]
@@ -310,18 +330,23 @@
           (.start s)
           s)))))
 
+(defmethod extensions/producer->queue-name HornetQConnection
+  [queue producer] (.toString (.getAddress producer)))
+
+(def sentinel-byte-array (.limit (fressian/write :done) 32))
+
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
   ;; match, hashCode() doesn't work as expected.
-  ([f n] (take-segments f n [] (.limit (fressian/write :done) 32)))
-  ([f n rets ba]
+  ([f n] (take-segments f n []))
+  ([f n rets]
      (if (= n (count rets))
        rets
        (let [segment (f)]
-         (if (nil? segment)
+         (if (nil? (:message segment))
            rets
-           (let [m (.toByteBuffer (.getBodyBufferCopy segment))]
-             (if (= m ba)
+           (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
+             (if (= m sentinel-byte-array)
                (conj rets segment)
-               (recur f n (conj rets segment) ba))))))))
+               (recur f n (conj rets segment)))))))))
 

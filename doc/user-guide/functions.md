@@ -1,44 +1,56 @@
 ## Functions
 
+This section outlines how Onyx programs execute behavior. Onyx uses plain Clojure functions to carry out distributed activity. You have the option of performing grouping and aggregation on each function.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Functions](#functions)
-  - [Transformers](#transformers)
-  - [Groupers](#groupers)
-  - [Aggregators](#aggregators)
+  - [Functional Transformation](#functional-transformation)
+  - [Grouping & Aggregation](#grouping-&-aggregation)
+    - [Group By Key](#group-by-key)
+    - [Group By Function](#group-by-function)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-### Functions
+#### Functional Transformation
 
-This section outlines how Onyx programs execute behavior. Onyx uses plain Clojure functions to carry out distributed activity. There are 3 kinds of functions you can use to apply changes to data.
-
-#### Transfomers
-
-A Transformer is a function that takes a segment as a parameter and outputs a segment or a seq of segments. Transformers are meant to literally transform a single unit of data in a functional manner. The following is an example of a transformer:
+A Function is a construct that takes a segment as a parameter and outputs a segment or a seq of segments. Functions are meant to literally transform a single unit of data in a functional manner. The following is an example of a function:
 
 ```clojure
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 ```
 
-#### Groupers
+#### Grouping & Aggregation
 
-A Grouper is a function that consolidates "like" values together. Grouping functions receive a single segment as input. The output of a grouper is the value to group on. All segments that are grouped with the same value will be emitted to the *same* virtual peer. If that virtual peer fails, all remaining segments of the group will be pinned to another virtual peer. The following is an example of a grouper:
+Grouping means consolidates "like" values together to the same virtual peer to presumably compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. If a virtual peer receiving grouped segments fails, all remaining segments of the group will be pinned to another virtual peer.
+
+#### Group By Key
+
+To group by a key in a segment, use `:onyx/group-by-key` in the catalog entry:
 
 ```clojure
-(defn group-by-name [{:keys [name] :as segment}]
-  name)
+{:onyx/name :sum-balance
+ :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
+ :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
+ :onyx/type :function
+ :onyx/group-by-key :name
+ :onyx/consumption :concurrent
+ :onyx/batch-size 1000}
 ```
 
-#### Aggregators
+#### Group By Function
 
-Aggregators receive segments that have been grouped together by a Grouper. Aggegators must directly follow Groupers in workflows. Aggregators receive a single segment as input, and output a segment or seq of segments. It's often useful to accrue local or durable state in an aggregator. The following is an example of an aggregator. This aggregator is parameterized with an atom to accrue state:
+To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 ```clojure
-(defn sum-balance [state {:keys [name amount] :as segment}]
-  (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
-  [])
+{:onyx/name :sum-balance
+ :onyx/ident :onyx.peer.fn-grouping-test/sum-balance
+ :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+ :onyx/type :function
+ :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+ :onyx/consumption :concurrent
+ :onyx/batch-size 1000}
 ```
 

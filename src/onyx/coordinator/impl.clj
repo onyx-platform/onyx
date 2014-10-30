@@ -7,6 +7,11 @@
 
 (def complete-marker ".complete")
 
+(def sentinel-marker ".sentinel")
+
+(defn tag-sentinel-node [queue-name]
+  (format ".%s-%s" queue-name sentinel-marker))
+
 (defn serialize-task [task job-id catalog-node workflow-node]
   {:task/id (:id task)
    :task/job-id job-id
@@ -16,13 +21,15 @@
    :task/phase (:phase task)
    :task/consumption (:consumption task)
    :task/ingress-queues (:ingress-queues task)
-   :task/egress-queues (or (vals (:egress-queues task)) [])})
+   :task/egress-queues (or (vals (:egress-queues task)) [])
+   :task/children-links (:egress-queues task)})
 
 (defn task-complete? [sync task-node]
   (extensions/node-exists? sync (str task-node complete-marker)))
 
-(defn completed-task? [task-node]
-  (.endsWith task-node complete-marker))
+(defn metadata-task? [task-node]
+  (or (.endsWith task-node complete-marker)
+      (.endsWith task-node sentinel-marker)))
 
 (defn complete-task [sync task-node]
   (extensions/create-node sync (str task-node complete-marker)))
@@ -179,9 +186,9 @@
 
         (when (and (zero? n) (not complete?))
           (release-waiting-nodes! sync (:task-node peer-state))
-          (complete-task sync (:task-node peer-state))
-          (extensions/write-node sync cooldown-node {:completed? true}))
+          (complete-task sync (:task-node peer-state)))
         
+        (extensions/write-node sync cooldown-node {:completed? complete?})
         {:n-peers n :peer-state peer-state})
       (do (extensions/write-node sync cooldown-node {:completed? true})
           {:n-peers n :peer-state peer-state}))))
@@ -216,7 +223,7 @@
 
 (defn find-incomplete-tasks [sync tasks]
   (filter (fn [task]
-            (and (not (completed-task? task))
+            (and (not (metadata-task? task))
                  (not (task-complete? sync task))))
           tasks))
 

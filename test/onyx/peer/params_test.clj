@@ -72,7 +72,7 @@
 
    {:onyx/name :add
     :onyx/fn :onyx.peer.params-test/my-adder
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :sequential
     :onyx/batch-size batch-size}
 

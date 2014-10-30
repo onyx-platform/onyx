@@ -10,3 +10,4 @@ pom.xml.asc
 /.nrepl-port
 onyx.log
 .#*
+.DS_Store

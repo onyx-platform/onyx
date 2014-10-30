@@ -107,7 +107,7 @@
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id id
-   :onyx.coordinator/revoke-delay 2000})
+   :onyx.coordinator/revoke-delay 5000})
 
 (def peer-opts
   {:hornetq/mode :udp
@@ -134,7 +134,7 @@
 
    {:onyx/name :inc
     :onyx/fn :onyx.peer.simulant.linear-cluster-sim/my-inc
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 

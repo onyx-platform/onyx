@@ -18,7 +18,7 @@ Sometimes, an operation during task execution will fail on a particular node. We
 
 In this example, we inject a function into the task that can be executed to requeue the node. If there's a failure, we invoke the function with the segment as a parameter. This segment will be retried infinitely until it succeeds. You'll probably want to bound retries - which are described in the next section.
 
-Note that if Onyx is in batch mode and the sentinel value is on the queue, this sentinel value will get bumped back to the tail of the queue - meaning you don't need to worry about the ordering. Also note that this operation is *not* executed in the current running transaction. Node hard-failure can result in the message being duplicated across queues.
+Note that if Onyx is in batch mode and the sentinel value is on the queue, this sentinel value will get bumped back to the tail of the queue - meaning you don't need to worry about the ordering. Also note that this operation *is* executed in the current running transaction. That means segments move to their respect queues - errors or not - atomically.
 
 ### Bounded Retry
 

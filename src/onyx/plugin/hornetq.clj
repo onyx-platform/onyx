@@ -13,13 +13,17 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(defn read-batch [session-factory task]
+(defn read-batch [queue session-factory task]
   (let [session (.createTransactedSession session-factory)
-        queue (:hornetq/queue-name task)
-        consumer (.createConsumer session queue)]
+        queue-name (:hornetq/queue-name task)
+        consumer (.createConsumer session queue-name)
+        timeout (or (:onyx/batch-timeout task) 1000)]
     (.start session)
-    (let [f #(.receive consumer)
-          rets (doall (take-segments f (:onyx/batch-size task)))]
+    (let [f (fn [] {:message (.receive consumer timeout)})
+          rets (filter (comp not nil? :message)
+                       (take-segments f (:onyx/batch-size task)))]
+      (doseq [segment rets]
+        (extensions/ack-message queue (:message segment)))
       {:onyx.core/batch (or rets [])
        :hornetq/session session
        :hornetq/consumer consumer})))
@@ -44,11 +48,12 @@
      :hornetq/producer producer
      :onyx.core/written? true}))
 
-(defn read-batch-shim [{:keys [onyx.core/task-map] :as event}]
-  (merge event (read-batch (:hornetq/session-factory event) task-map)))
+(defn read-batch-shim [{:keys [onyx.core/queue onyx.core/task-map] :as event}]
+  (merge event (read-batch queue (:hornetq/session-factory event) task-map)))
 
 (defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
-  (merge event {:onyx.core/decompressed (map decompress-segment batch)}))
+  (let [decompressed (map (comp decompress-segment :message) batch)]
+    (merge event {:onyx.core/decompressed decompressed})))
 
 (defn strip-sentinel-shim [event]
   (operation/on-last-batch
@@ -67,11 +72,6 @@
         (.send producer message)
         (.close producer)))
     (merge event {:onyx.core/requeued? true})))
-
-(defn ack-batch-shim [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  (doseq [message batch]
-    (extensions/ack-message queue message))
-  (merge event {:onyx.core/acked (count batch)}))
 
 (defn apply-fn-in-shim [event]
   (merge event {:onyx.core/results (:onyx.core/decompressed event)}))
@@ -101,7 +101,7 @@
   [_ {:keys [hornetq/session onyx.core/ingress-queues onyx.core/task-map]}]
   {:onyx.core/start-lifecycle?
    (if (= (:task/consumption task-map) :sequential)
-     (let [query (.queueQuery session (SimpleString. (first ingress-queues)))]
+     (let [query (.queueQuery session (SimpleString. (:hornetq/queue-name task-map)))]
        (zero? (.getConsumerCount query)))
      true)})
 
@@ -144,17 +144,11 @@
 (defmethod p-ext/requeue-sentinel [:input :hornetq]
   [event] (requeue-sentinel-shim event))
 
-(defmethod p-ext/ack-batch [:input :hornetq]
-  [event] (ack-batch-shim event))
-
 (defmethod p-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
 
 (defmethod p-ext/apply-fn [:output :hornetq]
   [event] (apply-fn-out-shim event))
-
-(defmethod p-ext/ack-batch [:output :hornetq]
-  [event] (ack-batch-shim event))
 
 (defmethod p-ext/compress-batch [:output :hornetq]
   [event] (compress-batch-shim event))
@@ -207,10 +201,6 @@
 (with-post-hook! #'apply-fn-in-shim
   (fn [{:keys [onyx.core/id onyx.core/results]}]
     (debug (format "[%s] Applied fn to %s segments" id (count results)))))
-
-(with-post-hook! #'ack-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/acked]}]
-    (debug (format "[%s] Acked %s segments" id acked))))
 
 (with-post-hook! #'apply-fn-out-shim
   (fn [{:keys [onyx.core/id onyx.core/results]}]

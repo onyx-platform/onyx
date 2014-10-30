@@ -29,14 +29,14 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :concurrent}
                     {:onyx/name :out
                      :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
+           workflow [[:in :inc] [:inc :out]]]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)

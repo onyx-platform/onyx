@@ -1,4 +1,4 @@
-(ns onyx.peer.transducers-test
+(ns onyx.peer.multi-input-test
   (:require [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
@@ -9,11 +9,13 @@
 
 (def batch-size 1320)
 
+(def k-inputs 4)
+
 (def echo 1000)
 
 (def id (str (java.util.UUID/randomUUID)))
 
-(def in-queue (str (java.util.UUID/randomUUID)))
+(def in-queues (map (fn [_] (str (java.util.UUID/randomUUID))) (range k-inputs)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
 
@@ -48,49 +50,67 @@
 
 (def conn (onyx.api/connect :memory coord-opts))
 
-(hq-util/create-queue! hq-config in-queue)
+(doseq [in-queue in-queues]
+  (hq-util/create-queue! hq-config in-queue))
+
 (hq-util/create-queue! hq-config out-queue)
 
-(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+(def messages
+  (->> k-inputs
+       (inc)
+       (range)
+       (map (fn [k] (* k (/ n-messages k-inputs))))
+       (partition 2 1)
+       (map (partial apply range))
+       (map (fn [r] (map (fn [x] {:n x}) r)))))
 
-(defn my-inc [segment]
-  (update-in segment [:n] inc))
+(doseq [[q b] (map (fn [q b] [q b]) in-queues messages)]
+  (hq-util/write-and-cap! hq-config q b echo))
 
-(defn x-form []
-  (comp (map my-inc)
-        (map my-inc)))
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
+
+(def input-entries
+  (map
+   (fn [k]
+     {:onyx/name (keyword (str "in-" k))
+      :onyx/ident :hornetq/read-segments
+      :onyx/type :input
+      :onyx/medium :hornetq
+      :onyx/consumption :concurrent
+      :hornetq/queue-name (nth in-queues (dec k))
+      :hornetq/host (:host (:non-clustered (:hornetq config)))
+      :hornetq/port (:port (:non-clustered (:hornetq config)))
+      :onyx/batch-size batch-size})
+   (range 1 (inc k-inputs))))
 
 (def catalog
-  [{:onyx/name :in
-    :onyx/ident :hornetq/read-segments
-    :onyx/type :input
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name in-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
-   
-   {:onyx/name :inc
-    :onyx/fn :onyx.peer.transducers-test/x-form
-    :onyx/type :transformer
-    :onyx/consumption :concurrent
-    :onyx/transduce? true
-    :onyx/batch-size batch-size}
-   
-   {:onyx/name :out
-    :onyx/ident :hornetq/write-segments
-    :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}])
+  (concat
+   input-entries
+   [{:onyx/name :inc
+     :onyx/fn :onyx.peer.multi-input-test/my-inc
+     :onyx/type :function
+     :onyx/consumption :concurrent
+     :onyx/batch-size batch-size}
 
-(def workflow {:in {:inc :out}})
+    {:onyx/name :out
+     :onyx/ident :hornetq/write-segments
+     :onyx/type :output
+     :onyx/medium :hornetq
+     :onyx/consumption :concurrent
+     :hornetq/queue-name out-queue
+     :hornetq/host (:host (:non-clustered (:hornetq config)))
+     :hornetq/port (:port (:non-clustered (:hornetq config)))
+     :onyx/batch-size batch-size}]))
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def workflow
+  (vec
+   (concat
+    [[:inc :out]]
+    (map (fn [a] [(keyword (str "in-" a)) :inc])
+         (range 1 (inc k-inputs))))))
+
+(def v-peers (onyx.api/start-peers conn 6 peer-opts))
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
@@ -107,7 +127,7 @@
      (onyx.api/shutdown conn)
      (catch Exception e (prn e)))))
 
-(let [expected (set (map (fn [x] {:n (inc (inc x))}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 

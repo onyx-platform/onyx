@@ -7,9 +7,9 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
-              [onyx.peer.transform :as transform]
-              [onyx.peer.group :as group]
+              [onyx.peer.function :as function]
               [onyx.peer.aggregate :as aggregate]
+              [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
 
@@ -31,8 +31,10 @@
         (merge event rets cycle-params {:onyx.core/session session}))
       (merge event cycle-params rets))))
 
-(defn munge-read-batch [event]
-  (merge event (p-ext/read-batch event)))
+(defn munge-read-batch [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
+  (let [commit? (extensions/node-exists? sync status-node)
+        event (assoc event :onyx.core/commit? commit?)]
+    (merge event (p-ext/read-batch event))))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
@@ -56,20 +58,12 @@
 (defn munge-write-batch [event]
   (merge event (p-ext/write-batch event)))
 
-(defn munge-status-check [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
-  (assoc event :onyx.core/commit? (extensions/node-exists? sync status-node)))
-
-(defn munge-ack [{:keys [onyx.core/queue onyx.core/batch onyx.core/commit?] :as event}]
-  (if commit?
-    (merge event (p-ext/ack-batch event))
-    event))
-
 (defn munge-commit-tx
   [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
   (if commit?
-    (do (extensions/commit-tx queue session)
-        (assoc event :onyx.core/committed true))
-    event))
+    (extensions/commit-tx queue session)
+    (extensions/rollback-tx queue session))
+  (merge event {:onyx.core/committed commit?}))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
@@ -78,7 +72,6 @@
   [{:keys [onyx.core/queue onyx.core/session onyx.core/producers
            onyx.core/consumers onyx.core/reserve?] :as event}]
   (doseq [producer producers] (extensions/close-resource queue producer))
-  (doseq [consumer consumers] (extensions/close-resource queue consumer))
   (when-not reserve?
     (extensions/close-resource queue session))
   (assoc event :onyx.core/closed? true))
@@ -125,7 +118,10 @@
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
     (when (first (alts!! [kill-ch] :default true))
-      (>!! read-ch (munge-inject-temporal pipeline-data))
+      (let [state @(:onyx.core/pipeline-state pipeline-data)]
+        (when (operation/drained-all-inputs? pipeline-data state)
+          (Thread/sleep (:onyx.core/drained-back-off pipeline-data)))
+        (>!! read-ch (munge-inject-temporal pipeline-data)))
       (recur))))
 
 (defn read-batch-loop [read-ch decompress-ch dead-ch]
@@ -164,22 +160,10 @@
       (>!! write-batch-ch (munge-compress-batch event))
       (recur))))
 
-(defn write-batch-loop [write-ch status-check-ch dead-ch]
+(defn write-batch-loop [write-ch commit-ch dead-ch]
   (loop []
     (when-let [event (<!! write-ch)]
-      (>!! status-check-ch (munge-write-batch event))
-      (recur))))
-
-(defn status-check-loop [status-ch ack-ch dead-ch]
-  (loop []
-    (when-let [event (<!! status-ch)]
-      (>!! ack-ch (munge-status-check event))
-      (recur))))
-
-(defn ack-loop [ack-ch commit-ch dead-ch]
-  (loop []
-    (when-let [event (<!! ack-ch)]
-      (>!! commit-ch (munge-ack event))
+      (>!! commit-ch (munge-write-batch event))
       (recur))))
 
 (defn commit-tx-loop [commit-ch close-resources-ch dead-ch]
@@ -242,8 +226,6 @@
           apply-fn-ch (chan 0)
           compress-batch-ch (chan 0)
           write-batch-ch (chan 0)
-          status-check-ch (chan 0)
-          ack-ch (chan 0)
           commit-tx-ch (chan 0)
           close-resources-ch (chan 0)
           close-temporal-ch (chan 0)
@@ -259,8 +241,6 @@
           apply-fn-dead-ch (chan)
           compress-batch-dead-ch (chan)
           write-batch-dead-ch (chan)
-          status-check-dead-ch (chan)
-          ack-dead-ch (chan)
           commit-tx-dead-ch (chan)
           close-resources-dead-ch (chan)
           close-temporal-dead-ch (chan)
@@ -271,12 +251,12 @@
           task (:task/name (:task payload))
           catalog (extensions/read-node sync (:node/catalog (:nodes payload)))
           ingress-queues (:task/ingress-queues (:task payload))
-          ingress-queues (if-not (coll? ingress-queues) (vector ingress-queues) ingress-queues)
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
                          :onyx.core/catalog catalog
                          :onyx.core/task-map (find-task catalog task)
+                         :onyx.core/serialized-task (:task payload)
                          :onyx.core/ingress-queues ingress-queues
                          :onyx.core/egress-queues (:task/egress-queues (:task payload))
                          :onyx.core/peer-node (:node/peer (:nodes payload))
@@ -291,9 +271,10 @@
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
                          :onyx.core/params (or (get (:fn-params opts) task) [])
+                         :onyx.core/drained-back-off (or (:drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/sync sync
-                         :onyx.core/pipeline-state (atom {:tried-to-seal? false})}
+                         :onyx.core/pipeline-state (atom {})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
           pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
@@ -341,18 +322,6 @@
           (go (>!! err-ch true))))
 
       (dire/with-handler! #'write-batch-loop
-        java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (go (>!! err-ch true))))
-
-      (dire/with-handler! #'status-check-loop
-        java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (go (>!! err-ch true))))
-
-      (dire/with-handler! #'ack-loop
         java.lang.Exception
         (fn [e & _]
           (warn e)
@@ -426,14 +395,6 @@
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'status-check-loop
-        (fn [& args]
-          (>!! (last args) true)))
-
-      (dire/with-finally! #'ack-loop
-        (fn [& args]
-          (>!! (last args) true)))
-
       (dire/with-finally! #'commit-tx-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -470,8 +431,6 @@
         :apply-fn-ch apply-fn-ch
         :compress-batch-ch compress-batch-ch
         :write-batch-ch write-batch-ch
-        :status-check-ch status-check-ch
-        :ack-ch ack-ch
         :commit-tx-ch commit-tx-ch
         :close-resources-ch close-resources-ch
         :close-temporal-ch close-temporal-ch
@@ -487,8 +446,6 @@
         :apply-fn-dead-ch apply-fn-dead-ch
         :compress-batch-dead-ch compress-batch-dead-ch
         :write-batch-dead-ch write-batch-dead-ch
-        :status-check-dead-ch status-check-dead-ch
-        :ack-dead-ch ack-dead-ch
         :commit-tx-dead-ch commit-tx-dead-ch
         :close-resources-dead-ch close-resources-dead-ch
         :close-temporal-dead-ch close-temporal-dead-ch
@@ -503,9 +460,7 @@
         :requeue-sentinel-loop (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch))
         :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch))
         :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch))
-        :write-batch-loop (thread (write-batch-loop write-batch-ch status-check-ch write-batch-dead-ch))
-        :status-check-loop (thread (status-check-loop status-check-ch ack-ch status-check-dead-ch))
-        :ack-loop (thread (ack-loop ack-ch commit-tx-ch ack-dead-ch))
+        :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch))
         :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
         :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
         :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
@@ -542,12 +497,6 @@
     (close! (:write-batch-ch component))
     (<!! (:write-batch-dead-ch component))
 
-    (close! (:status-check-ch component))
-    (<!! (:status-check-dead-ch component))
-
-    (close! (:ack-ch component))
-    (<!! (:ack-dead-ch component))
-
     (close! (:commit-tx-ch component))
     (<!! (:commit-tx-dead-ch component))
 
@@ -574,8 +523,6 @@
     (close! (:apply-fn-dead-ch component))
     (close! (:compress-batch-dead-ch component))
     (close! (:write-batch-dead-ch component))
-    (close! (:status-check-dead-ch component))
-    (close! (:ack-dead-ch component))
     (close! (:commit-tx-dead-ch component))
     (close! (:close-resources-dead-ch component))
     (close! (:close-temporal-dead-ch component))
@@ -628,14 +575,6 @@
 (dire/with-post-hook! #'munge-write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Wrote batch" id lifecycle-id))))
-
-(dire/with-post-hook! #'munge-status-check
-  (fn [{:keys [onyx.core/id onyx.core/status-node onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Checked the status node" id lifecycle-id))))
-
-(dire/with-post-hook! #'munge-ack
-  (fn [{:keys [onyx.core/id onyx.core/acked onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Acked %s segments" id lifecycle-id acked))))
 
 (dire/with-post-hook! #'munge-commit-tx
   (fn [{:keys [onyx.core/id onyx.core/commit? onyx.core/lifecycle-id]}]

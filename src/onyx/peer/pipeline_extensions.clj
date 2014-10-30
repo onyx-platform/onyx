@@ -1,13 +1,21 @@
 (ns onyx.peer.pipeline-extensions
   "Public API extensions for the virtual peer data pipeline.")
 
+(defn task-type [task-map]
+  (if (or (:onyx/group-by-key task-map) (:onyx/group-by-fn task-map))
+    :aggregator
+    (:onyx/type task-map)))
+
 (defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
-  [(:onyx/type task-map) (:onyx/medium task-map)])
+  [(task-type task-map) (:onyx/medium task-map)])
 
 (defmulti read-batch
   "Reads :onyx/batch-size segments off the incoming data source.
    Must return a map with key :onyx.core/batch and value seq representing
-   the ingested segments."
+   the ingested segments. The seq must be maps of two keys:
+
+   - :input - A keyword representing the task that the message came from
+   - :message - The consumed message"
   type-and-medium-dispatch)
 
 (defmulti decompress-batch
@@ -36,11 +44,6 @@
   "Puts the sentinel value back onto the tail of the incoming data source.
    Only required in batch mode on destructive data sources such as queues.
    Must return a map with key :requeued? and value boolean."
-  type-and-medium-dispatch)
-
-(defmulti ack-batch
-  "Acknowledges the reading of the ingested batch. Must return a map with
-   key :onyx.core/acked and value integer representing the number of segments ack'ed."
   type-and-medium-dispatch)
 
 (defmulti apply-fn

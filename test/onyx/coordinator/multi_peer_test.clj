@@ -47,14 +47,14 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
+           workflow [[:in :inc] [:inc :out]]]
 
        (tap (:ack-mult coordinator) ack-ch-spy)
        (tap (:offer-mult coordinator) offer-ch-spy)
@@ -164,7 +164,7 @@
                        (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
                              task-path (extensions/resolve-node sync :task (str job-id))]
                          (doseq [task-node (extensions/children sync task-path)]
-                           (when-not (impl/completed-task? task-node)
+                           (when-not (impl/metadata-task? task-node)
                              (fact (impl/task-complete? sync task-node) => true)))))
 
                 (facts "All peers are idle"
@@ -198,14 +198,14 @@
                      :onyx/consumption :sequential
                      :hornetq/queue-name "in-queue"}
                     {:onyx/name :inc
-                     :onyx/type :transformer
+                     :onyx/type :function
                      :onyx/consumption :sequential}
                     {:onyx/name :out
                      :onyx/type :output
                      :onyx/medium :hornetq
                      :onyx/consumption :sequential
                      :hornetq/queue-name "out-queue"}]
-           workflow {:in {:inc :out}}]
+           workflow [[:in :inc] [:inc :out]]]
 
        (tap (:offer-mult coordinator) offer-ch-spy)
        (tap (:ack-mult coordinator) ack-ch-spy)
@@ -286,7 +286,7 @@
                 (let [job-id (extensions/read-node sync (:path (<!! job-ch)))
                       task-path (extensions/resolve-node sync :task (str job-id))]
                   (doseq [task-node (extensions/children sync task-path)]
-                    (when-not (impl/completed-task? task-node)
+                    (when-not (impl/metadata-task? task-node)
                       (fact (impl/task-complete? sync task-node) => true))))))))
    {:onyx.coordinator/revoke-delay 50000}))
 
