@@ -1,4 +1,4 @@
-#### 0.5.0
+#### 0.5.0-SNAPSHOT
 
 - Transducer support for Functions.
 
