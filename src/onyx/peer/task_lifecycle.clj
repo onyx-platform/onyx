@@ -63,7 +63,7 @@
   (if commit?
     (extensions/commit-tx queue session)
     (extensions/rollback-tx queue session))
-  (merge event {:onyx.core/committed commit?}))
+  (merge event {:onyx.core/committed? commit?}))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))

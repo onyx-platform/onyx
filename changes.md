@@ -1,10 +1,14 @@
-#### 0.5.0
+#### 0.5.0-SNAPSHOT
 
 - Transducer support for Functions.
 
+#### 0.4.1
+
+- Fixes aggregate ignoring `:onyx/batch-timeout`.
+
 #### 0.4.0
 
-- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation.
+- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/MichaelDrogalis/onyx/issues/20)
 - Support for directed, acylic graphs as workflows. [#26](https://github.com/MichaelDrogalis/onyx/issues/26)
 - Fix for peer live lock on task completion. [#23](https://github.com/MichaelDrogalis/onyx/issues/23)
 - Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
