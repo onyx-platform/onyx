@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.aggregate
-    (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
+    (:require [clojure.core.async :refer [chan go >! <! >!! close! alts!! timeout]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
@@ -26,8 +26,7 @@
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
-  (let [
-        consumers (map (fn [[task queue-name]]
+  (let [consumers (map (fn [[task queue-name]]
                          (let [session (extensions/bind-active-session queue queue-name)]
                            {:input task
                             :session session
@@ -53,12 +52,15 @@
   ;;; in the pipeline.
   {:onyx.core/session :placeholder})
 
-(defn read-batch-shim [{:keys [onyx.core/queue] :as event}]
-  (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
+(defn read-batch-shim [{:keys [onyx.core/queue onyx.core/task-map] :as event}]
+  (let [ms (or (:onyx/batch-timeout task-map) 1000)
+        v (first (alts!! [(:onyx.aggregate/read-ch event) (timeout ms)]))
+        ;; Grab any session if there is none. Nothing will commit.
+        default-session (:session (first (:consumers (:onyx.aggregate/queue event))))]
     (merge event
-           {:onyx.core/session session
-            :onyx.core/batch msgs
-            :onyx.aggregate/halting-ch halting-ch})))
+           {:onyx.core/session (or (:session v) default-session)
+            :onyx.core/batch (or (:msgs v) [])
+            :onyx.aggregate/halting-ch (or (:halting-ch v) (chan 1))})))
 
 (defn write-batch-shim [event]
   (let [results (function/write-batch-shim event)]
