@@ -2,6 +2,10 @@
 
 - Transducer support for Functions.
 
+#### 0.4.1
+
+- Fixes aggregate ignoring `:onyx/batch-timeout`.
+
 #### 0.4.0
 
 - Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/MichaelDrogalis/onyx/issues/20)
