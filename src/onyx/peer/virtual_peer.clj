@@ -111,10 +111,6 @@
     
     component))
 
-(defn virtual-peer
-  [{:keys [onyx.peer/fn-params onyx.peer/sequential-back-off
-           onyx.peer/drained-back-off]}]
-  (map->VirtualPeer {:opts {:fn-params fn-params
-                            :back-off sequential-back-off
-                            :drained-back-off drained-back-off}}))
+(defn virtual-peer [opts]
+  (map->VirtualPeer {:opts opts}))
 
