@@ -274,6 +274,7 @@
                          :onyx.core/drained-back-off (or (:drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/sync sync
+                         :onyx.core/peer-opts opts
                          :onyx.core/pipeline-state (atom {})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
