@@ -6,6 +6,7 @@
 
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
+- Peer options available in pipeline event map under key `:onyx.core/peer-opts`.
 
 #### 0.4.0
 
