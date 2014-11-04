@@ -26,7 +26,7 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 #### Workflow
 
-A workflow is the structural specification of an Onyx program. It's purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acylic graph.
+A workflow is the structural specification of an Onyx program. It's purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acyclic graph.
 
 In the case of a tree, the workflow is a Clojure map representing a multi-rooted, acyclic tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything inbetween must name a function. Elements of a workflow must be Clojure keywords.
 

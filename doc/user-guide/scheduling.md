@@ -23,7 +23,7 @@ Onyx allocates tasks within a job using a balanced, breadth-first approach. That
      :c :e}}
 ```
 
-Onyx will assign peers in roughly the following sequence: A, B, C, D, E. The exact order within a level of the workflow tree depends on how Clojure hashed the underlying key sequence, but it is determistic given the key set. After the entire tree has filled up with peers, Onyx iterates over it again in the same order. If a task is marked `:sequential` and has one peer executing, it's skipped in favor of the next task.
+Onyx will assign peers in roughly the following sequence: A, B, C, D, E. The exact order within a level of the workflow tree depends on how Clojure hashed the underlying key sequence, but it is deterministic given the key set. After the entire tree has filled up with peers, Onyx iterates over it again in the same order. If a task is marked `:sequential` and has one peer executing, it's skipped in favor of the next task.
 
 Alternate peer allocate strategies to come in future versions. It's obviously desirable to have a less balanced approach in certain circumstances.
 

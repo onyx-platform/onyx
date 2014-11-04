@@ -14,7 +14,7 @@ This chapter describes what options the developer when an error occurs while a v
 
 ### Infinite Retry
 
-Sometimes, an operation during task execution will fail on a particular node. We're not talking about the node crashing, we're talking about an exception being thrown, or a network partition arising. In some cases, you'll want to try to execute the segment again at a later point in time. This can be accomplished by requeueing the segment back onto its ingress queue. Requeueing the segment for retry will insert it *at the back of the queue*. You can see [an example of this here](https://github.com/MichaelDrogalis/onyx-examples/tree/master/error-retry).
+Sometimes, an operation during task execution will fail on a particular node. We're not talking about the node crashing, we're talking about an exception being thrown, or a network partition arising. In some cases, you'll want to try to execute the segment again at a later point in time. This can be accomplished by requeuing the segment back onto its ingress queue. Requeuing the segment for retry will insert it *at the back of the queue*. You can see [an example of this here](https://github.com/MichaelDrogalis/onyx-examples/tree/master/error-retry).
 
 In this example, we inject a function into the task that can be executed to requeue the node. If there's a failure, we invoke the function with the segment as a parameter. This segment will be retried infinitely until it succeeds. You'll probably want to bound retries - which are described in the next section.
 
