@@ -64,7 +64,7 @@ Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes car
 
 #### HornetQ
 
-HornetQ is employed for shuttling segments between virtual peers for processing. HornetQ is a queueing platform from the JBoss stack. HornetQ queues can cluster for scalability.
+HornetQ is employed for shuttling segments between virtual peers for processing. HornetQ is a queuing platform from the JBoss stack. HornetQ queues can cluster for scalability.
 
 ### Cross Entity Communication
 
@@ -168,7 +168,7 @@ Peer states transition to new states. The transitions are specified below.
 
 - An `:active` peer may transition to:
   - `:sealing`: Peer reads the sentinel from an ingress queue, and the ingress queue is depleted
-  - `:waiting`: Peer reades the sentinel value from an ingress queue, and the ingress queue is depleted, but other peers are `:acking` or `:active`.
+  - `:waiting`: Peer reads the sentinel value from an ingress queue, and the ingress queue is depleted, but other peers are `:acking` or `:active`.
   - `:dead`: Peer crashes
   - `:active`: Stand-by Coordinator wakes up and replays log entries
 
@@ -195,11 +195,11 @@ The Coordinators holds watches on znodes in ZooKeeper and reacts to events. The 
 
 #### Serial Execution
 
-All events coming out of ZooKeeper are serialized onto a single core.async channel. This techniques allows ZooKeeper to act "transactional" for the particular workload that Onyx places on it. It's designed this way so that multiple writers can read incomplete or inconsistent values from ZooKeeper just before commiting to storage.
+All events coming out of ZooKeeper are serialized onto a single core.async channel. This techniques allows ZooKeeper to act "transactional" for the particular workload that Onyx places on it. It's designed this way so that multiple writers can read incomplete or inconsistent values from ZooKeeper just before committing to storage.
 
 #### Fault Tolerant Logging
 
-Just before each event's action is executed, the event is written to a durable log in ZooKeeper. When the Coordinator boots up, it runs through the log from the last known checkpoint and replays entries. All actions in the Coordinator are idempontent, so they are can be safely replayed if they crashed mid-action.
+Just before each event's action is executed, the event is written to a durable log in ZooKeeper. When the Coordinator boots up, it runs through the log from the last known checkpoint and replays entries. All actions in the Coordinator are idempotent, so they are can be safely replayed if they crashed mid-action.
 
 #### Timeouts
 
@@ -260,9 +260,9 @@ Time flows from top to bottom.
 
 ### Segment Transportation
 
-Onyx uses HornetQ to move segments between virtual peers. HornetQ queue's are constructed between every link in a workflow.
+Onyx uses HornetQ to move segments between virtual peers. HornetQ queues are constructed between every link in a workflow.
 
-For example, `{:in {:inc :out}}` is transformed into the following queueing topology:
+For example, `{:in {:inc :out}}` is transformed into the following queuing topology:
 
 `<queue> <- in -> <queue> <- inc -> <queue> <- out -> <queue>`
 
@@ -270,14 +270,14 @@ All tasks have exactly one ingress queue, and at least one egress queue. Each eg
 
 #### HornetQ Single Server
 
-Using a single HornetQ server, we are garunteed ordering of messages. Peers connect to the HornetQ server and consume messages.
+Using a single HornetQ server, we are guaranteed ordering of messages. Peers connect to the HornetQ server and consume messages.
 
 #### HornetQ Cluster
 
 In order to scale, we need a *cluster* of queues between each link the workflow. Using one queue would limit the network bandwidth to move data. HornetQ itself implements clustering, and some useful facts to know are:
 
 - Each server in the cluster holds *its own* queue that participates in the cluster.
-- Servers use *symetric* clustering. Every HornetQ server knows about every other HornetQ server.
+- Servers use *symmetric* clustering. Every HornetQ server knows about every other HornetQ server.
 - Producing messages onto a clustered queue will load balance them round-robin across all queues in the cluster.
 - Consuming messages from a clustered queue will read them round-robin from all queues in the cluster.
 - Producing and consuming messages happens in the context of a transaction.
@@ -288,7 +288,7 @@ In order to scale, we need a *cluster* of queues between each link the workflow.
 
 During client side load balancing, messages can be read in a variety of ways. Below, we see a peer reading off of two HornetQ servers. Messages can be read starting at either server, causing at least two different streams of messages to be read. Round robin isn't a promise, though. The network may hiccup, and we might see messages in a completely jumbled up stream. Note, though, that individual queue messages are consistently ordered.
 
-![Client side load balacing](img/client-side-load-balancing.png)
+![Client side load balancing](img/client-side-load-balancing.png)
 
 #### Message Dispersal Under Failure
 
@@ -298,7 +298,7 @@ As long as a HornetQ consumer is connected to a queue on a HornetQ server, it wi
 
 ### Virtual Peer Task Execution
 
-One virtual peer may be executing at most executing one task. This section describes what activies the peer carries out during execution.
+One virtual peer may be executing at most executing one task. This section describes what activities the peer carries out during execution.
 
 #### Phases of Execution
 
@@ -306,7 +306,7 @@ One virtual peer may be executing at most executing one task. This section descr
 - Read message batch: consumes and acknowledges messages off of HornetQ
 - Decompress message batch: Uses Fressian's reader to obtain EDN maps of segments
 - Strip sentinel: removes sentinel from decompressed batch if present
-- Requeue sentine: Requeues the sentinel on the ingress queue if it is the leader
+- Requeue sentinel: Requeues the sentinel on the ingress queue if it is the leader
 - Apply function: Apply fns to batches of segments
 - Compress message batch: Uses Fressian's writer to compress segments to bytes
 - Write message batch: Writes messages to HornetQ
@@ -334,7 +334,7 @@ Each virtual peer has one atom that it uses for local state. It is a map that ha
 
 ### Sentinel Values in a Distributed Setting
 
-One of the challenges in working with distributed systems is the property that messages can be delayed, duplicated, dropped, and reordered. For the most part, HornetQ's transactions aid with a lot of these concerns. One particularly difficult point, though, is the notion of "sealing". In order to propagate the sentinel value from one queue to the next, all of the segments must be processed. This is the key attribute that allows for at-least-once processing semantics. Unfortunately, inbetween the time that each peer asks the coordinator if it can seal, and by time it actually does seal and reports back, the peer can be fail. Worse yet, we have no way of knowing whether it successfully wrote the sentinel to the next queue. Therefore, we need to make this operation idemponent and handle multiple sentinel values. We also need to be able to handle sentinel values that appear in the middle of the queue due to the way HornetQ load balances.
+One of the challenges in working with distributed systems is the property that messages can be delayed, duplicated, dropped, and reordered. For the most part, HornetQ's transactions aid with a lot of these concerns. One particularly difficult point, though, is the notion of "sealing". In order to propagate the sentinel value from one queue to the next, all of the segments must be processed. This is the key attribute that allows for at-least-once processing semantics. Unfortunately, inbetween the time that each peer asks the coordinator if it can seal, and by time it actually does seal and reports back, the peer can be fail. Worse yet, we have no way of knowing whether it successfully wrote the sentinel to the next queue. Therefore, we need to make this operation idempotent and handle multiple sentinel values. We also need to be able to handle sentinel values that appear in the middle of the queue due to the way HornetQ load balances.
 
 #### Sentinel-in-the-Middle
 
@@ -344,7 +344,7 @@ We could requeue this sentinel and place it at the back of the queue. If we did 
 
 #### Leader Election
 
-Each sentinel value is marked with metadata when it is put on HornetQ. Specifically, each sentinel carries a UUID to uniquely identify it. When a peer encounters a sentinel for the first time in its lifecycle of a task, it tries to write the UUID of the sentinel to ZooKeeper. The semantics of ZooKeeper are such that multiple writers can try to write to the same znode, but only one will suceed. This guaruntees that exactly one leader will be picked. After the peer writes, or votes, for the UUID, it immediately reads from ZooKeeper to see what the leaders UUID is. It caches the leader's UUID locally, since it will not change. If the sentinel it is holding matches the leader's UUID, it requeues the sentinel so that others may find it. If it does not match, the sentinel is discarded. Hence, the number of sentinels on an ingress queue converges towards 1.
+Each sentinel value is marked with metadata when it is put on HornetQ. Specifically, each sentinel carries a UUID to uniquely identify it. When a peer encounters a sentinel for the first time in its lifecycle of a task, it tries to write the UUID of the sentinel to ZooKeeper. The semantics of ZooKeeper are such that multiple writers can try to write to the same znode, but only one will succeed. This guarantees that exactly one leader will be picked. After the peer writes, or votes, for the UUID, it immediately reads from ZooKeeper to see what the leaders UUID is. It caches the leader's UUID locally, since it will not change. If the sentinel it is holding matches the leader's UUID, it requeues the sentinel so that others may find it. If it does not match, the sentinel is discarded. Hence, the number of sentinels on an ingress queue converges towards 1.
 
 ![Election](img/election.png)
 

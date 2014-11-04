@@ -1,6 +1,6 @@
 ## APIs
 
-Onyx ships with three distinct APIs to accomodate different needs. A description of each follows.
+Onyx ships with three distinct APIs to accommodate different needs. A description of each follows.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -61,11 +61,11 @@ Spins down a connection to a Coordinator.
 
 ### Task Lifecycle API
 
-Each time a virtual peer receives a task from the coordinator to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/peer/task_lifecycle_extensions.clj) fascilitates this flow.
+Each time a virtual peer receives a task from the coordinator to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/peer/task_lifecycle_extensions.clj) facilitates this flow.
 
-Onyx provides hooks for user-level modification of this map both before the task begins executing, before each segment batch begins, after each segment batch is completed, and after the task is completed. See below for a description of each. Each of these functions allows dispatch based on the name, identity, type, and type/medium combination of a task. Map merge prescendence happens in this exact order, allowing you to override behavior specified by a plugin, or Onyx itself.
+Onyx provides hooks for user-level modification of this map both before the task begins executing, before each segment batch begins, after each segment batch is completed, and after the task is completed. See below for a description of each. Each of these functions allows dispatch based on the name, identity, type, and type/medium combination of a task. Map merge precedence happens in this exact order, allowing you to override behavior specified by a plugin, or Onyx itself.
 
-##### `start-lifeycle?`
+##### `start-lifecycle?`
 
 Just before beginning the task, this function is called to check whether the peer is ready to begin. For reasons external
 to Onyx, the peer might need to block and wait for another event. This function must return a map with key
@@ -78,7 +78,7 @@ Adds data once to the start of a peer's task execution. This data can be accesse
 
 ##### `inject-temporal-resources`
 
-Adds data to each iteration of the pipeline per peer task execution. Called at the rstart of each pipeline.
+Adds data to each iteration of the pipeline per peer task execution. Called at the start of each pipeline.
 
 ##### `close-temporal-resources`
 

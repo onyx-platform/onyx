@@ -21,7 +21,7 @@ To boil it down to the essentials:
 
 -  Put the HornetQ journal on its own physical volume
 
-HornetQ performs sequential writes, so it's a good idea to let the volume only work on writing HornetQ data. This prevents the drive head from moving unneccessarily. Even on an SSD drive, random-writes are slower than their sequential counterpart.
+HornetQ performs sequential writes, so it's a good idea to let the volume only work on writing HornetQ data. This prevents the drive head from moving unnecessarily. Even on an SSD drive, random-writes are slower than their sequential counterpart.
 
 -  Ensure that HornetQ is running on Linux with AIO enabled
 
@@ -29,13 +29,13 @@ HornetQ's journal is tuned specifically to go extraordinarily fast with AIO.
 
 ### ZooKeeper
 
-- Put the ZooKeeper jornal on its own physical volume
+- Put the ZooKeeper journal on its own physical volume
 
 The same idea applies here as for Onyx. Zookeeper tends to not get a huge amount of traffic, so this probably won't offer a huge performance boost.
 
 ### Onyx
 
-- Adjust the number of virtual peers started on each physical node to avoid underworking or pinning the processors.
+- Adjust the number of virtual peers started on each physical node to avoid under-working or pinning the processors.
 
 As always, keep an eye on processor consumption. Increasing by a single virtual peer will add about 10-15 threads to the box, so you're likely going to want a lower number of v-peers per box.
 
