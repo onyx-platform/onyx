@@ -92,33 +92,6 @@ The algorithm works as follows ("it" refers to the joining peer):
 - [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 2-phase join](/doc/design/join-examples/example-6.md)
 - [Example 7: 3 node cluster, 1 peer dies while joining](/doc/design/join-examples/example-7.md)
 
-##### Relevant Commands
-
--------------------------------------------------
-`prepare-join-cluster`
-
-- Submitter: Peer (P) that wants to join the cluster
-- Purpose: Determines which peer (Q) that P will watch
-- Replica update: Assoc {P Q} to `:prepare` key
-- Side effects: P adds a ZooKeeper watch to Q's pulse node
-- Reactions: P sends `accept-join-cluster` to the log
-
--------------------------------------------------
-`abort-join-cluster`
-
--------------------------------------------------
-`notify-watchers`
-
--------------------------------------------------
-`accept-join-cluster`
-
-- Takes 2 args: pair to move from prepared to pairs, and pair to update in pairs.
-
--------------------------------------------------
-`leave-cluster`
-
--------------------------------------------------
-
 More questions:
 - If a lot of commands have been buffered up, will there be negative affects by appending a huge number of commands to the log when the buffer is flushed?
 - What about a node's memory if the outbox buffers a huge number of messages?
@@ -169,7 +142,45 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 - [Example 3: 3 node cluster, 1 joins with garbage collection](/doc/design/leave-examples/example-3.md)
 - [Example 4: 3 node cluster, 1 peer lags during GC](/doc/design/leave-examples/example-4.md)
 
-##### Relevant Commands
+##### Command Reference
+
+-------------------------------------------------
+`prepare-join-cluster`
+
+- Submitter: Peer (P) that wants to join the cluster
+- Purpose: determines which peer (Q) that P will watch
+- Arguments: peer ID, peer pulse node
+- Replica update: assoc {P Q} to `:prepare` key
+- Side effects: P adds a ZooKeeper watch to Q's pulse node
+- Reactions: P sends `notify-watchers` to the log, with arg {Z P} (Z is Q's watcher)
+
+-------------------------------------------------
+`abort-join-cluster`
+
+-------------------------------------------------
+`notify-watchers`
+
+- Submitter: Peer (P) that wants to join the cluster
+- Purpose: Transitions this peer's watch (T) from one peer to another
+- Arguments: Pair of nodes to add a watch before ({T P})
+- Replica update: assoc {P Q} to `:accept` key, dissoc {P Q} from `:prepare` key
+- Side effects: T adds a ZooKeeper watch to P's pulse node, T removes a ZooKeeper watch from Q's pulse node
+- Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
+
+-------------------------------------------------
+`accept-join-cluster`
+
+- Submitter: Peer (T) wants to confirm that peer P can join the cluster
+- Purpose: Confirms that T has a watch on P's pulse node
+- Arguments: Pair of nodes {P Q} and pair of nodes {T P} to add to fully joined cluster
+- Replica update: dissoc {P Q} from `:accept` key, merge {P Q} and {T P} into `:pairs` key
+- Side effects: None
+- Reactions: Peer P flushes its outbox of messages
+
+-------------------------------------------------
+`leave-cluster`
+
+-------------------------------------------------
 
 -------------------------------------------------
 `peer-gc`
