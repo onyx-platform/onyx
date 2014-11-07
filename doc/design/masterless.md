@@ -27,13 +27,13 @@
 
 Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. This Coordinator manages distributed state, scheduled jobs, and handles peer birth and failure. This Coordinator uses multiple internal logs with checkpointing to write and process messages, potentionally failing over to stand-by Coordinators. State is kept inside of ZooKeeper.
 
-### The good things about a centralized Coordinator
+## The good things about a centralized Coordinator
 
 - Most znodes only have one watch that triggers on change - the Coordinator. Very few reactions need to happen.
 - Znode contention is low. Usually only the Coordinator and one peer are accessing znode
 - Coordination decisions happen in a single place, and can be easily traced down to a single location in the code executing on a single box
 
-### The bad things about a centralized Coordinator
+## The bad things about a centralized Coordinator
 
 - More bugs have come up inside the Coordinator than any other part of Onyx
 - Multiple implementations of Coordinator are supported in parallel (HTTP, memory)
@@ -43,7 +43,7 @@ Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. Thi
 - Only supporting one scheduling algorithm in 0.4.0. It's hard to support more scheduling algorithms
 - Task rotation to support peer failure replacement is really hard with the current set up
 
-### Towards a masterless design
+## Towards a masterless design
 
 An alternate design approach abolishes the Coordinator. This design proposal centers around the following ideas:
 
@@ -64,11 +64,11 @@ With no single node in the cluster in charge of all others, this raises the foll
 
 Below is an outline to implementing a fully masterless design in Onyx that mitigates the above concerns.
 
-#### Joining the cluster
+### Joining the cluster
 
 Aside from the log structure, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
-##### 2-Phase Cluster Join Strategy
+#### 2-Phase Cluster Join Strategy
 
 When a peer wishes to join the cluster, it must engage in a 2 phase protocol. Two phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch.
 
@@ -105,7 +105,7 @@ The algorithm works as follows ("it" refers to the joining peer):
   - this node instantly becomes part of the cluster
   - it flushes its outbox of commands
 
-##### Examples
+#### Examples
 
 - [Example 1: 3 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-1.md)
 - [Example 2: 3 node cluster, 2 peers successfully join](/doc/design/join-examples/example-2.md)
@@ -119,18 +119,18 @@ More questions:
 - If a lot of commands have been buffered up, will there be negative affects by appending a huge number of commands to the log when the buffer is flushed?
 - What about a node's memory if the outbox buffers a huge number of messages?
 
-#### Dead peer removal
+### Dead peer removal
 
 Peers will fail, or be shut down purposefully. Onyx needs to:
 - detect the downed peer
 - inform all peers that this peer is no longer executing its task
 - inform all peers that this peer is no longer part of the cluster
 
-##### Peer Failure Detection Strategy
+#### Peer Failure Detection Strategy
 
 In a cluster of > 1 peer, when a peer dies another peer will have a watch registered on its znode to detect the ephemeral disconnect. When a peer fails (peer F), the peer watching the failed peer (peer W) needs to inform the cluster about the failure, *and* go watch the node that the failed node was watching (peer Z). The joining strategy that has been outlined forces peers to form a ring. A ring structure is advantage because there is no coordination or contention as to who must now watch peer Z for failure. Peer W is responsible for watching Z, because W *was* watching F, and F *was* watching Z. Therefore, W transitively closes the ring, and W watches Z. All replicas can deterministicly compute this answer.
 
-##### Peer Failure Garbage Collection Strategy
+#### Peer Failure Garbage Collection Strategy
 
 It's not always the case that failures can be reported reliably. Consider the following scenario:
 
@@ -158,14 +158,14 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 - Peer Z sends a `leave-cluster` command to the log for every peer who's pulse node is disconnected
 - Peer Z continues to play the log, and eventually runs into the case of it being the only peer in the cluster. It is then fully joined
 
-##### Examples
+#### Examples
 
 - [Example 1: 4 node cluster, 1 peer crashes](/doc/design/leave-examples/example-1.md)
 - [Example 2: 4 node cluster, 2 peers instantaneously crash](/doc/design/leave-examples/example-2.md)
 - [Example 3: 3 node cluster, 1 joins with garbage collection](/doc/design/leave-examples/example-3.md)
 - [Example 4: 3 node cluster, 1 peer lags during GC](/doc/design/leave-examples/example-4.md)
 
-### Command Reference
+## Command Reference
 
 -------------------------------------------------
 `prepare-join-cluster`
@@ -228,7 +228,7 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 
 -------------------------------------------------
 
-### New functionality
+## New functionality
 
 This design enables a few things that I want to add to the API:
 
@@ -237,10 +237,7 @@ This design enables a few things that I want to add to the API:
 - Percentage task allocation (e.g. 75% of the cluster on task A)
 - `kill-job` API
 
-### Formal verification
+## Formal verification
 
 ?
-
-### Open questions
-- How am I going to handle `onyx-id`?
 
