@@ -63,7 +63,7 @@
   (if commit?
     (extensions/commit-tx queue session)
     (extensions/rollback-tx queue session))
-  (merge event {:onyx.core/committed commit?}))
+  (merge event {:onyx.core/committed? commit?}))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
@@ -270,10 +270,11 @@
                          :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
-                         :onyx.core/params (or (get (:fn-params opts) task) [])
-                         :onyx.core/drained-back-off (or (:drained-back-off opts) 400)
+                         :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])
+                         :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/sync sync
+                         :onyx.core/peer-opts opts
                          :onyx.core/pipeline-state (atom {})}
 
           pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
@@ -420,7 +421,7 @@
           (>!! (last args) true)))
 
       (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
-        (Thread/sleep (or (:back-off opts) 2000)))
+        (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
       
       (assoc component
         :open-session-kill-ch open-session-kill-ch

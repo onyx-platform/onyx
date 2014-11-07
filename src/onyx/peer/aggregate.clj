@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.aggregate
-    (:require [clojure.core.async :refer [chan go >! <! <!! >!! close!]]
+    (:require [clojure.core.async :refer [chan go >! <! >!! close! alts!! timeout]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
@@ -9,25 +9,35 @@
               [taoensso.timbre :refer [debug fatal]]
               [dire.core :refer [with-post-hook!]]))
 
+(defn reader-thread [event queue reader-ch input consumer]
+  (future
+    (try
+      (loop []
+        (let [segment (extensions/consume-message queue consumer)]
+          (when segment
+            (>!! reader-ch {:input input :message segment})
+            (recur))))
+      (finally
+       (close! reader-ch)))))
+
 (defn consumer-loop [event session input consumer halting-ch session-ch]
-  (go
-   (try
+  (let [task (:onyx.core/task-map event)
+        capacity (:onyx/batch-size task)
+        timeout-ms (or (:onyx/batch-timeout task) 1000)]
+    (go
      (loop []
-       (let [f
-             (fn []
-               {:input input
-                :message (extensions/consume-message (:onyx.core/queue event) consumer)})
-             msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
-         (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
-       (when (<! halting-ch)
-         (recur)))
-     (finally
-      (close! session-ch)))))
+       (let [reader-ch (chan capacity)
+             fut (reader-thread event (:onyx.core/queue event) reader-ch input consumer)]
+         (let [read-f #(first (alts!! (vector reader-ch (timeout timeout-ms))))
+               msgs (doall (take-segments read-f capacity))]
+           (future-cancel fut)
+           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
+         (when (<! halting-ch)
+           (recur)))))))
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
-  (let [
-        consumers (map (fn [[task queue-name]]
+  (let [consumers (map (fn [[task queue-name]]
                          (let [session (extensions/bind-active-session queue queue-name)]
                            {:input task
                             :session session
@@ -53,12 +63,15 @@
   ;;; in the pipeline.
   {:onyx.core/session :placeholder})
 
-(defn read-batch-shim [{:keys [onyx.core/queue] :as event}]
-  (let [{:keys [session halting-ch msgs]} (<!! (:onyx.aggregate/read-ch event))]
+(defn read-batch-shim [{:keys [onyx.core/queue onyx.core/task-map] :as event}]
+  (let [ms (or (:onyx/batch-timeout task-map) 1000)
+        v (first (alts!! [(:onyx.aggregate/read-ch event) (timeout ms)]))
+        ;; Grab any session if there is none. Nothing will commit.
+        default-session (:session (first (:consumers (:onyx.aggregate/queue event))))]
     (merge event
-           {:onyx.core/session session
-            :onyx.core/batch msgs
-            :onyx.aggregate/halting-ch halting-ch})))
+           {:onyx.core/session (or (:session v) default-session)
+            :onyx.core/batch (or (:msgs v) [])
+            :onyx.aggregate/halting-ch (or (:halting-ch v) (chan 1))})))
 
 (defn write-batch-shim [event]
   (let [results (function/write-batch-shim event)]
