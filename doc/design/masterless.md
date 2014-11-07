@@ -31,13 +31,15 @@ An alternate design approach abolishes the Coordinator. This design proposal cen
 - Peers contend for certain commands (say, volunteering to execute a task that can have at most one peer executing it) by submitting a *proposal* command to the log. The totally ordering of the log acts as an arbiter to settle whether the proposal should be accepted or rejected.
 - Non-reactive commands (submitting a job, registering a new peer) are done through a client API, and are submitted to the log.
 
-This design proposal raises the following questions and concerns:
+With no single node in the cluster in charge of all others, this raises the following questions and concerns:
 
 - How are peers detected as dead and removed from their executing tasks?
-- Contention sky-rockets under scenarios where all peers can submit proposal commands when reacting to a command.
-- How do proposals actually work?
-- What happens when the log is huge and a new peer joins? It needs to replay a *lot* of commands, and react (submitting proposals) in vain to everything it sees.
-- How are situations handled when a peer wins the proposal, but never confirms its success?
+- Contention sky-rockets under scenarios where all peers can submit proposal commands when reacting to a command. How can we mitigate that?
+- How do proposals actually work when there is semantic contention?
+- What happens when the log is huge and a new peer joins? Since a peer needs to play the log sequentially, from the beginning, it needs to replay a *lot* of commands, and react (submitting proposals) in vain to most everything it sees.
+- How are situations handled when a peer wins the proposal, but dies and never confirms its success?
+
+Below is an outline to implementing a fully masterless design in Onyx that mitigates the above concerns.
 
 #### Joining the cluster
 
