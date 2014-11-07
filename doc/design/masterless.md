@@ -4,22 +4,20 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-- [The Cluster as a Value](#the-cluster-as-a-value)
-  - [Context](#context)
-    - [The good things about a centralized Coordinator](#the-good-things-about-a-centralized-coordinator)
-    - [The bad things about a centralized Coordinator](#the-bad-things-about-a-centralized-coordinator)
-    - [Towards a masterless design](#towards-a-masterless-design)
-      - [Joining the cluster](#joining-the-cluster)
-        - [2-Phase Cluster Join Strategy](#2-phase-cluster-join-strategy)
-        - [Examples](#examples)
-      - [Dead peer removal](#dead-peer-removal)
-        - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
-        - [Peer Failure Garbage Collection Strategy](#peer-failure-garbage-collection-strategy)
-        - [Examples](#examples-1)
-    - [Command Reference](#command-reference)
-    - [New functionality](#new-functionality)
-    - [Formal verification](#formal-verification)
-    - [Open questions](#open-questions)
+- [Context](#context)
+- [The good things about a centralized Coordinator](#the-good-things-about-a-centralized-coordinator)
+- [The bad things about a centralized Coordinator](#the-bad-things-about-a-centralized-coordinator)
+- [Towards a masterless design](#towards-a-masterless-design)
+  - [Joining the cluster](#joining-the-cluster)
+    - [2-Phase Cluster Join Strategy](#2-phase-cluster-join-strategy)
+    - [Examples](#examples)
+  - [Dead peer removal](#dead-peer-removal)
+    - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
+    - [Peer Failure Garbage Collection Strategy](#peer-failure-garbage-collection-strategy)
+    - [Examples](#examples-1)
+- [Command Reference](#command-reference)
+- [New functionality](#new-functionality)
+- [Formal verification](#formal-verification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
