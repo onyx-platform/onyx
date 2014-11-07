@@ -2,22 +2,22 @@
 
 ## Context
 
-Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. This Coordinator manages distributed state, scheduled jobs, and handles peer birth and failure. This Coordinator uses an internal log with checkpointing to write and process messages, potentionally failing over to stand-by Coordinators. State is kept inside of ZooKeeper.
+Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. This Coordinator manages distributed state, scheduled jobs, and handles peer birth and failure. This Coordinator uses multiple internal logs with checkpointing to write and process messages, potentionally failing over to stand-by Coordinators. State is kept inside of ZooKeeper.
 
 ### The good things about a centralized Coordinator
 
-- Most znodes only have one watch that triggers on change - the Coordinators
+- Most znodes only have one watch that triggers on change - the Coordinator. Very few reactions need to happen.
 - Znode contention is low. Usually only the Coordinator and one peer are accessing znode
-- Coordination decisions happen in a single place, moderately easier to reason about
+- Coordination decisions happen in a single place, and can be easily traced down to a single location in the code executing on a single box
 
 ### The bad things about a centralized Coordinator
 
-- Most bugs have come up inside the Coordinator than any other part of Onyx
+- More bugs have come up inside the Coordinator than any other part of Onyx
 - Multiple implementations of Coordinator are supported in parallel (HTTP, memory)
 - Some state in ZooKeeper is mutable, and the Coordinator needs an atomic read of particular znodes
-- Writes and some reads to ZooKeeper need to be serialized - burden on me to do it right
+- *Most* writes and reads to ZooKeeper need to have (application/semantic level) serializable consistency - burden on me to do it right
 - Burden on the user to stand up a Coordinator and its failover instances
-- Only supporting one scheduling algorithm in 0.4.0
+- Only supporting one scheduling algorithm in 0.4.0. It's hard to support more scheduling algorithms
 - Task rotation to support peer failure replacement is really hard with the current set up
 
 ### Towards a masterless design
@@ -25,10 +25,10 @@ Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. Thi
 An alternate design approach abolishes the Coordinator. This design proposal centers around the following ideas:
 
 - ZooKeeper maintains a totally ordered log-structure of command proposals. This is a history and arbiter.
-- All peers consume all commands from the log, starting from the beginning.
-- Each peer maintains *local state*. Local state begins with the empty value. Each command execution may modify the local state (via an idempotent function) and generate one or more commands to submit back to the log.
-- All peers that have executed `k` logs entries will have *exactly* the same local state.
-- Peers contend for certain commands (volunteering to execute a task) by submitting a *proposal* command to the log. The totally ordering of the log acts as an arbiter as to whether the proposal should be accepted or rejected.
+- All peers consume all commands from the log at any rate, starting from the beginning.
+- Each peer maintains a local replica of the global state. The replica begins with the empty value. Each command execution may modify the local state (via a deterministic, idempotent function) and generate one or more commands to submit back to the log as a reaction.
+- All peers that have executed `k` logs entries will have *exactly* the same local replica. No exceptions, *ever*.
+- Peers contend for certain commands (say, volunteering to execute a task that can have at most one peer executing it) by submitting a *proposal* command to the log. The totally ordering of the log acts as an arbiter to settle whether the proposal should be accepted or rejected.
 - Non-reactive commands (submitting a job, registering a new peer) are done through a client API, and are submitted to the log.
 
 This design proposal raises the following questions and concerns:
