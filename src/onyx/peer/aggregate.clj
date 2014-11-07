@@ -9,20 +9,31 @@
               [taoensso.timbre :refer [debug fatal]]
               [dire.core :refer [with-post-hook!]]))
 
+(defn reader-thread [event queue reader-ch input consumer]
+  (future
+    (try
+      (loop []
+        (let [segment (extensions/consume-message queue consumer)]
+          (when segment
+            (>!! reader-ch {:input input :message segment})
+            (recur))))
+      (finally
+       (close! reader-ch)))))
+
 (defn consumer-loop [event session input consumer halting-ch session-ch]
-  (go
-   (try
+  (let [task (:onyx.core/task-map event)
+        capacity (:onyx/batch-size task)
+        timeout-ms (or (:onyx/batch-timeout task) 1000)]
+    (go
      (loop []
-       (let [f
-             (fn []
-               {:input input
-                :message (extensions/consume-message (:onyx.core/queue event) consumer)})
-             msgs (doall (take-segments f (:onyx/batch-size (:onyx.core/task-map event))))]
-         (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
-       (when (<! halting-ch)
-         (recur)))
-     (finally
-      (close! session-ch)))))
+       (let [reader-ch (chan capacity)
+             fut (reader-thread event (:onyx.core/queue event) reader-ch input consumer)]
+         (let [read-f #(first (alts!! (vector reader-ch (timeout timeout-ms))))
+               msgs (doall (take-segments read-f capacity))]
+           (future-cancel fut)
+           (>! session-ch {:session session :halting-ch halting-ch :msgs msgs}))
+         (when (<! halting-ch)
+           (recur)))))))
 
 (defn inject-pipeline-resource-shim
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
