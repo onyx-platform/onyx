@@ -147,7 +147,7 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 -------------------------------------------------
 `prepare-join-cluster`
 
-- Submitter: Peer (P) that wants to join the cluster
+- Submitter: peer (P) that wants to join the cluster
 - Purpose: determines which peer (Q) that P will watch
 - Arguments: peer ID, peer pulse node
 - Replica update: assoc {P Q} to `:prepare` key
@@ -157,12 +157,19 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 -------------------------------------------------
 `abort-join-cluster`
 
+- Submitter: peer (P) determines that peer (Q) cannot join the cluster (P may = Q)
+- Purpose: Aborts Q's attempt at joining the cluster, erases attempt from replica
+- Arguments: pair of nodes to add a watch before ({T P})
+- Replica update: assoc {P Q} to `:accept` key, dissoc {P Q} from `:prepare` key
+- Side effects: T adds a ZooKeeper watch to P's pulse node, T removes a ZooKeeper watch from Q's pulse node
+- Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
+
 -------------------------------------------------
 `notify-watchers`
 
-- Submitter: Peer (P) that wants to join the cluster
+- Submitter: peer (P) that wants to join the cluster
 - Purpose: Transitions this peer's watch (T) from one peer to another
-- Arguments: Pair of nodes to add a watch before ({T P})
+- Arguments: pair of nodes to add a watch before ({T P})
 - Replica update: assoc {P Q} to `:accept` key, dissoc {P Q} from `:prepare` key
 - Side effects: T adds a ZooKeeper watch to P's pulse node, T removes a ZooKeeper watch from Q's pulse node
 - Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
@@ -170,18 +177,31 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 -------------------------------------------------
 `accept-join-cluster`
 
-- Submitter: Peer (T) wants to confirm that peer P can join the cluster
-- Purpose: Confirms that T has a watch on P's pulse node
-- Arguments: Pair of nodes {P Q} and pair of nodes {T P} to add to fully joined cluster
+- Submitter: peer (T) wants to confirm that peer P can join the cluster
+- Purpose: confirms that T has a watch on P's pulse node
+- Arguments: pair of nodes {P Q} and pair of nodes {T P} to add to fully joined cluster
 - Replica update: dissoc {P Q} from `:accept` key, merge {P Q} and {T P} into `:pairs` key
 - Side effects: None
-- Reactions: Peer P flushes its outbox of messages
+- Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
 `leave-cluster`
 
+- Submitter: peer (P) reporting that peer Q is dead
+- Purpose: removes Q from all activity, transitions P's watch to R and transitively closes the ring
+- Arguments: peer ID of Q
+- Replica update: assoc {P R} into the `:pairs` key, dissoc {Q R}
+- Side effects: P adds a ZooKeeper watch to R's pulse node
+
 -------------------------------------------------
 `peer-gc`
+
+- Submitter: peer (P) that wants to join the cluster
+- Purpose: Generates `leave-cluster` commands for any peers that are dead, but haven't yet been reported
+- Arguments: P's ID
+- Replica update: none
+- Side effects: P reads pulse nodes from ZooKeeper
+- Reactions: P sends `leave-cluster` commands to the log, for all peers with missing pulses
 
 -------------------------------------------------
 
