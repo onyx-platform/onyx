@@ -142,7 +142,7 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 - [Example 3: 3 node cluster, 1 joins with garbage collection](/doc/design/leave-examples/example-3.md)
 - [Example 4: 3 node cluster, 1 peer lags during GC](/doc/design/leave-examples/example-4.md)
 
-##### Command Reference
+### Command Reference
 
 -------------------------------------------------
 `prepare-join-cluster`
@@ -179,8 +179,6 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 
 -------------------------------------------------
 `leave-cluster`
-
--------------------------------------------------
 
 -------------------------------------------------
 `peer-gc`
