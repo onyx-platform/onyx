@@ -43,7 +43,7 @@ Below is an outline to implementing a fully masterless design in Onyx that mitig
 
 #### Joining the cluster
 
-Aside from the log structure, ZooKeeper will maintain one other directory for heartbeats. Each virtual peer registers exactly one ephemeral node in the heartbeats directory. The name of this znode is a UUID.
+Aside from the log structure, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
 ##### 2-Phase Cluster Join Strategy
 
@@ -56,7 +56,7 @@ The technique needs peers to play by the following rules:
   - A peer picks another peer to watch by selecting a candidate group. This candidate group is sorted by peer ID. The target peer is chosen by taking the message id modulo the number of peers in the sorted candidate list.
 
 The algorithm works as follows ("it" refers to the joining peer):
-- it sends a `prepare-join-cluster` command to the log, indicating its peer ID and heartbeat znode
+- it sends a `prepare-join-cluster` command to the log, indicating its peer ID and pulse znode
 - it plays the log forward until it encounters the `prepare-join-cluster` message that it sent
 - if the cluster size (`n`) is `>= 1`:
   - let Q = this peer
@@ -96,6 +96,12 @@ The algorithm works as follows ("it" refers to the joining peer):
 
 -------------------------------------------------
 `prepare-join-cluster`
+
+- Submitter: Peer (P) that wants to join the cluster
+- Purpose: Determines which peer (Q) that P will watch
+- Replica update: Assoc {P Q} to `:prepare` key
+- Side effects: P adds a ZooKeeper watch to Q's pulse node
+- Reactions: P sends `accept-join-cluster` to the log
 
 -------------------------------------------------
 `abort-join-cluster`
@@ -152,8 +158,8 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 - Peer Z begins by sending a `peer-gc` command to the log
 - Peer Z plays the log forward
 - Peer Z encounters its `peer-gc` command
-- Peer Z takes the set of nodes in the cluster and checks if their heartbeat nodes are still online
-- Peer Z sends a `leave-cluster` command to the log for every peer who's heartbeat node is disconnected
+- Peer Z takes the set of nodes in the cluster and checks if their pulse nodes are still online
+- Peer Z sends a `leave-cluster` command to the log for every peer who's pulse node is disconnected
 - Peer Z continues to play the log, and eventually runs into the case of it being the only peer in the cluster. It is then fully joined
 
 ##### Examples
