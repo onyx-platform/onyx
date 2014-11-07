@@ -115,10 +115,7 @@ The algorithm works as follows ("it" refers to the joining peer):
 
 More questions:
 - If a lot of commands have been buffered up, will there be negative affects by appending a huge number of commands to the log when the buffer is flushed?
-- What about the very first peer to join the cluster? No one can watch it
-- What happens if it buffers a huge number of messages?
-- Talk about transitive closures during failure
-- What happens if a peer tries to join and dies after prepare?
+- What about a node's memory if the outbox buffers a huge number of messages?
 
 #### Dead peer removal
 
