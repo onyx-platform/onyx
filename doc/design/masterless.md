@@ -215,11 +215,11 @@ In the event that a peer leaves the cluster while the Round Robin scheduler is r
 
 **Job Addition**
 
-If a job is submitted while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster.
+If a job is submitted while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A has all 100 peers executing its task, and job B is submitted, 50 peers will move from job A to job B.
 
 **Job Removal**
 
-If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster.
+If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
 
 ##### Round Robin Rebalancing Strategy
 
