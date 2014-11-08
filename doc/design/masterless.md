@@ -277,6 +277,13 @@ When your workload is a batch job, it is possible to make progress on a job with
 
 Partial Coverage Protection is an option that can be enabled at the time of `submit-job`. When Partial Coverage Protection is enabled, Onyx will not assign *any* peers to a job of N tasks unless *at least* N peers *may* volunteer to execute tasks for that job. If a peer fails during the time that the job is executing and the total number of peers executing that job becomes less than N, *all peers* executing for that job will stop and go seek a new job. The scheduler will behave as if this job has been removed. When another peer joins the cluster, and this job now has enough peers to execute its tasks, the scheduler will behave as if this is a new job and assign work to it in either Greedy or Round Robin order (depending on which is enabled).
 
+#### Examples
+
+- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Greedy task scheduler](/doc/design/allocate-examples/example-1.md)
+- [Example 2: 3 node cluster, 1 job, Greedy job scheduler, Round Robin task scheduler](/doc/design/allocate-examples/example-2.md)
+- [Example 3: 7 node cluster, 2 jobs, Round Robin job scheduler, Greedy task schedulers](/doc/design/allocate-examples/example-3.md)
+- [Example 4: 7 node cluster, Round Robin job scheduler, Greedy task schedulers, 2 job cluster shift](/doc/design/allocate-examples/example-4.md)
+
 ## Command Reference
 
 -------------------------------------------------
