@@ -24,6 +24,7 @@
       - [Greedy Task Scheduler](#greedy-task-scheduler)
       - [Round Robin Task Scheduler](#round-robin-task-scheduler)
     - [Partial Coverage Protection](#partial-coverage-protection)
+    - [Examples](#examples-2)
 - [Command Reference](#command-reference)
 - [New functionality](#new-functionality)
 - [Formal verification](#formal-verification)
