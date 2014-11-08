@@ -163,6 +163,111 @@ The strategy outlined below will pessimistically garbage collect peers as it joi
 - [Example 3: 3 node cluster, 1 joins with garbage collection](/doc/design/leave-examples/example-3.md)
 - [Example 4: 3 node cluster, 1 peer lags during GC](/doc/design/leave-examples/example-4.md)
 
+## Allocating Peers to Jobs and Tasks
+
+In a masterless design, there is no single entity that assigns to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" make distribute the workload across the cluster. Onyx `0.5.0` will ship new job and task allocation policies. End users will be able to change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.
+
+### Job Schedulers
+
+Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute. There are currently two kinds of schedulers - Greedy and Round Robin.
+
+#### Greedy Job Scheduler
+
+The Greedy job scheduler allocates *all peers* to each job in the order that it was submitted. For example, suppose you had 100 virtual peers and you submitted two jobs - job A and job B. With a Greedy scheduler, *all* 100 peers would be allocated to job A. When (if) job A completes, all 100 peers will then execute tasks for job B. This *probably* isn't desirable when you're running streaming workflows, since they theoretically never end.
+
+##### Peer Addition
+
+In the event that a peer joins the cluster while the Greedy job scheduler is running, that new peer will be allocated to the current job that is being run greedily.
+
+##### Peer Removal
+
+In the event that a peer leaves the cluster while the Greedy job scheduler is running, no peers will be shifted off of the job that is greedily running.
+
+##### Job Addition
+
+If a job is submitted while this scheduler is running, no peers will be allocated to this job. The only exception to this rule is if *no* jobs are currently running. In this case, all peers will be allocated to this job.
+
+##### Job Removal
+
+If a job is completed or otherwise cancelled, *all* of the peers executed that task will move to the job that was submitted after this job.
+
+#### Round Robin Job Scheduler
+
+The Round Robin job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Round Robin scheduler, job A would be allocated peer 1, job B would be allocated peer 2, job A would be allocated peer 3, and so on. In the end, both jobs will end up with 50 virtual peers allocated to each. Round robin begins allocating by selecting the first job submitted.
+
+##### Peer Addition
+
+In the event that a peer joins the cluster while the Round Robin scheduler is running, that new peer will be allocated to the job *next* in the round robin sequence. The local replica has a reference to the job ID of the previous job that a peer was allocated for.
+
+##### Peer Removal
+
+In the event that a peer leaves the cluster while the Round Robin scheduler is running, the peers across *all* jobs will be rebalanced to evenly distribute the workflow. At most, one peer will change jobs to rebalance the workload.
+
+##### Job Addition
+
+If a job is submitted while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster.
+
+##### Job Removal
+
+If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster.
+
+##### Round Robin Rebalancing Strategy
+
+When a job is added or removed in Onyx, the round robin peer allocation needs to change to ensure that all jobs receive about the same amount of resources. When an even number of virtual peers cannot be distributed across the cluster (8 virtual peers, 3 jobs of 2 tasks each), the *fraction* of peers that is left is allocated round-robin, starting with the oldest job, working forward. Consider the following scenario:
+
+- There are 8 virtual peers running
+- There are 2 jobs, A and B, each using 4 virtual peers each
+- Job C is submitted
+- Onyx must rebalance and allocate 3 peers to A, 3 peers to B, and 2 peers to C
+
+The algorithm works as follows:
+
+- let J be the number of jobs executing
+- let P be the number of virtual peers in the cluster
+- every job will be allocated *at least* `P / J` virtual peers (integer division)
+- let R be the `(remainder of (P / J)) / J`
+- let N be the numerator of R
+- the first N jobs to be submitted will be allocated exactly `(P / J) + 1` peers
+- let K be the original number of peers executing this job
+- if `(P / J)` or `(P / J) + 1` (depending on the job) is less than K, this job reassigns `K - (P / J)` or `K - (P / J) + 1)` peers to the new job that was submitted
+- exactly which peers are released from a job depends on the Task Scheduler for that job
+
+### Task Schedulers
+
+Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are currently two kinds of schedulers - Greedy and Round Robin.
+
+#### Greedy Task Scheduler
+
+The Greedy Task Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler always assigns the next peer to the *earliest* task in the sorted workflow that is not complete. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to task A.
+
+##### Task Completion
+
+When a task is complete, this scheduler moves all peers executing that task to the next task in the topologically sorted workflow. If there are no more tasks, these peers are elligible to execute tasks for another job. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns all peers *from the completed task* to task B.
+
+##### Peer Removal
+
+If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is added to the currently executing task that all peers are greedily assigned to.
+
+#### Round Robin Task Scheduler
+
+The Round Robin Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to tasks A, B, C, D, A, B, C, D, ... and so on.
+
+##### Task Completion
+
+When a task is complete, this scheduler moves all peers executing that task and round robin assigns them, starting with the first incomplete task. the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns each peer *from the completed task* to tasks B, C, D, B, C, D, ... and so on.
+
+##### Peer Removal
+
+If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is assigned the next task in the round robin sequence.
+
+### Partial Coverage Protection
+
+Onyx is a batch and streaming hybrid data processing framework. Sometimes, you want Onyx to behave quite differently depending on whether your workload is batch or streaming oriented. In this section, we introduce the concept of Partial Coverage Protection.
+
+When your workload is a batch job, it is possible to make progress on a job with 3 tasks using a single virtual peer. Each task *will eventually* complete, and that single peer can move from one task to another and finish the job. When your job is streaming oriented, a single peer is insufficient *to ever* produce results for a job with 3 tasks. Since no tasks *ever* complete, that peer will never move to work on other tasks. This is obviously not desirable.
+
+Partial Coverage Protection is an option that can be enabled at the time of `submit-job`. When Partial Coverage Protection is enabled, Onyx will not assign *any* peers to a job of N tasks unless *at least* N peers *may* volunteer to execute tasks for that job. If a peer fails during the time that the job is executing and the total number of peers executing that job becomes less than N, *all peers* executing for that job will stop and go seek a new job. The scheduler will behave as if this job has been removed. When another peer joins the cluster, and this job now has enough peers to execute its tasks, the scheduler will behave as if this is a new job and assign work to it in either Greedy or Round Robin order (depending on which is enabled).
+
 ## Command Reference
 
 -------------------------------------------------
