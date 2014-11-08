@@ -347,6 +347,26 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: P sends `leave-cluster` commands to the log, for all peers with missing pulses
 
 -------------------------------------------------
+`volunteer-for-task`
+
+- Submitter:
+- Purpose:
+- Arguments:
+- Replica update:
+- Side effects:
+- Reactions:
+
+-------------------------------------------------
+`complete-task`
+
+- Submitter:
+- Purpose:
+- Arguments:
+- Replica update:
+- Side effects:
+- Reactions:
+
+-------------------------------------------------
 
 ## New functionality
 
