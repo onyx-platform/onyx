@@ -132,3 +132,22 @@
   (fn [element parents children]
     (:onyx/type element)))
 
+;;;;;;;;;;;; New ZooKeeper API ;;;;;;;;;;;;;;;;;
+
+(defmulti write-log-entry
+  (fn [log data] (type log)))
+
+(defmulti read-log-entry
+  (fn [log position] (type log)))
+
+(defmulti register-pulse
+  (fn [log id] (type log)))
+
+(defmulti on-delete
+  (fn [log node ch] (type log)))
+
+(defmulti subscribe-to-log
+  (fn [log starting-position ch] (type log)))
+
+;;;;;;;;;;;; New ZooKeeper API ;;;;;;;;;;;;;;;;;
+
