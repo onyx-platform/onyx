@@ -2,6 +2,13 @@
   "Extension interfaces for internally used queues, logs,
    and distributed coordination.")
 
+(defmulti apply-log-entry (fn [kw args] kw))
+
+(defmulti replica-diff (fn [kw args]))
+
+
+
+
 (defmulti write-log-entry (fn [log data] (type log)))
 
 (defmulti read-log-entry (fn [log position] (type log)))

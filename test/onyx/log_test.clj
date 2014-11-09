@@ -48,3 +48,11 @@
 
 (component/stop env)
 
+(def state {:replica {:pairs {:a :b :b :c :c :a}
+                      :peers [:a :b :c :d]}
+            :local-state {:id :d}})
+
+(def entry (onyx.log.entry/create-log-entry :prepare-join-cluster {}))
+
+((extensions/apply-log-entry (:fn entry) (:args entry)) state 0)
+
