@@ -8,6 +8,7 @@
 - [The good things about a centralized Coordinator](#the-good-things-about-a-centralized-coordinator)
 - [The bad things about a centralized Coordinator](#the-bad-things-about-a-centralized-coordinator)
 - [Towards a masterless design](#towards-a-masterless-design)
+  - [The Log](#the-log)
   - [The Inbox and Outbox](#the-inbox-and-outbox)
   - [Joining the Cluster](#joining-the-cluster)
     - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
@@ -27,6 +28,15 @@
     - [Partial Coverage Protection](#partial-coverage-protection)
     - [Examples](#examples-2)
 - [Command Reference](#command-reference)
+- [](#)
+- [](#-1)
+- [](#-2)
+- [](#-3)
+- [](#-4)
+- [](#-5)
+- [](#-6)
+- [](#-7)
+- [](#-8)
 - [New functionality](#new-functionality)
 - [Formal verification](#formal-verification)
 
@@ -54,30 +64,17 @@ Onyx 0.4.0's design revolves around the notion of a centralized Coordinator. Thi
 
 ## Towards a masterless design
 
-An alternate design approach abolishes the Coordinator. This design proposal centers around the following ideas:
+An alternate design approach abolishes the Coordinator. The rest of this document describes a design proposal centers around turning Onyx into a masterless system.
 
-- ZooKeeper maintains a totally ordered log-structure of command proposals. This is a history and arbiter.
-- All peers consume all commands from the log at any rate, starting from the beginning.
-- Each peer maintains a local replica of the global state. The replica begins with the empty value. Each command execution may modify the local state (via a deterministic, idempotent function) and generate one or more commands to submit back to the log as a reaction.
-- All peers that have executed `k` logs entries will have *exactly* the same local replica. No exceptions, *ever*.
-- Peers contend for certain commands (say, volunteering to execute a task that can have at most one peer executing it) by submitting a *proposal* command to the log. The totally ordering of the log acts as an arbiter to settle whether the proposal should be accepted or rejected.
-- Non-reactive commands (submitting a job, registering a new peer) are done through a client API, and are submitted to the log.
+### The Log
 
-With no single node in the cluster in charge of all others, this raises the following questions and concerns:
-
-- How are peers detected as dead and removed from their executing tasks?
-- Contention sky-rockets under scenarios where all peers can submit proposal commands when reacting to a command. How can we mitigate that?
-- How do proposals actually work when there is semantic contention?
-- What happens when the log is huge and a new peer joins? Since a peer needs to play the log sequentially, from the beginning, it needs to replay a *lot* of commands, and react (submitting proposals) in vain to most everything it sees.
-- How are situations handled when a peer wins the proposal, but dies and never confirms its success?
-
-Below is an outline to implementing a fully masterless design in Onyx that mitigates the above concerns.
+This design centers around a totally ordered sequence of commands using a log structure. The log acts as an immutable history and arbiter. It's maintained through ZooKeeper using a directory of persistent, sequential znodes. Virtual peers act as processes that consume from the log. At the time a peer starts up, it initializes its *local replica* to the "empty state". Log entries represent deterministic, idempontent functions to be applied to the local replica. The peer plays the log from the beginning, applying each log entry to its local replica. The local replica is transformed from one value to another. As a reaction to each replica transformation, the peer may send more commands to the tail of the log. Peers may play the log at any rate. After each peer has played `k` log entries, all peers will have *exactly* the same local replica.
 
 ### The Inbox and Outbox
 
 Every virtual peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
 
-Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's current processing - hence the inbox will probably be configured with a size greater than 1.
+Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's current processing - hence the inbox will probably be configured with a size greater than one.
 
 The outbox is used to send commands to the log. Certain commands processed by the peer will generate *other* commands. For example, if a peer is idle and it receives a command notifying it about a new job, the peer will *react* by sending a command to the log that it gets allocated for work. Each peer can choose to *pause* or *resume* the sending of its outbox messages. This is useful when the peer is just acquiring membership to the cluster. It will have to play log commands to join the cluster fully, but it cannot volunteer to be allocated for work.
 
