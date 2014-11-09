@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre]
+            [taoensso.timbre :refer [fatal]]
             [zookeeper :as zk]
             [onyx.extensions :as extensions])
   (:import [org.apache.curator.test TestingServer]))
@@ -86,18 +86,21 @@
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} starting-position ch]
   (thread
-   (loop [position starting-position]
-     (let [path (str log-path prefix "/entry-" position)]
-       (if (zk/exists conn path)
-         (>!! ch position)
-         (let [read-ch (chan 1)]
-           (zk/children conn (log-path prefix) :watcher #(>!! read-ch true))
-           ;; Log entry may have been added inbetween initial check and when we
-           ;; added the watch.
-           (when (zk/exists conn path)
-             (>!! read-ch true))
-           (<!! read-ch)
-           (close! read-ch)
-           (>!! ch position))))
-     (recur (inc position)))))
+   (try
+     (loop [position starting-position]
+       (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
+         (if (zk/exists conn path)
+           (>!! ch position)
+           (let [read-ch (chan 2)]
+             (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+             ;; Log entry may have been added in between initial check and when we
+             ;; added the watch.
+             (when (zk/exists conn path)
+               (>!! read-ch true))
+             (<!! read-ch)
+             (close! read-ch)
+             (>!! ch position))))
+       (recur (inc position)))
+     (catch Exception e
+       (fatal e)))))
 
