@@ -10,7 +10,7 @@
   (fn [{:keys [local-state replica] :as state} message-id]
     (let [n (count (:peers replica))]
       (if (> n 0)
-        (let [joining-peer (:id local-state)
+        (let [joining-peer (:joiner args)
               all-joined-peers (into #{} (keys (:pairs replica)))
               lone-peer #{(:lone-peer replica)}
               all-prepared-peers #(into {} (keys (:prepared replica)))
@@ -21,6 +21,6 @@
           (if (seq sorted-candidates)
             (let [index (mod message-id (count sorted-candidates))
                   target (nth sorted-candidates index)]
-              (assoc replica :prepared {joining-peer target}))
+              (update-in replica [:prepared] merge {joining-peer target}))
             replica))))))
 
