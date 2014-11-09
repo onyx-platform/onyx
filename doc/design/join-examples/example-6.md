@@ -1,4 +1,4 @@
-##### Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 2-phase join
+##### Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 3-phase join
 
 - Nodes A, B, and C fully in the cluster                              
 - Local state before (1): `{:pairs {:a :b, :b :c, :c :a}}`

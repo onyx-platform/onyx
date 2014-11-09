@@ -9,7 +9,7 @@
 - [The bad things about a centralized Coordinator](#the-bad-things-about-a-centralized-coordinator)
 - [Towards a masterless design](#towards-a-masterless-design)
   - [Joining the cluster](#joining-the-cluster)
-    - [2-Phase Cluster Join Strategy](#2-phase-cluster-join-strategy)
+    - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
     - [Examples](#examples)
   - [Dead peer removal](#dead-peer-removal)
     - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
@@ -76,9 +76,9 @@ Below is an outline to implementing a fully masterless design in Onyx that mitig
 
 Aside from the log structure, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
-#### 2-Phase Cluster Join Strategy
+#### 3-Phase Cluster Join Strategy
 
-When a peer wishes to join the cluster, it must engage in a 2 phase protocol. Two phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch.
+When a peer wishes to join the cluster, it must engage in a 3 phase protocol. Three phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch.
 
 The technique needs peers to play by the following rules:
   - Every peer must be watched by another peer in ZooKeeper, unless there is exactly one peer in the cluster.
@@ -120,7 +120,7 @@ The algorithm works as follows ("it" refers to the joining peer):
 - [Example 3: 2 node cluster, 1 peer successfully joins, 1 aborts](/doc/design/join-examples/example-3.md)
 - [Example 4: 1 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-4.md)
 - [Example 5: 0 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-5.md)
-- [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 2-phase join](/doc/design/join-examples/example-6.md)
+- [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 3-phase join](/doc/design/join-examples/example-6.md)
 - [Example 7: 3 node cluster, 1 peer dies while joining](/doc/design/join-examples/example-7.md)
 
 More questions:
