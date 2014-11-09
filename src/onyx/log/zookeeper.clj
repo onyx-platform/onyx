@@ -77,11 +77,11 @@
     (zk/create conn node :persistent? false)))
 
 (defmethod extensions/on-delete ZooKeeper
-  [{:keys [conn opts] :as log} node ch]
+  [{:keys [conn opts prefix] :as log} id ch]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
               (>!! event)))]
-    (zk/exists conn node :watcher f)))
+    (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} starting-position ch]

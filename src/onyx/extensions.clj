@@ -6,6 +6,10 @@
 
 (defmulti replica-diff (fn [kw old new] kw))
 
+(defmulti fire-side-effects! (fn [kw old new] kw))
+
+(defmulti reactions (fn [kw old new diff args] kw))
+
 
 
 
@@ -15,7 +19,7 @@
 
 (defmulti register-pulse (fn [log id] (type log)))
 
-(defmulti on-delete (fn [log node ch] (type log)))
+(defmulti on-delete (fn [log id ch] (type log)))
 
 (defmulti subscribe-to-log (fn [log starting-position ch] (type log)))
 

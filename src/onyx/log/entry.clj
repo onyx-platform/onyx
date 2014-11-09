@@ -1,5 +1,6 @@
 (ns onyx.log.entry
-  (:require [clojure.set :refer [union difference]]
+  (:require [clojure.core.async :refer [chan go >! <! close!]]
+            [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
@@ -27,5 +28,25 @@
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [kw old new]
-  (second (diff (:prepared old) (:prepared new))))
+  (let [rets (second (diff (:prepared old) (:prepared new)))]
+    (assert (<= (count rets) 1))
+    (when (seq rets)
+      {:watching (first (keys rets))
+       :watched (first (vals rets))})))
+
+(defmethod extensions/fire-side-effects! :prepare-join-cluster
+  [kw old new diff {:keys [env id]}]
+  (when (= id (:watching diff))
+    (let [ch (chan 1)]
+      (extensions/on-delete (:log env) (:watched diff) ch)
+      (go (<! ch)
+          (extensions/write-log-entry (:log env) :leave-cluster {:id (:watched diff)})
+          (close! ch)))))
+
+(defmethod extensions/reactions :prepare-join-cluster
+  [kw old new diff {:keys [id]}]
+  (when (= id (:watching diff))
+    [{:f :notify-watchers
+      :args {:watcher (get (map-invert (:pairs new)) (:watched diff))
+             :to-watch (:watching diff)}}]))
 
