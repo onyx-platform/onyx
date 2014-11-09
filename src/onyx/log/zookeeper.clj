@@ -50,20 +50,30 @@
 (defn deserialize-fressian [x]
   (fressian/read x))
 
+(defn pad-sequential-id
+  "ZooKeeper sequential IDs are at least 10 digits.
+   If this node's id is less, pad it. Otherwise returns the str'ed id"
+  [id]
+  (let [padding 10
+        id-len (count (str id))]
+    (if (< id-len padding)
+      (str (apply str (take (- padding id-len) (repeat "0"))) id)
+      (str id))))
+
 (defmethod extensions/write-log-entry ZooKeeper
-  [{:keys [conn opts] :as log} data]
-  (let [node (str (log-path (:onyx/id opts)) "/entry-")
+  [{:keys [conn opts prefix] :as log} data]
+  (let [node (str (log-path prefix) "/entry-")
         bytes (serialize-fressian data)]
     (zk/create conn node :data bytes :persistent? true :sequential? true)))
 
 (defmethod extensions/read-log-entry ZooKeeper
-  [{:keys [conn opts] :as log} position]
-  (let [node (str (log-path (:onyx/id opts)) "/entry-" position)]
+  [{:keys [conn opts prefix] :as log} position]
+  (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))]
     (deserialize-fressian (:data (zk/data conn node)))))
 
 (defmethod extensions/register-pulse ZooKeeper
-  [{:keys [conn opts] :as log} id]
-  (let [node (str (pulse-path (:onyx/id opts)) "/" id)]
+  [{:keys [conn opts prefix] :as log} id]
+  (let [node (str (pulse-path prefix) "/" id)]
     (zk/create conn node :persistent? false)))
 
 (defmethod extensions/on-delete ZooKeeper
@@ -74,14 +84,14 @@
     (zk/exists conn node :watcher f)))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
-  [{:keys [conn opts] :as log} starting-position ch]
+  [{:keys [conn opts prefix] :as log} starting-position ch]
   (thread
    (loop [position starting-position]
-     (let [path (str log-path (:onyx/id opts) "/entry-" position)]
+     (let [path (str log-path prefix "/entry-" position)]
        (if (zk/exists conn path)
          (>!! ch position)
          (let [read-ch (chan 1)]
-           (zk/children conn (log-path (:onyx/id opts)) :watcher #(>!! read-ch true))
+           (zk/children conn (log-path prefix) :watcher #(>!! read-ch true))
            ;; Log entry may have been added inbetween initial check and when we
            ;; added the watch.
            (when (zk/exists conn path)
