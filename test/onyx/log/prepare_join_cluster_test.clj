@@ -9,23 +9,33 @@
 
 (def f (extensions/apply-log-entry (:fn entry) (:args entry)))
 
-(def state {:replica {:pairs {:a :b :b :c :c :a}
-                      :peers [:a :b :c]}
-            :local-state {}})
+(def old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]})
 
-(fact (:prepared (f state 0)) => {:d :a})
+(let [new-replica (f old-replica 0)
+      diff (extensions/replica-diff :prepare-join-cluster old-replica new-replica)]
+  (fact (:prepared new-replica) => {:d :a})
+  (fact diff => {:d :a}))
 
-(let [state (assoc-in state [:replica :prepared :e] :a)]
-  (fact (:prepared (f state 0)) => {:e :a :d :b}))
+(let [old-replica (assoc-in old-replica [:prepared :e] :a)
+      new-replica (f old-replica 0)
+      diff (extensions/replica-diff :prepare-join-cluster old-replica new-replica)]
+  (fact (:prepared new-replica) => {:e :a :d :b})
+  (fact diff => {:d :b}))
 
-(let [state (-> state
-                (assoc-in [:replica :prepared :e] :a)
-                (assoc-in [:replica :prepared :f] :b))]
-  (fact (:prepared (f state 0)) => {:e :a :f :b :d :c}))
+(let [old-replica (-> old-replica
+                      (assoc-in [:prepared :e] :a)
+                      (assoc-in [:prepared :f] :b))
+      new-replica (f old-replica 0)
+      diff (extensions/replica-diff :prepare-join-cluster old-replica new-replica)]
+  (fact (:prepared new-replica) => {:e :a :f :b :d :c})
+  (fact diff => {:d :c}))
 
-(let [state (-> state
-                (assoc-in [:replica :prepared :e] :a)
-                (assoc-in [:replica :prepared :f] :b)
-                (assoc-in [:replica :prepared :g] :c))]
-  (fact (:prepared (f state 0)) => {:e :a :f :b :g :c}))
+(let [old-replica (-> old-replica
+                      (assoc-in [:prepared :e] :a)
+                      (assoc-in [:prepared :f] :b)
+                      (assoc-in [:prepared :g] :c))
+      new-replica (f old-replica 0)
+      diff (extensions/replica-diff :prepare-join-cluster old-replica new-replica)]
+  (fact (:prepared new-replica) => {:e :a :f :b :g :c})
+  (fact diff => nil))
 

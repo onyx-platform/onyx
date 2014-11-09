@@ -1,5 +1,6 @@
 (ns onyx.log.entry
   (:require [clojure.set :refer [union difference]]
+            [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
 (defn create-log-entry [kw args]
@@ -7,7 +8,7 @@
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [kw args]
-  (fn [{:keys [local-state replica] :as state} message-id]
+  (fn [replica message-id]
     (let [n (count (:peers replica))]
       (if (> n 0)
         (let [joining-peer (:joiner args)
@@ -23,4 +24,8 @@
                   target (nth sorted-candidates index)]
               (update-in replica [:prepared] merge {joining-peer target}))
             replica))))))
+
+(defmethod extensions/replica-diff :prepare-join-cluster
+  [kw old new]
+  (second (diff (:prepared old) (:prepared new))))
 
