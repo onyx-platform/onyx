@@ -18,18 +18,19 @@
 (defn log-path [prefix]
   (str (prefix-path prefix) "/log"))
 
-(defrecord ZooKeeper [opts]
+(defrecord ZooKeeper [id config]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper")
-    (let [server (when (:zookeeper/server? opts) (TestingServer. (:zookeeper.server/port opts)))
-          conn (zk/connect (:zookeeper/address opts))
-          prefix (:onyx/id opts)]
-      (zk/create-all conn (pulse-path prefix) :persistent? true)
-      (zk/create-all conn (log-path prefix) :persistent? true)
+    (let [server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
+          conn (zk/connect (:zookeeper/address config))]
+      (zk/create conn root-path :persistent? true)
+      (zk/create conn (prefix-path id) :persistent? true)
+      (zk/create conn (pulse-path id) :persistent? true)
+      (zk/create conn (log-path id) :persistent? true)
 
-      (assoc component :server server :conn conn :prefix (:onyx/id opts))))
+      (assoc component :server server :conn conn :prefix id)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping ZooKeeper")
@@ -40,8 +41,8 @@
 
     component))
 
-(defn zookeeper [opts]
-  (map->ZooKeeper {:opts opts}))
+(defn zookeeper [id config]
+  (map->ZooKeeper {:id id :config config}))
 
 (defn serialize-fressian [x]
   (.array (fressian/write x)))

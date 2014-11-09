@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [info] :as timbre]
             [com.postspectacular.rotor :as r]))
 
-(defrecord LoggingConfiguration [file config]
+(defrecord LoggingConfiguration [id file config]
   component/Lifecycle
 
   (start [component]
@@ -27,13 +27,12 @@
          {:path file :max-size (* 512 10240) :backlog 5})))
 
     (info "Starting Logging Configuration")
-
     component)
 
   (stop [component]
     (info "Stopping Logging Configuration")
     component))
 
-(defn logging-configuration [{:keys [onyx.log/file onyx.log/config]}]
-  (map->LoggingConfiguration {:file (or file "onyx.log") :config config}))
+(defn logging-configuration [id {:keys [onyx.log/file onyx.log/config]}]
+  (map->LoggingConfiguration {:id id :file (or file "onyx.log") :config config}))
 
