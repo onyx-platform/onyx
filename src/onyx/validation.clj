@@ -29,7 +29,7 @@
 
 (defn serializable? [x]
   (try
-    (do (fressian/read (.array (fressian/write x)))
+    (do (fressian/write x)
         true)
     (catch Exception e 
       false)))
