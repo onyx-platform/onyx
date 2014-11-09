@@ -8,7 +8,8 @@
 - [The good things about a centralized Coordinator](#the-good-things-about-a-centralized-coordinator)
 - [The bad things about a centralized Coordinator](#the-bad-things-about-a-centralized-coordinator)
 - [Towards a masterless design](#towards-a-masterless-design)
-  - [Joining the cluster](#joining-the-cluster)
+  - [The Inbox and Outbox](#the-inbox-and-outbox)
+  - [Joining the Cluster](#joining-the-cluster)
     - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
     - [Examples](#examples)
   - [Dead peer removal](#dead-peer-removal)
@@ -72,7 +73,15 @@ With no single node in the cluster in charge of all others, this raises the foll
 
 Below is an outline to implementing a fully masterless design in Onyx that mitigates the above concerns.
 
-### Joining the cluster
+### The Inbox and Outbox
+
+Every virtual peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
+
+Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's current processing - hence the inbox will probably be configured with a size greater than 1.
+
+The outbox is used to send commands to the log. Certain commands processed by the peer will generate *other* commands. For example, if a peer is idle and it receives a command notifying it about a new job, the peer will *react* by sending a command to the log that it gets allocated for work. Each peer can choose to *pause* or *resume* the sending of its outbox messages. This is useful when the peer is just acquiring membership to the cluster. It will have to play log commands to join the cluster fully, but it cannot volunteer to be allocated for work.
+
+### Joining the Cluster
 
 Aside from the log structure, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
