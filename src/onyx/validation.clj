@@ -9,6 +9,18 @@
    :onyx/batch-size (schema/pred pos? 'pos?)
    schema/Keyword schema/Any})
 
+(defn edge-two-nodes? [edge]
+  (= (count edge) 2))
+
+(def edge-validator
+  (schema/->Both [(schema/pred vector? 'vector?) 
+                  (schema/pred edge-two-nodes? 'edge-two-nodes?)
+                  [schema/Keyword]]))
+
+(def workflow-validator 
+  (schema/->Both [(schema/pred vector? 'vector?)
+                  [edge-validator]]))
+
 (def catalog-entry-validator
   (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
                       (merge base-catalog-entry-validator {:onyx/medium schema/Keyword})
@@ -45,13 +57,37 @@
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
 
+
+(defn input-tasks-output [{:keys [workflow catalog]}]
+  (let [input-tasks (set (map :onyx/name 
+                              (filter (fn [task] 
+                                        (= :input (:onyx/type task)))
+                                      catalog)))]
+    (some input-tasks (map second workflow))))
+
+(defn output-tasks-input [{:keys [workflow catalog]}]
+  (let [output-tasks (set (map :onyx/name 
+                               (filter (fn [task] 
+                                        (= :output (:onyx/type task)))
+                                      catalog)))]
+    (some output-tasks (map first workflow))))
+
+(defn validate-workflow-inputs [job]
+  (when-let [task (input-tasks-output job)]
+    (throw (Exception. (str "Input task " task " used as output.")))))
+
+(defn validate-workflow-outputs [job]
+  (when-let [task (output-tasks-input job)]
+    (throw (Exception. (str "Output task " task " used as input.")))))
+
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
-   :workflow (schema/pred vector? 'vector?)})
+   :workflow workflow-validator})
 
 (defn validate-job
   [job]
   (schema/validate job-validator job)
   (validate-catalog (:catalog job))
-  (validate-workflow-names job))
-
+  (validate-workflow-names job)
+  (validate-workflow-inputs job)
+  (validate-workflow-outputs job))
