@@ -2,92 +2,15 @@
   "Extension interfaces for internally used queues, logs,
    and distributed coordination.")
 
-(defmulti mark-peer-born (fn [sync node] (type sync)))
+(defmulti write-log-entry (fn [log data] (type log)))
 
-(defmulti mark-peer-dead (fn [sync node] (type sync)))
+(defmulti read-log-entry (fn [log position] (type log)))
 
-(defmulti mark-offered (fn [sync task peer nodes] (type sync)))
+(defmulti register-pulse (fn [log id] (type log)))
 
-(defmulti plan-job (fn [sync job-id tasks catalog workflow] (type sync)))
+(defmulti on-delete (fn [log node ch] (type log)))
 
-(defmulti ack (fn [sync node] (type sync)))
-
-(defmulti seal-resource? (fn [sync node] (type sync)))
-
-(defmulti revoke-offer (fn [sync ack-node] (type sync)))
-
-(defmulti complete (fn [sync complete-node cooldown-node cb] (type sync)))
-
-(defmulti next-tasks (fn [sync] (type sync)))
-
-(defmulti idle-peers (fn [sync] (type sync)))
-
-(defmulti create
-  (fn
-    ([sync bucket] [(type sync) bucket])
-    ([sync bucket content] [(type sync) bucket])))
-
-(defmulti create-at
-  (fn
-    ([sync bucket subpath] [(type sync) bucket])
-    ([sync bucket subpath content] [(type sync) bucket])))
-
-(defmulti create-node
-  (fn
-    ([sync node] (type sync))
-    ([sync node contents] (type sync))))
-
-(defmulti delete (fn [sync node] (type sync)))
-
-(defmulti write-node (fn [sync node contents] (type sync)))
-
-(defmulti touch-node (fn [sync node] (type sync)))
-
-(defmulti touched? (fn [sync bucket node] [(type sync) bucket]))
-
-(defmulti read-node (fn [sync node] (type sync)))
-
-(defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
-
-(defmulti list-nodes (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti dereference (fn [sync node] (type sync)))
-
-(defmulti previous-node (fn [sync node] (type sync)))
-
-(defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
-
-(defmulti leader (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
-
-(defmulti children (fn [sync node] (type sync)))
-
-(defmulti node-exists? (fn [sync node] (type sync)))
-
-(defmulti node-exists-at? (fn [sync bucket & subpaths] [(type sync) bucket]))
-
-(defmulti creation-time (fn [sync node] (type sync)))
-
-(defmulti bucket (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti bucket-at (fn [sync bucket subpath] [(type sync) bucket]))
-
-(defmulti version (fn [sync node] (type sync)))
-
-(defmulti on-change (fn [sync node cb] (type sync)))
-
-(defmulti on-child-change (fn [sync node cb] (type sync)))
-
-(defmulti on-delete (fn [sync node db] (type sync)))
-
-(defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti speculate-offset (fn [sync offset] (type sync)))
-
-(defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
-
-(defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))
+(defmulti subscribe-to-log (fn [log starting-position ch] (type log)))
 
 (defmulti create-tx-session (fn [queue] (type queue)))
 
@@ -131,23 +54,4 @@
 (defmulti create-io-task
   (fn [element parents children]
     (:onyx/type element)))
-
-;;;;;;;;;;;; New ZooKeeper API ;;;;;;;;;;;;;;;;;
-
-(defmulti write-log-entry
-  (fn [log data] (type log)))
-
-(defmulti read-log-entry
-  (fn [log position] (type log)))
-
-(defmulti register-pulse
-  (fn [log id] (type log)))
-
-(defmulti on-delete
-  (fn [log node ch] (type log)))
-
-(defmulti subscribe-to-log
-  (fn [log starting-position ch] (type log)))
-
-;;;;;;;;;;;; New ZooKeeper API ;;;;;;;;;;;;;;;;;
 
