@@ -30,16 +30,17 @@
 
 (defn await-job-completion* [sync job-id]
   (future
-    (loop []
-      (let [ch (chan 1)
-            task-path (extensions/resolve-node sync :task job-id)]
-        (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
-        (let [task-nodes (extensions/bucket-at sync :task job-id)
-              task-nodes (filter #(not (impl/metadata-task? %)) task-nodes)]
-          (if (every? (partial impl/task-complete? sync) task-nodes)
-            true
-            (do (<!! ch)
-                (recur))))))))
+    (let [job-id (str job-id)] 
+      (loop []
+        (let [ch (chan 1)
+              task-path (extensions/resolve-node sync :task job-id)]
+          (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
+          (let [task-nodes (extensions/bucket-at sync :task job-id)
+                task-nodes (filter #(not (impl/metadata-task? %)) task-nodes)]
+            (if (every? (partial impl/task-complete? sync) task-nodes)
+              true
+              (do (<!! ch)
+                  (recur)))))))))
 
 (defn unpack-workflow [workflow]
   (if (map? workflow)
