@@ -139,7 +139,7 @@ ZooKeeper is used to facilitate communication between the Coordinator and each v
 
 #### Description
 
-Each virtual peer can be in exactly one state at any given time. The Coordinator tracks the state of each virtual peer. In fact, the virtual peer does not know its only state. The state for each peer is maintained so that the Coordinator can make intelligent decisions about how to allocate work across the cluster.
+Each virtual peer can be in exactly one state at any given time. The Coordinator tracks the state of each virtual peer. In fact, the virtual peer does not know its own state. The state for each peer is maintained so that the Coordinator can make intelligent decisions about how to allocate work across the cluster.
 
 The peer states are:
 

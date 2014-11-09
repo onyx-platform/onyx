@@ -1,5 +1,6 @@
 (ns onyx.validation
-  (:require [schema.core :as schema]))
+  (:require [schema.core :as schema]
+            [clojure.data.fressian :as fressian]))
 
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
@@ -14,9 +15,25 @@
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
+(defn serializable? [x]
+  (try
+    (do (fressian/read (.array (fressian/write x)))
+        true)
+    (catch Exception e 
+      false)))
+
+(defn task-dispatch-validator [task]
+  (when (= (:onyx/name task)
+           (:onyx/type task))
+    (throw (Exception. (str "Task " (:onyx/name task) 
+                            " cannot use the same value for :onyx/name as :onyx/type.")))))
+
 (defn validate-catalog
   [catalog]
+  (when-not (serializable? catalog)
+    (throw (Exception. "Catalog must be serializable.")))
   (doseq [entry catalog]
+    (task-dispatch-validator entry)
     (schema/validate catalog-entry-validator entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
