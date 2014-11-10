@@ -47,13 +47,19 @@
     :onyx/batch-size 2}])
 
 (def illegal-function-catalog
-   [{:onyx/name :inc
+  [{:onyx/name :inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
 
+(def illegal-name-type-catalog
+  [{:onyx/name :input
+    :onyx/type :input
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
 (def illegal-grouper-catalog
-   [{:onyx/name :inc
+  [{:onyx/name :inc
     :onyx/type :grouper
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
@@ -80,11 +86,44 @@
 
 (fact (onyx.api/submit-job conn {:catalog illegal-function-catalog :workflow workflow}) => (throws Exception))
 
+(fact (onyx.api/submit-job conn {:catalog illegal-name-type-catalog :workflow workflow}) => (throws Exception))
+
 (fact (onyx.api/submit-job conn {:catalog illegal-grouper-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog illegal-aggregator-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog incomplete-catalog :workflow workflow}) => (throws Exception))
+
+(def workflow-tests-catalog
+  [{:onyx/name :in
+    :onyx/type :input
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}
+   {:onyx/name :intermediate
+    :onyx/type :function
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}
+   {:onyx/name :out
+    :onyx/type :output
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
+(def illegal-incoming-inputs-workflow 
+  [[:intermediate :in]])
+
+(def illegal-outgoing-outputs-workflow 
+  [[:out :intermediate]])
+
+(def illegal-edge-nodes-count-workflow 
+  [[:in :intermediate]
+   [:intermediate]])
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-incoming-inputs-workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-outgoing-outputs-workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-edge-nodes-count-workflow}) => (throws Exception))
+
 
 (try
   (onyx.api/shutdown conn)
