@@ -47,19 +47,26 @@
     :onyx/batch-size 2}])
 
 (def illegal-function-catalog
-   [{:onyx/name :inc
+  [{:onyx/name :inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
 
+(def illegal-dispatch-catalog
+  [{:onyx/name :input
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
 (def illegal-grouper-catalog
-   [{:onyx/name :inc
+  [{:onyx/name :inc
     :onyx/type :grouper
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
 
 (def illegal-aggregator-catalog
-   [{:onyx/name :inc
+  [{:onyx/name :inc
     :onyx/type :aggregator
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
@@ -80,11 +87,52 @@
 
 (fact (onyx.api/submit-job conn {:catalog illegal-function-catalog :workflow workflow}) => (throws Exception))
 
+(fact (onyx.api/submit-job conn {:catalog illegal-dispatch-catalog :workflow workflow}) => (throws Exception))
+
 (fact (onyx.api/submit-job conn {:catalog illegal-grouper-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog illegal-aggregator-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog incomplete-catalog :workflow workflow}) => (throws Exception))
+
+(def workflow-tests-catalog
+  [{:onyx/name :in
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}
+   {:onyx/name :intermediate
+    :onyx/fn :test-fn
+    :onyx/type :function
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}
+   {:onyx/name :out
+    :onyx/type :output
+    :onyx/medium :core.async
+    :onyx/consumption :concurrent
+    :onyx/batch-size 5}])
+
+(def illegal-incoming-inputs-workflow 
+  [[:intermediate :in]])
+
+(def illegal-outgoing-outputs-workflow 
+  [[:out :intermediate]])
+
+(def illegal-edge-nodes-count-workflow 
+  [[:in :intermediate]
+   [:intermediate]])
+
+(def illegal-intermediate-nodes-workflow 
+  [[:in :intermediate]
+   [:in :out]])
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-incoming-inputs-workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-outgoing-outputs-workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-edge-nodes-count-workflow}) => (throws Exception))
+
+(fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-intermediate-nodes-workflow}) => (throws Exception))
 
 (try
   (onyx.api/shutdown conn)

@@ -1,5 +1,7 @@
 (ns onyx.validation
   (:require [schema.core :as schema]
+            [com.stuartsierra.dependency :as dep]
+            [onyx.coordinator.planning :as planning]
             [clojure.data.fressian :as fressian]))
 
 (def base-catalog-entry-validator
@@ -29,7 +31,7 @@
 
 (defn serializable? [x]
   (try
-    (do (fressian/read (.array (fressian/write x)))
+    (do (fressian/write x)
         true)
     (catch Exception e 
       false)))
@@ -57,28 +59,49 @@
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
 
+(defn catalog->type-task-names [catalog type-pred]
+  (set (map :onyx/name 
+            (filter (fn [task] 
+                      (type-pred (:onyx/type task)))
+                    catalog))))
 
-(defn input-tasks-output [{:keys [workflow catalog]}]
-  (let [input-tasks (set (map :onyx/name 
-                              (filter (fn [task] 
-                                        (= :input (:onyx/type task)))
-                                      catalog)))]
-    (some input-tasks (map second workflow))))
+(defn validate-workflow-inputs [g input-tasks]
+  (when-let [invalid (ffirst (filter (comp seq second) 
+                                     (map (juxt identity 
+                                                (partial dep/immediate-dependencies g)) 
+                                          input-tasks)))]
+    (throw (Exception. (str "Input task " invalid " has incoming edge.")))))
 
-(defn output-tasks-input [{:keys [workflow catalog]}]
-  (let [output-tasks (set (map :onyx/name 
-                               (filter (fn [task] 
-                                        (= :output (:onyx/type task)))
-                                      catalog)))]
-    (some output-tasks (map first workflow))))
+(defn validate-workflow-outputs [g output-tasks]
+  (when-let [invalid (ffirst (filter (comp seq second) 
+                                     (map (juxt identity 
+                                                (partial dep/immediate-dependents g)) 
+                                          output-tasks)))]
+    (throw (Exception. (str "Output task " invalid " has outgoing edge.")))))
 
-(defn validate-workflow-inputs [job]
-  (when-let [task (input-tasks-output job)]
-    (throw (Exception. (str "Input task " task " used as output.")))))
+(defn validate-workflow-intermediates [g intermediate-tasks]
+  (let [invalid-intermediate? (fn [[_ dependencies dependents]]
+                                (not 
+                                  (or (and (empty? dependencies) 
+                                           (empty? dependents))
+                                      (and (not (empty? dependencies))
+                                           (not (empty? dependents))))))]
+    (when-let [invalid (ffirst (filter invalid-intermediate? 
+                                       (map (juxt identity 
+                                                  (partial dep/immediate-dependencies g)
+                                                  (partial dep/immediate-dependents g)) 
+                                            intermediate-tasks)))]
+      (throw (Exception. (str "Intermediate task " invalid " requires both incoming and outgoing edges."))))))
 
-(defn validate-workflow-outputs [job]
-  (when-let [task (output-tasks-input job)]
-    (throw (Exception. (str "Output task " task " used as input.")))))
+(defn validate-workflow-graph [{:keys [catalog workflow]}]
+  (let [g (planning/to-dependency-graph workflow)]
+    (validate-workflow-intermediates g (catalog->type-task-names catalog #{:function}))
+    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))
+    (validate-workflow-outputs g (catalog->type-task-names catalog #{:output}))))
+
+(defn validate-workflow [job]
+  (validate-workflow-graph job)
+  (validate-workflow-names job))
 
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
@@ -88,6 +111,4 @@
   [job]
   (schema/validate job-validator job)
   (validate-catalog (:catalog job))
-  (validate-workflow-names job)
-  (validate-workflow-inputs job)
-  (validate-workflow-outputs job))
+  (validate-workflow job))
