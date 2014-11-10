@@ -15,7 +15,6 @@
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
-                 [com.postspectacular/rotor "0.1.0"]
                  [javax.servlet/servlet-api "2.5"]
                  [zookeeper-clj "0.9.1" :exclusions [commons-codec]]
                  [clj-http "0.9.1"]
