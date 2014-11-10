@@ -10,4 +10,4 @@
 
 ### File System
 
-By default, all Onyx output is logged to a file called `onyx.log` in the same directory as where the peer or coordinator jar is executing. The logging configuration can be overridden completely since it uses Timbre. Pass in the location of a configuration file for Timbre through either the peer or Coordinator under the key `onyx.log/file`, or a Clojure-map configuration under `onyx.log/config`.
+By default, all Onyx output is logged to a file called `onyx.log` in the same directory as where the peer or coordinator jar is executing. The logging configuration can be overridden completely since it uses Timbre. Pass in the location of a [configuration file for Timbre](https://github.com/ptaoussanis/timbre#configuration) through either the peer or Coordinator under the key `onyx.log/file`, or a Clojure-map configuration under `onyx.log/config`.
