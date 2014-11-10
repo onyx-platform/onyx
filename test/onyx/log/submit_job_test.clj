@@ -28,4 +28,3 @@
   (fact (:jobs new-replica) => [:b :a])
   (fact diff => {:job :a})
   (fact reactions => nil))
-

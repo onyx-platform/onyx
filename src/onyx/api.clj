@@ -17,11 +17,22 @@
            (dep/graph)
            workflow)))
 
+(defn saturation [catalog]
+  (let [rets
+        (reduce #(+ %1 (or (:onyx/max-peers %1)
+                           Double/POSITIVE_INFINITY))
+                0
+                catalog)]
+    (if (zero? rets)
+      Double/POSITIVE_INFINITY
+      rets)))
+
 (defn submit-job [log job]
   (let [id (java.util.UUID/randomUUID)
         tasks (topological-sort (:workflow job))
         scheduler (:task-scheduler job)
-        args {:id id :tasks tasks :task-scheduler scheduler}
+        sat (saturation (:catalog job))
+        args {:id id :tasks tasks :task-scheduler scheduler :saturation sat}
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk log :catalog (:catalog job) id)
     (extensions/write-chunk log :workflow (:workflow job) id)

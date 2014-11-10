@@ -1,16 +1,43 @@
-(ns onyx.log.commands.common)
+(ns onyx.log.commands.common
+  (:require [clojure.data :refer [diff]]
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
-(defn balance-jobs [replica]
-  (let [j (count (:jobs replica))
-        p (count (:peers replica))
+(defn balance-workload [jobs p]
+  (let [j (count jobs)
         min-peers (int (/ p j))
         n (rem p j)
         max-peers (inc min-peers)]
-    (into {}
-          (map-indexed
-           (fn [i job]
-             {job (if (< i n) max-peers min-peers)})
-           (:jobs replica)))))
+    (map-indexed
+     (fn [i job]
+       [job (if (< i n) max-peers min-peers)])
+     jobs)))
+
+(defn unbounded-jobs [replica balanced]
+  (filter
+   (fn [[job n]]
+     (> (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))
+   balanced))
+
+(defn peer-overflow [replica balanced]
+  (reduce
+   (fn [sum [job n]]
+     (let [sat (or (get-in replica [:saturation job] Double/POSITIVE_INFINITY))
+           overflow (- n sat)]
+       (if (pos? overflow)
+         (+ sum overflow)
+         sum)))
+   0
+   balanced))
+
+(defn balance-jobs [replica]
+  (let [balanced (balance-workload (:jobs replica) (count (:peers replica)))
+        overflow (peer-overflow replica balanced)
+        unbounded (unbounded-jobs replica balanced)]
+    (merge-with
+     (into {} (balance-workload (map first unbounded) overflow))
+     (into {} balanced)
+     (second (diff (into {} unbounded) (into {} balanced))))))
 
 (defn job->peers [replica]
   (reduce-kv

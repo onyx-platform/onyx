@@ -12,7 +12,8 @@
       (update-in [:jobs] vec)
       (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
       (assoc-in [:tasks (:id args)] (vec (:tasks args)))
-      (assoc-in [:allocations (:id args)] {})))
+      (assoc-in [:allocations (:id args)] {})
+      (assoc-in [:saturation (:id args)] (:saturation args))))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]
