@@ -81,11 +81,10 @@
 
 (defn validate-workflow-intermediates [g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
-                                (not 
-                                  (or (and (empty? dependencies) 
-                                           (empty? dependents))
-                                      (and (not (empty? dependencies))
-                                           (not (empty? dependents))))))]
+                                (let [dependencies? (empty? dependencies)
+                                      dependents? (empty? dependents)]
+                                  (or (and dependencies? (not dependents?))
+                                      (and (not dependencies?) dependents?))))]
     (when-let [invalid (ffirst (filter invalid-intermediate? 
                                        (map (juxt identity 
                                                   (partial dep/immediate-dependencies g)
