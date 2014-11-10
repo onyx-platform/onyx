@@ -1,6 +1,7 @@
 (ns onyx.peer.task-lifecycle-extensions
   "Public API extensions for implementors of task lifecycles."
-  (:require [onyx.peer.pipeline-extensions :as p-ext]))
+  (:require [onyx.peer.pipeline-extensions :as p-ext]
+            [taoensso.timbre :refer [error]]))
 
 (defn name-dispatch [{:keys [onyx.core/task-map]}]
   (:onyx/name task-map))
@@ -17,7 +18,11 @@
 (defn merge-api-levels [f event]
   (reduce
    (fn [result g]
-     (merge result (f g result)))
+     (let [m (f g result)] 
+       (when-not (map? m)
+         (throw (Exception. (format "Lifecycle method for %s did not return a map." 
+                                    (:onyx/name (:onyx.core/task-map event))))))
+       (merge result m)))
    event
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
