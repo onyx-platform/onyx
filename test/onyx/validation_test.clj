@@ -52,7 +52,7 @@
     :onyx/consumption :concurrent
     :onyx/batch-size 5}])
 
-(def illegal-name-type-catalog
+(def illegal-dispatch-catalog
   [{:onyx/name :input
     :onyx/type :input
     :onyx/consumption :concurrent
@@ -86,7 +86,7 @@
 
 (fact (onyx.api/submit-job conn {:catalog illegal-function-catalog :workflow workflow}) => (throws Exception))
 
-(fact (onyx.api/submit-job conn {:catalog illegal-name-type-catalog :workflow workflow}) => (throws Exception))
+(fact (onyx.api/submit-job conn {:catalog illegal-dispatch-catalog :workflow workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog illegal-grouper-catalog :workflow workflow}) => (throws Exception))
 
