@@ -35,15 +35,16 @@
        :watched (first (vals rets))})))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
-  [kw old new diff {:keys [env id]}]
+  [kw old new diff {:keys [env id]} state]
   (when (= id (:watching diff))
     (let [ch (chan 1)]
       (extensions/on-delete (:log env) (:watched diff) ch)
-      (go (<! ch)
-          (extensions/write-log-entry
-           (:log env)
-           {:fn :leave-cluster :args {:id (:watched diff)}})
-          (close! ch)))))
+      (go (when (<! ch)
+            (extensions/write-log-entry
+             (:log env)
+             {:fn :leave-cluster :args {:id (:watched diff)}}))
+          (close! ch))
+      (assoc state :watch-ch ch))))
 
 (defmethod extensions/reactions :prepare-join-cluster
   [kw old new diff {:keys [id]}]
@@ -78,16 +79,17 @@
                                :watched (:watching diff)}}}])))
 
 (defmethod extensions/fire-side-effects! :notify-watchers
-  [kw old new diff {:keys [env id]}]
+  [kw old new diff {:keys [env id]} state]
   (let [rotator (get (map-invert (:pairs new)) (:watched diff))]
     (when (= id rotator)
       (let [ch (chan 1)]
         (extensions/on-delete (:log env) (:watching diff) ch)
-        ;;; TODO: Remove watch from other node
+        (go (when (<! ch)
+              (extensions/write-log-entry
+               (:log env)
+               {:fn :leave-cluster :args {:id (:watching diff)}}))
+            (close! ch))
+        (close! (:watch-ch state))
         ;;; TODO: What if this peer already died?
-        (go (<! ch)
-            (extensions/write-log-entry
-             (:log env)
-             {:fn :leave-cluster :args {:id (:watching diff)}})
-            (close! ch))))))
+        (assoc state :watch-ch ch)))))
 

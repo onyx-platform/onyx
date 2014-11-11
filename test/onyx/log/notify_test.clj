@@ -48,6 +48,8 @@
 
 (def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
+(def old-local-state {})
+
 (def new-replica (f old-replica message-id))
 
 (def diff (rep-diff old-replica new-replica))
@@ -58,7 +60,14 @@
   (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
     (extensions/write-log-entry (:log env) log-entry)))
 
-(extensions/fire-side-effects! (:fn read-entry) old-replica new-replica diff {:env env :id d-id})
+(def new-local-state
+  (extensions/fire-side-effects!
+   (:fn read-entry)
+   old-replica
+   new-replica
+   diff
+   {:env env :id d-id}
+   old-local-state))
 
 (def message-id (<!! ch))
 
@@ -67,8 +76,6 @@
 (fact (:fn read-entry) => :notify-watchers)
 (fact (:args read-entry) => {:watching c-id :watched d-id})
 
-;;;;
-
 (def f (extensions/apply-log-entry (:fn read-entry) (:args read-entry)))
 
 (def rep-diff (partial extensions/replica-diff (:fn read-entry)))
@@ -76,6 +83,8 @@
 (def rep-reactions (partial extensions/reactions (:fn read-entry)))
 
 (def old-replica new-replica)
+
+(def old-local-state new-local-state)
 
 (def new-replica (f old-replica message-id))
 
@@ -87,7 +96,14 @@
   (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
     (extensions/write-log-entry (:log env) log-entry)))
 
-(extensions/fire-side-effects! (:fn read-entry) old-replica new-replica diff {:env env :id c-id})
+(def new-local-state
+  (extensions/fire-side-effects!
+   (:fn read-entry)
+   old-replica
+   new-replica
+   diff
+   {:env env :id c-id}
+   old-local-state))
 
 (def message-id (<!! ch))
 
@@ -98,8 +114,16 @@
                              :watched "a"}
                              :updated-watch {:watching "c"
                                              :watched "d"}})
+(def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
-;;;;
+(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
+
+(zk/close conn)
+
+(def entry (extensions/read-log-entry (:log env) (<!! ch)))
+
+(fact (:fn entry) => :leave-cluster)
+(fact (:args entry) => {:id "d"})
 
 (component/stop env)
 

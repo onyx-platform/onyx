@@ -6,7 +6,7 @@
 
 (defmulti replica-diff (fn [kw old new] kw))
 
-(defmulti fire-side-effects! (fn [kw old new diff args] kw))
+(defmulti fire-side-effects! (fn [kw old new diff args local-state] kw))
 
 (defmulti reactions (fn [kw old new diff args] kw))
 
