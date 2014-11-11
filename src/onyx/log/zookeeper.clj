@@ -80,7 +80,7 @@
   [{:keys [conn opts prefix] :as log} id ch]
   (let [f (fn [event]
             (when (= (:event-type event) :NodeDeleted)
-              (>!! event)))]
+              (>!! ch event)))]
     (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)))
 
 (defmethod extensions/subscribe-to-log ZooKeeper

@@ -40,13 +40,15 @@
     (let [ch (chan 1)]
       (extensions/on-delete (:log env) (:watched diff) ch)
       (go (<! ch)
-          (extensions/write-log-entry (:log env) :leave-cluster {:id (:watched diff)})
+          (extensions/write-log-entry
+           (:log env)
+           {:fn :leave-cluster :args {:id (:watched diff)}})
           (close! ch)))))
 
 (defmethod extensions/reactions :prepare-join-cluster
   [kw old new diff {:keys [id]}]
   (when (= id (:watching diff))
     [{:f :notify-watchers
-      :args {:watcher (get (map-invert (:pairs new)) (:watched diff))
-             :to-watch (:watching diff)}}]))
+      :args {:watching (get (map-invert (:pairs new)) (:watched diff))
+             :watched (:watching diff)}}]))
 
