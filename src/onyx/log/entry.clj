@@ -52,3 +52,27 @@
       :args {:watching (get (map-invert (:pairs new)) (:watched diff))
              :watched (:watching diff)}}]))
 
+(defmethod extensions/apply-log-entry :notify-watchers
+  [kw args]
+  (fn [replica message-id]
+    (-> replica
+        (update-in [:accepted] merge {(:watching args) (:watched args)})
+        (update-in [:prepared] dissoc (:watched args)))))
+
+(defmethod extensions/replica-diff :notify-watchers
+  [kw old new]
+  (let [rets (second (diff (:accepted old) (:accepted new)))]
+    (assert (<= (count rets) 1))
+    (when (seq rets)
+      {:watching (first (vals rets))
+       :watched (first (keys rets))})))
+
+(defmethod extensions/reactions :notify-watchers
+  [kw old new diff {:keys [id]}]
+  (let [rotator (get (map-invert (:pairs new)) (:watched diff))]
+    (when (= id rotator)
+      [{:f :accept-join-cluster
+        :args {:accepted diff
+               :updated-watch {:watching rotator
+                               :watched (:watching diff)}}}])))
+

@@ -1,8 +1,5 @@
 (ns onyx.prepare-join-cluster-test
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.extensions :as extensions]
+  (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
 
