@@ -102,3 +102,15 @@
         (update-in [:accepted] dissoc (:observer accepted))
         (update-in [:peers] conj (:observer accepted)))))
 
+(defmethod extensions/replica-diff :accept-join-cluster
+  [kw old new]
+  (let [rets (first (diff (:accepted old) (:accepted new)))]
+    (assert (<= (count rets) 1))
+    (when (seq rets)
+      {:observer (first (keys rets))
+       :subject (first (vals rets))})))
+
+(defmethod extensions/reactions :accept-join-cluster
+  [kw old new diff args]
+  [])
+

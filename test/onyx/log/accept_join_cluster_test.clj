@@ -12,16 +12,18 @@
 
 (def f (extensions/apply-log-entry (:fn entry) (:args entry)))
 
-(def rep-diff (partial extensions/replica-diff :prepare-join-cluster))
+(def rep-diff (partial extensions/replica-diff :accept-join-cluster))
 
-(def rep-reactions (partial extensions/reactions :prepare-join-cluster))
+(def rep-reactions (partial extensions/reactions :accept-join-cluster))
 
 (def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:prepared new-replica) => {:d :a})
+      diff (rep-diff old-replica new-replica)]
+  (fact (get-in new-replica [:pairs :d]) => :a)
+  (fact (get-in new-replica [:pairs :c]) => :d)
+  (fact (get-in new-replica [:accepted]) => {})
+  (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :d :subject :a})
-  (fact reactions => [{:fn :notify-watchers :args {:observer :c :subject :d}}]))
+  (fact (rep-reactions old-replica new-replica diff {}) => []))
 
