@@ -74,7 +74,7 @@
 (def read-entry (extensions/read-log-entry (:log env) message-id))
 
 (fact (:fn read-entry) => :notify-watchers)
-(fact (:args read-entry) => {:watching c-id :watched d-id})
+(fact (:args read-entry) => {:observer c-id :subject d-id})
 
 (def f (extensions/apply-log-entry (:fn read-entry) (:args read-entry)))
 
@@ -110,10 +110,10 @@
 (def read-entry (extensions/read-log-entry (:log env) message-id))
 
 (fact (:fn read-entry) => :accept-join-cluster)
-(fact (:args read-entry) => {:accepted {:watching "d"
-                             :watched "a"}
-                             :updated-watch {:watching "c"
-                                             :watched "d"}})
+(fact (:args read-entry) => {:accepted {:observer "d"
+                             :subject "a"}
+                             :updated-watch {:observer "c"
+                                             :subject "d"}})
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))

@@ -17,16 +17,16 @@
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:d :a})
-  (fact diff => {:watching :d :watched :a})
-  (fact reactions => [{:f :notify-watchers :args {:watcher :c :to-watch :d}}]))
+  (fact diff => {:observer :d :subject :a})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :c :subject :d}}]))
 
 (let [old-replica (assoc-in old-replica [:prepared :e] :a)
       new-replica (f old-replica 0)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :d :b})
-  (fact diff => {:watching :d :watched :b})
-  (fact reactions => [{:f :notify-watchers :args {:watcher :a :to-watch :d}}]))
+  (fact diff => {:observer :d :subject :b})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :a :subject :d}}]))
 
 (let [old-replica (-> old-replica
                       (assoc-in [:prepared :e] :a)
@@ -35,8 +35,8 @@
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :f :b :d :c})
-  (fact diff => {:watching :d :watched :c})
-  (fact reactions => [{:f :notify-watchers :args {:watcher :b :to-watch :d}}]))
+  (fact diff => {:observer :d :subject :c})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :b :subject :d}}]))
 
 (let [old-replica (-> old-replica
                       (assoc-in [:prepared :e] :a)

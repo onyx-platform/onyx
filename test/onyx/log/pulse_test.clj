@@ -52,7 +52,7 @@
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
-(extensions/fire-side-effects! (:fn read-entry) old-replica new-replica diff {:env env :id d-id})
+(extensions/fire-side-effects! (:fn read-entry) old-replica new-replica diff {:env env :id d-id} {})
 
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
