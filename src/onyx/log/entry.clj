@@ -93,3 +93,12 @@
         ;;; TODO: What if this peer already died?
         (assoc state :watch-ch ch)))))
 
+(defmethod extensions/apply-log-entry :accept-join-cluster
+  [kw {:keys [accepted updated-watch]}]
+  (fn [replica message-id]
+    (-> replica
+        (update-in [:pairs] merge {(:observer accepted) (:subject accepted)})
+        (update-in [:pairs] merge {(:observer updated-watch) (:subject updated-watch)})
+        (update-in [:accepted] dissoc (:observer accepted))
+        (update-in [:peers] conj (:observer accepted)))))
+
