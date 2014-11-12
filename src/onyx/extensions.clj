@@ -12,6 +12,16 @@
 
 
 
+(defmulti read-from-inbox (fn []))
+
+(defmulti write-to-outbox (fn []))
+
+(defmulti hold-in-outbox (fn []))
+
+(defmulti flush-outbox (fn []))
+
+
+
 
 (defmulti write-log-entry (fn [log data] (type log)))
 

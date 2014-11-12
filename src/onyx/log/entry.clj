@@ -114,3 +114,8 @@
   [kw old new diff args]
   [])
 
+(defmethod extensions/fire-side-effects! :accept-join-cluster
+  [kw old new diff {:keys [env id]} state]
+  (when (= id (:observer (:accepted state)))
+    (extensions/flush-outbox (:outbox env))))
+
