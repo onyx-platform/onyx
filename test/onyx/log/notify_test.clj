@@ -1,4 +1,4 @@
-(ns onyx.notify-test
+(ns onyx.log.notify-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
@@ -52,7 +52,7 @@
 
 (def new-replica (f old-replica message-id))
 
-(def diff (rep-diff old-replica new-replica))
+(def diff (rep-diff old-replica new-replica) (:args read-entry))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
@@ -88,7 +88,7 @@
 
 (def new-replica (f old-replica message-id))
 
-(def diff (rep-diff old-replica new-replica))
+(def diff (rep-diff old-replica new-replica (:args read-entry)))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id c-id}))
 

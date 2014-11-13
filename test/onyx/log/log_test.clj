@@ -1,4 +1,4 @@
-(ns onyx.log-test
+(ns onyx.log.log-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]

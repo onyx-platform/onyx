@@ -24,7 +24,7 @@
             replica))))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
-  [kw old new]
+  [kw old new args]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)

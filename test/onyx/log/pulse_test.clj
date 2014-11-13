@@ -1,4 +1,4 @@
-(ns onyx.pulse-test
+(ns onyx.log.pulse-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
@@ -48,7 +48,7 @@
 
 (def new-replica (f old-replica 0))
 
-(def diff (rep-diff old-replica new-replica))
+(def diff (rep-diff old-replica new-replica (:args read-entry)))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 

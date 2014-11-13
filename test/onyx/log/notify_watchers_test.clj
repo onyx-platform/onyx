@@ -1,4 +1,4 @@
-(ns onyx.notify-watchers-test
+(ns onyx.log.notify-watchers-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
@@ -14,7 +14,7 @@
 (def old-replica {:pairs {:a :b :b :c :c :a} :prepared {:d :a} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
+      diff (rep-diff old-replica new-replica (:args entry))
       reactions (rep-reactions old-replica new-replica diff {:id :c})]
   (fact diff => {:observer :d :subject :a})
   (fact reactions => [{:fn :accept-join-cluster

@@ -14,7 +14,7 @@
         (update-in [:peers] conj (:observer accepted)))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
-  [kw old new]
+  [kw old new args]
   (let [rets (first (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)

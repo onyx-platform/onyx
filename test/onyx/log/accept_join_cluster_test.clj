@@ -1,4 +1,4 @@
-(ns onyx.accept-join-cluster-test
+(ns onyx.log.accept-join-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
@@ -19,7 +19,7 @@
 (def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)]
+      diff (rep-diff old-replica new-replica (:args entry))]
   (fact (get-in new-replica [:pairs :d]) => :a)
   (fact (get-in new-replica [:pairs :c]) => :d)
   (fact (get-in new-replica [:accepted]) => {})

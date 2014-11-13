@@ -4,7 +4,7 @@
 
 (defmulti apply-log-entry (fn [kw args] kw))
 
-(defmulti replica-diff (fn [kw old new] kw))
+(defmulti replica-diff (fn [kw old new args] kw))
 
 (defmulti fire-side-effects! (fn [kw old new diff args local-state] kw))
 

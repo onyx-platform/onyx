@@ -13,7 +13,7 @@
           (update-in [:prepared] dissoc (:subject args))))))
 
 (defmethod extensions/replica-diff :notify-watchers
-  [kw old new]
+  [kw old new args]
   (let [rets (second (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)

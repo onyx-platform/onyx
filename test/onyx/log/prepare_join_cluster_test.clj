@@ -1,4 +1,4 @@
-(ns onyx.prepare-join-cluster-test
+(ns onyx.log.prepare-join-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
@@ -14,7 +14,7 @@
 (def old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
+      diff (rep-diff old-replica new-replica (:args entry))
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:d :a})
   (fact diff => {:observer :d :subject :a})
@@ -22,7 +22,7 @@
 
 (let [old-replica (assoc-in old-replica [:prepared :e] :a)
       new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
+      diff (rep-diff old-replica new-replica (:args entry))
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :d :b})
   (fact diff => {:observer :d :subject :b})
@@ -32,7 +32,7 @@
                       (assoc-in [:prepared :e] :a)
                       (assoc-in [:prepared :f] :b))
       new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
+      diff (rep-diff old-replica new-replica (:args entry))
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :f :b :d :c})
   (fact diff => {:observer :d :subject :c})
@@ -43,7 +43,7 @@
                       (assoc-in [:prepared :f] :b)
                       (assoc-in [:prepared :g] :c))
       new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica)
+      diff (rep-diff old-replica new-replica (:args entry))
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :f :b :g :c})
   (fact diff => nil)

@@ -10,11 +10,11 @@
     (let [observer (get (map-invert (:pairs replica)) id)
           transitive (get (:pairs replica) id)]
       (-> replica
-          (update-in [:peers] remove #(= id))
+          (update-in [:peers] (partial remove #(= % id)))
           (update-in [:prepared] dissoc id)
           (update-in [:accepted] dissoc id)
           (update-in [:pairs] merge {observer transitive})
-          (update-in [:pairs] dissoc {id transitive})))))
+          (update-in [:pairs] dissoc id)))))
 
 (defmethod extensions/replica-diff :leave-cluster
   [kw old new {:keys [id]}]
