@@ -1,6 +1,7 @@
 (ns onyx.log.inbox
-  (:require [clojure.core.async :refer [chan close!]]
+  (:require [clojure.core.async :refer [chan <!! close!]]
             [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info]]
             [onyx.extensions :as extensions]))
 
 (defrecord Inbox [capacity starting-position]
@@ -20,4 +21,10 @@
 
 (defn inbox [capacity starting-position]
   (map->Inbox {:capacity capacity :starting-position starting-position}))
+
+(defmethod extensions/read-next-entry Inbox
+  [inbox]
+  (let [position (<!! (:ch inbox))]
+    {:position position
+     :entry (extensions/read-log-entry (:log inbox) position)}))
 

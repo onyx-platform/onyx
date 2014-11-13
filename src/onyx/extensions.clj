@@ -2,6 +2,8 @@
   "Extension interfaces for internally used queues, logs,
    and distributed coordination.")
 
+;; Replica interface
+
 (defmulti apply-log-entry (fn [kw args] kw))
 
 (defmulti replica-diff (fn [kw old new args] kw))
@@ -10,18 +12,7 @@
 
 (defmulti reactions (fn [kw old new diff args] kw))
 
-
-
-(defmulti read-from-inbox (fn []))
-
-(defmulti write-to-outbox (fn []))
-
-(defmulti hold-in-outbox (fn []))
-
-(defmulti flush-outbox (fn []))
-
-
-
+;; Log interface
 
 (defmulti write-log-entry (fn [log data] (type log)))
 
@@ -32,6 +23,18 @@
 (defmulti on-delete (fn [log id ch] (type log)))
 
 (defmulti subscribe-to-log (fn [log starting-position ch] (type log)))
+
+;; Inbox/Output interface
+
+(defmulti read-next-entry (fn [inbox] (type inbox)))
+
+(defmulti write-to-outbox (fn [outbox entry] (type outbox)))
+
+(defmulti hold-in-outbox (fn [outbox entry] (type outbox)))
+
+(defmulti flush-outbox (fn [outbox] (type outbox)))
+
+;; Queue interface
 
 (defmulti create-tx-session (fn [queue] (type queue)))
 
