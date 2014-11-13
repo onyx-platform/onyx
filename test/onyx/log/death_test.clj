@@ -1,4 +1,4 @@
-(ns onyx.log.notify-test
+(ns onyx.log.death-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
@@ -116,14 +116,14 @@
                                              :subject "d"}})
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
-(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
+(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" a-id))
 
 (zk/close conn)
 
 (def entry (extensions/read-log-entry (:log env) (<!! ch)))
 
 (fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id "d"})
+(fact (:args entry) => {:id "a"})
 
 (component/stop env)
 

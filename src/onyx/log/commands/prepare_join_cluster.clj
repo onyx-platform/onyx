@@ -35,8 +35,10 @@
   [kw old new diff {:keys [env id]} state]
   (when (= id (:observer diff))
     (let [ch (chan 1)]
+      (prn (:subject diff))
       (extensions/on-delete (:log env) (:subject diff) ch)
       (go (when (<! ch)
+            (prn "Boom!")
             (extensions/write-log-entry
              (:log env)
              {:fn :leave-cluster :args {:id (:subject diff)}}))
