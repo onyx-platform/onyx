@@ -4,7 +4,7 @@
 
 ;; Replica interface
 
-(defmulti apply-log-entry (fn [kw args] kw))
+(defmulti apply-log-entry (fn [entry replica] (:fn entry)))
 
 (defmulti replica-diff (fn [kw old new args] kw))
 

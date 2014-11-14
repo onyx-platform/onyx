@@ -5,8 +5,8 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
-  [kw {:keys [accepted updated-watch]}]
-  (fn [replica message-id]
+  [{:keys [args]} replica]
+  (let [{:keys [accepted updated-watch]} args]
     (-> replica
         (update-in [:pairs] merge {(:observer accepted) (:subject accepted)})
         (update-in [:pairs] merge {(:observer updated-watch) (:subject updated-watch)})

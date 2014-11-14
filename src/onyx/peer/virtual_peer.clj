@@ -6,8 +6,10 @@
             [onyx.log.entry :refer [create-log-entry]]))
 
 (defn processing-loop []
-  (let [{:keys [fn args]} (extensions/read-next-entry)]
-    (extensions/apply-log-entry fn args)))
+  (loop [local {:replica {} :local-state {}}]
+    (let [entry (extensions/read-next-entry)
+          next-replica (extensions/apply-log-entry entry (:replica local))]
+      (recur (assoc local :replica next-replica)))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle
@@ -18,10 +20,10 @@
 
       (let [entry (create-log-entry :prepare-join-cluster {:joiner id})]
         (extensions/register-pulse log id)
-        (extensions/send-to-outbox outbox entry)
+        (extensions/write-to-outbox entry)
 
-        (let [p-thread (thread (processing-loop))])
-        (assoc component :id id :processing-thread p-thread))))
+        (let [p-thread (thread (processing-loop))]
+          (assoc component :id id :processing-thread p-thread)))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))

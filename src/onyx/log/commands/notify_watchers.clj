@@ -5,12 +5,11 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :notify-watchers
-  [kw args]
-  (fn [replica message-id]
-    (let [target (get-in replica [:prepared (:subject args)])]
-      (-> replica
-          (update-in [:accepted] merge {(:subject args) target})
-          (update-in [:prepared] dissoc (:subject args))))))
+  [{:keys [args]} replica]
+  (let [target (get-in replica [:prepared (:subject args)])]
+    (-> replica
+        (update-in [:accepted] merge {(:subject args) target})
+        (update-in [:prepared] dissoc (:subject args)))))
 
 (defmethod extensions/replica-diff :notify-watchers
   [kw old new args]

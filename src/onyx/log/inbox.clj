@@ -24,7 +24,9 @@
 
 (defmethod extensions/read-next-entry Inbox
   [inbox]
-  (let [position (<!! (:ch inbox))]
-    {:position position
-     :entry (extensions/read-log-entry (:log inbox) position)}))
+  (let [position (<!! (:ch inbox))
+        entry (extensions/read-log-entry (:log inbox) position)]
+    {:message-id position
+     :fn (:fn entry)
+     :args (:args entry)}))
 

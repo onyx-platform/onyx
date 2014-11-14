@@ -5,17 +5,16 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :leave-cluster
-  [kw {:keys [id]}]
-  [{:keys [args]} replica message-id]
-  (fn [replica message-id]
-    (let [observer (get (map-invert (:pairs replica)) id)
-          transitive (get (:pairs replica) id)]
-      (-> replica
-          (update-in [:peers] (partial remove #(= % id)))
-          (update-in [:prepared] dissoc id)
-          (update-in [:accepted] dissoc id)
-          (update-in [:pairs] merge {observer transitive})
-          (update-in [:pairs] dissoc id)))))
+  [{:keys [args]} replica]
+  (let [{:keys [id]} args
+        observer (get (map-invert (:pairs replica)) id)
+        transitive (get (:pairs replica) id)]
+    (-> replica
+        (update-in [:peers] (partial remove #(= % id)))
+        (update-in [:prepared] dissoc id)
+        (update-in [:accepted] dissoc id)
+        (update-in [:pairs] merge {observer transitive})
+        (update-in [:pairs] dissoc id))))
 
 (defmethod extensions/replica-diff :leave-cluster
   [kw old new {:keys [id]}]
