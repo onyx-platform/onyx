@@ -10,18 +10,21 @@
    :fn (:fn entry)
    :args (:args entry)})
 
-(defn warm-up-processing-loop [log inbox-ch outbox-ch p-ch kill-ch]
-  (loop [local {:replica {} :local-state {}}]
-    (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
+(defn warm-up-processing-loop [id log inbox-ch outbox-ch p-ch kill-ch]
+  (loop [local {:replica {} :local-state {:id id :log log}}]
+    (let [old-replica (:replica local)
+          old-state (:local-state local)
+          position (first (alts!! [kill-ch inbox-ch] :priority? true))]
       (when position
         (let [entry (extensions/read-log-entry log position)
               bundled (bundle-entry entry position)
-              new-replica (extensions/apply-log-entry bundled (:replica local))
-              diff (extensions/replica-diff bundled (:replica local) new-replica)
-              reactions (extensions/reactions entry (:replica local) new-replica diff)]
+              new-replica (extensions/apply-log-entry bundled old-replica)
+              diff (extensions/replica-diff bundled old-replica new-replica)
+              reactions (extensions/reactions entry old-replica new-replica diff)
+              new-state (extensions/fire-side-effects! bundled old-replica new-replica diff old-state)]
           (doseq [reaction reactions]
             (extensions/hold-in-outbox outbox-ch reaction))
-          (recur (assoc local :replica new-replica)))))))
+          (recur (assoc local :replica new-replica :local-state new-state)))))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle
@@ -37,7 +40,7 @@
         (extensions/register-pulse log id)
         (extensions/write-to-outbox entry)
 
-        (thread (warm-up-processing-loop log inbox-ch outbox-ch nil kill-ch))
+        (thread (warm-up-processing-loop id log inbox-ch outbox-ch nil kill-ch))
         (thread (processing-loop))
         (assoc component :id id :inbox-ch inbox :outbox-ch outbox :kill-ch kill-ch))))
 
