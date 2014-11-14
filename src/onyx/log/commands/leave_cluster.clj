@@ -17,25 +17,25 @@
         (update-in [:pairs] dissoc id))))
 
 (defmethod extensions/replica-diff :leave-cluster
-  [kw old new {:keys [id]}]
-  (let [observer (get (map-invert (:pairs old)) id)
-        subject (get (:pairs old) id)]
-    {:died id
+  [{:keys [args]} old new]
+  (let [observer (get (map-invert (:pairs old)) (:id args))
+        subject (get (:pairs old) (:id args))]
+    {:died (:id args)
      :updated-watch {:observer observer
                      :subject subject}}))
 
 (defmethod extensions/reactions :leave-cluster
-  [kw old new diff args]
+  [entry old new diff]
   [])
 
 (defmethod extensions/fire-side-effects! :leave-cluster
-  [kw old new {:keys [updated-watch]} {:keys [env id]} state]
-  (when (= id (:observer updated-watch))
+  [{:keys [args]} old new {:keys [updated-watch]} state]
+  (when (= (:id args) (:observer updated-watch))
     (let [ch (chan 1)]
-      (extensions/on-delete (:log env) (:subject updated-watch) ch)
+      (extensions/on-delete (:log state) (:subject updated-watch) ch)
       (go (when (<! ch)
             (extensions/write-log-entry
-             (:log env)
+             (:log state)
              {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
           (close! ch))
       (close! (:watch-ch state))

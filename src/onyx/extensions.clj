@@ -6,11 +6,11 @@
 
 (defmulti apply-log-entry (fn [entry replica] (:fn entry)))
 
-(defmulti replica-diff (fn [kw old new args] kw))
+(defmulti replica-diff (fn [entry old new] (:fn entry)))
 
-(defmulti fire-side-effects! (fn [kw old new diff args local-state] kw))
+(defmulti fire-side-effects! (fn [entry old new diff local-state] (:fn entry)))
 
-(defmulti reactions (fn [kw old new diff args] kw))
+(defmulti reactions (fn [entry old new diff] (:fn entry)))
 
 ;; Log interface
 

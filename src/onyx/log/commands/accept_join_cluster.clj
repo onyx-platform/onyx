@@ -14,7 +14,7 @@
         (update-in [:peers] conj (:observer accepted)))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
-  [kw old new args]
+  [entry old new]
   (let [rets (first (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)
@@ -22,11 +22,11 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :accept-join-cluster
-  [kw old new diff args]
+  [entry old new diff]
   [])
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
-  [kw old new diff {:keys [env id]} state]
-  (when (= id (:observer (:accepted state)))
-    (extensions/flush-outbox (:outbox env))))
+  [{:keys [args]} old new diff state]
+  (when (= (:id args) (:observer (:accepted diff)))
+    (extensions/flush-outbox (:outbox state))))
 

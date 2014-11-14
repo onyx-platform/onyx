@@ -12,7 +12,7 @@
         (update-in [:prepared] dissoc (:subject args)))))
 
 (defmethod extensions/replica-diff :notify-watchers
-  [kw old new args]
+  [entry old new]
   (let [rets (second (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)
@@ -20,23 +20,23 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :notify-watchers
-  [kw old new diff {:keys [id]}]
+  [{:keys [args]} old new diff]
   (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
-    (when (= id rotator)
+    (when (= (:id args) rotator)
       [{:fn :accept-join-cluster
         :args {:accepted diff
                :updated-watch {:observer rotator
                                :subject (:observer diff)}}}])))
 
 (defmethod extensions/fire-side-effects! :notify-watchers
-  [kw old new diff {:keys [env id]} state]
+  [{:keys [args]} old new diff state]
   (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
-    (when (= id rotator)
+    (when (= (:id args) rotator)
       (let [ch (chan 1)]
-        (extensions/on-delete (:log env) (:observer diff) ch)
+        (extensions/on-delete (:log state) (:observer diff) ch)
         (go (when (<! ch)
               (extensions/write-log-entry
-               (:log env)
+               (:log state)
                {:fn :leave-cluster :args {:id (:observer diff)}}))
             (close! ch))
         (close! (:watch-ch state))

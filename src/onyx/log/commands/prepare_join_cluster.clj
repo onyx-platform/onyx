@@ -23,7 +23,7 @@
           replica)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
-  [kw old new args]
+  [entry old new]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)
@@ -31,22 +31,21 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
-  [kw old new diff {:keys [env id]} state]
-  (when (= id (:observer diff))
+  [{:keys [args]} old new diff state]
+  (when (= (:id args) (:observer diff))
     (let [ch (chan 1)]
       (prn (:subject diff))
-      (extensions/on-delete (:log env) (:subject diff) ch)
+      (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
-            (prn "Boom!")
             (extensions/write-log-entry
-             (:log env)
+             (:log state)
              {:fn :leave-cluster :args {:id (:subject diff)}}))
           (close! ch))
       (assoc state :watch-ch ch))))
 
 (defmethod extensions/reactions :prepare-join-cluster
-  [kw old new diff {:keys [id]}]
-  (when (= id (:observer diff))
+  [{:keys [args]} old new diff]
+  (when (= (:id args) (:observer diff))
     [{:fn :notify-watchers
       :args {:observer (get (map-invert (:pairs new)) (:subject diff))
              :subject (:observer diff)}}]))
