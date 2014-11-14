@@ -1,10 +1,8 @@
 (ns onyx.system
   (:require [com.stuartsierra.component :as component]
             [onyx.logging-configuration :as logging-config]
-            [onyx.peer.virtual-peer :refer [vitual-peer]]
-            [onyx.log.zookeeper :refer [zookeeper]]
-            [onyx.log.inbox :refer [inbox]]
-            [onyx.log.outbox :refer [outbox]]))
+            [onyx.peer.virtual-peer :refer [virtual-peer]]
+            [onyx.log.zookeeper :refer [zookeeper]]))
 
 (def development-components [:logging-config :log])
 
@@ -43,12 +41,8 @@
 
 (defn onyx-peer
   [onyx-id config opts]
-  (let [ch-capacity 100
-        starting-position 0]
-    (map->OnyxDevelopmentEnv
-     {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
-      :log (component/using (zookeeper onyx-id (:zookeeper config)) [:logging-config])
-      :inbox (component/using (inbox capacity starting-position) [:log])
-      :outbox (component/using (outbox capacity) [:log])
-      :virtual-peer (component/using (virtual-peer opts) [:inbox :outbox :log])})))
+  (map->OnyxDevelopmentEnv
+   {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
+    :log (component/using (zookeeper onyx-id (:zookeeper config)) [:logging-config])
+    :virtual-peer (component/using (virtual-peer opts) [:log])}))
 
