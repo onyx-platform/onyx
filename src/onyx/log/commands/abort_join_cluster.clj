@@ -8,7 +8,7 @@
   [{:keys [args message-id]} replica]
   (-> replica
       (update-in [:prepared] dissoc (:id args))
-      (update-in [:accepted] (:id args))))
+      (update-in [:accepted] dissoc (:id args))))
 
 (defmethod extensions/replica-diff :abort-join-cluster
   [entry old new]
@@ -23,7 +23,7 @@
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
-    (Thread/sleep 2000))
+    (Thread/sleep 50))
   state)
 
 (defmethod extensions/reactions :abort-join-cluster
