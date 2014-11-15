@@ -8,13 +8,15 @@
   [{:keys [args]} replica]
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
-        transitive (get (:pairs replica) id)]
+        transitive (get (:pairs replica) id)
+        pair (if (= observer transitive) {} {observer transitive})]
     (-> replica
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:prepared] dissoc id)
         (update-in [:accepted] dissoc id)
-        (update-in [:pairs] merge {observer transitive})
-        (update-in [:pairs] dissoc id))))
+        (update-in [:pairs] merge pair)
+        (update-in [:pairs] dissoc id)
+        (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %)))))
 
 (defmethod extensions/replica-diff :leave-cluster
   [{:keys [args]} old new]
@@ -30,7 +32,8 @@
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [args]} old new {:keys [updated-watch]} state]
-  (when (= (:id args) (:observer updated-watch))
+  (when (and (= (:id args) (:observer updated-watch))
+             (not= (:observer updated-watch) (:subject updated-watch)))
     (let [ch (chan 1)]
       (extensions/on-delete (:log state) (:subject updated-watch) ch)
       (go (when (<! ch)
