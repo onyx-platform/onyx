@@ -36,15 +36,17 @@
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
-  (when (= (:id state) (:observer diff))
-    (let [ch (chan 1)]
-      (extensions/on-delete (:log state) (:subject diff) ch)
-      (go (when (<! ch)
-            (extensions/write-log-entry
-             (:log state)
-             {:fn :leave-cluster :args {:id (:subject diff)}}))
-          (close! ch))
-      (assoc state :watch-ch ch))))
+  (cond (= (:id state) (:observer diff))
+        (let [ch (chan 1)]
+          (extensions/on-delete (:log state) (:subject diff) ch)
+          (go (when (<! ch)
+                (extensions/write-log-entry
+                 (:log state)
+                 {:fn :leave-cluster :args {:id (:subject diff)}}))
+              (close! ch))
+          (assoc state :watch-ch ch))
+        (= (:id state) (:instant-join diff))
+        (extensions/flush-outbox (:outbox state))))
 
 (defmethod extensions/reactions :prepare-join-cluster
   [entry old new diff peer-args]
