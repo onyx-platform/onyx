@@ -27,3 +27,27 @@
   (fact diff => {:observer :d :subject :a})
   (fact (rep-reactions old-replica new-replica diff {}) => []))
 
+(def entry
+  (create-log-entry :accept-join-cluster
+                    {:accepted {:observer :d
+                                :subject :a}
+                     :updated-watch {:observer :a
+                                     :subject :d}}))
+
+(def f (partial extensions/apply-log-entry entry))
+
+(def rep-diff (partial extensions/replica-diff entry))
+
+(def rep-reactions (partial extensions/reactions entry))
+
+(def old-replica {:pairs {} :accepted {:d :a} :peers [:a]})
+
+(let [new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)]
+  (fact (get-in new-replica [:pairs :d]) => :a)
+  (fact (get-in new-replica [:pairs :a]) => :d)
+  (fact (get-in new-replica [:accepted]) => {})
+  (fact (last (get-in new-replica [:peers])) => :d)
+  (fact diff => {:observer :d :subject :a})
+  (fact (rep-reactions old-replica new-replica diff {}) => []))
+
