@@ -21,3 +21,13 @@
   (fact diff => {:aborted :d})
   (fact reactions => []))
 
+(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
+
+(let [new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)
+      reactions (rep-reactions old-replica new-replica diff {:id :d})]
+  (fact (:pairs new-replica) => {:a :b :b :c :c :a})
+  (fact (:peers new-replica) => [:a :b :c])
+  (fact diff => {:aborted :d})
+  (fact reactions => []))
+
