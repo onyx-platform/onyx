@@ -10,16 +10,16 @@
                      :updated-watch {:observer :c
                                      :subject :d}}))
 
-(def f (extensions/apply-log-entry (:fn entry) (:args entry)))
+(def f (partial extensions/apply-log-entry entry))
 
-(def rep-diff (partial extensions/replica-diff :accept-join-cluster))
+(def rep-diff (partial extensions/replica-diff entry))
 
-(def rep-reactions (partial extensions/reactions :accept-join-cluster))
+(def rep-reactions (partial extensions/reactions entry))
 
 (def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
 
-(let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica (:args entry))]
+(let [new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :d]) => :a)
   (fact (get-in new-replica [:pairs :c]) => :d)
   (fact (get-in new-replica [:accepted]) => {})

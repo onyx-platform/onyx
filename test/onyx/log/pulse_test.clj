@@ -33,11 +33,11 @@
 
 (def read-entry (extensions/read-log-entry (:log env) (<!! ch)))
 
-(def f (extensions/apply-log-entry (:fn read-entry) (:args read-entry)))
+(def f (partial extensions/apply-log-entry read-entry))
 
-(def rep-diff (partial extensions/replica-diff (:fn read-entry)))
+(def rep-diff (partial extensions/replica-diff read-entry))
 
-(def rep-reactions (partial extensions/reactions (:fn read-entry)))
+(def rep-reactions (partial extensions/reactions read-entry))
 
 (extensions/register-pulse (:log env) a-id)
 (extensions/register-pulse (:log env) b-id)
@@ -46,13 +46,13 @@
 
 (def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
-(def new-replica (f old-replica 0))
+(def new-replica (f old-replica))
 
-(def diff (rep-diff old-replica new-replica (:args read-entry)))
+(def diff (rep-diff old-replica new-replica))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
-(extensions/fire-side-effects! (:fn read-entry) old-replica new-replica diff {:env env :id d-id} {})
+(extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id d-id})
 
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 

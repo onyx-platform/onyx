@@ -5,12 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]))
 
-(defn bundle-entry [entry position]
-  {:message-id position
-   :fn (:fn entry)
-   :args (:args entry)})
-
-(defn processing-loop [id log inbox-ch outbox-ch p-ch kill-ch]
+#_(defn processing-loop [id log inbox-ch outbox-ch p-ch kill-ch]
   (loop [local {:replica {} :local-state {:id id :log log}}]
     (let [old-replica (:replica local)
           old-state (:local-state local)

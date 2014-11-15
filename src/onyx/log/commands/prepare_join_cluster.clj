@@ -32,9 +32,8 @@
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
-  (when (= (:id args) (:observer diff))
+  (when (= (:id state) (:observer diff))
     (let [ch (chan 1)]
-      (prn (:subject diff))
       (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
             (extensions/write-log-entry
@@ -44,8 +43,8 @@
       (assoc state :watch-ch ch))))
 
 (defmethod extensions/reactions :prepare-join-cluster
-  [{:keys [args]} old new diff]
-  (when (= (:id args) (:observer diff))
+  [entry old new diff peer-args]
+  (when (= (:id peer-args) (:observer diff))
     [{:fn :notify-watchers
       :args {:observer (get (map-invert (:pairs new)) (:subject diff))
              :subject (:observer diff)}}]))

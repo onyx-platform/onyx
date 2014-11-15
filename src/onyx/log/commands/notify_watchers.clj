@@ -20,9 +20,9 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :notify-watchers
-  [{:keys [args]} old new diff]
+  [entry old new diff peer-args]
   (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
-    (when (= (:id args) rotator)
+    (when (= (:id peer-args) rotator)
       [{:fn :accept-join-cluster
         :args {:accepted diff
                :updated-watch {:observer rotator
@@ -31,7 +31,7 @@
 (defmethod extensions/fire-side-effects! :notify-watchers
   [{:keys [args]} old new diff state]
   (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
-    (when (= (:id args) rotator)
+    (when (= (:id state) rotator)
       (let [ch (chan 1)]
         (extensions/on-delete (:log state) (:observer diff) ch)
         (go (when (<! ch)

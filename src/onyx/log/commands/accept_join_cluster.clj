@@ -22,11 +22,12 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :accept-join-cluster
-  [entry old new diff]
+  [entry old new diff peer-args]
   [])
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
-  [{:keys [args]} old new diff state]
-  (when (= (:id args) (:observer (:accepted diff)))
-    (extensions/flush-outbox (:outbox state))))
+  [entry old new diff state]
+  (when (= (:id state) (:observer (:accepted diff)))
+    (extensions/flush-outbox (:outbox state)))
+  state)
 

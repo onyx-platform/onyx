@@ -25,7 +25,7 @@
                      :subject subject}}))
 
 (defmethod extensions/reactions :leave-cluster
-  [entry old new diff]
+  [entry old new diff peer-args]
   [])
 
 (defmethod extensions/fire-side-effects! :leave-cluster

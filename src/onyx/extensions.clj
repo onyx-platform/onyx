@@ -10,7 +10,7 @@
 
 (defmulti fire-side-effects! (fn [entry old new diff local-state] (:fn entry)))
 
-(defmulti reactions (fn [entry old new diff] (:fn entry)))
+(defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
 
 ;; Log interface
 

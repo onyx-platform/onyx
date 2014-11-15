@@ -68,8 +68,9 @@
 
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} position]
-  (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))]
-    (deserialize-fressian (:data (zk/data conn node)))))
+  (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
+        content (deserialize-fressian (:data (zk/data conn node)))]
+    (assoc content :message-id position)))
 
 (defmethod extensions/register-pulse ZooKeeper
   [{:keys [conn opts prefix] :as log} id]

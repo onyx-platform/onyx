@@ -5,16 +5,16 @@
 
 (def entry (create-log-entry :leave-cluster {:id :c}))
 
-(def f (extensions/apply-log-entry (:fn entry) (:args entry)))
+(def f (partial extensions/apply-log-entry entry))
 
-(def rep-diff (partial extensions/replica-diff (:fn entry)))
+(def rep-diff (partial extensions/replica-diff entry))
 
-(def rep-reactions (partial extensions/reactions (:fn entry)))
+(def rep-reactions (partial extensions/reactions entry))
 
 (def old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]})
 
-(let [new-replica (f old-replica 0)
-      diff (rep-diff old-replica new-replica (:args entry))]
+(let [new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :a]) => :b)
   (fact (get-in new-replica [:pairs :b]) => :a)
   (fact (get-in new-replica [:pairs :c]) => nil)

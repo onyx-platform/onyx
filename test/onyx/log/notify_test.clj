@@ -40,19 +40,19 @@
 
 (def read-entry (extensions/read-log-entry (:log env) message-id))
 
-(def f (extensions/apply-log-entry (:fn read-entry) (:args read-entry)))
+(def f (partial extensions/apply-log-entry read-entry))
 
-(def rep-diff (partial extensions/replica-diff (:fn read-entry)))
+(def rep-diff (partial extensions/replica-diff read-entry))
 
-(def rep-reactions (partial extensions/reactions (:fn read-entry)))
+(def rep-reactions (partial extensions/reactions read-entry))
 
 (def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
-(def old-local-state {})
+(def old-local-state {:log (:log env) :id d-id})
 
-(def new-replica (f old-replica message-id))
+(def new-replica (f old-replica))
 
-(def diff (rep-diff old-replica new-replica (:args read-entry)))
+(def diff (rep-diff old-replica new-replica))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
@@ -61,13 +61,7 @@
     (extensions/write-log-entry (:log env) log-entry)))
 
 (def new-local-state
-  (extensions/fire-side-effects!
-   (:fn read-entry)
-   old-replica
-   new-replica
-   diff
-   {:env env :id d-id}
-   old-local-state))
+  (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
 
 (def message-id (<!! ch))
 
@@ -76,19 +70,19 @@
 (fact (:fn read-entry) => :notify-watchers)
 (fact (:args read-entry) => {:observer c-id :subject d-id})
 
-(def f (extensions/apply-log-entry (:fn read-entry) (:args read-entry)))
+(def f (partial extensions/apply-log-entry read-entry))
 
-(def rep-diff (partial extensions/replica-diff (:fn read-entry)))
+(def rep-diff (partial extensions/replica-diff read-entry))
 
-(def rep-reactions (partial extensions/reactions (:fn read-entry)))
+(def rep-reactions (partial extensions/reactions read-entry))
 
 (def old-replica new-replica)
 
-(def old-local-state new-local-state)
+(def old-local-state {:log (:log env) :id c-id :watch-ch (chan)})
 
-(def new-replica (f old-replica message-id))
+(def new-replica (f old-replica))
 
-(def diff (rep-diff old-replica new-replica (:args read-entry)))
+(def diff (rep-diff old-replica new-replica))
 
 (def reactions (rep-reactions old-replica new-replica diff {:id c-id}))
 
@@ -97,13 +91,7 @@
     (extensions/write-log-entry (:log env) log-entry)))
 
 (def new-local-state
-  (extensions/fire-side-effects!
-   (:fn read-entry)
-   old-replica
-   new-replica
-   diff
-   {:env env :id c-id}
-   old-local-state))
+  (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
 
 (def message-id (<!! ch))
 
@@ -114,6 +102,7 @@
                              :subject "a"}
                              :updated-watch {:observer "c"
                                              :subject "d"}})
+
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
