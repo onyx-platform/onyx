@@ -41,7 +41,7 @@
              (:log state)
              {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
           (close! ch))
-      (close! (:watch-ch state))
+      (close! (or (:watch-ch state) (chan)))
       ;; TODO: What if this peer already died?
       (assoc state :watch-ch ch))))
 

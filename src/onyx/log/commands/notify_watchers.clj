@@ -21,7 +21,8 @@
 
 (defmethod extensions/reactions :notify-watchers
   [entry old new diff peer-args]
-  (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
+  (let [rotator (or (get (map-invert (:pairs new)) (:subject diff))
+                    (:subject diff))]
     (when (= (:id peer-args) rotator)
       [{:fn :accept-join-cluster
         :args {:accepted diff
@@ -30,7 +31,8 @@
 
 (defmethod extensions/fire-side-effects! :notify-watchers
   [{:keys [args]} old new diff state]
-  (let [rotator (get (map-invert (:pairs new)) (:subject diff))]
+  (let [rotator (or (get (map-invert (:pairs new)) (:subject diff))
+                    (:subject diff))]
     (when (= (:id state) rotator)
       (let [ch (chan 1)]
         (extensions/on-delete (:log state) (:observer diff) ch)
@@ -39,7 +41,7 @@
                (:log state)
                {:fn :leave-cluster :args {:id (:observer diff)}}))
             (close! ch))
-        (close! (:watch-ch state))
+        (close! (or (:watch-ch state) (chan)))
         ;; TODO: What if this peer already died?
         (assoc state :watch-ch ch)))))
 

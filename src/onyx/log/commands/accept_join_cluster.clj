@@ -1,6 +1,5 @@
 (ns onyx.log.accept-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
-            [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
