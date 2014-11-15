@@ -9,7 +9,8 @@
   (let [n (count (:peers replica))]
     (if (> n 0)
       (let [joining-peer (:joiner args)
-            all-joined-peers (into #{} (keys (:pairs replica)))
+            cluster (:peers replica)
+            all-joined-peers (into #{} (concat (keys (:pairs replica)) cluster))
             all-prepared-peers #(into {} (keys (:prepared replica)))
             all-prepared-deps (into #{} (vals (:prepared replica)))
             candidates (difference all-joined-peers all-prepared-deps)
@@ -52,6 +53,7 @@
   [entry old new diff peer-args]
   (when (= (:id peer-args) (:observer diff))
     [{:fn :notify-watchers
-      :args {:observer (get (map-invert (:pairs new)) (:subject diff))
+      :args {:observer (or (get (map-invert (:pairs new)) (:subject diff))
+                           (:subject diff))
              :subject (:observer diff)}}]))
 

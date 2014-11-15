@@ -57,3 +57,11 @@
   (fact diff => {:instant-join :d})
   (fact reactions => nil))
 
+(let [old-replica {:peers [:a]}
+      new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)
+      reactions (rep-reactions old-replica new-replica diff {:id :d})]
+  (fact new-replica => {:peers [:a] :prepared {:d :a}})
+  (fact diff => {:observer :d :subject :a})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :a :subject :d}}]))
+
