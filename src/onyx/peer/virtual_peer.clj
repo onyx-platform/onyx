@@ -47,7 +47,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log inbox outbox] :as component}]
+  (start [{:keys [log] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
@@ -66,7 +66,7 @@
 ;;        (timbre/info (format "[%s] Starting processing loop..." id))
         (thread (outbox-loop id log outbox-ch))
         (thread (processing-loop id log inbox-ch outbox-ch kill-ch))
-        (assoc component :id id :inbox-ch inbox :outbox-ch outbox :kill-ch kill-ch))))
+        (assoc component :id id :inbox-ch inbox-ch :outbox-ch outbox-ch :kill-ch kill-ch))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))

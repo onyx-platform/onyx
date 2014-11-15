@@ -54,8 +54,16 @@
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer onyx-id config opts)]
-        {:runner (future (component/start v-peer))
-         :shutdown-fn (fn [])}))
+      (let [stop-ch (chan)
+            v-peer (system/onyx-peer onyx-id config opts)]
+        {:runner (future
+                   (let [live (component/start v-peer)]
+                     (let [ack-ch (<!! stop-ch)]
+                       (component/stop live)
+                       (>!! ack-ch true))))
+         :shutdown-fn (fn []
+                        (let [ack-ch (chan)]
+                          (>!! stop-ch ack-ch)
+                          (<!! ack-ch)))}))
     (range n))))
 

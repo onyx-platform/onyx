@@ -20,7 +20,14 @@
   {:inbox-capacity 100
    :outbox-capacity 100})
 
-(onyx.api/start-peers! onyx-id 1 (:peer config) peer-opts)
+(def v-peers (onyx.api/start-peers! onyx-id 20 (:peer config) peer-opts))
+
+(doseq [v-peer v-peers]
+  (try
+    (prn "go")
+    ((:shutdown-fn v-peer))
+    (prn "Done")
+    (catch Exception e (prn e))))
 
 (component/stop env)
 
