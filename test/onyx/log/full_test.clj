@@ -20,15 +20,31 @@
   {:inbox-capacity 100
    :outbox-capacity 100})
 
-(def v-peers (onyx.api/start-peers! onyx-id 10 (:peer config) peer-opts))
+(def n-peers 50)
 
-#_(doseq [v-peer v-peers]
+(def v-peers (onyx.api/start-peers! onyx-id n-peers (:peer config) peer-opts))
+
+(def ch (chan n-peers))
+
+(extensions/subscribe-to-log (:log env) 0 ch)
+
+(def replica
+  (loop [replica {}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (< (count (:pairs new-replica)) n-peers)
+        (recur new-replica)
+        new-replica))))
+
+(fact (:prepared replica) => {})
+(fact (:accepted replica) => {})
+(fact (count (:peers replica)) => n-peers)
+
+(doseq [v-peer v-peers]
   (try
     ((:shutdown-fn v-peer))
     (catch Exception e (prn e))))
 
-;;(component/stop env)
-
-
-
+(component/stop env)
 
