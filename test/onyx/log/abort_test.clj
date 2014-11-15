@@ -19,7 +19,7 @@
   (fact (:pairs new-replica) => {:a :b :b :c :c :a})
   (fact (:peers new-replica) => [:a :b :c])
   (fact diff => {:aborted :d})
-  (fact reactions => []))
+  (fact reactions => [{:fn :prepare-join-cluster :args {:joiner :d}}]))
 
 (def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
 
@@ -29,5 +29,5 @@
   (fact (:pairs new-replica) => {:a :b :b :c :c :a})
   (fact (:peers new-replica) => [:a :b :c])
   (fact diff => {:aborted :d})
-  (fact reactions => []))
+  (fact reactions => [{:fn :prepare-join-cluster :args {:joiner :d}}]))
 

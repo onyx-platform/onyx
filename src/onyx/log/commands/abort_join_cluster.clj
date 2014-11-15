@@ -21,9 +21,13 @@
 
 (defmethod extensions/fire-side-effects! :abort-join-cluster
   [{:keys [args]} old new diff state]
+  ;; Abort back-off/retry
+  (when (= (:id args) (:id state))
+    (Thread/sleep 2000))
   state)
 
 (defmethod extensions/reactions :abort-join-cluster
-  [entry old new diff peer-args]
-  [])
+  [{:keys [args]} old new diff peer-args]
+  (when (= (:id args) (:id peer-args))
+    [{:fn :prepare-join-cluster :args {:joiner (:id peer-args)}}]))
 
