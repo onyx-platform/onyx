@@ -10,25 +10,29 @@
     (if (> n 0)
       (let [joining-peer (:joiner args)
             all-joined-peers (into #{} (keys (:pairs replica)))
-            lone-peer #{(:lone-peer replica)}
             all-prepared-peers #(into {} (keys (:prepared replica)))
             all-prepared-deps (into #{} (vals (:prepared replica)))
-            cluster (union all-joined-peers lone-peer)
-            candidates (difference cluster all-prepared-deps)
+            candidates (difference all-joined-peers all-prepared-deps)
             sorted-candidates (sort (filter identity candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
                 target (nth sorted-candidates index)]
             (update-in replica [:prepared] merge {joining-peer target}))
-          replica)))))
+          replica))
+      (update-in replica [:peers] conj (:joiner args)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
-    (when (seq rets)
-      {:observer (first (keys rets))
-       :subject (first (vals rets))})))
+    (cond (seq rets)
+          {:observer (first (keys rets))
+           :subject (first (vals rets))}
+          (and (not (seq (:peers old))) (seq (:peers new)))
+          (let [lone-peer (first (:peers new))]
+            (assert (= (count (:peers old)) 0))
+            (assert (= (count (:peers new)) 1))
+            {:instant-join lone-peer}))))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]

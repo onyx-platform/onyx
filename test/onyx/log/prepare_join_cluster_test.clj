@@ -49,3 +49,11 @@
   (fact diff => nil)
   (fact reactions => nil))
 
+(let [old-replica {:peers []}
+      new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)
+      reactions (rep-reactions old-replica new-replica diff {:id :d})]
+  (fact new-replica => {:peers [:d]})
+  (fact diff => {:instant-join :d})
+  (fact reactions => nil))
+
