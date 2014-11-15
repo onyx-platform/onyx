@@ -10,7 +10,7 @@
    :fn (:fn entry)
    :args (:args entry)})
 
-(defn warm-up-processing-loop [id log inbox-ch outbox-ch p-ch kill-ch]
+(defn processing-loop [id log inbox-ch outbox-ch p-ch kill-ch]
   (loop [local {:replica {} :local-state {:id id :log log}}]
     (let [old-replica (:replica local)
           old-state (:local-state local)
@@ -40,8 +40,6 @@
         (extensions/register-pulse log id)
         (extensions/write-to-outbox entry)
 
-        (thread (warm-up-processing-loop id log inbox-ch outbox-ch nil kill-ch))
-        (thread (processing-loop))
         (assoc component :id id :inbox-ch inbox :outbox-ch outbox :kill-ch kill-ch))))
 
   (stop [component]
