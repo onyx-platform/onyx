@@ -24,16 +24,6 @@
 
 (defmulti subscribe-to-log (fn [log starting-position ch] (type log)))
 
-;; Inbox/Output interface
-
-(defmulti read-next-entry (fn [inbox] (type inbox)))
-
-(defmulti write-to-outbox (fn [outbox entry] (type outbox)))
-
-(defmulti hold-in-outbox (fn [outbox entry] (type outbox)))
-
-(defmulti flush-outbox (fn [outbox] (type outbox)))
-
 ;; Queue interface
 
 (defmulti create-tx-session (fn [queue] (type queue)))

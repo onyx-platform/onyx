@@ -1,5 +1,5 @@
 (ns onyx.log.prepare-join-cluster
-  (:require [clojure.core.async :refer [chan go >! <! close!]]
+  (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
@@ -47,7 +47,9 @@
               (close! ch))
           (assoc state :watch-ch ch))
         (= (:id state) (:instant-join diff))
-        (extensions/flush-outbox (:outbox state))))
+        (do (doseq [entry (:buffered-outbox state)]
+              (>!! (:outbox-ch state) entry))
+            (dissoc state :buffered-outbox))))
 
 (defmethod extensions/reactions :prepare-join-cluster
   [entry old new diff peer-args]

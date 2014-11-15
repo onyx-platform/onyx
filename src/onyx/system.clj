@@ -6,7 +6,7 @@
 
 (def development-components [:logging-config :log])
 
-(def peer-components [:logging-config :log :inbox :outbox :peer])
+(def peer-components [:logging-config :log :virtual-peer])
 
 (defn rethrow-component [f]
   (try
@@ -41,7 +41,7 @@
 
 (defn onyx-peer
   [onyx-id config opts]
-  (map->OnyxDevelopmentEnv
+  (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
     :log (component/using (zookeeper onyx-id (:zookeeper config)) [:logging-config])
     :virtual-peer (component/using (virtual-peer opts) [:log])}))

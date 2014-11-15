@@ -50,12 +50,12 @@
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
    by invoking the fn returned by :shutdown-fn."
-  [n config]
+  [id n config opts]
   (doall
    (map
     (fn [_]
       (let [id (java.util.UUID/randomUUID)
-            v-peer (system/onyx-peer id config)]
+            v-peer (system/onyx-peer id config opts)]
         {:runner (future (component/start v-peer))
          :shutdown-fn (fn [])}))
     (range n))))
