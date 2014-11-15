@@ -47,7 +47,7 @@
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:e :a :f :b :g :c})
   (fact diff => nil)
-  (fact reactions => nil))
+  (fact reactions => [{:fn :abort-join-cluster :args {:id :d}}]))
 
 (let [old-replica {:peers []}
       new-replica (f old-replica)

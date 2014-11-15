@@ -53,9 +53,12 @@
 
 (defmethod extensions/reactions :prepare-join-cluster
   [entry old new diff peer-args]
-  (when (= (:id peer-args) (:observer diff))
-    [{:fn :notify-watchers
-      :args {:observer (or (get (map-invert (:pairs new)) (:subject diff))
-                           (:subject diff))
-             :subject (:observer diff)}}]))
+  (cond (and (= (:id peer-args) (:joiner (:args entry)))
+             (nil? diff))
+        [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
+        (= (:id peer-args) (:observer diff))
+        [{:fn :notify-watchers
+          :args {:observer (or (get (map-invert (:pairs new)) (:subject diff))
+                               (:subject diff))
+                 :subject (:observer diff)}}]))
 
