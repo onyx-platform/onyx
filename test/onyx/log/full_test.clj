@@ -17,8 +17,8 @@
 (def env (component/start dev))
 
 (def peer-opts
-  {:inbox-capacity 100
-   :outbox-capacity 100})
+  {:inbox-capacity 1000
+   :outbox-capacity 1000})
 
 (def n-peers 50)
 
