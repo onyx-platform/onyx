@@ -16,10 +16,9 @@
 (facts
  "We can write to the log and read the entries back out"
  (doseq [n (range 10)]
-   (extensions/write-log-entry (:log env) n))
+   (extensions/write-log-entry (:log env) {:n n}))
 
- (fact (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))
-       => (range 10)))
+ (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
 
 (component/stop env)
 
@@ -36,15 +35,15 @@
 (future
   (try
     (doseq [n (range entries)]
-      (extensions/write-log-entry (:log env) n))
+      (extensions/write-log-entry (:log env) {:n n}))
     (catch Exception e
       (.printStackTrace e))))
 
 (facts
  "We can asynchronously write log entries and read them back in order"
- (fact (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
-            (range entries))
-       => (range entries)))
+ (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
+                   (range entries)))
+       => entries))
 
 (component/stop env)
 

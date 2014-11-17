@@ -23,7 +23,7 @@
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
-    (Thread/sleep 50))
+    (Thread/sleep (rand-int 250)))
   state)
 
 (defmethod extensions/reactions :abort-join-cluster

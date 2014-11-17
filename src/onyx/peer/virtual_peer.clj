@@ -9,15 +9,15 @@
   (try
     (loop [replica {}
            state {:id id :log log}]
-      (timbre/info (format "[%s] Replica is: %s" id replica))
+;;      (timbre/info (format "[%s] Replica is: %s" id replica))
 ;;      (timbre/info (format "[%s] Reading from inbox.." id))
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
-        (timbre/info (format "[%s] Read position: %s" id position))
+;;        (timbre/info (format "[%s] Read position: %s" id position))
         (when position
           (let [entry (extensions/read-log-entry log position)
-                _ (timbre/info (format "[%s] Entry is: %s" id entry))
+;;                _ (timbre/info (format "[%s] Entry is: %s" id entry))
                 new-replica (extensions/apply-log-entry entry replica)
-                _ (timbre/info (format "[%s] New replica is: %s" id new-replica))
+;;                _ (timbre/info (format "[%s] New replica is: %s" id new-replica))
                 diff (extensions/replica-diff entry replica new-replica)
 ;;                _ (timbre/info (format "[%s] Diff is: %s" id diff))
                 reactions (extensions/reactions entry replica new-replica diff state)

@@ -1,6 +1,6 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan alts!! >!! <!!]]
+            [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [warn]]
@@ -54,16 +54,22 @@
   (doall
    (map
     (fn [_]
-      (let [stop-ch (chan)
+      (let [stop-ch (chan (clojure.core.async/sliding-buffer 1))
             v-peer (system/onyx-peer onyx-id config opts)]
         {:runner (future
                    (let [live (component/start v-peer)]
                      (let [ack-ch (<!! stop-ch)]
+                       (taoensso.timbre/info "Got SG")
                        (component/stop live)
-                       (>!! ack-ch true))))
+                       (>!! ack-ch true)
+                       (close! ack-ch))))
          :shutdown-fn (fn []
+                        (taoensso.timbre/info "Invoked kill signal")
                         (let [ack-ch (chan)]
+                          (taoensso.timbre/info "Burp")
                           (>!! stop-ch ack-ch)
-                          (<!! ack-ch)))}))
+                          (taoensso.timbre/info "Sent kill signal")
+                          (<!! ack-ch)
+                          (taoensso.timbre/info "Acked")))}))
     (range n))))
 
