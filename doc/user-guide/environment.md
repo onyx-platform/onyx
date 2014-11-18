@@ -107,7 +107,7 @@ Quick side note when you're standing up HornetQ servers - you might be tempted t
 
 #### Explanation
 
-There are a lot of options for how to run HornetQ in the cloud. If you want an educated understand of all of them, I recommend [the HornetQ 2.4.0-Final documentation](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/). 
+There are a lot of options for how to run HornetQ in the cloud. If you want an educated understanding of all of them, I recommend [the HornetQ 2.4.0-Final documentation](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/). 
 
 ##### ZooKeeper clustering
 

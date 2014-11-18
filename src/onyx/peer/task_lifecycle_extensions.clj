@@ -1,7 +1,6 @@
 (ns onyx.peer.task-lifecycle-extensions
   "Public API extensions for implementors of task lifecycles."
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.timbre :refer [error]]))
+  (:require [onyx.peer.pipeline-extensions :as p-ext]))
 
 (defn name-dispatch [{:keys [onyx.core/task-map]}]
   (:onyx/name task-map))
