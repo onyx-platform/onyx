@@ -42,6 +42,23 @@
               (do (<!! ch)
                   (recur)))))))))
 
+(defn map-set-workflow->workflow 
+  "Converts a workflow in format: 
+  {:a #{:b :c}
+   :b #{:d}}
+
+  to format:
+  [[:a :b]
+   [:b :c]
+   [:b :d]]"
+  [workflow]
+  (vec
+    (reduce-kv (fn [w k v]
+                 (concat w
+                         (map (fn [t] [k t]) v)))
+               []
+               workflow)))
+
 (defn unpack-workflow [workflow]
   (if (map? workflow)
     (onyx.coordinator.planning/unpack-map-workflow workflow)

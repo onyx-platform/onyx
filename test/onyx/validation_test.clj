@@ -127,7 +127,6 @@
    [:in :out]])
 
 (fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-incoming-inputs-workflow}) => (throws Exception))
-
 (fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-outgoing-outputs-workflow}) => (throws Exception))
 
 (fact (onyx.api/submit-job conn {:catalog workflow-tests-catalog :workflow illegal-edge-nodes-count-workflow}) => (throws Exception))
@@ -142,6 +141,18 @@
 (fact (unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
 (fact (unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
 (fact (unpack-map-workflow {:a {:b :c :d :e}}) => [[:a :b] [:a :d] [:b :c] [:d :e]])
+
+
+(fact (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
+                                                  :b #{:d}
+                                                  :c #{:d :e}}))
+                                           =>
+                                           (sort [[:a :b]
+                                                  [:a :c]
+                                                  [:b :d]
+                                                  [:c :d]
+                                                  [:c :e]]))
+
 
 (fact (into #{} (unpack-map-workflow {:a {:b :c} :d {:e :f :g :h}}))
       => #{[:a :b]
