@@ -7,7 +7,11 @@
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
 - Peer options available in pipeline event map under key `:onyx.core/peer-opts`.
-- Support alternative workflow format e.g. `{:a #{:b :c} :b #{:d}}`. Convert to the regular workflow format prior to submit-job using onyx.api/map-set-workflow->workflow.
+- Support alternative workflow format e.g. `{:a #{:b :c} :b #{:d}}`. Convert to the regular workflow format prior to submit-job using onyx.api/map-set-workflow->workflow. [#47](https://github.com/MichaelDrogalis/onyx/pull/47)
+- Throw an exception on `submit-job` when the catalog or worklow aren't serializable [#45](https://github.com/MichaelDrogalis/onyx/pull/45/files)
+- Increased validation of workflow formats [#43](https://github.com/MichaelDrogalis/onyx/pull/43)
+- Throw an exception when lifecycle methods don't return maps [#46](https://github.com/MichaelDrogalis/onyx/pull/46)
+- Fixes logging of stack traces to the log file - no longer using Rotor [#46](https://github.com/MichaelDrogalis/onyx/pull/46)
 
 #### 0.4.0
 
