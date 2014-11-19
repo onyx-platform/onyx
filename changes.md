@@ -7,7 +7,7 @@
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
 - Peer options available in pipeline event map under key `:onyx.core/peer-opts`.
-- Support alternative workflow format e.g. {:a #{:b :c} :b #{:d}}. Convert to the regular workflow format prior to submit-job using onyx.api/map-set-workflow->workflow.
+- Support alternative workflow format e.g. `{:a #{:b :c} :b #{:d}}`. Convert to the regular workflow format prior to submit-job using onyx.api/map-set-workflow->workflow.
 
 #### 0.4.0
 
