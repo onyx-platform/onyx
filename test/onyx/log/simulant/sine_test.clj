@@ -104,9 +104,9 @@
 (def sine-cluster-model-data
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
-    :model/peek-peers 30
-    :model/peer-rate 500
-    :model/sine-length (u/hours->msec 1)
+    :model/peek-peers 15
+    :model/peer-rate 2000
+    :model/sine-length (u/hours->msec 0.25)
     :model/sine-start 0
     :model/sine-reps 8}])
 
@@ -116,17 +116,15 @@
 
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
-  (prn "Puts")
-  (let [peer (first (onyx.api/start-peers! onyx-id 1 (:peer config) peer-opts))]
-    (swap! cluster conj peer)))
+  (when (< (count @cluster) 30)
+    (let [peer (first (onyx.api/start-peers! onyx-id 1 (:peer config) peer-opts))]
+      (swap! cluster conj peer))))
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
   [action process]
-  (prn "Drops")
   (swap! cluster
          (fn [c]
            (when (last c)
-             (prn "Dropping " (last c))
              ((:shutdown-fn (last c))))
            (vec (butlast c)))))
 
@@ -134,7 +132,7 @@
   (sim/create-test sim-conn
                    sine-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration (u/hours->msec 1)}))
+                    :test/duration (u/hours->msec 0.25)}))
 
 (def sine-cluster-sim
   (sim/create-sim sim-conn
@@ -147,6 +145,10 @@
 
 (sim/create-action-log sim-conn sine-cluster-sim)
 
+;; Seed it with 20 peers since sine waves goes negative.
+(doseq [peer (onyx.api/start-peers! onyx-id 20 (:peer config) peer-opts)]
+  (swap! cluster conj peer))
+
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id sine-cluster-sim))
        (repeatedly (:sim/processCount sine-cluster-sim))
@@ -154,5 +156,44 @@
 
 (doseq [prun pruns] @(:runner prun))
 
-(component/stop env)
+;; We should finish with 15 peers. Take it to a global maximum
+;; to have a reliable seek point in the log for verification.
+(doseq [peer (onyx.api/start-peers! onyx-id 30 (:peer config) peer-opts)]
+  (swap! cluster conj peer))
+
+(def ch (chan 5))
+
+(extensions/subscribe-to-log (:log env) 0 ch)
+
+(future
+  (def replica
+    (loop [replica {}]
+      (let [position (<!! ch)
+            entry (extensions/read-log-entry (:log env) position)
+            new-replica (extensions/apply-log-entry entry replica)]
+;;        (println "===")
+;;        (println)
+        (prn entry)
+;;        (println)
+;;        (clojure.pprint/pprint replica)
+;;        (println)
+;;        (clojure.pprint/pprint new-replica)
+        (if (< (count (:pairs new-replica)) 45)
+          (recur new-replica)
+          new-replica))))
+
+  (fact (count (:peers replica)) => 45))
+
+(comment
+  (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
+
+  (def c (count (zk/children conn (str "/onyx/" onyx-id "/log"))))
+
+  (count c)
+
+  (zk/close conn))
+
+
+;;(component/stop env)
+
 

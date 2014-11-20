@@ -11,9 +11,10 @@
       (let [joining-peer (:joiner args)
             cluster (:peers replica)
             all-joined-peers (into #{} (concat (keys (:pairs replica)) cluster))
-            all-prepared-peers #(into {} (keys (:prepared replica)))
             all-prepared-deps (into #{} (vals (:prepared replica)))
-            candidates (difference all-joined-peers all-prepared-deps)
+            prep-watches (into #{} (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
+            accepting-deps (into #{} (vals (:accepted replica)))
+            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches)
             sorted-candidates (sort (filter identity candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
@@ -41,6 +42,7 @@
         (let [ch (chan 1)]
           (extensions/on-delete (:log state) (:subject diff) ch)
           (go (when (<! ch)
+                ;; TODO: Send this through the outbox, not directly to the log.
                 (extensions/write-log-entry
                  (:log state)
                  {:fn :leave-cluster :args {:id (:subject diff)}}))

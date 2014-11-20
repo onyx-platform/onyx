@@ -38,3 +38,18 @@
   (fact diff => {:died :b :updated-watch {:observer :a :subject :a}})
   (fact (rep-reactions old-replica new-replica diff {}) => []))
 
+
+
+(def entry (create-log-entry :leave-cluster {:id :b}))
+
+(def f (partial extensions/apply-log-entry entry))
+
+(def rep-diff (partial extensions/replica-diff entry))
+
+(def rep-reactions (partial extensions/reactions entry))
+
+(def old-replica {:pairs {} :prepared {:a :b} :peers [:b]})
+
+(f old-replica)
+(rep-reactions old-replica (f old-replica) (rep-diff old-replica (f old-replica)) {:id :b})
+

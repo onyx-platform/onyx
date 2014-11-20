@@ -30,16 +30,6 @@
 
 (let [old-replica (-> old-replica
                       (assoc-in [:prepared :e] :a)
-                      (assoc-in [:prepared :f] :b))
-      new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:prepared new-replica) => {:e :a :f :b :d :c})
-  (fact diff => {:observer :d :subject :c})
-  (fact reactions => [{:fn :notify-watchers :args {:observer :b :subject :d}}]))
-
-(let [old-replica (-> old-replica
-                      (assoc-in [:prepared :e] :a)
                       (assoc-in [:prepared :f] :b)
                       (assoc-in [:prepared :g] :c))
       new-replica (f old-replica)
@@ -64,4 +54,15 @@
   (fact new-replica => {:peers [:a] :prepared {:d :a}})
   (fact diff => {:observer :d :subject :a})
   (fact reactions => [{:fn :notify-watchers :args {:observer :a :subject :d}}]))
+
+(let [old-replica {:pairs {:b :a,:a :b}
+                   :accepted {}
+                   :prepared {:c :a}
+                   :peers [:a :b]}
+      new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)
+      reactions (rep-reactions old-replica new-replica diff {:id :d})]
+  (fact new-replica => old-replica)
+  (fact diff => nil)
+  (fact reactions => [{:fn :abort-join-cluster :args {:id :d}}]))
 

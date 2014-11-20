@@ -9,10 +9,12 @@
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)
-        pair (if (= observer transitive) {} {observer transitive})]
+        pair (if (= observer transitive) {} {observer transitive})
+        prep-observer (get (map-invert (:prepared replica)) id)]
     (-> replica
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:prepared] dissoc id)
+        (update-in [:prepared] dissoc prep-observer)
         (update-in [:accepted] dissoc id)
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
@@ -27,12 +29,14 @@
                      :subject subject}}))
 
 (defmethod extensions/reactions :leave-cluster
-  [entry old new diff peer-args]
-  [])
+  [{:keys [args]} old new diff peer-args]
+  (when (or (= (:id peer-args) (get (map-invert (:prepared old)) (:id args)))
+            (= (:id peer-args) (get (map-invert (:accepted old)) (:id args))))
+    [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [args]} old new {:keys [updated-watch]} state]
-  (when (and (= (:id args) (:observer updated-watch))
+  (when (and (= (:id state) (:observer updated-watch))
              (not= (:observer updated-watch) (:subject updated-watch)))
     (let [ch (chan 1)]
       (extensions/on-delete (:log state) (:subject updated-watch) ch)
@@ -42,6 +46,5 @@
              {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
-      ;; TODO: What if this peer already died?
       (assoc state :watch-ch ch))))
 

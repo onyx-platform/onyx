@@ -59,17 +59,12 @@
         {:runner (future
                    (let [live (component/start v-peer)]
                      (let [ack-ch (<!! stop-ch)]
-                       (taoensso.timbre/info "Got SG")
                        (component/stop live)
                        (>!! ack-ch true)
                        (close! ack-ch))))
          :shutdown-fn (fn []
-                        (taoensso.timbre/info "Invoked kill signal")
                         (let [ack-ch (chan)]
-                          (taoensso.timbre/info "Burp")
                           (>!! stop-ch ack-ch)
-                          (taoensso.timbre/info "Sent kill signal")
-                          (<!! ack-ch)
-                          (taoensso.timbre/info "Acked")))}))
+                          (<!! ack-ch)))}))
     (range n))))
 

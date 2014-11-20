@@ -5,7 +5,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [zookeeper :as zk]
+            [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
@@ -15,105 +16,32 @@
 
 (def env (component/start dev))
 
-(def a-id "a")
+(comment
+  (future
+    (def ch (chan 100))
 
-(def b-id "b")
+    (extensions/subscribe-to-log (:log env) 0 ch)
 
-(def c-id "c")
+    (loop [replica {}]
+      (let [position (<!! ch)
+            entry (extensions/read-log-entry (:log env) position)
+            new-replica (extensions/apply-log-entry entry replica)]
+        (clojure.pprint/pprint entry)
+        (clojure.pprint/pprint new-replica)
+        (prn "==")
+        (recur new-replica))))
 
-(def d-id "d")
+  (def peer-opts
+    {:inbox-capacity 1000
+     :outbox-capacity 1000})
 
-(extensions/register-pulse (:log env) a-id)
-(extensions/register-pulse (:log env) b-id)
-(extensions/register-pulse (:log env) c-id)
-(extensions/register-pulse (:log env) d-id)
+  (def ps (onyx.api/start-peers! onyx-id 3 (:peer config) peer-opts))
 
-(def entry (create-log-entry :prepare-join-cluster {:joiner d-id}))
+  ;;(def p (onyx.api/start-peers! onyx-id 1 (:peer config) peer-opts))
 
-(def ch (chan 5))
+  ((:shutdown-fn (nth ps 0)))
+  ((:shutdown-fn (nth ps 1)))
+  ((:shutdown-fn (nth ps 2)))
 
-(extensions/write-log-entry (:log env) entry)
-
-(extensions/subscribe-to-log (:log env) 0 ch)
-
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
-
-(def f (partial extensions/apply-log-entry read-entry))
-
-(def rep-diff (partial extensions/replica-diff read-entry))
-
-(def rep-reactions (partial extensions/reactions read-entry))
-
-(def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
-
-(def old-local-state {})
-
-(def new-replica (f old-replica))
-
-(def diff (rep-diff old-replica new-replica))
-
-(def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
-
-(doseq [reaction reactions]
-  (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
-    (extensions/write-log-entry (:log env) log-entry)))
-
-(def new-local-state
-  (extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id d-id}))
-
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
-
-(fact (:fn read-entry) => :notify-watchers)
-(fact (:args read-entry) => {:observer c-id :subject d-id})
-
-(def f (partial extensions/apply-log-entry read-entry))
-
-(def rep-diff (partial extensions/replica-diff read-entry))
-
-(def rep-reactions (partial extensions/reactions read-entry))
-
-(def old-replica new-replica)
-
-(def old-local-state new-local-state)
-
-(def new-replica (f old-replica))
-
-(def diff (rep-diff old-replica new-replica))
-
-(def reactions (rep-reactions old-replica new-replica diff {:id c-id}))
-
-(doseq [reaction reactions]
-  (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
-    (extensions/write-log-entry (:log env) log-entry)))
-
-(def new-local-state
-  (extensions/fire-side-effects! read-entry old-replica new-replica diff
-                                 {:log (:log env) :id c-id :watch-ch (chan)}))
-
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
-
-(fact (:fn read-entry) => :accept-join-cluster)
-(fact (:args read-entry) => {:accepted {:observer "d"
-                             :subject "a"}
-                             :updated-watch {:observer "c"
-                                             :subject "d"}})
-
-(def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
-
-(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" a-id))
-
-(zk/close conn)
-
-(def entry (extensions/read-log-entry (:log env) (<!! ch)))
-
-(fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id "a"})
-
-(component/stop env)
+  (component/stop env))
 
