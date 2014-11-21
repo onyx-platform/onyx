@@ -36,6 +36,17 @@
             (assert (= (count (:peers new)) 1))
             {:instant-join lone-peer}))))
 
+(defmethod extensions/reactions :prepare-join-cluster
+  [entry old new diff peer-args]
+  (cond (and (= (:id peer-args) (:joiner (:args entry)))
+             (nil? diff))
+        [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
+        (= (:id peer-args) (:observer diff))
+        [{:fn :notify-join-cluster
+          :args {:observer (:subject diff)
+                 :subject (or (get (:pairs new) (:observer diff))
+                              (:observer diff))}}]))
+
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
   (cond (= (:id state) (:observer diff))
@@ -52,15 +63,4 @@
         (do (doseq [entry (:buffered-outbox state)]
               (>!! (:outbox-ch state) entry))
             (dissoc state :buffered-outbox))))
-
-(defmethod extensions/reactions :prepare-join-cluster
-  [entry old new diff peer-args]
-  (cond (and (= (:id peer-args) (:joiner (:args entry)))
-             (nil? diff))
-        [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
-        (= (:id peer-args) (:observer diff))
-        [{:fn :notify-join-cluster
-          :args {:observer (:subject diff)
-                 :subject (or (get (:pairs new) (:observer diff))
-                              (:observer diff))}}]))
 

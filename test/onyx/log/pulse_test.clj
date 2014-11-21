@@ -52,18 +52,18 @@
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
-(extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id d-id})
+(extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id a-id})
 
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
-(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" a-id))
+(zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
 
 (zk/close conn)
 
 (def entry (extensions/read-log-entry (:log env) (<!! ch)))
 
 (fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id "a"})
+(fact (:args entry) => {:id "d"})
 
 (component/stop env)
 
