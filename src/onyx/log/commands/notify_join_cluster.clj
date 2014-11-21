@@ -22,17 +22,22 @@
 (defmethod extensions/reactions :notify-join-cluster
   [entry old new diff peer-args]
   (when (= (:id peer-args) (:subject diff))
-    [{:fn :accept-join-cluster :args diff}]))
+    (let [transitive (get (:pairs old) (:observer diff))]
+      [{:fn :accept-join-cluster
+        :args {:accepted diff
+               :updated-watch {:observer (:subject diff)
+                               :subject transitive}}}])))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
   [{:keys [args]} old new diff state]
   (when (= (:id state) (:subject diff))
-    (let [ch (chan 1)]
-      (extensions/on-delete (:log state) (:observer diff) ch)
+    (let [ch (chan 1)
+          transitive (get (:pairs old) (:observer diff))]
+      (extensions/on-delete (:log state) transitive ch)
       (go (when (<! ch)
             (extensions/write-log-entry
              (:log state)
-             {:fn :leave-cluster :args {:id (:observer diff)}}))
+             {:fn :leave-cluster :args {:id transitive}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
       ;; TODO: What if this peer already died?

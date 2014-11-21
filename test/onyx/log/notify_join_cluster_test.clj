@@ -18,7 +18,9 @@
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact diff => {:observer :a :subject :d})
   (fact reactions => [{:fn :accept-join-cluster
-                       :args {:subject :d :observer :a}}])
+                       :args {:accepted {:subject :d :observer :a}
+                              :updated-watch {:observer :d
+                                              :subject :b}}}])
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil))

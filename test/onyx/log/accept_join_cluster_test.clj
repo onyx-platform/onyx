@@ -3,12 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
 
-(def entry
-  (create-log-entry :accept-join-cluster
-                    {:accepted {:observer :d
-                                :subject :a}
-                     :updated-watch {:observer :c
-                                     :subject :d}}))
+(def entry (create-log-entry :accept-join-cluster {:observer :a :subject :d}))
 
 (def f (partial extensions/apply-log-entry entry))
 
@@ -16,7 +11,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
+(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:a :d} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
