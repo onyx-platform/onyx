@@ -10,12 +10,14 @@
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)
         pair (if (= observer transitive) {} {observer transitive})
-        prep-observer (get (map-invert (:prepared replica)) id)]
+        prep-observer (get (map-invert (:prepared replica)) id)
+        accep-observer (get (map-invert (:accepted replica)) id)]
     (-> replica
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:prepared] dissoc id)
         (update-in [:prepared] dissoc prep-observer)
         (update-in [:accepted] dissoc id)
+        (update-in [:accepted] dissoc accep-observer)
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %)))))
