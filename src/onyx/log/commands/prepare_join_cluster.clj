@@ -59,6 +59,16 @@
                  {:fn :leave-cluster :args {:id (:subject diff)}}))
               (close! ch))
           (assoc state :watch-ch ch))
+        (= (:id state) (:subject diff))
+        (let [ch (chan 1)]
+          (extensions/on-delete (:log state) (:observer diff) ch)
+          (go (when (<! ch)
+                ;; TODO: Send this through the outbox, not directly to the log.
+                (extensions/write-log-entry
+                 (:log state)
+                 {:fn :leave-cluster :args {:id (:observer diff)}}))
+              (close! ch))
+          (assoc state :watch-ch ch))
         (= (:id state) (:instant-join diff))
         (do (doseq [entry (:buffered-outbox state)]
               (>!! (:outbox-ch state) entry))

@@ -19,7 +19,7 @@
   (fact (get-in new-replica [:pairs :b]) => :a)
   (fact (get-in new-replica [:pairs :c]) => nil)
   (fact diff => {:died :c :updated-watch {:observer :b :subject :a}})
-  (fact (rep-reactions old-replica new-replica diff {}) => []))
+  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil))
 
 (def entry (create-log-entry :leave-cluster {:id :b}))
 
@@ -36,7 +36,7 @@
   (fact (get-in new-replica [:pairs :a]) => nil)
   (fact (get-in new-replica [:pairs :b]) => nil)
   (fact diff => {:died :b :updated-watch {:observer :a :subject :a}})
-  (fact (rep-reactions old-replica new-replica diff {}) => []))
+  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil))
 
 
 

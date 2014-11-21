@@ -38,6 +38,5 @@
              {:fn :leave-cluster :args {:id (:subject diff)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
-      ;; TODO: What if this peer already died?
       (assoc state :watch-ch ch))))
 

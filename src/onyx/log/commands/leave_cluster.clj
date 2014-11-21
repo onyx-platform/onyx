@@ -32,8 +32,8 @@
 
 (defmethod extensions/reactions :leave-cluster
   [{:keys [args]} old new diff peer-args]
-  (when (or (= (:id peer-args) (get (map-invert (:prepared old)) (:id args)))
-            (= (:id peer-args) (get (map-invert (:accepted old)) (:id args))))
+  (when (or (= (:id peer-args) (get (:prepared old) (:id args)))
+            (= (:id peer-args) (get (:accepted old) (:id args))))
     [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
