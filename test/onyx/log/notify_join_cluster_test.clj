@@ -16,11 +16,9 @@
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact diff => {:observer :a :subject :d})
+  (fact diff => {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a})
   (fact reactions => [{:fn :accept-join-cluster
-                       :args {:accepted {:subject :d :observer :a}
-                              :updated-watch {:observer :d
-                                              :subject :b}}}])
+                       :args diff}])
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil))

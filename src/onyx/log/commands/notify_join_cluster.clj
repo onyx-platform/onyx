@@ -16,28 +16,26 @@
   (let [rets (second (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
     (when (seq rets)
-      {:observer (first (keys rets))
-       :subject (first (vals rets))})))
+      {:observer (first (vals rets))
+       :subject (get-in old [:pairs (first (keys rets))])
+       :accepted-observer (first (keys rets))
+       :accepted-joiner (first (vals rets))})))
 
 (defmethod extensions/reactions :notify-join-cluster
   [entry old new diff peer-args]
-  (when (= (:id peer-args) (:subject diff))
-    (let [transitive (get (:pairs old) (:observer diff))]
-      [{:fn :accept-join-cluster
-        :args {:accepted diff
-               :updated-watch {:observer (:subject diff)
-                               :subject transitive}}}])))
+  (when (= (:id peer-args) (:observer diff))
+    [{:fn :accept-join-cluster
+      :args diff}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
   [{:keys [args]} old new diff state]
-  (when (= (:id state) (:subject diff))
-    (let [ch (chan 1)
-          transitive (get (:pairs old) (:observer diff))]
-      (extensions/on-delete (:log state) transitive ch)
+  (when (= (:id state) (:observer diff))
+    (let [ch (chan 1)]
+      (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
             (extensions/write-log-entry
              (:log state)
-             {:fn :leave-cluster :args {:id transitive}}))
+             {:fn :leave-cluster :args {:id (:subject diff)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
       ;; TODO: What if this peer already died?

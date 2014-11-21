@@ -3,7 +3,11 @@
             [onyx.log.entry :refer [create-log-entry]]
             [midje.sweet :refer :all]))
 
-(def entry (create-log-entry :accept-join-cluster {:observer :a :subject :d}))
+(def entry (create-log-entry :accept-join-cluster
+                             {:observer :d
+                              :subject :b
+                              :accepted-joiner :d
+                              :accepted-observer :a}))
 
 (def f (partial extensions/apply-log-entry entry))
 
@@ -15,19 +19,12 @@
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (get-in new-replica [:pairs :d]) => :a)
-  (fact (get-in new-replica [:pairs :c]) => :d)
+  (fact (get-in new-replica [:pairs :a]) => :d)
+  (fact (get-in new-replica [:pairs :d]) => :b)
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
-  (fact diff => {:observer :d :subject :a})
+  (fact diff => {:observer :a :subject :d})
   (fact (rep-reactions old-replica new-replica diff {}) => []))
-
-(def entry
-  (create-log-entry :accept-join-cluster
-                    {:accepted {:observer :d
-                                :subject :a}
-                     :updated-watch {:observer :a
-                                     :subject :d}}))
 
 (def f (partial extensions/apply-log-entry entry))
 
@@ -35,7 +32,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {} :accepted {:d :a} :peers [:a]})
+(def old-replica {:pairs {} :accepted {:a :d} :peers [:a]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
@@ -43,6 +40,6 @@
   (fact (get-in new-replica [:pairs :a]) => :d)
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
-  (fact diff => {:observer :d :subject :a})
+  (fact diff => {:observer :a :subject :d})
   (fact (rep-reactions old-replica new-replica diff {}) => []))
 

@@ -5,12 +5,14 @@
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
   [{:keys [args]} replica]
-  (let [{:keys [accepted updated-watch]} args]
+  (let [{:keys [accepted-joiner accepted-observer]} args
+        target (or (get-in replica [:pairs accepted-observer])
+                   accepted-observer)]
     (-> replica
-        (update-in [:pairs] merge {(:observer accepted) (:subject accepted)})
-        (update-in [:pairs] merge {(:observer updated-watch) (:subject updated-watch)})
-        (update-in [:accepted] dissoc (:observer accepted))
-        (update-in [:peers] conj (:observer accepted)))))
+        (update-in [:pairs] merge {accepted-observer accepted-joiner})
+        (update-in [:pairs] merge {accepted-joiner target})
+        (update-in [:accepted] dissoc accepted-observer)
+        (update-in [:peers] conj accepted-joiner))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
