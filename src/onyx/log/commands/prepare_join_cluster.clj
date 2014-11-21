@@ -11,15 +11,15 @@
       (let [joining-peer (:joiner args)
             cluster (:peers replica)
             all-joined-peers (into #{} (concat (keys (:pairs replica)) cluster))
-            all-prepared-deps (into #{} (vals (:prepared replica)))
+            all-prepared-deps (into #{} (keys (:prepared replica)))
             prep-watches (into #{} (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
-            accepting-deps (into #{} (vals (:accepted replica)))
+            accepting-deps (into #{} (keys (:accepted replica)))
             candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches)
             sorted-candidates (sort (filter identity candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
-                target (nth sorted-candidates index)]
-            (update-in replica [:prepared] merge {joining-peer target}))
+                watcher (nth sorted-candidates index)]
+            (update-in replica [:prepared] merge {watcher joining-peer}))
           replica))
       (update-in replica [:peers] conj (:joiner args)))))
 
@@ -60,7 +60,7 @@
         [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
         (= (:id peer-args) (:observer diff))
         [{:fn :notify-watchers
-          :args {:observer (or (get (map-invert (:pairs new)) (:subject diff))
-                               (:subject diff))
-                 :subject (:observer diff)}}]))
+          :args {:observer (:subject diff)
+                 :subject (or (get (:pairs new) (:observer diff))
+                              (:observer diff))}}]))
 

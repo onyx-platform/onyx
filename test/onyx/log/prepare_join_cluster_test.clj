@@ -15,27 +15,27 @@
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:prepared new-replica) => {:d :a})
-  (fact diff => {:observer :d :subject :a})
-  (fact reactions => [{:fn :notify-watchers :args {:observer :c :subject :d}}]))
+      reactions (rep-reactions old-replica new-replica diff {:id :a})]
+  (fact (:prepared new-replica) => {:a :d})
+  (fact diff => {:observer :a :subject :d})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :d :subject :b}}]))
 
-(let [old-replica (assoc-in old-replica [:prepared :e] :a)
+(let [old-replica (assoc-in old-replica [:prepared :a] :e)
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:prepared new-replica) => {:e :a :d :b})
-  (fact diff => {:observer :d :subject :b})
-  (fact reactions => [{:fn :notify-watchers :args {:observer :a :subject :d}}]))
+      reactions (rep-reactions old-replica new-replica diff {:id :b})]
+  (fact (:prepared new-replica) => {:a :e :b :d})
+  (fact diff => {:observer :b :subject :d})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :d :subject :c}}]))
 
 (let [old-replica (-> old-replica
-                      (assoc-in [:prepared :e] :a)
-                      (assoc-in [:prepared :f] :b)
-                      (assoc-in [:prepared :g] :c))
+                      (assoc-in [:prepared :a] :e)
+                      (assoc-in [:prepared :b] :f)
+                      (assoc-in [:prepared :c] :g))
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:prepared new-replica) => {:e :a :f :b :g :c})
+  (fact (:prepared new-replica) => {:a :e :b :f :c :g})
   (fact diff => nil)
   (fact reactions => [{:fn :abort-join-cluster :args {:id :d}}]))
 
@@ -50,14 +50,14 @@
 (let [old-replica {:peers [:a]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact new-replica => {:peers [:a] :prepared {:d :a}})
-  (fact diff => {:observer :d :subject :a})
-  (fact reactions => [{:fn :notify-watchers :args {:observer :a :subject :d}}]))
+      reactions (rep-reactions old-replica new-replica diff {:id :a})]
+  (fact new-replica => {:peers [:a] :prepared {:a :d}})
+  (fact diff => {:observer :a :subject :d})
+  (fact reactions => [{:fn :notify-watchers :args {:observer :d :subject :a}}]))
 
-(let [old-replica {:pairs {:b :a,:a :b}
+(let [old-replica {:pairs {:a :b :b :a}
                    :accepted {}
-                   :prepared {:c :a}
+                   :prepared {:a :c}
                    :peers [:a :b]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
