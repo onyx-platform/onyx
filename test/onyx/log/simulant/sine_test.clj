@@ -105,8 +105,8 @@
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
     :model/peek-peers 15
-    :model/peer-rate 2000
-    :model/sine-length (u/hours->msec 0.25)
+    :model/peer-rate 500
+    :model/sine-length (u/hours->msec 1)
     :model/sine-start 0
     :model/sine-reps 8}])
 
@@ -132,7 +132,7 @@
   (sim/create-test sim-conn
                    sine-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration (u/hours->msec 0.25)}))
+                    :test/duration (u/hours->msec 1)}))
 
 (def sine-cluster-sim
   (sim/create-sim sim-conn
@@ -165,35 +165,16 @@
 
 (extensions/subscribe-to-log (:log env) 0 ch)
 
-(future
-  (def replica
-    (loop [replica {}]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)]
-;;        (println "===")
-;;        (println)
-        (prn entry)
-;;        (println)
-;;        (clojure.pprint/pprint replica)
-;;        (println)
-;;        (clojure.pprint/pprint new-replica)
-        (if (< (count (:pairs new-replica)) 45)
-          (recur new-replica)
-          new-replica))))
+(def replica
+  (loop [replica {}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (< (count (:pairs new-replica)) 45)
+        (recur new-replica)
+        new-replica))))
 
-  (fact (count (:peers replica)) => 45))
+(fact (count (:peers replica)) => 45)
 
-(comment
-  (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
-
-  (def c (count (zk/children conn (str "/onyx/" onyx-id "/log"))))
-
-  (count c)
-
-  (zk/close conn))
-
-
-;;(component/stop env)
-
+(component/stop env)
 

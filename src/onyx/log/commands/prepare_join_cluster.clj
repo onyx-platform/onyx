@@ -71,6 +71,8 @@
           (assoc state :watch-ch ch))
         (= (:id state) (:instant-join diff))
         (do (doseq [entry (:buffered-outbox state)]
-              (>!! (:outbox-ch state) entry))
+              (prn "Flush here!")
+              ;;(>!! (:outbox-ch state) entry)
+              )
             (dissoc state :buffered-outbox))))
 
