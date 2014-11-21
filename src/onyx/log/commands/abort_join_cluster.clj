@@ -7,13 +7,13 @@
 (defmethod extensions/apply-log-entry :abort-join-cluster
   [{:keys [args message-id]} replica]
   (-> replica
-      (update-in [:prepared] dissoc (:id args))
-      (update-in [:accepted] dissoc (:id args))))
+      (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
+      (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))))
 
 (defmethod extensions/replica-diff :abort-join-cluster
   [entry old new]
-  (let [prepared (keys (first (diff (:prepared old) (:prepared new))))
-        accepted (keys (first (diff (:accepted old) (:accepted new))))]
+  (let [prepared (vals (first (diff (:prepared old) (:prepared new))))
+        accepted (vals (first (diff (:accepted old) (:accepted new))))]
     (assert (<= (count prepared) 1))
     (assert (<= (count accepted) 1))
     (when (or (seq prepared) (seq accepted))

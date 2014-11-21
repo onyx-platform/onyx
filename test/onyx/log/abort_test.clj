@@ -11,7 +11,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {:a :b :b :c :c :a} :prepared {:d :a} :peers [:a :b :c]})
+(def old-replica {:pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -21,7 +21,7 @@
   (fact diff => {:aborted :d})
   (fact reactions => [{:fn :prepare-join-cluster :args {:joiner :d}}]))
 
-(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:d :a} :peers [:a :b :c]})
+(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:a :d} :peers [:a :b :c]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
