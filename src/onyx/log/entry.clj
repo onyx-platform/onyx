@@ -2,7 +2,7 @@
   (:require [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
-            [onyx.log.commands.notify-watchers]
+            [onyx.log.commands.notify-join-cluster]
             [onyx.log.commands.leave-cluster]))
 
 (defn create-log-entry [kw args]

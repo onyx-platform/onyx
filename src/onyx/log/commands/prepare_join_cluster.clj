@@ -59,7 +59,7 @@
              (nil? diff))
         [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
         (= (:id peer-args) (:observer diff))
-        [{:fn :notify-watchers
+        [{:fn :notify-join-cluster
           :args {:observer (:subject diff)
                  :subject (or (get (:pairs new) (:observer diff))
                               (:observer diff))}}]))

@@ -67,7 +67,7 @@
 
 (def read-entry (extensions/read-log-entry (:log env) message-id))
 
-(fact (:fn read-entry) => :notify-watchers)
+(fact (:fn read-entry) => :notify-join-cluster)
 (fact (:args read-entry) => {:observer c-id :subject d-id})
 
 (def f (partial extensions/apply-log-entry read-entry))
