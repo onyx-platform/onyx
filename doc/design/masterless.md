@@ -285,7 +285,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 ## Command Reference
 
 -------------------------------------------------
-`[prepare-join-cluster](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/prepare_join_cluster.clj)`
+[`prepare-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/prepare_join_cluster.clj)
 
 - Submitter: peer (P) that wants to join the cluster
 - Purpose: determines which peer (Q) that P will watch
@@ -295,7 +295,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: P sends `notify-watchers` to the log, with arg {Z P} (Z is Q's watcher)
 
 -------------------------------------------------
-`[notify-join-cluster](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/notify_join_cluster.clj)`
+[`notify-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/notify_join_cluster.clj)
 
 - Submitter: peer (P) that wants to join the cluster
 - Purpose: Transitions this peer's watch (T) from one peer to another
@@ -305,7 +305,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
 
 -------------------------------------------------
-`[accept-join-cluster](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/accept_join_cluster.clj)`
+[`accept-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/accept_join_cluster.clj)
 
 - Submitter: peer (T) wants to confirm that peer P can join the cluster
 - Purpose: confirms that T has a watch on P's pulse node
@@ -315,7 +315,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
-`[abort-join-cluster](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/abort_join_cluster.clj)`
+[`abort-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/abort_join_cluster.clj)
 
 - Submitter: peer (P) determines that peer (Q) cannot join the cluster (P may = Q)
 - Purpose: Aborts Q's attempt at joining the cluster, erases attempt from replica
@@ -325,7 +325,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
 
 -------------------------------------------------
-`[leave-cluster](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/leave_cluster.clj)`
+[`leave-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/leave_cluster.clj)`
 
 - Submitter: peer (P) reporting that peer Q is dead
 - Purpose: removes Q from all activity, transitions P's watch to R and transitively closes the ring
