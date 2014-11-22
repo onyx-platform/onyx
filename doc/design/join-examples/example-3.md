@@ -14,7 +14,7 @@
   - Post: `{:pairs {:a :b, :b :a} :prepared {:c :b}}`
   - determines C will attach to B. Records this in the local state.
   - adds watch to B
-  - sends `notify-watchers` (3)
+  - sends `notify-join-cluster` (3)
 
 - A, B, and D encounter (1)
   - Pre: `{:pairs {:a :b, :b :a}}`

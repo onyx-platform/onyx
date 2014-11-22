@@ -9,73 +9,72 @@
 
 - A, B, C, D, and E play the log
 
-- D encounters (1)
+- A encounters (1)
   - Pre: `{:pairs {:a :b, :b :c, :c :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - determines D will attach to A. Records this in the local state.
-  - adds watch to A
-  - sends `notify-watchers` (3)
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - determines A will attach to D. Records this in the local state.
+  - adds watch to D
+  - sends `notify-join-cluster` (3)
 
-- A, B, C, and E encounter (1)
+ - B, C, D, and E encounter (1)
   - Pre: `{:pairs {:a :b, :b :c, :c :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - determines D will attach to A. Records this in the local state.
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - determines A will attach to D. Records this in the local state.
   - no reactions
 
-- E encounters (2)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a, :e :b}}`
-  - determines E will attach to B. Records this in the local state.
-  - adds watch to B
-  - sends `notify-watchers` (4)
+- B encounters (2)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d, :b :e}}`
+  - determines B will attach to E. Records this in the local state.
+  - adds watch to E
+  - sends `notify-join-cluster` (4)
 
-- A, B, C, and D encounter (2)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a, :e :b}}`
-  - determines E will attach to B. Records this in the local state.
+- A, C, D, and E encounter (2)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d, :b :e}}`
+  - determines B will attach to E. Records this in the local state.
   - no reactions
-- C encounters (3)                                                                                                                                          
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a, :e :b}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepated {:e :b} :accepted {:d :a}}`
-  - adds a watch to D
-  - removes its watch from A
+
+- D encounters (3)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d, :b :e}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:b :e} :accepted {:a :d}}`
+  - adds a watch to B
   - sends `accept-join-cluster` (5)
 
-- A, B, D, E encounter (3)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a, :e :b}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepated {:e :b} :accepted {:d :a}}`
+- A, B, C, E encounter (3)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d, :b :e}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:b :e} :accepted {:a :d}}`
   - ignore
 
-- A encounters (4)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepated {:e :b} :accepted {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a, :e :b}}`
-  - adds a watch to E
-  - removes its watch from B
+- E encounters (4)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:b :e} :accepted {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d, :b :e}}`
+  - adds a watch to C
   - sends `accept-join-cluster` (6)
 
-- B, C, D, E encounter (4)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepated {:e :b} :accepted {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a, :e :b}}`
+- A, B, C, D encounter (4)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:b :e} :accepted {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d, :b :e}}`
   - ignore
 
-- D encounters (5)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a, :e :b}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :d, :d :a} :accepted {:e :b}}`
-  - flushes outbox
-  - fully joined into cluster
+- A encounters (5)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d, :b :e}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :a} :accepted {:b :e}}`
+  - A drops its watch from B
 
-- A, B, C, E encounter (5)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a, :e :b}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :d, :d :a} :accepted {:e :b}}`
+- B, C, D, E encounter (5)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d, :b :e}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :a} :accepted {:b :e}}`
+  - D flushes outbox
   - ignore
 
-- E encounters (6)
-  - Pre: `{:pairs {:a :b, :b :c, :c :d, :d :a} :accepted {:e :b}}`
-  - Post: `{:pairs {:e :b, :a :e, :b :c, :c :d, :d :a}}`
-  - flushes outbox
-  - fully joined into cluster
+- B encounters (6)
+  - Pre: `{:pairs {:a :d, :d :b, :b :c, :c :a} :accepted {:b :e}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :e, :e :c, :c :a}}`
+  - B drops its watch from C
 
-- A, B, C, D encounter (6)
-  - Pre: `{:pairs {:a :b, :b :c, :c :d, :d :a} :accepted {:e :b}}`
-  - Post: `{:pairs {:e :b, :a :e, :b :c, :c :d, :d :a}}`
+- A, C, D, E encounter (6)
+  - Pre: `{:pairs {:a :d, :d :b, :b :c, :c :a} :accepted {:b :e}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :e, :e :c, :c :a}}`
+  - E flushes its outbox
   - ignore

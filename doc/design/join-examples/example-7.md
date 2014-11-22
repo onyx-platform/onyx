@@ -13,7 +13,7 @@
   - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
   - determines D will attach to A. Records this in the local state.
   - adds watch to A
-  - sends `notify-watchers` (2)
+  - sends `notify-join-cluster` (2)
   - D dies. No peer is watching, so this isn't reported
 
 - A, B, C encounter (1)

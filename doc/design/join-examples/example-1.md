@@ -34,12 +34,11 @@
 
 - A encounters (3)
   - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
-  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :d}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :a}}`
   - drops its watch from B
-  - fully joined into cluster
 
 - B, C, D encounter (3)
   - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
-  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :d}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :a}}`
   - D flushes its outbox
   - ignore

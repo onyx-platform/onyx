@@ -14,7 +14,7 @@
   - determines D will attach to A. Records this in the local state.
   - adds watch to A
   - C dies. B sends `leave-cluster` (2) for C.
-  - sends `notify-watchers` (3)
+  - sends `notify-join-cluster` (3)
 
 - A, B, C encounters (1)
   - Pre: `{:pairs {:a :b, :b :c, :c :a}}`

@@ -13,7 +13,7 @@
   - Post: `{:pairs {} :prepared {:b :a}}`
   - determines B will attach to A
   - adds watch to A
-  - sends `notify-watchers` (2)
+  - sends `notify-join-cluster` (2)
 
 - A encounters (1)
   - Pre: `{:pair {}}`
