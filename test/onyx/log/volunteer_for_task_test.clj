@@ -26,3 +26,18 @@
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:allocations new-replica) => {:a [:y :x]}))
 
+(let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+                   :jobs [:a :b] :allocations {:a [:y]} :last-allocated :a}
+      new-replica (f old-replica)]
+  (fact new-replica => {:job-scheduler :onyx.job-scheduler/round-robin
+                        :jobs [:a :b] :allocations {:a [:y] :b [:x]} :last-allocated :b}))
+
+
+(let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin :jobs [:a :b]
+                   :allocations {:b [:z], :a [:y]} :last-allocated :b}
+      new-replica (f old-replica)]
+  (fact new-replica =>
+        {:job-scheduler :onyx.job-scheduler/round-robin :jobs [:a :b]
+         :allocations {:b [:z], :a [:y :x]} :last-allocated :a}))
+
+

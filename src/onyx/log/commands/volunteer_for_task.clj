@@ -4,14 +4,34 @@
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
-(defmethod extensions/apply-log-entry :volunteer-for-task
+(defmulti update-replica-using-scheduler
+  (fn [{:keys [args]} replica]
+    (:job-scheduler replica)))
+
+(defmethod update-replica-using-scheduler :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
-  (if (= (:job-scheduler replica) :onyx.job-scheduler/greedy)
-    (let [job (first (:jobs replica))]
-      (-> replica
-          (update-in [:allocations job] conj (:id args))
-          (update-in [:allocations job] vec)))
-    replica))
+  (let [job (first (:jobs replica))]
+    (-> replica
+        (update-in [:allocations job] conj (:id args))
+        (update-in [:allocations job] vec))))
+
+(defmethod update-replica-using-scheduler :onyx.job-scheduler/round-robin
+  [{:keys [args]} replica]
+  (let [prev (or (:last-allocated replica) (first (:jobs replica)))
+        job (second (drop-while (partial not= prev) (cycle (:jobs replica))))]
+    (-> replica
+        (update-in [:allocations job] conj (:id args))
+        (update-in [:allocations job] vec)
+        (assoc-in [:last-allocated] job))))
+
+(defmethod update-replica-using-scheduler :default
+  [_ replica]
+  (throw (ex-info "This peer has no :job-scheduler set in its replica"
+                  {:replica replica})))
+
+(defmethod extensions/apply-log-entry :volunteer-for-task
+  [entry replica]
+  (update-replica-using-scheduler entry replica))
 
 (defmethod extensions/replica-diff :volunteer-for-task
   [{:keys [args]} old new]
