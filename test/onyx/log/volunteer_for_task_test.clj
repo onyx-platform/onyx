@@ -4,8 +4,7 @@
             [midje.sweet :refer :all]))
 
 (def entry
-  (create-log-entry :volunteer-for-task
-                    {:id :x :job-scheduler :onyx.job-scheduler/greedy}))
+  (create-log-entry :volunteer-for-task {:id :x}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
 
@@ -13,14 +12,15 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:jobs [:a]})
+(def old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:a]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:allocations new-replica) => {:a [:x]}))
 
-(let [old-replica {:jobs [:a] :allocations {:a [:y]}}
+(let [old-replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :jobs [:a] :allocations {:a [:y]}}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]

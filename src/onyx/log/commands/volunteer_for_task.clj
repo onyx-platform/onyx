@@ -6,7 +6,7 @@
 
 (defmethod extensions/apply-log-entry :volunteer-for-task
   [{:keys [args]} replica]
-  (if (= (:job-scheduler args) :onyx.job-scheduler/greedy)
+  (if (= (:job-scheduler replica) :onyx.job-scheduler/greedy)
     (let [job (first (:jobs replica))]
       (-> replica
           (update-in [:allocations job] conj (:id args))
