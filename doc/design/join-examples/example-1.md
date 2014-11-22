@@ -8,38 +8,38 @@
 
 - A, B, C, and D play the log
 
-- D encounters (1)
+- A encounters (1)
   - Pre: `{:pairs {:a :b, :b :c, :c :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - determines D will attach to A. Records this in the local state.
-  - adds watch to A
-  - sends `notify-watchers` (2)
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - determines A will attach to D. Records this in the local state.
+  - adds watch to D
+  - sends `notify-join-cluster` (2)
 
-- A, B, C encounter (1)
+- B, C, D encounter (1)
   - Pre: `{:pairs {:a :b, :b :c, :c :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - determines D will attach to A. Records this in the local state.
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - determines A will attach to D. Records this in the local state.
   - no reactions
 
-- C encounters (2)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a}}`
-  - adds a watch to D
-  - removes its watch from A
+- D encounters (2)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
+  - adds a watch to B
   - sends `accept-join-cluster` (3)
 
-- A, B, D encounter (2)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a}}`
+- A, B, C encounter (2)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :prepared {:a :d}}`
+  - Post: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
   - ignore
 
-- D encounters (3)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :d :d :a}}`
-  - flushes outbox
+- A encounters (3)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :d}}`
+  - drops its watch from B
   - fully joined into cluster
 
-- A, B, C encounter (3)
-  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:d :a}}`
-  - Post: `{:pairs {:a :b, :b :c, :c :d :d :a}}`
+- B, C, D encounter (3)
+  - Pre: `{:pairs {:a :b, :b :c, :c :a} :accepted {:a :d}}`
+  - Post: `{:pairs {:a :d, :d :b, :b :c, :c :d}}`
+  - D flushes its outbox
   - ignore
