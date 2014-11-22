@@ -8,7 +8,7 @@
 (defn processing-loop [id log inbox-ch outbox-ch kill-ch]
   (try
     (loop [replica {}
-           state {:id id :log log}]
+           state {:id id :log log :outbox-ch outbox-ch}]
 ;;      (timbre/info (format "[%s] Replica is: %s" id replica))
 ;;      (timbre/info (format "[%s] Reading from inbox.." id))
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
