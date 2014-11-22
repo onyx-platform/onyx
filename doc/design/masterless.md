@@ -122,10 +122,6 @@ The algorithm works as follows:
 - [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 3-phase join](/doc/design/join-examples/example-6.md)
 - [Example 7: 3 node cluster, 1 peer dies while joining](/doc/design/join-examples/example-7.md)
 
-More questions:
-- If a lot of commands have been buffered up, will there be negative affects by appending a huge number of commands to the log when the buffer is flushed?
-- What about a node's memory if the outbox buffers a huge number of messages?
-
 ### Dead peer removal
 
 Peers will fail, or be shut down purposefully. Onyx needs to:
@@ -135,7 +131,7 @@ Peers will fail, or be shut down purposefully. Onyx needs to:
 
 #### Peer Failure Detection Strategy
 
-In a cluster of > 1 peer, when a peer dies another peer will have a watch registered on its znode to detect the ephemeral disconnect. When a peer fails (peer F), the peer watching the failed peer (peer W) needs to inform the cluster about the failure, *and* go watch the node that the failed node was watching (peer Z). The joining strategy that has been outlined forces peers to form a ring. A ring structure is advantage because there is no coordination or contention as to who must now watch peer Z for failure. Peer W is responsible for watching Z, because W *was* watching F, and F *was* watching Z. Therefore, W transitively closes the ring, and W watches Z. All replicas can deterministicly compute this answer.
+In a cluster of > 1 peer, when a peer dies another peer will have a watch registered on its znode to detect the ephemeral disconnect. When a peer fails (peer F), the peer watching the failed peer (peer W) needs to inform the cluster about the failure, *and* go watch the node that the failed node was watching (peer Z). The joining strategy that has been outlined forces peers to form a ring. A ring structure has an advantage because there is no coordination or contention as to who must now watch peer Z for failure. Peer W is responsible for watching Z, because W *was* watching F, and F *was* watching Z. Therefore, W transitively closes the ring, and W watches Z. All replicas can deterministicly compute this answer without conferring with each other.
 
 #### Peer Failure Garbage Collection Strategy
 
@@ -150,20 +146,7 @@ It's not always the case that failures can be reported reliably. Consider the fo
 
 This is a pretty nasty edge case. Normally, a failure will case *some* node in the ring to respond and send a command to the log about the death of another peer. This strategy utterly fails in the above sequence. It becomes necessary to take a fallback approach.
 
-We start by observing that this scenario is only a problem when:
-- all peers die in this particular fashion (no death reports)
-- a new peer arrives
-
-The strategy outlined below will pessimistically garbage collect peers as it joins the cluster:
-
-- Peer Z wants to join the cluster
-- Peers A, B, and C are fully joined in the cluster, but actually all dead due to the above scenario
-- Peer Z begins by sending a `peer-gc` command to the log
-- Peer Z plays the log forward
-- Peer Z encounters its `peer-gc` command
-- Peer Z takes the set of nodes in the cluster and checks if their pulse nodes are still online
-- Peer Z sends a `leave-cluster` command to the log for every peer who's pulse node is disconnected
-- Peer Z continues to play the log, and eventually runs into the case of it being the only peer in the cluster. It is then fully joined
+When peer P sends a `prepare-join-cluster` command, it eventually encounters the message and realizes it will be stitched in by Q. P adds a watch to Q's pulse node. If Q is no longer alive, P will send a `leave-cluster` command for Q. P will encounter this message, remove Q from the cluster, abort its attempted join, and retry. If Q is alive, P cancels its watch on Q later in the algorithm.
 
 #### Examples
 
