@@ -290,7 +290,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Submitter: peer (P) that wants to join the cluster
 - Purpose: determines which peer (Q) that will watch P. If P is the only peer, it instantly fully joins the cluster
 - Arguments: P's ID
-- Replica update: assoc {Q P} to `:prepare` key. If P is the only P, P is immediately added to the `:peers` key, and no further reactions are taken
+- Replica update: assoc `{Q P}` to `:prepare` key. If P is the only P, P is immediately added to the `:peers` key, and no further reactions are taken
 - Side effects: Q adds a ZooKeeper watch to P's pulse node
 - Reactions: Q sends `notify-join-cluster` to the log, with args P and R (R being the peer Q watches currently)
 
@@ -300,7 +300,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Submitter: peer Q helping to stitch peer P into the cluster
 - Purpose: Add's a watch from P to R, where R is the node watched by Q
 - Arguments: P and R's ids
-- Replica update: assoc {Q P} to `:accept` key, dissoc {Q P} from `:prepare` key
+- Replica update: assoc `{Q P}` to `:accept` key, dissoc `{Q P}` from `:prepare` key
 - Side effects: P adds a ZooKeeper watch to R's pulse node
 - Reactions: P sends `accept-join-cluster` to the log, with args P, Q, and R
 
@@ -310,7 +310,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Submitter: peer P wants to join the cluster
 - Purpose: confirms that P can safely join, Q can drop its watch from R, since P now watches R, and Q watches P
 - Arguments: P, Q, and R's ids
-- Replica update: dissoc {Q P} from `:accept` key, merge {Q P} and {P R} into `:pairs` key, conj P onto the `:peers` key
+- Replica update: dissoc `{Q P}` from `:accept` key, merge `{Q P}` and `{P R}` into `:pairs` key, conj P onto the `:peers` key
 - Side effects: Q drops its ZooKeeper watch from R
 - Reactions: peer P flushes its outbox of messages
 
@@ -325,12 +325,12 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: P optionally sends `:prepare-join-cluster` to the log and tries again
 
 -------------------------------------------------
-[`leave-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/leave_cluster.clj)`
+[`leave-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/leave_cluster.clj)
 
 - Submitter: peer (Q) reporting that peer P is dead
 - Purpose: removes P from `:prepared`, `:accepted`, `:pairs`, and/or `:peers`, transitions Q's watch to R (the node P watches) and transitively closes the ring
 - Arguments: peer ID of P
-- Replica update: assoc {Q R} into the `:pairs` key, dissoc {P R}
+- Replica update: assoc `{Q R}` into the `:pairs` key, dissoc `{P R}`
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
 
 -------------------------------------------------
