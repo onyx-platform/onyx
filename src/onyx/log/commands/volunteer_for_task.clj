@@ -10,8 +10,8 @@
     (let [job (first (:jobs replica))]
       (-> replica
           (update-in [:allocations job] conj (:id args))
-          (update-in [:allocations job] vec))))
-  replica)
+          (update-in [:allocations job] vec)))
+    replica))
 
 (defmethod extensions/replica-diff :volunteer-for-task
   [{:keys [args]} old new]
