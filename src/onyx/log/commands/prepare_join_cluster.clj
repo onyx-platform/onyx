@@ -40,7 +40,9 @@
   [entry old new diff peer-args]
   (cond (and (= (:id peer-args) (:joiner (:args entry)))
              (nil? diff))
-        [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]
+        [{:fn :abort-join-cluster
+          :args {:id (:id peer-args)}
+          :immediate? true}]
         (= (:id peer-args) (:observer diff))
         [{:fn :notify-join-cluster
           :args {:observer (:subject diff)
@@ -53,7 +55,6 @@
         (let [ch (chan 1)]
           (extensions/on-delete (:log state) (:subject diff) ch)
           (go (when (<! ch)
-                ;; TODO: Send this through the outbox, not directly to the log.
                 (extensions/write-log-entry
                  (:log state)
                  {:fn :leave-cluster :args {:id (:subject diff)}}))
@@ -63,7 +64,6 @@
         (let [ch (chan 1)]
           (extensions/on-delete (:log state) (:observer diff) ch)
           (go (when (<! ch)
-                ;; TODO: Send this through the outbox, not directly to the log.
                 (extensions/write-log-entry
                  (:log state)
                  {:fn :leave-cluster :args {:id (:observer diff)}}))
@@ -71,7 +71,6 @@
           (assoc state :watch-ch ch))
         (= (:id state) (:instant-join diff))
         (do (doseq [entry (:buffered-outbox state)]
-              ;;(>!! (:outbox-ch state) entry)
-              )
-            (dissoc state :buffered-outbox))))
+              (>!! (:outbox-ch state) entry))
+            (assoc (dissoc state :buffered-outbox) :stall-output? false))))
 

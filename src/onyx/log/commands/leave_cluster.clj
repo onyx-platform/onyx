@@ -34,7 +34,9 @@
   [{:keys [args]} old new diff peer-args]
   (when (or (= (:id peer-args) (get (:prepared old) (:id args)))
             (= (:id peer-args) (get (:accepted old) (:id args))))
-    [{:fn :abort-join-cluster :args {:id (:id peer-args)}}]))
+    [{:fn :abort-join-cluster
+      :args {:id (:id peer-args)}
+      :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [args]} old new {:keys [updated-watch]} state]

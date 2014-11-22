@@ -25,7 +25,8 @@
   [entry old new diff peer-args]
   (when (= (:id peer-args) (:observer diff))
     [{:fn :accept-join-cluster
-      :args diff}]))
+      :args diff
+      :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
   [{:keys [args]} old new diff state]

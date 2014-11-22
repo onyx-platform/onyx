@@ -30,8 +30,7 @@
   [entry old new diff state]
   (if (= (:id state) (:observer diff))
     (do (doseq [entry (:buffered-outbox state)]
-          ;;          (>!! (:outbox-ch state) entry)
-          )
-        (dissoc state :buffered-outbox))
+          (>!! (:outbox-ch state) entry))
+        (assoc (dissoc state :buffered-outbox) :stall-output? false))
     state))
 
