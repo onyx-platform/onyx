@@ -71,44 +71,46 @@ The outbox is used to send commands to the log. Certain commands processed by th
 
 ### Joining the Cluster
 
-Aside from the log structure, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
+Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
 #### 3-Phase Cluster Join Strategy
 
-When a peer wishes to join the cluster, it must engage in a 3 phase protocol. Three phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch.
+When a peer wishes to join the cluster, it must engage in a 3 phase protocol. Three phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch. I call this process "stitching" a peer into the cluster.
 
 The technique needs peers to play by the following rules:
-  - Every peer must be watched by another peer in ZooKeeper, unless there is exactly one peer in the cluster.
-  - When a peer joins the cluster, all peers must form a "ring". This makes failure repair very easy because peer's can transitvely close any gaps in the ring after machine failure.
-  - As a peer joining the cluster begins playing the log, it must buffer all reactive messages unless otherwise specified. The buffered messages are flushed after the peer has fully joined the cluster. This is because a peer could volunteer to perform work, but later abort its attempt to join the cluster.
-  - A peer picks another peer to watch by selecting a candidate group. This candidate group is sorted by peer ID. The target peer is chosen by taking the message id modulo the number of peers in the sorted candidate list.
+  - Every peer must be watched by another peer in ZooKeeper, unless there is exactly one peer in the cluster - in which cases there are no watches.
+  - When a peer joins the cluster, all peers must form a "ring" in terms of who-watches-who. This makes failure repair very easy because peers can transitvely close any gaps in the ring after machine failure.
+  - As a peer joining the cluster begins playing the log, it must buffer all reactive messages unless otherwise specified. The buffered messages are flushed after the peer has fully joined the cluster. This is because a peer could volunteer to perform work, but later abort its attempt to join the cluster, and therefore not be able to carry out any work.
+  - A peer picks another peer to watch by determining a candidate list of peers it can stitch into. This candidate list is sorted by peer ID. The target peer is chosen by taking the message id modulo the number of peers in the sorted candidate list. The peer chosen can't be random because all peers will play the message to select a peer to stitch with, and they must all determine the same peer. Hence, the message modulo piece is a sort of "random seed" trick.
 
-The algorithm works as follows ("it" refers to the joining peer):
-- it sends a `prepare-join-cluster` command to the log, indicating its peer ID and pulse znode
-- it plays the log forward until it encounters the `prepare-join-cluster` message that it sent
+The algorithm works as follows:
+- let S = the peer to stitch into the cluster
+- S sends a `prepare-join-cluster` command to the log, indicating its peer ID
+- S plays the log forward
+- Eventually, all peers encounter `prepare-join-cluster` message that was sent by it
 - if the cluster size (`n`) is `>= 1`:
-  - let Q = this peer
+  - let Q = this peer playing the log entry
   - let A = the set of all peers in the fully joined in the cluster
-  - let X = the single peer paired with no one (case only when n = 1)
+  - let X = the single peer paired with no one (case only when `n = 1`)
   - let P = set of all peers prepared to join the cluster
-  - let D = set of all nodes in A that are depended on by a node in P
+  - let D = set of all peers in A that are depended on by a peer in P
   - let V = sorted vector of `(set-difference (set-union A X) D)` by peer ID
   - if V is empty:
-    - it sends an `abort-join-cluster` command to the log
-    - when it encounters `abort-join-cluster`, it backs off and tries to join again later
+    - S sends an `abort-join-cluster` command to the log
+    - when S encounters `abort-join-cluster`, it backs off and tries to join again later
   - let T = nth in V of `message-id mod (count V)`
-  - let W = the nodes that depend on T
-  - it adds a watch to peer T
-  - it sends a `notify-watchers` command to the log, notifying nodes in W, adding itself to P
-  - for all nodes in W that encounter `notify-watchers`:
-    - it adds a watch to Q
-    - it removes its watch from T
-    - it sends a `accept-join-cluster` command, removing Q from P, adding P to A
-  - when `accept-join-cluster` has been encountered, this node is part of the cluster
-  - it flushes its outbox of commands
+  - let W = the peer that T watches
+  - T adds a watch to S
+  - T sends a `notify-join-cluster` command to the log, notifying S that it is watched, adding S to P
+  - when S encounters `notify-join-cluster`:
+    - it adds a watch to W
+    - it sends a `accept-join-cluster` command, removing S from P, adding S to A
+  - when `accept-join-cluster` has been encountered, this peer is part of the cluster
+  - S flushes its outbox of commands
+  - T drops it watch from W - it is now redundant, as S is watching Q
 - if the cluster size is `0`:
-  - this node instantly becomes part of the cluster
-  - it flushes its outbox of commands
+  - S instantly becomes part of the cluster
+  - S flushes its outbox of commands
 
 #### Examples
 
