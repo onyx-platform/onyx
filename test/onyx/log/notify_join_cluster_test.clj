@@ -17,8 +17,7 @@
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact diff => {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a})
-  (fact reactions => [{:fn :accept-join-cluster
-                       :args diff}])
+  (fact reactions => [{:fn :accept-join-cluster :args diff :immediate? true}])
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil))
