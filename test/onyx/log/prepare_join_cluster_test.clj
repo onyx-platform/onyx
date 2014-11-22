@@ -18,7 +18,9 @@
       reactions (rep-reactions old-replica new-replica diff {:id :a})]
   (fact (:prepared new-replica) => {:a :d})
   (fact diff => {:observer :a :subject :d})
-  (fact reactions => [{:fn :notify-join-cluster :args {:observer :d :subject :b}}]))
+  (fact reactions => [{:fn :notify-join-cluster
+                       :args {:observer :d :subject :b}
+                       :immediate? true}]))
 
 (let [old-replica (assoc-in old-replica [:prepared :a] :e)
       new-replica (f old-replica)
@@ -26,7 +28,9 @@
       reactions (rep-reactions old-replica new-replica diff {:id :b})]
   (fact (:prepared new-replica) => {:a :e :b :d})
   (fact diff => {:observer :b :subject :d})
-  (fact reactions => [{:fn :notify-join-cluster :args {:observer :d :subject :c}}]))
+  (fact reactions => [{:fn :notify-join-cluster
+                       :args {:observer :d :subject :c}
+                       :immediate? true}]))
 
 (let [old-replica (-> old-replica
                       (assoc-in [:prepared :a] :e)
@@ -37,7 +41,9 @@
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:prepared new-replica) => {:a :e :b :f :c :g})
   (fact diff => nil)
-  (fact reactions => [{:fn :abort-join-cluster :args {:id :d}}]))
+  (fact reactions => [{:fn :abort-join-cluster
+                       :args {:id :d}
+                       :immediate? true}]))
 
 (let [old-replica {:peers []}
       new-replica (f old-replica)
@@ -53,7 +59,9 @@
       reactions (rep-reactions old-replica new-replica diff {:id :a})]
   (fact new-replica => {:peers [:a] :prepared {:a :d}})
   (fact diff => {:observer :a :subject :d})
-  (fact reactions => [{:fn :notify-join-cluster :args {:observer :d :subject :a}}]))
+  (fact reactions => [{:fn :notify-join-cluster
+                       :args {:observer :d :subject :a}
+                       :immediate? true}]))
 
 (let [old-replica {:pairs {:a :b :b :a}
                    :accepted {}
@@ -64,5 +72,7 @@
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact new-replica => old-replica)
   (fact diff => nil)
-  (fact reactions => [{:fn :abort-join-cluster :args {:id :d}}]))
+  (fact reactions => [{:fn :abort-join-cluster
+                       :args {:id :d}
+                       :immediate? true}]))
 
