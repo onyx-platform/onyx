@@ -16,7 +16,12 @@
 
 (defmethod extensions/reactions :submit-job
   [{:keys [args]} old new diff peer-args]
-  [])
+  (if (and (= (:job-scheduler args) :onyx.job-scheduler/greedy)
+           (not (seq (:jobs old))))
+    [{:fn :volunteer-for-task
+      :args {:id (:id peer-args)
+             :job-scheduler (:job-scheduler args)}}]
+    []))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
