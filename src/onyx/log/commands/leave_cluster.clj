@@ -40,7 +40,7 @@
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [args]} old new {:keys [updated-watch]} state]
-  (when (and (= (:id state) (:observer updated-watch))
+  (if (and (= (:id state) (:observer updated-watch))
              (not= (:observer updated-watch) (:subject updated-watch)))
     (let [ch (chan 1)]
       (extensions/on-delete (:log state) (:subject updated-watch) ch)
@@ -50,5 +50,6 @@
              {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
-      (assoc state :watch-ch ch))))
+      (assoc state :watch-ch ch))
+    state))
 

@@ -47,7 +47,8 @@
         [{:fn :notify-join-cluster
           :args {:observer (:subject diff)
                  :subject (or (get (:pairs new) (:observer diff))
-                              (:observer diff))}}]))
+                              (:observer diff))}
+          :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
@@ -72,5 +73,6 @@
         (= (:id state) (:instant-join diff))
         (do (doseq [entry (:buffered-outbox state)]
               (>!! (:outbox-ch state) entry))
-            (assoc (dissoc state :buffered-outbox) :stall-output? false))))
+            (assoc (dissoc state :buffered-outbox) :stall-output? false))
+        :else state))
 

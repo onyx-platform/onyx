@@ -10,7 +10,7 @@
     (do
       (doseq [reaction (filter :immediate? reactions)]
         (clojure.core.async/>!! outbox-ch reaction))
-      (update-in state [:buffered-outbox] conj (remove :immediate? reactions)))
+      (update-in state [:buffered-outbox] concat (remove :immediate? reactions)))
     (do
       (doseq [reaction reactions]
         (clojure.core.async/>!! outbox-ch reaction))
@@ -27,7 +27,7 @@
                 diff (extensions/replica-diff entry replica new-replica)
                 reactions (extensions/reactions entry replica new-replica diff state)
                 new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
-            (recur new-replica (send-to-outbox state reactions))))))
+            (recur new-replica (send-to-outbox new-state reactions))))))
     (catch Exception e
       (taoensso.timbre/fatal "Fell out of processing loop")
       (taoensso.timbre/fatal e))))

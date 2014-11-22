@@ -30,7 +30,7 @@
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
   [{:keys [args]} old new diff state]
-  (when (= (:id state) (:observer diff))
+  (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]
       (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
@@ -39,5 +39,6 @@
              {:fn :leave-cluster :args {:id (:subject diff)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
-      (assoc state :watch-ch ch))))
+      (assoc state :watch-ch ch))
+    state))
 
