@@ -288,50 +288,50 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 [`prepare-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/prepare_join_cluster.clj)
 
 - Submitter: peer (P) that wants to join the cluster
-- Purpose: determines which peer (Q) that P will watch
-- Arguments: peer ID, peer pulse node
-- Replica update: assoc {P Q} to `:prepare` key
-- Side effects: P adds a ZooKeeper watch to Q's pulse node
-- Reactions: P sends `notify-watchers` to the log, with arg {Z P} (Z is Q's watcher)
+- Purpose: determines which peer (Q) that will watch P. If P is the only peer, it instantly fully joins the cluster
+- Arguments: P's ID
+- Replica update: assoc {Q P} to `:prepare` key. If P is the only P, P is immediately added to the `:peers` key, and no further reactions are taken
+- Side effects: Q adds a ZooKeeper watch to P's pulse node
+- Reactions: Q sends `notify-join-cluster` to the log, with args P and R (R being the peer Q watches currently)
 
 -------------------------------------------------
 [`notify-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/notify_join_cluster.clj)
 
-- Submitter: peer (P) that wants to join the cluster
-- Purpose: Transitions this peer's watch (T) from one peer to another
-- Arguments: pair of nodes to add a watch before ({T P})
-- Replica update: assoc {P Q} to `:accept` key, dissoc {P Q} from `:prepare` key
-- Side effects: T adds a ZooKeeper watch to P's pulse node, T removes a ZooKeeper watch from Q's pulse node
-- Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
+- Submitter: peer Q helping to stitch peer P into the cluster
+- Purpose: Add's a watch from P to R, where R is the node watched by Q
+- Arguments: P and R's ids
+- Replica update: assoc {Q P} to `:accept` key, dissoc {Q P} from `:prepare` key
+- Side effects: P adds a ZooKeeper watch to R's pulse node
+- Reactions: P sends `accept-join-cluster` to the log, with args P, Q, and R
 
 -------------------------------------------------
 [`accept-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/accept_join_cluster.clj)
 
-- Submitter: peer (T) wants to confirm that peer P can join the cluster
-- Purpose: confirms that T has a watch on P's pulse node
-- Arguments: pair of nodes {P Q} and pair of nodes {T P} to add to fully joined cluster
-- Replica update: dissoc {P Q} from `:accept` key, merge {P Q} and {T P} into `:pairs` key
-- Side effects: None
+- Submitter: peer P wants to join the cluster
+- Purpose: confirms that P can safely join, Q can drop its watch from R, since P now watches R, and Q watches P
+- Arguments: P, Q, and R's ids
+- Replica update: dissoc {Q P} from `:accept` key, merge {Q P} and {P R} into `:pairs` key, conj P onto the `:peers` key
+- Side effects: Q drops its ZooKeeper watch from R
 - Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
 [`abort-join-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/abort_join_cluster.clj)
 
-- Submitter: peer (P) determines that peer (Q) cannot join the cluster (P may = Q)
-- Purpose: Aborts Q's attempt at joining the cluster, erases attempt from replica
-- Arguments: pair of nodes to add a watch before ({T P})
-- Replica update: assoc {P Q} to `:accept` key, dissoc {P Q} from `:prepare` key
-- Side effects: T adds a ZooKeeper watch to P's pulse node, T removes a ZooKeeper watch from Q's pulse node
-- Reactions: T sends `accept-join-cluster` to the log, with args {P Q} and {T P}
+- Submitter: peer (Q) determines that peer (P) cannot join the cluster (P may = Q)
+- Purpose: Aborts P's attempt at joining the cluster, erases attempt from replica
+- Arguments: P's id
+- Replica update: Remove any `:prepared` or `:accepted` entries where P is a key's value
+- Side effects: P optionally backs off for a period
+- Reactions: P optionally sends `:prepare-join-cluster` to the log and tries again
 
 -------------------------------------------------
 [`leave-cluster`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/leave_cluster.clj)`
 
-- Submitter: peer (P) reporting that peer Q is dead
-- Purpose: removes Q from all activity, transitions P's watch to R and transitively closes the ring
-- Arguments: peer ID of Q
-- Replica update: assoc {P R} into the `:pairs` key, dissoc {Q R}
-- Side effects: P adds a ZooKeeper watch to R's pulse node
+- Submitter: peer (Q) reporting that peer P is dead
+- Purpose: removes P from `:prepared`, `:accepted`, `:pairs`, and/or `:peers`, transitions Q's watch to R (the node P watches) and transitively closes the ring
+- Arguments: peer ID of P
+- Replica update: assoc {Q R} into the `:pairs` key, dissoc {P R}
+- Side effects: Q adds a ZooKeeper watch to R's pulse node
 
 -------------------------------------------------
 `volunteer-for-task`
