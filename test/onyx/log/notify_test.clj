@@ -48,7 +48,37 @@
 
 (def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
-(def old-local-state {:log (:log env) :id d-id})
+(def old-local-state {:log (:log env) :id a-id})
+
+(def new-replica (f old-replica))
+
+(def diff (rep-diff old-replica new-replica))
+
+(def reactions (rep-reactions old-replica new-replica diff {:id a-id}))
+
+(doseq [reaction reactions]
+  (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
+    (extensions/write-log-entry (:log env) log-entry)))
+
+(def new-local-state
+  (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
+
+(def message-id (<!! ch))
+
+(def read-entry (extensions/read-log-entry (:log env) message-id))
+
+(fact (:fn read-entry) => :notify-join-cluster)
+(fact (:args read-entry) => {:observer d-id :subject b-id})
+
+(def f (partial extensions/apply-log-entry read-entry))
+
+(def rep-diff (partial extensions/replica-diff read-entry))
+
+(def rep-reactions (partial extensions/reactions read-entry))
+
+(def old-replica new-replica)
+
+(def old-local-state {:log (:log env) :id d-id :watch-ch (chan)})
 
 (def new-replica (f old-replica))
 
@@ -67,41 +97,11 @@
 
 (def read-entry (extensions/read-log-entry (:log env) message-id))
 
-(fact (:fn read-entry) => :notify-join-cluster)
-(fact (:args read-entry) => {:observer c-id :subject d-id})
-
-(def f (partial extensions/apply-log-entry read-entry))
-
-(def rep-diff (partial extensions/replica-diff read-entry))
-
-(def rep-reactions (partial extensions/reactions read-entry))
-
-(def old-replica new-replica)
-
-(def old-local-state {:log (:log env) :id c-id :watch-ch (chan)})
-
-(def new-replica (f old-replica))
-
-(def diff (rep-diff old-replica new-replica))
-
-(def reactions (rep-reactions old-replica new-replica diff {:id c-id}))
-
-(doseq [reaction reactions]
-  (let [log-entry (create-log-entry (:fn reaction) (:args reaction))]
-    (extensions/write-log-entry (:log env) log-entry)))
-
-(def new-local-state
-  (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
-
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
-
 (fact (:fn read-entry) => :accept-join-cluster)
-(fact (:args read-entry) => {:accepted {:observer "d"
-                             :subject "a"}
-                             :updated-watch {:observer "c"
-                                             :subject "d"}})
+(fact (:args read-entry) => {:accepted-joiner "d"
+                             :accepted-observer "a"
+                             :subject "b"
+                             :observer "d"})
 
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
