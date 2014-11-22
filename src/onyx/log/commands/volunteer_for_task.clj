@@ -10,18 +10,20 @@
 
 (defmethod update-replica-using-scheduler :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
-  (let [job (first (:jobs replica))]
+  (let [job (first (:jobs replica))
+        tasks (get-in replica [:tasks job])]
     (-> replica
-        (update-in [:allocations job] conj (:id args))
-        (update-in [:allocations job] vec))))
+        (update-in [:allocations job (first tasks)] conj (:id args))
+        (update-in [:allocations job (first tasks)] vec))))
 
 (defmethod update-replica-using-scheduler :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
   (let [prev (or (:last-allocated replica) (first (:jobs replica)))
-        job (second (drop-while (partial not= prev) (cycle (:jobs replica))))]
+        job (second (drop-while (partial not= prev) (cycle (:jobs replica))))
+        tasks (get-in replica [:tasks job])]
     (-> replica
-        (update-in [:allocations job] conj (:id args))
-        (update-in [:allocations job] vec)
+        (update-in [:allocations job (first tasks)] conj (:id args))
+        (update-in [:allocations job (first tasks)] vec)
         (assoc-in [:last-allocated] job))))
 
 (defmethod update-replica-using-scheduler :default

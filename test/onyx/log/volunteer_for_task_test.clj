@@ -12,32 +12,45 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:a]})
-
-(let [new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :x})]
-  (fact (:allocations new-replica) => {:a [:x]}))
-
 (let [old-replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :jobs [:a] :allocations {:a [:y]}}
+                   :jobs [:j1]
+                   :tasks {:j1 [:t1 :t2 :t3]}}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
-  (fact (:allocations new-replica) => {:a [:y :x]}))
+  (fact (:allocations new-replica) => {:j1 {:t1 [:x]}}))
+
+(let [old-replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :jobs [:j1]
+                   :tasks {:j1 [:t1 :t2 :t3]}
+                   :allocations {:j1 {:t1 [:y]}}}
+      new-replica (f old-replica)
+      diff (rep-diff old-replica new-replica)
+      reactions (rep-reactions old-replica new-replica diff {:id :x})]
+  (fact (:allocations new-replica) => {:j1 {:t1 [:y :x]}}))
 
 (let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin
-                   :jobs [:a :b] :allocations {:a [:y]} :last-allocated :a}
+                   :jobs [:j1 :j2]
+                   :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
+                   :allocations {:j1 {:t1 [:y]}}
+                   :last-allocated :j1}
       new-replica (f old-replica)]
   (fact new-replica => {:job-scheduler :onyx.job-scheduler/round-robin
-                        :jobs [:a :b] :allocations {:a [:y] :b [:x]} :last-allocated :b}))
+                        :jobs [:j1 :j2]
+                        :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
+                        :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:x]}}
+                        :last-allocated :j2}))
 
-
-(let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin :jobs [:a :b]
-                   :allocations {:b [:z], :a [:y]} :last-allocated :b}
+(let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+                   :jobs [:j1 :j2]
+                   :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
+                   :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:z]}}
+                   :last-allocated :j1}
       new-replica (f old-replica)]
   (fact new-replica =>
-        {:job-scheduler :onyx.job-scheduler/round-robin :jobs [:a :b]
-         :allocations {:b [:z], :a [:y :x]} :last-allocated :a}))
-
+        {:job-scheduler :onyx.job-scheduler/round-robin
+         :jobs [:j1 :j2]
+         :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
+         :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:z :x]}}
+         :last-allocated :j2}))
 
