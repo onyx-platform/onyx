@@ -4,36 +4,48 @@
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
-(defmulti update-replica-using-scheduler
+(defmulti select-task
+  (fn [replica job]
+    (get-in replica [:task-schedulers job])))
+
+(defmethod select-task :onyx.task-scheduler/greedy
+  [replica job]
+  (first (get-in replica [:tasks job])))
+
+(defmethod select-task :default
+  [_ job]
+  (throw (ex-info "Job has no task scheduler specified" {:job job})))
+
+(defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
 
-(defmethod update-replica-using-scheduler :onyx.job-scheduler/greedy
+(defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (:jobs replica))
-        tasks (get-in replica [:tasks job])]
+        task (select-task replica job)]
     (-> replica
-        (update-in [:allocations job (first tasks)] conj (:id args))
-        (update-in [:allocations job (first tasks)] vec))))
+        (update-in [:allocations job task] conj (:id args))
+        (update-in [:allocations job task] vec))))
 
-(defmethod update-replica-using-scheduler :onyx.job-scheduler/round-robin
+(defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
   (let [prev (or (:last-allocated replica) (first (:jobs replica)))
         job (second (drop-while (partial not= prev) (cycle (:jobs replica))))
-        tasks (get-in replica [:tasks job])]
+        task (select-task replica job)]
     (-> replica
-        (update-in [:allocations job (first tasks)] conj (:id args))
-        (update-in [:allocations job (first tasks)] vec)
+        (update-in [:allocations job task] conj (:id args))
+        (update-in [:allocations job task] vec)
         (assoc-in [:last-allocated] job))))
 
-(defmethod update-replica-using-scheduler :default
+(defmethod select-job :default
   [_ replica]
   (throw (ex-info "This peer has no :job-scheduler set in its replica"
                   {:replica replica})))
 
 (defmethod extensions/apply-log-entry :volunteer-for-task
   [entry replica]
-  (update-replica-using-scheduler entry replica))
+  (select-job entry replica))
 
 (defmethod extensions/replica-diff :volunteer-for-task
   [{:keys [args]} old new]
