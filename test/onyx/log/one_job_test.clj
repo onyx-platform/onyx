@@ -30,8 +30,6 @@
                       :catalog []
                       :task-scheduler :onyx.task-scheduler/round-robin})
 
-(Thread/sleep 2000)
-
 (def ch (chan n-peers))
 
 (extensions/subscribe-to-log (:log env) 0 ch)
