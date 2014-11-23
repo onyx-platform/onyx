@@ -28,7 +28,7 @@
 (onyx.api/submit-job (:log env)
                      {:workflow [[:a :b] [:b :c]]
                       :catalog []
-                      :task-scheduler :onyx.task-scheduler/greedy})
+                      :task-scheduler :onyx.task-scheduler/round-robin})
 
 (Thread/sleep 2000)
 

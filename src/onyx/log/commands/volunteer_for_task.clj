@@ -15,9 +15,11 @@
 (defmethod select-task :onyx.task-scheduler/round-robin
   [replica job]
   (let [task (get-in replica [:last-task-allocated job])
-        prev (or task (first (get-in replica [:tasks job])))
+        lead (first (get-in replica [:tasks job]))
         tasks (cycle (get-in replica [:tasks job]))]
-    (second (drop-while (partial not= prev) tasks))))
+    (if task
+      (second (drop-while (partial not= task) tasks))
+      lead)))
 
 (defmethod select-task :default
   [replica job]
