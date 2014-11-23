@@ -1,4 +1,4 @@
-(ns onyx.log.submit-job
+(ns onyx.log.commands.submit-job
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
@@ -8,7 +8,9 @@
   [{:keys [args]} replica]
   (-> replica
       (update-in [:jobs] conj (:id args))
-      (update-in [:jobs] vec)))
+      (update-in [:jobs] vec)
+      (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
+      (assoc-in [:tasks (:id args)] (:tasks args))))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]

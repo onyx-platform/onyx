@@ -1,4 +1,4 @@
-(ns onyx.log.volunteer-for-task
+(ns onyx.log.commands.volunteer-for-task
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
@@ -23,7 +23,7 @@
   [replica job]
   (throw (ex-info (format "Task scheduler %s not recognized"
                           (get-in replica [:task-schedulers job]))
-                  {:job job})))
+                  {:replica replica})))
 
 (defmulti select-job
   (fn [{:keys [args]} replica]

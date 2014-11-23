@@ -18,7 +18,7 @@
 
 (defn processing-loop [id log inbox-ch outbox-ch kill-ch]
   (try
-    (loop [replica {}
+    (loop [replica {:job-scheduler :onyx.job-scheduler/greedy}
            state {:id id :log log :outbox-ch outbox-ch :stall-output? true}]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
         (when position

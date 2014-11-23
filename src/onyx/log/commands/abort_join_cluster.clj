@@ -1,4 +1,4 @@
-(ns onyx.log.abort-join-cluster
+(ns onyx.log.commands.abort-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]

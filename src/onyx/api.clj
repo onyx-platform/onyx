@@ -2,30 +2,30 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
+            [com.stuartsierra.dependency :as dep]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [warn]]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.validation :as validator]))
 
-(defprotocol ISubmit
-  "Protocol for sending a job to the coordinator for execution."
-  (submit-job [this job]))
+(defn topological-sort [workflow]
+  (dep/topo-sort
+   (reduce (fn [all [to from]]
+             (dep/depend all from to))
+           (dep/graph)
+           workflow)))
 
-(defprotocol IRegister
-  "Protocol for registering a virtual peer with the coordinator.
-   Registering allows the virtual peer to accept tasks."
-  (register-peer [this peer-node]))
-
-(defprotocol IAwait
-  "Protocol for waiting for completion of Onyx internals"
-  (await-job-completion [this job-id]))
-
-(defprotocol IShutdown
-  "Protocol for stopping a virtual peer's task and no longer allowing
-   it to accept new tasks. Releases all resources that were previously
-   acquired."
-  (shutdown [this]))
+(defn submit-job [log job]
+  (let [id (java.util.UUID/randomUUID)
+        tasks (topological-sort (:workflow job))
+        scheduler (:task-scheduler job)
+        args {:id id :tasks tasks :task-scheduler scheduler}
+        entry (create-log-entry :submit-job args)]
+    (extensions/write-chunk log :catalog (:catalog job) id)
+    (extensions/write-chunk log :workflow (:workflow job) id)
+    (extensions/write-log-entry log entry)))
 
 (defn await-job-completion* [sync job-id]
   ;; TODO: re-implement me
