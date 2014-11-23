@@ -28,14 +28,14 @@
 (onyx.api/submit-job (:log env)
                      {:workflow [[:a :b] [:b :c]]
                       :catalog []
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+                      :task-scheduler :onyx.task-scheduler/greedy})
 
-(Thread/sleep 500)
+(Thread/sleep 5000)
 
 (onyx.api/submit-job (:log env)
                      {:workflow [[:d :e] [:e :f]]
                       :catalog []
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+                      :task-scheduler :onyx.task-scheduler/greedy})
 
 (def ch (chan n-peers))
 

@@ -19,14 +19,14 @@
 
 (defmulti drop-peers
   (fn [replica job n]
-    (:job-scheduler replica)))
+    (get-in replica [:task-schedulers job])))
 
-(defmethod drop-peers :onyx.job-scheduler/greedy
+(defmethod drop-peers :onyx.task-scheduler/greedy
   [replica job n]
   (let [tasks (get (:allocations replica) job)]
     (take-last n (apply concat (vals tasks)))))
 
-(defmethod drop-peers :onyx.job-scheduler/round-robin
+(defmethod drop-peers :onyx.task-scheduler/round-robin
   [replica job n])
 
 (defmethod drop-peers :default
@@ -74,7 +74,8 @@
           (let [peer-counts (balance-jobs new)
                 peers (get (job->peers new) (:job allocation))]
             (when (> (count peers) (get peer-counts (:job allocation)))
-              (let [peers-to-drop (drop-peers new (:job allocation) (- (count peers) (get peer-counts (:job allocation))))]
+              (let [n (- (count peers) (get peer-counts (:job allocation)))
+                    peers-to-drop (drop-peers new (:job allocation) n)]
                 (when (some #{(:id peer-args)} (into #{} peers-to-drop))
                   [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))
           [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
