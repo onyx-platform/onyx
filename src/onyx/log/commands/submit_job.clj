@@ -34,7 +34,7 @@
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:replica replica})))
 
-(defn job->n-peers [replica]
+(defn balance-jobs [replica]
   (let [j (count (:jobs replica))
         p (count (:peers replica))
         min-peers (int (/ p j))
@@ -46,6 +46,12 @@
            (fn [i [job-id tasks]]
              {job-id (if (<= i n) max-peers min-peers)})
            (:allocations replica)))))
+
+(defn job->peers [replica]
+  (reduce-kv
+   (fn [all job tasks]
+     (assoc all job (apply concat (vals tasks))))
+   {} (:allocations replica)))
 
 (defn peer->allocated-job [allocations id]
   (get
@@ -65,8 +71,11 @@
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]
         (= (:job-scheduler old) :onyx.job-scheduler/round-robin)
         (if-let [allocation (peer->allocated-job (:allocations new) (:id peer-args))]
-          (let [peer-counts (job->n-peers new)]
-            (prn (get peer-counts (:job allocation)))
+          (let [peer-counts (balance-jobs new)
+                peers (get (job->peers new) (:job allocation))]
+            (when (> (count peers) (get peer-counts (:job allocation)))
+              (let [peers-to-drop (drop-peers new (:job allocation) (- (count peers) (get peer-counts (:job allocation))))]
+                (when (some #{(:id peer-args)} (into #{} peers-to-drop)))))
             [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])
           [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
