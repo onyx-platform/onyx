@@ -36,8 +36,8 @@
                    :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
                    :task-schedulers {:j1 :onyx.task-scheduler/greedy
                                      :j2 :onyx.task-scheduler/greedy}
-                   :allocations {:j1 {:t1 [:y]}}
-                   :last-job-allocated :j1}
+                   :allocations {:j1 {:t1 [:y]} :j2 {}}
+                   :peers [:x :y]}
       new-replica (f old-replica)]
   (fact new-replica => {:job-scheduler :onyx.job-scheduler/round-robin
                         :jobs [:j1 :j2]
@@ -45,16 +45,15 @@
                         :task-schedulers {:j1 :onyx.task-scheduler/greedy
                                           :j2 :onyx.task-scheduler/greedy}
                         :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:x]}}
-                        :last-job-allocated :j2
-                        :last-task-allocated {:j2 :t4}}))
+                        :peers [:x :y]}))
 
 (let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin
                    :jobs [:j1 :j2]
                    :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
                    :task-schedulers {:j1 :onyx.task-scheduler/greedy
                                      :j2 :onyx.task-scheduler/greedy}
-                   :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:z]}}
-                   :last-job-allocated :j1}
+                   :allocations {:j1 {:t1 [:y :z]} :j2 {:t4 []}}
+                   :peers [:x :y :z]}
       new-replica (f old-replica)]
   (fact new-replica =>
         {:job-scheduler :onyx.job-scheduler/round-robin
@@ -62,15 +61,15 @@
          :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5]}
          :task-schedulers {:j1 :onyx.task-scheduler/greedy
                            :j2 :onyx.task-scheduler/greedy}
-         :allocations {:j1 {:t1 [:y]} :j2 {:t4 [:z :x]}}
-         :last-job-allocated :j2
-         :last-task-allocated {:j2 :t4}}))
+         :allocations {:j1 {:t1 [:y :z]} :j2 {:t4 [:x]}}
+         :peers [:x :y :z]}))
 
 (let [old-replica {:job-scheduler :onyx.job-scheduler/round-robin
                    :jobs [:j1]
                    :tasks {:j1 [:t1 :t2 :t3]}
                    :allocations {:j1 {:t1 [:a :b :c]}}
-                   :task-schedulers {:j1 :onyx.task-scheduler/greedy}}
+                   :task-schedulers {:j1 :onyx.task-scheduler/greedy}
+                   :peers [:a :b :c :x]}
       new-replica (f old-replica)]
   (fact new-replica =>
         {:job-scheduler :onyx.job-scheduler/round-robin
@@ -78,16 +77,14 @@
          :tasks {:j1 [:t1 :t2 :t3]}
          :allocations {:j1 {:t1 [:a :b :c :x]}}
          :task-schedulers {:j1 :onyx.task-scheduler/greedy}
-         :last-job-allocated :j1
-         :last-task-allocated {:j1 :t1}}))
+         :peers [:a :b :c :x]}))
 
 (let [old-replica {:job-scheduler :onyx.job-scheduler/greedy
                    :jobs [:j1]
                    :tasks {:j1 [:t1 :t2 :t3]}
                    :allocations {:j1 {:t1 [:y]}}
-                   :last-job-allocated :j1
-                   :last-task-allocated {:j1 :t1}
-                   :task-schedulers {:j1 :onyx.task-scheduler/round-robin}}
+                   :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
+                   :peers [:x :y]}
       new-replica (f old-replica)]
   (fact new-replica =>
         {:job-scheduler :onyx.job-scheduler/greedy
@@ -95,6 +92,5 @@
          :tasks {:j1 [:t1 :t2 :t3]}
          :allocations {:j1 {:t1 [:y] :t2 [:x]}}
          :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
-         :last-job-allocated :j1
-         :last-task-allocated {:j1 :t2}}))
+         :peers [:x :y]}))
 

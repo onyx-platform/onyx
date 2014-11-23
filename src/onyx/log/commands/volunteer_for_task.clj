@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
 (defmulti select-task
@@ -37,20 +38,23 @@
         task (select-task replica job)]
     (-> replica
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec)
-        (assoc-in [:last-job-allocated] job)
-        (assoc-in [:last-task-allocated job] task))))
+        (update-in [:allocations job task] vec))))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
-  (let [prev (or (:last-job-allocated replica) (first (:jobs replica)))
-        job (second (drop-while (partial not= prev) (cycle (:jobs replica))))
+  (let [balanced (common/balance-jobs replica)
+        counts (common/job->peers replica)
+        job (reduce
+             (fn [default job]
+               (if (< (count (get counts job)) (get balanced job))
+                 (reduced job)
+                 default))
+             (first (:jobs replica))
+             (:jobs replica))
         task (select-task replica job)]
     (-> replica
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec)
-        (assoc-in [:last-job-allocated] job)
-        (assoc-in [:last-task-allocated job] task))))
+        (update-in [:allocations job task] vec))))
 
 (defmethod select-job :default
   [_ replica]
