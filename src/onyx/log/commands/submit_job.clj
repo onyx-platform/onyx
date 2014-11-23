@@ -75,8 +75,8 @@
                 peers (get (job->peers new) (:job allocation))]
             (when (> (count peers) (get peer-counts (:job allocation)))
               (let [peers-to-drop (drop-peers new (:job allocation) (- (count peers) (get peer-counts (:job allocation))))]
-                (when (some #{(:id peer-args)} (into #{} peers-to-drop)))))
-            [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])
+                (when (some #{(:id peer-args)} (into #{} peers-to-drop))
+                  [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))
           [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :submit-job
