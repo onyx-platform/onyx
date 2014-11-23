@@ -17,6 +17,23 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
+(defmulti drop-peers
+  (fn [replica job n]
+    (:job-scheduler replica)))
+
+(defmethod drop-peers :onyx.job-scheduler/greedy
+  [replica job n]
+  (let [tasks (get (:allocations replica) job)]
+    (take-last n (apply concat (vals tasks)))))
+
+(defmethod drop-peers :onyx.job-scheduler/round-robin
+  [replica job n])
+
+(defmethod drop-peers :default
+  [replica job n]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:replica replica})))
+
 (defn job->n-peers [replica]
   (let [j (count (:jobs replica))
         p (count (:peers replica))
@@ -49,7 +66,7 @@
         (= (:job-scheduler old) :onyx.job-scheduler/round-robin)
         (if-let [allocation (peer->allocated-job (:allocations new) (:id peer-args))]
           (let [peer-counts (job->n-peers new)]
-            (prn "~>" peer-counts)
+            (prn (get peer-counts (:job allocation)))
             [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])
           [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
