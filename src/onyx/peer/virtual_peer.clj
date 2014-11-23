@@ -16,9 +16,9 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log inbox-ch outbox-ch kill-ch]
+(defn processing-loop [id log inbox-ch outbox-ch kill-ch opts]
   (try
-    (loop [replica {:job-scheduler :onyx.job-scheduler/greedy}
+    (loop [replica {:job-scheduler (:job-scheduler opts)}
            state {:id id :log log :outbox-ch outbox-ch :stall-output? true}]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
         (when position
@@ -59,7 +59,7 @@
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log inbox-ch outbox-ch kill-ch))
+        (thread (processing-loop id log inbox-ch outbox-ch kill-ch opts))
         (assoc component :id id :inbox-ch inbox-ch :outbox-ch outbox-ch :kill-ch kill-ch))))
 
   (stop [component]

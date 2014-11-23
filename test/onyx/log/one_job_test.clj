@@ -18,7 +18,8 @@
 
 (def peer-opts
   {:inbox-capacity 1000
-   :outbox-capacity 1000})
+   :outbox-capacity 1000
+   :job-scheduler :onyx.job-scheduler/greedy})
 
 (def n-peers 5)
 
@@ -29,15 +30,19 @@
                       :catalog []
                       :task-scheduler :onyx.task-scheduler/greedy})
 
+(Thread/sleep 2000)
+
 (def ch (chan n-peers))
 
 (extensions/subscribe-to-log (:log env) 0 ch)
 
 (def replica
-  (loop [replica {:job-scheduler :onyx.job-scheduler/greedy}]
+  (loop [replica {:job-scheduler (:job-scheduler peer-opts)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
+      (println)
+      (clojure.pprint/pprint entry)
       (clojure.pprint/pprint new-replica)
       (recur new-replica))))
 

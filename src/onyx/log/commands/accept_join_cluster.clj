@@ -28,7 +28,7 @@
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
-  (if (= (:id state) (:observer diff))
+  (if (= (:id state) (:subject diff))
     (do (doseq [entry (:buffered-outbox state)]
           (>!! (:outbox-ch state) entry))
         (assoc (dissoc state :buffered-outbox) :stall-output? false))
