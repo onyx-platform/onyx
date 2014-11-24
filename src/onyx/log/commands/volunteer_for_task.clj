@@ -15,12 +15,13 @@
 
 (defmethod select-task :onyx.task-scheduler/round-robin
   [replica job]
-  (let [task (get-in replica [:last-task-allocated job])
-        lead (first (get-in replica [:tasks job]))
-        tasks (cycle (get-in replica [:tasks job]))]
-    (if task
-      (second (drop-while (partial not= task) tasks))
-      lead)))
+  (let [allocations (get-in replica [:allocations job])
+        tasks (get-in replica [:tasks job])]
+    (->> tasks
+         (map (fn [t] {:task t :n (count (get allocations t))}))
+         (sort-by :n)
+         (first)
+         :task)))
 
 (defmethod select-task :default
   [replica job]
