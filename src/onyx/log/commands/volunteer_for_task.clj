@@ -79,20 +79,23 @@
   (let [counts (common/job->peers replica)]
     (ffirst (sort-by count counts))))
 
+(defn saturated-cluster? [replica]
+  (let [balanced (common/balance-jobs replica)
+        counts (common/job->peers replica)]
+    (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
+         (= (apply + (vals balanced)) (count (:peers replica))))))
+
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
-  (let [balanced (common/balance-jobs replica)
-        counts (common/job->peers replica)
-        job (or (find-job-needing-peers replica) (round-robin-next-job replica))
-        task (select-task replica job)
-        prev (get (allocations->peers (:allocations replica)) (:id args))]
-    (if (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
-             (= (apply + (vals balanced)) (count (:peers replica))))
-      replica
+  (if-not (saturated-cluster? replica)
+    (let [job (or (find-job-needing-peers replica) (round-robin-next-job replica))
+          task (select-task replica job)
+          prev (get (allocations->peers (:allocations replica)) (:id args))]
       (-> replica
           (remove-peers args prev)
           (update-in [:allocations job task] conj (:id args))
-          (update-in [:allocations job task] vec)))))
+          (update-in [:allocations job task] vec)))
+    replica))
 
 (defmethod select-job :default
   [_ replica]

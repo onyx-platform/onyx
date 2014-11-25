@@ -38,11 +38,13 @@
   (loop [replica {:job-scheduler (:job-scheduler peer-opts)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (println)
-      (clojure.pprint/pprint entry)
-      (clojure.pprint/pprint new-replica)
-      (recur new-replica))))
+          new-replica (extensions/apply-log-entry entry replica)
+          counts (map count (mapcat vals (vals (:allocations new-replica))))]
+      (when-not (= (into #{} counts) #{1 2})
+        (recur new-replica)))))
+
+(fact "peers balanced on 1 jobs" true => true)
+
 
 (doseq [v-peer v-peers]
   (try
