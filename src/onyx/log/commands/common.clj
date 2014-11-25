@@ -4,8 +4,7 @@
   (let [j (count (:jobs replica))
         p (count (:peers replica))
         min-peers (int (/ p j))
-        r (/ (* min-peers j) j)
-        n (if (integer? r) 0 (numerator r))
+        n (rem p j)
         max-peers (inc min-peers)]
     (into {}
           (map-indexed

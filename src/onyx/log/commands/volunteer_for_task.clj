@@ -3,7 +3,8 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre]))
 
 (defmulti select-task
   (fn [replica job]
@@ -29,6 +30,27 @@
                           (get-in replica [:task-schedulers job]))
                   {:replica replica})))
 
+(defn allocations->peers [allocations]
+  (reduce-kv
+   (fn [all job tasks]
+     (merge all
+            (reduce-kv
+             (fn [all task allocations]
+               (->> allocations
+                    (map (fn [peer] {peer {:job job :task task}}))
+                    (into {})
+                    (merge all)))
+             {}
+             tasks)))
+   {}
+   allocations))
+
+(defn remove-peers [replica args prev]
+  (if (and (:job prev (:task prev)))
+    (let [remove-f #(vec (remove (partial = (:id args)) %))]
+      (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
+    replica))
+
 (defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
@@ -36,26 +58,36 @@
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (:jobs replica))
-        task (select-task replica job)]
+        task (select-task replica job)
+        prev (get (allocations->peers (:allocations replica)) (:id args))]
     (-> replica
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec))))
+        (update-in [:allocations job task] vec)
+        (remove-peers args prev))))
+
+(defn find-job-needing-peers [replica]
+  (let [balanced (common/balance-jobs replica)
+        counts (common/job->peers replica)]
+    (reduce
+     (fn [default job]
+       (when (< (count (get counts job)) (get balanced job))
+         (reduced job)))
+     nil
+     (:jobs replica))))
+
+(defn round-robin-next-job [replica]
+  (let [counts (common/job->peers replica)]
+    (ffirst (sort-by count counts))))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
-  (let [balanced (common/balance-jobs replica)
-        counts (common/job->peers replica)
-        job (reduce
-             (fn [default job]
-               (if (< (count (get counts job)) (get balanced job))
-                 (reduced job)
-                 default))
-             (first (:jobs replica))
-             (:jobs replica))
-        task (select-task replica job)]
+  (let [job (or (find-job-needing-peers replica) (round-robin-next-job replica))
+        task (select-task replica job)
+        prev (get (allocations->peers (:allocations replica)) (:id args))]
     (-> replica
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec))))
+        (update-in [:allocations job task] vec)
+        (remove-peers args prev))))
 
 (defmethod select-job :default
   [_ replica]

@@ -21,7 +21,9 @@
                 watcher (nth sorted-candidates index)]
             (update-in replica [:prepared] merge {watcher joining-peer}))
           replica))
-      (update-in replica [:peers] conj (:joiner args)))))
+      (-> replica
+          (update-in [:peers] conj (:joiner args))
+          (update-in [:peers] vec)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]

@@ -12,7 +12,8 @@
         (update-in [:pairs] merge {accepted-observer accepted-joiner})
         (update-in [:pairs] merge {accepted-joiner target})
         (update-in [:accepted] dissoc accepted-observer)
-        (update-in [:peers] conj accepted-joiner))))
+        (update-in [:peers] conj accepted-joiner)
+        (update-in [:peers] vec))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
