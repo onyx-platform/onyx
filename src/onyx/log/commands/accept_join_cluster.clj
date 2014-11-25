@@ -25,7 +25,8 @@
 
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff peer-args]
-  [])
+  (when (and (= (:id peer-args) (:subject diff)) (seq (:jobs new)))
+    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]

@@ -50,7 +50,9 @@
           :args {:observer (:subject diff)
                  :subject (or (get (:pairs new) (:observer diff))
                               (:observer diff))}
-          :immediate? true}]))
+          :immediate? true}]
+        (and (:instant-join diff) (seq (:jobs new)))
+        [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
