@@ -81,13 +81,18 @@
 
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
-  (let [job (or (find-job-needing-peers replica) (round-robin-next-job replica))
+  (let [balanced (common/balance-jobs replica)
+        counts (common/job->peers replica)
+        job (or (find-job-needing-peers replica) (round-robin-next-job replica))
         task (select-task replica job)
         prev (get (allocations->peers (:allocations replica)) (:id args))]
-    (-> replica
-        (remove-peers args prev)
-        (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec))))
+    (if (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
+             (= (apply + (vals balanced)) (count (:peers replica))))
+      replica
+      (-> replica
+          (remove-peers args prev)
+          (update-in [:allocations job task] conj (:id args))
+          (update-in [:allocations job task] vec)))))
 
 (defmethod select-job :default
   [_ replica]
