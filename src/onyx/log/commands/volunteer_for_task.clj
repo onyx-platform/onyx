@@ -61,9 +61,9 @@
         task (select-task replica job)
         prev (get (allocations->peers (:allocations replica)) (:id args))]
     (-> replica
+        (remove-peers args prev)
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec)
-        (remove-peers args prev))))
+        (update-in [:allocations job task] vec))))
 
 (defn find-job-needing-peers [replica]
   (let [balanced (common/balance-jobs replica)
@@ -85,9 +85,9 @@
         task (select-task replica job)
         prev (get (allocations->peers (:allocations replica)) (:id args))]
     (-> replica
+        (remove-peers args prev)
         (update-in [:allocations job task] conj (:id args))
-        (update-in [:allocations job task] vec)
-        (remove-peers args prev))))
+        (update-in [:allocations job task] vec))))
 
 (defmethod select-job :default
   [_ replica]

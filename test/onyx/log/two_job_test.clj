@@ -21,7 +21,7 @@
    :outbox-capacity 1000
    :job-scheduler :onyx.job-scheduler/round-robin})
 
-(def n-peers 5)
+(def n-peers 10)
 
 (def v-peers (onyx.api/start-peers! onyx-id n-peers (:peer config) peer-opts))
 
@@ -29,8 +29,6 @@
                      {:workflow [[:a :b] [:b :c]]
                       :catalog []
                       :task-scheduler :onyx.task-scheduler/greedy})
-
-(Thread/sleep 5000)
 
 (onyx.api/submit-job (:log env)
                      {:workflow [[:d :e] [:e :f]]
