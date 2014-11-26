@@ -30,27 +30,6 @@
                           (get-in replica [:task-schedulers job]))
                   {:replica replica})))
 
-(defn allocations->peers [allocations]
-  (reduce-kv
-   (fn [all job tasks]
-     (merge all
-            (reduce-kv
-             (fn [all task allocations]
-               (->> allocations
-                    (map (fn [peer] {peer {:job job :task task}}))
-                    (into {})
-                    (merge all)))
-             {}
-             tasks)))
-   {}
-   allocations))
-
-(defn remove-peers [replica args prev]
-  (if (and (:job prev (:task prev)))
-    (let [remove-f #(vec (remove (partial = (:id args)) %))]
-      (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
-    replica))
-
 (defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
@@ -58,41 +37,20 @@
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (:jobs replica))
-        task (select-task replica job)
-        prev (get (allocations->peers (:allocations replica)) (:id args))]
+        task (select-task replica job)]
     (-> replica
-        (remove-peers args prev)
+        (common/remove-peers args)
         (update-in [:allocations job task] conj (:id args))
         (update-in [:allocations job task] vec))))
 
-(defn find-job-needing-peers [replica]
-  (let [balanced (common/balance-jobs replica)
-        counts (common/job->peers replica)]
-    (reduce
-     (fn [default job]
-       (when (< (count (get counts job)) (get balanced job))
-         (reduced job)))
-     nil
-     (:jobs replica))))
-
-(defn round-robin-next-job [replica]
-  (let [counts (common/job->peers replica)]
-    (ffirst (sort-by count counts))))
-
-(defn saturated-cluster? [replica]
-  (let [balanced (common/balance-jobs replica)
-        counts (common/job->peers replica)]
-    (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
-         (= (apply + (vals balanced)) (count (:peers replica))))))
-
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
-  (if-not (saturated-cluster? replica)
-    (let [job (or (find-job-needing-peers replica) (round-robin-next-job replica))
-          task (select-task replica job)
-          prev (get (allocations->peers (:allocations replica)) (:id args))]
+  (if-not (common/saturated-cluster? replica)
+    (let [job (or (common/find-job-needing-peers replica)
+                  (common/round-robin-next-job replica))
+          task (select-task replica job)]
       (-> replica
-          (remove-peers args prev)
+          (common/remove-peers args)
           (update-in [:allocations job task] conj (:id args))
           (update-in [:allocations job task] vec)))
     replica))

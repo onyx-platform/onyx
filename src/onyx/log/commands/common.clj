@@ -29,3 +29,45 @@
     {} allocations)
    id))
 
+(defn allocations->peers [allocations]
+  (reduce-kv
+   (fn [all job tasks]
+     (merge all
+            (reduce-kv
+             (fn [all task allocations]
+               (->> allocations
+                    (map (fn [peer] {peer {:job job :task task}}))
+                    (into {})
+                    (merge all)))
+             {}
+             tasks)))
+   {}
+   allocations))
+
+(defn remove-peers [replica args]
+  (let [prev (get (allocations->peers (:allocations replica)) (:id args))]
+    (if (and (:job prev (:task prev)))
+      (let [remove-f #(vec (remove (partial = (:id args)) %))]
+        (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
+      replica)))
+
+(defn find-job-needing-peers [replica]
+  (let [balanced (balance-jobs replica)
+        counts (job->peers replica)]
+    (reduce
+     (fn [default job]
+       (when (< (count (get counts job)) (get balanced job))
+         (reduced job)))
+     nil
+     (:jobs replica))))
+
+(defn round-robin-next-job [replica]
+  (let [counts (job->peers replica)]
+    (ffirst (sort-by count counts))))
+
+(defn saturated-cluster? [replica]
+  (let [balanced (balance-jobs replica)
+        counts (job->peers replica)]
+    (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
+         (= (apply + (vals balanced)) (count (:peers replica))))))
+

@@ -24,7 +24,7 @@
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :a :subject :d})
-  (fact (rep-reactions old-replica new-replica diff {}) => []))
+  (fact (rep-reactions old-replica new-replica diff {}) => nil))
 
 (def f (partial extensions/apply-log-entry entry))
 
@@ -41,5 +41,5 @@
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :a :subject :d})
-  (fact (rep-reactions old-replica new-replica diff {}) => []))
+  (fact (rep-reactions old-replica new-replica diff {}) => nil))
 

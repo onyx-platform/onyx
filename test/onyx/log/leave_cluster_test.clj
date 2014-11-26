@@ -38,9 +38,7 @@
   (fact diff => {:died :b :updated-watch {:observer :a :subject :a}})
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil))
 
-
-
-(def entry (create-log-entry :leave-cluster {:id :b}))
+(def entry (create-log-entry :leave-cluster {:id :d}))
 
 (def f (partial extensions/apply-log-entry entry))
 
@@ -48,8 +46,14 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {} :prepared {:a :b} :peers [:b]})
+(def old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+                  :pairs {:a :b :b :c :c :d :d :a} 
+                  :peers [:a :b :c :d]
+                  :jobs [:j1 :j2]
+                  :task-schedulers {:j1 :onyx.task-scheduler/greedy
+                                    :j2 :onyx.task-scheduler/greedy} 
+                  :tasks {:j1 [:t1] :j2 [:t2]}
+                  :allocations {:j1 {:t1 [:a :b] :t2 [:c :d]}}})
 
-(f old-replica)
-(rep-reactions old-replica (f old-replica) (rep-diff old-replica (f old-replica)) {:id :b})
+(fact (:allocations (f old-replica)) => {:j1 {:t1 [:a :b] :t2 [:c]}})
 

@@ -27,5 +27,5 @@
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:jobs new-replica) => [:b :a])
   (fact diff => {:job :a})
-  (fact reactions => []))
+  (fact reactions => nil))
 

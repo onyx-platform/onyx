@@ -2,7 +2,8 @@
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.log.commands.common :as common]))
 
 (defmethod extensions/apply-log-entry :leave-cluster
   [{:keys [args]} replica]
@@ -20,7 +21,8 @@
         (update-in [:accepted] dissoc accep-observer)
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
-        (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %)))))
+        (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
+        (common/remove-peers args))))
 
 (defmethod extensions/replica-diff :leave-cluster
   [{:keys [args]} old new]
