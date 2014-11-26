@@ -51,19 +51,19 @@
         (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
       replica)))
 
-(defn find-job-needing-peers [replica]
+(defn find-job-needing-peers [replica candidates]
   (let [balanced (balance-jobs replica)
         counts (job->peers replica)]
     (reduce
      (fn [default job]
-       (when (< (count (get counts job)) (get balanced job))
+       (when (< (count (get counts job)) (get balanced job 0))
          (reduced job)))
      nil
-     (:jobs replica))))
+     candidates)))
 
-(defn round-robin-next-job [replica]
+(defn round-robin-next-job [replica candidates]
   (let [counts (job->peers replica)]
-    (->> (:jobs replica)
+    (->> candidates
          (reduce #(conj %1 {:job %2 :n (count (get counts %2))}) [])
          (sort-by :n)
          (first)
@@ -74,6 +74,12 @@
         counts (job->peers replica)]
     (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
          (= (apply + (vals balanced)) (count (:peers replica))))))
+
+(defn incomplete-jobs [replica]
+  (filter
+   #(< (count (get-in replica [:completions %]))
+       (count (get-in replica [:tasks %])))
+   (:jobs replica)))
 
 (defmulti drop-peers
   (fn [replica job n]
