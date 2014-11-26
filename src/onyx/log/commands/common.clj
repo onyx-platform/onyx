@@ -63,7 +63,11 @@
 
 (defn round-robin-next-job [replica]
   (let [counts (job->peers replica)]
-    (ffirst (sort-by count counts))))
+    (->> (:jobs replica)
+         (reduce #(conj %1 {:job %2 :n (count (get counts %2))}) [])
+         (sort-by :n)
+         (first)
+         :job)))
 
 (defn saturated-cluster? [replica]
   (let [balanced (balance-jobs replica)
