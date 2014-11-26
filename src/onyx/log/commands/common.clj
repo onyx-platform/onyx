@@ -71,3 +71,20 @@
     (and (= balanced (into {} (map (fn [[job peers]] {job (count peers)}) counts)))
          (= (apply + (vals balanced)) (count (:peers replica))))))
 
+(defmulti drop-peers
+  (fn [replica job n]
+    (get-in replica [:task-schedulers job])))
+
+(defmethod drop-peers :onyx.task-scheduler/greedy
+  [replica job n]
+  (let [tasks (get (:allocations replica) job)]
+    (take-last n (apply concat (vals tasks)))))
+
+(defmethod drop-peers :onyx.task-scheduler/round-robin
+  [replica job n])
+
+(defmethod drop-peers :default
+  [replica job n]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:replica replica})))
+
