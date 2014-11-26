@@ -28,8 +28,6 @@
         [{:fn :volunteer-for-task :args {:id :b}}])
   (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil?))
 
-
-
 (def entry (create-log-entry :volunteer-for-task {:id :a}))
 
 (def f (partial extensions/apply-log-entry entry))
