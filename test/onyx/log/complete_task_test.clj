@@ -80,3 +80,21 @@
 
 (fact (:allocations (f old-replica)) => {:j1 {}})
 
+(def entry (create-log-entry :volunteer-for-task {:id :a}))
+
+(def f (partial extensions/apply-log-entry entry))
+
+(def rep-diff (partial extensions/replica-diff entry))
+
+(def rep-reactions (partial extensions/reactions entry))
+
+(def old-replica {:job-scheduler :onyx.job-scheduler/greedy
+                  :jobs [:j1]
+                  :tasks {:j1 [:t1 :t2]}
+                  :allocations {:j1 {}}
+                  :completions {:j1 [:t1]}
+                  :task-schedulers {:j1 :onyx.task-scheduler/greedy}
+                  :peers [:a]})
+
+(fact (:allocations (f old-replica)) => {:j1 {:t2 [:a]}})
+

@@ -10,15 +10,19 @@
   (fn [replica job]
     (get-in replica [:task-schedulers job])))
 
+(defn incomplete-tasks [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        completed (get-in replica [:completions job])]
+    (filter identity (second (diff completed tasks)))))
+
 (defmethod select-task :onyx.task-scheduler/greedy
   [replica job]
-  (first (get-in replica [:tasks job])))
+  (first (incomplete-tasks replica job)))
 
 (defmethod select-task :onyx.task-scheduler/round-robin
   [replica job]
-  (let [allocations (get-in replica [:allocations job])
-        tasks (get-in replica [:tasks job])]
-    (->> tasks
+  (let [allocations (get-in replica [:allocations job])]
+    (->> (incomplete-tasks replica job)
          (map (fn [t] {:task t :n (count (get allocations t))}))
          (sort-by :n)
          (first)
