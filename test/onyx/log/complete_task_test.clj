@@ -70,3 +70,13 @@
 
 (fact (:allocations (f old-replica)) => {:j1 {} :j3 {:t3 [:a]}})
 
+(def old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+                  :jobs [:j1]
+                  :tasks {:j1 [:t1]}
+                  :allocations {:j1 {}}
+                  :completions {:j1 [:t1]}
+                  :task-schedulers {:j1 :onyx.task-scheduler/greedy}
+                  :peers [:a]})
+
+(fact (:allocations (f old-replica)) => {:j1 {}})
+
