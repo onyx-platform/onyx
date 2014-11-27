@@ -46,8 +46,8 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations replica) j1))) 40)
-                   (zero? (apply + (map count (vals (get (:allocations replica) j2))))))
+      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 40)
+                   (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
         (recur new-replica)
         new-replica))))
 

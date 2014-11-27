@@ -8,9 +8,9 @@
         max-peers (inc min-peers)]
     (into {}
           (map-indexed
-           (fn [i [job-id tasks]]
-             {job-id (if (< i n) max-peers min-peers)})
-           (:allocations replica)))))
+           (fn [i job]
+             {job (if (< i n) max-peers min-peers)})
+           (:jobs replica)))))
 
 (defn job->peers [replica]
   (reduce-kv
@@ -91,7 +91,21 @@
     (take-last n (apply concat (vals tasks)))))
 
 (defmethod drop-peers :onyx.task-scheduler/round-robin
-  [replica job n])
+  [replica job n]
+  (let [task-seq (cycle (reverse (get-in replica [:tasks job])))
+        rets
+        (:rets
+         (reduce
+          (fn [{:keys [rets allocations task-seq] :as vars} _]
+            (-> vars
+                (update-in [:rets] conj (last (get allocations (first task-seq))))
+                (update-in [:allocations (first task-seq)] butlast)
+                (update-in [:task-seq] rest)))
+          {:rets []
+           :allocations (get-in replica [:allocations job])
+           :task-seq task-seq}
+          (range n)))]
+    rets))
 
 (defmethod drop-peers :default
   [replica job n]

@@ -46,12 +46,12 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations replica) j1))) 6)
-                   (= (count (:b (get (:allocations replica) j1))) 6)
-                   (= (count (:c (get (:allocations replica) j1))) 6)
-                   (= (count (:d (get (:allocations replica) j2))) 6)
-                   (= (count (:e (get (:allocations replica) j2))) 6)
-                   (= (count (:f (get (:allocations replica) j2))) 6))
+      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 6)
+                   (= (count (:b (get (:allocations new-replica) j1))) 6)
+                   (= (count (:c (get (:allocations new-replica) j1))) 6)
+                   (= (count (:d (get (:allocations new-replica) j2))) 6)
+                   (= (count (:e (get (:allocations new-replica) j2))) 6)
+                   (= (count (:f (get (:allocations new-replica) j2))) 6))
         (recur new-replica)
         new-replica))))
 

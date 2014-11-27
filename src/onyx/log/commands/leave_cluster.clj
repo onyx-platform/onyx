@@ -43,11 +43,11 @@
           allocation
           (let [peer-counts (common/balance-jobs new)
                 peers (get (common/job->peers new) (:job allocation))]
-            (> (count peers) (get peer-counts (:job allocation)))
-            (let [n (- (count peers) (get peer-counts (:job allocation)))
-                  peers-to-drop (common/drop-peers new (:job allocation) n)]
-              (when (some #{(:id peer-args)} (into #{} peers-to-drop))
-                [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))))
+            (when (> (count peers) (get peer-counts (:job allocation)))
+              (let [n (- (count peers) (get peer-counts (:job allocation)))
+                    peers-to-drop (common/drop-peers new (:job allocation) n)]
+                (when (some #{(:id peer-args)} (into #{} peers-to-drop))
+                  [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))))))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [args]} old new {:keys [updated-watch]} state]
