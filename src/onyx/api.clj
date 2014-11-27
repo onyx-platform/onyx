@@ -25,7 +25,8 @@
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk log :catalog (:catalog job) id)
     (extensions/write-chunk log :workflow (:workflow job) id)
-    (extensions/write-log-entry log entry)))
+    (extensions/write-log-entry log entry)
+    id))
 
 (defn await-job-completion* [sync job-id]
   ;; TODO: re-implement me

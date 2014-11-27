@@ -20,5 +20,6 @@
       [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :complete-task
-  [{:keys [args]} old new diff state])
+  [{:keys [args]} old new diff state]
+  state)
 
