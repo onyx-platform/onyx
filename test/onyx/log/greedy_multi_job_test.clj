@@ -61,12 +61,12 @@
   (let [position (<!! ch)
         entry (extensions/read-log-entry (:log env) position)
         new-replica (extensions/apply-log-entry entry replica)]
-    (if-not (and (= (count (:b (get (:allocations replica) j1))) 40)
-                 (zero? (apply + (map count (vals (get (:allocations replica) j2))))))
-      (do (clojure.pprint/pprint entry)
-          (clojure.pprint/pprint new-replica)
-          (recur new-replica))
-      new-replica)))
+    (if (and (= (count (:b (get (:allocations new-replica) j1))) 40)
+             (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
+      new-replica
+      (recur new-replica))))
+
+(fact "All peers were reallocated to job 1, task B" true => true)
 
 (doseq [v-peer v-peers]
   (try
