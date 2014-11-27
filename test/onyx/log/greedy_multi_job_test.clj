@@ -57,16 +57,62 @@
 
 (extensions/write-log-entry (:log env) entry)
 
-(loop [replica replica]
-  (let [position (<!! ch)
-        entry (extensions/read-log-entry (:log env) position)
-        new-replica (extensions/apply-log-entry entry replica)]
-    (if (and (= (count (:b (get (:allocations new-replica) j1))) 40)
-             (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
-      new-replica
-      (recur new-replica))))
+(def replica-2
+  (loop [replica replica]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (and (= (count (:b (get (:allocations new-replica) j1))) 40)
+               (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
+        new-replica
+        (recur new-replica)))))
 
 (fact "All peers were reallocated to job 1, task B" true => true)
+
+(def entry (create-log-entry :complete-task {:job j1 :task :b}))
+
+(extensions/write-log-entry (:log env) entry)
+
+(def replica-3
+  (loop [replica replica-2]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (= (count (:c (get (:allocations new-replica) j2))) 40)
+        new-replica
+        (recur new-replica)))))
+
+(fact "All peers were reallocated to job 2, task C" true => true)
+
+(def entry (create-log-entry :complete-task {:job j2 :task :c}))
+
+(extensions/write-log-entry (:log env) entry)
+
+(def replica-4
+  (loop [replica replica-3]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (= (count (:d (get (:allocations new-replica) j2))) 40)
+        new-replica
+        (recur new-replica)))))
+
+(fact "All peers were reallocated to job 2, task D" true => true)
+
+(def entry (create-log-entry :complete-task {:job j2 :task :d}))
+
+(extensions/write-log-entry (:log env) entry)
+
+(def replica-5
+  (loop [replica replica-4]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (zero? (apply + (map count (vals (get (:allocations new-replica) j2)))))
+        new-replica
+        (recur new-replica)))))
+
+(fact "No peers are executing any tasks" true => true)
 
 (doseq [v-peer v-peers]
   (try
