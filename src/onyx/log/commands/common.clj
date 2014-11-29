@@ -3,14 +3,15 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]]))
 
-(defn balance-workload [jobs p]
+(defn balance-workload [replica jobs p]
   (let [j (count jobs)
         min-peers (int (/ p j))
         n (rem p j)
         max-peers (inc min-peers)]
     (map-indexed
      (fn [i job]
-       [job (if (< i n) max-peers min-peers)])
+       (let [sat (get-in replica [:saturation job] Double/POSITIVE_INFINITY)]
+         [job (min sat (if (< i n) max-peers min-peers))]))
      jobs)))
 
 (defn unbounded-jobs [replica balanced]
@@ -31,11 +32,11 @@
    balanced))
 
 (defn balance-jobs [replica]
-  (let [balanced (balance-workload (:jobs replica) (count (:peers replica)))
+  (let [balanced (balance-workload replica (:jobs replica) (count (:peers replica)))
         overflow (peer-overflow replica balanced)
         unbounded (unbounded-jobs replica balanced)]
     (merge-with
-     (into {} (balance-workload (map first unbounded) overflow))
+     (into {} (balance-workload replica (map first unbounded) overflow))
      (into {} balanced)
      (second (diff (into {} unbounded) (into {} balanced))))))
 
