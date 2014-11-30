@@ -4,41 +4,46 @@
             [taoensso.timbre :refer [info]]))
 
 (defn balance-workload [replica jobs p]
-  (let [j (count jobs)
-        min-peers (int (/ p j))
-        n (rem p j)
-        max-peers (inc min-peers)]
-    (map-indexed
-     (fn [i job]
-       (let [sat (get-in replica [:saturation job] Double/POSITIVE_INFINITY)]
-         [job (min sat (if (< i n) max-peers min-peers))]))
-     jobs)))
+  (if (seq jobs)
+    (let [j (count jobs)
+          min-peers (int (/ p j))
+          n (rem p j)
+          max-peers (inc min-peers)]
+      (map-indexed
+       (fn [i job]
+         [job (if (< i n) max-peers min-peers)])
+       jobs))
+    []))
 
 (defn unbounded-jobs [replica balanced]
   (filter
-   (fn [[job n]]
-     (> (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))
+   (fn [[job _]]
+     (= (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
+        Double/POSITIVE_INFINITY))
    balanced))
 
-(defn peer-overflow [replica balanced]
+(defn adjust-with-overflow [replica balanced]
   (reduce
-   (fn [sum [job n]]
+   (fn [result [job n]]
      (let [sat (or (get-in replica [:saturation job] Double/POSITIVE_INFINITY))
-           overflow (- n sat)]
-       (if (pos? overflow)
-         (+ sum overflow)
-         sum)))
-   0
+           extra (- n sat)]
+       (if (pos? extra)
+         (-> result
+             (update-in [:overflow] + extra)
+             (update-in [:jobs] conj [job sat]))
+         (-> result
+             (update-in [:jobs] conj [job n])))))
+   {:overflow 0 :jobs []}
    balanced))
 
 (defn balance-jobs [replica]
   (let [balanced (balance-workload replica (:jobs replica) (count (:peers replica)))
-        overflow (peer-overflow replica balanced)
-        unbounded (unbounded-jobs replica balanced)]
+        {:keys [overflow jobs]} (adjust-with-overflow replica balanced)
+        unbounded (unbounded-jobs replica jobs)]
     (merge-with
+     +
      (into {} (balance-workload replica (map first unbounded) overflow))
-     (into {} balanced)
-     (second (diff (into {} unbounded) (into {} balanced))))))
+     (into {} jobs))))
 
 (defn job->peers [replica]
   (reduce-kv
