@@ -37,13 +37,14 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 |`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
 |`:onyx/consumption`   | `keyword`  | `:sequential`, `:concurrent`     |
 |`:onyx/batch-size`    | `integer`  | `>= 0`                           |
-|`:onyx/batch-timeout` | `integer`  | `>= 0`                           | 1000
 
 #### All maps may optionally have these keys
 
-| key name          | type       | choices
-|-------------------|------------|----------
-|`:onyx/ident`      | `keyword`  | `any`
+| key name             | type       | choices   | default
+|----------------------|------------|---------------------
+|`:onyx/ident`         | `keyword`  | `any`     |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`    | 1000
+|`:onyx/max-peers`     | `integer`  | `> 0`     |
 
 #### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 

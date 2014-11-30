@@ -1,12 +1,16 @@
 #### 0.5.0-SNAPSHOT
 
-- Transducer support for Functions.
+- Transducer support for Functions. (Mike's note: need to cherry-pick this commit back into 0.5.x branch)
+- The Coordinator has been abolished. Onyx is now a fully masterless system. The environment now only requires Zookeeper and a shared Onyx ID across cluster members.
+- Job schedulers are now available to control peer allocation across different jobs. Supports `:onyx.job-scheduler/greedy` and `:onyx.job-scheduler/round-robin`.
+- Task schedulers are now available to control peer allocation across tasks within a particular job. Supports `:onyx.task-scheduler/greedy` and `:onyx.task-scheduler/round-robin`.
+- `:onyx/max-peers` may optionally be specified on any catalog entry to bound the number of peers executing a particular task. Only applicable under a Round Robin Job Scheduler
 
 #### 0.4.1
 
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
-- Peer options available in pipeline event map under key `:onyx.core/peer-opts`.
+- Peer options available in pipeline event map under key `:onyx.core/peer-opts`
 
 #### 0.4.0
 

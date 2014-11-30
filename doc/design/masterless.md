@@ -252,6 +252,10 @@ When a task is complete, this scheduler moves all peers executing that task and 
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is assigned the next task in the round robin sequence.
 
+**Max Peer Parameter**
+
+With the Round Robin Task Scheduler, each entry in the catalog can specify a key of `:onyx/max-peers` with an integer value > 0. When this key is set, Onyx will never assign that task more than that number of peers. Round Robin will simply skip the task for allocation when more peers are available, and continue assigning round robin to other tasks.
+
 #### Partial Coverage Protection
 
 Onyx is a batch and streaming hybrid data processing framework. Sometimes, you want Onyx to behave quite differently depending on whether your workload is batch or streaming oriented. In this section, we introduce the concept of Partial Coverage Protection.
