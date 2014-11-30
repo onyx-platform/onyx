@@ -61,12 +61,17 @@
 
 (zk/close conn)
 
-#_(def replica-2
+(def replica-2
   (loop [replica replica-1]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (recur new-replica))))
+      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 3)
+                   (= (count (:b (get (:allocations new-replica) j1))) 3)
+                   (= (count (:c (get (:allocations new-replica) j2))) 3)
+                   (= (count (:d (get (:allocations new-replica) j2))) 2))
+        (recur new-replica)
+        new-replica))))
 
 (doseq [v-peer v-peers]
   (try
