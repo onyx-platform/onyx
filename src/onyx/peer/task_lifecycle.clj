@@ -255,19 +255,11 @@
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
                          :onyx.core/catalog catalog
+                         :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
                          :onyx.core/task-map (find-task catalog task)
                          :onyx.core/serialized-task (:task payload)
                          :onyx.core/ingress-queues ingress-queues
                          :onyx.core/egress-queues (:task/egress-queues (:task payload))
-                         :onyx.core/peer-node (:node/peer (:nodes payload))
-                         :onyx.core/status-node (:node/status (:nodes payload))
-                         :onyx.core/exhaust-node (:node/exhaust (:nodes payload))
-                         :onyx.core/seal-node (:node/seal (:nodes payload))
-                         :onyx.core/completion-node (:node/completion (:nodes payload))
-                         :onyx.core/cooldown-node (:node/cooldown (:nodes payload))
-                         :onyx.core/task-node (:node/task (:nodes payload))
-                         :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
-                         :onyx.core/peer-version (extensions/version sync (:node/peer (:nodes payload)))
                          :onyx.core/payload-ch payload-ch
                          :onyx.core/complete-ch complete-ch
                          :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])

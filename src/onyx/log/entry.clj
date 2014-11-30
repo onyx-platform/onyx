@@ -6,6 +6,7 @@
             [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
             [onyx.log.commands.volunteer-for-task]
+            [onyx.log.commands.update-peer-state]
             [onyx.log.commands.complete-task]))
 
 (defn create-log-entry [kw args]
