@@ -59,3 +59,13 @@
    :job-scheduler :onyx.job-scheduler/round-robin})
  => {:j1 2 :j2 1})
 
+(fact
+ (common/balance-jobs
+  {:peers [:a :b :c :d :e :f :g :h]
+   :jobs [:j1 :j2]
+   :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
+   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
+                     :j2 :onyx.task-scheduler/round-robin}
+   :job-scheduler :onyx.job-scheduler/round-robin})
+ => {:j1 4 :j2 4})
+

@@ -61,12 +61,11 @@
 
 (zk/close conn)
 
-(def replica-2
+#_(def replica-2
   (loop [replica replica-1]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (clojure.pprint/pprint new-replica)
       (recur new-replica))))
 
 (doseq [v-peer v-peers]

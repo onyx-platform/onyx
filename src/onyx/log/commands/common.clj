@@ -1,7 +1,6 @@
 (ns onyx.log.commands.common
   (:require [clojure.data :refer [diff]]
-            [onyx.extensions :as extensions]
-            [taoensso.timbre :refer [info]]))
+            [onyx.extensions :as extensions]))
 
 (defn balance-workload [replica jobs p]
   (if (seq jobs)
