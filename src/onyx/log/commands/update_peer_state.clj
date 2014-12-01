@@ -4,7 +4,7 @@
 (defmethod extensions/apply-log-entry :update-peer-state
   [{:keys [args]} replica]
   (-> replica
-      (update-in [:peer-state (:job args) (:peer args)] (:state args))))
+      (assoc-in [:peer-state (:peer args)] (:state args))))
 
 (defmethod extensions/replica-diff :update-peer-state
   [{:keys [args]} old new]

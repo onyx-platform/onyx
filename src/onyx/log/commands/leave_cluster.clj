@@ -22,6 +22,7 @@
         (update-in [:pairs] merge pair)
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
+        (update-in [:peer-state] dissoc id)
         (common/remove-peers args))))
 
 (defmethod extensions/replica-diff :leave-cluster

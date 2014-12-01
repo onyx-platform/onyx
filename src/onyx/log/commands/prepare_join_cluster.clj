@@ -23,7 +23,8 @@
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
-          (update-in [:peers] vec)))))
+          (update-in [:peers] vec)
+          (assoc-in [:peer-state (:joiner args)] :idle)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
