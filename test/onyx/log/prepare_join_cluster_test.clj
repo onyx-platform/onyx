@@ -49,7 +49,7 @@
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact new-replica => {:peers [:d]})
+  (fact new-replica => {:peers [:d] :peer-state {:d :idle}})
   (fact diff => {:instant-join :d})
   (fact reactions => nil))
 

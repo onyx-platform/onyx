@@ -113,6 +113,14 @@
        (count (get-in replica [:tasks %])))
    (:jobs replica)))
 
+(defn task-status [replica job task]
+  (let [peers (get-in replica [:allocations job task])]
+    (reduce-kv
+     (fn [all k v]
+       (assoc all v (+ (get all v 0) 1)))
+     {}
+     (select-keys (:peer-states replica) peers))))
+
 (defmulti drop-peers
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
