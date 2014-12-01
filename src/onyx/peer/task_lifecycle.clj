@@ -3,7 +3,7 @@
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn] :as timbre]
-              [onyx.coordinator.planning :refer [find-task]]
+              [onyx.log.commands.common :as common]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
@@ -12,6 +12,13 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
+
+(defn seal-task? [replica job task id]
+  (let [n-peers (count (get-in replica [:allocations job task]))
+        status (common/task-status replica job task)]
+    (and (>= (:waiting status) (dec n))
+         (zero? (:sealing status))
+         (= (get-in replica [:peer-states id]) :active))))
 
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
