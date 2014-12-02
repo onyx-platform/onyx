@@ -2,7 +2,9 @@
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.extensions :as extensions]
             [taoensso.timbre]))
 
@@ -75,12 +77,20 @@
 
 (defmethod extensions/replica-diff :volunteer-for-task
   [{:keys [args]} old new]
-  {:job (:id args)})
+  (let [allocation (second (diff (:allocations old) (:allocations new)))]
+    {:job (first (keys allocation))
+     :task (first (keys (get allocation (first (keys allocation)))))}))
 
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args])
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task
-  [entry old new diff state]
-  state)
+  [{:keys [args]} old new diff state]
+  (if (and (= (:id args) (:id state)) (:job diff) (:task diff)
+           (or (not= (:job state) (:job diff))
+               (not= (:task state) (:task diff))))
+    (do (component/stop (:lifecycle state))
+        (let [new-lifecycle (component/start (task-lifecycle))]
+          (assoc state :job (:job diff) :task (:task diff) :lifecycle new-lifecycle)))
+    state))
 

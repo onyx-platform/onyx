@@ -92,5 +92,6 @@
          :tasks {:j1 [:t1 :t2 :t3]}
          :allocations {:j1 {:t1 [:y] :t2 [:x]}}
          :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
-         :peers [:x :y]}))
+         :peers [:x :y]})
+  (extensions/replica-diff entry old-replica new-replica))
 
