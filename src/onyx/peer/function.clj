@@ -4,7 +4,7 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [take-segments]]
-              [onyx.coordinator.planning :refer [find-task]]
+              [onyx.planning :refer [find-task]]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [taoensso.timbre :refer [debug]]

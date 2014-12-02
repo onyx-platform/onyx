@@ -1,6 +1,6 @@
 (ns onyx.plugin.hornetq
   (:require [clojure.data.fressian :as fressian]
-            [onyx.coordinator.planning :as planning]
+            [onyx.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]

@@ -7,6 +7,7 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.queue.hornetq :refer [hornetq]]
+              [onyx.planning :refer [find-task]]
               [onyx.peer.function :as function]
               [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
@@ -16,19 +17,12 @@
 (defn seal-task? [replica job task id]
   (let [n-peers (count (get-in replica [:allocations job task]))
         status (common/task-status replica job task)]
-    (and (>= (:waiting status) (dec n))
+    (and (>= (:waiting status) (dec n-peers))
          (zero? (:sealing status))
          (= (get-in replica [:peer-states id]) :active))))
 
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
-
-(defn new-payload [sync peer-node payload-ch]
-  (let [peer-contents (extensions/read-node sync peer-node)
-        node (:node (extensions/create sync :payload))
-        updated-contents (assoc peer-contents :payload-node node)]
-    (extensions/write-node sync peer-node updated-contents)
-    node))
 
 (defn munge-inject-temporal [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
@@ -38,10 +32,8 @@
         (merge event rets cycle-params {:onyx.core/session session}))
       (merge event cycle-params rets))))
 
-(defn munge-read-batch [{:keys [onyx.core/sync onyx.core/status-node] :as event}]
-  (let [commit? (extensions/node-exists? sync status-node)
-        event (assoc event :onyx.core/commit? commit?)]
-    (merge event (p-ext/read-batch event))))
+(defn munge-read-batch [event]
+  (merge event (p-ext/read-batch (assoc event :onyx.core/commit? true))))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
@@ -84,43 +76,16 @@
   (assoc event :onyx.core/closed? true))
 
 (defn munge-new-payload
-  [{:keys [onyx.core/sync onyx.core/peer-node
-           onyx.core/peer-version onyx.core/payload-ch] :as event}]
-  (if (= (extensions/version sync peer-node) peer-version)
-    (let [node (new-payload sync peer-node payload-ch)]
-      (extensions/on-change sync node #(>!! payload-ch %))
-      (assoc event :onyx.core/new-payload-node node))
-    event))
+  [{:keys [onyx.core/payload-ch] :as event}]
+  event)
 
 (defn munge-seal-resource
-  [{:keys [onyx.core/sync onyx.core/exhaust-node onyx.core/seal-node
-           onyx.core/pipeline-state] :as event}]
-  (let [state @pipeline-state]
-    (if (:tried-to-seal? state)
-      (merge event {:onyx.core/sealed? false})
-      (let [seal-response-ch (chan)]
-        (extensions/on-change sync seal-node #(>!! seal-response-ch %))
-        (extensions/touch-node sync exhaust-node)
-        (let [response (<!! seal-response-ch)]
-          (let [path (:path response)
-                {:keys [seal?]} (extensions/read-node sync path)]
-            (swap! pipeline-state assoc :tried-to-seal? true)
-            (if seal?
-              (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
-              (merge event {:onyx.core/sealed? true}))))))))
+  [{:keys [onyx.core/pipeline-state] :as event}]
+  event)
 
 (defn munge-complete-task
-  [{:keys [onyx.core/sync onyx.core/completion-node
-           onyx.core/cooldown-node onyx.core/pipeline-state onyx.core/sealed?]
-    :as event}]
-  (let [state @pipeline-state]
-    (let [complete-response-ch (chan)]
-      (extensions/on-change sync cooldown-node #(>!! complete-response-ch %))
-      (extensions/touch-node sync completion-node)
-      (let [response (<!! complete-response-ch)]
-        (let [path (:path response)
-              result (extensions/read-node sync path)]
-          (merge event {:onyx.core/complete-success? true}))))))
+  [{:keys [onyx.core/pipeline-state onyx.core/sealed?] :as event}]
+  event)
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -219,7 +184,7 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id payload sync queue payload-ch complete-ch err-ch opts]
+(defrecord TaskLifeCycle [id payload log queue payload-ch complete-ch err-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -256,13 +221,13 @@
           complete-task-dead-ch (chan)
 
           task (:task/name (:task payload))
-          catalog (extensions/read-node sync (:node/catalog (:nodes payload)))
+          catalog (extensions/read-chunk log :catalog (:job-id payload))
           ingress-queues (:task/ingress-queues (:task payload))
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
                          :onyx.core/catalog catalog
-                         :onyx.core/workflow (extensions/read-node sync (:node/workflow (:nodes payload)))
+                         :onyx.core/workflow (extensions/read-chunk log :workflow (:job-id payload))
                          :onyx.core/task-map (find-task catalog task)
                          :onyx.core/serialized-task (:task payload)
                          :onyx.core/ingress-queues ingress-queues
@@ -272,7 +237,7 @@
                          :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
-                         :onyx.core/sync sync
+                         :onyx.core/log log
                          :onyx.core/peer-opts opts
                          :onyx.core/pipeline-state (atom {})}
 
@@ -534,9 +499,8 @@
 
     component))
 
-(defn task-lifecycle [id payload sync queue payload-ch complete-ch err-ch opts]
-  (map->TaskLifeCycle {:id id :payload payload :sync sync
-                       :queue queue :payload-ch payload-ch
+(defn task-lifecycle [id payload log queue payload-ch complete-ch err-ch opts]
+  (map->TaskLifeCycle {:id id :payload payload :log log :queue queue :payload-ch payload-ch
                        :complete-ch complete-ch :err-ch err-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle

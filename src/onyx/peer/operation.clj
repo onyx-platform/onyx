@@ -1,6 +1,5 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
-            [onyx.coordinator.impl :as impl]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-fn [f params segment]
@@ -14,11 +13,11 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn sentinel-node [task-node input]
-  (str task-node (impl/tag-sentinel-node input)))
+(defn sentinel-node [task-node input])
 
 (defn vote-for-sentinel-leader [sync task-node input uuid]
-  (extensions/create-node sync (sentinel-node task-node input) {:uuid uuid}))
+  ;;(extensions/create-node sync (sentinel-node task-node input) {:uuid uuid})
+  )
 
 (defn filter-sentinels [decompressed]
   (remove (partial = :done) decompressed))
@@ -50,7 +49,8 @@
           (if-not (get-in state [:learned-sentinel input])
             (do (vote-for-sentinel-leader sync task-node input uuid)
                 (let [node (sentinel-node task-node input)
-                      learned (:uuid (extensions/read-node sync node))
+                      learned (:uuid ;;(extensions/read-node sync node)
+                               )
                       successor
                       (swap! pipeline-state
                              (fn [v]
