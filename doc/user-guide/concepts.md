@@ -147,7 +147,7 @@ A segment is the smallest unit of data in Onyx. Segments are required to be Cloj
 
 #### Function
 
-A function is a construct that receives segments and emits segments for further processing. It literally translate down to a Clojure function.
+A function is a construct that receives segments and emits segments for further processing. It literally translates down to a Clojure function.
 
 #### Plugin
 
@@ -159,7 +159,7 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Coordinator
 
-The Coordinator is single node in the cluster responsible for doing distributed coordination. This node can be made highly available through traditional heart beat techniques as Datomic's transactor does.
+The Coordinator a is single node in the cluster responsible for doing distributed coordination. This node can be made highly available through traditional heart beat techniques as Datomic's transactor does.
 
 #### Peer
 
