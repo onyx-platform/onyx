@@ -496,7 +496,7 @@
 
     component))
 
-(defn task-lifecycle [id log queue job task err-ch opts]
+(defn task-lifecycle [args {:keys [id log queue job task err-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job job
                        :task task :err-ch err-ch :opts opts}))
 
