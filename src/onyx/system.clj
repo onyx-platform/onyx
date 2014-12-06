@@ -2,11 +2,12 @@
   (:require [com.stuartsierra.component :as component]
             [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
+            [onyx.queue.hornetq :refer [hornetq]]
             [onyx.log.zookeeper :refer [zookeeper]]))
 
-(def development-components [:logging-config :log])
+(def development-components [:logging-config :log :queue])
 
-(def peer-components [:logging-config :log :virtual-peer])
+(def peer-components [:logging-config :log :queue :virtual-peer])
 
 (defn rethrow-component [f]
   (try
@@ -34,15 +35,17 @@
      #(component/stop-system this peer-components))))
 
 (defn onyx-development-env
-  [id config]
+  [onyx-id config]
   (map->OnyxDevelopmentEnv
-   {:logging-config (logging-config/logging-configuration id (:logging config))
-    :log (component/using (zookeeper id (:zookeeper config)) [:logging-config])}))
+   {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
+    :log (component/using (zookeeper onyx-id (:zookeeper config)) [:logging-config])
+    :queue (component/using (hornetq onyx-id (:hornetq config)) [:log])}))
 
 (defn onyx-peer
   [onyx-id config opts]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
     :log (component/using (zookeeper onyx-id (:zookeeper config)) [:logging-config])
+    :queue (component/using (hornetq onyx-id (:hornetq config)) [:log])
     :virtual-peer (component/using (virtual-peer opts) [:log])}))
 
