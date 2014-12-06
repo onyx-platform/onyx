@@ -4,6 +4,7 @@
             [onyx.system :refer [onyx-development-env]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
+            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -19,20 +20,57 @@
 (def peer-opts
   {:inbox-capacity 1000
    :outbox-capacity 1000
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :job-scheduler :onyx.job-scheduler/round-robin
+   :state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
 (def n-peers 10)
 
 (def v-peers (onyx.api/start-peers! onyx-id n-peers (:peer config) peer-opts))
 
+(def catalog-1
+  [{:onyx/name :a
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :b
+    :onyx/fn :onyx.peer.single-peer-test/my-inc
+    :onyx/type :function
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :c
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}])
+
+(def catalog-2
+  [{:onyx/name :d
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :e
+    :onyx/fn :onyx.peer.single-peer-test/my-inc
+    :onyx/type :function
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :f
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}])
+
 (onyx.api/submit-job (:log env)
                      {:workflow [[:a :b] [:b :c]]
-                      :catalog []
+                      :catalog catalog-1
                       :task-scheduler :onyx.task-scheduler/greedy})
 
 (onyx.api/submit-job (:log env)
                      {:workflow [[:d :e] [:e :f]]
-                      :catalog []
+                      :catalog catalog-2
                       :task-scheduler :onyx.task-scheduler/greedy})
 
 (def ch (chan n-peers))
