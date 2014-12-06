@@ -20,7 +20,7 @@
 
 (defn saturation [catalog]
   (let [rets
-        (reduce #(+ %1 (or (:onyx/max-peers %1)
+        (reduce #(+ %1 (or (:onyx/max-peers %2)
                            Double/POSITIVE_INFINITY))
                 0
                 catalog)]

@@ -136,7 +136,7 @@
 
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw chunk id]
-  (let [node (str (task-path prefix) "/" id "/" (:id chunk))
+  (let [node (str (task-path prefix) "/" (:id chunk))
         bytes (serialize-fressian chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 

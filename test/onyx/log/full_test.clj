@@ -18,7 +18,8 @@
 
 (def peer-opts
   {:inbox-capacity 1000
-   :outbox-capacity 1000})
+   :outbox-capacity 1000
+   :lifecycle-impl :stub})
 
 (def n-peers 50)
 

@@ -89,8 +89,9 @@
   (if (and (= (:id args) (:id state)) (:job diff) (:task diff)
            (or (not= (:job state) (:job diff))
                (not= (:task state) (:task diff))))
-    (do (component/stop (:lifecycle state))
-        (let [new-lifecycle (component/start (task-lifecycle))]
+    (do (when (:lifecycle state)
+          (component/stop (:lifecycle state)))
+        (let [new-lifecycle (component/start ((:task-lifecycle-fn state) diff state))]
           (assoc state :job (:job diff) :task (:task diff) :lifecycle new-lifecycle)))
     state))
 

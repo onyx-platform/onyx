@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.log.entry :refer [create-log-entry]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
@@ -19,7 +20,9 @@
 (defn processing-loop [id log inbox-ch outbox-ch kill-ch opts]
   (try
     (loop [replica {:job-scheduler (:job-scheduler opts)}
-           state {:id id :log log :outbox-ch outbox-ch :stall-output? true}]
+           state (merge {:id id :log log :outbox-ch outbox-ch :stall-output? true
+                         :task-lifecycle-fn task-lifecycle}
+                        (:state opts))]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
         (when position
           (let [entry (extensions/read-log-entry log position)
