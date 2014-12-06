@@ -4,6 +4,7 @@
             [onyx.system :refer [onyx-development-env]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
+            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -19,18 +20,45 @@
 (def peer-opts
   {:inbox-capacity 1000
    :outbox-capacity 1000
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :job-scheduler :onyx.job-scheduler/round-robin
+   :state {:task-lifecycle-fn util/stub-task-lifecycle}})
+
+(def catalog-1
+  [{:onyx/name :a
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :b
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}])
+
+(def catalog-2
+  [{:onyx/name :c
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}
+
+   {:onyx/name :d
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent}])
 
 (def j1
   (onyx.api/submit-job (:log env)
                        {:workflow [[:a :b]]
-                        :catalog []
+                        :catalog catalog-1
                         :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
   (onyx.api/submit-job (:log env)
                        {:workflow [[:c :d]]
-                        :catalog []
+                        :catalog catalog-2
                         :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def n-peers 12)
@@ -53,6 +81,8 @@
         (recur new-replica)
         new-replica))))
 
+(fact "the peers evenly balance" true => true)
+
 (def conn (zk/connect (:zookeeper/address (:zookeeper (:env config)))))
 
 (def id (last (:b (get (:allocations replica-1) j1))))
@@ -72,6 +102,8 @@
                    (= (count (:d (get (:allocations new-replica) j2))) 2))
         (recur new-replica)
         new-replica))))
+
+(fact "the peers rebalance" true => true)
 
 (doseq [v-peer v-peers]
   (try
