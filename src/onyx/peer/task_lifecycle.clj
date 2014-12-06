@@ -184,7 +184,7 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id log queue job task opts]
+(defrecord TaskLifeCycle [id log queue job task err-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -221,18 +221,17 @@
           complete-task-dead-ch (chan)
 
           catalog (extensions/read-chunk log :catalog job)
-          ingress-queues (:task/ingress-queues (:task payload))
+          task (extensions/read-chunk log :task task)
+          ingress-queues (:task/ingress-queues task)
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
                          :onyx.core/catalog catalog
-                         :onyx.core/workflow (extensions/read-chunk log :workflow (:job-id payload))
+                         :onyx.core/workflow (extensions/read-chunk log :workflow job)
                          :onyx.core/task-map (find-task catalog task)
-                         :onyx.core/serialized-task (:task payload)
+                         :onyx.core/serialized-task task
                          :onyx.core/ingress-queues ingress-queues
-                         :onyx.core/egress-queues (:task/egress-queues (:task payload))
-                         :onyx.core/payload-ch payload-ch
-                         :onyx.core/complete-ch complete-ch
+                         :onyx.core/egress-queues (:task/egress-queues task)
                          :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
@@ -435,7 +434,7 @@
         :pipeline-data pipeline-data)))
 
   (stop [component]
-    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:task/name (:task payload))))
+    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:task/name task)))
 
     (close! (:open-session-kill-ch component))
     (<!! (:open-session-dead-ch component))
@@ -498,9 +497,9 @@
 
     component))
 
-(defn task-lifecycle [id log queue job task opts]
+(defn task-lifecycle [id log queue job task err-ch opts]
   (map->TaskLifeCycle {:id id :log log :queue queue :job job
-                       :task task :opts opts}))
+                       :task task :err-ch err-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
