@@ -8,7 +8,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [onyx.validation :as validator]))
+            [onyx.validation :as validator]
+            [onyx.planning :as planning]))
 
 (defn topological-sort [workflow]
   (dep/topo-sort
@@ -29,13 +30,18 @@
 
 (defn submit-job [log job]
   (let [id (java.util.UUID/randomUUID)
-        tasks (topological-sort (:workflow job))
+        tasks (planning/discovery-tasks (:catalog job) (:workflow job))
+        sorted-tasks (topological-sort (:workflow job))
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
-        args {:id id :tasks tasks :task-scheduler scheduler :saturation sat}
+        args {:id id :tasks sorted-tasks :task-scheduler scheduler :saturation sat}
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk log :catalog (:catalog job) id)
     (extensions/write-chunk log :workflow (:workflow job) id)
+
+    (doseq [task tasks]
+      (extensions/write-chunk log :task task id))
+
     (extensions/write-log-entry log entry)
     id))
 

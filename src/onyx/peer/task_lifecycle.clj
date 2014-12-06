@@ -184,11 +184,11 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id payload log queue payload-ch complete-ch err-ch opts]
+(defrecord TaskLifeCycle [id log queue job task opts]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:task/name (:task payload))))
+    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id task))
 
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
@@ -220,8 +220,7 @@
           seal-dead-ch (chan)
           complete-task-dead-ch (chan)
 
-          task (:task/name (:task payload))
-          catalog (extensions/read-chunk log :catalog (:job-id payload))
+          catalog (extensions/read-chunk log :catalog job)
           ingress-queues (:task/ingress-queues (:task payload))
 
           pipeline-data {:onyx.core/id id
@@ -499,9 +498,9 @@
 
     component))
 
-(defn task-lifecycle [id payload log queue payload-ch complete-ch err-ch opts]
-  (map->TaskLifeCycle {:id id :payload payload :log log :queue queue :payload-ch payload-ch
-                       :complete-ch complete-ch :err-ch err-ch :opts opts}))
+(defn task-lifecycle [id log queue job task opts]
+  (map->TaskLifeCycle {:id id :log log :queue queue :job job
+                       :task task :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]

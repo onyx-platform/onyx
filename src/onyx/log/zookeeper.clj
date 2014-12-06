@@ -24,6 +24,9 @@
 (defn workflow-path [prefix]
   (str (prefix-path prefix) "/workflow"))
 
+(defn task-path [prefix]
+  (str (prefix-path prefix) "/task"))
+
 (defrecord ZooKeeper [onyx-id config]
   component/Lifecycle
 
@@ -37,6 +40,7 @@
       (zk/create conn (log-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
+      (zk/create conn (task-path onyx-id) :persistent? true)
 
       (assoc component :server server :conn conn :prefix onyx-id)))
 
@@ -127,6 +131,12 @@
 (defmethod extensions/write-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (workflow-path prefix) "/" id)
+        bytes (serialize-fressian chunk)]
+    (zk/create conn node :persistent? true :data bytes)))
+
+(defmethod extensions/write-chunk [ZooKeeper :task]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (let [node (str (task-path prefix) "/" id "/" (:id chunk))
         bytes (serialize-fressian chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
