@@ -222,7 +222,6 @@
 
           catalog (extensions/read-chunk log :catalog job)
           task (extensions/read-chunk log :task task)
-          ingress-queues (:task/ingress-queues task)
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/task task
@@ -230,7 +229,7 @@
                          :onyx.core/workflow (extensions/read-chunk log :workflow job)
                          :onyx.core/task-map (find-task catalog task)
                          :onyx.core/serialized-task task
-                         :onyx.core/ingress-queues ingress-queues
+                         :onyx.core/ingress-queues (:task/ingress-queues task)
                          :onyx.core/egress-queues (:task/egress-queues task)
                          :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)

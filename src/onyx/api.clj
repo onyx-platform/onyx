@@ -30,7 +30,7 @@
 
 (defn submit-job [log job]
   (let [id (java.util.UUID/randomUUID)
-        tasks (planning/discovery-tasks (:catalog job) (:workflow job))
+        tasks (planning/discover-tasks (:catalog job) (:workflow job))
         sorted-tasks (topological-sort (:workflow job))
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
