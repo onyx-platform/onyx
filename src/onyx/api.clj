@@ -68,12 +68,12 @@
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
    by invoking the fn returned by :shutdown-fn."
-  [onyx-id n config opts]
+  [onyx-id n config]
   (doall
    (map
     (fn [_]
       (let [stop-ch (chan (clojure.core.async/sliding-buffer 1))
-            v-peer (system/onyx-peer onyx-id config opts)]
+            v-peer (system/onyx-peer onyx-id config)]
         {:runner (future
                    (let [live (component/start v-peer)]
                      (let [ack-ch (<!! stop-ch)]
