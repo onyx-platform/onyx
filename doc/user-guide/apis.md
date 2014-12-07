@@ -57,7 +57,7 @@ Given a job ID, blocks the calling thread until the job is complete.
 
 ##### `shutdown`
 
-Spins down a connection to a Coordinator.
+Shts down a connection to a Coordinator.
 
 ### Task Lifecycle API
 
@@ -86,7 +86,7 @@ Hook for closing out any stateful data injected into the pipeline. Called once a
 
 ##### `close-lifecycle-resources`
 
-Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called whether or not the task succeeded or failed for some reason.
+Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called regardless of the task execution status.
 
 ### Peer Pipeline API
 

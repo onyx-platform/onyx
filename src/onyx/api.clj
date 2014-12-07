@@ -169,4 +169,3 @@
 
 (defn stop-distributed-coordinator [coordinator]
   (component/stop coordinator))
-
