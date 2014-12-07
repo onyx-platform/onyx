@@ -29,12 +29,18 @@
    :onyx/id onyx-id
    :onyx.coordinator/revoke-delay 5000})
 
-(def dev (onyx-development-env onyx-id env-config))
+(def dev (onyx-development-env env-config))
 
 (def env (component/start dev))
 
 (def peer-config
-  {:zookeeper/address (:address (:zookeeper config))
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
    :onyx/id onyx-id
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
@@ -42,7 +48,7 @@
 
 (def n-peers 50)
 
-(def v-peers (onyx.api/start-peers! onyx-id n-peers peer-config))
+(def v-peers (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 

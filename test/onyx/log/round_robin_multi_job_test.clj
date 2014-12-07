@@ -43,7 +43,7 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env onyx-id env-config))
+(def dev (onyx-development-env env-config))
 
 (def env (component/start dev))
 
@@ -97,7 +97,7 @@
 
 (def n-peers 36)
 
-(def v-peers (onyx.api/start-peers! onyx-id n-peers peer-config))
+(def v-peers (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 
