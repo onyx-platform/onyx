@@ -13,15 +13,39 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def dev (onyx-development-env onyx-id (:env config)))
+(def env-config
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.server/type :embedded
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.coordinator/revoke-delay 5000})
+
+(def peer-config
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
+   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
+   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
+
+(def dev (onyx-development-env env-config))
 
 (def env (component/start dev))
-
-(def peer-opts
-  {:inbox-capacity 1000
-   :outbox-capacity 1000
-   :job-scheduler :onyx.job-scheduler/greedy
-   :state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
 (def catalog-1
   [{:onyx/name :a
@@ -63,14 +87,14 @@
 
 (def n-peers 40)
 
-(def v-peers (onyx.api/start-peers! onyx-id n-peers (:peer config) peer-opts))
+(def v-peers (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 
 (extensions/subscribe-to-log (:log env) 0 ch)
 
 (def replica
-  (loop [replica {:job-scheduler (:job-scheduler peer-opts)}]
+  (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
