@@ -4,6 +4,7 @@
             [onyx.system :refer [onyx-development-env]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
+            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]
@@ -16,15 +17,41 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def dev (onyx-development-env onyx-id (:env config)))
+(def env-config
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.server/type :embedded
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.coordinator/revoke-delay 5000})
+
+(def peer-config
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
+   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
+   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
+
+(def dev (onyx-development-env env-config))
 
 (def env (component/start dev))
 
 (def cluster (atom []))
-
-(def peer-opts
-  {:inbox-capacity 1000
-   :outbox-capacity 1000})
 
 (defn create-peer [executor t k]
   (mapcat
@@ -117,7 +144,7 @@
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
   (when (< (count @cluster) 30)
-    (let [peer (first (onyx.api/start-peers! onyx-id 1 (:peer config) peer-opts))]
+    (let [peer (first (onyx.api/start-peers! 1 peer-config))]
       (swap! cluster conj peer))))
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
@@ -146,7 +173,7 @@
 (sim/create-action-log sim-conn sine-cluster-sim)
 
 ;; Seed it with 20 peers since sine waves goes negative.
-(doseq [peer (onyx.api/start-peers! onyx-id 20 (:peer config) peer-opts)]
+(doseq [peer (onyx.api/start-peers! 20 peer-config)]
   (swap! cluster conj peer))
 
 (def pruns
@@ -158,7 +185,7 @@
 
 ;; We should finish with 15 peers. Take it to a global maximum
 ;; to have a reliable seek point in the log for verification.
-(doseq [peer (onyx.api/start-peers! onyx-id 30 (:peer config) peer-opts)]
+(doseq [peer (onyx.api/start-peers! 30 peer-config)]
   (swap! cluster conj peer))
 
 (def ch (chan 5))
