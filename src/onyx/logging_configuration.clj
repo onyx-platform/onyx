@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [info] :as timbre]
             [taoensso.timbre.appenders.rotor :as rotor]))
 
-(defrecord LoggingConfiguration [onyx-id file config]
+(defrecord LoggingConfiguration [file config]
   component/Lifecycle
 
   (start [component]
@@ -30,6 +30,6 @@
     (info "Stopping Logging Configuration")
     component))
 
-(defn logging-configuration [onyx-id {:keys [onyx.log/file onyx.log/config]}]
-  (map->LoggingConfiguration {:onyx-id onyx-id :file (or file "onyx.log") :config config}))
+(defn logging-configuration [{:keys [onyx.log/file onyx.log/config]}]
+  (map->LoggingConfiguration {:file (or file "onyx.log") :config config}))
 

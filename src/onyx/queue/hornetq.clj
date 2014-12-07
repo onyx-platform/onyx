@@ -113,7 +113,7 @@
        [(get params "host") (get params "port")]))
    (into [] (.getStaticTransportConfigurations locator))))
 
-(defrecord HornetQConnection [onyx-id opts]
+(defrecord HornetQConnection [opts]
   component/Lifecycle
 
   (start [component]
@@ -137,8 +137,8 @@
     
     component))
 
-(defn hornetq [onyx-id opts]
-  (map->HornetQConnection {:onyx-id onyx-id :opts opts}))
+(defn hornetq [opts]
+  (map->HornetQConnection {:opts opts}))
 
 (defmethod extensions/optimize-concurrently HornetQConnection
   [queue event]

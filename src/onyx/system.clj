@@ -36,17 +36,17 @@
      #(component/stop-system this peer-components))))
 
 (defn onyx-development-env
-  [onyx-id config]
+  [config]
   (map->OnyxDevelopmentEnv
-   {:logging-config (logging-config/logging-configuration onyx-id config)
-    :log (component/using (zookeeper onyx-id config) [:logging-config])
-    :queue (component/using (hornetq onyx-id config) [:log])}))
+   {:logging-config (logging-config/logging-configuration config)
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])}))
 
 (defn onyx-peer
-  [onyx-id config]
+  [config]
   (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration onyx-id (:logging config))
-    :log (component/using (zookeeper onyx-id config) [:logging-config])
-    :queue (component/using (hornetq onyx-id config) [:log])
+   {:logging-config (logging-config/logging-configuration (:logging config))
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])
     :virtual-peer (component/using (virtual-peer config) [:log])}))
 

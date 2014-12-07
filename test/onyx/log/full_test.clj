@@ -4,6 +4,7 @@
             [onyx.system :refer [onyx-development-env]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
+            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -12,17 +13,36 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def dev (onyx-development-env onyx-id (:env config)))
+(def env-config
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.server/type :embedded
+   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
+   :hornetq.udp/group-address (:group-address (:hornetq config))
+   :hornetq.udp/group-port (:group-port (:hornetq config))
+   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
+   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
+   :hornetq.embedded/config (:configs (:hornetq config))
+   :zookeeper/address (:address (:zookeeper config))
+   :zookeeper/server? true
+   :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.coordinator/revoke-delay 5000})
+
+(def dev (onyx-development-env onyx-id env-config))
 
 (def env (component/start dev))
 
-(def peer-opts
-  {:inbox-capacity 1000
-   :outbox-capacity 1000})
+(def peer-config
+  {:zookeeper/address (:address (:zookeeper config))
+   :onyx/id onyx-id
+   :onyx.peer/inbox-capacity 1000
+   :onyx.peer/outbox-capacity 1000
+   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
 (def n-peers 50)
 
-(def v-peers (onyx.api/start-peers! onyx-id n-peers (:peer config) peer-opts))
+(def v-peers (onyx.api/start-peers! onyx-id n-peers peer-config))
 
 (def ch (chan n-peers))
 

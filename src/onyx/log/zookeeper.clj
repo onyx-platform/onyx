@@ -27,12 +27,13 @@
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
-(defrecord ZooKeeper [onyx-id config]
+(defrecord ZooKeeper [config]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper")
-    (let [server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
+    (let [onyx-id (:onyx/id config)
+          server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
           conn (zk/connect (:zookeeper/address config))]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
@@ -53,8 +54,8 @@
 
     component))
 
-(defn zookeeper [onyx-id config]
-  (map->ZooKeeper {:onyx-id onyx-id :config config}))
+(defn zookeeper [config]
+  (map->ZooKeeper {:config config}))
 
 (defn serialize-fressian [x]
   (.array (fressian/write x)))
