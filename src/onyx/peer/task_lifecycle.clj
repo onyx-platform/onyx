@@ -75,10 +75,6 @@
     (extensions/close-resource queue session))
   (assoc event :onyx.core/closed? true))
 
-(defn munge-new-payload
-  [{:keys [onyx.core/payload-ch] :as event}]
-  event)
-
 (defn munge-seal-resource
   [{:keys [onyx.core/pipeline-state] :as event}]
   event)
@@ -159,10 +155,7 @@
 (defn reset-payload-node-loop [reset-ch seal-ch dead-ch]
   (loop []
     (when-let [event (<!! reset-ch)]
-      (if (and (:onyx.core/tail-batch? event) (:onyx.core/commit? event))
-        (let [event (munge-new-payload event)]
-          (>!! seal-ch event))
-        (>!! seal-ch event))
+      (>!! seal-ch event)
       (recur))))
 
 (defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
