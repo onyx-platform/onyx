@@ -141,3 +141,18 @@
         bytes (serialize-fressian chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
+(defmethod extensions/read-chunk [ZooKeeper :catalog]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (catalog-path prefix) "/" id)]
+    (deserialize-fressian (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :workflow]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (workflow-path prefix) "/" id)]
+    (deserialize-fressian (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :task]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (task-path prefix) "/" id)]
+    (deserialize-fressian (:data (zk/data conn node)))))
+

@@ -91,7 +91,8 @@
                (not= (:task state) (:task diff))))
     (do (when (:lifecycle state)
           (component/stop (:lifecycle state)))
-        (let [new-lifecycle (component/start ((:task-lifecycle-fn state) diff state))]
-          (assoc state :job (:job diff) :task (:task diff) :lifecycle new-lifecycle)))
+        (let [new-state (assoc state :job (:job diff) :task (:task diff))
+              new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
+          (assoc new-state :lifecycle new-lifecycle)))
     state))
 
