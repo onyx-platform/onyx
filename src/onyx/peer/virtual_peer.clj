@@ -17,11 +17,11 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log inbox-ch outbox-ch kill-ch opts]
+(defn processing-loop [id log queue inbox-ch outbox-ch kill-ch opts]
   (try
     (loop [replica {:job-scheduler (:onyx.peer/job-scheduler opts)}
-           state (merge {:id id :log log :outbox-ch outbox-ch :stall-output? true
-                         :task-lifecycle-fn task-lifecycle}
+           state (merge {:id id :log log :queue queue :outbox-ch outbox-ch
+                         :stall-output? true :task-lifecycle-fn task-lifecycle}
                         (:onyx.peer/state opts))]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
         (when position
@@ -48,7 +48,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log] :as component}]
+  (start [{:keys [log queue] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
@@ -62,7 +62,7 @@
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log inbox-ch outbox-ch kill-ch opts))
+        (thread (processing-loop id log queue inbox-ch outbox-ch kill-ch opts))
         (assoc component :id id :inbox-ch inbox-ch :outbox-ch outbox-ch :kill-ch kill-ch))))
 
   (stop [component]

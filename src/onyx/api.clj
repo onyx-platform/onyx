@@ -2,7 +2,6 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [com.stuartsierra.dependency :as dep]
             [clj-http.client :refer [post]]
             [taoensso.timbre :refer [warn]]
             [onyx.log.entry :refer [create-log-entry]]
@@ -10,13 +9,6 @@
             [onyx.extensions :as extensions]
             [onyx.validation :as validator]
             [onyx.planning :as planning]))
-
-(defn topological-sort [workflow]
-  (dep/topo-sort
-   (reduce (fn [all [to from]]
-             (dep/depend all from to))
-           (dep/graph)
-           workflow)))
 
 (defn saturation [catalog]
   (let [rets
@@ -31,10 +23,10 @@
 (defn submit-job [log job]
   (let [id (java.util.UUID/randomUUID)
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
-        sorted-tasks (topological-sort (:workflow job))
+        task-ids (map :id tasks)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
-        args {:id id :tasks sorted-tasks :task-scheduler scheduler :saturation sat}
+        args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk log :catalog (:catalog job) id)
     (extensions/write-chunk log :workflow (:workflow job) id)

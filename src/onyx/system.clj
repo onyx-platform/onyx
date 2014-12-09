@@ -48,5 +48,5 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :queue (component/using (hornetq config) [:log])
-    :virtual-peer (component/using (virtual-peer config) [:log])}))
+    :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 

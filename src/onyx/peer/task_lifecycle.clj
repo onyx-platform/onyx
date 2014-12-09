@@ -224,10 +224,10 @@
           task (extensions/read-chunk log :task task)
 
           pipeline-data {:onyx.core/id id
-                         :onyx.core/task task
+                         :onyx.core/task (:onyx/name task)
                          :onyx.core/catalog catalog
                          :onyx.core/workflow (extensions/read-chunk log :workflow job)
-                         :onyx.core/task-map (find-task catalog task)
+                         :onyx.core/task-map task
                          :onyx.core/serialized-task task
                          :onyx.core/ingress-queues (:task/ingress-queues task)
                          :onyx.core/egress-queues (:task/egress-queues task)
@@ -383,7 +383,7 @@
 
       (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
         (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
-      
+
       (assoc component
         :open-session-kill-ch open-session-kill-ch
         :read-batch-ch read-batch-ch
@@ -430,7 +430,7 @@
         :seal-resource-loop (thread (seal-resource-loop seal-ch complete-task-ch seal-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
 
-        :pipeline-data pipeline-data)))
+        :pipexline-data pipeline-data)))
 
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:task/name task)))
@@ -496,7 +496,7 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log queue job task err-ch opts]}]
+(defn task-lifecycle [args {:keys [id log queue job task err-ch opts] :as x}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job job
                        :task task :err-ch err-ch :opts opts}))
 
