@@ -99,10 +99,6 @@
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-
-
-
-
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (try

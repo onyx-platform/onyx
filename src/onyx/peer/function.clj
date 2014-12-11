@@ -129,14 +129,14 @@
 
 (defn compress-batch-shim
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
-  (let [next-tasks (keys (:task/children-links serialized-task))
+  (let [next-tasks (keys (:egress-queues serialized-task))
         compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defn write-batch-shim
   [{:keys [onyx.core/queue onyx.core/egress-queues onyx.core/serialized-task
            onyx.core/catalog onyx.core/session onyx.core/compressed] :as event}]
-  (let [queue-name->task (clojure.set/map-invert (:task/children-links serialized-task))
+  (let [queue-name->task (clojure.set/map-invert (:egress-queues serialized-task))
         producers (map (partial extensions/create-producer queue session) egress-queues)
         batch (write-batch queue session producers compressed catalog queue-name->task)]
     (merge event {:onyx.core/producers producers})))
