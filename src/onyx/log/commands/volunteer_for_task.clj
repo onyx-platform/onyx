@@ -92,7 +92,8 @@
     (do (when (:lifecycle state)
           (component/stop (:lifecycle state)))
         (let [new-state (assoc state :job (:job diff) :task (:task diff))
-              new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
-          (assoc new-state :lifecycle new-lifecycle)))
+              new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))
+              seal-ch (chan)]
+          (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 

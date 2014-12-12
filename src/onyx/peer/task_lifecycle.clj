@@ -75,7 +75,7 @@
   (let [state @pipeline-state]
     (if (:tried-to-seal? state)
       (merge event {:onyx.core/sealed? false})
-      (let [entry (entry/create-log-entry :seal-task {})
+      (let [entry (entry/create-log-entry :seal-task {:id :job :task})
             response (<!! seal-response-ch)]
         (swap! pipeline-state assoc :tried-to-seal? true)
         (if (:seal? response)
@@ -492,7 +492,7 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log queue job task err-ch opts] :as x}]
+(defn task-lifecycle [args {:keys [id log queue job task err-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job job
                        :task task :err-ch err-ch :opts opts}))
 
