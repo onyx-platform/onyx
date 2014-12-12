@@ -4,22 +4,16 @@
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn] :as timbre]
               [onyx.log.commands.common :as common]
-              [onyx.peer.task-lifecycle-extensions :as l-ext]
-              [onyx.peer.pipeline-extensions :as p-ext]
+              [onyx.log.entry :as entry]
               [onyx.queue.hornetq :refer [hornetq]]
               [onyx.planning :refer [find-task]]
+              [onyx.peer.task-lifecycle-extensions :as l-ext]
+              [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
-
-(defn seal-task? [replica job task id]
-  (let [n-peers (count (get-in replica [:allocations job task]))
-        status (common/task-status replica job task)]
-    (and (>= (:waiting status) (dec n-peers))
-         (zero? (:sealing status))
-         (= (get-in replica [:peer-states id]) :active))))
 
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
@@ -76,8 +70,17 @@
   (assoc event :onyx.core/closed? true))
 
 (defn munge-seal-resource
-  [{:keys [onyx.core/pipeline-state] :as event}]
-  event)
+  [{:keys [onyx.core/pipeline-state onyx.core/outbox-ch
+           onyx.core/seal-response-ch] :as event}]
+  (let [state @pipeline-state]
+    (if (:tried-to-seal? state)
+      (merge event {:onyx.core/sealed? false})
+      (let [entry (entry/create-log-entry :seal-task {})
+            response (<!! seal-response-ch)]
+        (swap! pipeline-state assoc :tried-to-seal? true)
+        (if (:seal? response)
+          (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
+          (merge event {:onyx.core/sealed? true}))))))
 
 (defn munge-complete-task
   [{:keys [onyx.core/pipeline-state onyx.core/sealed?] :as event}]

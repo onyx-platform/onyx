@@ -4,7 +4,17 @@
             [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.log.zookeeper :refer [zookeeper]]))
+            [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.log.commands.prepare-join-cluster]
+            [onyx.log.commands.accept-join-cluster]
+            [onyx.log.commands.abort-join-cluster]
+            [onyx.log.commands.notify-join-cluster]
+            [onyx.log.commands.leave-cluster]
+            [onyx.log.commands.submit-job]
+            [onyx.log.commands.volunteer-for-task]
+            [onyx.log.commands.update-peer-state]
+            [onyx.log.commands.seal-task]
+            [onyx.log.commands.complete-task]))
 
 (def development-components [:logging-config :log :queue])
 
