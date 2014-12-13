@@ -184,7 +184,7 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch err-ch seal-ch opts]
+(defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch err-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -238,7 +238,7 @@
                          :onyx.core/queue queue
                          :onyx.core/log log
                          :onyx.core/outbox-ch outbox-ch
-                         :onyx.core/seal-response-ch seal-ch
+                         :onyx.core/seal-response-ch seal-resp-ch
                          :onyx.core/peer-opts opts
                          :onyx.core/pipeline-state (atom {})}
 
@@ -503,7 +503,7 @@
 (defn task-lifecycle [args {:keys [id log queue job task outbox-ch err-ch seal-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job-id job
                        :task-id task :outbox-ch outbox-ch
-                       :err-ch err-ch :seal-ch seal-ch :opts opts}))
+                       :err-ch err-ch :seal-resp-ch seal-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
