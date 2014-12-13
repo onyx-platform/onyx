@@ -21,7 +21,9 @@
         status (common/task-status new (:job args) (:task args))]
     (when (= (:id args) (:id state))
       (>!! (:seal-response-ch state)
-           (and (>= (:waiting status) (dec n-peers))
-                (zero? (:sealing status))
-                (= (get-in new [:peer-states (:id args)]) :active))))))
+           (boolean
+            (and (>= (or (:waiting status) 0) (dec n-peers))
+                 (= (or (:active status) 0) 1)
+                 (= (get-in new [:peer-state (:id args)]) :active)))))
+    state))
 

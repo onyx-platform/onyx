@@ -119,7 +119,7 @@
      (fn [all k v]
        (assoc all v (+ (get all v 0) 1)))
      {}
-     (select-keys (:peer-states replica) peers))))
+     (select-keys (:peer-state replica) peers))))
 
 (defmulti drop-peers
   (fn [replica job n]

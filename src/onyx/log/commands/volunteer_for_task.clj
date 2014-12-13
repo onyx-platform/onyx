@@ -48,7 +48,8 @@
         (-> replica
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
-            (update-in [:allocations job task] vec)))
+            (update-in [:allocations job task] vec)
+            (assoc-in [:peer-state (:id args)] :active)))
       replica)))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
@@ -62,7 +63,8 @@
           (-> replica
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
-              (update-in [:allocations job task] vec)))
+              (update-in [:allocations job task] vec)
+              (assoc-in [:peer-state (:id args)] :active)))
         replica))
     replica))
 
@@ -91,8 +93,9 @@
                (not= (:task state) (:task diff))))
     (do (when (:lifecycle state)
           (component/stop (:lifecycle state)))
-        (let [new-state (assoc state :job (:job diff) :task (:task diff))
+        (let [seal-ch (chan)
+              new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
               new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
-          (assoc new-state :lifecycle new-lifecycle :seal-response-ch (chan))))
+          (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 

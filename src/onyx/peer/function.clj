@@ -142,7 +142,7 @@
     (merge event {:onyx.core/producers producers})))
 
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
-  (merge event (seal-queue queue egress-queues)))
+  (merge event (seal-queue queue (vals egress-queues))))
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
