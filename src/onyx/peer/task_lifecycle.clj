@@ -83,8 +83,8 @@
             response (<!! seal-response-ch)]
         (swap! pipeline-state assoc :tried-to-seal? true)
         (if response
-          (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
-          (merge event {:onyx.core/sealed? true}))))))
+          (merge event (p-ext/seal-resource event) {:onyx.core/sealed? response})
+          (merge event {:onyx.core/sealed? response}))))))
 
 (defn munge-complete-task
   [{:keys [onyx.core/pipeline-state onyx.core/sealed? onyx.core/outbox-ch] :as event}]
