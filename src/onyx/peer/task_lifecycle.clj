@@ -75,7 +75,10 @@
   (let [state @pipeline-state]
     (if (:tried-to-seal? state)
       (merge event {:onyx.core/sealed? false})
-      (let [entry (entry/create-log-entry :seal-task {:id :job :task})
+      (let [args {:id (:onyx.core/id event)
+                  :job (:onyx.core/job-id event)
+                  :task (:onyx.core/task-id event)}
+            entry (entry/create-log-entry :seal-task args)
             response (<!! seal-response-ch)]
         (swap! pipeline-state assoc :tried-to-seal? true)
         (if (:seal? response)
@@ -180,11 +183,11 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id log queue job task err-ch opts]
+(defrecord TaskLifeCycle [id log queue job-id task-id err-ch opts]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id task))
+    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id task-id))
 
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
@@ -216,13 +219,15 @@
           seal-dead-ch (chan)
           complete-task-dead-ch (chan)
 
-          catalog (extensions/read-chunk log :catalog job)
-          task (extensions/read-chunk log :task task)
+          catalog (extensions/read-chunk log :catalog job-id)
+          task (extensions/read-chunk log :task task-id)
 
           pipeline-data {:onyx.core/id id
+                         :onyx.core/job-id job-id
+                         :onyx.core/task-id task-id
                          :onyx.core/task (:name task)
                          :onyx.core/catalog catalog
-                         :onyx.core/workflow (extensions/read-chunk log :workflow job)
+                         :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                          :onyx.core/task-map (find-task catalog (:name task))
                          :onyx.core/serialized-task task
                          :onyx.core/ingress-queues (:ingress-queues task)
@@ -426,10 +431,10 @@
         :seal-resource-loop (thread (seal-resource-loop seal-ch complete-task-ch seal-dead-ch))
         :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
 
-        :pipexline-data pipeline-data)))
+        :pipeline-data pipeline-data)))
 
   (stop [component]
-    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:task/name task)))
+    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
 
     (close! (:open-session-kill-ch component))
     (<!! (:open-session-dead-ch component))
@@ -493,8 +498,8 @@
     component))
 
 (defn task-lifecycle [args {:keys [id log queue job task err-ch opts]}]
-  (map->TaskLifeCycle {:id id :log log :queue queue :job job
-                       :task task :err-ch err-ch :opts opts}))
+  (map->TaskLifeCycle {:id id :log log :queue queue :job-id job
+                       :task-id task :err-ch err-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
