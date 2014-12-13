@@ -20,27 +20,6 @@
       Double/POSITIVE_INFINITY
       rets)))
 
-(defn submit-job [log job]
-  (let [id (java.util.UUID/randomUUID)
-        tasks (planning/discover-tasks (:catalog job) (:workflow job))
-        task-ids (map :id tasks)
-        scheduler (:task-scheduler job)
-        sat (saturation (:catalog job))
-        args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
-        entry (create-log-entry :submit-job args)]
-    (extensions/write-chunk log :catalog (:catalog job) id)
-    (extensions/write-chunk log :workflow (:workflow job) id)
-
-    (doseq [task tasks]
-      (extensions/write-chunk log :task task id))
-
-    (extensions/write-log-entry log entry)
-    id))
-
-(defn await-job-completion* [sync job-id]
-  ;; TODO: re-implement me
-  )
-
 (defn unpack-workflow
   ([workflow] (vec (unpack-workflow workflow [])))
   ([workflow result]
@@ -56,6 +35,30 @@
                         [[k child]])))
                   roots))
          result))))
+
+(defn submit-job [log job]
+  (let [id (java.util.UUID/randomUUID)
+        normalized-workflow (if (map? (:workflow job))
+                              (unpack-workflow (:workflow job))
+                              (:workflow job))
+        tasks (planning/discover-tasks (:catalog job) normalized-workflow)
+        task-ids (map :id tasks)
+        scheduler (:task-scheduler job)
+        sat (saturation (:catalog job))
+        args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
+        entry (create-log-entry :submit-job args)]
+    (extensions/write-chunk log :catalog (:catalog job) id)
+    (extensions/write-chunk log :workflow normalized-workflow id)
+
+    (doseq [task tasks]
+      (extensions/write-chunk log :task task id))
+
+    (extensions/write-log-entry log entry)
+    id))
+
+(defn await-job-completion* [sync job-id]
+  ;; TODO: re-implement me
+  )
 
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped

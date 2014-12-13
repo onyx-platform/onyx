@@ -20,7 +20,7 @@
 (defn processing-loop [id log queue inbox-ch outbox-ch kill-ch opts]
   (try
     (loop [replica {:job-scheduler (:onyx.peer/job-scheduler opts)}
-           state (merge {:id id :log log :queue queue :outbox-ch outbox-ch
+           state (merge {:id id :log log :queue queue :outbox-ch outbox-ch :opts opts
                          :stall-output? true :task-lifecycle-fn task-lifecycle}
                         (:onyx.peer/state opts))]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]

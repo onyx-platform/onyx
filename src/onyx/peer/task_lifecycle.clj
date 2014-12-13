@@ -236,7 +236,7 @@
                          :onyx.core/serialized-task task
                          :onyx.core/ingress-queues (:ingress-queues task)
                          :onyx.core/egress-queues (:egress-queues task)
-                         :onyx.core/params (or (get (:onyx.peer/fn-params opts) task) [])
+                         :onyx.core/params (or (get (:onyx.peer/fn-params opts) (:name task)) [])
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/log log
