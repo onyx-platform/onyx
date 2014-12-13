@@ -191,8 +191,6 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id task-id))
-
     (let [open-session-kill-ch (chan 0)
           read-batch-ch (chan 0)
           decompress-batch-ch (chan 0)
@@ -225,6 +223,8 @@
 
           catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
+
+          _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
 
           pipeline-data {:onyx.core/id id
                          :onyx.core/job-id job-id

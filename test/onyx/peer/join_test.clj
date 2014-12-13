@@ -149,4 +149,3 @@
 
 (fact (into #{} (butlast results)) => (into #{} people))
 
-

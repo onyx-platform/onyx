@@ -13,8 +13,12 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn vote-for-sentinel-leader [log task-id uuid]
-  (extensions/write-chunk log :sentinel {:leader uuid} task-id))
+(defn sentinel-node-name [task-id input-name]
+  (format "%s-%s" task-id input-name))
+
+(defn vote-for-sentinel-leader [log task-id input-name uuid]
+  (let [node (sentinel-node-name task-id input-name)]
+    (extensions/write-chunk log :sentinel {:leader uuid} node)))
 
 (defn filter-sentinels [decompressed]
   (remove (partial = :done) decompressed))
@@ -45,8 +49,9 @@
             state @pipeline-state]
         (if uuid
           (if-not (get-in state [:learned-sentinel input])
-            (do (vote-for-sentinel-leader log task-id uuid)
-                (let [learned (:leader (extensions/read-chunk log :sentinel task-id))
+            (do (vote-for-sentinel-leader log task-id input uuid)
+                (let [node (sentinel-node-name task-id input)
+                      learned (:leader (extensions/read-chunk log :sentinel node))
                       successor
                       (swap! pipeline-state
                              (fn [v]
