@@ -79,9 +79,10 @@
                   :job (:onyx.core/job-id event)
                   :task (:onyx.core/task-id event)}
             entry (entry/create-log-entry :seal-task args)
+            _ (>!! outbox-ch entry)
             response (<!! seal-response-ch)]
         (swap! pipeline-state assoc :tried-to-seal? true)
-        (if (:seal? response)
+        (if response
           (merge event (p-ext/seal-resource event) {:onyx.core/sealed? true})
           (merge event {:onyx.core/sealed? true}))))))
 
@@ -183,7 +184,7 @@
             (>!! (:onyx.core/complete-ch event) true))))
       (recur))))
 
-(defrecord TaskLifeCycle [id log queue job-id task-id err-ch opts]
+(defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch err-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -236,6 +237,7 @@
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/log log
+                         :onyx.core/outbox-ch outbox-ch
                          :onyx.core/peer-opts opts
                          :onyx.core/pipeline-state (atom {})}
 
@@ -497,9 +499,10 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log queue job task err-ch opts]}]
+(defn task-lifecycle [args {:keys [id log queue job task outbox-ch err-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job-id job
-                       :task-id task :err-ch err-ch :opts opts}))
+                       :task-id task :outbox-ch outbox-ch
+                       :err-ch err-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
