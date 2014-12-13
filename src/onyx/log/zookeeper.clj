@@ -27,6 +27,9 @@
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
+(defn sentinel-path [prefix]
+  (str (prefix-path prefix) "/sentinel"))
+
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
@@ -42,6 +45,7 @@
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
+      (zk/create conn (sentinel-path onyx-id) :persistent? true)
 
       (assoc component :server server :conn conn :prefix onyx-id)))
 
@@ -141,6 +145,12 @@
         bytes (serialize-fressian chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
+(defmethod extensions/write-chunk [ZooKeeper :sentinel]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (let [node (str (sentinel-path prefix) "/" id)
+        bytes (serialize-fressian chunk)]
+    (zk/create conn node :persistent? true :data bytes)))
+
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (catalog-path prefix) "/" id)]
@@ -154,5 +164,10 @@
 (defmethod extensions/read-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (task-path prefix) "/" id)]
+    (deserialize-fressian (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :sentinel]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (sentinel-path prefix) "/" id)]
     (deserialize-fressian (:data (zk/data conn node)))))
 

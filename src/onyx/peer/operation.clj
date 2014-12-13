@@ -13,11 +13,8 @@
     (catch Exception e
       (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
 
-(defn sentinel-node [task-node input])
-
-(defn vote-for-sentinel-leader [sync task-node input uuid]
-  ;;(extensions/create-node sync (sentinel-node task-node input) {:uuid uuid})
-  )
+(defn vote-for-sentinel-leader [log task-id uuid]
+  (extensions/write-chunk log :sentinel {:leader uuid} task-id))
 
 (defn filter-sentinels [decompressed]
   (remove (partial = :done) decompressed))
@@ -32,8 +29,9 @@
        (into #{} (keys (:onyx.core/ingress-queues event))))))
 
 (defn on-last-batch
-  [{:keys [onyx.core/sync onyx.core/queue onyx.core/decompressed
-           onyx.core/pipeline-state onyx.core/task-node] :as event} f]
+  [{:keys [onyx.core/log onyx.core/queue onyx.core/decompressed
+           onyx.core/task-id onyx.core/pipeline-state onyx.core/task-node]
+    :as event} f]
   (if (= (last decompressed) :done)
     (if (= (:onyx/type (:onyx.core/task-map event)) :input)
       (let [n-messages (f event)]
@@ -47,10 +45,8 @@
             state @pipeline-state]
         (if uuid
           (if-not (get-in state [:learned-sentinel input])
-            (do (vote-for-sentinel-leader sync task-node input uuid)
-                (let [node (sentinel-node task-node input)
-                      learned (:uuid ;;(extensions/read-node sync node)
-                               )
+            (do (vote-for-sentinel-leader log task-id uuid)
+                (let [learned (:uuid (extensions/read-chunk log :sentinel task-id))
                       successor
                       (swap! pipeline-state
                              (fn [v]
