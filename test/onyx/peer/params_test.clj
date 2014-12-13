@@ -111,3 +111,4 @@
 (component/stop env)
 
 (fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
+
