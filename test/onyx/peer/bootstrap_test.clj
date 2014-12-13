@@ -88,7 +88,7 @@
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 
 (onyx.api/submit-job
- (:log env)
+ peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 

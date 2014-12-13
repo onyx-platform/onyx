@@ -36,8 +36,9 @@
                   roots))
          result))))
 
-(defn submit-job [log job]
+(defn submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
+        client (component/start (system/onyx-client config))
         normalized-workflow (if (map? (:workflow job))
                               (unpack-workflow (:workflow job))
                               (:workflow job))
@@ -47,13 +48,17 @@
         sat (saturation (:catalog job))
         args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
         entry (create-log-entry :submit-job args)]
-    (extensions/write-chunk log :catalog (:catalog job) id)
-    (extensions/write-chunk log :workflow normalized-workflow id)
+    (extensions/write-chunk (:log client) :catalog (:catalog job) id)
+    (extensions/write-chunk (:log client) :workflow normalized-workflow id)
 
     (doseq [task tasks]
-      (extensions/write-chunk log :task task id))
+      (extensions/write-chunk (:log client) :task task id)
+      (let [task-map (planning/find-task (:catalog job) (:name task))]
+        (when (:onyx/bootstrap? task-map)
+          (extensions/bootstrap-queue (:queue client) task))))
 
-    (extensions/write-log-entry log entry)
+    (extensions/write-log-entry (:log client) entry)
+    (component/stop client)
     id))
 
 (defn await-job-completion* [sync job-id]

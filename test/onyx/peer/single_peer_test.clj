@@ -95,16 +95,14 @@
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 
 (onyx.api/submit-job
- (:log env)
+ peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  ((:shutdown-fn v-peer)))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)

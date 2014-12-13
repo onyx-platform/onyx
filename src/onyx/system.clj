@@ -17,6 +17,8 @@
 
 (def development-components [:logging-config :log :queue])
 
+(def client-components [:logging-config :log :queue])
+
 (def peer-components [:logging-config :log :queue :virtual-peer])
 
 (defn rethrow-component [f]
@@ -35,6 +37,15 @@
     (rethrow-component
      #(component/stop-system this development-components))))
 
+(defrecord OnyxClient []
+  component/Lifecycle
+  (start [this]
+    (rethrow-component
+     #(component/start-system this client-components)))
+  (stop [this]
+    (rethrow-component
+     #(component/stop-system this client-components))))
+
 (defrecord OnyxPeer []
   component/Lifecycle
   (start [this]
@@ -48,6 +59,13 @@
   [config]
   (map->OnyxDevelopmentEnv
    {:logging-config (logging-config/logging-configuration config)
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])}))
+
+(defn onyx-client
+  [config]
+  (map->OnyxClient
+   {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :queue (component/using (hornetq config) [:log])}))
 

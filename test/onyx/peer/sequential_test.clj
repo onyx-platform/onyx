@@ -83,8 +83,8 @@
     (hq-util/create-queue! hq-config out-queue)
 
     (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
-    (onyx.api/submit-job (:log env) {:catalog catalog :workflow workflow
-                                     :task-scheduler :onyx.task-scheduler/round-robin})
+    (onyx.api/submit-job peer-config {:catalog catalog :workflow workflow
+                                      :task-scheduler :onyx.task-scheduler/round-robin})
 
     (let [results (hq-util/consume-queue! hq-config out-queue echo)]
       (doseq [v-peer v-peers]
