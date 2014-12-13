@@ -46,7 +46,7 @@
         (if uuid
           (if-not (get-in state [:learned-sentinel input])
             (do (vote-for-sentinel-leader log task-id uuid)
-                (let [learned (:uuid (extensions/read-chunk log :sentinel task-id))
+                (let [learned (:leader (extensions/read-chunk log :sentinel task-id))
                       successor
                       (swap! pipeline-state
                              (fn [v]

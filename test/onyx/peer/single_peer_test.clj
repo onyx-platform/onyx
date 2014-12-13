@@ -101,16 +101,10 @@
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
-(try
-  ;; (dorun (map deref (map :runner v-peers)))
-  (finally
-   (doseq [v-peer v-peers]
-     (try
-       ((:shutdown-fn v-peer))
-       (catch Exception e (prn e))))
-   (try
-     (onyx.api/shutdown conn)
-     (catch Exception e (prn e)))))
+(doseq [v-peer v-peers]
+  (try
+    ((:shutdown-fn v-peer))
+    (catch Exception e (prn e))))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
