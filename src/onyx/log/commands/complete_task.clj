@@ -25,6 +25,7 @@
 (defmethod extensions/fire-side-effects! :complete-task
   [{:keys [args]} old new diff state]
   (if (= (:id args) (:id state))
-    (assoc state :lifecycle (component/stop (:lifecycle state)))
+    (do (component/stop (:lifecycle state))
+        (assoc state :lifecycle nil))
     state))
 
