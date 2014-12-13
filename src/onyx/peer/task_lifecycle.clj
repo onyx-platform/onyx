@@ -87,8 +87,13 @@
           (merge event {:onyx.core/sealed? true}))))))
 
 (defn munge-complete-task
-  [{:keys [onyx.core/pipeline-state onyx.core/sealed?] :as event}]
-  event)
+  [{:keys [onyx.core/pipeline-state onyx.core/sealed? onyx.core/outbox-ch] :as event}]
+  (let [args {:id (:onyx.core/id event)
+              :job (:onyx.core/job-id event)
+              :task (:onyx.core/task-id event)}
+        entry (entry/create-log-entry :complete-task args)]
+    (>!! outbox-ch entry)
+    {:onyx.core/complete-success? true}))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -179,9 +184,7 @@
       (when (and (:onyx.core/tail-batch? event)
                  (:onyx.core/commit? event)
                  (:onyx.core/sealed? event))
-        (let [event (munge-complete-task event)]
-          (when (:onyx.core/complete-success? event)
-            (>!! (:onyx.core/complete-ch event) true))))
+        (munge-complete-task event))
       (recur))))
 
 (defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch err-ch seal-resp-ch opts]

@@ -1,5 +1,6 @@
 (ns onyx.log.commands.complete-task
-  (:require [onyx.extensions :as extensions]))
+  (:require [com.stuartsierra.component :as component]
+            [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :complete-task
   [{:keys [args message-id]} replica]
@@ -23,5 +24,7 @@
 
 (defmethod extensions/fire-side-effects! :complete-task
   [{:keys [args]} old new diff state]
-  state)
+  (if (= (:id args) (:id state))
+    (assoc state :lifecycle (component/stop (:lifecycle state)))
+    state))
 
