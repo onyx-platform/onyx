@@ -80,20 +80,15 @@
                   :task (:onyx.core/task-id event)}
             entry (entry/create-log-entry :seal-task args)
             _ (>!! outbox-ch entry)
-            response (<!! seal-response-ch)]
+            seal? (<!! seal-response-ch)]
         (swap! pipeline-state assoc :tried-to-seal? true)
-        (if response
-          (merge event (p-ext/seal-resource event) {:onyx.core/sealed? response})
-          (merge event {:onyx.core/sealed? response}))))))
-
-(defn munge-complete-task
-  [{:keys [onyx.core/pipeline-state onyx.core/sealed? onyx.core/outbox-ch] :as event}]
-  (let [args {:id (:onyx.core/id event)
-              :job (:onyx.core/job-id event)
-              :task (:onyx.core/task-id event)}
-        entry (entry/create-log-entry :complete-task args)]
-    (>!! outbox-ch entry)
-    {:onyx.core/complete-success? true}))
+        (when seal?
+          (p-ext/seal-resource event)
+          (let [args {:id (:onyx.core/id event)
+                      :job (:onyx.core/job-id event)
+                      :task (:onyx.core/task-id event)}
+                entry (entry/create-log-entry :complete-task args)]
+            (>!! outbox-ch entry)))))))
 
 (defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch]
   (loop []
@@ -170,21 +165,11 @@
       (>!! seal-ch event)
       (recur))))
 
-(defn seal-resource-loop [seal-ch internal-complete-ch dead-ch]
+(defn seal-resource-loop [seal-ch dead-ch]
   (loop []
     (when-let [event (<!! seal-ch)]
-      (if (:onyx.core/tail-batch? event)
-        (>!! internal-complete-ch (munge-seal-resource event))
-        (>!! internal-complete-ch event))
-      (recur))))
-
-(defn complete-task-loop [complete-ch dead-ch]
-  (loop []
-    (when-let [event (<!! complete-ch)]
-      (when (and (:onyx.core/tail-batch? event)
-                 (:onyx.core/commit? event)
-                 (:onyx.core/sealed? event))
-        (munge-complete-task event))
+      (when (:onyx.core/tail-batch? event)
+        (munge-seal-resource event))
       (recur))))
 
 (defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch err-ch seal-resp-ch opts]
@@ -204,7 +189,6 @@
           close-temporal-ch (chan 0)
           reset-payload-node-ch (chan 0)
           seal-ch (chan 0)
-          complete-task-ch (chan 0)
 
           open-session-dead-ch (chan)
           read-batch-dead-ch (chan)
@@ -219,7 +203,6 @@
           close-temporal-dead-ch (chan)
           reset-payload-node-dead-ch (chan)
           seal-dead-ch (chan)
-          complete-task-dead-ch (chan)
 
           catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
@@ -326,12 +309,6 @@
           (warn e)
           (go (>!! err-ch true))))
 
-      (dire/with-handler! #'complete-task-loop
-        java.lang.Exception
-        (fn [e & _]
-          (warn e)
-          (go (>!! err-ch true))))
-
       (dire/with-finally! #'inject-temporal-loop
         (fn [& args]
           (>!! (last args) true)))
@@ -384,10 +361,6 @@
         (fn [& args]
           (>!! (last args) true)))
 
-      (dire/with-finally! #'complete-task-loop
-        (fn [& args]
-          (>!! (last args) true)))
-
       (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
         (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
@@ -405,7 +378,6 @@
         :close-temporal-ch close-temporal-ch
         :reset-payload-node-ch reset-payload-node-ch
         :seal-ch seal-ch
-        :complete-task-ch complete-task-ch
 
         :open-session-dead-ch open-session-dead-ch
         :read-batch-dead-ch read-batch-dead-ch
@@ -420,8 +392,7 @@
         :close-temporal-dead-ch close-temporal-dead-ch
         :reset-payload-node-dead-ch reset-payload-node-dead-ch
         :seal-dead-ch seal-dead-ch
-        :complete-task-dead-ch complete-task-dead-ch
-        
+
         :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
         :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch))
         :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch))
@@ -434,8 +405,7 @@
         :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
         :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
         :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch seal-ch reset-payload-node-dead-ch))
-        :seal-resource-loop (thread (seal-resource-loop seal-ch complete-task-ch seal-dead-ch))
-        :complete-task-loop (thread (complete-task-loop complete-task-ch complete-task-dead-ch))
+        :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch))
 
         :pipeline-data pipeline-data)))
 
@@ -481,9 +451,6 @@
     (close! (:seal-ch component))
     (<!! (:seal-dead-ch component))
 
-    (close! (:complete-task-ch component))
-    (<!! (:complete-task-dead-ch component))
-
     (close! (:open-session-dead-ch component))
     (close! (:read-batch-dead-ch component))
     (close! (:decompress-batch-dead-ch component))
@@ -497,7 +464,6 @@
     (close! (:close-temporal-dead-ch component))
     (close! (:reset-payload-node-dead-ch component))
     (close! (:seal-dead-ch component))
-    (close! (:complete-task-dead-ch component))
 
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
@@ -560,8 +526,4 @@
 (dire/with-post-hook! #'munge-seal-resource
   (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed? onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
-
-(dire/with-post-hook! #'munge-complete-task
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Completing task" id lifecycle-id))))
 
