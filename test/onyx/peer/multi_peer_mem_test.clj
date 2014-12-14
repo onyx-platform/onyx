@@ -94,11 +94,12 @@
 
 (def workflow {:in {:inc :out}})
 
-(def v-peers (onyx.api/start-peers! 1 peer-config))
+(def v-peers (onyx.api/start-peers! 8 peer-config))
 
-(onyx.api/submit-job peer-config
-                     {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
