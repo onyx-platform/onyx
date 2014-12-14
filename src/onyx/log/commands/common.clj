@@ -114,11 +114,14 @@
        (count (get-in replica [:tasks %])))
    (:jobs replica)))
 
+(defn active-tasks-only [replica tasks]
+  (filter #(nil? (get-in replica [:sealing-task %])) tasks))
+
 (defn jobs-with-available-tasks [replica jobs]
   (filter
    (fn [job]
      (let [tasks (get-in replica [:tasks job])]
-       (some #(nil? (get-in replica [:sealing-task %])) tasks)))
+       (seq (active-tasks-only replica tasks))))
    jobs))
 
 (defn remove-sealing-tasks [replica args]
