@@ -87,3 +87,16 @@
   (fact (rep-reactions old-replica new-replica diff {:id :b})
         => [{:fn :volunteer-for-task :args {:id :b}}]))
 
+(def old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+                  :pairs {:a :b :b :c :c :a} 
+                  :peers [:a :b :c]
+                  :jobs [:j1 :j2]
+                  :task-schedulers {:j1 :onyx.task-scheduler/greedy
+                                    :j2 :onyx.task-scheduler/greedy} 
+                  :tasks {:j1 [:t1] :j2 [:t2]}
+                  :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}
+                  :sealing-tasks {:t2 :c}})
+
+(let [new-replica (f old-replica)]
+  (:sealing-tasks new-replica) => {})
+

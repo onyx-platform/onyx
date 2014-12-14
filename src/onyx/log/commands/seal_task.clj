@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
 (defn should-seal? [replica args]
   (let [status (common/task-status replica (:job args) (:task args))]
@@ -14,12 +15,15 @@
 (defmethod extensions/apply-log-entry :seal-task
   [{:keys [args]} replica]
   (if-not (should-seal? replica args)
-    (assoc-in replica [:peer-state (:id args)] :idle)
+    (-> replica
+        (assoc-in [:sealing-task (:task args)] (:id args))
+        (assoc-in [:peer-state (:id args)] :idle)
+        (common/remove-peers args))
     replica))
 
 (defmethod extensions/replica-diff :seal-task
   [{:keys [args]} old new]
-  nil)
+  {:seal? (= old new)})
 
 (defmethod extensions/reactions :seal-task
   [{:keys [args]} old new diff peer-args]
@@ -28,7 +32,7 @@
 (defmethod extensions/fire-side-effects! :seal-task
   [{:keys [args]} old new diff state]
   (if (= (:id args) (:id state))
-    (if (should-seal? new args)
+    (if (:seal? diff)
       (do (>!! (:seal-response-ch state) true)
           state)
       (do (>!! (:seal-response-ch state) false)

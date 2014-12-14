@@ -42,7 +42,8 @@
 
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
-  (let [job (first (common/incomplete-jobs replica))]
+  (let [job (first (common/jobs-with-available-tasks replica
+                     (common/incomplete-jobs replica)))]
     (if job
       (let [task (select-task replica job)]
         (-> replica
@@ -55,7 +56,8 @@
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
   (if-not (common/saturated-cluster? replica)
-    (let [candidates (common/incomplete-jobs replica)
+    (let [candidates (common/jobs-with-available-tasks replica
+                       (common/incomplete-jobs replica))
           job (or (common/find-job-needing-peers replica candidates)
                   (common/round-robin-next-job replica candidates))]
       (if job

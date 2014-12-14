@@ -1,5 +1,6 @@
 (ns onyx.log.commands.common
   (:require [clojure.data :refer [diff]]
+            [clojure.set :refer [map-invert]]
             [onyx.extensions :as extensions]))
 
 (defn balance-workload [replica jobs p]
@@ -112,6 +113,19 @@
    #(< (count (get-in replica [:completions %]))
        (count (get-in replica [:tasks %])))
    (:jobs replica)))
+
+(defn jobs-with-available-tasks [replica jobs]
+  (filter
+   (fn [job]
+     (let [tasks (get-in replica [:tasks job])]
+       (some #(not (get-in replica [:sealing-tasks job %])) tasks)))
+   jobs))
+
+(defn remove-sealing-tasks [replica args]
+  (let [task (get (map-invert (:sealing-tasks replica)) (:id args))]
+    (if task
+      (update-in replica [:sealing-tasks] dissoc task)
+      replica)))
 
 (defn task-status [replica job task]
   (let [peers (get-in replica [:allocations job task])]

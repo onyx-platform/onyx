@@ -23,6 +23,7 @@
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
+        (common/remove-sealing-tasks args)
         (common/remove-peers args))))
 
 (defmethod extensions/replica-diff :leave-cluster
