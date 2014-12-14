@@ -15,15 +15,16 @@
 (defmethod extensions/apply-log-entry :seal-task
   [{:keys [args]} replica]
   (if-not (should-seal? replica args)
-    (-> replica
-        (assoc-in [:sealing-task (:task args)] (:id args))
-        (assoc-in [:peer-state (:id args)] :idle)
-        (common/remove-peers args))
-    replica))
+    (let [peer (get-in replica [:sealing-task (:task args)])]
+      (-> replica
+          (assoc-in [:sealing-task (:task args)] (or peer true))
+          (assoc-in [:peer-state (:id args)] :idle)
+          (common/remove-peers args)))
+    (assoc-in replica [:sealing-task (:task args)] (:id args))))
 
 (defmethod extensions/replica-diff :seal-task
   [{:keys [args]} old new]
-  {:seal? (= old new)})
+  {:seal? (= (:peer-state old) (:peer-state new))})
 
 (defmethod extensions/reactions :seal-task
   [{:keys [args]} old new diff peer-args]
