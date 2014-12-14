@@ -2,6 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.commands.common :as common]
+            [onyx.system]
             [midje.sweet :refer :all]))
 
 (fact

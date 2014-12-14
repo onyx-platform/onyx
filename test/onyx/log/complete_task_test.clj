@@ -1,6 +1,7 @@
 (ns onyx.log.complete-task-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.system]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :complete-task {:job :j1 :task :t1}))

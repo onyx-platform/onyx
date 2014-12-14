@@ -1,6 +1,7 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.system]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :abort-join-cluster {:id :d}))
