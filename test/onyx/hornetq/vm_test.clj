@@ -76,8 +76,7 @@
    :zookeeper/address "127.0.0.1:2185"
    :zookeeper/server? true
    :zookeeper.server/port 2185
-   :onyx/id id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx/id id})
 
 (def peer-config
   {:hornetq/mode :vm
