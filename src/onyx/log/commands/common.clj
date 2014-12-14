@@ -118,7 +118,7 @@
   (filter
    (fn [job]
      (let [tasks (get-in replica [:tasks job])]
-       (some #(nil? (get-in replica [:sealing-tasks %])) tasks)))
+       (some #(nil? (get-in replica [:sealing-task %])) tasks)))
    jobs))
 
 (defn remove-sealing-tasks [replica args]

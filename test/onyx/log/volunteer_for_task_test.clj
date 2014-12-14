@@ -106,7 +106,7 @@
                    :task-schedulers {:j1 :onyx.task-scheduler/greedy
                                      :j2 :onyx.task-scheduler/greedy}
                    :allocations {:j1 {:t1 []} :j2 {:t2 [:y]}}
-                   :sealing-tasks {:t1 true}
+                   :sealing-task {:t1 true}
                    :peers [:x :y]}
       new-replica (f old-replica)]
   (fact new-replica => {:job-scheduler :onyx.job-scheduler/round-robin
@@ -115,6 +115,6 @@
                         :task-schedulers {:j1 :onyx.task-scheduler/greedy
                                           :j2 :onyx.task-scheduler/greedy}
                         :allocations {:j1 {:t1 []} :j2 {:t2 [:y :x]}}
-                        :sealing-tasks {:t1 true}
+                        :sealing-task {:t1 true}
                         :peer-state {:x :active}
                         :peers [:x :y]}))
