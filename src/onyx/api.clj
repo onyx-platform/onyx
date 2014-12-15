@@ -20,7 +20,23 @@
       Double/POSITIVE_INFINITY
       rets)))
 
-(defn unpack-workflow
+(defn map-set-workflow->workflow
+  "Converts a workflow in format:
+   {:a #{:b :c}
+    :b #{:d}}
+   to format:
+   [[:a :b]
+    [:b :c]
+    [:b :d]]"
+  [workflow]
+  (vec
+   (reduce-kv (fn [w k v]
+                (concat w
+                        (map (fn [t] [k t]) v)))
+              []
+              workflow)))
+
+(defn unpack-map-workflow
   ([workflow] (vec (unpack-workflow workflow [])))
   ([workflow result]
      (let [roots (keys workflow)]
@@ -31,16 +47,17 @@
                     (let [child (get workflow k)]
                       (if (map? child)
                         (concat (map (fn [x] [k x]) (keys child))
-                                (unpack-workflow child result))
+                                (unpack-map-workflow child result))
                         [[k child]])))
                   roots))
          result))))
 
 (defn submit-job [config job]
+  (validator/validate-job job)
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
         normalized-workflow (if (map? (:workflow job))
-                              (unpack-workflow (:workflow job))
+                              (unpack-map-workflow (:workflow job))
                               (:workflow job))
         tasks (planning/discover-tasks (:catalog job) normalized-workflow)
         task-ids (map :id tasks)

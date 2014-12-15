@@ -171,11 +171,10 @@
 
 (component/stop env)
 
-(fact (unpack-map-workflow {:a :b}) => [[:a :b]])
-(fact (unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
-(fact (unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
-(fact (unpack-map-workflow {:a {:b :c :d :e}}) => [[:a :b] [:a :d] [:b :c] [:d :e]])
-
+(fact (onyx.api/unpack-map-workflow {:a :b}) => [[:a :b]])
+(fact (onyx.api/unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
+(fact (onyx.api/unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
+(fact (onyx.api/unpack-map-workflow {:a {:b :c :d :e}}) => [[:a :b] [:a :d] [:b :c] [:d :e]])
 
 (fact (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
                                                   :b #{:d}
@@ -188,7 +187,7 @@
              [:c :e]]))
 
 
-(fact (into #{} (unpack-map-workflow {:a {:b :c} :d {:e :f :g :h}}))
+(fact (into #{} (onyx.api/unpack-map-workflow {:a {:b :c} :d {:e :f :g :h}}))
       => #{[:a :b]
            [:b :c]
            [:d :e]
@@ -227,7 +226,7 @@
         :onyx/medium :hornetq
         :onyx/consumption :concurrent}]
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
-      tasks (onyx.coordinator.planning/discover-tasks catalog workflow)
+      tasks (onyx.planning/discover-tasks catalog workflow)
 
       [a b c d e f g :as sorted-tasks]
       (reduce (fn [all next]
@@ -250,3 +249,4 @@
   (fact ":a has an ingress queue" (:ingress-queues a) =not=> nil?)
   (fact ":b has an ingress queue" (:ingress-queues b) =not=> nil?)
   (fact ":g has an egress queue" (:egress-queues g) =not=> empty?))
+
