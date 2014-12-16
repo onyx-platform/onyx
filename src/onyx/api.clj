@@ -37,7 +37,7 @@
               workflow)))
 
 (defn unpack-map-workflow
-  ([workflow] (vec (unpack-workflow workflow [])))
+  ([workflow] (vec (unpack-map-workflow workflow [])))
   ([workflow result]
      (let [roots (keys workflow)]
        (if roots
