@@ -15,6 +15,10 @@
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
 
+(defn resolve-calling-params [catalog-entry opts]
+  (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
+          (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
+
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
 
@@ -206,6 +210,7 @@
 
           catalog (extensions/read-chunk log :catalog job-id)
           task (extensions/read-chunk log :task task-id)
+          catalog-entry (find-task catalog (:name task))
 
           _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
 
@@ -215,11 +220,11 @@
                          :onyx.core/task (:name task)
                          :onyx.core/catalog catalog
                          :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
-                         :onyx.core/task-map (find-task catalog (:name task))
+                         :onyx.core/task-map catalog-entry
                          :onyx.core/serialized-task task
                          :onyx.core/ingress-queues (:ingress-queues task)
                          :onyx.core/egress-queues (:egress-queues task)
-                         :onyx.core/params (or (get (:onyx.peer/fn-params opts) (:name task)) [])
+                         :onyx.core/params (resolve-calling-params catalog-entry  opts)
                          :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                          :onyx.core/queue queue
                          :onyx.core/log log

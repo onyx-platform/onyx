@@ -53,12 +53,12 @@
          result))))
 
 (defn submit-job [config job]
-  (validator/validate-job job)
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
         normalized-workflow (if (map? (:workflow job))
                               (unpack-map-workflow (:workflow job))
                               (:workflow job))
+        _  (validator/validate-job (assoc job :workflow normalized-workflow))
         tasks (planning/discover-tasks (:catalog job) normalized-workflow)
         task-ids (map :id tasks)
         scheduler (:task-scheduler job)

@@ -1,4 +1,4 @@
-(ns onyx.peer.params-test
+(ns onyx.peer.catalog-params-test
   (:require [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
             [midje.sweet :refer :all]
@@ -36,8 +36,7 @@
    :onyx/id id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
-   :onyx.peer/fn-params {:add [42]}})
+   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
 (def hq-config {"host" (:host (:non-clustered (:hornetq config)))
                 "port" (:port (:non-clustered (:hornetq config)))})
@@ -59,7 +58,7 @@
 (defn my-adder [factor {:keys [n] :as segment}]
   (assoc segment :n (+ n factor)))
 
-(def workflow {:in {:add :out}})
+(def workflow [[:in :add] [:add :out]])
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -78,9 +77,11 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :add
-    :onyx/fn :onyx.peer.params-test/my-adder
+    :onyx/fn :onyx.peer.catalog-params-test/my-adder
     :onyx/type :function
     :onyx/consumption :sequential
+    :onyx/factor 42
+    :onyx/params [:onyx/factor]
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
