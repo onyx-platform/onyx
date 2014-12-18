@@ -27,7 +27,7 @@
       (merge event cycle-params rets))))
 
 (defn munge-read-batch [event]
-  (merge event (p-ext/read-batch (assoc event :onyx.core/commit? true))))
+  (merge event {:onyx.core/commit? true} (p-ext/read-batch event)))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
