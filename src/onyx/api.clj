@@ -86,9 +86,9 @@
       (let [position (<!! ch)
             entry (extensions/read-log-entry (:log client) position)
             new-replica (extensions/apply-log-entry entry replica)
-            tasks (get (:tasks replica) job-id)
-            complete-tasks (get (:completions replica) job-id)]
-        (when-not (= (into #{} tasks) (into #{} complete-tasks))
+            tasks (get (:tasks new-replica) job-id)
+            complete-tasks (get (:completions new-replica) job-id)]
+        (when (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))
           (recur new-replica))))))
 
 (defn start-peers!
