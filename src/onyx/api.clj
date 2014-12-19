@@ -78,9 +78,19 @@
     (component/stop client)
     id))
 
-(defn await-job-completion* [sync job-id]
-  ;; TODO: re-implement me
-  )
+(defn await-job-completion [config job-id]
+  (let [client (component/start (system/onyx-client config))
+        ch (chan 100)]
+    (extensions/subscribe-to-log (:log client) 0 ch))
+
+  (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)
+          tasks (get (:tasks replica) job-id)
+          complete-tasks (get (:completions replica) job-id)]
+      (when-not (= (into #{} tasks) (into #{} complete-tasks))
+        (recur new-replica)))))
 
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
