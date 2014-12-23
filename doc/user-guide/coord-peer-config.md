@@ -56,11 +56,11 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 
 | key name                                      | type      |
 |-----------------------------------------------|-----------|
-|`:hornetq.udp/cluster-name`                    |  `string` |
+|`:hornetq.jgroups/cluster-name`                    |  `string` |
 |`:hornetq.jgroups/file jgroups-file`           |  `string` |
 |`:hornetq.jgroups/channel-name jgroups-channel`|  `string` |
-|`:hornetq.udp/refresh-timeout`                 |  `int`    |
-|`:hornetq.udp/discovery-timeout`               |  `int`    |
+|`:hornetq.jgroups/refresh-timeout`                 |  `int`    |
+|`:hornetq.jgroups/discovery-timeout`               |  `int`    |
 
 ### Coordinator Only
 
