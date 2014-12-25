@@ -7,6 +7,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 
 - [Functions](#functions)
   - [Functional Transformation](#functional-transformation)
+  - [Functional Parameterization](#functional-parameterization)
   - [Grouping & Aggregation](#grouping-&-aggregation)
     - [Group By Key](#group-by-key)
     - [Group By Function](#group-by-function)
@@ -21,6 +22,44 @@ A Function is a construct that takes a segment as a parameter and outputs a segm
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 ```
+
+#### Functional Parameterization
+
+A function can be parameterized before a job is submitted to Onyx. The segment is always the last argument to the function. If more than one of these options are used, the arguments are concatenated in the order that this documentation section lists them. There are three ways to parameterize a function:
+
+- Via the `:onyx.peer/fn-params` peer configuration
+
+```clojure
+(def peer-opts
+  {...
+   :onyx.peer/fn-params {:my-fn-name [:my-args-here]}})
+```
+
+The function is then invoked with `(partial f :my-args-here)`.
+
+- Via the `:onyx.peer-fn-params` in the `inject-lifecycle-resources` multimethod
+
+```clojure
+(defmethod onyx.peer.task-lifecycle-extensions/inject-lifecycle-resources
+  :my-fn-name-or-identity
+  [_ context]
+    {:onyx.core/fn-params [:my-args-here]})
+```
+
+The function is then invoked with `(partial f :my-args-here)`.
+
+- Via the catalog `:onyx/params` entry
+
+```clojure
+(def catalog
+{...
+ :my/param-1 "abc"
+ :my/param-2 "def"
+ :onyx/params [:my/param-1 :my/param-2]
+ ...}
+```
+
+The function is then invoked with `(partial f "abc" "def")`. The order is controlled by the vector of `:onyx/params`.
 
 #### Grouping & Aggregation
 
