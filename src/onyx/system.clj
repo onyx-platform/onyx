@@ -13,7 +13,8 @@
             [onyx.log.commands.submit-job]
             [onyx.log.commands.volunteer-for-task]
             [onyx.log.commands.seal-task]
-            [onyx.log.commands.complete-task]))
+            [onyx.log.commands.complete-task]
+            [onyx.log.commands.kill-job]))
 
 (def development-components [:logging-config :log :queue])
 
