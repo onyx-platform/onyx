@@ -98,17 +98,12 @@
   (doall
    (map
     (fn [_]
-      (let [stop-ch (chan (clojure.core.async/sliding-buffer 1))
-            v-peer (system/onyx-peer config)]
-        {:runner (future
-                   (let [live (component/start v-peer)]
-                     (let [ack-ch (<!! stop-ch)]
-                       (component/stop live)
-                       (>!! ack-ch true)
-                       (close! ack-ch))))
-         :shutdown-fn (fn []
-                        (let [ack-ch (chan)]
-                          (>!! stop-ch ack-ch)
-                          (<!! ack-ch)))}))
+      (let [v-peer (system/onyx-peer config)]
+        (component/start v-peer)))
     (range n))))
+
+(defn shutdown
+  "Shutdowns the given resource - presumably either a peer or dev env."
+  [resource]
+  (component/stop resource))
 

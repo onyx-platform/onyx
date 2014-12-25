@@ -102,11 +102,11 @@
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown v-peer))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-(component/stop env)
+(onyx.api/shutdown env)
 
