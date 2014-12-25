@@ -78,7 +78,9 @@
     (component/stop client)
     id))
 
-(defn await-job-completion [config job-id]
+(defn await-job-completion
+  "Blocks until job-id has had all of its tasks completed."
+  [config job-id]
   (let [client (component/start (system/onyx-client config))
         ch (chan 100)]
     (extensions/subscribe-to-log (:log client) 0 ch)
