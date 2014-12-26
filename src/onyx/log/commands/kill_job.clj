@@ -20,7 +20,7 @@
   (second (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new)))))
 
 (defn executing-killed-job? [diff replica job-id peer-id]
-  (and diff (= (peer->allocated-job (:allocations replica) peer-id) job-id)))
+  (and diff (= (:job (peer->allocated-job (:allocations replica) peer-id)) job-id)))
 
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]
