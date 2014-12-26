@@ -22,7 +22,7 @@
 (defmethod extensions/reactions :submit-job
   [entry old new diff peer-args]
   (cond (and (= (:job-scheduler old) :onyx.job-scheduler/greedy)
-             (not (seq (:jobs old))))
+             (not (seq (common/alive-jobs old (:jobs old)))))
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]
         (= (:job-scheduler old) :onyx.job-scheduler/round-robin)
         (if-let [allocation (common/peer->allocated-job (:allocations new) (:id peer-args))]
