@@ -46,10 +46,10 @@
     (:job-scheduler replica)))
 
 (defn universally-executable-jobs [replica]
-  (-> replica
-      (common/incomplete-jobs)
-      (common/alive-jobs)
-      (common/jobs-with-available-tasks)))
+  (->> replica
+       (common/incomplete-jobs)
+       (common/alive-jobs replica)
+       (common/jobs-with-available-tasks replica)))
 
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
