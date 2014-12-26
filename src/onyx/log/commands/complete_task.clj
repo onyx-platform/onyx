@@ -9,7 +9,7 @@
         (update-in [:completions (:job args)] conj (:task args))
         (update-in [:completions (:job args)] vec)
         (update-in [:allocations (:job args)] dissoc (:task args))
-        (merge {:peer-states (into {} (map (fn [p] {p :idle}) peers))}))))
+        (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))}))))
 
 (defmethod extensions/replica-diff :complete-task
   [{:keys [args]} old new]

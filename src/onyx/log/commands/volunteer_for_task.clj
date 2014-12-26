@@ -45,10 +45,15 @@
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
 
+(defn universally-executable-jobs [replica]
+  (-> replica
+      (common/incomplete-jobs)
+      (common/alive-jobs)
+      (common/jobs-with-available-tasks)))
+
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
-  (let [job (first (common/jobs-with-available-tasks replica
-                     (common/incomplete-jobs replica)))]
+  (let [job (first (universally-executable-jobs replica))]
     (if job
       (let [task (select-task replica job)]
         (-> replica
@@ -61,8 +66,7 @@
 (defmethod select-job :onyx.job-scheduler/round-robin
   [{:keys [args]} replica]
   (if-not (common/saturated-cluster? replica)
-    (let [candidates (common/jobs-with-available-tasks replica
-                       (common/incomplete-jobs replica))
+    (let [candidates (universally-executable-jobs replica)
           job (or (common/find-job-needing-peers replica candidates)
                   (common/round-robin-next-job replica candidates))]
       (if job

@@ -124,6 +124,10 @@
        (seq (active-tasks-only replica tasks))))
    jobs))
 
+(defn alive-jobs [replica jobs]
+  (let [dead-jobs (into #{} (:killed-jobs replica))]
+    (filter (fn [job] (some #{job} dead-jobs)) jobs)))
+
 (defn remove-sealing-tasks [replica args]
   (let [task (get (map-invert (:sealing-tasks replica)) (:id args))]
     (if task
