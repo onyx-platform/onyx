@@ -181,17 +181,6 @@
     (warn e)
     (>!! outbox-ch entry)))
 
-;; "safe" versions of core.async api, since the task lifecycle
-;; component can throw an exception during a construction, and
-;; all of the channels to operate on will be nil.
-(defn safe-close-ch! [ch]
-  (when ch
-    (close! ch)))
-
-(defn safe-take-ch!! [ch]
-  (when ch
-    (<!! ch)))
-
 (defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
@@ -226,6 +215,45 @@
             seal-dead-ch (chan)
 
             release-fn! (fn []
+                          (close! open-session-kill-ch)
+                          (<!! open-session-dead-ch)
+
+                          (close! read-batch-ch)
+                          (<!! read-batch-dead-ch)
+
+                          (close! decompress-batch-ch)
+                          (<!! decompress-batch-dead-ch)
+
+                          (close! strip-sentinel-ch)
+                          (<!! strip-sentinel-dead-ch)
+
+                          (close! requeue-sentinel-ch)
+                          (<!! requeue-sentinel-dead-ch)
+
+                          (close! apply-fn-ch)
+                          (<!! apply-fn-dead-ch)
+
+                          (close! compress-batch-ch)
+                          (<!! compress-batch-dead-ch)
+
+                          (close! write-batch-ch)
+                          (<!! write-batch-dead-ch)
+
+                          (close! commit-tx-ch)
+                          (<!! commit-tx-dead-ch)
+
+                          (close! close-resources-ch)
+                          (<!! close-resources-dead-ch)
+    
+                          (close! close-temporal-ch)
+                          (<!! close-temporal-dead-ch)
+
+                          (close! reset-payload-node-ch)
+                          (<!! reset-payload-node-dead-ch)
+
+                          (close! seal-ch)
+                          (<!! seal-dead-ch)
+
                           (close! open-session-dead-ch)
                           (close! read-batch-dead-ch)
                           (close! decompress-batch-dead-ch)
@@ -405,6 +433,7 @@
           :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch seal-ch reset-payload-node-dead-ch))
           :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch))
 
+          :release-fn! release-fn!
           :pipeline-data pipeline-data))
       (catch Exception e
         (kill-job e outbox-ch job-id)
@@ -413,59 +442,9 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
 
-    (safe-close-ch! (:open-session-kill-ch component))
-    (safe-take-ch!! (:open-session-dead-ch component))
-
-    (safe-close-ch! (:read-batch-ch component))
-    (safe-take-ch!! (:read-batch-dead-ch component))
-
-    (safe-close-ch! (:decompress-batch-ch component))
-    (safe-take-ch!! (:decompress-batch-dead-ch component))
-
-    (safe-close-ch! (:strip-sentinel-ch component))
-    (safe-take-ch!! (:strip-sentinel-dead-ch component))
-
-    (safe-close-ch! (:requeue-sentinel-ch component))
-    (safe-take-ch!! (:requeue-sentinel-dead-ch component))
-
-    (safe-close-ch! (:apply-fn-ch component))
-    (safe-take-ch!! (:apply-fn-dead-ch component))
-
-    (safe-close-ch! (:compress-batch-ch component))
-    (safe-take-ch!! (:compress-batch-dead-ch component))
-
-    (safe-close-ch! (:write-batch-ch component))
-    (safe-take-ch!! (:write-batch-dead-ch component))
-
-    (safe-close-ch! (:commit-tx-ch component))
-    (safe-take-ch!! (:commit-tx-dead-ch component))
-
-    (safe-close-ch! (:close-resources-ch component))
-    (safe-take-ch!! (:close-resources-dead-ch component))
+    (when-let [f (:release-fn! component)]
+      (f))
     
-    (safe-close-ch! (:close-temporal-ch component))
-    (safe-take-ch!! (:close-temporal-dead-ch component))
-
-    (safe-close-ch! (:reset-payload-node-ch component))
-    (safe-take-ch!! (:reset-payload-node-dead-ch component))
-
-    (safe-close-ch! (:seal-ch component))
-    (safe-take-ch!! (:seal-dead-ch component))
-
-    (safe-close-ch! (:open-session-dead-ch component))
-    (safe-close-ch! (:read-batch-dead-ch component))
-    (safe-close-ch! (:decompress-batch-dead-ch component))
-    (safe-close-ch! (:strip-sentinel-dead-ch component))
-    (safe-close-ch! (:requeue-sentinel-dead-ch component))
-    (safe-close-ch! (:apply-fn-dead-ch component))
-    (safe-close-ch! (:compress-batch-dead-ch component))
-    (safe-close-ch! (:write-batch-dead-ch component))
-    (safe-close-ch! (:commit-tx-dead-ch component))
-    (safe-close-ch! (:close-resources-dead-ch component))
-    (safe-close-ch! (:close-temporal-dead-ch component))
-    (safe-close-ch! (:reset-payload-node-dead-ch component))
-    (safe-close-ch! (:seal-dead-ch component))
-
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
     component))
