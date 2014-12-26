@@ -349,43 +349,69 @@
           (fn [e & _] (kill-job e outbox-ch job-id)))
 
         (dire/with-finally! #'inject-temporal-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'read-batch-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'decompress-batch-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'strip-sentinel-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'requeue-sentinel-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'apply-fn-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'compress-batch-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'write-batch-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'commit-tx-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'close-resources-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'close-temporal-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'reset-payload-node-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (dire/with-finally! #'seal-resource-loop
-          (fn [& args] (release-fn!)))
+          (fn [& args]
+            (>!! (last args) true)
+            (release-fn!)))
 
         (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
