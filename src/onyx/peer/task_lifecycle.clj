@@ -157,16 +157,10 @@
       (>!! close-temporal-ch (munge-close-resources event))
       (recur))))
 
-(defn close-temporal-loop [close-temporal-ch reset-payload-ch dead-ch]
+(defn close-temporal-loop [close-temporal-ch seal-ch dead-ch]
   (loop []
     (when-let [event (<!! close-temporal-ch)]
-      (>!! reset-payload-ch (munge-close-temporal-resources event))
-      (recur))))
-
-(defn reset-payload-node-loop [reset-ch seal-ch dead-ch]
-  (loop []
-    (when-let [event (<!! reset-ch)]
-      (>!! seal-ch event)
+      (>!! seal-ch (munge-close-temporal-resources event))
       (recur))))
 
 (defn seal-resource-loop [seal-ch dead-ch]
@@ -187,6 +181,7 @@
   (start [component]
     (try
       (let [open-session-kill-ch (chan 0)
+
             read-batch-ch (chan 0)
             decompress-batch-ch (chan 0)
             strip-sentinel-ch (chan 0)
@@ -197,7 +192,6 @@
             commit-tx-ch (chan 0)
             close-resources-ch (chan 0)
             close-temporal-ch (chan 0)
-            reset-payload-node-ch (chan 0)
             seal-ch (chan 0)
 
             open-session-dead-ch (chan)
@@ -211,12 +205,14 @@
             commit-tx-dead-ch (chan)
             close-resources-dead-ch (chan)
             close-temporal-dead-ch (chan)
-            reset-payload-node-dead-ch (chan)
             seal-dead-ch (chan)
 
             release-fn! (fn []
+                          (prn "Starting close")
                           (close! open-session-kill-ch)
+                          (prn "Up")
                           (<!! open-session-dead-ch)
+                          (prn "Down")
 
                           (close! read-batch-ch)
                           (<!! read-batch-dead-ch)
@@ -248,9 +244,6 @@
                           (close! close-temporal-ch)
                           (<!! close-temporal-dead-ch)
 
-                          (close! reset-payload-node-ch)
-                          (<!! reset-payload-node-dead-ch)
-
                           (close! seal-ch)
                           (<!! seal-dead-ch)
 
@@ -265,7 +258,6 @@
                           (close! commit-tx-dead-ch)
                           (close! close-resources-dead-ch)
                           (close! close-temporal-dead-ch)
-                          (close! reset-payload-node-dead-ch)
                           (close! seal-dead-ch))
 
             catalog (extensions/read-chunk log :catalog job-id)
@@ -298,55 +290,75 @@
 
         (dire/with-handler! #'inject-temporal-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! open-session-dead-ch)))
 
         (dire/with-handler! #'read-batch-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! read-batch-ch)))
 
         (dire/with-handler! #'decompress-batch-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! decompress-batch-ch)))
 
         (dire/with-handler! #'strip-sentinel-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! strip-sentinel-ch)))
 
         (dire/with-handler! #'requeue-sentinel-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! requeue-sentinel-ch)))
 
         (dire/with-handler! #'apply-fn-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! apply-fn-ch)))
 
         (dire/with-handler! #'compress-batch-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! compress-batch-ch)))
 
         (dire/with-handler! #'write-batch-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! write-batch-ch)))
 
         (dire/with-handler! #'commit-tx-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! commit-tx-ch)))
 
         (dire/with-handler! #'close-resources-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! close-resources-ch)))
         
         (dire/with-handler! #'close-temporal-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
-
-        (dire/with-handler! #'reset-payload-node-loop
-          java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! close-temporal-ch)))
 
         (dire/with-handler! #'seal-resource-loop
           java.lang.Exception
-          (fn [e & _] (kill-job e outbox-ch job-id)))
+          (fn [e & _]
+            (kill-job e outbox-ch job-id)
+            (close! seal-ch)))
 
         (dire/with-finally! #'inject-temporal-loop
           (fn [& args]
@@ -403,11 +415,6 @@
             (>!! (last args) true)
             (release-fn!)))
 
-        (dire/with-finally! #'reset-payload-node-loop
-          (fn [& args]
-            (>!! (last args) true)
-            (release-fn!)))
-
         (dire/with-finally! #'seal-resource-loop
           (fn [& args]
             (>!! (last args) true)
@@ -428,7 +435,6 @@
           :commit-tx-ch commit-tx-ch
           :close-resources-ch close-resources-ch
           :close-temporal-ch close-temporal-ch
-          :reset-payload-node-ch reset-payload-node-ch
           :seal-ch seal-ch
 
           :open-session-dead-ch open-session-dead-ch
@@ -442,7 +448,6 @@
           :commit-tx-dead-ch commit-tx-dead-ch
           :close-resources-dead-ch close-resources-dead-ch
           :close-temporal-dead-ch close-temporal-dead-ch
-          :reset-payload-node-dead-ch reset-payload-node-dead-ch
           :seal-dead-ch seal-dead-ch
 
           :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch))
@@ -455,8 +460,7 @@
           :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch))
           :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch))
           :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch))
-          :close-temporal-loop (thread (close-temporal-loop close-temporal-ch reset-payload-node-ch close-temporal-dead-ch))
-          :reset-payload-node-loop (thread (reset-payload-node-loop reset-payload-node-ch seal-ch reset-payload-node-dead-ch))
+          :close-temporal-loop (thread (close-temporal-loop close-temporal-ch seal-ch close-temporal-dead-ch))
           :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch))
 
           :release-fn! release-fn!
