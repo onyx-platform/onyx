@@ -78,6 +78,18 @@
     (component/stop client)
     id))
 
+(defn kill-job
+  "Kills a currently executing job, given it's job ID. All peers executing
+   tasks for this job cleanly stop executing and volunteer to work on other jobs.
+   Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
+   for execution."
+  [config job-id]
+  (let [client (component/start (system/onyx-client config))
+        entry (create-log-entry :kill-job {:job job-id})]
+    (extensions/write-log-entry (:log client) entry)
+    (component/stop client)
+    true))
+
 (defn await-job-completion
   "Blocks until job-id has had all of its tasks completed."
   [config job-id]
@@ -90,8 +102,10 @@
             new-replica (extensions/apply-log-entry entry replica)
             tasks (get (:tasks new-replica) job-id)
             complete-tasks (get (:completions new-replica) job-id)]
-        (when (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))
-          (recur new-replica))))))
+        (if (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))
+          (recur new-replica)
+          (do (component/stop client)
+              true))))))
 
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
