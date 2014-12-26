@@ -58,6 +58,10 @@
 
 (def out-queue-2 (str (java.util.UUID/randomUUID)))
 
+(def in-queue-3 (str (java.util.UUID/randomUUID)))
+
+(def out-queue-3 (str (java.util.UUID/randomUUID)))
+
 (def hq-config {"host" (:host (:non-clustered (:hornetq config)))
                 "port" (:port (:non-clustered (:hornetq config)))})
 
@@ -67,8 +71,12 @@
 (hq-util/create-queue! hq-config in-queue-2)
 (hq-util/create-queue! hq-config out-queue-2)
 
+(hq-util/create-queue! hq-config in-queue-3)
+(hq-util/create-queue! hq-config out-queue-3)
+
 (hq-util/write-and-cap! hq-config in-queue-1 (map (fn [x] {:n x}) (range n-messages)) echo)
 (hq-util/write-and-cap! hq-config in-queue-2 (map (fn [x] {:n x}) (range n-messages)) echo)
+(hq-util/write-and-cap! hq-config in-queue-3 (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -106,7 +114,7 @@
     :onyx/type :input
     :onyx/medium :hornetq
     :onyx/consumption :concurrent
-    :hornetq/queue-name in-queue-2
+    :hornetq/queue-name "bad-queue-name"
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}
@@ -127,6 +135,33 @@
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}])
 
+(def catalog-3
+  [{:onyx/name :in
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent
+    :hornetq/queue-name in-queue-3
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.automatic-kill-test/my-inc
+    :onyx/type :function
+    :onyx/consumption :concurrent
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :out
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent
+    :hornetq/queue-name out-queue-3
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
+    :onyx/batch-size batch-size}])
+
 (def workflow [[:in :inc] [:inc :out]])
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
@@ -141,18 +176,23 @@
          {:catalog catalog-2 :workflow workflow
           :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(def results (hq-util/consume-queue! hq-config out-queue-2 echo))
+(def j3 (onyx.api/submit-job
+         peer-config
+         {:catalog catalog-3 :workflow workflow
+          :task-scheduler :onyx.task-scheduler/round-robin}))
+
+(def results (hq-util/consume-queue! hq-config out-queue-3 echo))
 
 (def ch (chan 100))
 
 (extensions/subscribe-to-log (:log env) 0 ch)
 
-;; Make sure we find the killed job in the replica, then bail
+;; Make sure we find the first two killed jobs in the replica, then bail
 (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
   (let [position (<!! ch)
         entry (extensions/read-log-entry (:log env) position)
         new-replica (extensions/apply-log-entry entry replica)]
-    (when-not (= (first (:killed-jobs new-replica)) j1)
+    (when-not (= (:killed-jobs new-replica) [j1 j2])
       (recur new-replica))))
 
 (doseq [v-peer v-peers]

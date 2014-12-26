@@ -225,6 +225,21 @@
             reset-payload-node-dead-ch (chan)
             seal-dead-ch (chan)
 
+            release-fn! (fn []
+                          (close! open-session-dead-ch)
+                          (close! read-batch-dead-ch)
+                          (close! decompress-batch-dead-ch)
+                          (close! strip-sentinel-dead-ch)
+                          (close! requeue-sentinel-dead-ch)
+                          (close! apply-fn-dead-ch)
+                          (close! compress-batch-dead-ch)
+                          (close! write-batch-dead-ch)
+                          (close! commit-tx-dead-ch)
+                          (close! close-resources-dead-ch)
+                          (close! close-temporal-dead-ch)
+                          (close! reset-payload-node-dead-ch)
+                          (close! seal-dead-ch))
+
             catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             catalog-entry (find-task catalog (:name task))
@@ -306,56 +321,43 @@
           (fn [e & _] (kill-job e outbox-ch job-id)))
 
         (dire/with-finally! #'inject-temporal-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'read-batch-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'decompress-batch-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'strip-sentinel-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'requeue-sentinel-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'apply-fn-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'compress-batch-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'write-batch-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'commit-tx-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'close-resources-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'close-temporal-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'reset-payload-node-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (dire/with-finally! #'seal-resource-loop
-          (fn [& args]
-            (>!! (last args) true)))
+          (fn [& args] (release-fn!)))
 
         (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
@@ -463,8 +465,6 @@
     (safe-close-ch! (:close-temporal-dead-ch component))
     (safe-close-ch! (:reset-payload-node-dead-ch component))
     (safe-close-ch! (:seal-dead-ch component))
-
-    (prn "Done!")
 
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
