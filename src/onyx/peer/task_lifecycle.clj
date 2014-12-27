@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread go]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread go sliding-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn] :as timbre]
@@ -194,25 +194,22 @@
             close-temporal-ch (chan 0)
             seal-ch (chan 0)
 
-            open-session-dead-ch (chan)
-            read-batch-dead-ch (chan)
-            decompress-batch-dead-ch (chan)
-            strip-sentinel-dead-ch (chan)
-            requeue-sentinel-dead-ch (chan)
-            apply-fn-dead-ch (chan)
-            compress-batch-dead-ch (chan)
-            write-batch-dead-ch (chan)
-            commit-tx-dead-ch (chan)
-            close-resources-dead-ch (chan)
-            close-temporal-dead-ch (chan)
-            seal-dead-ch (chan)
+            open-session-dead-ch (chan (sliding-buffer 1))
+            read-batch-dead-ch (chan (sliding-buffer 1))
+            decompress-batch-dead-ch (chan (sliding-buffer 1))
+            strip-sentinel-dead-ch (chan (sliding-buffer 1))
+            requeue-sentinel-dead-ch (chan (sliding-buffer 1))
+            apply-fn-dead-ch (chan (sliding-buffer 1))
+            compress-batch-dead-ch (chan (sliding-buffer 1))
+            write-batch-dead-ch (chan (sliding-buffer 1))
+            commit-tx-dead-ch (chan (sliding-buffer 1))
+            close-resources-dead-ch (chan (sliding-buffer 1))
+            close-temporal-dead-ch (chan (sliding-buffer 1))
+            seal-dead-ch (chan (sliding-buffer 1))
 
             release-fn! (fn []
-                          (prn "Starting close")
                           (close! open-session-kill-ch)
-                          (prn "Up")
                           (<!! open-session-dead-ch)
-                          (prn "Down")
 
                           (close! read-batch-ch)
                           (<!! read-batch-dead-ch)
@@ -292,73 +289,86 @@
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! open-session-dead-ch)))
+            (close! open-session-kill-ch)
+            ;; Unblock any blocked puts
+            (<!! open-session-dead-ch)))
 
         (dire/with-handler! #'read-batch-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! read-batch-ch)))
+            (close! read-batch-ch)
+            (<!! read-batch-ch)))
 
         (dire/with-handler! #'decompress-batch-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! decompress-batch-ch)))
+            (close! decompress-batch-ch)
+            (<!! decompress-batch-ch)))
 
         (dire/with-handler! #'strip-sentinel-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! strip-sentinel-ch)))
+            (close! strip-sentinel-ch)
+            (<!! strip-sentinel-ch)))
 
         (dire/with-handler! #'requeue-sentinel-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! requeue-sentinel-ch)))
+            (close! requeue-sentinel-ch)
+            (<!! requeue-sentinel-ch)))
 
         (dire/with-handler! #'apply-fn-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! apply-fn-ch)))
+            (close! apply-fn-ch)
+            (<!! apply-fn-ch)))
 
         (dire/with-handler! #'compress-batch-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! compress-batch-ch)))
+            (close! compress-batch-ch)
+            (<!! compress-batch-ch)))
 
         (dire/with-handler! #'write-batch-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! write-batch-ch)))
+            (close! write-batch-ch)
+            (<!! write-batch-ch)))
 
         (dire/with-handler! #'commit-tx-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! commit-tx-ch)))
+            (close! commit-tx-ch)
+            (<!! commit-tx-ch)))
 
         (dire/with-handler! #'close-resources-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! close-resources-ch)))
+            (close! close-resources-ch)
+            (<!! close-resources-ch)))
         
         (dire/with-handler! #'close-temporal-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! close-temporal-ch)))
+            (close! close-temporal-ch)
+            (<!! close-temporal-ch)))
 
         (dire/with-handler! #'seal-resource-loop
           java.lang.Exception
           (fn [e & _]
             (kill-job e outbox-ch job-id)
-            (close! seal-ch)))
+            (close! seal-ch)
+            (<!! seal-ch)))
 
         (dire/with-finally! #'inject-temporal-loop
           (fn [& args]

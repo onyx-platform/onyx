@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx4g" "-Djava.net.preferIPv4Stack=true"]
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.clojure/data.generators "0.1.2"]
                  [org.clojure/data.fressian "0.2.0"]
                  [org.hornetq/hornetq-commons "2.4.0.Final"]
