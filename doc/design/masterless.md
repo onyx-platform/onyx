@@ -28,7 +28,6 @@
     - [Partial Coverage Protection](#partial-coverage-protection)
     - [Examples](#examples-2)
 - [Command Reference](#command-reference)
-- [New functionality](#new-functionality)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -357,31 +356,22 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 -------------------------------------------------
 [`submit-job`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/submit_job.clj)
 
-- Submitter:
-- Purpose:
-- Arguments:
-- Replica update:
-- Side effects:
-- Reactions:
+- Submitter: Client, via public facing API
+- Purpose: Send a catalog and workflow to be scheduled for execution by the cluster
+- Arguments: The job ID (`:id`), the task scheduler for this job (`:task-scheduler`), a topologically sorted sequence of tasks (`:tasks`), the catalog (`:catalog`), and the saturation level for this job (`:saturation`). Saturation denotes the number of peers this job can use, at most. This is typically Infinity, unless all catalog entries set `:onyx/max-peers` to an integer value. Saturation is then the sum of those numbers, since it creates an upper bound on the total number of peers that can be allocated to this task.
+- Replica update: 
+- Side effects: None
+- Reactions: If the job scheduler dictates that this peer should be reallocated to this job or another job, sends `:volunteer-for-task` to the log
 
 -------------------------------------------------
 [`kill-job`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/kill_job.clj)
 
-- Submitter:
-- Purpose:
-- Arguments:
-- Replica update:
-- Side effects:
-- Reactions:
+- Submitter: Client, via public facing API
+- Purpose: Stop all peers currently working on this job, and never allow this job's tasks to be scheduled for execution again
+- Arguments: The job ID (`:job`)
+- Replica update: Adds this job id to `:killed-jobs` vector, removes any peers in `:allocations` for this job's tasks. Switches the `:peer-state` for all peer's executing a task for this job to `:idle`.
+- Side effects: If this peer is executing a task for this job, stops the current task lifecycle
+- Reactions: If this peer is executing a task for this job, reacts with `:volunteer-for-task`
 
 -------------------------------------------------
-
-## New functionality
-
-This design enables a few things that I want to add to the API:
-
-- Alternate schedulers
-- Dynamic task reassignment
-- Percentage task allocation (e.g. 75% of the cluster on task A)
-- `kill-job` API
 
