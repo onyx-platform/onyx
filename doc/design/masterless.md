@@ -29,7 +29,6 @@
     - [Examples](#examples-2)
 - [Command Reference](#command-reference)
 - [New functionality](#new-functionality)
-- [Formal verification](#formal-verification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -323,7 +322,40 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
 
 -------------------------------------------------
-`volunteer-for-task`
+[`volunteer-for-task`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/volunteer_for_task.clj)
+
+- Submitter: peer (P) that wants to execute a new task
+- Purpose: P is possibly available to execute a new task because a new job was submitted, or the cluster size changed - depending on the job and task schedulers
+- Arguments: peer ID of P
+- Replica update: Updates `:allocations` with peer ID under the chosen job and task, if any. Switches `:peer-state` for this peer to `:active` if a task is chosen
+- Side effects: Stop the current task lifecycle, if one is running. Starts a new task lifecycle for the chosen task
+- Reactions: None
+
+-------------------------------------------------
+[`seal-task`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/seal_task.clj)
+
+- Submitter: peer (P), who has seen the leader sentinel
+- Purpose: P wants to propagate the sentinel to all downstream tasks
+- Arguments: P's ID (`:id`), the job ID (`:job`), and the task ID (`:task`)
+- Replica update: If this peer is allowed to seal, updates `:sealing-task` with the task ID associated this peers ID.
+
+<<< Needs more code, docs will be incorrect is transcribed now >>>
+
+- Side effects:
+- Reactions: None
+
+-------------------------------------------------
+[`complete-task`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/complete_task.clj)
+
+- Submitter: peer (P), who has successfully sealed the task
+- Purpose: Indicates to the replica that all downstream tasks have received the sentinel, so this task can be marked complete
+- Arguments: P's ID (`:id`), the job ID (`:job`), and the task ID (`:task`)
+- Replica update: Updates `:completions` to associate job ID to a vector of task ID that have been completed. Removes all peers under `:allocations` for this task. Sets `:peer-state` for all peers executing this task to `:idle`
+- Side effects: Stops this task lifecycle
+- Reactions: Any peer executing this task reacts with `:volunteer-for-task`
+
+-------------------------------------------------
+[`submit-job`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/submit_job.clj)
 
 - Submitter:
 - Purpose:
@@ -333,7 +365,7 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions:
 
 -------------------------------------------------
-`complete-task`
+[`kill-job`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/kill_job.clj)
 
 - Submitter:
 - Purpose:
@@ -352,8 +384,4 @@ This design enables a few things that I want to add to the API:
 - Dynamic task reassignment
 - Percentage task allocation (e.g. 75% of the cluster on task A)
 - `kill-job` API
-
-## Formal verification
-
-?
 

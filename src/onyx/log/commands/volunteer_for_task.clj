@@ -95,7 +95,8 @@
      :task (first (keys (get allocation (first (keys allocation)))))}))
 
 (defmethod extensions/reactions :volunteer-for-task
-  [{:keys [args]} old new diff peer-args])
+  [{:keys [args]} old new diff peer-args]
+  [])
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task
   [{:keys [args]} old new diff state]

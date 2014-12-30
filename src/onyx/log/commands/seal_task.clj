@@ -14,6 +14,10 @@
 
 (defmethod extensions/apply-log-entry :seal-task
   [{:keys [args]} replica]
+  ;;; FIX ME - this is probably a bug causing a race condition.
+  ;;; Can't fix now, but the idea is that this handles the case where
+  ;;; it's either okay to seal, or sealing has already taken place. It
+  ;;; doesn't cover the case where it's not yet okay to seal.
   (if-not (should-seal? replica args)
     (let [peer (get-in replica [:sealing-task (:task args)])]
       (-> replica
