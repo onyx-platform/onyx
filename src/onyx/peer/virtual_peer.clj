@@ -55,6 +55,7 @@
       (let [inbox-ch (chan (:onyx.peer/inbox-capacity opts))
             outbox-ch (chan (:onyx.peer/outbox-capacity opts))
             kill-ch (chan 1)
+            restart-ch (chan 1)
             entry (create-log-entry :prepare-join-cluster {:joiner id})]
         (extensions/subscribe-to-log log 0 inbox-ch)
         (extensions/register-pulse log id)
@@ -63,7 +64,9 @@
 
         (thread (outbox-loop id log outbox-ch))
         (thread (processing-loop id log queue inbox-ch outbox-ch kill-ch opts))
-        (assoc component :id id :inbox-ch inbox-ch :outbox-ch outbox-ch :kill-ch kill-ch))))
+        (assoc component :id id :inbox-ch inbox-ch
+               :outbox-ch outbox-ch :kill-ch kill-ch
+               :restart-ch restart-ch))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
@@ -71,22 +74,10 @@
     (close! (:inbox-ch component))
     (close! (:outbox-ch component))
     (close! (:kill-ch component))
+    (close! (:restart-ch component))
 
     component))
 
 (defn virtual-peer [opts]
   (map->VirtualPeer {:opts opts}))
-
-(defrecord RestartChannel [opts]
-  component/Lifecycle
-
-  (start [component]
-    (assoc component :ch (chan 1)))
-
-  (stop [component]
-    (close! (:ch component))
-    (dissoc component :ch)))
-
-(defn restart-channel []
-  (map->RestartChannel {}))
 

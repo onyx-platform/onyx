@@ -2,7 +2,7 @@
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal]]
             [onyx.logging-configuration :as logging-config]
-            [onyx.peer.virtual-peer :refer [virtual-peer restart-channel]]
+            [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
@@ -74,8 +74,7 @@
   [config]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration (:logging config))
-    :restart-chan (restart-channel)
     :log (component/using (zookeeper config) [:logging-config])
     :queue (component/using (hornetq config) [:log])
-    :virtual-peer (component/using (virtual-peer config) [:restart-chan :log :queue])}))
+    :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 

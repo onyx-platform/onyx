@@ -3,7 +3,7 @@
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
-            [taoensso.timbre :refer [warn]]
+            [taoensso.timbre :refer [warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
@@ -108,16 +108,20 @@
               true))))))
 
 (defn peer-lifecycle [started-peer shutdown-ch ack-ch]
-  (loop [live started-peer]
-    (let [restart-ch (:ch (:restart-chan live))
-          [ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
-      (cond (= ch shutdown-ch)
-            (do (component/stop live)
-                (>!! ack-ch true))
-            (= ch restart-ch)
-            (do (component/stop live)
-                (recur (component/start live)))
-            :else (throw (ex-info "Read from a channel with no response implementation" {}))))))
+  (try
+    (loop [live started-peer]
+      (let [restart-ch (:restart-ch (:virtual-peer live))
+            [v ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
+        (cond (= ch shutdown-ch)
+              (do (component/stop live)
+                  (>!! ack-ch true))
+              (= ch restart-ch)
+              (do (component/stop live)
+                  (recur (component/start live)))
+              :else (throw (ex-info "Read from a channel with no response implementation" {})))))
+    (catch Exception e
+      (fatal "Peer lifecycle threw an exception")
+      (fatal e))))
 
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
@@ -141,7 +145,7 @@
   (>!! (:shutdown-ch peer) true)
   (<!! (:ack-ch peer)))
 
-(defn shutdown-dev-env
+(defn shutdown-env
   "Spins down the given development environment"
   [env]
   (component/stop env))
