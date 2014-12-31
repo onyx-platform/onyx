@@ -77,3 +77,16 @@
 (defn virtual-peer [opts]
   (map->VirtualPeer {:opts opts}))
 
+(defrecord RestartChannel [opts]
+  component/Lifecycle
+
+  (start [component]
+    (assoc component :ch (chan 1)))
+
+  (stop [component]
+    (close! (:ch component))
+    (dissoc component :ch)))
+
+(defn restart-channel []
+  (map->RestartChannel {}))
+

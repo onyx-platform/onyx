@@ -107,6 +107,18 @@
           (do (component/stop client)
               true))))))
 
+(defn peer-lifecycle [started-peer shutdown-ch ack-ch]
+  (loop [live started-peer]
+    (let [restart-ch (:ch (:restart-chan live))
+          [ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
+      (cond (= ch shutdown-ch)
+            (do (component/stop live)
+                (>!! ack-ch true))
+            (= ch restart-ch)
+            (do (component/stop live)
+                (recur (component/start live)))
+            :else (throw (ex-info "Read from a channel with no response implementation" {}))))))
+
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
    by invoking the fn returned by :shutdown-fn."
@@ -114,12 +126,23 @@
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer config)]
-        (component/start v-peer)))
+      (let [v-peer (system/onyx-peer config)
+            live (component/start v-peer)
+            shutdown-ch (chan 1)
+            ack-ch (chan)]
+        {:peer (future (peer-lifecycle live shutdown-ch ack-ch))
+         :shutdown-ch shutdown-ch
+         :ack-ch ack-ch}))
     (range n))))
 
-(defn shutdown
-  "Shutdowns the given resource - presumably either a peer or dev env."
-  [resource]
-  (component/stop resource))
+(defn shutdown-peer
+  "Spins down the virtual peer"
+  [peer]
+  (>!! (:shutdown-ch peer) true)
+  (<!! (:ack-ch peer)))
+
+(defn shutdown-dev-env
+  "Spins down the given development environment"
+  [env]
+  (component/stop env))
 
