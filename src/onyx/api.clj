@@ -107,7 +107,7 @@
           (do (component/stop client)
               true))))))
 
-(defn peer-lifecycle [started-peer shutdown-ch ack-ch]
+(defn peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
     (loop [live started-peer]
       (let [restart-ch (:restart-ch (:virtual-peer live))
@@ -117,6 +117,7 @@
                   (>!! ack-ch true))
               (= ch restart-ch)
               (do (component/stop live)
+                  (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
                   (recur (component/start live)))
               :else (throw (ex-info "Read from a channel with no response implementation" {})))))
     (catch Exception e
@@ -134,7 +135,7 @@
             live (component/start v-peer)
             shutdown-ch (chan 1)
             ack-ch (chan)]
-        {:peer (future (peer-lifecycle live shutdown-ch ack-ch))
+        {:peer (future (peer-lifecycle live config shutdown-ch ack-ch))
          :shutdown-ch shutdown-ch
          :ack-ch ack-ch}))
     (range n))))

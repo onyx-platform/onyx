@@ -16,7 +16,8 @@
               [onyx.plugin.hornetq]))
 
 (def restartable-exceptions
-  [org.hornetq.api.core.HornetQInternalErrorException])
+  [org.hornetq.api.core.HornetQNotConnectedException
+   org.hornetq.api.core.HornetQInternalErrorException])
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
@@ -172,7 +173,6 @@
       (when (:onyx.core/tail-batch? event)
         (munge-seal-resource event))
       (recur))))
-
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
