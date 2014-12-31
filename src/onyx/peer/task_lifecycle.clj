@@ -15,6 +15,9 @@
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
 
+(def restartable-exceptions
+  [org.hornetq.api.core.HornetQInternalErrorException])
+
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
@@ -170,12 +173,15 @@
         (munge-seal-resource event))
       (recur))))
 
-(defn kill-job [e outbox-ch job-id]
-  (let [entry (entry/create-log-entry :kill-job {:job job-id})]
-    (warn e)
-    (>!! outbox-ch entry)))
 
-(defrecord TaskLifeCycle [id log queue job-id task-id outbox-ch seal-resp-ch opts]
+(defn handle-exception [e restart-ch outbox-ch job-id]
+  (warn e)
+  (if (some #{(type e)} restartable-exceptions)
+    (>!! restart-ch true)
+    (let [entry (entry/create-log-entry :kill-job {:job job-id})]
+      (>!! outbox-ch entry))))
+
+(defrecord TaskLifeCycle [id log queue job-id task-id restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -288,7 +294,7 @@
         (dire/with-handler! #'inject-temporal-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! open-session-kill-ch)
             ;; Unblock any blocked puts
             (<!! open-session-dead-ch)))
@@ -296,77 +302,77 @@
         (dire/with-handler! #'read-batch-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! read-batch-ch)
             (<!! read-batch-ch)))
 
         (dire/with-handler! #'decompress-batch-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! decompress-batch-ch)
             (<!! decompress-batch-ch)))
 
         (dire/with-handler! #'strip-sentinel-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! strip-sentinel-ch)
             (<!! strip-sentinel-ch)))
 
         (dire/with-handler! #'requeue-sentinel-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! requeue-sentinel-ch)
             (<!! requeue-sentinel-ch)))
 
         (dire/with-handler! #'apply-fn-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! apply-fn-ch)
             (<!! apply-fn-ch)))
 
         (dire/with-handler! #'compress-batch-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! compress-batch-ch)
             (<!! compress-batch-ch)))
 
         (dire/with-handler! #'write-batch-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! write-batch-ch)
             (<!! write-batch-ch)))
 
         (dire/with-handler! #'commit-tx-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! commit-tx-ch)
             (<!! commit-tx-ch)))
 
         (dire/with-handler! #'close-resources-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! close-resources-ch)
             (<!! close-resources-ch)))
         
         (dire/with-handler! #'close-temporal-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! close-temporal-ch)
             (<!! close-temporal-ch)))
 
         (dire/with-handler! #'seal-resource-loop
           java.lang.Exception
           (fn [e & _]
-            (kill-job e outbox-ch job-id)
+            (handle-exception e restart-ch outbox-ch job-id)
             (close! seal-ch)
             (<!! seal-ch)))
 
@@ -476,7 +482,7 @@
           :release-fn! release-fn!
           :pipeline-data pipeline-data))
       (catch Exception e
-        (kill-job e outbox-ch job-id)
+        (handle-exception e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
@@ -489,9 +495,9 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log queue job task outbox-ch seal-ch opts]}]
+(defn task-lifecycle [args {:keys [id log queue job task restart-ch outbox-ch seal-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :queue queue :job-id job
-                       :task-id task :outbox-ch outbox-ch
+                       :task-id task :restart-ch restart-ch :outbox-ch outbox-ch
                        :seal-resp-ch seal-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
