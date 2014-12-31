@@ -77,7 +77,7 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :sequential
+    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
