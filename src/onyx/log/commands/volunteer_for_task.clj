@@ -79,6 +79,19 @@
         replica))
     replica))
 
+(defmethod select-job :onyx.job-scheduler/percentage
+  [{:keys [args]} replica]
+  (let [candidates (universally-executable-jobs replica)
+        balanced (common/percentage-balanced-workload replica)]
+    (reduce
+     (fn [_ job]
+       (let [required-count (get balanced job)
+             actual-count (count (get (common/job->peers replica) job))]
+         (when (< actual-count required-count)
+           (reduced job))))
+     nil
+     candidates)))
+
 (defmethod select-job :default
   [_ replica]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))

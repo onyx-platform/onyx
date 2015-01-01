@@ -31,7 +31,8 @@
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
    :workflow (schema/pred vector? 'vector?)
-   :task-scheduler schema/Keyword})
+   :task-scheduler schema/Keyword
+   (schema/optional-key :percentage) schema/Int})
 
 (defn validate-job
   [job]

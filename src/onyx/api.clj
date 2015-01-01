@@ -52,6 +52,11 @@
                   roots))
          result))))
 
+(defn add-percentages-to-log-entry [config job args]
+  (if (= (:job-scheduler config) :onyx.job-scheduler/percentage)
+    (assoc args :percentage (:percentage job))
+    args))
+
 (defn submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
@@ -64,6 +69,7 @@
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
+        args (add-percentages-to-log-entry config job args)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow normalized-workflow id)
@@ -145,6 +151,11 @@
   [peer]
   (>!! (:shutdown-ch peer) true)
   (<!! (:ack-ch peer)))
+
+(defn start-env
+  "Spins up a development environment, using in-memory ZooKeeper and HornetQ"
+  [env-config]
+  (component/start (system/onyx-development-env env-config)))
 
 (defn shutdown-env
   "Spins down the given development environment"

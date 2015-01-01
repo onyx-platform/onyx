@@ -170,6 +170,42 @@
 
 (defmethod drop-peers :default
   [replica job n]
-  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
-                  {:replica replica})))
+  (let [scheduler (get-in replica [:task-schedulers job])]
+    (throw (ex-info (format "Task scheduler %s not recognized" scheduler)
+                    {:replica replica}))))
+
+(defn sort-jobs-by-pct [replica]
+  (let [indexed
+        (map-indexed
+         (fn [k j]
+           {:position k :job j :pct (get-in replica [:percentages j])})
+         (reverse (:jobs replica)))]
+    (reverse (sort-by (juxt :pct :position) indexed))))
+
+(defn maximum-jobs-to-use [jobs]
+  (reduce
+   (fn [all {:keys [pct] :as job}]
+     (let [sum (apply + (map :pct all))]
+       (if (<= (+ sum pct) 100)
+         (conj all job)
+         (reduced all))))
+   []
+   jobs))
+
+(defn min-allocations [jobs n-peers]
+  (mapv
+   (fn [job]
+     (let [n (int (Math/floor (* (* 0.01 (:pct job)) n-peers)))]
+       (assoc job :allocation n)))
+   jobs))
+
+(defn percentage-balanced-workload [replica]
+  (let [n-peers (count (:peers replica))
+        sorted-jobs (sort-jobs-by-pct replica)
+        jobs-to-use (maximum-jobs-to-use sorted-jobs)
+        init-allocations (min-allocations jobs-to-use n-peers)
+        init-usage (apply + (map :allocation init-allocations))
+        left-over-peers (- n-peers init-usage)
+        with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
+    (into {} (map (fn [j] {(:job j) j}) with-leftovers))))
 

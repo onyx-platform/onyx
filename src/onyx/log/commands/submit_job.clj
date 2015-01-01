@@ -52,45 +52,11 @@
             true))))
     true))
 
-(defn sort-jobs-by-pct [replica]
-  (let [indexed
-        (map-indexed
-         (fn [k j]
-           {:position k :job j :pct (get-in replica [:percentages j])})
-         (reverse (:jobs replica)))]
-    (reverse (sort-by (juxt :pct :position) indexed))))
-
-(defn maximum-jobs-to-use [jobs]
-  (reduce
-   (fn [all {:keys [pct] :as job}]
-     (let [sum (apply + (map :pct all))]
-       (if (<= (+ sum pct) 100)
-         (conj all job)
-         (reduced all))))
-   []
-   jobs))
-
-(defn min-allocations [jobs n-peers]
-  (mapv
-   (fn [job]
-     (let [n (int (Math/floor (* (* 0.01 (:pct job)) n-peers)))]
-       (assoc job :allocation n)))
-   jobs))
-
-(defn percentage-balanced-workload [replica]
-  (let [n-peers (count (:peers replica))
-        sorted-jobs (sort-jobs-by-pct replica)
-        jobs-to-use (maximum-jobs-to-use sorted-jobs)
-        init-allocations (min-allocations jobs-to-use n-peers)
-        init-usage (apply + (map :allocation init-allocations))
-        left-over-peers (- n-peers init-usage)]
-    (update-in init-allocations [0 :allocation] + left-over-peers)))
-
 (defmethod reallocate? :onyx.job-scheduler/percentage
   [scheduler old new state]
   (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (let [balanced (percentage-balanced-workload new)
-          peer-counts (:allocation (first (filter #(= (:job %) (:job allocation)) balanced)))
+    (let [balanced (common/percentage-balanced-workload new)
+          peer-counts (:allocation (get balanced (:job allocation)))
           peers (get (common/job->peers new) (:job allocation))]
       (when (> (count peers) peer-counts)
         (let [n (- (count peers) peer-counts)
