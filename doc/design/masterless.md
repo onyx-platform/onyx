@@ -250,6 +250,21 @@ If a job is submitted while this scheduler is running, the entire cluster will b
 
 If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced.
 
+##### Percentage Rebalancing Strategy
+
+When a job or peer are added or removed, the Percentage job scheduler needs to dynamically adjust which peers are allocated to which jobs. 
+
+The algorithm works as follows:
+
+- let P be the number of virtual peers in the cluster
+- let S be the jobs sorted from highest to lowest by percentage, subsorted by submit time, earliest first
+- let J be the first n jobs in S who's percentage values do not exceed 100%
+- For each job in J, in order:
+  - let this job be J'
+  - J' will be allocated *at least* (floor (P * J's % value))
+- let X be the sum of all allocations for all J' values
+- Allocate P - X *more* peers to the first job in J
+
 #### Task Schedulers
 
 Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are currently two kinds of schedulers - Greedy and Round Robin.
