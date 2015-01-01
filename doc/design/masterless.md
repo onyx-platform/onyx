@@ -232,6 +232,8 @@ If there aren't enough peers to satisfy the percentage values of all the jobs, t
 
 If the total percentages of all submitted jobs doesn't sum up to 100%, the job with the highest percentage value will receive the extra peers. When percentage values are equal, the earliest submitted job will get priority.
 
+If the algorithm determines that any job should receive a number of peers that is less than 1 (a decimal value), that job receives no peers. This value is floored, and is described in more detail below.
+
 This scheduler does not compose with using `:onyx/max-peers` set on all tasks. The strict upper bound on the number of peers will be respected.
 
 **Peer Addition**
@@ -264,6 +266,12 @@ The algorithm works as follows:
   - J' will be allocated *at least* (floor (P * J's % value))
 - let X be the sum of all allocations for all J' values
 - Allocate P - X *more* peers to the first job in J
+
+And now, for the reassignment phase:
+- for each job J' in J
+- let K be the original number of peers executing this job at current
+- if the current number of peers executing this job exceeds the new assigned amount, this job reassigns the difference to another job
+- exactly which peers are released from a job depends on the Task Scheduler for that job
 
 #### Task Schedulers
 
