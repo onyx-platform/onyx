@@ -2,7 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.log.replica :as replica]
             [onyx.system]
             [schema.test]

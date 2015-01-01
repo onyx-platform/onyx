@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]))
 
@@ -62,8 +62,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 2
 
         catalog [{:onyx/name :names
@@ -115,30 +113,24 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :join-person
-                     :lifecycle/calls :onyx.peer.join-test/join-calls}]
+                     :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
-        v-peers (onyx.api/start-peers 4 peer-group)]
-    (doseq [name names]
-      (>!! name-chan name))
+    (with-test-env [test-env [4 env-config peer-config]]
+      (doseq [name names]
+        (>!! name-chan name))
 
-    (doseq [age ages]
-      (>!! age-chan age))
+      (doseq [age ages]
+        (>!! age-chan age))
 
-    (>!! name-chan :done)
-    (>!! age-chan :done)
+      (>!! name-chan :done)
+      (>!! age-chan :done)
 
-    (onyx.api/submit-job
-      peer-config
-      {:catalog catalog :workflow workflow
-       :lifecycles lifecycles
-       :task-scheduler :onyx.task-scheduler/balanced})
+      (onyx.api/submit-job
+        peer-config
+        {:catalog catalog :workflow workflow
+         :lifecycles lifecycles
+         :task-scheduler :onyx.task-scheduler/balanced})
 
-    (let [results (take-segments! out-chan)]
-      (is (= (set people)
-             (set (butlast results)))))
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+      (let [results (take-segments! out-chan)]
+        (is (= (set people)
+               (set (butlast results))))))))

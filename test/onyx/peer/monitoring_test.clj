@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -36,8 +36,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 20
         catalog [{:onyx/name :in
                   :onyx/plugin :onyx.plugin.core-async/input
@@ -68,13 +66,6 @@
                      :lifecycle/calls :onyx.peer.monitoring-test/out-calls}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-
-        _ (doseq [n (range n-messages)]
-            (>!! in-chan {:n n}))
-
-        _ (>!! in-chan :done)
-        _ (close! in-chan)
-
         monitoring-config {:monitoring :custom
                            :zookeeper-write-log-entry update-state
                            :zookeeper-read-log-entry update-state
@@ -97,36 +88,37 @@
                            :zookeeper-read-job-scheduler update-state
                            :zookeeper-read-messaging update-state
                            :zookeeper-write-origin update-state
-                           :zookeeper-gc-log-entry update-state}
-        v-peers (onyx.api/start-peers 3 peer-group monitoring-config)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog
-             :workflow workflow
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
-        results (take-segments! out-chan)]
+                           :zookeeper-gc-log-entry update-state}]
 
-    (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= expected (set (butlast results))))
-      (is (= :done (last results))))
 
-    (let [metrics @state]
-      (is (seq? (:zookeeper-read-task metrics)))
-      (is (seq? (:zookeeper-read-catalog metrics)))
-      (is (seq? (:zookeeper-read-log-entry metrics)))
-      (is (seq? (:zookeeper-read-workflow metrics)))
-      (is (seq? (:zookeeper-read-flow-conditions metrics)))
-      (is (seq? (:zookeeper-read-lifecycles metrics)))
-      (is (seq? (:zookeeper-read-messaging metrics)))
-      (is (seq? (:zookeeper-read-job-scheduler metrics)))
-      (is (seq? (:zookeeper-read-origin metrics)))
-      (is (seq? (:zookeeper-write-messaging metrics)))
-      (is (seq? (:zookeeper-write-job-scheduler metrics)))
-      (is (seq? (:zookeeper-write-log-entry metrics))))
+    (with-test-env [test-env [3 env-config peer-config monitoring-config]]
+      (doseq [n (range n-messages)]
+        (>!! in-chan {:n n}))
 
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-    (onyx.api/shutdown-peer-group peer-group)
-    (onyx.api/shutdown-env env))) 
+      (>!! in-chan :done)
+      (close! in-chan)
 
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog
+                            :workflow workflow
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
+
+      (let [results (take-segments! out-chan)
+            expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+        (is (= expected (set (butlast results))))
+        (is (= :done (last results))))
+
+      (let [metrics @state]
+        (is (seq? (:zookeeper-read-task metrics)))
+        (is (seq? (:zookeeper-read-catalog metrics)))
+        (is (seq? (:zookeeper-read-log-entry metrics)))
+        (is (seq? (:zookeeper-read-workflow metrics)))
+        (is (seq? (:zookeeper-read-flow-conditions metrics)))
+        (is (seq? (:zookeeper-read-lifecycles metrics)))
+        (is (seq? (:zookeeper-read-messaging metrics)))
+        (is (seq? (:zookeeper-read-job-scheduler metrics)))
+        (is (seq? (:zookeeper-read-origin metrics)))
+        (is (seq? (:zookeeper-write-messaging metrics)))
+        (is (seq? (:zookeeper-write-job-scheduler metrics)))
+        (is (seq? (:zookeeper-write-log-entry metrics))))))) 

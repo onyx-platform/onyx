@@ -11,7 +11,7 @@
             [onyx.api]
             [onyx.types :refer [map->Leaf map->Ack]]
             [com.stuartsierra.component :as component]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 

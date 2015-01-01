@@ -3,7 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api :as api]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]

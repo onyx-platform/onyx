@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def people-in-chan (chan 100))
@@ -78,8 +78,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
         catalog [{:onyx/name :people-in
                   :onyx/plugin :onyx.plugin.core-async/input
@@ -191,30 +189,6 @@
                     {:lifecycle/task :everyone-out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        v-peers (onyx.api/start-peers 9 peer-group)
-
-        _ (doseq [x [{:age 24 :job "athlete" :location "Washington"}
-                     {:age 17 :job "programmer" :location "Washington"}
-                     {:age 18 :job "mechanic" :location "Vermont"}
-                     {:age 13 :job "student" :location "Maine"}
-                     {:age 42 :job "doctor" :location "Florida"}
-                     {:age 64 :job "athlete" :location "Pennsylvania"}
-                     {:age 35 :job "bus driver" :location "Texas"}
-                     {:age 50 :job "lawyer" :location "California"}
-                     {:age 25 :job "psychologist" :location "Washington"}]]
-            (>!! people-in-chan x))
-        _ (>!! people-in-chan :done)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog :workflow workflow
-             :flow-conditions flow-conditions
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
-        children (take-segments! children-out-chan)
-        adults (take-segments! adults-out-chan)
-        athletes-wa (take-segments! athletes-wa-out-chan)
-        everyone (take-segments! everyone-out-chan)
-
         children-expectatations #{{:age 17 :job "programmer" :location "Washington"}
                                   {:age 13 :job "student" :location "Maine"}
                                   :done}
@@ -239,16 +213,31 @@
                                   {:age 25 :job "psychologist" :location "Washington"}
                                   :done}]
 
-    (is (= children-expectatations (into #{} children)))
-    (is (= adults-expectatations (into #{} adults)))
-    (is (= athletes-wa-expectatations (into #{} athletes-wa)))
-    (is (= everyone-expectatations (into #{} everyone)))
+    (with-test-env [test-env [9 env-config peer-config]]
+        (doseq [x [{:age 24 :job "athlete" :location "Washington"}
+                     {:age 17 :job "programmer" :location "Washington"}
+                     {:age 18 :job "mechanic" :location "Vermont"}
+                     {:age 13 :job "student" :location "Maine"}
+                     {:age 42 :job "doctor" :location "Florida"}
+                     {:age 64 :job "athlete" :location "Pennsylvania"}
+                     {:age 35 :job "bus driver" :location "Texas"}
+                     {:age 50 :job "lawyer" :location "California"}
+                     {:age 25 :job "psychologist" :location "Washington"}]]
+            (>!! people-in-chan x))
+        (>!! people-in-chan :done)
+        (onyx.api/submit-job peer-config
+                             {:catalog catalog :workflow workflow
+                              :flow-conditions flow-conditions
+                              :lifecycles lifecycles
+                              :task-scheduler :onyx.task-scheduler/balanced})
+        (let [children (take-segments! children-out-chan)
+              adults (take-segments! adults-out-chan)
+              athletes-wa (take-segments! athletes-wa-out-chan)
+              everyone (take-segments! everyone-out-chan)] 
 
-    (close! people-in-chan)
+          (is (= children-expectatations (into #{} children)))
+          (is (= adults-expectatations (into #{} adults)))
+          (is (= athletes-wa-expectatations (into #{} athletes-wa)))
+          (is (= everyone-expectatations (into #{} everyone)))
 
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+          (close! people-in-chan)))))

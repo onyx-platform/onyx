@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -34,8 +34,6 @@
                            :onyx/id id
                            :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
                            :onyx.messaging/compress-fn #(.getBytes (pr-str %)))
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 20
 
         catalog [{:onyx/name :in
@@ -68,30 +66,22 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.custom-compression-test/out-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
-        v-peers (onyx.api/start-peers 3 peer-group)]
+    (with-test-env [test-env [3 env-config peer-config]]
+      (doseq [n (range n-messages)]
+        (>!! in-chan {:n n}))
 
-    (doseq [n (range n-messages)]
-      (>!! in-chan {:n n}))
+      (>!! in-chan :done)
+      (close! in-chan)
 
-    (>!! in-chan :done)
-    (close! in-chan)
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog
+                            :workflow workflow
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
 
-    (onyx.api/submit-job peer-config
-                         {:catalog catalog
-                          :workflow workflow
-                          :lifecycles lifecycles
-                          :task-scheduler :onyx.task-scheduler/balanced})
-
-    (let [results (take-segments! out-chan)
-          expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= expected (set (butlast results))))
-      (is (= :done (last results)))
-
-      (doseq [v-peer v-peers]
-        (onyx.api/shutdown-peer v-peer))
-
-      (onyx.api/shutdown-peer-group peer-group)
-
-      (onyx.api/shutdown-env env))))
+      (let [results (take-segments! out-chan)
+            expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+        (is (= expected (set (butlast results))))
+        (is (= :done (last results)))))))
