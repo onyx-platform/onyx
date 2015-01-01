@@ -39,6 +39,7 @@
                              (when (= (swap! batch-counter inc) 2)
                                (throw (ex-info "Oops, I died." {:restartable? true})))
                              {})})
+
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
