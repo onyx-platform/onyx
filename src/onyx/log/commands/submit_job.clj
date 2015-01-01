@@ -5,15 +5,28 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
+(defmulti scheduler-replica-update
+  (fn [replica entry]
+    (:job-scheduler replica)))
+
+(defmethod scheduler-replica-update :onyx.job-scheduler/percentage
+  [replica {:keys [args]}]
+  (assoc-in replica [:percentages (:id args)] (:percentage args)))
+
+(defmethod scheduler-replica-update :default
+  [replica entry]
+  replica)
+
 (defmethod extensions/apply-log-entry :submit-job
-  [{:keys [args]} replica]
+  [{:keys [args] :as entry} replica]
   (-> replica
       (update-in [:jobs] conj (:id args))
       (update-in [:jobs] vec)
       (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
       (assoc-in [:tasks (:id args)] (vec (:tasks args)))
       (assoc-in [:allocations (:id args)] {})
-      (assoc-in [:saturation (:id args)] (:saturation args))))
+      (assoc-in [:saturation (:id args)] (:saturation args))
+      (scheduler-replica-update entry)))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]
