@@ -22,6 +22,8 @@
       - [Greedy Job Scheduler](#greedy-job-scheduler)
       - [Round Robin Job Scheduler](#round-robin-job-scheduler)
       - [Round Robin Rebalancing Strategy](#round-robin-rebalancing-strategy)
+      - [Percentage Job Scheduler](#percentage-job-scheduler)
+      - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
     - [Task Schedulers](#task-schedulers)
       - [Greedy Task Scheduler](#greedy-task-scheduler)
       - [Round Robin Task Scheduler](#round-robin-task-scheduler)
@@ -221,6 +223,32 @@ The algorithm works as follows:
 - let K be the original number of peers executing this job
 - if `(P / J)` or `(P / J) + 1` (depending on the job) is less than K, this job reassigns `K - (P / J)` or `K - (P / J) + 1)` peers to the new job that was submitted
 - exactly which peers are released from a job depends on the Task Scheduler for that job
+
+##### Percentage Job Scheduler
+
+The Percentage job scheduler allows jobs to be submitted with a percentage value. The percentage value indicates what percentage of the cluster will be allocated to this job. The use case for this scheduler is for when you have a static number of jobs and a varying number of peers. For example, if you have 2 jobs - A and B, you'd give each of this percentage values - say 70% and 30%, respectively. If you had 100 virtual peers running, 70 would be allocated to A, and 30 to B. If you then added 100 more peers to the cluster, job A would be allocated 140 peers, and job B 30. This dynamically scaling is a big step forward over statically configuring slots, which is normal in ecosystems like Hadoop.
+
+If there aren't enough peers to satisfy the percentage values of all the jobs, this scheduler will allocate with priority to jobs with the highest percentage value. When percentage values are equal, the earliest submitted job will get priority. In the event that jobs are submitted, and the total percentage value exceeds 100%, the earliest submitted jobs that do not exceed 100% will receive peers. Jobs that go beyond it will not receive peers. For example, if you submitted jobs A, B, and C with 70%, 30%, and 20% respectively, jobs A and B would receive peers, and C will not be allocated any peers until either A or B completes.
+
+If the total percentages of all submitted jobs doesn't sum up to 100%, the job with the highest percentage value will receive the extra peers. When percentage values are equal, the earliest submitted job will get priority.
+
+This scheduler does not compose with using `:onyx/max-peers` set on all tasks. The strict upper bound on the number of peers will be respected.
+
+**Peer Addition**
+
+In the event that a peer joins the cluster while the Percentage job scheduler is running, the entire cluster will rebalance.
+
+**Peer Removal**
+
+In the event that a peer leaves the cluster while the Percentage job scheduler is running, the entire cluster will rebalance.
+
+**Job Addition**
+
+If a job is submitted while this scheduler is running, the entire cluster will be rebalanced.
+
+**Job Removal**
+
+If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced.
 
 #### Task Schedulers
 
