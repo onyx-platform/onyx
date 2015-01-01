@@ -90,10 +90,10 @@
   [scheduler old new state]
   (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
     (let [balanced (percentage-balanced-workload new)
-          peer-counts (first (filter #(= (:job %) (:job allocation)) balanced))
+          peer-counts (:allocation (first (filter #(= (:job %) (:job allocation)) balanced)))
           peers (get (common/job->peers new) (:job allocation))]
-      (when (> (count peers) (get peer-counts (:job allocation)))
-        (let [n (- (count peers) (get peer-counts (:job allocation)))
+      (when (> (count peers) peer-counts)
+        (let [n (- (count peers) peer-counts)
               peers-to-drop (common/drop-peers new (:job allocation) n)]
           (when (some #{(:id state)} (into #{} peers-to-drop))
             true))))

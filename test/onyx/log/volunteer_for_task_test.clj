@@ -4,8 +4,7 @@
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(def entry
-  (create-log-entry :volunteer-for-task {:id :x}))
+(def entry (create-log-entry :volunteer-for-task {:id :x}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
 
@@ -118,3 +117,4 @@
                         :sealing-task {:t1 true}
                         :peer-state {:x :active}
                         :peers [:x :y]}))
+
