@@ -90,7 +90,7 @@
 
 (def n-peers 10)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config))
+(def v-peers-1 (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 
@@ -101,78 +101,36 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 7)
-                   (= (count (:c (get (:allocations new-replica) j2))) 3))
+      (if-not (and (= (count (apply concat (vals (get (:allocations new-replica) j1)))) 7)
+                   (= (count (apply concat (vals (get (:allocations new-replica) j2)))) 3))
         (recur new-replica)
         new-replica))))
 
 (fact "70/30% split for percentage job scheduler succeeded" true => true)
 
-(comment
-  (def entry (create-log-entry :complete-task {:job j1 :task :a}))
+(def v-peers-2 (onyx.api/start-peers! n-peers peer-config))
 
-  (extensions/write-log-entry (:log env) entry)
+(def ch (chan n-peers))
 
-  (def replica-2
-    (loop [replica replica]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if (and (= (count (:b (get (:allocations new-replica) j1))) 40)
-                 (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
-          new-replica
-          (recur new-replica)))))
+(extensions/subscribe-to-log (:log env) 0 ch)
 
-  (fact "All peers were reallocated to job 1, task B" true => true)
+(def replica
+  (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if-not (and (= (count (apply concat (vals (get (:allocations new-replica) j1)))) 14)
+                   (= (count (apply concat (vals (get (:allocations new-replica) j2)))) 6))
+        (recur new-replica)
+        new-replica))))
 
-  (def entry (create-log-entry :complete-task {:job j1 :task :b}))
+(fact "70/30% split for percentage job scheduler succeeded after rebalance" true => true)
 
-  (extensions/write-log-entry (:log env) entry)
+(doseq [v-peer v-peers-1]
+  (onyx.api/shutdown-peer v-peer))
 
-  (def replica-3
-    (loop [replica replica-2]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if (= (count (:c (get (:allocations new-replica) j2))) 40)
-          new-replica
-          (recur new-replica)))))
+(doseq [v-peer v-peers-2]
+  (onyx.api/shutdown-peer v-peer))
 
-  (fact "All peers were reallocated to job 2, task C" true => true)
+(onyx.api/shutdown-env env)
 
-  (def entry (create-log-entry :complete-task {:job j2 :task :c}))
-
-  (extensions/write-log-entry (:log env) entry)
-
-  (def replica-4
-    (loop [replica replica-3]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if (= (count (:d (get (:allocations new-replica) j2))) 40)
-          new-replica
-          (recur new-replica)))))
-
-  (fact "All peers were reallocated to job 2, task D" true => true)
-
-  (def entry (create-log-entry :complete-task {:job j2 :task :d}))
-
-  (extensions/write-log-entry (:log env) entry)
-
-  (def replica-5
-    (loop [replica replica-4]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if (zero? (apply + (map count (vals (get (:allocations new-replica) j2)))))
-          new-replica
-          (recur new-replica)))))
-
-  (fact "No peers are executing any tasks" true => true)
-
-  (doseq [v-peer v-peers]
-    (onyx.api/shutdown-peer v-peer))
-
-  (onyx.api/shutdown-env env)
-
-)

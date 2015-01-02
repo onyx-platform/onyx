@@ -82,15 +82,24 @@
 (defmethod select-job :onyx.job-scheduler/percentage
   [{:keys [args]} replica]
   (let [candidates (universally-executable-jobs replica)
-        balanced (common/percentage-balanced-workload replica)]
-    (reduce
-     (fn [_ job]
-       (let [required-count (get balanced job)
-             actual-count (count (get (common/job->peers replica) job))]
-         (when (< actual-count required-count)
-           (reduced job))))
-     nil
-     candidates)))
+        balanced (common/percentage-balanced-workload replica)
+        job
+        (reduce
+         (fn [_ job]
+           (let [required-count (:allocation (get balanced job))
+                 actual-count (count (get (common/job->peers replica) job))]
+             (when (< actual-count required-count)
+               (reduced job))))
+         nil
+         candidates)]
+    (if job
+      (let [task (select-task replica job)]
+        (-> replica
+            (common/remove-peers args)
+            (update-in [:allocations job task] conj (:id args))
+            (update-in [:allocations job task] vec)
+            (assoc-in [:peer-state (:id args)] :active)))
+      replica)))
 
 (defmethod select-job :default
   [_ replica]

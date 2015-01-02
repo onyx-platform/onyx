@@ -53,7 +53,7 @@
          result))))
 
 (defn add-percentages-to-log-entry [config job args]
-  (if (= (:job-scheduler config) :onyx.job-scheduler/percentage)
+  (if (= (:onyx.peer/job-scheduler config) :onyx.job-scheduler/percentage)
     (assoc args :percentage (:percentage job))
     args))
 
