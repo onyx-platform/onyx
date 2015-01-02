@@ -27,7 +27,7 @@
     - [Task Schedulers](#task-schedulers)
       - [Greedy Task Scheduler](#greedy-task-scheduler)
       - [Round Robin Task Scheduler](#round-robin-task-scheduler)
-      - [Percentage Task Scheduler]#(percentage-task-scheduler)
+      - [Percentage Task Scheduler](#percentage-task-scheduler)
     - [Partial Coverage Protection](#partial-coverage-protection)
     - [Examples](#examples-2)
 - [Command Reference](#command-reference)
