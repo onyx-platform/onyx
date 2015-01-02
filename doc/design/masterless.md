@@ -27,6 +27,7 @@
     - [Task Schedulers](#task-schedulers)
       - [Greedy Task Scheduler](#greedy-task-scheduler)
       - [Round Robin Task Scheduler](#round-robin-task-scheduler)
+      - [Percentage Task Scheduler]#(percentage-task-scheduler)
     - [Partial Coverage Protection](#partial-coverage-protection)
     - [Examples](#examples-2)
 - [Command Reference](#command-reference)
@@ -304,6 +305,24 @@ If a peer fails, or is otherwise removed from the cluster, the Task scheduler de
 **Max Peer Parameter**
 
 With the Round Robin Task Scheduler, each entry in the catalog can specify a key of `:onyx/max-peers` with an integer value > 0. When this key is set, Onyx will never assign that task more than that number of peers. Round Robin will simply skip the task for allocation when more peers are available, and continue assigning round robin to other tasks.
+
+##### Percentage Task Scheduler
+
+The Percentage Scheduler takes a set of tasks, all of which must be assigned a percentage value (`:onyx/percent`) in the corresponding catalog entries. The percentage values *must* add up to 100 or less. Percent values may be integers between 1 and 99, inclusive. This schedule will allocate peers for this job in proportions to the specified tasks. As more or less peers join the cluster, allocations will automatically scale. For example, if a job has tasks A, B, and C with 70%, 20%, and 30% specified as their percentages, and there are 10 peers, task A receives 7 peers, B 2 peers, and C 1 peer.
+
+This scheduler handles corner cases (fractions of peers) in the same way as the Percentage Job Scheduler. See that documentation for a full description.
+
+**Task Completion**
+
+When a task is complete, this scheduler moves all peers executing and adds them all to the next incomplete task with the largest percentage.
+
+**Peer Removal**
+
+If a peer fails, or is otherwise removed from the cluster, the Task scheduler rebalances all the peers for even distribution.
+
+**Max Peer Parameter**
+
+This task scheduler is *not* composable with `:onyx/max-peers`.
 
 #### Partial Coverage Protection
 
