@@ -43,54 +43,58 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def catalog-1
   [{:onyx/name :a
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :c
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def catalog-2
   [{:onyx/name :d
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :e
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :f
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def j1
-  (onyx.api/submit-job (:log env)
+  (onyx.api/submit-job peer-config
                        {:workflow [[:a :b] [:b :c]]
                         :catalog catalog-1
                         :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
-  (onyx.api/submit-job (:log env)
+  (onyx.api/submit-job peer-config
                        {:workflow [[:d :e] [:e :f]]
                         :catalog catalog-2
                         :task-scheduler :onyx.task-scheduler/round-robin}))
@@ -107,19 +111,37 @@
   (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 6)
-                   (= (count (:b (get (:allocations new-replica) j1))) 6)
-                   (= (count (:c (get (:allocations new-replica) j1))) 6)
-                   (= (count (:d (get (:allocations new-replica) j2))) 6)
-                   (= (count (:e (get (:allocations new-replica) j2))) 6)
-                   (= (count (:f (get (:allocations new-replica) j2))) 6))
+          new-replica (extensions/apply-log-entry entry replica)
+          task-a (nth (get-in new-replica [:tasks j1]) 0)
+          task-b (nth (get-in new-replica [:tasks j1]) 1)
+          task-c (nth (get-in new-replica [:tasks j1]) 2)
+          task-d (nth (get-in new-replica [:tasks j2]) 0)
+          task-e (nth (get-in new-replica [:tasks j2]) 1)
+          task-f (nth (get-in new-replica [:tasks j2]) 2)]
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 6)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 6)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 6)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 6))
         (recur new-replica)
         new-replica))))
 
+(def task-a (nth (get-in replica-1 [:tasks j1]) 0))
+
+(def task-b (nth (get-in replica-1 [:tasks j1]) 1))
+
+(def task-c (nth (get-in replica-1 [:tasks j1]) 2))
+
+(def task-d (nth (get-in replica-1 [:tasks j2]) 0))
+
+(def task-e (nth (get-in replica-1 [:tasks j2]) 1))
+
+(def task-f (nth (get-in replica-1 [:tasks j2]) 2))
+
 (fact "6 peers are assigned to each task" true => true)
 
-(def entry (create-log-entry :complete-task {:job j2 :task :d}))
+(def entry (create-log-entry :complete-task {:job j2 :task task-d}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -128,18 +150,18 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 6)
-                   (= (count (:b (get (:allocations new-replica) j1))) 6)
-                   (= (count (:c (get (:allocations new-replica) j1))) 6)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 9)
-                   (= (count (:f (get (:allocations new-replica) j2))) 9))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 6)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 9)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 9))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers rebalanced after job 2, task D completes" true => true)
 
-(def entry (create-log-entry :complete-task {:job j2 :task :e}))
+(def entry (create-log-entry :complete-task {:job j2 :task task-e}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -148,18 +170,18 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 6)
-                   (= (count (:b (get (:allocations new-replica) j1))) 6)
-                   (= (count (:c (get (:allocations new-replica) j1))) 6)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 0)
-                   (= (count (:f (get (:allocations new-replica) j2))) 18))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 6)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 6)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 18))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers rebalanced after job 2, task E completes" true => true)
 
-(def entry (create-log-entry :complete-task {:job j1 :task :a}))
+(def entry (create-log-entry :complete-task {:job j1 :task task-a}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -168,18 +190,18 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 0)
-                   (= (count (:b (get (:allocations new-replica) j1))) 9)
-                   (= (count (:c (get (:allocations new-replica) j1))) 9)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 0)
-                   (= (count (:f (get (:allocations new-replica) j2))) 18))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 9)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 9)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 18))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers rebalanced after job 1, task A completes" true => true)
 
-(def entry (create-log-entry :complete-task {:job j2 :task :f}))
+(def entry (create-log-entry :complete-task {:job j2 :task task-f}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -188,18 +210,18 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 0)
-                   (= (count (:b (get (:allocations new-replica) j1))) 18)
-                   (= (count (:c (get (:allocations new-replica) j1))) 18)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 0)
-                   (= (count (:f (get (:allocations new-replica) j2))) 0))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 18)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 18)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 0))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers rebalanced after job 2, task F completes" true => true)
 
-(def entry (create-log-entry :complete-task {:job j1 :task :b}))
+(def entry (create-log-entry :complete-task {:job j1 :task task-b}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -208,18 +230,18 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 0)
-                   (= (count (:b (get (:allocations new-replica) j1))) 0)
-                   (= (count (:c (get (:allocations new-replica) j1))) 36)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 0)
-                   (= (count (:f (get (:allocations new-replica) j2))) 0))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 36)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 0))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers rebalanced after job 1, task B completes" true => true)
 
-(def entry (create-log-entry :complete-task {:job j1 :task :c}))
+(def entry (create-log-entry :complete-task {:job j1 :task task-c}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -228,21 +250,19 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 0)
-                   (= (count (:b (get (:allocations new-replica) j1))) 0)
-                   (= (count (:c (get (:allocations new-replica) j1))) 0)
-                   (= (count (:d (get (:allocations new-replica) j2))) 0)
-                   (= (count (:e (get (:allocations new-replica) j2))) 0)
-                   (= (count (:f (get (:allocations new-replica) j2))) 0))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 0)
+                   (= (count (get (get (:allocations new-replica) j1) task-c)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-e)) 0)
+                   (= (count (get (get (:allocations new-replica) j2) task-f)) 0))
         (recur new-replica)
         new-replica))))
 
 (fact "The peers stop working after job 1, task C completes" true => true)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 

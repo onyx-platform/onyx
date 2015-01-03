@@ -27,9 +27,7 @@
    :onyx/id onyx-id
    :onyx.coordinator/revoke-delay 5000})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def a-id "a")
 
@@ -81,5 +79,5 @@
 (fact (:fn entry) => :leave-cluster)
 (fact (:args entry) => {:id "d"})
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
