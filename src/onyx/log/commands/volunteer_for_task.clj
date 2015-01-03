@@ -128,27 +128,20 @@
   (fn [scheduler old new job state]
     scheduler))
 
-(defn under-allocated-tasks? [replica job tasks balanced]
-  (seq (filter
-        (fn [t]
-          (< (:allocation (get balanced t))
-             (count (get-in replica [:allocations job t])))) tasks)))
-
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
-  (if-let [allocated-task (:task (common/peer->allocated-job (:allocations new) (:id state)))]
-    (let [candidate-tasks (keys (get-in new [:allocations job]))
-          n-peers (count (apply concat (vals (get-in new [:allocations job]))))
-          balanced (common/percentage-balanced-taskload new job candidate-tasks n-peers)
-          required (:allocation (get balanced allocated-task))
-          actual (count (get-in new [:allocations job allocated-task]))
-          under-allocated? (under-allocated-tasks? new job candidate-tasks balanced)]
-      (when (and (> actual required) under-allocated?)
-        (let [n (- actual required)
-              peers-to-drop (common/drop-peers new job n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
+  (let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
+    (when (= (:job allocation) job)
+      (let [candidate-tasks (keys (get-in new [:allocations job]))
+            n-peers (count (apply concat (vals (get-in new [:allocations job]))))
+            balanced (common/percentage-balanced-taskload new job candidate-tasks n-peers)
+            required (:allocation (get balanced (:task allocation)))
+            actual (count (get-in new [:allocations job (:task allocation)]))]
+        (when (and (> actual required))
+          (let [n (- actual required)
+                peers-to-drop (common/drop-peers new job n)]
+            (when (some #{(:id state)} (into #{} peers-to-drop))
+              true)))))))
 
 (defmethod reallocate-from-task? :default
   [scheduler old new job state]

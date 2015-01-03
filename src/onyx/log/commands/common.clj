@@ -114,7 +114,9 @@
        (count (get-in replica [:tasks %])))
    (:jobs replica)))
 
-(defn active-tasks-only [replica tasks]
+(defn active-tasks-only
+  "Filters out tasks that are currently being sealed."
+  [replica tasks]
   (filter #(nil? (get-in replica [:sealing-task %])) tasks))
 
 (defn jobs-with-available-tasks [replica jobs]
@@ -209,17 +211,18 @@
 (defn task-needing-pct-peers [replica job tasks peer]
   (let [allocations (get-in replica [:allocations job])
         total-allocated (count (into #{} (conj (apply concat (vals allocations)) peer)))
-        balanced (percentage-balanced-taskload replica job tasks total-allocated)]
+        balanced (percentage-balanced-taskload replica job tasks total-allocated)
+        sorted-tasks (reverse (sort-by (juxt :pct :position) (vals balanced)))]
     (reduce
      (fn [default t]
-       (let [pct (:pct (get balanced t))
-             allocated (get allocations t)
+       (let [pct (:pct (get balanced (:task t)))
+             allocated (get allocations (:task t))
              required (int (Math/floor (* total-allocated (* 0.01 pct))))]
          (if (< (count allocated) required)
-           (reduced t)
+           (reduced (:task t))
            default)))
-     (:task (first (reverse (sort-by (juxt :pct :position) (vals balanced)))))
-     tasks)))
+     (:task (first sorted-tasks))
+     sorted-tasks)))
 
 (defmulti drop-peers
   (fn [replica job n]

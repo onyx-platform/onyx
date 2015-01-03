@@ -73,33 +73,30 @@
     :onyx/percentage 20
     :onyx/batch-size 20}])
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:a :b] [:b :c]]
-  :catalog catalog
-  :task-scheduler :onyx.task-scheduler/percentage})
+(def job-id
+  (onyx.api/submit-job
+   peer-config
+   {:workflow [[:a :b] [:b :c]]
+    :catalog catalog
+    :task-scheduler :onyx.task-scheduler/percentage}))
 
-(comment
-  (def ch (chan n-peers))
+(def ch (chan n-peers))
 
-  (extensions/subscribe-to-log (:log env) 0 ch)
+(extensions/subscribe-to-log (:log env) 0 ch)
 
-  (def replica
-    (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log env) position)
-            new-replica (extensions/apply-log-entry entry replica)
-            counts (map count (mapcat vals (vals (:allocations new-replica))))]
-        (when-not (= (into #{} counts) #{1 2})
-          (recur new-replica)))))
+(def replica
+  (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)
+          counts (map count (vals (get-in new-replica [:allocations job-id])))]
+      (when-not (= #{2 3 5} (into #{} counts))
+        (recur new-replica)))))
 
-  (fact "peers balanced on 1 jobs" true => true)
+(fact "peers balanced in 50/30/20 split" true => true)
 
-  (doseq [v-peer v-peers]
-    (try
-      ((:shutdown-fn v-peer))
-      (catch Exception e (prn e))))
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
 
-  (onyx.api/shutdown-env env)
+(onyx.api/shutdown-env env)
 
-)
