@@ -43,47 +43,51 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def catalog-1
   [{:onyx/name :a
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def catalog-2
   [{:onyx/name :c
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :d
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def j1
-  (onyx.api/submit-job (:log env)
-                       {:workflow [[:a :b]]
-                        :catalog catalog-1
-                        :task-scheduler :onyx.task-scheduler/greedy}))
+  (onyx.api/submit-job
+   peer-config
+   {:workflow [[:a :b]]
+    :catalog catalog-1
+    :task-scheduler :onyx.task-scheduler/greedy}))
 
 (def j2
-  (onyx.api/submit-job (:log env)
-                       {:workflow [[:c :d]]
-                        :catalog catalog-2
-                        :task-scheduler :onyx.task-scheduler/greedy}))
+  (onyx.api/submit-job
+   peer-config
+   {:workflow [[:c :d]]
+    :catalog catalog-2
+    :task-scheduler :onyx.task-scheduler/greedy}))
 
 (def n-peers 40)
 

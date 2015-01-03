@@ -90,10 +90,41 @@
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)
           counts (map count (vals (get-in new-replica [:allocations job-id])))]
-      (when-not (= #{2 3 5} (into #{} counts))
-        (recur new-replica)))))
+      (if-not (= #{2 3 5} (into #{} counts))
+        (recur new-replica)
+        new-replica))))
 
 (fact "peers balanced in 50/30/20 split" true => true)
+
+(def inversions (clojure.set/map-invert (get-in replica [:task-percentages job-id])))
+
+(def task-a (get inversions 50))
+
+(def task-b (get inversions 30))
+
+(def task-c (get inversions 20))
+
+(def entry (create-log-entry :complete-task {:job job-id :task task-a}))
+
+(extensions/write-log-entry (:log env) entry)
+
+(def entry (create-log-entry :complete-task {:job job-id :task task-b}))
+
+(extensions/write-log-entry (:log env) entry)
+
+(def ch (chan n-peers))
+
+(extensions/subscribe-to-log (:log env) 0 ch)
+
+(def replica-2
+  (loop [replica replica]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)
+          counts (map count (vals (get-in new-replica [:allocations job-id])))]
+      (if-not (= #{10} (into #{} counts))
+        (recur new-replica)
+        new-replica))))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
