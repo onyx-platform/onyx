@@ -206,9 +206,9 @@
         with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
     (into {} (map (fn [t] {(:task t) t}) with-leftovers))))
 
-(defn task-needing-pct-peers [replica job tasks]
+(defn task-needing-pct-peers [replica job tasks peer]
   (let [allocations (get-in replica [:allocations job])
-        total-allocated (inc (count (apply concat (vals allocations))))
+        total-allocated (count (into #{} (conj (apply concat (vals allocations)) peer)))
         balanced (percentage-balanced-taskload replica job tasks total-allocated)]
     (reduce
      (fn [default t]

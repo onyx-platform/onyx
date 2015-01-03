@@ -9,7 +9,7 @@
             [taoensso.timbre]))
 
 (defmulti select-task
-  (fn [replica job]
+  (fn [replica job peer-id]
     (get-in replica [:task-schedulers job])))
 
 (defn incomplete-tasks [replica job tasks]
@@ -18,14 +18,14 @@
     (filter identity (second (diff completed tasks)))))
 
 (defmethod select-task :onyx.task-scheduler/greedy
-  [replica job]
+  [replica job peer-id]
   (->> (get-in replica [:tasks job])
        (incomplete-tasks replica job)
        (common/active-tasks-only replica)
        (first)))
 
 (defmethod select-task :onyx.task-scheduler/round-robin
-  [replica job]
+  [replica job peer-id]
   (let [allocations (get-in replica [:allocations job])]
     (->> (get-in replica [:tasks job])
          (incomplete-tasks replica job)
@@ -36,15 +36,15 @@
          :task)))
 
 (defmethod select-task :onyx.task-scheduler/percentage
-  [replica job]
+  [replica job peer-id]
   (let [candidates (->> (get-in replica [:tasks job])
                         (incomplete-tasks replica job)
                         (common/active-tasks-only replica))]
-    (or (common/task-needing-pct-peers replica job candidates)
+    (or (common/task-needing-pct-peers replica job candidates peer-id)
         (common/highest-pct-task replica job candidates))))
 
 (defmethod select-task :default
-  [replica job]
+  [replica job peer-id]
   (throw (ex-info (format "Task scheduler %s not recognized"
                           (get-in replica [:task-schedulers job]))
                   {:replica replica})))
@@ -63,7 +63,7 @@
   [{:keys [args]} replica]
   (let [job (first (universally-executable-jobs replica))]
     (if job
-      (let [task (select-task replica job)]
+      (let [task (select-task replica job (:id args))]
         (-> replica
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
@@ -78,7 +78,7 @@
           job (or (common/find-job-needing-peers replica candidates)
                   (common/round-robin-next-job replica candidates))]
       (if job
-        (let [task (select-task replica job)]
+        (let [task (select-task replica job (:id args))]
           (-> replica
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
@@ -101,7 +101,7 @@
          nil
          candidates)]
     (if job
-      (let [task (select-task replica job)]
+      (let [task (select-task replica job (:id args))]
         (-> replica
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
@@ -128,6 +128,12 @@
   (fn [scheduler old new job state]
     scheduler))
 
+(defn under-allocated-tasks? [replica job tasks balanced]
+  (seq (filter
+        (fn [t]
+          (< (:allocation (get balanced t))
+             (count (get-in replica [:allocations job t])))) tasks)))
+
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
   (if-let [allocated-task (:task (common/peer->allocated-job (:allocations new) (:id state)))]
@@ -135,8 +141,9 @@
           n-peers (count (apply concat (vals (get-in new [:allocations job]))))
           balanced (common/percentage-balanced-taskload new job candidate-tasks n-peers)
           required (:allocation (get balanced allocated-task))
-          actual (count (get-in new [:allocations job allocated-task]))]
-      (when (> actual required)
+          actual (count (get-in new [:allocations job allocated-task]))
+          under-allocated? (under-allocated-tasks? new job candidate-tasks balanced)]
+      (when (and (> actual required) under-allocated?)
         (let [n (- actual required)
               peers-to-drop (common/drop-peers new job n)]
           (when (some #{(:id state)} (into #{} peers-to-drop))
