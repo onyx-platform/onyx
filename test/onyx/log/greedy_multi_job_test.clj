@@ -101,15 +101,27 @@
   (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 40)
+          new-replica (extensions/apply-log-entry entry replica)
+          task-a (first (get-in new-replica [:tasks j1]))
+          task-b (second (get-in new-replica [:tasks j1]))
+          task-c (first (get-in new-replica [:tasks j2]))
+          task-d (second (get-in new-replica [:tasks j2]))]
+      (if-not (and (= (count (get-in new-replica [:allocations j1 task-a])) 40)
                    (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
         (recur new-replica)
         new-replica))))
 
 (fact "40 peers were allocated to job 1, task A" true => true)
 
-(def entry (create-log-entry :complete-task {:job j1 :task :a}))
+(def task-a (first (get-in replica [:tasks j1])))
+
+(def task-b (second (get-in replica [:tasks j1])))
+
+(def task-c (first (get-in replica [:tasks j2])))
+
+(def task-d (second (get-in replica [:tasks j2])))
+
+(def entry (create-log-entry :complete-task {:job j1 :task task-a}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -118,14 +130,14 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if (and (= (count (:b (get (:allocations new-replica) j1))) 40)
+      (if (and (= (count (get (get (:allocations new-replica) j1) task-a)) 40)
                (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
         new-replica
         (recur new-replica)))))
 
 (fact "All peers were reallocated to job 1, task B" true => true)
 
-(def entry (create-log-entry :complete-task {:job j1 :task :b}))
+(def entry (create-log-entry :complete-task {:job j1 :task task-b}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -134,13 +146,13 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if (= (count (:c (get (:allocations new-replica) j2))) 40)
+      (if (= (count (get (get (:allocations new-replica) j2) task-c)) 40)
         new-replica
         (recur new-replica)))))
 
 (fact "All peers were reallocated to job 2, task C" true => true)
 
-(def entry (create-log-entry :complete-task {:job j2 :task :c}))
+(def entry (create-log-entry :complete-task {:job j2 :task task-c}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -149,13 +161,13 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if (= (count (:d (get (:allocations new-replica) j2))) 40)
+      (if (= (count (get (get (:allocations new-replica) j2) task-d)) 40)
         new-replica
         (recur new-replica)))))
 
 (fact "All peers were reallocated to job 2, task D" true => true)
 
-(def entry (create-log-entry :complete-task {:job j2 :task :d}))
+(def entry (create-log-entry :complete-task {:job j2 :task task-d}))
 
 (extensions/write-log-entry (:log env) entry)
 
@@ -171,9 +183,7 @@
 (fact "No peers are executing any tasks" true => true)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
