@@ -43,9 +43,7 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def n-peers 10)
 
@@ -56,43 +54,49 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :c
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def catalog-2
   [{:onyx/name :d
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :e
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :f
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
-(onyx.api/submit-job (:log env)
+(onyx.api/submit-job peer-config
                      {:workflow [[:a :b] [:b :c]]
                       :catalog catalog-1
                       :task-scheduler :onyx.task-scheduler/greedy})
 
-(onyx.api/submit-job (:log env)
+(onyx.api/submit-job peer-config
                      {:workflow [[:d :e] [:e :f]]
                       :catalog catalog-2
                       :task-scheduler :onyx.task-scheduler/greedy})
@@ -113,9 +117,7 @@
 (fact "peers balanced on 2 jobs" true => true)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
