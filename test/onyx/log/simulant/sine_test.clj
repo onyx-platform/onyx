@@ -47,9 +47,7 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def cluster (atom []))
 
@@ -152,7 +150,7 @@
   (swap! cluster
          (fn [c]
            (when (last c)
-             ((:shutdown-fn (last c))))
+             (onyx.api/shutdown-peer (last c)))
            (vec (butlast c)))))
 
 (def sine-cluster-test
@@ -203,5 +201,5 @@
 
 (fact (count (:peers replica)) => 45)
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
