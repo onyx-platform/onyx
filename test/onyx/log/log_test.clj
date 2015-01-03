@@ -25,9 +25,7 @@
    :onyx/id onyx-id
    :onyx.coordinator/revoke-delay 5000})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (facts
  "We can write to the log and read the entries back out"
@@ -36,11 +34,9 @@
 
  (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def entries 10000)
 
@@ -61,5 +57,5 @@
                    (range entries)))
        => entries))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 

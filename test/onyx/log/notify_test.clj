@@ -1,6 +1,6 @@
 (ns onyx.log.notify-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
+             [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
@@ -29,9 +29,7 @@
    :onyx/id onyx-id
    :onyx.coordinator/revoke-delay 5000})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def a-id "a")
 
@@ -132,5 +130,6 @@
 (fact (:fn entry) => :leave-cluster)
 (fact (:args entry) => {:id "d"})
 
-(component/stop env)
+(onyx.api/shutdown-env env)
+
 

@@ -43,9 +43,7 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def n-peers 5)
 
@@ -56,23 +54,27 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :c
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
-(onyx.api/submit-job (:log env)
-                     {:workflow [[:a :b] [:b :c]]
-                      :catalog catalog
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+(onyx.api/submit-job
+ peer-config
+ {:workflow [[:a :b] [:b :c]]
+  :catalog catalog
+  :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def ch (chan n-peers))
 
@@ -90,9 +92,7 @@
 (fact "peers balanced on 1 jobs" true => true)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
