@@ -45,15 +45,15 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
-(defmulti reallocate?
+(defmulti reallocate-from-job?
   (fn [scheduler old new state]
     scheduler))
 
-(defmethod reallocate? :onyx.job-scheduler/greedy
+(defmethod reallocate-from-job? :onyx.job-scheduler/greedy
   [scheduler old new state]
   (not (seq (common/alive-jobs old (:jobs old)))))
 
-(defmethod reallocate? :onyx.job-scheduler/round-robin
+(defmethod reallocate-from-job? :onyx.job-scheduler/round-robin
   [scheduler old new state]
   (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
     (let [peer-counts (common/balance-jobs new)
@@ -65,7 +65,7 @@
             true))))
     true))
 
-(defmethod reallocate? :onyx.job-scheduler/percentage
+(defmethod reallocate-from-job? :onyx.job-scheduler/percentage
   [scheduler old new state]
   (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
     (let [balanced (common/percentage-balanced-workload new)
@@ -80,7 +80,7 @@
 
 (defmethod extensions/reactions :submit-job
   [entry old new diff peer-args]
-  (when (reallocate? (:job-scheduler old) old new peer-args)
+  (when (reallocate-from-job? (:job-scheduler old) old new peer-args)
     [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :submit-job

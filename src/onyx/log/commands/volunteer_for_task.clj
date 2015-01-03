@@ -124,9 +124,34 @@
     {:job (first (keys allocation))
      :task (first (keys (get allocation (first (keys allocation)))))}))
 
+(defmulti reallocate-from-task?
+  (fn [scheduler old new job state]
+    scheduler))
+
+(defmethod reallocate-from-task? :onyx.task-scheduler/percentage
+  [scheduler old new job state]
+  (if-let [allocated-task (:task (common/peer->allocated-job (:allocations new) (:id state)))]
+    (let [candidate-tasks (keys (get-in new [:allocations job]))
+          n-peers (count (apply concat (vals (get-in new [:allocations job]))))
+          balanced (common/percentage-balanced-taskload new job candidate-tasks n-peers)
+          required (:allocation (get balanced allocated-task))
+          actual (count (get-in new [:allocations job allocated-task]))]
+      (when (> actual required)
+        (let [n (- actual required)
+              peers-to-drop (common/drop-peers new job n)]
+          (when (some #{(:id state)} (into #{} peers-to-drop))
+            true))))
+    true))
+
+(defmethod reallocate-from-task? :default
+  [scheduler old new job state]
+  false)
+
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args]
-  [])
+  (let [scheduler (get-in new [:task-schedulers (:job diff)])]
+    (when (reallocate-from-task? scheduler old new (:job diff) peer-args)
+      [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task
   [{:keys [args]} old new diff state]
