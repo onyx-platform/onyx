@@ -29,9 +29,7 @@
    :onyx/id onyx-id
    :onyx.coordinator/revoke-delay 5000})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def peer-config
   {:hornetq/mode :udp
@@ -68,9 +66,7 @@
 (fact (count (:peers replica)) => n-peers)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
