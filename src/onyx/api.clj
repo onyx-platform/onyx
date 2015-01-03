@@ -52,10 +52,25 @@
                   roots))
          result))))
 
-(defn add-percentages-to-log-entry [config job args]
+(defn add-job-percentage [config job args]
   (if (= (:onyx.peer/job-scheduler config) :onyx.job-scheduler/percentage)
     (assoc args :percentage (:percentage job))
     args))
+
+(defn task-id->pct [catalog task]
+  (let [task-map (planning/find-task catalog (:name task))]
+    {(:id task) (:onyx/percentage task-map)}))
+
+(defn add-task-percentage [args job-id tasks catalog]
+  (if (= (:task-scheduler args) :onyx.task-scheduler/percentage)
+    (assoc-in args
+              [:task-percentages]
+              (into {} (map (fn [t] (task-id->pct catalog t)) tasks)))
+    args))
+
+(defn add-percentages-to-log-entry [config job args tasks catalog job-id]
+  (let [job-updated (add-job-percentage config job args)]
+    (add-task-percentage job-updated job-id tasks catalog)))
 
 (defn submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
@@ -69,7 +84,7 @@
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
-        args (add-percentages-to-log-entry config job args)
+        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow normalized-workflow id)

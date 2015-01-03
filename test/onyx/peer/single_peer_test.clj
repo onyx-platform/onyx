@@ -36,6 +36,7 @@
    :onyx/id id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
 (def dev (onyx-development-env env-config))

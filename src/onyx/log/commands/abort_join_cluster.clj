@@ -23,7 +23,7 @@
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
-    (Thread/sleep (rand-int 250)))
+    (Thread/sleep (or (:onyx.peer/join-failure-back-off (:opts state)) 250)))
   state)
 
 (defmethod extensions/reactions :abort-join-cluster

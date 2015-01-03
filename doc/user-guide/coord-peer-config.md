@@ -108,12 +108,23 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 
 #### Base Configuration
 
-| key name                        | type       | default|
-|---------------------------------|------------|--------|
-|`:onyx.peer/retry-start-interval`| `int`      | `2000` |
-|`:onyx.peer/sequential-back-off` | `int`      | `2000` |
-|`:onyx.peer/drained-back-off`    | `int`      | `400`  |
-|`:onyx.peer/fn-params`           | `map`      | `{}`   |
+| key name                         | type       | default|
+|----------------------------------|------------|--------|
+|`:onyx.peer/inbox-capacity`       | `int`      | `1000` |
+|`:onyx.peer/outbox-capacity`      | `int`      | `1000` |
+|`:onyx.peer/join-failure-back-off`| `int`      | `250`  |
+|`:onyx.peer/retry-start-interval` | `int`      | `2000` |
+|`:onyx.peer/sequential-back-off`  | `int`      | `2000` |
+|`:onyx.peer/drained-back-off`     | `int`      | `400`  |
+|`:onyx.peer/fn-params`            | `map`      | `{}`   |
+
+##### `:onyx.peer/inbox-capacity`
+
+Maximum number of messages to try to prefetch and store in the inbox, since reading from the log happens asynchronously.
+
+##### `:onyx.peer/outbox-capacity`
+
+Maximum number of messages to buffer in the outbox for writing, since writing to the log happens asynchronously.
 
 ##### `:onyx.peer/retry-start-interval`
 
@@ -133,27 +144,9 @@ A map of keywords to vectors. Keywords represent task names, vectors represent t
 to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
 underlying `:add` with `(f 42 <segment>)`.
 
-### Coordinator Full Example
+##### `onyx.peer/join-failure-back-off`
 
-```clojure
-(def coord-opts
-  {:hornetq/mode :udp
-   :hornetq/server? true
-   :hornetq.udp/cluster-name "onyx-cluster"
-   :hornetq.udp/group-address "231.7.7.7"
-   :hornetq.udp/group-port 9876
-   :hornetq.udp/refresh-timeout 5000
-   :hornetq.udp/discovery-timeout 5000
-   :hornetq.server/type :embedded
-   :hornetq.embedded/config ["hornetq/clustered-1.xml" "hornetq/clustered-2.xml"]
-   :zookeeper/address "127.0.0.1:2181"
-   :zookeeper/server? true
-   :zookeeper.server/port "2181"
-   :onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
-   :onyx.coordinator/host "localhost"
-   :onyx.coordinator/port "12345"
-   :onyx.coordinator/revoke-delay 5000})
-```
+Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
 
 ### Peer Full Example
 

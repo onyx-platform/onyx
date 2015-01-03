@@ -20,8 +20,13 @@
 (defn processing-loop [id log queue inbox-ch outbox-ch restart-ch kill-ch opts]
   (try
     (loop [replica {:job-scheduler (:onyx.peer/job-scheduler opts)}
-           state (merge {:id id :log log :queue queue :outbox-ch outbox-ch
-                         :opts opts :restart-ch restart-ch :stall-output? true
+           state (merge {:id id
+                         :log log
+                         :queue queue
+                         :outbox-ch outbox-ch
+                         :opts opts
+                         :restart-ch restart-ch
+                         :stall-output? true
                          :task-lifecycle-fn task-lifecycle}
                         (:onyx.peer/state opts))]
       (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
@@ -53,8 +58,8 @@
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
-      (let [inbox-ch (chan (:onyx.peer/inbox-capacity opts))
-            outbox-ch (chan (:onyx.peer/outbox-capacity opts))
+      (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
+            outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
             kill-ch (chan 1)
             restart-ch (chan 1)
             entry (create-log-entry :prepare-join-cluster {:joiner id})]

@@ -35,32 +35,13 @@
          (first)
          :task)))
 
-(defn highest-pct-task [replica job tasks]
-  (->> tasks
-       (sort-by #(get-in replica [:task-percentages job %]))
-       (reverse)
-       (first)))
-
-(defn task-needing-pct-peers [replica job tasks]
-  (let [allocations (get-in replica [:allocations job])
-        total-allocated (apply concat (vals allocations))]
-    (reduce
-     (fn [_ t]
-       (let [pct (get-in replica [:task-percentages job t])
-             allocated (get allocations t)
-             required (int (Math/floor (* total-allocated (* 0.01 pct))))]
-         (when (< (count allocated) required)
-           (reduced t))))
-     nil
-     tasks)))
-
 (defmethod select-task :onyx.task-scheduler/percentage
   [replica job]
   (let [candidates (->> (get-in replica [:tasks job])
                         (incomplete-tasks replica job)
                         (common/active-tasks-only replica))]
-    (or (task-needing-pct-peers replica job candidates)
-        (highest-pct-task replica job candidates))))
+    (or (common/task-needing-pct-peers replica job candidates)
+        (common/highest-pct-task replica job candidates))))
 
 (defmethod select-task :default
   [replica job]

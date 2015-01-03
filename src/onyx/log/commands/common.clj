@@ -142,37 +142,26 @@
      {}
      (select-keys (:peer-state replica) peers))))
 
-(defmulti drop-peers
-  (fn [replica job n]
-    (get-in replica [:task-schedulers job])))
+(defn highest-pct-task [replica job tasks]
+  (->> tasks
+       (sort-by #(get-in replica [:task-percentages job %]))
+       (reverse)
+       (first)))
 
-(defmethod drop-peers :onyx.task-scheduler/greedy
-  [replica job n]
-  (let [tasks (get (:allocations replica) job)]
-    (take-last n (apply concat (vals tasks)))))
+(defn task-needing-pct-peers [replica job tasks]
+  (let [allocations (get-in replica [:allocations job])
+        total-allocated (count (apply concat (vals allocations)))]
+    (reduce
+     (fn [_ t]
+       (let [pct (get-in replica [:task-percentages job t])
+             allocated (get allocations t)
+             required (int (Math/floor (* total-allocated (* 0.01 pct))))]
+         (when (< (count allocated) required)
+           (reduced t))))
+     nil
+     tasks)))
 
-(defmethod drop-peers :onyx.task-scheduler/round-robin
-  [replica job n]
-  (let [task-seq (cycle (reverse (get-in replica [:tasks job])))
-        rets
-        (:rets
-         (reduce
-          (fn [{:keys [rets allocations task-seq] :as vars} _]
-            (-> vars
-                (update-in [:rets] conj (last (get allocations (first task-seq))))
-                (update-in [:allocations (first task-seq)] butlast)
-                (update-in [:task-seq] rest)))
-          {:rets []
-           :allocations (get-in replica [:allocations job])
-           :task-seq task-seq}
-          (range n)))]
-    rets))
-
-(defmethod drop-peers :default
-  [replica job n]
-  (let [scheduler (get-in replica [:task-schedulers job])]
-    (throw (ex-info (format "Task scheduler %s not recognized" scheduler)
-                    {:replica replica}))))
+(get-in {#uuid "9c05b855-9682-40e8-9551-430ad05e756f" {#uuid "90350d31-3848-458d-9ed0-e3e356c88e5b" 50, #uuid "b1be3056-a3c6-4e9e-b93b-9238e3216bc5" 30, #uuid "0966f2b3-de0b-4107-a17d-4f4fb3ea5be6" 20}} [])
 
 (defn sort-jobs-by-pct [replica]
   (let [indexed
@@ -180,6 +169,14 @@
          (fn [k j]
            {:position k :job j :pct (get-in replica [:percentages j])})
          (reverse (:jobs replica)))]
+    (reverse (sort-by (juxt :pct :position) indexed))))
+
+(defn sort-tasks-by-pct [replica job]
+  (let [indexed
+        (map-indexed
+         (fn [k t]
+           {:position k :task t :pct (get-in replica [:task-percentages job t])})
+         (reverse (get-in replica [:tasks job])))]
     (reverse (sort-by (juxt :pct :position) indexed))))
 
 (defn maximum-jobs-to-use [jobs]
@@ -199,6 +196,13 @@
        (assoc job :allocation n)))
    jobs))
 
+(defn min-task-allocations [replica job tasks n-peers]
+  (mapv
+   (fn [task]
+     (let [n (int (Math/floor (* (* 0.01 (:pct task)) n-peers)))]
+       (assoc task :allocation n)))
+   tasks))
+
 (defn percentage-balanced-workload [replica]
   (let [n-peers (count (:peers replica))
         sorted-jobs (sort-jobs-by-pct replica)
@@ -208,4 +212,50 @@
         left-over-peers (- n-peers init-usage)
         with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
     (into {} (map (fn [j] {(:job j) j}) with-leftovers))))
+
+(defn percentage-balanced-taskload [replica job n-peers]
+  (let [sorted-tasks (sort-tasks-by-pct replica job)
+        init-allocations (min-task-allocations replica job sorted-tasks n-peers)
+        init-usage (apply + (map :allocation init-allocations))
+        left-over-peers (- n-peers init-usage)
+        with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
+    (into {} (map (fn [t] {(:task t) t}) with-leftovers))))
+
+(defmulti drop-peers
+  (fn [replica job n]
+    (get-in replica [:task-schedulers job])))
+
+(defmethod drop-peers :onyx.task-scheduler/greedy
+  [replica job n]
+  (let [tasks (get (:allocations replica) job)]
+    (take-last n (apply concat (vals tasks)))))
+
+(defmethod drop-peers :onyx.task-scheduler/round-robin
+  [replica job n]
+  (let [task-seq (cycle (reverse (get-in replica [:tasks job])))]
+    (:rets
+     (reduce
+      (fn [{:keys [rets allocations task-seq] :as vars} _]
+        (-> vars
+            (update-in [:rets] conj (last (get allocations (first task-seq))))
+            (update-in [:allocations (first task-seq)] butlast)
+            (update-in [:task-seq] rest)))
+      {:rets []
+       :allocations (get-in replica [:allocations job])
+       :task-seq task-seq}
+      (range n)))))
+
+(defmethod drop-peers :onyx.task-scheduler/percentage
+  [replica job n]
+  (let [balanced (percentage-balanced-taskload replica job n)]
+    (mapcat
+     (fn [[task {:keys [allocation]}]]
+       (drop-last allocation (get-in replica [:allocations job task])))
+     balanced)))
+
+(defmethod drop-peers :default
+  [replica job n]
+  (let [scheduler (get-in replica [:task-schedulers job])]
+    (throw (ex-info (format "Task scheduler %s not recognized" scheduler)
+                    {:replica replica}))))
 

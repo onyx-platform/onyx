@@ -2,8 +2,8 @@
 
 - Transducer support for Functions. (Mike's note: need to cherry-pick this commit back into 0.5.x branch)
 - The Coordinator has been abolished. Onyx is now a fully masterless system. The environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.
-- Job schedulers are now available to control peer allocation across different jobs. Supports `:onyx.job-scheduler/greedy` and `:onyx.job-scheduler/round-robin`.
-- Task schedulers are now available to control peer allocation across tasks within a particular job. Supports `:onyx.task-scheduler/greedy` and `:onyx.task-scheduler/round-robin`.
+- Job schedulers are now available to control peer allocation across different jobs. Supports `:onyx.job-scheduler/greedy`, `:onyx.job-scheduler/round-robin`, and `:onyx.job-scheduler/percentage`.
+- Task schedulers are now available to control peer allocation across tasks within a particular job. Supports `:onyx.task-scheduler/greedy`, `:onyx.task-scheduler/round-robin`, and `:onyx.task-scheduler/percentage`.
 - `:onyx/max-peers` may optionally be specified on any catalog entry to bound the number of peers executing a particular task. Only applicable under a Round Robin Job Scheduler.
 - New `kill-job` API function.
 - Peers now automatically kill their currently running job if it throws an exception.

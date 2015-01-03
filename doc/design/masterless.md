@@ -10,6 +10,7 @@
 - [Towards a masterless design](#towards-a-masterless-design)
   - [The Log](#the-log)
   - [The Inbox and Outbox](#the-inbox-and-outbox)
+  - [Applying Log Entries](#applying-log-entries)
   - [Joining the Cluster](#joining-the-cluster)
     - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
     - [Examples](#examples)
@@ -69,6 +70,20 @@ Every virtual peer maintains its own inbox and output. Messages received appear 
 Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's current processing - hence the inbox will probably be configured with a size greater than one.
 
 The outbox is used to send commands to the log. Certain commands processed by the peer will generate *other* commands. For example, if a peer is idle and it receives a command notifying it about a new job, the peer will *react* by sending a command to the log that it gets allocated for work. Each peer can choose to *pause* or *resume* the sending of its outbox messages. This is useful when the peer is just acquiring membership to the cluster. It will have to play log commands to join the cluster fully, but it cannot volunteer to be allocated for work.
+
+### Applying Log Entries
+
+This section describes how log entries are applied to the peer's local replica. A log entry is a persistent, sequential znode. It's content is a map with keys `:fn` and `:args`. `:fn` is mapped to a keyword that finds this log entries implementation. `:args` is mapped to another map with any data needed to apply the log entry to the replica.
+
+Peers begin with the empty state value, and local state. Local state maintains a mapping of things like the inbox and outbox. Local state does not contain values.
+
+Each virtual peer starts a thread that listens for additions to the log. When it the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
+
+Peers affect change in the world by reacting to log entries. When a log entry is applied, the peer calls `onyx.extensions/replica-diff`, passing it the old and new replicas. The peer produces a value summarization of what changed. This diff is used in subsequent sections to decide how to react and what side-effects to carry out.
+
+Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the diff, and it's local state. The peer can decide to submit new entries back to the log as a reaction to the log entry it just saw. It might react to "submit-job" with "volunteer-for-task", for instance.
+
+Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-side-effects!`. This function will do things like talking to ZooKeeper or writing to core.async channels. Isolating side effects means that a subset of the test suite can operate on pure functions alone.
 
 ### Joining the Cluster
 
@@ -162,11 +177,13 @@ In a masterless design, there is no single entity that assigns to peers. Instead
 
 #### Job Schedulers
 
-Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute. There are currently two kinds of schedulers - Greedy and Round Robin.
+Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute. There are a few different kinds of schedulers, listed below. To use each, configure the Peer Options map with key `:onyx.peer/job-scheduler` to the value specified below.
 
 ##### Greedy Job Scheduler
 
 The Greedy job scheduler allocates *all peers* to each job in the order that it was submitted. For example, suppose you had 100 virtual peers and you submitted two jobs - job A and job B. With a Greedy scheduler, *all* 100 peers would be allocated to job A. When (if) job A completes, all 100 peers will then execute tasks for job B. This *probably* isn't desirable when you're running streaming workflows, since they theoretically never end.
+
+To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/greedy` in the Peer Options.
 
 **Peer Addition**
 
@@ -187,6 +204,8 @@ If a job is completed or otherwise cancelled, *all* of the peers executed that t
 ##### Round Robin Job Scheduler
 
 The Round Robin job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Round Robin scheduler, job A would be allocated peer 1, job B would be allocated peer 2, job A would be allocated peer 3, and so on. In the end, both jobs will end up with 50 virtual peers allocated to each. Round robin begins allocating by selecting the first job submitted.
+
+To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/round-robin` in the Peer Options.
 
 **Peer Addition**
 
@@ -237,6 +256,8 @@ If the algorithm determines that any job should receive a number of peers that i
 
 This scheduler does not compose with using `:onyx/max-peers` set on all tasks. The strict upper bound on the number of peers will be respected.
 
+To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/percentage` in the Peer Options.
+
 **Peer Addition**
 
 In the event that a peer joins the cluster while the Percentage job scheduler is running, the entire cluster will rebalance.
@@ -276,11 +297,13 @@ And now, for the reassignment phase:
 
 #### Task Schedulers
 
-Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are currently two kinds of schedulers - Greedy and Round Robin.
+Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are a few different Task Scheduler implementations, listed below. To use each, call `onyx.api/submit-job`. The second argument of this function is a map. Supply a `:task-scheduler` key and map it to the value specified below.
 
 ##### Greedy Task Scheduler
 
 The Greedy Task Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler always assigns the next peer to the *earliest* task in the sorted workflow that is not complete. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to task A.
+
+To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/greedy`.
 
 **Task Completion**
 
@@ -293,6 +316,8 @@ If a peer fails, or is otherwise removed from the cluster, the Task scheduler de
 ##### Round Robin Task Scheduler
 
 The Round Robin Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to tasks A, B, C, D, A, B, C, D, ... and so on.
+
+To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/round-robin`.
 
 **Task Completion**
 
@@ -308,9 +333,11 @@ With the Round Robin Task Scheduler, each entry in the catalog can specify a key
 
 ##### Percentage Task Scheduler
 
-The Percentage Scheduler takes a set of tasks, all of which must be assigned a percentage value (`:onyx/percent`) in the corresponding catalog entries. The percentage values *must* add up to 100 or less. Percent values may be integers between 1 and 99, inclusive. This schedule will allocate peers for this job in proportions to the specified tasks. As more or less peers join the cluster, allocations will automatically scale. For example, if a job has tasks A, B, and C with 70%, 20%, and 30% specified as their percentages, and there are 10 peers, task A receives 7 peers, B 2 peers, and C 1 peer.
+The Percentage Scheduler takes a set of tasks, all of which must be assigned a percentage value (`:onyx/percentage`) in the corresponding catalog entries. The percentage values *must* add up to 100 or less. Percent values may be integers between 1 and 99, inclusive. This schedule will allocate peers for this job in proportions to the specified tasks. As more or less peers join the cluster, allocations will automatically scale. For example, if a job has tasks A, B, and C with 70%, 20%, and 30% specified as their percentages, and there are 10 peers, task A receives 7 peers, B 2 peers, and C 1 peer.
 
 This scheduler handles corner cases (fractions of peers) in the same way as the Percentage Job Scheduler. See that documentation for a full description.
+
+To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/percentage`.
 
 **Task Completion**
 
