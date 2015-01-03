@@ -43,51 +43,53 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def catalog-1
   [{:onyx/name :a
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def catalog-2
   [{:onyx/name :c
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}
 
    {:onyx/name :d
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent}])
+    :onyx/consumption :concurrent
+    :onyx/batch-size 20}])
 
 (def j1
-  (onyx.api/submit-job (:log env)
+  (onyx.api/submit-job peer-config
                        {:workflow [[:a :b]]
                         :catalog catalog-1
                         :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
-  (onyx.api/submit-job (:log env)
+  (onyx.api/submit-job peer-config
                        {:workflow [[:c :d]]
                         :catalog catalog-2
                         :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def n-peers 12)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config ))
+(def v-peers (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 
@@ -97,19 +99,31 @@
   (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 3)
-                   (= (count (:b (get (:allocations new-replica) j1))) 3)
-                   (= (count (:c (get (:allocations new-replica) j2))) 3)
-                   (= (count (:d (get (:allocations new-replica) j2))) 3))
+          new-replica (extensions/apply-log-entry entry replica)
+          task-a (first (get-in new-replica [:tasks j1]))
+          task-b (second (get-in new-replica [:tasks j1]))
+          task-c (first (get-in new-replica [:tasks j2]))
+          task-d (second (get-in new-replica [:tasks j2]))]
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 3)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 3)
+                   (= (count (get (get (:allocations new-replica) j2) task-c)) 3)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 3))
         (recur new-replica)
         new-replica))))
+
+(def task-a (first (get-in replica-1 [:tasks j1])))
+
+(def task-b (second (get-in replica-1 [:tasks j1])))
+
+(def task-c (first (get-in replica-1 [:tasks j2])))
+
+(def task-d (second (get-in replica-1 [:tasks j2])))
 
 (fact "the peers evenly balance" true => true)
 
 (def conn (zk/connect (:address (:zookeeper config))))
 
-(def id (last (:b (get (:allocations replica-1) j1))))
+(def id (last (get (get (:allocations replica-1) j1) task-b)))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" id))
 
@@ -120,19 +134,17 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (:a (get (:allocations new-replica) j1))) 3)
-                   (= (count (:b (get (:allocations new-replica) j1))) 3)
-                   (= (count (:c (get (:allocations new-replica) j2))) 3)
-                   (= (count (:d (get (:allocations new-replica) j2))) 2))
+      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 3)
+                   (= (count (get (get (:allocations new-replica) j1) task-b)) 3)
+                   (= (count (get (get (:allocations new-replica) j2) task-c)) 3)
+                   (= (count (get (get (:allocations new-replica) j2) task-d)) 2))
         (recur new-replica)
         new-replica))))
 
 (fact "the peers rebalance" true => true)
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
