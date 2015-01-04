@@ -1,8 +1,7 @@
-(ns onyx.coordinator.sim-test-utils
+(ns onyx.peer.simulant.sim-test-utils
   (:require [midje.sweet :refer :all]
             [clojure.core.async :refer [chan <!! >!! timeout]]
             [clojure.data.generators :as gen]
-            [com.stuartsierra.component :as component]
             [datomic.api :as d]
             [zookeeper :as zk]
             [taoensso.timbre :refer [info]]))
@@ -23,3 +22,4 @@
     (doseq [v (vals m)]
       (doseq [tx v]
         (d/transact conn tx)))))
+

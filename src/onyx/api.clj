@@ -147,7 +147,7 @@
 
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
-   by invoking the fn returned by :shutdown-fn."
+   by passing it to the shutdown-peer function."
   ([n config]
      (start-peers! n config system/onyx-peer))
   ([n config peer-f]
