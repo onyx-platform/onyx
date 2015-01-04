@@ -1,4 +1,4 @@
-(ns onyx.peer.kill-job-test
+(ns onyx.peer.killed-job-test
   (:require [clojure.core.async :refer [chan <!!]]
             [com.stuartsierra.component :as component]
             [midje.sweet :refer :all]
