@@ -1,7 +1,7 @@
 (ns onyx.log.notify-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-             [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
+            [com.stuartsierra.component :as component]
+            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]

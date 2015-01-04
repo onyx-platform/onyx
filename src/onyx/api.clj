@@ -148,18 +148,20 @@
 (defn start-peers!
   "Launches n virtual peers. Each peer may be stopped
    by invoking the fn returned by :shutdown-fn."
-  [n config]
-  (doall
-   (map
-    (fn [_]
-      (let [v-peer (system/onyx-peer config)
-            live (component/start v-peer)
-            shutdown-ch (chan 1)
-            ack-ch (chan)]
-        {:peer (future (peer-lifecycle live config shutdown-ch ack-ch))
-         :shutdown-ch shutdown-ch
-         :ack-ch ack-ch}))
-    (range n))))
+  ([n config]
+     (start-peers! n config system/onyx-peer))
+  ([n config peer-f]
+     (doall
+      (map
+       (fn [_]
+         (let [v-peer (peer-f config)
+               live (component/start v-peer)
+               shutdown-ch (chan 1)
+               ack-ch (chan)]
+           {:peer (future (peer-lifecycle live config shutdown-ch ack-ch))
+            :shutdown-ch shutdown-ch
+            :ack-ch ack-ch}))
+       (range n)))))
 
 (defn shutdown-peer
   "Spins down the virtual peer"

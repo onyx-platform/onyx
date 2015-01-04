@@ -1,7 +1,7 @@
 (ns onyx.log.simulant.sine-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
+            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -142,7 +142,7 @@
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
   (when (< (count @cluster) 30)
-    (let [peer (first (onyx.api/start-peers! 1 peer-config))]
+    (let [peer (first (onyx.api/start-peers! 1 peer-config system/onyx-fake-peer))]
       (swap! cluster conj peer))))
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
@@ -171,7 +171,7 @@
 (sim/create-action-log sim-conn sine-cluster-sim)
 
 ;; Seed it with 20 peers since sine waves goes negative.
-(doseq [peer (onyx.api/start-peers! 20 peer-config)]
+(doseq [peer (onyx.api/start-peers! 20 peer-config system/onyx-fake-peer)]
   (swap! cluster conj peer))
 
 (def pruns
@@ -183,7 +183,7 @@
 
 ;; We should finish with 15 peers. Take it to a global maximum
 ;; to have a reliable seek point in the log for verification.
-(doseq [peer (onyx.api/start-peers! 30 peer-config)]
+(doseq [peer (onyx.api/start-peers! 30 peer-config system/onyx-fake-peer)]
   (swap! cluster conj peer))
 
 (def ch (chan 5))

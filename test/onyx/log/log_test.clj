@@ -1,7 +1,7 @@
 (ns onyx.log.log-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
+            [onyx.system :as system]
             [onyx.extensions :as extensions]
             [midje.sweet :refer :all]))
 

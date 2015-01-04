@@ -1,7 +1,7 @@
 (ns onyx.log.greedy-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
+            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -91,7 +91,7 @@
 
 (def n-peers 40)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config))
+(def v-peers (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
 
 (def ch (chan n-peers))
 

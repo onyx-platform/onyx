@@ -56,6 +56,15 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
+(defrecord OnyxFakePeer []
+  component/Lifecycle
+  (start [this]
+    (rethrow-component
+     #(component/start-system this peer-components)))
+  (stop [this]
+    (rethrow-component
+     #(component/stop-system this peer-components))))
+
 (defn onyx-development-env
   [config]
   (map->OnyxDevelopmentEnv
@@ -76,5 +85,27 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :queue (component/using (hornetq config) [:log])
+    :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
+
+(defrecord FakeHornetQConnection []
+  component/Lifecycle
+
+  (start [component]
+    (taoensso.timbre/info "Starting Fake HornetQ connection")
+    component)
+
+  (stop [component]
+    (taoensso.timbre/info "Stopping Fake HornetQ connection")
+    component))
+
+(defn fake-hornetq [_]
+  (map->FakeHornetQConnection {}))
+
+(defn onyx-fake-peer
+  [config]
+  (map->OnyxFakePeer
+   {:logging-config (logging-config/logging-configuration (:logging config))
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (fake-hornetq config) [:log])
     :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 
