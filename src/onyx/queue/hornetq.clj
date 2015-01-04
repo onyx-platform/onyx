@@ -222,9 +222,16 @@
                       n))
                   sessions))]
         (.close session)
-        (doall (map #(.close %) sessions))
-        (doall (map #(.close %) session-factories))
-        (doall (map #(.close %) locators))
+
+        (doseq [session sessions]
+          (.close session))
+
+        (doseq [factory session-factories]
+          (.close factory))
+
+        (doseq [locator locators]
+          (.close locator))
+
         (apply + consumer-counts)))))
 
 (defmethod extensions/bootstrap-queue HornetQConnection
@@ -318,9 +325,16 @@
                       {:route pair :consumers c :messages m}))
                   sessions host-port-pairs))]
         (.close session)
-        (doall (map #(.close %) sessions))
-        (doall (map #(.close %) session-factories))
-        (doall (map #(.close %) locators))
+
+        (doseq [session sessions]
+          (.close session))
+
+        (doseq [factory session-factories]
+          (.close factory))
+
+        (doseq [locator locators]
+          (.close locator))
+
         (let [active-queues (filter #(> (:messages %) 0) counts)
               pair (or (:route (first (sort-by :consumers < active-queues))) (first host-port-pairs))
               locator (apply connect-standalone pair)

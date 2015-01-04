@@ -137,7 +137,7 @@
             balanced (common/percentage-balanced-taskload new job candidate-tasks n-peers)
             required (:allocation (get balanced (:task allocation)))
             actual (count (get-in new [:allocations job (:task allocation)]))]
-        (when (and (> actual required))
+        (when (> actual required)
           (let [n (- actual required)
                 peers-to-drop (common/drop-peers new job n)]
             (when (some #{(:id state)} (into #{} peers-to-drop))

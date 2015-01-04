@@ -101,7 +101,7 @@
               (>!! ch true)))]
     (try
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
-        (>!! true))
+        (>!! ch true))
       (catch Exception e
         ;; Node doesn't exist.
         (>!! ch true)))))

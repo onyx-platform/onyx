@@ -25,7 +25,7 @@
 (defn adjust-with-overflow [replica balanced]
   (reduce
    (fn [result [job n]]
-     (let [sat (or (get-in replica [:saturation job] Double/POSITIVE_INFINITY))
+     (let [sat (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
            extra (- n sat)]
        (if (pos? extra)
          (-> result
@@ -79,7 +79,7 @@
 
 (defn remove-peers [replica args]
   (let [prev (get (allocations->peers (:allocations replica)) (:id args))]
-    (if (and (:job prev (:task prev)))
+    (if (and (:job prev) (:task prev))
       (let [remove-f #(vec (remove (partial = (:id args)) %))]
         (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
       replica)))
