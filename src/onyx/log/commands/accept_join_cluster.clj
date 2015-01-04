@@ -1,4 +1,4 @@
-(ns onyx.log.accept-join-cluster
+(ns onyx.log.commands.accept-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))

@@ -1,6 +1,5 @@
 (ns onyx.peer.single-peer-test
-  (:require [com.stuartsierra.component :as component]
-            [midje.sweet :refer :all]
+  (:require [midje.sweet :refer :all]
             [onyx.system :refer [onyx-development-env]]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
@@ -39,9 +38,7 @@
    :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def n-messages 15000)
 
