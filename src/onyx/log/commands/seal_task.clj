@@ -7,17 +7,14 @@
             [taoensso.timbre :refer [info]]))
 
 (defn should-seal? [replica args]
-  (let [status (common/task-status replica (:job args) (:task args))]
-    (boolean
-     (and (= (get status :active 0) 1)
-          (= (get-in replica [:peer-state (:id args)]) :active)))))
+  (let [status (common/task-status replica (:job args) (:task args))
+        one-active-peer? (= (get status :active 0) 1)
+        this-peer-is-active? (= (get-in replica [:peer-state (:id args)]) :active)]
+    (info (format "[%s] seal? --> %s" status (:id args)))
+    (boolean (and one-active-peer? this-peer-is-active?))))
 
 (defmethod extensions/apply-log-entry :seal-task
   [{:keys [args]} replica]
-  ;;; FIX ME - this is probably a bug causing a race condition.
-  ;;; Can't fix now, but the idea is that this handles the case where
-  ;;; it's either okay to seal, or sealing has already taken place. It
-  ;;; doesn't cover the case where it's not yet okay to seal.
   (if-not (should-seal? replica args)
     (let [peer (get-in replica [:sealing-task (:task args)])]
       (-> replica

@@ -1,15 +1,17 @@
 (ns onyx.log.commands.complete-task
   (:require [com.stuartsierra.component :as component]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
 (defmethod extensions/apply-log-entry :complete-task
   [{:keys [args message-id]} replica]
+  (taoensso.timbre/info (format "Completing task %s" (:task args)))
   (let [peers (get-in replica [:allocations (:job args) (:task args)])]
     (-> replica
         (update-in [:completions (:job args)] conj (:task args))
         (update-in [:completions (:job args)] vec)
         (update-in [:allocations (:job args)] dissoc (:task args))
-        (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))}))))
+        (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers))))))
 
 (defmethod extensions/replica-diff :complete-task
   [{:keys [args]} old new]
