@@ -1,4 +1,4 @@
-#### 0.5.0-SNAPSHOT
+#### 0.5.0
 
 - Design change: the Coordinator has been abolished. Onyx is now a fully masterless system. The supporting environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.
 
@@ -8,9 +8,7 @@
 - New feature: `:onyx/max-peers` may optionally be specified on any catalog entry to create an upper bound on the number of peers executing a particular task. Only applicable under a Round Robin Task Scheduler.
 - New feature: `:onyx/params` may be specified on any catalog entry. It takes a vector of keywords. These keywords are resolved to other keys in the same catalog entry, and the corresponding values are passing as arguments to the function that implements that catalog entry.
 - New feature: `kill-job` API function.
-
 - Enhancement: peers now automatically kill their currently running job if it throws an exception other than a Zookeeper or HornetQ connection failure. The latter cases still cause the peer to automatically reboot.
-
 - New sub-project: [onyx-dashboard](https://github.com/vijaykiran/onyx-dashboard) provides support for realtime monitoring of cluster activity.
 
 #### 0.4.1
