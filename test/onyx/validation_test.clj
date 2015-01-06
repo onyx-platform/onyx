@@ -165,7 +165,7 @@
                                         :task-scheduler :onyx.task-scheduler/round-robin})
       => (throws Exception))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
 (fact (onyx.api/unpack-map-workflow {:a :b}) => [[:a :b]])
 (fact (onyx.api/unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
