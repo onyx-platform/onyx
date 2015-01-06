@@ -41,7 +41,7 @@
 
 (def dev (onyx-development-env env-config))
 
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def batch-size 2)
 
@@ -143,9 +143,9 @@
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
 (fact (into #{} (butlast results)) => (into #{} people))
 

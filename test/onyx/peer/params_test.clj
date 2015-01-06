@@ -42,9 +42,7 @@
 (def hq-config {"host" (:host (:non-clustered (:hornetq config)))
                 "port" (:port (:non-clustered (:hornetq config)))})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
@@ -103,9 +101,9 @@
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
 (fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
 

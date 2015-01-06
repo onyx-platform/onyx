@@ -40,9 +40,7 @@
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def n-messages 15000)
 

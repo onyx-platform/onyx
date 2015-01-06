@@ -41,15 +41,13 @@
 (def hq-config {"host" (:host (:non-clustered (:hornetq config)))
                 "port" (:port (:non-clustered (:hornetq config)))})
 
-(def dev (onyx-development-env env-config))
-
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
 (def workflow {:in {:inc :out}})
 
 (defn run-job [in-queue out-queue n-messages batch-size echo]
-  (let [env (component/start dev)
+  (let [env (onyx.api/start-env env-config)
         id (str (java.util.UUID/randomUUID))
         catalog
         [{:onyx/name :in
@@ -88,12 +86,9 @@
 
     (let [results (hq-util/consume-queue! hq-config out-queue echo)]
       (doseq [v-peer v-peers]
-        (try
-          ((:shutdown-fn v-peer))
-          (catch Exception e (prn e))))
-      (try
-        (component/stop env)
-        (catch Exception e (prn e)))
+        (onyx.api/shutdown-peer v-peer))
+
+      (onyx.api/shutdown-env env)
 
       (fact results => (conj (vec (map (fn [x] {:n (inc x)}) (range n-messages))) :done)))))
 

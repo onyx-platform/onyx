@@ -38,9 +38,7 @@
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def n-messages 15000)
 
@@ -127,9 +125,9 @@
 (def results (hq-util/consume-queue! hq-config out-queue echo))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
