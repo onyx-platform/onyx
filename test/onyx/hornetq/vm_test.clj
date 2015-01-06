@@ -1,7 +1,5 @@
 (ns onyx.hornetq.vm-test
-  (:require [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [onyx.peer.pipeline-extensions :as p-ext]
             [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
@@ -86,9 +84,7 @@
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
-(def dev (onyx-development-env env-config))
-
-(def env (component/start dev))
+(def env (onyx.api/start-env env-config))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 
@@ -111,7 +107,7 @@
   (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(component/stop env)
+(onyx.api/shutdown-env env)
 
