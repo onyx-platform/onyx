@@ -195,7 +195,6 @@
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (prn (count (:pairs new-replica)))
       (if (< (count (:pairs new-replica)) 45)
         (recur new-replica)
         new-replica))))
