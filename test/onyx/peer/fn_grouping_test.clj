@@ -1,7 +1,5 @@
 (ns onyx.peer.fn-grouping-test
-  (:require [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
+  (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
             [taoensso.timbre :refer [info]]
             [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
@@ -179,3 +177,4 @@
       (count (into #{} (filter identity (mapcat keys out-val)))))
 
 (fact results => [:done])
+
