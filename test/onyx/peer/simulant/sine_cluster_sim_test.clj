@@ -1,19 +1,14 @@
-(ns onyx.log.simulant.sine-test
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
-            [onyx.system :as system]
-            [onyx.log.entry :refer [create-log-entry]]
-            [onyx.extensions :as extensions]
-            [onyx.log.util :as util]
-            [onyx.api :as api]
-            [midje.sweet :refer :all]
-            [zookeeper :as zk]
+(ns onyx.peer.simulant.sine-cluster-sim-test
+  (:require [midje.sweet :refer :all]
             [simulant.sim :as sim]
             [simulant.util :as u]
+            [datomic.api :as d]
+            [taoensso.timbre :refer [info warn]]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.simulant.sim-test-utils :as sim-utils]
-            [datomic.api :as d]))
+            [onyx.api]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(def id (java.util.UUID/randomUUID))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
@@ -30,7 +25,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id
+   :onyx/id id
    :onyx.coordinator/revoke-delay 5000})
 
 (def peer-config
@@ -41,17 +36,33 @@
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
    :zookeeper/address (:address (:zookeeper config))
-   :onyx/id onyx-id
+   :onyx/id id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
+   :onyx.peer/join-failure-back-off 500
+   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
 (def env (onyx.api/start-env env-config))
 
 (def cluster (atom []))
 
-(defn create-peer [executor t k]
+(def in-queue (str (java.util.UUID/randomUUID)))
+
+(def out-queue (str (java.util.UUID/randomUUID)))
+
+(def n-messages 100000)
+
+(def batch-size 1320)
+
+(def echo 1000)
+
+(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
+                "port" (:port (:non-clustered (:hornetq config)))})
+
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
+
+(defn create-multi-births [executor t k]
   (mapcat
    (constantly
     [[{:db/id (d/tempid :test)
@@ -60,7 +71,7 @@
        :action/type :action.type/register-sine-peer}]])
    (range k)))
 
-(defn kill-peer [executor t k]
+(defn create-multi-deaths [executor t k]
   (mapcat
    (constantly
     [[{:db/id (d/tempid :test)
@@ -82,10 +93,9 @@
         wave (map (fn [x] (int (* height (Math/sin (* unit x)))))
                   (range 0 (+ end rate) rate))
         deltas (map (fn [[a b]] (- b a)) (partition 2 1 wave))]
-    (mapcat (fn [[t delta]]
-              (if (>= delta 0)
-                (create-peer executor t delta)
-                (kill-peer executor t (Math/abs delta))))
+    (mapcat (fn [[t delta]] (if (>= delta 0)
+                              (create-multi-births executor t delta)
+                              (create-multi-deaths executor t (Math/abs delta))))
             (map vector (range start end rate) deltas))))
 
 (defn create-sine-cluster-test [conn model test]
@@ -106,9 +116,8 @@
 (defmethod sim/create-test :model.type/sine-cluster
   [conn model test]
   (let [test (create-sine-cluster-test conn model test)
-        executor (create-executor conn test)
-        actions (generate-sine-scaling-data test executor)]
-    (u/transact-batch conn actions 1000)
+        executor (create-executor conn test)]
+    (u/transact-batch conn (generate-sine-scaling-data test executor) 1000)
     (d/entity (d/db conn) (u/e test))))
 
 (defmethod sim/create-sim :test.type/sine-cluster
@@ -124,16 +133,56 @@
 
 (sim-utils/load-schema sim-conn "simulant/peer-sim.edn")
 
+(def catalog
+  [{:onyx/name :in
+    :onyx/ident :hornetq/read-segments
+    :onyx/type :input
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent
+    :hornetq/queue-name in-queue
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.simulant.sine-cluster-sim-test/my-inc
+    :onyx/type :function
+    :onyx/consumption :concurrent
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :out
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent
+    :hornetq/queue-name out-queue
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
+    :onyx/batch-size batch-size}])
+
+(def workflow {:in {:inc :out}})
+
+(hq-util/create-queue! hq-config in-queue)
+(hq-util/create-queue! hq-config out-queue)
+
+(hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
+
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :task-scheduler :onyx.task-scheduler/round-robin})
+
 (def sine-model-id (d/tempid :model))
 
 (def sine-cluster-model-data
   [{:db/id sine-model-id
     :model/type :model.type/sine-cluster
+    :model/n-peers 10
     :model/peek-peers 15
     :model/peer-rate 500
-    :model/sine-length (u/hours->msec 1)
-    :model/sine-start 0
-    :model/sine-reps 8}])
+    :model/sine-length 40000
+    :model/sine-start 5000
+    :model/sine-reps 80}])
 
 (def sine-cluster-model
   (-> @(d/transact sim-conn sine-cluster-model-data)
@@ -141,23 +190,25 @@
 
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
-  (when (< (count @cluster) 30)
-    (let [peer (first (onyx.api/start-peers! 1 peer-config system/onyx-fake-peer))]
-      (swap! cluster conj peer))))
+  (let [peers (onyx.api/start-peers! 1 peer-config)]
+    (info (count @cluster) "in the cluster")
+    (swap! cluster concat peers)))
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
   [action process]
-  (swap! cluster
-         (fn [c]
-           (when (last c)
-             (onyx.api/shutdown-peer (last c)))
-           (vec (butlast c)))))
+  (let [peer (first @cluster)]
+    (swap! cluster rest)
+    (info (count @cluster) "left in the cluster")
+    (try
+      (onyx.api/shutdown-peer peer)
+      (catch Exception e
+        (warn e)))))
 
 (def sine-cluster-test
   (sim/create-test sim-conn
                    sine-cluster-model
                    {:db/id (d/tempid :test)
-                    :test/duration (u/hours->msec 1)}))
+                    :test/duration 60000}))
 
 (def sine-cluster-sim
   (sim/create-sim sim-conn
@@ -166,44 +217,31 @@
                    :sim/systemURI (str "datomic:mem://" (d/squuid))
                    :sim/processCount 1}))
 
-(sim/create-fixed-clock sim-conn sine-cluster-sim {:clock/multiplier 150})
+(sim/create-fixed-clock sim-conn sine-cluster-sim {:clock/multiplier 1})
 
 (sim/create-action-log sim-conn sine-cluster-sim)
 
-;; Seed it with 20 peers since sine waves goes negative.
-(doseq [peer (onyx.api/start-peers! 20 peer-config system/onyx-fake-peer)]
-  (swap! cluster conj peer))
+(doseq [n (range 3)]
+  (swap! cluster concat (onyx.api/start-peers! 1 peer-config)))
 
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id sine-cluster-sim))
        (repeatedly (:sim/processCount sine-cluster-sim))
        (into [])))
 
-(doseq [prun pruns] @(:runner prun))
+(def results (hq-util/consume-queue! hq-config out-queue echo))
 
-;; We should finish with 15 peers. Take it to a global maximum
-;; to have a reliable seek point in the log for verification.
-(doseq [peer (onyx.api/start-peers! 30 peer-config system/onyx-fake-peer)]
-  (swap! cluster conj peer))
-
-(def ch (chan 5))
-
-(extensions/subscribe-to-log (:log env) 0 ch)
-
-(def replica
-  (loop [replica {}]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (prn (count (:pairs new-replica)))
-      (if (< (count (:pairs new-replica)) 45)
-        (recur new-replica)
-        new-replica))))
-
-(fact (count (:peers replica)) => 45)
+(doseq [prun pruns] (future-cancel (:runner prun)))
 
 (doseq [peer @cluster]
-  (onyx.api/shutdown-peer peer))
+  (try
+    (onyx.api/shutdown-peer peer)
+    (catch Exception e
+      (warn e))))
 
 (onyx.api/shutdown-env env)
+
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 

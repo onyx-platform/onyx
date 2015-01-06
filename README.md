@@ -69,6 +69,10 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
+### Monitoring
+
+Onyx ships with a monitoring dashboard. You can [find that here](https://github.com/vijaykiran/onyx-dashboard).
+
 ### lib-onyx
 
 [lib-onyx](https://github.com/MichaelDrogalis/lib-onyx) is a library created to support extra functionality in Onyx. It provides pluggable functionality such as in-memory streaming joins, automatic message retry, and interval-based actions.
@@ -110,19 +114,13 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Lucas Bradstreet](https://github.com/lbradstreet)
 - [Bryce Blanton](https://github.com/bblanton)
 
-#### Project Maturity
-
-Onyx is **not** a battle-tested framework compared to Storm or Cascading. Please keep this in mind when considering taking it to production. That being said, the test suite uses simulation testing to create exceptionally bad data center network partitions, and checks against a number of correctness criteria afterwards. Community effort will help a great deal on this front.
-
-It's worth noting that nearly all inter-cluster communication happens via HornetQ. HornetQ *is* a battle tested queueing platform from the JBoss stack that has been in production for many years. This does give Onyx a significant leg up on reliability.
-
 #### Performance Benchmarks
 
 At the time of writing this, I do not have any performance benchmarks to publish. Creating a correct, useful benchmark is extremely difficult. I'm working on it - hang tight.
 
 ### Author
 
-This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogalis), an independent software consultant. Get in touch (mjd3089.at.rit.edu) to work together.
+This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogalis). You can get me directly at (mjd3089.at.rit.edu) if needed.
 
 ### License
 

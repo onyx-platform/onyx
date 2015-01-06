@@ -103,14 +103,19 @@
               (>!! outbox-ch entry)))))))
   event)
 
-(defn with-clean-up [f dead-ch release-f]
+(defn with-clean-up [f ch dead-ch release-f exception-f]
   (try
     (f)
+    (catch Exception e
+      (exception-f e)
+      (close! ch)
+      ;; Unblock any blocked puts
+      (<!! ch))
     (finally
      (>!! dead-ch true)
      (release-f))))
 
-(defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch release-f]
+(defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when (first (alts!! [kill-ch] :default true))
@@ -119,95 +124,95 @@
              (Thread/sleep (:onyx.core/drained-back-off pipeline-data)))
            (>!! read-ch (munge-inject-temporal pipeline-data)))
          (recur)))
-    dead-ch release-f))
+    kill-ch dead-ch release-f exception-f))
 
-(defn read-batch-loop [read-ch decompress-ch dead-ch release-f]
+(defn read-batch-loop [read-ch decompress-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! read-ch)]
          (>!! decompress-ch (munge-read-batch event))
          (recur)))
-    dead-ch release-f))
+    read-ch dead-ch release-f exception-f))
 
-(defn decompress-batch-loop [decompress-ch strip-ch dead-ch release-f]
+(defn decompress-batch-loop [decompress-ch strip-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! decompress-ch)]
          (>!! strip-ch (munge-decompress-batch event))
          (recur)))
-    dead-ch release-f))
+    decompress-ch dead-ch release-f exception-f))
 
-(defn strip-sentinel-loop [strip-ch requeue-ch dead-ch release-f]
+(defn strip-sentinel-loop [strip-ch requeue-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! strip-ch)]
          (>!! requeue-ch (munge-strip-sentinel event))
          (recur)))
-    dead-ch release-f))
+    strip-ch dead-ch release-f exception-f))
 
-(defn requeue-sentinel-loop [requeue-ch apply-fn-ch dead-ch release-f]
+(defn requeue-sentinel-loop [requeue-ch apply-fn-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! requeue-ch)]
          (>!! apply-fn-ch (munge-requeue-sentinel event))
          (recur)))
-    dead-ch release-f))
+    requeue-ch dead-ch release-f exception-f))
 
-(defn apply-fn-loop [apply-fn-ch compress-ch dead-ch release-f]
+(defn apply-fn-loop [apply-fn-ch compress-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! apply-fn-ch)]
          (>!! compress-ch (munge-apply-fn event))
          (recur)))
-    dead-ch release-f))
+    apply-fn-ch dead-ch release-f exception-f))
 
-(defn compress-batch-loop [compress-ch write-batch-ch dead-ch release-f]
+(defn compress-batch-loop [compress-ch write-batch-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! compress-ch)]
          (>!! write-batch-ch (munge-compress-batch event))
          (recur)))
-    dead-ch release-f))
+    compress-ch dead-ch release-f exception-f))
 
-(defn write-batch-loop [write-ch commit-ch dead-ch release-f]
+(defn write-batch-loop [write-ch commit-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! write-ch)]
          (>!! commit-ch (munge-write-batch event))
          (recur)))
-    dead-ch release-f))
+    write-ch dead-ch release-f exception-f))
 
-(defn commit-tx-loop [commit-ch close-resources-ch dead-ch release-f]
+(defn commit-tx-loop [commit-ch close-resources-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! commit-ch)]
          (>!! close-resources-ch (munge-commit-tx event))
          (recur)))
-    dead-ch release-f))
+    commit-ch dead-ch release-f exception-f))
 
-(defn close-resources-loop [close-ch close-temporal-ch dead-ch release-f]
+(defn close-resources-loop [close-ch close-temporal-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! close-ch)]
          (>!! close-temporal-ch (munge-close-resources event))
          (recur)))
-    dead-ch release-f))
+    close-ch dead-ch release-f exception-f))
 
-(defn close-temporal-loop [close-temporal-ch seal-ch dead-ch release-f]
+(defn close-temporal-loop [close-temporal-ch seal-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! close-temporal-ch)]
          (>!! seal-ch (munge-close-temporal-resources event))
          (recur)))
-    dead-ch release-f))
+    close-temporal-ch dead-ch release-f exception-f))
 
-(defn seal-resource-loop [seal-ch dead-ch release-f]
+(defn seal-resource-loop [seal-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! seal-ch)]
          (munge-seal-resource event)
          (recur)))
-    dead-ch release-f))
+    seal-ch dead-ch release-f exception-f))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
@@ -323,93 +328,9 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/pipeline-state (atom {})}
 
+            ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
-
-        (dire/with-handler! #'inject-temporal-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! open-session-kill-ch)
-            ;; Unblock any blocked puts
-            (<!! open-session-dead-ch)))
-
-        (dire/with-handler! #'read-batch-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! read-batch-ch)
-            (<!! read-batch-ch)))
-
-        (dire/with-handler! #'decompress-batch-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! decompress-batch-ch)
-            (<!! decompress-batch-ch)))
-
-        (dire/with-handler! #'strip-sentinel-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! strip-sentinel-ch)
-            (<!! strip-sentinel-ch)))
-
-        (dire/with-handler! #'requeue-sentinel-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! requeue-sentinel-ch)
-            (<!! requeue-sentinel-ch)))
-
-        (dire/with-handler! #'apply-fn-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! apply-fn-ch)
-            (<!! apply-fn-ch)))
-
-        (dire/with-handler! #'compress-batch-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! compress-batch-ch)
-            (<!! compress-batch-ch)))
-
-        (dire/with-handler! #'write-batch-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! write-batch-ch)
-            (<!! write-batch-ch)))
-
-        (dire/with-handler! #'commit-tx-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! commit-tx-ch)
-            (<!! commit-tx-ch)))
-
-        (dire/with-handler! #'close-resources-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! close-resources-ch)
-            (<!! close-resources-ch)))
-        
-        (dire/with-handler! #'close-temporal-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! close-temporal-ch)
-            (<!! close-temporal-ch)))
-
-        (dire/with-handler! #'seal-resource-loop
-          java.lang.Exception
-          (fn [e & _]
-            (handle-exception e restart-ch outbox-ch job-id)
-            (close! seal-ch)
-            (<!! seal-ch)))
 
         (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
@@ -441,18 +362,18 @@
           :close-temporal-dead-ch close-temporal-dead-ch
           :seal-dead-ch seal-dead-ch
 
-          :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch release-fn!))
-          :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch release-fn!))
-          :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch release-fn!))
-          :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch strip-sentinel-dead-ch release-fn!))
-          :requeue-sentinel-loop (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch release-fn!))
-          :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch release-fn!))
-          :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch release-fn!))
-          :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch release-fn!))
-          :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch release-fn!))
-          :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch release-fn!))
-          :close-temporal-loop (thread (close-temporal-loop close-temporal-ch seal-ch close-temporal-dead-ch release-fn!))
-          :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch release-fn!))
+          :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch release-fn! ex-f))
+          :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch release-fn! ex-f))
+          :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch release-fn! ex-f))
+          :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch strip-sentinel-dead-ch release-fn! ex-f))
+          :requeue-sentinel-loop (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch release-fn! ex-f))
+          :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch release-fn! ex-f))
+          :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch release-fn! ex-f))
+          :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch release-fn! ex-f))
+          :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch release-fn! ex-f))
+          :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch release-fn! ex-f))
+          :close-temporal-loop (thread (close-temporal-loop close-temporal-ch seal-ch close-temporal-dead-ch release-fn! ex-f))
+          :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch release-fn! ex-f))
 
           :release-fn! release-fn!
           :pipeline-data pipeline-data))
