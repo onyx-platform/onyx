@@ -3,14 +3,12 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.extensions :as extensions]
-            [taoensso.timbre :refer [info]]))
+            [onyx.extensions :as extensions]))
 
 (defn should-seal? [replica args]
   (let [status (common/task-status replica (:job args) (:task args))
         one-active-peer? (= (get status :active 0) 1)
         this-peer-is-active? (= (get-in replica [:peer-state (:id args)]) :active)]
-    (info (format "[%s] seal? --> %s" status (:id args)))
     (boolean (and one-active-peer? this-peer-is-active?))))
 
 (defmethod extensions/apply-log-entry :seal-task
