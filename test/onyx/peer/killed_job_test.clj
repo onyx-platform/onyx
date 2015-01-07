@@ -83,7 +83,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.kill-job-test/my-inc
+    :onyx/fn :onyx.peer.killed-job-test/my-inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
@@ -110,7 +110,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.kill-job-test/my-inc
+    :onyx/fn :onyx.peer.killed-job-test/my-inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
