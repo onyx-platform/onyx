@@ -61,9 +61,7 @@
 
 (defn munge-commit-tx
   [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
-  (if commit?
-    (extensions/commit-tx queue session)
-    (extensions/rollback-tx queue session))
+  (extensions/commit-tx queue session)
   (merge event {:onyx.core/committed? commit?}))
 
 (defn munge-close-temporal-resources [event]
