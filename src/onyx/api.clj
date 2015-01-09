@@ -111,6 +111,18 @@
     (component/stop client)
     true))
 
+(defn gc
+  "Invokes the garbage collector on Onyx. Compresses all local replicas
+   for peers, decreasing memory usage. Also deletes old log entries from
+   ZooKeeper, freeing up disk space."
+  [config]
+  (let [id (java.util.UUID/randomUUID)
+        client (component/start (system/onyx-client config))
+        entry (create-log-entry :gc {:id id})]
+    (extensions/write-log-entry (:log client) entry)
+    (component/stop client)
+    true))
+
 (defn await-job-completion
   "Blocks until job-id has had all of its tasks completed."
   [config job-id]
