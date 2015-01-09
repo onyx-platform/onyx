@@ -8,11 +8,14 @@
   (let [completed (difference (into #{} (:jobs replica))
                               (into #{} (common/incomplete-jobs replica)))
         killed (:killed-jobs replica)
-        jobs (concat completed killed)]
+        jobs (concat completed killed)
+        remove-f #(vec (remove (fn [j] (some #{j} jobs)) %))]
     (as-> jobs x
-         (reduce (fn [new job] (update-in new [:tasks] dissoc job)) replica x)
-         (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
-         (reduce (fn [new job] (update-in new [:completions] dissoc job)) x jobs))))
+          (reduce (fn [new job] (update-in new [:jobs] remove-f)) replica x)
+          (reduce (fn [new job] (update-in new [:killed-jobs] remove-f)) x jobs)
+          (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
+          (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
+          (reduce (fn [new job] (update-in new [:completions] dissoc job)) x jobs))))
 
 (extensions/apply-log-entry {:fn :gc :args {:id 1}}
                             {:jobs [:j1 :j2 :j3]
