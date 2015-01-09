@@ -22,8 +22,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx/id onyx-id})
 
 (def env (onyx.api/start-env env-config))
 

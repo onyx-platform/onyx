@@ -1,11 +1,11 @@
-## Coordination and Peer Configuration
+## Peer Configuration
 
-The chapter describes the options available to configure both the Coordinator and Virtual Peers.
+The chapter describes the options available to configure the Virtual Peers.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-- [Coordination and Peer Configuration](#coordination-and-peer-configuration)
+- [Peer Configuration](#peer-configuration)
   - [Coordinator & Peer](#coordinator-&-peer)
     - [Base Configuration](#base-configuration)
     - [`:hornetq/mode`](#hornetqmode)
@@ -62,25 +62,14 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 |`:hornetq.udp/refresh-timeout`                 |  `int`    |
 |`:hornetq.udp/discovery-timeout`               |  `int`    |
 
-### Coordinator Only
+### Environment Only
 
-| key name          | type       | choices    | optional?                         |
-|-------------------|------------|------------|-----------------------------------|
-|`:onyx.coordinator/revoke-delay`|  `int`     |                                   |
-|`:onyx.coordinator/host`        |  `string`  | Optional for in-memory coordinator|
-|`:onyx.coordinator/port`        |  `int`     | Optional for in-memory coordinator|
-|`:hornetq/server?`              |  `boolean` | Yes                               |
-|`:hornetq.server/type`          |  `keyword` |                                   |
-|`:zookeeper/server?`            |  `boolean` | Yes                               |
-|`:zookeeper.server/port`        |  `int`     | Optional for in-memory coordinator|
-
-##### `:onyx.coordinator/revoke-delay`
-
-Number of ms to wait for a peer to acknowledge an assigned task before revoking it.
-
-##### `:onyx.coordinator/port`
-
-The port to run the Coordinator web server on.
+| key name               | type       | optional?  |
+|------------------------|------------|------------|
+|`:hornetq/server?`      |  `boolean` | Yes        |
+|`:hornetq.server/type`  |  `keyword` | No         |
+|`:zookeeper/server?`    |  `boolean` | Yes        |
+|`:zookeeper.server/port`|  `int`     | Yes        |
 
 ##### `:hornetq/server`
 

@@ -23,14 +23,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.4.0"]
+[com.mdrogalis/onyx "0.5.0"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.4.0
+### User Guide 0.5.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -39,7 +39,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Constraints](doc/user-guide/constraints.md)
 - [Architecture](doc/user-guide/architecture.md)
 - [Internal Design](doc/user-guide/internal-design.md)
-- [Coordinator and Peer Configuration](doc/user-guide/coord-peer-config.md)
+- [Peer Configuration](doc/user-guide/peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
 - [Error Handling](doc/user-guide/error-handling.md)
@@ -47,19 +47,18 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
 - [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
 - [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
-- [Coordinator High Availability](doc/user-guide/coordinator-ha.md)
 - [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.4.0
+### API Docs 0.5.0
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.4.0` goes with `onyx` version `0.4.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.4.0.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.0` goes with `onyx` version `0.5.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.0.1`).
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
@@ -79,7 +78,7 @@ Onyx ships with a monitoring dashboard. You can [find that here](https://github.
 
 ### Release Notes
 
-You can find [the release notes here](doc/release-notes/0.4.0.md).
+You can find [the release notes here](doc/release-notes/0.5.0.md).
 
 ### Need help?
 
@@ -87,11 +86,11 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.4.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.5.x/resources/logo).
 
 ### Running the tests
 
-A simple `lein midje` will run the full suite, which takes about 15 minutes on my quad-core MacBook Pro. Expect a long, 5-10 minute pause during the coordinator tests as it's being completely slammed with requests and checked for correctness. The pause is waiting for the Coordinator to catch up and close out cleanly.
+A simple `lein midje` will run the full suite, which takes about 15-20 minutes on my quad-core MacBook Pro.
 
 ### Contributing
 
@@ -124,6 +123,6 @@ This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogal
 
 ### License
 
-Copyright © 2014 Michael Drogalis
+Copyright © 2015 Michael Drogalis
 
 Distributed under the Eclipse Public License, the same as Clojure.

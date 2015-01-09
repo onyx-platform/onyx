@@ -25,8 +25,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx/id id})
 
 (def peer-config
   {:hornetq/mode :udp

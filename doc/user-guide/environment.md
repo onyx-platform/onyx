@@ -49,9 +49,9 @@ One of the primary design goals of Onyx is to make the development environment a
 
 #### HornetQ
 
-##### Coordinator Launch of In-VM HornetQ
+##### Environment Launch of In-VM HornetQ
 
-To launch an In-VM HornetQ server, pass `hornetq/mode :vm` and `hornetq/server? true` to the coordinator options, and specify `:hornetq.server/type :vm` in the options too. This will run the server as part of the Coordinator. Since we're presumably using a single Coordinator in development mode, this is the ideal entity to also start up the server.
+To launch an In-VM HornetQ server, pass `hornetq/mode :vm` and `hornetq/server? true` to the environment options, and specify `:hornetq.server/type :vm` in the options too.
 
 ##### Peer Connection to In-VM HornetQ
 
@@ -59,11 +59,11 @@ Add `:hornetq/mode :vm` to the peer options. That's it - the virtual peers will 
 
 #### ZooKeeper
 
-##### Coordinator Launch of In-Memory ZooKeeper
+##### Environment Launch of In-Memory ZooKeeper
 
-To launch an in-memory ZooKeeper instance, add `:zookeeper/server? true` to the coordination options. Also, specify `:zookeeper.server/port <my port>` so that Curator knows what port to start running the server on. As usual, specify `:zookeeper/address "127.0.0.1:<myport>"` so the Coordinator knows what to connect to.
+To launch an in-memory ZooKeeper instance, add `:zookeeper/server? true` to the environment options. Also, specify `:zookeeper.server/port <my port>` so that Curator knows what port to start running the server on.
 
-Since we're presumably using a single Coordinator in development mode, this is the ideal entity to also start up the server. Be sure to shut down the Coordinator after every test run when using ZooKeeper. If you're test throws an exception and doesn't shut down ZooKeeper, it will remain open. Firing up the Coordinator again will cause a port collision.
+If your deployment throws an exception and doesn't shut down ZooKeeper, it will remain open. Firing up the environment again will cause a port collision, so be sure to restart your repl in that case.
 
 ##### Peer Connection to In-Memory ZooKeeper
 
@@ -74,27 +74,24 @@ Add `:zookeeper/address "127.0.0.1:<my port>"` to the peer options as usual. In-
 Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're not mutually exclusive - you can run, both, or neither.
 
 ```clojure
-(def coord-opts
+(def env-config
   {:hornetq/mode :vm
    :hornetq/server? true
    :hornetq.server/type :vm
    :zookeeper/address "127.0.0.1:2182"
    :zookeeper/server? true
    :zookeeper.server/port 2182
-   :onyx/id id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx/id id})
 
 (def peer-opts
   {:hornetq/mode :vm
    :zookeeper/address "127.0.0.1:2182"
    :onyx/id id})
-
-(def conn (onyx.api/connect :memory coord-opts))
 ```
 
 ### Production Environment
 
-Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster, a 3-5 node ZooKeeper cluster, and at least one back-up Coordinator in addition to the primary Coordinator. I don't recommend running HornetQ in either VM or embedded mode for production as this hurts fault tolerancy significantly. Instead, [download HornetQ 2.4.0-final](http://hornetq.jboss.org/downloads) and configure each server. Stand each server up by running the typical `bin/run.sh` command.
+Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster and a 3-5 node ZooKeeper cluster. I don't recommend running HornetQ in either VM or embedded mode for production as this hurts fault tolerancy significantly. Instead, [download HornetQ 2.4.0-final](http://hornetq.jboss.org/downloads) and configure each server. Stand each server up by running the typical `bin/run.sh` command.
 
 Quick side note when you're standing up HornetQ servers - you might be tempted to copy and paste the entire HornetQ directory to make new nodes in the cluster. That's fine, but remember to *never* copy the `data` directory. The cluster will be super wonky if you do!
 
@@ -115,8 +112,7 @@ Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems
 
 ###### Example
 
-Notice that all we're doing is extending the address string to include more host:port pairs. Do the same for
-the Coordinator.
+Notice that all we're doing is extending the address string to include more host:port pairs.
 
 ```clojure
 (def peer-opts
@@ -145,18 +141,9 @@ There are a few things to take note of, but otherwise you can and should reuse t
 - In all nodes, security is turned off via `<security-enabled>false</security-enabled>`. I presume you're running Onyx in a closed, trusted environment.
 - In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix later on in the Fault Tolerancy Tuning section. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
 
-Configure both the Coordinator and peer with the details to dynamically discover other HornetQ nodes.
+Configure the peer with the details to dynamically discover other HornetQ nodes.
 
 ```clojure
-(def coord-opts
-  {:hornetq/mode :udp
-   :hornetq.udp/cluster-name hornetq-cluster-name
-   :hornetq.udp/group-address hornetq-group-address
-   :hornetq.udp/group-port hornetq-group-port
-   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-   ...})
-
 (def peer-opts
   {:hornetq/mode :udp
    :hornetq.udp/cluster-name hornetq-cluster-name
@@ -180,18 +167,9 @@ Let's look at a single HornetQ node's configuration. The same advice in the UDP 
 
 Note: You can see the JGroups local storage being configured in the `FILE_PING` tag. I'd recommend using the S3 discovery mechanism if you're running in AWS.
 
-Configure both the Coordinator and peer with the details to dynamically discover other HornetQ nodes.
+Configure the peer with the details to dynamically discover other HornetQ nodes.
 
 ```clojure
-(def coord-opts
-  {:hornetq/mode :jgroups
-   :hornetq.jgroups/cluster-name hornetq-cluster-name
-   :hornetq.jgroups/file jgroups-file
-   :hornetq.jgroups/channel-name jgroups-channel
-   :hornetq.jgroups/refresh-timeout hornetq-refresh-timeout
-   :hornetq.jgroups/discovery-timeout hornetq-discovery-timeout
-   ...})
-
 (def peer-opts
   {:hornetq/mode :jgroups
    :hornetq.jgroups/cluster-name hornetq-cluster-name
@@ -208,8 +186,6 @@ Onyx uses HornetQ to construct data pipelines that offer transactional execution
 
 Remember to always provide a replica for the node running the Local grouping handler! Losing this box in an under-replicated scenario will disallow Onyx from doing grouping operations.
 
-Finally, see the chapter on running multiple Coordinators for high availability. You should always have a stand-by ready to jump in in the case of failure of the primary.
-
 ### Test Environment
 
 #### Dependencies
@@ -225,13 +201,11 @@ To handle this, Onyx ships with an embedded option for HornetQ. Embeddeding Horn
 
 #### HornetQ
 
-##### Coordinator Launch of Embedded HornetQ
+##### Environment Launch of Embedded HornetQ
 
-To launch one or more embedded HornetQ nodes, pass `:hornetq/server? true` to the Coordinator options, and specify `:hornetq.server/type :embedded` in the options, too. Finally, embedded servers need a real configuration files to operate. Pass `:hornetq.embedded/config <config file 1, config file 2, ...>` to these options as well. The config file names must be available on the classpath.
+To launch one or more embedded HornetQ nodes, pass `:hornetq/server? true` to the environment options, and specify `:hornetq.server/type :embedded` in the options, too. Finally, embedded servers need a real configuration files to operate. Pass `:hornetq.embedded/config <config file 1, config file 2, ...>` to these options as well. The config file names must be available on the classpath.
 
 To jump past writing these configuration files, you can use [the configuration files that Onyx uses in the test suite](https://github.com/MichaelDrogalis/onyx/tree/master/resources/hornetq).
-
-To connect to the Coordinator to HornetQ, use the normal means as if it were a live cluster. See the example below for the options that the test suite uses.
 
 ##### Peer Connection to Embedded HornetQ
 
@@ -242,7 +216,7 @@ Embedded HornetQ is invisible to the peer. Simply connect via the normal means a
 Here's an example of using both HornetQ in embedded mode. Notice that we're running ZooKeeper in-memory for convenience:
 
 ```clojure
-(def coord-opts
+(def env-config
   {:hornetq/mode :udp
    :hornetq/server? true
    :hornetq.udp/cluster-name hornetq-cluster-name
@@ -255,8 +229,7 @@ Here's an example of using both HornetQ in embedded mode. Notice that we're runn
    :zookeeper/address "127.0.0.1:2185"
    :zookeeper/server? true
    :zookeeper.server/port 2185
-   :onyx/id id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx/id id})
 
 (def peer-opts
   {:hornetq/mode :udp
@@ -267,7 +240,5 @@ Here's an example of using both HornetQ in embedded mode. Notice that we're runn
    :hornetq.udp/discovery-timeout hornetq-discovery-timeout
    :zookeeper/address "127.0.0.1:2185"
    :onyx/id id})
-
-(def conn (onyx.api/connect :memory coord-opts))
 ```
 
