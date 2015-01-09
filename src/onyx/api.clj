@@ -114,7 +114,10 @@
 (defn gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
    for peers, decreasing memory usage. Also deletes old log entries from
-   ZooKeeper, freeing up disk space."
+   ZooKeeper, freeing up disk space.
+
+   Local replicas clear out all data about completed and killed jobs -
+   as if they never existed. "
   [config]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
