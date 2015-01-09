@@ -28,6 +28,10 @@
 
 (defmulti read-chunk (fn [log kw id] [(type log) kw]))
 
+(defmulti update-origin! (fn [log replica message-id] (type log)))
+
+(defmulti gc-log-entry (fn [log position] (type log)))
+
 ;; Queue interface
 
 (defmulti create-tx-session (fn [queue] (type queue)))

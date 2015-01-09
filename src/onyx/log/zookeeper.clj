@@ -30,6 +30,9 @@
 (defn sentinel-path [prefix]
   (str (prefix-path prefix) "/sentinel"))
 
+(defn origin-path [prefix]
+  (str (prefix-path prefix) "/origin"))
+
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
@@ -46,6 +49,7 @@
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
+      (zk/create conn (origin-path onyx-id) :persistent? true)
 
       (assoc component :server server :conn conn :prefix onyx-id)))
 
@@ -61,10 +65,10 @@
 (defn zookeeper [config]
   (map->ZooKeeper {:config config}))
 
-(defn serialize-fressian [x]
+(defn serialize [x]
   (.array (fressian/write x)))
 
-(defn deserialize-fressian [x]
+(defn deserialize [x]
   (fressian/read x))
 
 (defn pad-sequential-id
@@ -80,13 +84,13 @@
 (defmethod extensions/write-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} data]
   (let [node (str (log-path prefix) "/entry-")
-        bytes (serialize-fressian data)]
+        bytes (serialize data)]
     (zk/create conn node :data bytes :persistent? true :sequential? true)))
 
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} position]
   (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-        content (deserialize-fressian (:data (zk/data conn node)))]
+        content (deserialize (:data (zk/data conn node)))]
     (assoc content :message-id position)))
 
 (defmethod extensions/register-pulse ZooKeeper
@@ -130,44 +134,63 @@
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (catalog-path prefix) "/" id)
-        bytes (serialize-fressian chunk)]
+        bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (workflow-path prefix) "/" id)
-        bytes (serialize-fressian chunk)]
+        bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (task-path prefix) "/" (:id chunk))
-        bytes (serialize-fressian chunk)]
+        bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :sentinel]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (sentinel-path prefix) "/" id)
-        bytes (serialize-fressian chunk)]
+        bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (catalog-path prefix) "/" id)]
-    (deserialize-fressian (:data (zk/data conn node)))))
+    (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (workflow-path prefix) "/" id)]
-    (deserialize-fressian (:data (zk/data conn node)))))
+    (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (task-path prefix) "/" id)]
-    (deserialize-fressian (:data (zk/data conn node)))))
+    (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :sentinel]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (sentinel-path prefix) "/" id)]
-    (deserialize-fressian (:data (zk/data conn node)))))
+    (deserialize (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :origin]
+  [{:keys [conn opts prefix] :as log} kw]
+  (let [node (str (origin-path prefix) "/origin")]
+    (deserialize (:data (zk/data conn node)))))
+
+(defmethod extensions/update-origin! ZooKeeper
+  [{:keys [conn opts prefix] :as log} replica message-id]
+  (let [node (str (origin-path prefix) "/origin")
+        {:keys [version data]} (zk/exists node)
+        content (deserialize data)]
+    (when (< (:message-id content) message-id)
+      (let [new-content {:message-id message-id :replica replica}]
+        (zk/set-data conn node (serialize new-content) version)))))
+
+(defmethod extensions/gc-log-entry ZooKeeper
+  [{:keys [conn opts prefix] :as log} position]
+  (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))]
+    (zk/delete conn node)))
 

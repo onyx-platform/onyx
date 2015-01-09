@@ -471,4 +471,13 @@ Partial Coverage Protection is an option that can be enabled at the time of `sub
 - Reactions: If this peer is executing a task for this job, reacts with `:volunteer-for-task`
 
 -------------------------------------------------
+[`gc`](https://github.com/MichaelDrogalis/onyx/blob/0.5.x/src/onyx/log/commands/gc.clj)
 
+- Submitter: Client, via public facing API
+- Purpose: Compress all peer local replicas and trim old log entries in ZooKeeper.
+- Arguments: The caller ID (`:id`)
+- Replica update: Clears out all data in all keys about completed and killed jobs - as if they never existed.
+- Side effects: Deletes all log entries before this command's entry, creates a compressed replica at a special origin log location, and updates to the pointer to the origin
+- Reactions: None
+
+-------------------------------------------------
