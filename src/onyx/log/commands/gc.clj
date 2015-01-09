@@ -20,16 +20,6 @@
           (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs))))
 
-(extensions/apply-log-entry {:fn :gc :args {:id 1}}
-                            {:jobs [:j1 :j2 :j3]
-                             :tasks {:j1 [:t1 :t2]
-                                     :j2 [:t3 :t4]
-                                     :j3 [:t5 :t6]}
-                             :killed-jobs [:j1]
-                             :completions {:j3 [:t5 :t6]}
-                             :allocations {:j1 {:t2 []}
-                                           :j2 {:t3 [:p1]}}})
-
 (defmethod extensions/replica-diff :gc
   [entry old new])
 
