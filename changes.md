@@ -12,6 +12,7 @@
 - New feature: `kill-job` API function.
 - New feature: `shutdown-peer` API function.
 - New feature: `shutdown-env` API function. Shuts down a development environment (ZK/HQ in memory).
+- New feature: `gc` API function. Garbage collects all peer replicas and deletes old log entries from ZooKeeper.
 - Enhancement: peers now automatically kill their currently running job if it throws an exception other than a Zookeeper or HornetQ connection failure. The latter cases still cause the peer to automatically reboot.
 - New sub-project: [onyx-dashboard](https://github.com/vijaykiran/onyx-dashboard) provides support for realtime monitoring of cluster activity.
 
