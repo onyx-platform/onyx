@@ -121,8 +121,20 @@
   [config]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
-        entry (create-log-entry :gc {:id id})]
+        entry (create-log-entry :gc {:id id})
+        ch (chan 1000)]
     (extensions/write-log-entry (:log client) entry)
+    (extensions/subscribe-to-log (:log client) 0 ch)
+
+    (loop [replica {:job-scheduler (:onyx.peer/job-scheduler config)}]
+      (let [position (<!! ch)
+            entry (extensions/read-log-entry (:log client) position)
+            new-replica (extensions/apply-log-entry entry replica)]
+        (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
+          (let [diff (extensions/replica-diff entry replica new-replica)]
+            (prn "-->" diff)
+            (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+          (recur new-replica))))
     (component/stop client)
     true))
 

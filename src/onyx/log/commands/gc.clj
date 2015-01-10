@@ -37,8 +37,11 @@
 (defmethod extensions/fire-side-effects! :gc
   [{:keys [args message-id]} old new diff state]
   (when (= (:id args) (:id state))
+    (prn "Me!")
     (when (extensions/update-origin! (:log state) new message-id)
+      (prn "Origin update")
       (doseq [k (range 0 message-id)]
+        (prn "Deleting " k)
         (extensions/gc-log-entry (:log state) k))))
   state)
 

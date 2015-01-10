@@ -33,6 +33,17 @@
 (defn origin-path [prefix]
   (str (prefix-path prefix) "/origin"))
 
+(defn serialize [x]
+  (.array (fressian/write x)))
+
+(defn deserialize [x]
+  (fressian/read x))
+
+(defn initialize-origin! [conn prefix]
+  (let [node (str (origin-path prefix) "/origin")
+        bytes (serialize {:message-id -1})]
+    (zk/create conn node :data bytes :persistent? true)))
+
 (defrecord ZooKeeper [config]
   component/Lifecycle
 
@@ -51,6 +62,7 @@
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
 
+      (initialize-origin! conn onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id)))
 
   (stop [component]
@@ -64,12 +76,6 @@
 
 (defn zookeeper [config]
   (map->ZooKeeper {:config config}))
-
-(defn serialize [x]
-  (.array (fressian/write x)))
-
-(defn deserialize [x]
-  (fressian/read x))
 
 (defn pad-sequential-id
   "ZooKeeper sequential IDs are at least 10 digits.
@@ -118,16 +124,21 @@
        (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
          (if (zk/exists conn path)
            (>!! ch position)
-           (let [read-ch (chan 2)]
-             (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
-             ;; Log entry may have been added in between initial check and when we
-             ;; added the watch.
-             (when (zk/exists conn path)
-               (>!! read-ch true))
-             (<!! read-ch)
-             (close! read-ch)
-             (>!! ch position))))
-       (recur (inc position)))
+           (loop []
+             (let [read-ch (chan 2)]
+               (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+               ;; Log entry may have been added in between initial check and when we
+               ;; added the watch.
+               (when (zk/exists conn path)
+                 (>!! read-ch true))
+               (<!! read-ch)
+               (close! read-ch)
+               ;; Requires one more check. Watch may have been triggered by a delete
+               ;; from a GC call.
+               (if (zk/exists conn path)
+                 (>!! ch position)
+                 (recur)))))
+         (recur (inc position))))
      (catch Exception e
        (fatal e)))))
 
@@ -183,8 +194,8 @@
 (defmethod extensions/update-origin! ZooKeeper
   [{:keys [conn opts prefix] :as log} replica message-id]
   (let [node (str (origin-path prefix) "/origin")
-        {:keys [version data]} (zk/exists node)
-        content (deserialize data)]
+        version (:version (zk/exists conn node))
+        content (deserialize (:data (zk/data conn node)))]
     (when (< (:message-id content) message-id)
       (let [new-content {:message-id message-id :replica replica}]
         (zk/set-data conn node (serialize new-content) version)))))
