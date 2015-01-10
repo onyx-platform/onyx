@@ -117,28 +117,29 @@
         (>!! ch true)))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
-  [{:keys [conn opts prefix] :as log} starting-position ch]
+  [{:keys [conn opts prefix] :as log} ch]
   (thread
    (try
-     (loop [position starting-position]
-       (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
-         (if (zk/exists conn path)
-           (>!! ch position)
-           (loop []
-             (let [read-ch (chan 2)]
-               (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
-               ;; Log entry may have been added in between initial check and when we
-               ;; added the watch.
-               (when (zk/exists conn path)
-                 (>!! read-ch true))
-               (<!! read-ch)
-               (close! read-ch)
-               ;; Requires one more check. Watch may have been triggered by a delete
-               ;; from a GC call.
-               (if (zk/exists conn path)
-                 (>!! ch position)
-                 (recur)))))
-         (recur (inc position))))
+     (let [starting-position (inc (:message-id (extensions/read-chunk log :origin nil)))]
+       (loop [position starting-position]
+         (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
+           (if (zk/exists conn path)
+             (>!! ch position)
+             (loop []
+               (let [read-ch (chan 2)]
+                 (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+                 ;; Log entry may have been added in between initial check and when we
+                 ;; added the watch.
+                 (when (zk/exists conn path)
+                   (>!! read-ch true))
+                 (<!! read-ch)
+                 (close! read-ch)
+                 ;; Requires one more check. Watch may have been triggered by a delete
+                 ;; from a GC call.
+                 (if (zk/exists conn path)
+                   (>!! ch position)
+                   (recur)))))
+           (recur (inc position)))))
      (catch Exception e
        (fatal e)))))
 
@@ -187,7 +188,7 @@
     (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
-  [{:keys [conn opts prefix] :as log} kw]
+  [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (origin-path prefix) "/origin")]
     (deserialize (:data (zk/data conn node)))))
 

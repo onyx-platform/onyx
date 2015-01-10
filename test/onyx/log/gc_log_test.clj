@@ -50,6 +50,11 @@
 
 (onyx.api/gc peer-config)
 
+;;(def zk (zk/connect "127.0.0.1:2185"))
+
+(clojure.pprint/pprint (clojure.data.fressian/read (:data (zk/data zk (str "/onyx/" onyx-id "/origin/origin")))))
+
+
 ;; (def ch (chan n-peers))
 
 ;; (extensions/subscribe-to-log (:log env) 0 ch)

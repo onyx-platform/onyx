@@ -63,7 +63,7 @@
             kill-ch (chan 1)
             restart-ch (chan 1)
             entry (create-log-entry :prepare-join-cluster {:joiner id})]
-        (extensions/subscribe-to-log log 0 inbox-ch)
+        (extensions/subscribe-to-log log inbox-ch)
         (extensions/register-pulse log id)
 
         (>!! outbox-ch entry)
