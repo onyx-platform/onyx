@@ -52,20 +52,24 @@
 
 ;;(def zk (zk/connect "127.0.0.1:2185"))
 
+(last (sort (zk/children zk (str "/onyx/" onyx-id "/log"))))
 (clojure.pprint/pprint (clojure.data.fressian/read (:data (zk/data zk (str "/onyx/" onyx-id "/origin/origin")))))
 
 
-;; (def ch (chan n-peers))
+(def ch (chan n-peers))
 
-;; (extensions/subscribe-to-log (:log env) 0 ch)
+(extensions/subscribe-to-log (:log env) ch)
 
-;; (def replica
-;;   (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
-;;     (let [position (<!! ch)
-;;           entry (extensions/read-log-entry (:log env) position)
-;;           new-replica (extensions/apply-log-entry entry replica)]
-;;       (clojure.pprint/pprint (str position "::" entry))
-;;       (recur new-replica))))
+(future
+  (loop [replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (prn "===")
+      (println position)
+      (println entry)
+      (clojure.pprint/pprint new-replica)
+      (recur new-replica))))
 
 ;; (fact "peers balanced on 1 jobs" true => true)
 
