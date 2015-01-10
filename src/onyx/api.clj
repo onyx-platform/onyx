@@ -132,7 +132,6 @@
             new-replica (extensions/apply-log-entry entry replica)]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
           (let [diff (extensions/replica-diff entry replica new-replica)]
-            (prn "-->" diff)
             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
           (recur new-replica))))
     (component/stop client)
