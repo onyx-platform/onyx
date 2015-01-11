@@ -12,6 +12,7 @@
         (update-in [:pairs] merge {accepted-observer accepted-joiner})
         (update-in [:pairs] merge {accepted-joiner target})
         (update-in [:accepted] dissoc accepted-observer)
+        (update-in [:peers] vec)
         (update-in [:peers] conj accepted-joiner)
         (update-in [:peers] vec)
         (assoc-in [:peer-state accepted-joiner] :idle))))

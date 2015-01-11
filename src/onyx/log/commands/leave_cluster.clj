@@ -15,6 +15,7 @@
         accep-observer (get (map-invert (:accepted replica)) id)]
     (-> replica
         (update-in [:peers] (partial remove #(= % id)))
+        (update-in [:peers] vec)
         (update-in [:prepared] dissoc id)
         (update-in [:prepared] dissoc prep-observer)
         (update-in [:accepted] dissoc id)
