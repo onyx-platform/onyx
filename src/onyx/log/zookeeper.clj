@@ -39,9 +39,9 @@
 (defn deserialize [x]
   (fressian/read x))
 
-(defn initialize-origin! [conn prefix]
+(defn initialize-origin! [conn config prefix]
   (let [node (str (origin-path prefix) "/origin")
-        bytes (serialize {:message-id -1})]
+        bytes (serialize {:message-id -1 :replica {:job-scheduler (:onyx.peer/job-scheduler config)}})]
     (zk/create conn node :data bytes :persistent? true)))
 
 (defrecord ZooKeeper [config]
@@ -62,7 +62,7 @@
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
 
-      (initialize-origin! conn onyx-id)
+      (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id)))
 
   (stop [component]
@@ -118,30 +118,35 @@
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]
-  (thread
-   (try
-     (let [starting-position (inc (:message-id (extensions/read-chunk log :origin nil)))]
-       (loop [position starting-position]
-         (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
-           (if (zk/exists conn path)
-             (>!! ch position)
-             (loop []
-               (let [read-ch (chan 2)]
-                 (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
-                 ;; Log entry may have been added in between initial check and when we
-                 ;; added the watch.
-                 (when (zk/exists conn path)
-                   (>!! read-ch true))
-                 (<!! read-ch)
-                 (close! read-ch)
-                 ;; Requires one more check. Watch may have been triggered by a delete
-                 ;; from a GC call.
-                 (if (zk/exists conn path)
-                   (>!! ch position)
-                   (recur)))))
-           (recur (inc position)))))
-     (catch Exception e
-       (fatal e)))))
+  (let [rets (chan)]
+    (thread
+     (try
+       (let [origin (extensions/read-chunk log :origin nil)
+             starting-position (inc (:message-id origin))]
+         (>!! rets (:replica origin))
+         (close! rets)
+         (loop [position starting-position]
+           (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
+             (if (zk/exists conn path)
+               (>!! ch position)
+               (loop []
+                 (let [read-ch (chan 2)]
+                   (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
+                   ;; Log entry may have been added in between initial check and when we
+                   ;; added the watch.
+                   (when (zk/exists conn path)
+                     (>!! read-ch true))
+                   (<!! read-ch)
+                   (close! read-ch)
+                   ;; Requires one more check. Watch may have been triggered by a delete
+                   ;; from a GC call.
+                   (if (zk/exists conn path)
+                     (>!! ch position)
+                     (recur)))))
+             (recur (inc position)))))
+       (catch Exception e
+         (fatal e))))
+    (<!! rets)))
 
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw chunk id]

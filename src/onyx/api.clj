@@ -124,9 +124,8 @@
         entry (create-log-entry :gc {:id id})
         ch (chan 1000)]
     (extensions/write-log-entry (:log client) entry)
-    (extensions/subscribe-to-log (:log client) ch)
-
-    (loop [replica {:job-scheduler (:onyx.peer/job-scheduler config)}]
+    
+    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [position (<!! ch)
             entry (extensions/read-log-entry (:log client) position)
             new-replica (extensions/apply-log-entry entry replica)]
@@ -142,8 +141,7 @@
   [config job-id]
   (let [client (component/start (system/onyx-client config))
         ch (chan 100)]
-    (extensions/subscribe-to-log (:log client) ch)
-    (loop [replica {:job-scheduler (:onyx.peer/job-scheduler config)}]
+    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [position (<!! ch)
             entry (extensions/read-log-entry (:log client) position)
             new-replica (extensions/apply-log-entry entry replica)

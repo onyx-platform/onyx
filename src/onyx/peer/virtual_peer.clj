@@ -17,9 +17,9 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log queue inbox-ch outbox-ch restart-ch kill-ch opts]
+(defn processing-loop [id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts]
   (try
-    (loop [replica {:job-scheduler (:onyx.peer/job-scheduler opts)}
+    (loop [replica origin
            state (merge {:id id
                          :log log
                          :queue queue
@@ -62,14 +62,14 @@
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
             kill-ch (chan 1)
             restart-ch (chan 1)
-            entry (create-log-entry :prepare-join-cluster {:joiner id})]
-        (extensions/subscribe-to-log log inbox-ch)
+            entry (create-log-entry :prepare-join-cluster {:joiner id})
+            origin (extensions/subscribe-to-log log inbox-ch)]
         (extensions/register-pulse log id)
 
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log queue inbox-ch outbox-ch restart-ch kill-ch opts))
+        (thread (processing-loop id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts))
         (assoc component :id id :inbox-ch inbox-ch
                :outbox-ch outbox-ch :kill-ch kill-ch
                :restart-ch restart-ch))))
