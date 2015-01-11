@@ -53,31 +53,21 @@
 
 (onyx.api/gc peer-config)
 
-;;(def zk (zk/connect "127.0.0.1:2185"))
-
-(last (sort (zk/children zk (str "/onyx/" onyx-id "/log"))))
-(clojure.pprint/pprint (clojure.data.fressian/read (:data (zk/data zk (str "/onyx/" onyx-id "/origin/origin")))))
-
+(def v-peers (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
 
 (def ch (chan 100))
 
-(def origin (extensions/subscribe-to-log (:log env) ch))
-
-(future
-  (loop [replica origin]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (prn "===")
-      (println position)
-      (println entry)
-      (clojure.pprint/pprint new-replica)
+(loop [replica (extensions/subscribe-to-log (:log env) ch)]
+  (let [position (<!! ch)
+        entry (extensions/read-log-entry (:log env) position)
+        new-replica (extensions/apply-log-entry entry replica)]
+    (when-not (= (count (:peers new-replica)) 10)
       (recur new-replica))))
 
-;; (fact "peers balanced on 1 jobs" true => true)
+(fact "Starting peers after GC succeeded" true => true)
 
-;; (doseq [v-peer v-peers]
-;;   (onyx.api/shutdown-peer v-peer))
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
 
-;; (onyx.api/shutdown-env env)
+(onyx.api/shutdown-env env)
 
