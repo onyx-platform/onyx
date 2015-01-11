@@ -17,7 +17,7 @@
     (assert (<= (count rets) 1))
     (when (seq rets)
       {:observer (first (vals rets))
-       :subject (get-in old [:pairs (first (keys rets))])
+       :subject (or (get-in old [:pairs (first (keys rets))]) (first (keys rets)))
        :accepted-observer (first (keys rets))
        :accepted-joiner (first (vals rets))})))
 
