@@ -3,11 +3,14 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [midje.sweet :refer :all]))
+            [midje.sweet :refer :all]
+            [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+
+(def scheduler :onyx.job-scheduler/greedy)
 
 (def env-config
   {:hornetq/mode :udp
@@ -22,6 +25,7 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
+   :onyx.peer/job-scheduler scheduler
    :onyx/id onyx-id})
 
 (def env (onyx.api/start-env env-config))
@@ -41,7 +45,7 @@
 
 (def ch (chan entries))
 
-(extensions/subscribe-to-log (:log env) 0 ch)
+(extensions/subscribe-to-log (:log env) ch)
 
 (future
   (try
