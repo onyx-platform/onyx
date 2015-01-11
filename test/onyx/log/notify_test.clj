@@ -49,7 +49,7 @@
 
 (extensions/write-log-entry (:log env) entry)
 
-(extensions/subscribe-to-log (:log env) 0 ch)
+(extensions/subscribe-to-log (:log env) ch)
 
 (def message-id (<!! ch))
 
