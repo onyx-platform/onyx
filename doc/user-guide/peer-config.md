@@ -12,8 +12,6 @@ The chapter describes the options available to configure the Virtual Peers.
     - [UDP Configuration](#udp-configuration)
     - [JGroups Configuration](#jgroups-configuration)
   - [Coordinator Only](#coordinator-only)
-      - [`:onyx.coordinator/revoke-delay`](#onyxcoordinatorrevoke-delay)
-      - [`:onyx.coordinator/port`](#onyxcoordinatorport)
       - [`:hornetq/server`](#hornetqserver)
       - [`:hornetq.server/type`](#hornetqservertype)
       - [`:zookeeper/server`](#zookeeperserver)

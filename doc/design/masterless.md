@@ -168,8 +168,6 @@ When peer P sends a `prepare-join-cluster` command, it eventually encounters the
 
 - [Example 1: 4 node cluster, 1 peer crashes](/doc/design/leave-examples/example-1.md)
 - [Example 2: 4 node cluster, 2 peers instantaneously crash](/doc/design/leave-examples/example-2.md)
-- [Example 3: 3 node cluster, 1 joins with garbage collection](/doc/design/leave-examples/example-3.md)
-- [Example 4: 3 node cluster, 1 peer lags during GC](/doc/design/leave-examples/example-4.md)
 
 ### Allocating Peers to Jobs and Tasks
 

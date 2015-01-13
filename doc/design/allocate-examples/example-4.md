@@ -2,18 +2,18 @@
 
 - Nodes A, B, C, D, E, F, G fully in the cluster
 - Client sends `submit-job` (j1, tasks t1, t2, t3) with a Greedy task scheduler (1)
-- t1, t2, t3 are all `concurrent`
+- t1, t2, t3 request no maximum number of peers
 
 - Tasks get allocated to shorten the example
-- Local state before (1): `{:job-seq [:j1] :task-seq {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
+- Local state before (1): `{:jobs [:j1] :tasks {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
 
 - A, B, C, D, E, F, G play the log
 
 - Client sends `submit-job` (j2, tasks t4, t5, t6) with a Greedy task scheduler (2)
 
 - A, B, C, D, E, F, G encounter (2)
-  - Pre: `{:job-seq [:j1] :task-seq {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
-  - Post: `{:job-seq [:j1] :task-seq {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
+  - Pre: `{:jobs [:j1] :tasks {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
+  - Post: `{:jobs [:j1] :tasks {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
   - adds job information to local replica
   - let J = 2 (the number of jobs)
   - let P = 7 (the number of peers)
@@ -28,8 +28,8 @@
   - E, F, G send `volunteer-for-task` (3) (4) (5)
 
 -A, B, C, D, E, F, G encounter (3) (4) and (5)
-  - Pre: `{:job-seq [:j1] :task-seq {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
-  - Post: `{:job-seq [:j1] :task-seq {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D] :t2 [] :t3 []} :j2 {:t4 [:E :F :G] :t5 [] :t6 []}}}`
+  - Pre: `{:jobs [:j1] :tasks {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D :E :F :G] :t2 [] :t3 []}}}`
+  - Post: `{:jobs [:j1] :tasks {:j1 [:t1 :t2 :t3]} :allocations {:j1 {:t1 [:A :B :C :D] :t2 [] :t3 []} :j2 {:t4 [:E :F :G] :t5 [] :t6 []}}}`
   - (condenses messages 3, 4, and 5 for concision)
   - E, F, and G execute t4
   - no reactions
