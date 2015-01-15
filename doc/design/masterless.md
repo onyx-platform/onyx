@@ -87,7 +87,7 @@ Each virtual peer starts a thread that listens for additions to the log. When it
 
 *A peer reads the first log entry and applies the function to its local replica, moving the replica into a state "as of" entry 0*
 
-<img src="/doc/design/images/diagram-4.png" height="75%" width="75%">
+<img src="/doc/design/images/diagram-4.png" height="65%" width="65%">
 
 *Because application of functions from the log against the replica are deterministic and free of side effects, peers do not need to coordinate about the speed that each plays the log. Peers read the log and completely independent timelines*
 
@@ -95,7 +95,7 @@ Peers affect change in the world by reacting to log entries. When a log entry is
 
 Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the diff, and it's local state. The peer can decide to submit new entries back to the log as a reaction to the log entry it just saw. It might react to "submit-job" with "volunteer-for-task", for instance.
 
-<img src="/doc/design/images/diagram-5.png" height="65%" width="65%">
+<img src="/doc/design/images/diagram-5.png" height="85%" width="85%">
 
 *After a peer reads a lot entry and applies it to the log replica, it will (deterministically!) react by appending zero or more log entries to the tail of the log*
 
@@ -116,6 +116,11 @@ The technique needs peers to play by the following rules:
   - When a peer joins the cluster, all peers must form a "ring" in terms of who-watches-who. This makes failure repair very easy because peers can transitvely close any gaps in the ring after machine failure.
   - As a peer joining the cluster begins playing the log, it must buffer all reactive messages unless otherwise specified. The buffered messages are flushed after the peer has fully joined the cluster. This is because a peer could volunteer to perform work, but later abort its attempt to join the cluster, and therefore not be able to carry out any work.
   - A peer picks another peer to watch by determining a candidate list of peers it can stitch into. This candidate list is sorted by peer ID. The target peer is chosen by taking the message id modulo the number of peers in the sorted candidate list. The peer chosen can't be random because all peers will play the message to select a peer to stitch with, and they must all determine the same peer. Hence, the message modulo piece is a sort of "random seed" trick.
+
+<img src="/doc/design/images/diagram-7.png" height="85%" width="85%">
+
+*At monotonic clock value t = 42, the replica has the above `:pairs` key, indicates who watches whom. As nodes are added, they maintain a ring formation so that every peer is watched by another.*
+
 
 The algorithm works as follows:
 - let S = the peer to stitch into the cluster
