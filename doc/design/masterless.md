@@ -85,6 +85,10 @@ Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the di
 
 Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-side-effects!`. This function will do things like talking to ZooKeeper or writing to core.async channels. Isolating side effects means that a subset of the test suite can operate on pure functions alone.
 
+<img src="/doc/design/images/diagram-1.png" height="75%" width="75%">
+
+*Figure 1: A single peer begins with the empty replica (`{}`) and progressively applies log entries to the replica, advancing its state from one immutable value to the next.*
+
 ### Joining the Cluster
 
 Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper will maintain one other directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
