@@ -97,9 +97,7 @@ Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the di
 
 <img src="/doc/design/images/diagram-5.png" height="85%" width="85%">
 
-*After a peer reads a lot entry and applies it to the log replica, it will (deterministically!) react by appending zero or more log entries to the tail of the log*
-
-*Figure 4: 
+*After a peer reads a lot entry and applies it to the log replica, it will (deterministically!) react by appending zero or more log entries to the tail of the log.*
 
 Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-side-effects!`. This function will do things like talking to ZooKeeper or writing to core.async channels. Isolating side effects means that a subset of the test suite can operate on pure functions alone.
 
@@ -178,6 +176,18 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 <img src="/doc/design/images/diagram-9.png" height="85%" width="85%">
 
 *At t = 45, all of the replicas realize that Peer 5 is dead, and that Peer 1 is responsible for closing the gap by now watching Peer 4 to maintain the ring.*
+
+<img src="/doc/design/images/diagram-10.png" height="85%" width="85%">
+
+*One edge case of this design is the simultaneous death of two or more consecutive peers in the ring. Suppose Peers 4 and 5 die at the exact same time. Peer 1 will signal Peer 5's death, but Peer 5 never got the chance to signal Peer 4's death. Continued below...*
+
+<img src="/doc/design/images/diagram-11.png" height="85%" width="85%">
+
+*Peer 1 signals Peer 5's death, and closes to the ring by adding a watch to Peer 4. Peer 4 is dead, but no one yet knows that. We circumvent this problem by first determining whether a peer is dead or not before adding a watch to it. If it's dead, as is Peer 4 in this case, we report it and further close the ring. Continued below...*
+
+<img src="/doc/design/images/diagram-12.png" height="85%" width="85%">
+
+*Peer 1 siginals peer 4's death, and further closes to the ring by adding a watch to Peer 3. The ring is now fully in-tact.*
 
 #### Examples
 
