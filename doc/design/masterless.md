@@ -83,9 +83,13 @@ Each virtual peer starts a thread that listens for additions to the log. When it
 
 *Figure 1: A single peer begins with the empty replica (`{}`) and progressively applies log entries to the replica, advancing its state from one immutable value to the next.*
 
-<img src="/doc/design/images/diagram-2.png" height="75%" width="75%">
+<img src="/doc/design/images/diagram-2.png" height="65%" width="65%">
 
 *Figure 2: A peer reads the first log entry and applies the function to its local replica, moving the replica into a state "as of" entry 0*
+
+<img src="/doc/design/images/diagram-4.png" height="65%" width="65%">
+
+*Figure 3: Because application of functions from the log against the replica are deterministic and free of side effects, peers do not need to coordinate about the speed that each plays the log. Peers read the log and completely independent timelines*
 
 Peers affect change in the world by reacting to log entries. When a log entry is applied, the peer calls `onyx.extensions/replica-diff`, passing it the old and new replicas. The peer produces a value summarization of what changed. This diff is used in subsequent sections to decide how to react and what side-effects to carry out.
 
