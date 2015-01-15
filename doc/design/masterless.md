@@ -121,7 +121,6 @@ The technique needs peers to play by the following rules:
 
 *At monotonic clock value t = 42, the replica has the above `:pairs` key, indicates who watches whom. As nodes are added, they maintain a ring formation so that every peer is watched by another.*
 
-
 The algorithm works as follows:
 - let S = the peer to stitch into the cluster
 - S sends a `prepare-join-cluster` command to the log, indicating its peer ID
@@ -172,20 +171,13 @@ Peers will fail, or be shut down purposefully. Onyx needs to:
 
 In a cluster of > 1 peer, when a peer dies another peer will have a watch registered on its znode to detect the ephemeral disconnect. When a peer fails (peer F), the peer watching the failed peer (peer W) needs to inform the cluster about the failure, *and* go watch the node that the failed node was watching (peer Z). The joining strategy that has been outlined forces peers to form a ring. A ring structure has an advantage because there is no coordination or contention as to who must now watch peer Z for failure. Peer W is responsible for watching Z, because W *was* watching F, and F *was* watching Z. Therefore, W transitively closes the ring, and W watches Z. All replicas can deterministicly compute this answer without conferring with each other.
 
-#### Peer Failure Garbage Collection Strategy
+<img src="/doc/design/images/diagram-8.png" height="55%" width="55%">
 
-It's not always the case that failures can be reported reliably. Consider the following scenario:
+*The nodes form a typical ring pattern. Peer 5 dies, and it's connection with ZooKeeper is severed. Peer 1 reacts by reporting Peer 5's death to the log. Continued below...*
 
-- A cluster exists with 3 nodes: A, B, and C
-- A watches B, B watches C, and C watches A
-- C dies
-- B notices that C has died, but before it can send a `leave-cluster` command to the log, B dies.
-- A notices that B has died, but before it can send a `leave-cluster` command to the log, A dies.
-- Peer D tries to join the cluster, and sees that there are 3 active peers since none of the deaths were reported. D times out, unable to ever join the cluster
+<img src="/doc/design/images/diagram-9.png" height="85%" width="85%">
 
-This is a pretty nasty edge case. Normally, a failure will case *some* node in the ring to respond and send a command to the log about the death of another peer. This strategy utterly fails in the above sequence. It becomes necessary to take a fallback approach.
-
-When peer P sends a `prepare-join-cluster` command, it eventually encounters the message and realizes it will be stitched in by Q. P adds a watch to Q's pulse node. If Q is no longer alive, P will send a `leave-cluster` command for Q. P will encounter this message, remove Q from the cluster, abort its attempted join, and retry. If Q is alive, P cancels its watch on Q later in the algorithm.
+*At t = 45, all of the replicas realize that Peer 5 is dead, and that Peer 1 is responsible for closing the gap by now watching Peer 4 to maintain the ring.*
 
 #### Examples
 
