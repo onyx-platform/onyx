@@ -79,15 +79,19 @@ Peers begin with the empty state value, and local state. Local state maintains a
 
 Each virtual peer starts a thread that listens for additions to the log. When it the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
 
+<img src="/doc/design/images/diagram-1.png" height="75%" width="75%">
+
+*Figure 1: A single peer begins with the empty replica (`{}`) and progressively applies log entries to the replica, advancing its state from one immutable value to the next.*
+
+<img src="/doc/design/images/diagram-2.png" height="75%" width="75%">
+
+*Figure 2: A peer reads the first log entry and applies the function to its local replica, moving the replica into a state "as of" entry 0*
+
 Peers affect change in the world by reacting to log entries. When a log entry is applied, the peer calls `onyx.extensions/replica-diff`, passing it the old and new replicas. The peer produces a value summarization of what changed. This diff is used in subsequent sections to decide how to react and what side-effects to carry out.
 
 Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the diff, and it's local state. The peer can decide to submit new entries back to the log as a reaction to the log entry it just saw. It might react to "submit-job" with "volunteer-for-task", for instance.
 
 Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-side-effects!`. This function will do things like talking to ZooKeeper or writing to core.async channels. Isolating side effects means that a subset of the test suite can operate on pure functions alone.
-
-<img src="/doc/design/images/diagram-1.png" height="75%" width="75%">
-
-*Figure 1: A single peer begins with the empty replica (`{}`) and progressively applies log entries to the replica, advancing its state from one immutable value to the next.*
 
 ### Joining the Cluster
 
