@@ -16,8 +16,8 @@
     - [Examples](#examples)
   - [Dead peer removal](#dead-peer-removal)
     - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
-    - [Peer Failure Garbage Collection Strategy](#peer-failure-garbage-collection-strategy)
     - [Examples](#examples-1)
+  - [Garbage collection](#garbage-collection)
   - [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
     - [Job Schedulers](#job-schedulers)
       - [Greedy Job Scheduler](#greedy-job-scheduler)
@@ -209,6 +209,18 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 
 - [Example 1: 4 node cluster, 1 peer crashes](/doc/design/leave-examples/example-1.md)
 - [Example 2: 4 node cluster, 2 peers instantaneously crash](/doc/design/leave-examples/example-2.md)
+
+### Garbage collection
+
+One of the primary obstacles that this design imposes is the requirement of seemingly infinite storage. Log entries are only ever appended - never mutated. If left running long enough, ZooKeeper will run out of space. Similiarly, if enough jobs are submitted and either completed or killed, the in memory replica that each peer houses will grow too large. Onyx requires a garbage collector to be periodically invoked.
+
+When the garbage collector is invoked, two things will happen. The caller of gc will place an entry onto the log. As each peer processed this log entry, it carries out a deterministic, pure function to shrink the replica. The second thing will occur when each peer invokes the side effects for this log entry. The caller will have specified a unique ID such that it is the only one that is allowed to trim the log. The caller will take the current replica (log entry N to this log entry), and store it in an "origin" znode. Anytime that a peer boots up, it first reads out of the origin location. Finally, the caller deletes log entry N to this log entry minus 1. This has the dual effect of making new peers start up faster, as they have less of the log to play. They begin in a "hot" state.
+
+The garbage collector can be invoked by the public API function `onyx.api/gc`. Upon returning, the log will be trimmed, and the in memory replicas will be compressed.
+
+<img src="/doc/design/images/diagram-17.png" height="85%" width="85%">
+
+*A peer can start by reading out of the origin, and continue directly to a particular log location.*
 
 ### Allocating Peers to Jobs and Tasks
 
