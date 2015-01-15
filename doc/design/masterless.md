@@ -148,6 +148,22 @@ The algorithm works as follows:
   - S instantly becomes part of the cluster
   - S flushes its outbox of commands
 
+<img src="/doc/design/images/diagram-13.png" height="85%" width="85%">
+
+*Peers 1 - 4 form a ring. Peer 5 wants to join. Continued below...*
+
+<img src="/doc/design/images/diagram-14.png" height="85%" width="85%">
+
+*Peer 5 initiates the first phase of the join protocol. Peer 1 prepares to accept Peer 5 into the ring by adding a watch to it. Continued below...*
+
+<img src="/doc/design/images/diagram-15.png" height="85%" width="85%">
+
+*Peer 5 initiates the second phase of the join protocol. Peer 5 notifies Peer 4 as a peer to watch. At this point, a stable "mini ring" has been stitched along the outside of the cluster. We note that the link between Peer 1 and 4 is extraneous. Continued below...*
+
+<img src="/doc/design/images/diagram-16.png" height="85%" width="85%">
+
+*Peer 5 has been fully stitched into the cluster, and the ring is in tact*
+
 #### Examples
 
 - [Example 1: 3 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-1.md)
