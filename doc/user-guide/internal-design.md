@@ -6,7 +6,6 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [High Level Components](#high-level-components)
-  - [Coordinator](#coordinator)
   - [Peer](#peer)
   - [Virtual Peer](#virtual-peer)
   - [ZooKeeper](#zookeeper)
@@ -46,10 +45,6 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 
 ### High Level Components
 
-#### Coordinator
-
-The Coordinator is single node in the cluster responsible for doing distributed coordination. It receives jobs from Onyx clients, assigns work to peers, and handles peer failure.
-
 #### Peer
 
 A Peer is a node in the cluster responsible for processing data. It is similar to Storm's Worker node. A peer generally refers to a physical machine, though in the documentation, "peer" and "virtual peer" are often used interchangeably.
@@ -65,75 +60,6 @@ Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes car
 #### HornetQ
 
 HornetQ is employed for shuttling segments between virtual peers for processing. HornetQ is a queueing platform from the JBoss stack. HornetQ queues can cluster for scalability.
-
-### Cross Entity Communication
-
-ZooKeeper is used to facilitate communication between the Coordinator and each virtual peer. Onyx expects to use the `/onyx` path in ZooKeeper without interference. The structure of this directory looks like the following tree (descriptions in-line):
-
-- `/onyx`
-  - `/<deployment UUID>` # `:onyx/id` in Coordinator and Peer
-    - `/peer`
-      - `/<UUID>` # composite node, pointers to other znodes
-    - `/status`
-      - `/<UUID>` # presence signifies that peer should continue to commit to HornetQ
-    - `/task`
-      - `/<UUID>`
-        - `/task-<sequential-id>` # composite node, pointers to znodes about this task
-        - `/task-<sequential-id>.complete` # marker node, signifies that task is complete
-    - `/ack`
-      - `/<UUID>` # peer touches this znode to acknowledge task acceptance
-    - `/catalog`
-      - `/<UUID>` # data node for the catalog
-    - `/job-log`
-      - `/offer-<sequential id>` # durable log of job IDs to do round-robin job dispersal
-    - `/job`
-      - `/<UUID>` # composite node, pointers to other znodes about this job
-    - `/payload`
-      - `/<UUID>` # composite node, pointers to other znodes about this payload for a task
-    - `/pulse`
-      - `/<UUID>` # ephemeral node for a peer to signify that it is still online
-    - `/completion`
-      - `/<UUID>` # peer touches this znode to signal that its finished with its task
-    - `/cooldown`
-      - `/<UUID>` # peer listens on this node for response from Coordinator about completion
-    - `/workflow`
-      - `/<UUID>` # data node for the workflow
-    - `/election`
-      - `/proposal-<sequential id>` # leader election nodes for stand-by Coordinators
-    - `/plan`
-      - `/<UUID>` # Durable log of jobs to submit to the Coordinator
-    - `/seal`
-      - `/<UUID>` # Peer touches this node to signal that it can seal the next queue
-    - `/exhaust`
-      - `/<UUID>` # Peer listens to this node for response from Coordinator about sealing
-    - `/coordinator` # Durable log entries of all the prior actions for fault tolerance
-      - `/revoke-log`
-        - `/log-entry-<sequential id>`
-      - `/born-log`
-        - `/log-entry-<sequential id>`
-      - `/seal-log`
-        - `/log-entry-<sequential id>`
-      - `/ack-log`
-        - `/log-entry-<sequential id>`
-      - `/death-log`
-        - `/log-entry-<sequential id>`
-      - `/evict-log`
-        - `/log-entry-<sequential id>`
-      - `/offer-log`
-        - `/log-entry-<sequential id>`
-      - `/shutdown-log`
-        - `/log-entry-<sequential id>`
-      - `/exhaust-log`
-        - `/log-entry-<sequential id>`
-      - `/planning-log`
-        - `/log-entry-<sequential id>`
-      - `/complete-log`
-        - `/log-entry-<sequential id>`
-    - `/peer-state`
-      - `/<UUID>`
-        - `/state-<sequential id>` # Data node for state of the peer
-    - `/shutdown`
-      - `/<UUID>` # Peer listens to this node, shuts down on trigger
 
 ### Virtual Peer States
 
@@ -188,85 +114,6 @@ Peer states transition to new states. The transitions are specified below.
 
 - A `:dead` peer may transition to:
   - `:dead`: Stand-by Coordinator wakes up and replays log entries
-
-### Coordinator Event Handling
-
-The Coordinators holds watches on znodes in ZooKeeper and reacts to events. The events are placed onto core.async channels and serialized.
-
-#### Serial Execution
-
-All events coming out of ZooKeeper are serialized onto a single core.async channel. This techniques allows ZooKeeper to act "transactional" for the particular workload that Onyx places on it. It's designed this way so that multiple writers can read incomplete or inconsistent values from ZooKeeper just before commiting to storage.
-
-#### Fault Tolerant Logging
-
-Just before each event's action is executed, the event is written to a durable log in ZooKeeper. When the Coordinator boots up, it runs through the log from the last known checkpoint and replays entries. All actions in the Coordinator are idempontent, so they are can be safely replayed if they crashed mid-action.
-
-#### Timeouts
-
-As of present, the Coordinator only has one situation where it employs timeouts. When a Coordinator offers a task to a peer, the peer must acknowledge that it wants to execute that task. If the peer doesn't make a decision about whether or not it wants the task within the timeout interval, the Coordinator revokes the task from the peer and marks the peer as dead. The peer can no longer receive new tasks.
-
-### Coordinator/Virtual Peer Interaction
-
-This section captures the interactions between the Coordinator and a peer under a variety of interesting circumstances. In particular, I try to show how Onyx is able to recover in the face of crashed peers at very specific points in time by indicating what the states of the peer are on the left of each diagram.
-
-#### Notation
-
-- "/": Right-way black-slash indicates blocking. No forward progress happens until the next message is received.
-- "C": Coordinator
-- "P", "P1", "P2": Peers
-- "Green box": Peer state as known by the Coordinator
-
-Time flows from top to bottom.
-
-#### 1 Peer - happy path
-
-![1 Peer 1 Task](img/1-peer-1-task.png)
-
-#### 1 Peer - times out while acking
-
-![1 Peer times out](img/1-peer-times-out.png)
-
-#### 1 Peer - dies while acking
-
-![1 Peer dies acking](img/1-peer-dies-acking.png)
-
-#### 1 Peer - dies while acking
-
-![1 Peer dies active](img/1-peer-dies-active.png)
-
-#### 1 Peer - dies while sealing
-
-![1 Peer dies sealing](img/1-peer-dies-sealing.png)
-
-#### 1 Peer - dies while completing
-
-![1 Peer dies completing](img/1-peer-dies-completing.png)
-
-#### 2 Peers - 1 waits
-
-![1 Peer waits](img/2-peers-1-waits.png)
-
-#### 2 Peers - 1 joins while sealing
-
-![1 Peer joins sealing](img/2-peers-1-joins-while-sealing.png)
-
-#### 2 Peers - 1 joins late and dies
-
-![1 Peer joins and dies](img/2-peers-1-joins-late.png)
-
-#### 2 Peers - 1 dies while sealing
-
-![1 Peer dies sealing](img/2-peers-1-dies-sealing.png)
-
-### Segment Transportation
-
-Onyx uses HornetQ to move segments between virtual peers. HornetQ queue's are constructed between every link in a workflow.
-
-For example, `{:in {:inc :out}}` is transformed into the following queueing topology:
-
-`<queue> <- in -> <queue> <- inc -> <queue> <- out -> <queue>`
-
-All tasks have exactly one ingress queue, and at least one egress queue. Each egress queue is an ingress queue to the next task, if there is a next task.
 
 #### HornetQ Single Server
 
