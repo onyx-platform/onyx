@@ -1,5 +1,7 @@
 ## Scheduling
 
+Onyx offers fine-grained control of how many peers are allocated to particular jobs and tasks. This section outlines how to use the built-in schedulers.
+
 - [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
   - [Job Schedulers](#job-schedulers)
     - [Greedy Job Scheduler](#greedy-job-scheduler)
