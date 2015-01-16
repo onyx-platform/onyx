@@ -17,8 +17,7 @@ This chapter outlines how Onyx works on the inside to meet the required properti
   - [Dead peer removal](#dead-peer-removal)
     - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
     - [Examples](#examples-1)
-  - [Virtual Peer States](#virtual-peer-states)
-    - [Description](#description)
+  - [Messaging](#messaging)
     - [HornetQ Single Server](#hornetq-single-server)
     - [HornetQ Cluster](#hornetq-cluster)
     - [Client Side Load Balancing](#client-side-load-balancing)
@@ -32,6 +31,19 @@ This chapter outlines how Onyx works on the inside to meet the required properti
     - [Leader Election](#leader-election)
   - [Garbage collection](#garbage-collection)
 - [Command Reference](#command-reference)
+- [](#)
+- [](#-1)
+- [](#-2)
+- [](#-3)
+- [](#-4)
+- [](#-5)
+- [](#-6)
+- [](#-7)
+- [](#-8)
+- [](#-9)
+- [](#-10)
+- [](#-11)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### High Level Components
