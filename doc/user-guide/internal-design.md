@@ -285,7 +285,6 @@ Each sentinel value is marked with metadata when it is put on HornetQ. Specifica
 
 ![Election](img/election.png)
 
-
 ### Garbage collection
 
 One of the primary obstacles that this design imposes is the requirement of seemingly infinite storage. Log entries are only ever appended - never mutated. If left running long enough, ZooKeeper will run out of space. Similiarly, if enough jobs are submitted and either completed or killed, the in memory replica that each peer houses will grow too large. Onyx requires a garbage collector to be periodically invoked.
