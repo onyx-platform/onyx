@@ -2,7 +2,7 @@
 
 ### What is it?
 
-- a cloud scale, fault tolerant, distributed computation system
+- a masterless, cloud scale, fault tolerant, distributed computation system
 - written in Clojure, for Clojure
 - batch and stream processing hybrid
 - exposes an information model for the description and construction of distributed workflows
@@ -42,10 +42,10 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Peer Configuration](doc/user-guide/peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
+- [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
 - [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
-- [Job and Peer Execution Scheduling](doc/user-guide/scheduling.md)
 - [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
