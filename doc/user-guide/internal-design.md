@@ -203,21 +203,7 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 - [Example 1: 4 node cluster, 1 peer crashes](/doc/design/leave-examples/example-1.md)
 - [Example 2: 4 node cluster, 2 peers instantaneously crash](/doc/design/leave-examples/example-2.md)
 
-### Virtual Peer States
-
-#### Description
-
-Each virtual peer can be in exactly one state at any given time. The Coordinator tracks the state of each virtual peer. In fact, the virtual peer does not know its only state. The state for each peer is maintained so that the Coordinator can make intelligent decisions about how to allocate work across the cluster.
-
-The peer states are:
-
-- `:idle` - Peer is not allocated to a task
-- `:acking` - Peer is deciding whether it wants to accept a task given to it by the Coordinator
-- `:active` - Peer is executing a task
-- `:waiting` - Peer has finished executing a task, but other peers are still finishing the same task. Cannot yet be reallocated to `:idle`, otherwise peer would continuously be allocated and removed from the same task.
-- `:sealing` - Peer is propagating the sentinel onto the task's egress queues.
-- `:revoked` - Peer has had its task taken away from it. Peer will shortly be killed off by the Coordinator.
-- `:dead` - Peer has crashed, and may not receive any more tasks.
+### Messaging
 
 #### HornetQ Single Server
 
