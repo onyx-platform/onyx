@@ -31,19 +31,6 @@ This chapter outlines how Onyx works on the inside to meet the required properti
     - [Leader Election](#leader-election)
   - [Garbage collection](#garbage-collection)
 - [Command Reference](#command-reference)
-- [](#)
-- [](#-1)
-- [](#-2)
-- [](#-3)
-- [](#-4)
-- [](#-5)
-- [](#-6)
-- [](#-7)
-- [](#-8)
-- [](#-9)
-- [](#-10)
-- [](#-11)
-
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### High Level Components
