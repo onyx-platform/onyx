@@ -30,6 +30,7 @@
     (->> (get-in replica [:tasks job])
          (incomplete-tasks replica job)
          (common/active-tasks-only replica)
+         (common/unsaturated-tasks replica job)
          (map (fn [t] {:task t :n (count (get allocations t))}))
          (sort-by :n)
          (first)

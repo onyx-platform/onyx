@@ -20,6 +20,16 @@
       Double/POSITIVE_INFINITY
       rets)))
 
+(defn task-saturation [catalog tasks]
+  (into
+   {}
+   (map
+    (fn [task]
+      {(:id task)
+       (or (:onyx/max-peers (planning/find-task catalog (:name task)))
+           Double/POSITIVE_INFINITY)})
+    tasks)))
+
 (defn map-set-workflow->workflow
   "Converts a workflow in format:
    {:a #{:b :c}
@@ -83,7 +93,9 @@
         task-ids (map :id tasks)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
-        args {:id id :tasks task-ids :task-scheduler scheduler :saturation sat}
+        task-saturation (task-saturation (:catalog job) tasks)
+        args {:id id :tasks task-ids :task-scheduler scheduler
+              :saturation sat :task-saturation task-saturation}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)

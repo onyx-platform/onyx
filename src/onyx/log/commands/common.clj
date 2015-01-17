@@ -119,6 +119,14 @@
   [replica tasks]
   (filter #(nil? (get-in replica [:sealing-task %])) tasks))
 
+(defn unsaturated-tasks [replica job tasks]
+  (filter
+   (fn [task]
+     (let [allocated (get-in replica [:allocations job task])
+           n-allocated (if (seq allocated) (count allocated) 0)]
+       (< n-allocated (get-in replica [:task-saturation job task]))))
+   tasks))
+
 (defn jobs-with-available-tasks [replica jobs]
   (filter
    (fn [job]
