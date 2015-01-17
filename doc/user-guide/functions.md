@@ -4,13 +4,13 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Functions](#functions)
-  - [Functional Transformation](#functional-transformation)
-  - [Functional Parameterization](#functional-parameterization)
-  - [Grouping & Aggregation](#grouping-&-aggregation)
-    - [Group By Key](#group-by-key)
-    - [Group By Function](#group-by-function)
+- [Functional Transformation](#functional-transformation)
+- [Function Parameterization](#function-parameterization)
+- [Grouping & Aggregation](#grouping-&-aggregation)
+- [Group By Key](#group-by-key)
+- [Group By Function](#group-by-function)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

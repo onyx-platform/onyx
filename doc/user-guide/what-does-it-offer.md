@@ -4,18 +4,18 @@ In this chapter, I'll enumerate and explain the reasons that I built Onyx.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [What does Onyx offer?](#what-does-onyx-offer)
-    - [An Information Model](#an-information-model)
-    - [Temporal Decoupling](#temporal-decoupling)
-    - [Elimination of Macros](#elimination-of-macros)
-    - [Plain Clojure Functions](#plain-clojure-functions)
-    - [Testing Without Mocking](#testing-without-mocking)
-    - [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
-    - [TransactionalSemantics](#transactional-semantics)
-    - [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
-    - [Aspect Orientation](#aspect-orientation)
-    - [AOT Nothing](#aot-nothing)
+- [An Information Model](#an-information-model)
+- [Temporal Decoupling](#temporal-decoupling)
+- [Elimination of Macros](#elimination-of-macros)
+- [Plain Clojure Functions](#plain-clojure-functions)
+- [Testing Without Mocking](#testing-without-mocking)
+- [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
+- [Transactional Semantics](#transactional-semantics)
+- [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
+- [Aspect Orientation](#aspect-orientation)
+- [AOT Nothing](#aot-nothing)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

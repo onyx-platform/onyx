@@ -4,11 +4,11 @@ Plugins serve as an abstract to compose mechanisms for getting data into and out
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Plugins](#plugins)
-  - [Interfaces](#interfaces)
-  - [Bootstrapping](#bootstrapping)
-  - [Templates](#templates)
+- [Interfaces](#interfaces)
+- [Bootstrapping](#bootstrapping)
+- [Templates](#templates)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

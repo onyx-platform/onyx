@@ -4,25 +4,29 @@ The chapter describes the options available to configure the Virtual Peers.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Peer Configuration](#peer-configuration)
-  - [Coordinator & Peer](#coordinator-&-peer)
-    - [Base Configuration](#base-configuration)
-    - [`:hornetq/mode`](#hornetqmode)
-    - [UDP Configuration](#udp-configuration)
-    - [JGroups Configuration](#jgroups-configuration)
-  - [Coordinator Only](#coordinator-only)
-      - [`:hornetq/server`](#hornetqserver)
-      - [`:hornetq.server/type`](#hornetqservertype)
-      - [`:zookeeper/server`](#zookeeperserver)
-    - [Embedded Configuration](#embedded-configuration)
-      - [`:hornetq.embedded/config hq-servers`](#hornetqembeddedconfig-hq-servers)
-  - [Peer Only](#peer-only)
-    - [Base Configuration](#base-configuration-1)
-      - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
-      - [`:onyx.peer/sequential-back-off`](#onyxpeersequential-back-off)
-  - [Coordinator Full Example](#coordinator-full-example)
-  - [Peer Full Example](#peer-full-example)
+- [Coordinator & Peer](#coordinator-&-peer)
+  - [Base Configuration](#base-configuration)
+  - [`:hornetq/mode`](#hornetqmode)
+  - [UDP Configuration](#udp-configuration)
+  - [JGroups Configuration](#jgroups-configuration)
+- [Environment Only](#environment-only)
+    - [`:hornetq/server`](#hornetqserver)
+    - [`:hornetq.server/type`](#hornetqservertype)
+    - [`:zookeeper/server`](#zookeeperserver)
+  - [Embedded Configuration](#embedded-configuration)
+    - [`:hornetq.embedded/config hq-servers`](#hornetqembeddedconfig-hq-servers)
+- [Peer Only](#peer-only)
+  - [Base Configuration](#base-configuration-1)
+    - [`:onyx.peer/inbox-capacity`](#onyxpeerinbox-capacity)
+    - [`:onyx.peer/outbox-capacity`](#onyxpeeroutbox-capacity)
+    - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
+    - [`:onyx.peer/sequential-back-off`](#onyxpeersequential-back-off)
+    - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
+    - [`onyx.peer/fn-params`](#onyxpeerfn-params)
+    - [`onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
+- [Peer Full Example](#peer-full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
