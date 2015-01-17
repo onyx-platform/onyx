@@ -1,3 +1,7 @@
+## Scheduling
+
+This section discusses how you can control cluster allocation to specific jobs and tasks.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
@@ -17,8 +21,6 @@
     - [Examples](#examples)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-## Scheduling
 
 Onyx offers fine-grained control of how many peers are allocated to particular jobs and tasks. This section outlines how to use the built-in schedulers.
 
