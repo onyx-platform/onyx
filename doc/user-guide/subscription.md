@@ -1,3 +1,7 @@
+## Event Subscription
+
+Onyx's log-based design provides open-ended access to react to all coordination events. This section describes how to tap into these notifications.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
@@ -5,27 +9,8 @@
   - [Event Subscription](#event-subscription)
     - [Explanation](#explanation)
     - [Subscribing to the Log](#subscribing-to-the-log)
-- [```clojure](#clojure)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-1)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-2)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-3)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-4)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-5)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-6)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-7)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-8)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-9)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-10)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-11)
-- [ :job-scheduler :onyx.job-scheduler/greedy}](#job-scheduler-onyxjob-schedulergreedy-12)
-- [   #uuid "fb86b977-d668-4c98-abaa-80ee0d29663a" Infinity}}}](##uuid-fb86b977-d668-4c98-abaa-80ee0d29663a-infinity)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-## Event Subscription
-
-Onyx's log-based design provides open-ended access to react to all coordination events. This section describes how to tap into these notifications.
 
 ### Explanation
 
