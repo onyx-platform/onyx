@@ -124,7 +124,7 @@
    (fn [task]
      (let [allocated (get-in replica [:allocations job task])
            n-allocated (if (seq allocated) (count allocated) 0)]
-       (< n-allocated (get-in replica [:task-saturation job task]))))
+       (< n-allocated (or (get-in replica [:task-saturation job task]) Double/POSITIVE_INFINITY))))
    tasks))
 
 (defn jobs-with-available-tasks [replica jobs]
