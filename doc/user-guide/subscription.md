@@ -35,7 +35,7 @@ The following is a complete example to pretty print all events as they are writt
 
 Some example output from a test, printing the log position, log entry content, and the replica as-of that log entry:
 
-```
+```clojure
 ====
 Log Entry #0
 Entry is {:message-id 0, :fn :prepare-join-cluster, :args {:joiner #uuid "b7e5d564-02a3-46d3-863f-c4a2bac7e577"}}
