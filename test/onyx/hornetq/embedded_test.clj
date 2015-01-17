@@ -8,6 +8,8 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
+(def scheduler :onyx.job-scheduler/round-robin)
+
 (def hq-servers
   ["hornetq/clustered-1.xml"
    "hornetq/clustered-2.xml"
@@ -36,7 +38,8 @@
    :zookeeper/address "127.0.0.1:2185"
    :zookeeper/server? true
    :zookeeper.server/port 2185
-   :onyx/id id})
+   :onyx/id id
+   :onyx.peer/job-scheduler scheduler})
 
 (def peer-config
   {:hornetq/mode :udp
@@ -49,7 +52,7 @@
    :onyx/id id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
+   :onyx.peer/job-scheduler scheduler})
 
 (def env (onyx.api/start-env env-config))
 
