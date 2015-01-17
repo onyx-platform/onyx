@@ -43,6 +43,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
 - [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
+- [Event Subscription](doc/user-guide/subscription.md)
 - [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)

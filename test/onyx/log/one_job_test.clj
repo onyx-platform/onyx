@@ -80,14 +80,20 @@
 
 (def ch (chan n-peers))
 
+(def subscription (onyx.api/subscribe-to-log peer-config ch))
+
+(def log (:log (:env subscription)))
+
 (def replica
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
+  (loop [replica (:replica subscription)]
     (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
+          entry (extensions/read-log-entry log position)
           new-replica (extensions/apply-log-entry entry replica)
           counts (map count (mapcat vals (vals (:allocations new-replica))))]
       (when-not (= (into #{} counts) #{1 2})
         (recur new-replica)))))
+
+(onyx.api/shutdown-env (:env subscription))
 
 (fact "peers balanced on 1 jobs" true => true)
 

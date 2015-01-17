@@ -10,6 +10,7 @@
 - New feature: `:onyx.peer/inbox-capacity` option in the peer config specifies the max number of inbound messages a peer will buffer in memory.
 - New feature: `:onyx.peer/outbox-capacity` option in the peer config specifies the max number of outbound messages a peer will buffer in memory.
 - New feature: `kill-job` API function.
+- New feature: `subscribe-to-log` API function.
 - New feature: `shutdown-peer` API function.
 - New feature: `shutdown-env` API function. Shuts down a development environment (ZK/HQ in memory).
 - New feature: `gc` API function. Garbage collects all peer replicas and deletes old log entries from ZooKeeper.

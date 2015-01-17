@@ -111,6 +111,19 @@
     (component/stop client)
     true))
 
+(defn subscribe-to-log
+  "Sends all events from the log to the provided core.async channel.
+   Starts at the origin of the log and plays forward monotonically.
+
+   Returns a map with keys :replica and :env. :replica contains the origin
+   replica. :env contains an Component with a :log connection to ZooKeeper,
+   convenient for directly querying the znodes. :env can be shutdown with
+   the onyx.api/shutdown-env function"
+  [config ch]
+  (let [env (component/start (system/onyx-client config))]
+    {:replica (extensions/subscribe-to-log (:log env) ch)
+     :env env}))
+
 (defn gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
    for peers, decreasing memory usage. Also deletes old log entries from
