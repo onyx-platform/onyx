@@ -64,7 +64,27 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 |`:hornetq.udp/refresh-timeout`                 |  `int`    |
 |`:hornetq.udp/discovery-timeout`               |  `int`    |
 
+<<<<<<< HEAD:doc/user-guide/peer-config.md
 ### Environment Only
+=======
+### Coordinator Only
+
+| key name                       | type       | choices                           | optional?  |
+|--------------------------------|------------|-----------------------------------|------------|
+|`:onyx.coordinator/revoke-delay`|  `int`     |                                   |            |
+|`:onyx.coordinator/host`        |  `string`  | Optional for in-memory coordinator|            |
+|`:onyx.coordinator/port`        |  `int`     | Optional for in-memory coordinator|            |
+|`:hornetq/server?`              |  `boolean` |                                   | Yes        |
+|`:hornetq.server/type`          |  `keyword` |                                   |            |
+|`:zookeeper/server?`            |  `boolean` |                                   | Yes        |
+|`:zookeeper.server/port`        |  `int`     | Optional for in-memory coordinator|            |
+
+##### `:onyx.coordinator/revoke-delay`
+
+Number of ms to wait for a peer to acknowledge an assigned task before revoking it.
+
+##### `:onyx.coordinator/port`
+>>>>>>> master:doc/user-guide/coord-peer-config.md
 
 | key name               | type       | optional?  |
 |------------------------|------------|------------|
@@ -73,7 +93,7 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 |`:zookeeper/server?`    |  `boolean` | Yes        |
 |`:zookeeper.server/port`|  `int`     | Yes        |
 
-##### `:hornetq/server`
+##### `:hornetq/server?`
 
 True to spin up a HornetQ server inside the Coordinator for convenience.
 
@@ -81,7 +101,7 @@ True to spin up a HornetQ server inside the Coordinator for convenience.
 
 The type of server to spin up inside the Coordinator on the developers behalf. One of `:embedded, :vm`.
 
-##### `:zookeeper/server`
+##### `:zookeeper/server?`
 
 True to spin up a ZooKeeper server inside the Coordinator for convenience.
 

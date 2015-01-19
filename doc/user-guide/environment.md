@@ -90,10 +90,9 @@ Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're n
 ```
 
 ### Production Environment
-
 Running a good production Onyx cluster is mostly about running a good HornetQ cluster. To ensure that we're fault tolerant every step of the way, we need a 2+ node HornetQ cluster and a 3-5 node ZooKeeper cluster. I don't recommend running HornetQ in either VM or embedded mode for production as this hurts fault tolerancy significantly. Instead, [download HornetQ 2.4.0-final](http://hornetq.jboss.org/downloads) and configure each server. Stand each server up by running the typical `bin/run.sh` command.
 
-Quick side note when you're standing up HornetQ servers - you might be tempted to copy and paste the entire HornetQ directory to make new nodes in the cluster. That's fine, but remember to *never* copy the `data` directory. The cluster will be super wonky if you do!
+Quick side note when you're starting up HornetQ servers - you might be tempted to copy and paste the entire HornetQ directory to make new nodes in the cluster. That's fine, but remember to *never* copy the `data` directory. The cluster will be super wonky if you do!
 
 #### Dependencies
 
@@ -108,7 +107,7 @@ There are a lot of options for how to run HornetQ in the cloud. If you want an e
 
 ##### ZooKeeper clustering
 
-Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems. See [this link](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html) for getting set up. I won't go into detail since this is particular common set up.
+Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems. See [this link](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html) for getting set up. I won't go into detail since this is a particularly common set up.
 
 ###### Example
 
@@ -125,7 +124,7 @@ Notice that all we're doing is extending the address string to include more host
 
 One option for running a HornetQ cluster is to use UDP multicast for dynamic peer discovery. This is the route that the Onyx suite takes. You can consult the tests and configuration files in the resource path. We'll break down the options below for better understanding.
 
-Note that if you're looking to run Onyx inside a cloud provider like AWS, you're going to need to use JGroups. Cloud providers typically don't allow UDP multicast. This is a requirement that a lot of clustered services face.
+Note that if you're looking to run Onyx inside a cloud provider like AWS, you're going to need to use JGroups. Cloud providers typically don't allow UDP multicast, which is a limitation that a lot of clustered services face.
 
 ###### Example
 
@@ -137,7 +136,7 @@ Let's have a look at the three node cluster that the Onyx test suite uses.
 
 There are a few things to take note of, but otherwise you can and should reuse these configuration files for your own cluster. It'll save you a lot of leg work in understanding HornetQ:
 
-- Note that the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you won't want the ports to collide.
+- Note that the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you don't want the ports to collide.
 - In all nodes, security is turned off via `<security-enabled>false</security-enabled>`. I presume you're running Onyx in a closed, trusted environment.
 - In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix later on in the Fault Tolerancy Tuning section. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
 

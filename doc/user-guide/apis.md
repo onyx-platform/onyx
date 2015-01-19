@@ -92,7 +92,7 @@ Hook for closing out any stateful data injected into the pipeline. Called once a
 
 ##### `close-lifecycle-resources`
 
-Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called whether or not the task succeeded or failed for some reason.
+Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called regardless of the task execution status.
 
 ### Peer Pipeline API
 
