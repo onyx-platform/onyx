@@ -44,6 +44,17 @@ The chapter describes the options available to configure the Virtual Peers.
 
 The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :udp, :jgroups, :standalone`.
 
+#### VM
+
+None
+
+#### Standalone
+
+| key name                       | type       |
+|--------------------------------|------------|
+|`:hornetq.standalone/host`      |  `string`  |
+|`:hornetq.standalone/port`      |  `int`     |
+
 #### UDP Configuration
 
 | key name                       | type       |
@@ -64,7 +75,6 @@ The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :
 |`:hornetq.udp/refresh-timeout`                 |  `int`    |
 |`:hornetq.udp/discovery-timeout`               |  `int`    |
 
-<<<<<<< HEAD:doc/user-guide/peer-config.md
 ### Environment Only
 =======
 ### Coordinator Only
