@@ -76,25 +76,6 @@ None
 |`:hornetq.udp/discovery-timeout`               |  `int`    |
 
 ### Environment Only
-=======
-### Coordinator Only
-
-| key name                       | type       | choices                           | optional?  |
-|--------------------------------|------------|-----------------------------------|------------|
-|`:onyx.coordinator/revoke-delay`|  `int`     |                                   |            |
-|`:onyx.coordinator/host`        |  `string`  | Optional for in-memory coordinator|            |
-|`:onyx.coordinator/port`        |  `int`     | Optional for in-memory coordinator|            |
-|`:hornetq/server?`              |  `boolean` |                                   | Yes        |
-|`:hornetq.server/type`          |  `keyword` |                                   |            |
-|`:zookeeper/server?`            |  `boolean` |                                   | Yes        |
-|`:zookeeper.server/port`        |  `int`     | Optional for in-memory coordinator|            |
-
-##### `:onyx.coordinator/revoke-delay`
-
-Number of ms to wait for a peer to acknowledge an assigned task before revoking it.
-
-##### `:onyx.coordinator/port`
->>>>>>> master:doc/user-guide/coord-peer-config.md
 
 | key name               | type       | optional?  |
 |------------------------|------------|------------|
