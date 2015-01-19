@@ -1,171 +1,230 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan alts!! >!! <!!]]
+            [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
             [clj-http.client :refer [post]]
-            [taoensso.timbre :refer [warn]]
-            [onyx.coordinator.impl :as impl]
+            [taoensso.timbre :refer [warn fatal]]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [onyx.validation :as validator]))
+            [onyx.validation :as validator]
+            [onyx.planning :as planning]))
 
-(defprotocol ISubmit
-  "Protocol for sending a job to the coordinator for execution."
-  (submit-job [this job]))
+(defn saturation [catalog]
+  (let [rets
+        (reduce #(+ %1 (or (:onyx/max-peers %2)
+                           Double/POSITIVE_INFINITY))
+                0
+                catalog)]
+    (if (zero? rets)
+      Double/POSITIVE_INFINITY
+      rets)))
 
-(defprotocol IRegister
-  "Protocol for registering a virtual peer with the coordinator.
-   Registering allows the virtual peer to accept tasks."
-  (register-peer [this peer-node]))
-
-(defprotocol IAwait
-  "Protocol for waiting for completion of Onyx internals"
-  (await-job-completion [this job-id]))
-
-(defprotocol IShutdown
-  "Protocol for stopping a virtual peer's task and no longer allowing
-   it to accept new tasks. Releases all resources that were previously
-   acquired."
-  (shutdown [this]))
-
-(defn await-job-completion* [sync job-id]
-  (future
-    (loop []
-      (let [ch (chan 1)
-            task-path (extensions/resolve-node sync :task job-id)]
-        (extensions/on-child-change sync task-path (fn [_] (>!! ch true)))
-        (let [task-nodes (extensions/bucket-at sync :task job-id)
-              task-nodes (filter #(not (impl/metadata-task? %)) task-nodes)]
-          (if (every? (partial impl/task-complete? sync) task-nodes)
-            true
-            (do (<!! ch)
-                (recur))))))))
-
-(defn unpack-workflow [workflow]
-  (if (map? workflow)
-    (onyx.coordinator.planning/unpack-map-workflow workflow)
-    workflow))
-
-;; A coordinator that runs strictly in memory. Peers communicate with
-;; the coordinator by directly accessing its channels.
-(deftype InMemoryCoordinator [onyx-coord]
-  ISubmit
-  (submit-job [this job]
-    (let [job (update-in job [:workflow] unpack-workflow)]
-      (validator/validate-job job)
-      (let [ch (chan 1)
-            node (extensions/create (:sync onyx-coord) :plan)
-            cb #(>!! ch (extensions/read-node (:sync onyx-coord) (:path %)))]
-        (extensions/on-change (:sync onyx-coord) (:node node) cb)
-        (extensions/create (:sync onyx-coord) :planning-log {:job job :node (:node node)})
-        (>!! (:planning-ch-head (:coordinator onyx-coord)) true)
-        (<!! ch))))
-
-  IAwait
-  (await-job-completion [this job-id]
-    (await-job-completion* (:sync onyx-coord) job-id))
-
-  IRegister
-  (register-peer [this peer-node]
-    (extensions/create (:sync onyx-coord) :born-log peer-node)
-    (>!! (:born-peer-ch-head (:coordinator onyx-coord)) true))
-
-  IShutdown
-  (shutdown [this] (component/stop onyx-coord)))
-
-;; Connect to a coordinator that runs remotely. Peers communicate with the
-;; coordinator by submitting HTTP requests and parsing the responses.
-(deftype HttpCoordinator [conn]
-  ISubmit
-  (submit-job [this job]
-    (let [job (update-in job [:workflow] unpack-workflow)]
-      (validator/validate-job job)
-      (let [leader (extensions/leader (:sync conn) :election)
-            data (extensions/read-node (:sync conn) leader)
-            uri (format "http://%s:%s/submit-job" (:host data) (:port data))
-            response (post uri {:body (pr-str job)})]
-        (:job-id (read-string (:body response))))))
-
-  IRegister
-  (register-peer [this peer-node]
-    (let [leader (extensions/leader (:sync conn) :election)
-          data (extensions/read-node (:sync conn) leader)
-          uri (format "http://%s:%s/register-peer" (:host data) (:port data))
-          response (post uri {:body (pr-str peer-node)})]
-      (read-string (:body response))))
-
-  IShutdown
-  (shutdown [this]
-    (component/stop conn)))
-
-(defmulti connect
-  "Establish a communication channel with the coordinator.
-   kw can be :memory or :distributed."
-  (fn [kw opts] kw))
-
-(defmethod connect :memory
-  [kw opts]
-  (let [c (system/onyx-coordinator opts)]
-    (InMemoryCoordinator. (component/start c))))
-
-(defmethod connect :distributed
-  [kw opts]
-  ;; Disallow duplicate Zookeeper hosting - causes a port collision
-  (let [opts (dissoc opts :zookeeper/server?)
-        c (system/onyx-coordinator-connection opts)]
-    (HttpCoordinator. (component/start c))))
-
-(defn start-peers
-  "Launches n virtual peers. Starts a payload thread for each vpeer.
-   Takes a coordinator type to connect to and a virtual peer configuration.
-   Each peer may be stopped by invoking the fn returned by :shutdown-fn."
-  [coord n config]
-  (doall
+(defn task-saturation [catalog tasks]
+  (into
+   {}
    (map
-    (fn [_]
-      (let [stop-ch (chan)
-            v-peer (system/onyx-peer config)]
-        {:runner
-         (future
-           (loop []
-             (let [rets
-                   (try
-                     (let [live (component/start v-peer)]
-                       (register-peer coord (:node (:peer (:peer live))))
+    (fn [task]
+      {(:id task)
+       (or (:onyx/max-peers (planning/find-task catalog (:name task)))
+           Double/POSITIVE_INFINITY)})
+    tasks)))
 
-                       (let [restart-ch (:dead-restart-tail-ch (:peer live))
-                             [v ch] (alts!! [stop-ch restart-ch] :priority true)]
-                         (try
-                           (if (= ch stop-ch)
-                             (try
-                               (component/stop live)
-                               :stopped
-                               (catch Exception e
-                                 (warn e)
-                                 :stopped))
-                             (try
-                               (component/stop live)
-                               nil
-                               (catch Exception e
-                                 (warn e)
-                                 :stopped)))
-                           (finally
-                            (when (= ch stop-ch)
-                              (>!! v true))))))
-                     (catch Exception e
-                       (warn e)
-                       (warn "Virtual peer failed, backing off and rebooting...")
-                       (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                       nil))]
-               (or rets (recur)))))
-         :shutdown-fn (fn []
-                        (let [ack-ch (chan)]
-                          (>!! stop-ch ack-ch)
-                          (<!! ack-ch)))}))
-    (range n))))
+(defn map-set-workflow->workflow
+  "Converts a workflow in format:
+   {:a #{:b :c}
+    :b #{:d}}
+   to format:
+   [[:a :b]
+    [:b :c]
+    [:b :d]]"
+  [workflow]
+  (vec
+   (reduce-kv (fn [w k v]
+                (concat w
+                        (map (fn [t] [k t]) v)))
+              []
+              workflow)))
 
-(defn start-distributed-coordinator [opts]
-  (component/start (system/onyx-ha-coordinator opts)))
+(defn unpack-map-workflow
+  ([workflow] (vec (unpack-map-workflow workflow [])))
+  ([workflow result]
+     (let [roots (keys workflow)]
+       (if roots
+         (concat result
+                 (mapcat
+                  (fn [k]
+                    (let [child (get workflow k)]
+                      (if (map? child)
+                        (concat (map (fn [x] [k x]) (keys child))
+                                (unpack-map-workflow child result))
+                        [[k child]])))
+                  roots))
+         result))))
 
-(defn stop-distributed-coordinator [coordinator]
-  (component/stop coordinator))
+(defn add-job-percentage [config job args]
+  (if (= (:onyx.peer/job-scheduler config) :onyx.job-scheduler/percentage)
+    (assoc args :percentage (:percentage job))
+    args))
+
+(defn task-id->pct [catalog task]
+  (let [task-map (planning/find-task catalog (:name task))]
+    {(:id task) (:onyx/percentage task-map)}))
+
+(defn add-task-percentage [args job-id tasks catalog]
+  (if (= (:task-scheduler args) :onyx.task-scheduler/percentage)
+    (assoc-in args
+              [:task-percentages]
+              (into {} (map (fn [t] (task-id->pct catalog t)) tasks)))
+    args))
+
+(defn add-percentages-to-log-entry [config job args tasks catalog job-id]
+  (let [job-updated (add-job-percentage config job args)]
+    (add-task-percentage job-updated job-id tasks catalog)))
+
+(defn submit-job [config job]
+  (let [id (java.util.UUID/randomUUID)
+        client (component/start (system/onyx-client config))
+        normalized-workflow (if (map? (:workflow job))
+                              (unpack-map-workflow (:workflow job))
+                              (:workflow job))
+        _  (validator/validate-job (assoc job :workflow normalized-workflow))
+        tasks (planning/discover-tasks (:catalog job) normalized-workflow)
+        task-ids (map :id tasks)
+        scheduler (:task-scheduler job)
+        sat (saturation (:catalog job))
+        task-saturation (task-saturation (:catalog job) tasks)
+        args {:id id :tasks task-ids :task-scheduler scheduler
+              :saturation sat :task-saturation task-saturation}
+        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
+        entry (create-log-entry :submit-job args)]
+    (extensions/write-chunk (:log client) :catalog (:catalog job) id)
+    (extensions/write-chunk (:log client) :workflow normalized-workflow id)
+
+    (doseq [task tasks]
+      (extensions/write-chunk (:log client) :task task id)
+      (let [task-map (planning/find-task (:catalog job) (:name task))]
+        (when (:onyx/bootstrap? task-map)
+          (extensions/bootstrap-queue (:queue client) task))))
+
+    (extensions/write-log-entry (:log client) entry)
+    (component/stop client)
+    id))
+
+(defn kill-job
+  "Kills a currently executing job, given it's job ID. All peers executing
+   tasks for this job cleanly stop executing and volunteer to work on other jobs.
+   Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
+   for execution."
+  [config job-id]
+  (let [client (component/start (system/onyx-client config))
+        entry (create-log-entry :kill-job {:job job-id})]
+    (extensions/write-log-entry (:log client) entry)
+    (component/stop client)
+    true))
+
+(defn subscribe-to-log
+  "Sends all events from the log to the provided core.async channel.
+   Starts at the origin of the log and plays forward monotonically.
+
+   Returns a map with keys :replica and :env. :replica contains the origin
+   replica. :env contains an Component with a :log connection to ZooKeeper,
+   convenient for directly querying the znodes. :env can be shutdown with
+   the onyx.api/shutdown-env function"
+  [config ch]
+  (let [env (component/start (system/onyx-client config))]
+    {:replica (extensions/subscribe-to-log (:log env) ch)
+     :env env}))
+
+(defn gc
+  "Invokes the garbage collector on Onyx. Compresses all local replicas
+   for peers, decreasing memory usage. Also deletes old log entries from
+   ZooKeeper, freeing up disk space.
+
+   Local replicas clear out all data about completed and killed jobs -
+   as if they never existed. "
+  [config]
+  (let [id (java.util.UUID/randomUUID)
+        client (component/start (system/onyx-client config))
+        entry (create-log-entry :gc {:id id})
+        ch (chan 1000)]
+    (extensions/write-log-entry (:log client) entry)
+    
+    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+      (let [position (<!! ch)
+            entry (extensions/read-log-entry (:log client) position)
+            new-replica (extensions/apply-log-entry entry replica)]
+        (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
+          (let [diff (extensions/replica-diff entry replica new-replica)]
+            (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+          (recur new-replica))))
+    (component/stop client)
+    true))
+
+(defn await-job-completion
+  "Blocks until job-id has had all of its tasks completed."
+  [config job-id]
+  (let [client (component/start (system/onyx-client config))
+        ch (chan 100)]
+    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+      (let [position (<!! ch)
+            entry (extensions/read-log-entry (:log client) position)
+            new-replica (extensions/apply-log-entry entry replica)
+            tasks (get (:tasks new-replica) job-id)
+            complete-tasks (get (:completions new-replica) job-id)]
+        (if (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))
+          (recur new-replica)
+          (do (component/stop client)
+              true))))))
+
+(defn peer-lifecycle [started-peer config shutdown-ch ack-ch]
+  (try
+    (loop [live started-peer]
+      (let [restart-ch (:restart-ch (:virtual-peer live))
+            [v ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
+        (cond (= ch shutdown-ch)
+              (do (component/stop live)
+                  (>!! ack-ch true))
+              (= ch restart-ch)
+              (do (component/stop live)
+                  (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
+                  (recur (component/start live)))
+              :else (throw (ex-info "Read from a channel with no response implementation" {})))))
+    (catch Exception e
+      (fatal "Peer lifecycle threw an exception")
+      (fatal e))))
+
+(defn start-peers!
+  "Launches n virtual peers. Each peer may be stopped
+   by passing it to the shutdown-peer function."
+  ([n config]
+     (start-peers! n config system/onyx-peer))
+  ([n config peer-f]
+     (doall
+      (map
+       (fn [_]
+         (let [v-peer (peer-f config)
+               live (component/start v-peer)
+               shutdown-ch (chan 1)
+               ack-ch (chan)]
+           {:peer (future (peer-lifecycle live config shutdown-ch ack-ch))
+            :shutdown-ch shutdown-ch
+            :ack-ch ack-ch}))
+       (range n)))))
+
+(defn shutdown-peer
+  "Spins down the virtual peer"
+  [peer]
+  (>!! (:shutdown-ch peer) true)
+  (<!! (:ack-ch peer)))
+
+(defn start-env
+  "Spins up a development environment, using in-memory ZooKeeper and HornetQ"
+  [env-config]
+  (component/start (system/onyx-development-env env-config)))
+
+(defn shutdown-env
+  "Spins down the given development environment"
+  [env]
+  (component/stop env))
+

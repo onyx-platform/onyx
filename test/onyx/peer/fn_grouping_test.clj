@@ -1,40 +1,33 @@
 (ns onyx.peer.fn-grouping-test
-  (:require [midje.sweet :refer :all]
+  (:require [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [taoensso.timbre :refer [info]]
+            [midje.sweet :refer :all]
             [onyx.queue.hornetq-utils :as hq-util]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.api]
-            [taoensso.timbre :refer [info]]))
+            [onyx.api]))
 
-(def output (atom []))
+(def id (java.util.UUID/randomUUID))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
+(def scheduler :onyx.job-scheduler/round-robin)
 
-(def id (str (java.util.UUID/randomUUID)))
-
-(def in-queue (str (java.util.UUID/randomUUID)))
-
-(def out-queue (str (java.util.UUID/randomUUID)))
-
-(def coord-opts
+(def env-config
   {:hornetq/mode :udp
    :hornetq/server? true
+   :hornetq.server/type :embedded
    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
    :hornetq.udp/group-address (:group-address (:hornetq config))
    :hornetq.udp/group-port (:group-port (:hornetq config))
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :hornetq.server/type :embedded
    :hornetq.embedded/config (:configs (:hornetq config))
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id id
-   :onyx.coordinator/revoke-delay 5000})
+   :onyx.peer/job-scheduler scheduler})
 
-(def peer-opts
+(def peer-config
   {:hornetq/mode :udp
    :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
    :hornetq.udp/group-address (:group-address (:hornetq config))
@@ -42,9 +35,21 @@
    :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
    :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
    :zookeeper/address (:address (:zookeeper config))
-   :onyx/id id})
+   :onyx/id id
+   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
+   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/job-scheduler scheduler})
 
-(def conn (onyx.api/connect :memory coord-opts))
+(def env (onyx.api/start-env env-config))
+
+(def output (atom []))
+
+(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
+                "port" (:port (:non-clustered (:hornetq config)))})
+
+(def in-queue (str (java.util.UUID/randomUUID)))
+
+(def out-queue (str (java.util.UUID/randomUUID)))
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)
@@ -75,7 +80,7 @@
   [{:onyx/name :in
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
-    :onyx/medium :hornetq    
+    :onyx/medium :hornetq
     :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
@@ -89,7 +94,7 @@
     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
     :onyx/consumption :concurrent
     :onyx/batch-size 1000}
-   
+
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
@@ -152,20 +157,18 @@
 
 (hq-util/write-and-cap! hq-config in-queue data 100)
 
-(def v-peers (onyx.api/start-peers conn 6 peer-opts))
+(def v-peers (onyx.api/start-peers! 6 peer-config))
 
-(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
+(onyx.api/submit-job peer-config
+                     {:catalog catalog :workflow workflow
+                      :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (hq-util/consume-queue! hq-config out-queue 1))
 
 (doseq [v-peer v-peers]
-  (try
-    ((:shutdown-fn v-peer))
-    (catch Exception e (prn e))))
+  (onyx.api/shutdown-peer v-peer))
 
-(try
-  (onyx.api/shutdown conn)
-  (catch Exception e (prn e)))
+(onyx.api/shutdown-env env)
 
 (def out-val @output)
 

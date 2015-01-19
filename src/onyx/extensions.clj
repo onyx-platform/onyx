@@ -2,92 +2,37 @@
   "Extension interfaces for internally used queues, logs,
    and distributed coordination.")
 
-(defmulti mark-peer-born (fn [sync node] (type sync)))
+;; Replica interface
 
-(defmulti mark-peer-dead (fn [sync node] (type sync)))
+(defmulti apply-log-entry (fn [entry replica] (:fn entry)))
 
-(defmulti mark-offered (fn [sync task peer nodes] (type sync)))
+(defmulti replica-diff (fn [entry old new] (:fn entry)))
 
-(defmulti plan-job (fn [sync job-id tasks catalog workflow] (type sync)))
+(defmulti fire-side-effects! (fn [entry old new diff local-state] (:fn entry)))
 
-(defmulti ack (fn [sync node] (type sync)))
+(defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
 
-(defmulti seal-resource? (fn [sync node] (type sync)))
+;; Log interface
 
-(defmulti revoke-offer (fn [sync ack-node] (type sync)))
+(defmulti write-log-entry (fn [log data] (type log)))
 
-(defmulti complete (fn [sync complete-node cooldown-node cb] (type sync)))
+(defmulti read-log-entry (fn [log position] (type log)))
 
-(defmulti next-tasks (fn [sync] (type sync)))
+(defmulti register-pulse (fn [log id] (type log)))
 
-(defmulti idle-peers (fn [sync] (type sync)))
+(defmulti on-delete (fn [log id ch] (type log)))
 
-(defmulti create
-  (fn
-    ([sync bucket] [(type sync) bucket])
-    ([sync bucket content] [(type sync) bucket])))
+(defmulti subscribe-to-log (fn [log ch] (type log)))
 
-(defmulti create-at
-  (fn
-    ([sync bucket subpath] [(type sync) bucket])
-    ([sync bucket subpath content] [(type sync) bucket])))
+(defmulti write-chunk (fn [log kw chunk id] [(type log) kw]))
 
-(defmulti create-node
-  (fn
-    ([sync node] (type sync))
-    ([sync node contents] (type sync))))
+(defmulti read-chunk (fn [log kw id] [(type log) kw]))
 
-(defmulti delete (fn [sync node] (type sync)))
+(defmulti update-origin! (fn [log replica message-id] (type log)))
 
-(defmulti write-node (fn [sync node contents] (type sync)))
+(defmulti gc-log-entry (fn [log position] (type log)))
 
-(defmulti touch-node (fn [sync node] (type sync)))
-
-(defmulti touched? (fn [sync bucket node] [(type sync) bucket]))
-
-(defmulti read-node (fn [sync node] (type sync)))
-
-(defmulti read-node-at (fn [sync node & subpaths] [(type sync) node]))
-
-(defmulti list-nodes (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti dereference (fn [sync node] (type sync)))
-
-(defmulti previous-node (fn [sync node] (type sync)))
-
-(defmulti smallest? (fn [sync bucket node] [(type sync) bucket]))
-
-(defmulti leader (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti resolve-node (fn [sync bucket & subpath] [(type sync) bucket]))
-
-(defmulti children (fn [sync node] (type sync)))
-
-(defmulti node-exists? (fn [sync node] (type sync)))
-
-(defmulti node-exists-at? (fn [sync bucket & subpaths] [(type sync) bucket]))
-
-(defmulti creation-time (fn [sync node] (type sync)))
-
-(defmulti bucket (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti bucket-at (fn [sync bucket subpath] [(type sync) bucket]))
-
-(defmulti version (fn [sync node] (type sync)))
-
-(defmulti on-change (fn [sync node cb] (type sync)))
-
-(defmulti on-child-change (fn [sync node cb] (type sync)))
-
-(defmulti on-delete (fn [sync node db] (type sync)))
-
-(defmulti next-offset (fn [sync bucket] [(type sync) bucket]))
-
-(defmulti speculate-offset (fn [sync offset] (type sync)))
-
-(defmulti log-entry-at (fn [sync bucket offset] [(type sync) bucket]))
-
-(defmulti checkpoint (fn [sync bucket offset] [(type sync) bucket]))
+;; Queue interface
 
 (defmulti create-tx-session (fn [queue] (type queue)))
 

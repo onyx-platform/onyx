@@ -1,12 +1,26 @@
-#### 0.5.0-SNAPSHOT
+#### 0.5.0
 
-- Transducer support for Functions.
+- Design change: the Coordinator has been abolished. Onyx is now a fully masterless system. The supporting environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.
+- New feature: Realtime event subscription service. All coordination events can be observed in a push-based API backed with core.async.
+- New feature: Job schedulers are now available to control how many peers get assigned to particular jobs. Supports `:onyx.job-scheduler/greedy`, `:onyx.job-scheduler/round-robin`, and `:onyx.job-scheduler/percentage`.
+- New feature: Task schedulers are now available to control how many peers get assigned to particular tasks within a single job. Supports `:onyx.task-scheduler/greedy`, `:onyx.task-scheduler/round-robin`, and `:onyx.task-scheduler/percentage`.
+- New feature: `:onyx/max-peers` may optionally be specified on any catalog entry to create an upper bound on the number of peers executing a particular task. Only applicable under a Round Robin Task Scheduler.
+- New feature: `:onyx/params` may be specified on any catalog entry. It takes a vector of keywords. These keywords are resolved to other keys in the same catalog entry, and the corresponding values are passing as arguments to the function that implements that catalog entry.
+- New feature: `:onyx.peer/join-failure-back-off` option in the peer config specifies a cooldown period to wait to try and join the cluster after previously aborting
+- New feature: `:onyx.peer/inbox-capacity` option in the peer config specifies the max number of inbound messages a peer will buffer in memory.
+- New feature: `:onyx.peer/outbox-capacity` option in the peer config specifies the max number of outbound messages a peer will buffer in memory.
+- New feature: `kill-job` API function.
+- New feature: `subscribe-to-log` API function.
+- New feature: `shutdown-peer` API function.
+- New feature: `shutdown-env` API function. Shuts down a development environment (ZK/HQ in memory).
+- New feature: `gc` API function. Garbage collects all peer replicas and deletes old log entries from ZooKeeper.
+- Enhancement: peers now automatically kill their currently running job if it throws an exception other than a Zookeeper or HornetQ connection failure. The latter cases still cause the peer to automatically reboot.
 
 #### 0.4.1
 
 - Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
 - Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
-- Peer options available in pipeline event map under key `:onyx.core/peer-opts`.
+- Peer options available in pipeline event map under key `:onyx.core/peer-opts`
 
 #### 0.4.0
 

@@ -1,15 +1,14 @@
 (ns onyx.hornetq.embedded-test
-  (:require [midje.sweet :refer :all]
-            [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [onyx.peer.pipeline-extensions :as p-ext]
+            [midje.sweet :refer :all]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
-(def n-messages 2600)
+(def id (java.util.UUID/randomUUID))
 
-(def batch-size 1320)
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def echo 100)
-
-(def id (str (java.util.UUID/randomUUID)))
+(def scheduler :onyx.job-scheduler/round-robin)
 
 (def hq-servers
   ["hornetq/clustered-1.xml"
@@ -26,6 +25,43 @@
 
 (def hornetq-discovery-timeout 5000)
 
+(def env-config
+  {:hornetq/mode :udp
+   :hornetq/server? true
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   :hornetq.server/type :embedded
+   :hornetq.embedded/config hq-servers
+   :zookeeper/address "127.0.0.1:2185"
+   :zookeeper/server? true
+   :zookeeper.server/port 2185
+   :onyx/id id
+   :onyx.peer/job-scheduler scheduler})
+
+(def peer-config
+  {:hornetq/mode :udp
+   :hornetq.udp/cluster-name hornetq-cluster-name
+   :hornetq.udp/group-address hornetq-group-address
+   :hornetq.udp/group-port hornetq-group-port
+   :hornetq.udp/refresh-timeout hornetq-refresh-timeout
+   :hornetq.udp/discovery-timeout hornetq-discovery-timeout
+   :zookeeper/address "127.0.0.1:2185"
+   :onyx/id id
+   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
+   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/job-scheduler scheduler})
+
+(def env (onyx.api/start-env env-config))
+
+(def n-messages 2600)
+
+(def batch-size 1320)
+
+(def echo 100)
+
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
@@ -37,13 +73,13 @@
     :onyx/consumption :concurrent
     :onyx/bootstrap? true
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :inc
     :onyx/fn :onyx.hornetq.embedded-test/my-inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :out
     :onyx/ident :mem/write-segments
     :onyx/type :output
@@ -79,35 +115,11 @@
   (swap! output conj :done)
   {})
 
-(def coord-opts {:hornetq/mode :udp
-                 :hornetq/server? true
-                 :hornetq.udp/cluster-name hornetq-cluster-name
-                 :hornetq.udp/group-address hornetq-group-address
-                 :hornetq.udp/group-port hornetq-group-port
-                 :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                 :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                 :hornetq.server/type :embedded
-                 :hornetq.embedded/config hq-servers
-                 :zookeeper/address "127.0.0.1:2185"
-                 :zookeeper/server? true
-                 :zookeeper.server/port 2185
-                 :onyx/id id
-                 :onyx.coordinator/revoke-delay 5000})
+(def v-peers (onyx.api/start-peers! 1 peer-config))
 
-(def conn (onyx.api/connect :memory coord-opts))
-
-(def peer-opts {:hornetq/mode :udp
-                :hornetq.udp/cluster-name hornetq-cluster-name
-                :hornetq.udp/group-address hornetq-group-address
-                :hornetq.udp/group-port hornetq-group-port
-                :hornetq.udp/refresh-timeout hornetq-refresh-timeout
-                :hornetq.udp/discovery-timeout hornetq-discovery-timeout
-                :zookeeper/address "127.0.0.1:2185"
-                :onyx/id id})
-
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
-
-(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
+(onyx.api/submit-job peer-config
+                     {:catalog catalog :workflow workflow
+                      :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def p (promise))
 
@@ -124,7 +136,7 @@
   (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown conn)
+(onyx.api/shutdown-env env)
 

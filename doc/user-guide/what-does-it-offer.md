@@ -4,18 +4,18 @@ In this chapter, I'll enumerate and explain the reasons that I built Onyx.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [What does Onyx offer?](#what-does-onyx-offer)
-    - [An Information Model](#an-information-model)
-    - [Temporal Decoupling](#temporal-decoupling)
-    - [Elimination of Macros](#elimination-of-macros)
-    - [Plain Clojure Functions](#plain-clojure-functions)
-    - [Testing Without Mocking](#testing-without-mocking)
-    - [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
-    - [TransactionalSemantics](#transactional-semantics)
-    - [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
-    - [Aspect Orientation](#aspect-orientation)
-    - [AOT Nothing](#aot-nothing)
+- [An Information Model](#an-information-model)
+- [Temporal Decoupling](#temporal-decoupling)
+- [Elimination of Macros](#elimination-of-macros)
+- [Plain Clojure Functions](#plain-clojure-functions)
+- [Testing Without Mocking](#testing-without-mocking)
+- [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
+- [Transactional Semantics](#transactional-semantics)
+- [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
+- [Aspect Orientation](#aspect-orientation)
+- [AOT Nothing](#aot-nothing)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -60,5 +60,5 @@ Clojure functions again serve as a huge win. [Dire](https://github.com/MichaelDr
 
 #### AOT Nothing
 
-Onyx AOT's absolutely nothing on your behalf. When you're ready to stand your jar up, simply uberjar and start executing on the target machine. Hadoop and Storm cause dependency hell (In Storm's case, you're restricted to Clojure 1.4.0 because you're locked in by the Executor) by providing their own dependencies ontop of yours. Onyx won't mess with your dependencies.
+Onyx AOT's absolutely nothing on your behalf. When you're ready to stand your jar up, simply uberjar and start executing on the target machine. Hadoop and Storm cause dependency hell (In Storm's case, you're restricted to Clojure 1.5.1 because you're locked in by the Executor) by providing their own dependencies ontop of yours. Onyx won't mess with your dependencies.
 

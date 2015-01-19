@@ -1,114 +1,87 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-  (:require [clojure.core.async :refer [chan mult tap alts!! >!! <!! close!]]
+  (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [warn] :as timbre]
-            [dire.core :as dire]
+            [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.peer.task-lifecycle :refer [task-lifecycle]]))
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+            [onyx.log.entry :refer [create-log-entry]]))
 
-(defn force-close-pipeline! [pipeline]
+(defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
+  (if (:stall-output? state)
+    (do
+      (doseq [reaction (filter :immediate? reactions)]
+        (clojure.core.async/>!! outbox-ch reaction))
+      (update-in state [:buffered-outbox] concat (remove :immediate? reactions)))
+    (do
+      (doseq [reaction reactions]
+        (clojure.core.async/>!! outbox-ch reaction))
+      state)))
+
+(defn processing-loop [id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts]
   (try
-    (l-ext/close-lifecycle-resources* (:pipeline-data pipeline))
+    (loop [replica origin
+           state (merge {:id id
+                         :log log
+                         :queue queue
+                         :outbox-ch outbox-ch
+                         :opts opts
+                         :restart-ch restart-ch
+                         :stall-output? true
+                         :task-lifecycle-fn task-lifecycle}
+                        (:onyx.peer/state opts))]
+      (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
+        (when position
+          (let [entry (extensions/read-log-entry log position)
+                new-replica (extensions/apply-log-entry entry replica)
+                diff (extensions/replica-diff entry replica new-replica)
+                reactions (extensions/reactions entry replica new-replica diff state)
+                new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
+            (recur new-replica (send-to-outbox new-state reactions))))))
     (catch Exception e
-      (timbre/warn e))))
+      (taoensso.timbre/fatal "Fell out of processing loop")
+      (taoensso.timbre/fatal e))))
 
-(defn payload-loop [id sync queue payload-ch shutdown-ch status-ch dead-ch pulse opts]
+(defn outbox-loop [id log outbox-ch]
   (try
-    (let [complete-ch (chan 1)
-          err-ch (chan 1)]
-      (loop [pipeline nil]
-        (when-let [[v ch] (alts!! [shutdown-ch err-ch complete-ch payload-ch] :priority true)]
-          (when (and (not (nil? pipeline)) (not= ch err-ch))
-            (component/stop pipeline))
-
-          (cond (nil? v) (extensions/delete sync (:node pulse))
-                (= ch complete-ch) (recur nil)
-                (= ch shutdown-ch) (recur nil)
-                (= ch err-ch) (force-close-pipeline! pipeline)
-                (= ch payload-ch)
-                (let [payload-node (:path v)
-                      payload (extensions/read-node sync payload-node)
-                      status-ch (chan 1)]
-
-                  (extensions/on-change sync (:node/status (:nodes payload)) #(>!! status-ch %))
-                  (extensions/touch-node sync (:node/ack (:nodes payload)))
-
-                  (<!! status-ch)
-
-                  (let [new-pipeline (task-lifecycle id payload sync queue payload-ch complete-ch err-ch opts)]
-                    (recur (component/start new-pipeline))))))))
+    (loop []
+      (when-let [entry (<!! outbox-ch)]
+        (extensions/write-log-entry log entry)
+        (recur)))
     (catch Exception e
-      (warn e))
-    (finally
-     (>!! dead-ch true))))
+      (taoensso.timbre/fatal "Fell out of outbox loop")
+      (taoensso.timbre/fatal e))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [sync queue] :as component}]
-    (let [peer (extensions/create sync :peer)
-          payload (extensions/create sync :payload)
-          pulse (extensions/create sync :pulse)
-          shutdown (extensions/create sync :shutdown)
+  (start [{:keys [log queue] :as component}]
+    (let [id (java.util.UUID/randomUUID)]
+      (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
-          payload-ch (chan 1)
-          shutdown-ch (chan 1)
-          status-ch (chan 1)
-          
-          dead-head-ch (chan 1)
-          dead-close-tail-ch (chan 1)
-          dead-restart-tail-ch (chan 1)
-          dead-mult (mult dead-head-ch)]
+      (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
+            outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
+            kill-ch (chan 1)
+            restart-ch (chan 1)
+            entry (create-log-entry :prepare-join-cluster {:joiner id})
+            origin (extensions/subscribe-to-log log inbox-ch)]
+        (extensions/register-pulse log id)
 
-      (tap dead-mult dead-close-tail-ch)
-      (tap dead-mult dead-restart-tail-ch)
+        (>!! outbox-ch entry)
 
-      (taoensso.timbre/info (format "Starting Virtual Peer %s" (:uuid peer)))
-      
-      (extensions/write-node sync (:node peer)
-                              {:id (:uuid peer)
-                               :peer-node (:node peer)
-                               :pulse-node (:node pulse)
-                               :shutdown-node (:node shutdown)
-                               :payload-node (:node payload)})
-      
-      (extensions/write-node sync (:node pulse) {:id (:uuid peer)})
-      (extensions/write-node sync (:node shutdown) {:id (:uuid peer)})
-      (extensions/on-change sync (:node payload) #(>!! payload-ch %))
-
-      (dire/with-handler! #'payload-loop
-        java.lang.Exception
-        (fn [e & _] (timbre/info e)))
-
-      (assoc component
-        :peer peer
-        :payload payload
-        :pulse pulse
-        :shutdown shutdown
-        
-        :payload-ch payload-ch
-        :shutdown-ch shutdown-ch
-        :status-ch status-ch
-        :dead-head-ch dead-head-ch
-
-        :dead-close-tail-ch dead-close-tail-ch
-        :dead-restart-tail-ch dead-restart-tail-ch
-
-        :payload-thread (future (payload-loop (:uuid peer) sync queue payload-ch
-                                              shutdown-ch status-ch dead-head-ch pulse opts)))))
+        (thread (outbox-loop id log outbox-ch))
+        (thread (processing-loop id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts))
+        (assoc component :id id :inbox-ch inbox-ch
+               :outbox-ch outbox-ch :kill-ch kill-ch
+               :restart-ch restart-ch))))
 
   (stop [component]
-    (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:uuid (:peer component))))
+    (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
-    (close! (:payload-ch component))
-    (close! (:shutdown-ch component))
-    (close! (:status-ch component))
-    
-    (<!! (:dead-close-tail-ch component))
+    (close! (:inbox-ch component))
+    (close! (:outbox-ch component))
+    (close! (:kill-ch component))
+    (close! (:restart-ch component))
 
-    (close! (:dead-head-ch component))
-    
     component))
 
 (defn virtual-peer [opts]

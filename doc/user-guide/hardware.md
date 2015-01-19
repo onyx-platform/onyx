@@ -4,10 +4,10 @@ In this chapter, we'll outline the hardware that should be used in an Onyx produ
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Hardware](#hardware)
-  - [Solid State Drives](#solid-state-drives)
-  - [10 Gigabit Ethernet Connection](#10-gigabit-ethernet-connection)
+- [Solid State Drives](#solid-state-drives)
+- [10 Gigabit Ethernet Connection](#10-gigabit-ethernet-connection)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

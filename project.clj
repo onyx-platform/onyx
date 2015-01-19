@@ -1,11 +1,11 @@
-(defproject com.mdrogalis/onyx "0.4.1-SNAPSHOT"
+(defproject com.mdrogalis/onyx "0.5.0-SNAPSHOT"
   :description "Distributed data processing"
   :url "https://github.com/MichaelDrogalis/onyx"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx4g" "-Djava.net.preferIPv4Stack=true"]
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.clojure/data.generators "0.1.2"]
                  [org.clojure/data.fressian "0.2.0"]
                  [org.hornetq/hornetq-commons "2.4.0.Final"]
@@ -15,7 +15,6 @@
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
-                 [com.postspectacular/rotor "0.1.0"]
                  [javax.servlet/servlet-api "2.5"]
                  [zookeeper-clj "0.9.1" :exclusions [commons-codec]]
                  [clj-http "0.9.1"]

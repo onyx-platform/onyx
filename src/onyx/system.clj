@@ -1,58 +1,52 @@
 (ns onyx.system
   (:require [com.stuartsierra.component :as component]
-            [onyx.coordinator.async :refer [coordinator]]
-            [onyx.coordinator.election :refer [election]]
-            [onyx.coordinator.distributed :refer [coordinator-server]]
-            [onyx.sync.zookeeper :refer [zookeeper]]
+            [taoensso.timbre :refer [fatal]]
+            [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
-            [onyx.logging-configuration :as logging-config]))
+            [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.log.commands.prepare-join-cluster]
+            [onyx.log.commands.accept-join-cluster]
+            [onyx.log.commands.abort-join-cluster]
+            [onyx.log.commands.notify-join-cluster]
+            [onyx.log.commands.leave-cluster]
+            [onyx.log.commands.submit-job]
+            [onyx.log.commands.volunteer-for-task]
+            [onyx.log.commands.seal-task]
+            [onyx.log.commands.complete-task]
+            [onyx.log.commands.kill-job]
+            [onyx.log.commands.gc]))
 
-(def coordinator-components
-  [:logging-config :sync :queue :coordinator])
+(def development-components [:logging-config :log :queue])
 
-(def ha-coordinator-components
-  [:logging-config :sync :queue :election :coordinator :server])
+(def client-components [:logging-config :log :queue])
 
-(def connection-components
-  [:logging-config :sync])
-
-(def peer-components
-  [:logging-config :sync :queue :peer])
+(def peer-components [:logging-config :log :queue :virtual-peer])
 
 (defn rethrow-component [f]
   (try
     (f)
     (catch Exception e
-      (.printStackTrace e)
+      (fatal e)
       (throw (.getCause e)))))
 
-(defrecord OnyxCoordinator []
+(defrecord OnyxDevelopmentEnv []
   component/Lifecycle
   (start [this]
     (rethrow-component
-     #(component/start-system this coordinator-components)))
+     #(component/start-system this development-components)))
   (stop [this]
     (rethrow-component
-     #(component/stop-system this coordinator-components))))
+     #(component/stop-system this development-components))))
 
-(defrecord OnyxHACoordinator []
+(defrecord OnyxClient []
   component/Lifecycle
   (start [this]
     (rethrow-component
-     #(component/start-system this ha-coordinator-components)))
+     #(component/start-system this client-components)))
   (stop [this]
     (rethrow-component
-     #(component/stop-system this ha-coordinator-components))))
-
-(defrecord OnyxCoordinatorConnection []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this connection-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this connection-components))))
+     #(component/stop-system this client-components))))
 
 (defrecord OnyxPeer []
   component/Lifecycle
@@ -63,35 +57,56 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
-(defn onyx-coordinator
-  [opts]
-  (map->OnyxCoordinator
-   {:logging-config (logging-config/logging-configuration opts)
-    :queue (component/using (hornetq opts) [:logging-config])
-    :sync (component/using (zookeeper opts) [:queue :logging-config])
-    :coordinator (component/using (coordinator opts) [:sync :queue])}))
+(defrecord OnyxFakePeer []
+  component/Lifecycle
+  (start [this]
+    (rethrow-component
+     #(component/start-system this peer-components)))
+  (stop [this]
+    (rethrow-component
+     #(component/stop-system this peer-components))))
 
-(defn onyx-ha-coordinator
-  [opts]
-  (map->OnyxHACoordinator
-   {:logging-config (logging-config/logging-configuration opts)
-    :queue (component/using (hornetq opts) [:logging-config])
-    :sync (component/using (zookeeper opts) [:queue :logging-config])
-    :election (component/using (election opts) [:sync :queue])
-    :coordinator (component/using (coordinator opts) [:sync :queue :election])
-    :server (component/using (coordinator-server opts) [:coordinator])}))
+(defn onyx-development-env
+  [config]
+  (map->OnyxDevelopmentEnv
+   {:logging-config (logging-config/logging-configuration config)
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])}))
 
-(defn onyx-coordinator-connection
-  [opts]
-  (map->OnyxCoordinatorConnection
-   {:logging-config (logging-config/logging-configuration opts)
-    :sync (component/using (zookeeper opts) [:logging-config])}))
+(defn onyx-client
+  [config]
+  (map->OnyxClient
+   {:logging-config (logging-config/logging-configuration (:logging config))
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])}))
 
 (defn onyx-peer
-  [opts]
+  [config]
   (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration opts)
-    :queue (component/using (hornetq opts) [:logging-config])
-    :sync (component/using (zookeeper opts) [:queue :logging-config])
-    :peer (component/using (virtual-peer opts) [:sync :queue])}))
+   {:logging-config (logging-config/logging-configuration (:logging config))
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (hornetq config) [:log])
+    :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
+
+(defrecord FakeHornetQConnection []
+  component/Lifecycle
+
+  (start [component]
+    (taoensso.timbre/info "Starting Fake HornetQ connection")
+    component)
+
+  (stop [component]
+    (taoensso.timbre/info "Stopping Fake HornetQ connection")
+    component))
+
+(defn fake-hornetq [_]
+  (map->FakeHornetQConnection {}))
+
+(defn onyx-fake-peer
+  [config]
+  (map->OnyxFakePeer
+   {:logging-config (logging-config/logging-configuration (:logging config))
+    :log (component/using (zookeeper config) [:logging-config])
+    :queue (component/using (fake-hornetq config) [:log])
+    :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 

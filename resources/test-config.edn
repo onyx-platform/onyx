@@ -10,5 +10,8 @@
            :refresh-timeout 5000
            :discovery-timeout 5000}
  :zookeeper {:address "127.0.0.1:2185"
-             :spawn-port 2185}}
+             :spawn-port 2185}
+ :peer {:inbox-capacity 1000
+        :outbox-capacity 1000}
+ :logging {}}
 

@@ -1,6 +1,7 @@
 (ns onyx.hornetq.vm-test
-  (:require [midje.sweet :refer :all]
-            [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [onyx.peer.pipeline-extensions :as p-ext]
+            [midje.sweet :refer :all]
+            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
 (def n-messages 2600)
@@ -20,13 +21,13 @@
     :onyx/consumption :concurrent
     :onyx/bootstrap? true
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :inc
     :onyx/fn :onyx.hornetq.vm-test/my-inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
-   
+
    {:onyx/name :out
     :onyx/ident :mem/write-segments
     :onyx/type :output
@@ -62,26 +63,37 @@
   (swap! output conj :done)
   {})
 
-(def id (str (java.util.UUID/randomUUID)))
+(def id (java.util.UUID/randomUUID))
 
-(def coord-opts {:hornetq/mode :vm
-                 :hornetq/server? true
-                 :hornetq.server/type :vm
-                 :zookeeper/address "127.0.0.1:2185"
-                 :zookeeper/server? true
-                 :zookeeper.server/port 2185
-                 :onyx/id id
-                 :onyx.coordinator/revoke-delay 5000})
+(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def conn (onyx.api/connect :memory coord-opts))
+(def scheduler :onyx.job-scheduler/round-robin)
 
-(def peer-opts {:hornetq/mode :vm
-                :zookeeper/address "127.0.0.1:2185"
-                :onyx/id id})
+(def env-config
+  {:hornetq/mode :vm
+   :hornetq/server? true
+   :hornetq.server/type :vm
+   :zookeeper/address "127.0.0.1:2185"
+   :zookeeper/server? true
+   :zookeeper.server/port 2185
+   :onyx/id id
+   :onyx.peer/job-scheduler scheduler})
 
-(def v-peers (onyx.api/start-peers conn 1 peer-opts))
+(def peer-config
+  {:hornetq/mode :vm
+   :zookeeper/address "127.0.0.1:2185"   
+   :onyx/id id
+   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
+   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
+   :onyx.peer/job-scheduler scheduler})
 
-(onyx.api/submit-job conn {:catalog catalog :workflow workflow})
+(def env (onyx.api/start-env env-config))
+
+(def v-peers (onyx.api/start-peers! 1 peer-config))
+
+(onyx.api/submit-job
+ peer-config {:catalog catalog :workflow workflow
+              :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def p (promise))
 
@@ -98,7 +110,7 @@
   (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
-  ((:shutdown-fn v-peer)))
+  (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown conn)
+(onyx.api/shutdown-env env)
 

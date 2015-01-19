@@ -4,64 +4,66 @@ Onyx ships with three distinct APIs to accomodate different needs. A description
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-- [APIs](#apis)
-  - [Connection API](#connection-api)
-      - [`connect`](#connect)
-      - [`start-peers`](#start-peers)
-      - [`register-peer`](#register-peer)
-      - [`submit-job`](#submit-job)
-      - [`await-job-completion`](#await-job-completion)
-      - [`shutdown`](#shutdown)
-  - [Task Lifecycle API](#task-lifecycle-api)
-      - [`start-lifecycle?`](#start-lifecycle?)
-      - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
-      - [`inject-temporal-resources`](#inject-temporal-resources)
-      - [`close-temporal-resources`](#close-temporal-resources)
-      - [`close-lifecycle-resources`](#close-lifecycle-resources)
-  - [Peer Pipeline API](#peer-pipeline-api)
-      - [`read-batch`](#read-batch)
-      - [`decompress-batch`](#decompress-batch)
-      - [`requeue-sentinel`](#requeue-sentinel)
-      - [`ack-batch`](#ack-batch)
-      - [`apply-fn`](#apply-fn)
-      - [`compress-batch`](#compress-batch)
-      - [`write-batch`](#write-batch)
-      - [`seal-resource`](#seal-resource)
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [Core API](#core-api)
+    - [`start-env`](#start-env)
+    - [`start-peers!`](#start-peers!)
+    - [`submit-job`](#submit-job)
+    - [`await-job-completion`](#await-job-completion)
+    - [`shutdown-peer`](#shutdown-peer)
+    - [`shutdown-env`](#shutdown-env)
+- [Task Lifecycle API](#task-lifecycle-api)
+    - [`start-lifeycle?`](#start-lifeycle)
+    - [`start-lifecycle?`](#start-lifecycle)
+    - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
+    - [`inject-temporal-resources`](#inject-temporal-resources)
+    - [`close-temporal-resources`](#close-temporal-resources)
+    - [`close-lifecycle-resources`](#close-lifecycle-resources)
+- [Peer Pipeline API](#peer-pipeline-api)
+    - [`read-batch`](#read-batch)
+    - [`decompress-batch`](#decompress-batch)
+    - [`requeue-sentinel`](#requeue-sentinel)
+    - [`ack-batch`](#ack-batch)
+    - [`apply-fn`](#apply-fn)
+    - [`compress-batch`](#compress-batch)
+    - [`write-batch`](#write-batch)
+    - [`seal-resource`](#seal-resource)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
-### Connection API
+### Core API
 
-The [Connection API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/api.clj) is used for typical interaction with Onyx. You'd use the Connection API for interaction with the Coordinator to make Onyx do work.
+The [Core API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/api.clj) is used to start/stop resources, jobs, and monitor job progress. It's accessible through the `onyx.api` namespace.
 
-##### `connect`
+##### `start-env`
 
-Connects the calling thread to the Coordinator. Connection returned is used for submitting jobs and starting peers.
+Starts a development environment with in-memory ZooKeeper and HornetQ. Helpful for developing locally without needing to start any other services.
 
-##### `start-peers`
+##### `start-peers!`
 
-Starts N virtual peer pipelines and registers them with the Coordinator for task execution.
-
-##### `register-peer`
-
-Informs the Coordinator of a new peer. Used by other API functions, and probably not something you'd want to use directly.
+Starts N virtual peers to execute tasks.
 
 ##### `submit-job`
 
-Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog` and `:workflow`.
+Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, and `:task-scheduler`.
 
 ##### `await-job-completion`
 
-Given a job ID, blocks the calling thread until the job is complete.
+Given a job ID, blocks the calling thread until all the tasks for this job have been completed.
 
-##### `shutdown`
+##### `shutdown-peer`
 
-Shts down a connection to a Coordinator.
+Shuts down a single peer, stopping any task that it is presently executing.
+
+##### `shutdown-env`
+
+Shuts down the development environment, stopping in memory HornetQ and ZooKeeper.
 
 ### Task Lifecycle API
 
-Each time a virtual peer receives a task from the coordinator to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/peer/task_lifecycle_extensions.clj) fascilitates this flow.
+Each time a virtual peer receives a task to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/src/onyx/peer/task_lifecycle_extensions.clj) fascilitates this flow.
 
 Onyx provides hooks for user-level modification of this map both before the task begins executing, before each segment batch begins, after each segment batch is completed, and after the task is completed. See below for a description of each. Each of these functions allows dispatch based on the name, identity, type, and type/medium combination of a task. Map merge prescendence happens in this exact order, allowing you to override behavior specified by a plugin, or Onyx itself.
 
@@ -71,6 +73,10 @@ Just before beginning the task, this function is called to check whether the pee
 to Onyx, the peer might need to block and wait for another event. This function must return a map with key
 `:onyx.core/start-lifecycle?` and a boolean value. If true, the task will begin executing. If false, the peer will back off
 for `:onyx.peer/retry-start-interval` before recalling `start-lifecycle?`.
+
+##### `start-lifecycle?`
+
+Returns true if it's okay for this peer to start this task. If false, the peer will back off and sleep for a configurable period of time before calling this function again. Useful for lock acquisition.
 
 ##### `inject-lifecycle-resources`
 

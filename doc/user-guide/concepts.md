@@ -1,20 +1,21 @@
 ## Concepts
 
+We'll take a quick overview of some terms you'll see in the rest of this user guide.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Concepts](#concepts)
-  - [Terminology](#terminology)
-    - [Task](#task)
-    - [Workflow](#workflow)
-    - [Catalog](#catalog)
-    - [Segment](#segment)
-    - [Function](#function)
-    - [Plugin](#plugin)
-    - [Sentinel](#sentinel)
-    - [Coordinator](#coordinator)
-    - [Peer](#peer)
-    - [Virtual Peer](#virtual-peer)
+- [Terminology](#terminology)
+  - [Task](#task)
+  - [Workflow](#workflow)
+  - [Catalog](#catalog)
+  - [Segment](#segment)
+  - [Function](#function)
+  - [Plugin](#plugin)
+  - [Sentinel](#sentinel)
+  - [Peer](#peer)
+  - [Virtual Peer](#virtual-peer)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -28,7 +29,7 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 A workflow is the structural specification of an Onyx program. It's purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acylic graph.
 
-In the case of a tree, the workflow is a Clojure map representing a multi-rooted, acyclic tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything inbetween must name a function. Elements of a workflow must be Clojure keywords.
+In the case of a tree, the workflow is a Clojure map representing a multi-rooted tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything inbetween must name a function. Elements of a workflow must be Clojure keywords.
 
 In the case of a directed acylic graph, the workflow is a Clojure vector of vectors. The inner vectors contain exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge between from the first node to the second.
 
@@ -123,7 +124,7 @@ Example:
  :onyx/doc "A HornetQ input stream"}
 
 {:onyx/name :inc
- :onyx/fn :onyx.peer.multi-peer-mem-test/my-inc
+ :onyx/fn :my.namespace/my-function-name
  :onyx/type :function
  :onyx/consumption :concurrent
  :onyx/batch-size batch-size
@@ -143,7 +144,7 @@ Example:
 
 #### Segment
 
-A segment is the smallest unit of data in Onyx. Segments are required to be Clojure maps. They represent the data flowing through the cluster.
+A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster.
 
 #### Function
 
@@ -151,15 +152,11 @@ A function is a construct that receives segments and emits segments for further 
 
 #### Plugin
 
-A plugin is a means for hooking into data sources to extract data as input and produce data as output.
+A plugin is a means for hooking into data sources to extract data as input and produce data as output. Onyx comes with a few plugins, but you can craft your own, too.
 
 #### Sentinel
 
 A sentinel is a value that can be pushed into Onyx to signal the end of a stream of data. This effectively lets Onyx switch between streaming and batching mode. The sentinel in Onyx is represented by the Clojure keyword `:done`.
-
-#### Coordinator
-
-The Coordinator a is single node in the cluster responsible for doing distributed coordination. This node can be made highly available through traditional heart beat techniques as Datomic's transactor does.
 
 #### Peer
 

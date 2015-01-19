@@ -1,6 +1,6 @@
 (ns onyx.plugin.hornetq
   (:require [clojure.data.fressian :as fressian]
-            [onyx.coordinator.planning :as planning]
+            [onyx.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]
@@ -185,32 +185,4 @@
   [pipeline-data]
   (seal-resource-shim pipeline-data)
   {})
-
-(with-post-hook! #'read-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/batch]}]
-    (debug (format "[%s] Read %s segments" id (count batch)))))
-
-(with-post-hook! #'decompress-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/decompressed]}]
-    (debug (format "[%s] Decompressed %s segments" id (count decompressed)))))
-
-(with-post-hook! #'requeue-sentinel-shim
-  (fn [{:keys [onyx.core/id]}]
-    (debug (format "[%s] Requeued sentinel value" id))))
-
-(with-post-hook! #'apply-fn-in-shim
-  (fn [{:keys [onyx.core/id onyx.core/results]}]
-    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
-
-(with-post-hook! #'apply-fn-out-shim
-  (fn [{:keys [onyx.core/id onyx.core/results]}]
-    (debug (format "[%s] Applied fn to %s segments" id (count results)))))
-
-(with-post-hook! #'compress-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/compressed]}]
-    (debug (format "[%s] Compressed batch of %s segments" id (count compressed)))))
-
-(with-post-hook! #'write-batch-shim
-  (fn [{:keys [onyx.core/id onyx.core/written?]}]
-    (debug (format "[%s] Wrote batch with value" id written?))))
 
