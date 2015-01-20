@@ -1,5 +1,5 @@
 (defproject com.mdrogalis/onyx "0.5.0-SNAPSHOT"
-  :description "Distributed data processing"
+  :description "Distributed, masterless, fault tolerant data processing for Clojure"
   :url "https://github.com/MichaelDrogalis/onyx"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
@@ -17,7 +17,6 @@
                  [com.taoensso/timbre "3.0.1"]
                  [javax.servlet/servlet-api "2.5"]
                  [zookeeper-clj "0.9.1" :exclusions [commons-codec]]
-                 [clj-http "0.9.1"]
                  [ring "1.2.2" :exclusions [joda-time]]
                  [dire "0.5.1"]
                  [prismatic/schema "0.3.1"]]
