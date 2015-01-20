@@ -2,7 +2,6 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [clj-http.client :refer [post]]
             [taoensso.timbre :refer [warn fatal]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
