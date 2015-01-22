@@ -50,7 +50,7 @@ If a job is submitted while this scheduler is running, no peers will be allocate
 
 **Job Removal**
 
-If a job is completed or otherwise cancelled, *all* of the peers executed that task will move to the job that was submitted after this job.
+If a job is completed or otherwise canceled, *all* of the peers executed that task will move to the job that was submitted after this job.
 
 ##### Round Robin Job Scheduler
 
@@ -72,7 +72,7 @@ If a job is submitted while this scheduler is running, the entire cluster will b
 
 **Job Removal**
 
-If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
+If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
 
 ##### Round Robin Rebalancing Strategy
 
@@ -123,7 +123,7 @@ If a job is submitted while this scheduler is running, the entire cluster will b
 
 **Job Removal**
 
-If a job is completed or otherwise cancelled while this scheduler is running, the entire cluster will be rebalanced.
+If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced.
 
 ##### Percentage Rebalancing Strategy
 
@@ -158,7 +158,7 @@ To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/greedy`.
 
 **Task Completion**
 
-When a task is complete, this scheduler moves all peers executing that task to the next task in the topologically sorted workflow. If there are no more tasks, these peers are elligible to execute tasks for another job. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns all peers *from the completed task* to task B.
+When a task is complete, this scheduler moves all peers executing that task to the next task in the topologically sorted workflow. If there are no more tasks, these peers are eligible to execute tasks for another job. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns all peers *from the completed task* to task B.
 
 **Peer Removal**
 
