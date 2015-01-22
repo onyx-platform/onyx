@@ -194,9 +194,9 @@ Remember to always provide a replica for the node running the Local grouping han
 
 #### Explanation
 
-For the most part, you're going to want to write your tests using the options described in the development environment. In the in-memory machine starts up much faster, so you'll get more develoment cycles. One thing you're unable to simulate with that set up, though, is running an actual HornetQ cluster as the underlying messaging system. It's critical to be able to have this if you want to test idempotency of your workflow, or you're using functionality like grouping that behaves a bit differently with a HornetQ cluster.
+For the most part, you're going to want to write your tests using the options described in the development environment. In the in-memory machine starts up much faster, so you'll get more development cycles. One thing you're unable to simulate with that set up, though, is running an actual HornetQ cluster as the underlying messaging system. It's critical to be able to have this if you want to test idempotency of your workflow, or you're using functionality like grouping that behaves a bit differently with a HornetQ cluster.
 
-To handle this, Onyx ships with an embedded option for HornetQ. Embeddeding HornetQ means spinning up one or more servers inside the application. This allows you to run a cluster without having to configure HornetQ outside your project. We use embedded HornetQ for the Onyx test suite for this reason.
+To handle this, Onyx ships with an embedded option for HornetQ. Embedding HornetQ means spinning up one or more servers inside the application. This allows you to run a cluster without having to configure HornetQ outside your project. We use embedded HornetQ for the Onyx test suite for this reason.
 
 #### HornetQ
 

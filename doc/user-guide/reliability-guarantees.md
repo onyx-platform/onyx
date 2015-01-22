@@ -1,6 +1,6 @@
 ## Reliability Guarantees
 
-This chapter discusses the reliability features that you can expect out of Onyx. These features are tunable and require the developer to make trade-offs.
+This chapter discusses the reliability features that you can expect out of Onyx. These features are tuneable and require the developer to make trade-offs.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -13,7 +13,7 @@ This chapter discusses the reliability features that you can expect out of Onyx.
 
 ### Transactions
 
-Onyx offers transactional processing semantics per batch. Messages are moved from one HornetQ server to the other using non-XA transacted sesssions. Messages are eligible for replay if there is machine failure in between the time a batch has been read and committed back to storage.
+Onyx offers transactional processing semantics per batch. Messages are moved from one HornetQ server to the other using non-XA transacted sessions. Messages are eligible for replay if there is machine failure in between the time a batch has been read and committed back to storage.
 
 ### Replication
 
