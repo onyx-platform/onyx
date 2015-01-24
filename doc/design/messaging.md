@@ -99,7 +99,7 @@ Implement XOR algorithm in peer's acking thread as described above.
 
 Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks.
 
-### Impleenntation plan
+### Implementation plan
 
 - Add a new component to all peers - BufferChannels.
   - Two channels: inbound & outbound
