@@ -7,17 +7,19 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Messaging Buffers")
+    (taoensso.timbre/info "Starting Messaging Buffer")
 
     (let [inbound-ch (chan (or (:onyx.messaging/inbound-capacity opts) 20000))
-          outbound-ch (chan (or (:onyx.messaging/outbound-capacity opts) 20000))]
-      (assoc component :inbound-ch inbound-ch :outbound-ch outbound-ch)))
+;          outbound-ch (chan (or (:onyx.messaging/outbound-capacity opts) 20000))
+          ]
+      (assoc component :inbound-ch inbound-ch; :outbound-ch outbound-ch
+             )))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping Messaging Buffers")
+    (taoensso.timbre/info "Stopping Messaging Buffer")
 
     (close! (:inbound-ch component))
-    (close! (:outbound-ch) component)
+;    (close! (:outbound-ch) component)
 
     component))
 

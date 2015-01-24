@@ -1,10 +1,11 @@
 (ns ^:no-doc onyx.messaging.http-kit
-    (:require [com.stuartsierra.component :as component]
+    (:require [clojure.core.async :refer [>!!]]
+              [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [org.httpkit.server :as http]))
 
-(defn app [request]
-  (println (format "Dropping %s on the floor" request))
+(defn app [inbound-ch request]
+  (>!! inbound-ch (:body request))
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body ""})
@@ -15,7 +16,8 @@
   (start [component]
     (taoensso.timbre/info "Starting HTTP Kit")
 
-    (let [server (http/run-server app {:port 0 :thread 1})]
+    (let [ch (:inbound-ch (:messaging-buffer component))
+          server (http/run-server (partial app ch) {:port 0 :thread 1})]
       (assoc component :server server)))
 
   (stop [component]

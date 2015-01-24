@@ -5,7 +5,6 @@
               [taoensso.timbre :refer [info warn] :as timbre]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
-              [onyx.queue.hornetq :refer [hornetq]]
               [onyx.planning :refer [find-task]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -35,7 +34,7 @@
       (merge event cycle-params rets))))
 
 (defn munge-read-batch [event]
-  (merge event {:onyx.core/commit? true} (p-ext/read-batch event)))
+  (merge event (p-ext/read-batch event)))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
@@ -58,11 +57,6 @@
 
 (defn munge-write-batch [event]
   (merge event (p-ext/write-batch event)))
-
-(defn munge-commit-tx
-  [{:keys [onyx.core/queue onyx.core/session onyx.core/commit?] :as event}]
-  (extensions/commit-tx queue session)
-  (merge event {:onyx.core/committed? commit?}))
 
 (defn munge-close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
@@ -216,7 +210,7 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
-(defrecord TaskLifeCycle [id log queue job-id task-id restart-ch outbox-ch seal-resp-ch opts]
+(defrecord TaskLifeCycle [id log message-buffer messaging job-id task-id restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -316,7 +310,6 @@
                            :onyx.core/egress-queues (:egress-queues task)
                            :onyx.core/params (resolve-calling-params catalog-entry  opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
-                           :onyx.core/queue queue
                            :onyx.core/log log
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
@@ -324,7 +317,6 @@
                            :onyx.core/pipeline-state (atom {})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (assoc pipeline-data :onyx.core/queue (extensions/optimize-concurrently queue pipeline-data))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
         (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))

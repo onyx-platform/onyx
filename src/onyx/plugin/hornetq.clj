@@ -4,7 +4,6 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]
-            [onyx.queue.hornetq :refer [take-segments]]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
             [taoensso.timbre :refer [debug]])
@@ -12,6 +11,23 @@
            [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
+
+(def sentinel-byte-array (.limit (fressian/write :done) 32))
+
+(defn take-segments
+  ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
+  ;; match, hashCode() doesn't work as expected.
+  ([f n] (take-segments f n []))
+  ([f n rets]
+     (if (= n (count rets))
+       rets
+       (let [segment (f)]
+         (if (nil? (:message segment))
+           rets
+           (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
+             (if (= m sentinel-byte-array)
+               (conj rets segment)
+               (recur f n (conj rets segment)))))))))
 
 (defn read-batch [queue session-factory task]
   (let [session (.createTransactedSession session-factory)
@@ -146,6 +162,14 @@
 
 (defmethod p-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
+
+(defmethod p-ext/ack-message [:input :hornetq]
+  [event]
+  (println "Acking HornetQ message"))
+
+(defmethod p-ext/replay-message [:input :hornetq]
+  [event]
+  (println "Releasing HornetQ message"))
 
 (defmethod p-ext/apply-fn [:output :hornetq]
   [event] (apply-fn-out-shim event))
