@@ -4,6 +4,7 @@
             [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
+            [onyx.messaging.messaging-buffer :refer [messaging-buffer]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -17,11 +18,11 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]))
 
-(def development-components [:logging-config :log :queue])
+(def development-components [:logging-config :log :messaging-buffer :queue])
 
-(def client-components [:logging-config :log :queue])
+(def client-components [:logging-config :log :messaging-buffer :queue])
 
-(def peer-components [:logging-config :log :queue :virtual-peer])
+(def peer-components [:logging-config :log :messaging-buffer :queue :virtual-peer])
 
 (defn rethrow-component [f]
   (try
@@ -71,21 +72,24 @@
   (map->OnyxDevelopmentEnv
    {:logging-config (logging-config/logging-configuration config)
     :log (component/using (zookeeper config) [:logging-config])
-    :queue (component/using (hornetq config) [:log])}))
+    :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :queue (component/using (hornetq config) [:log :messaging-buffer])}))
 
 (defn onyx-client
   [config]
   (map->OnyxClient
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
-    :queue (component/using (hornetq config) [:log])}))
+    :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :queue (component/using (hornetq config) [:log :messaging-buffer])}))
 
 (defn onyx-peer
   [config]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
-    :queue (component/using (hornetq config) [:log])
+    :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :queue (component/using (hornetq config) [:messaging-buffer])
     :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 
 (defrecord FakeHornetQConnection []
@@ -107,6 +111,7 @@
   (map->OnyxFakePeer
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
-    :queue (component/using (fake-hornetq config) [:log])
+    :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :queue (component/using (fake-hornetq config) [:messaging-buffer :log])
     :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 

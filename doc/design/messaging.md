@@ -101,7 +101,7 @@ Implement a load balancing algorithm for spreading out messages over a range of 
 
 ### Implementation plan
 
-- Add a new component to all peers - BufferChannels.
+- Add a new component to all peers - MessagingBuffer.
   - Two channels: inbound & outbound
   - Fixed sized buffers on both, make configurable
 - Add `send-message` and `receive-message` to `onyx.extensions`.
