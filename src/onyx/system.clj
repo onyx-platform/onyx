@@ -5,6 +5,7 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.queue.hornetq :refer [hornetq]]
             [onyx.messaging.messaging-buffer :refer [messaging-buffer]]
+            [onyx.messaging.http-kit :refer [http-kit]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -18,11 +19,14 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]))
 
-(def development-components [:logging-config :log :messaging-buffer :queue])
+(def development-components [:logging-config :log :messaging-buffer :messaging :queue])
 
-(def client-components [:logging-config :log :messaging-buffer :queue])
+(def client-components [:logging-config :log :messaging-buffer :messaging :queue])
 
-(def peer-components [:logging-config :log :messaging-buffer :queue :virtual-peer])
+(def peer-components [:logging-config :log :messaging-buffer :messaging :queue :virtual-peer])
+
+(def messaging
+  {:http-kit http-kit})
 
 (defn rethrow-component [f]
   (try
@@ -73,6 +77,7 @@
    {:logging-config (logging-config/logging-configuration config)
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])
     :queue (component/using (hornetq config) [:log :messaging-buffer])}))
 
 (defn onyx-client
@@ -81,6 +86,7 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])
     :queue (component/using (hornetq config) [:log :messaging-buffer])}))
 
 (defn onyx-peer
@@ -89,6 +95,7 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])
     :queue (component/using (hornetq config) [:messaging-buffer])
     :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 
@@ -112,6 +119,7 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
+    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])
     :queue (component/using (fake-hornetq config) [:messaging-buffer :log])
     :virtual-peer (component/using (virtual-peer config) [:log :queue])}))
 
