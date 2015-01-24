@@ -99,6 +99,31 @@ Implement XOR algorithm in peer's acking thread as described above.
 
 Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks.
 
+### Impleenntation plan
+
+- Add a new component to all peers - BufferChannels.
+  - Two channels: inbound & outbound
+  - Fixed sized buffers on both, make configurable
+- Add `send-message` and `receive-message` to `onyx.extensions`.
+  - Implement in folder named `messaging`.
+  - Add an `http-kit` file to this folder, implement send/receive message
+- Make a map of keyword to function that returns a new Component
+  - `:http-kit` -> New HttpKit server
+  - Use this for when the peers boots up
+  - Make sure the result of this gets passed into the peer task lifecycle
+  - Use this for receiving messages
+  - Do the same, make a Component for sending messages, make sure it gets the receiver as a parameter in case it needs it
+- Strip out all pipelining. I want to start from scratch and tune performance from the ground up
+- Add an Acker component to every peer
+  - Listens for ack messages, contains an atom as described above
+  - This should be part of the interface for any messaging implementations
+  - Reuse existing booted up messaging components
+- Add a holding pen to all input tasks
+  - Add an atom to maintain the holding pen
+  - Make sure a future is running to periodically clear the atom out
+  - Do the same as above wrt to reusing messaging components, needs to come through the same interface
+- Implement HornetQ first, straightforward semantics
+
 ### Open questions
 
 - How do peers look each other up?
