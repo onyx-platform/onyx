@@ -29,23 +29,81 @@
                (conj rets segment)
                (recur f n (conj rets segment)))))))))
 
-(defn read-batch [consumer task]
-  (let [queue-name (:hornetq/queue-name task)
-        timeout (or (:onyx/batch-timeout task) 1000)]
-    (let [f (fn [] {:message (.receive consumer timeout)})
+(defmethod l-ext/start-lifecycle? :hornetq/read-segments
+  [_ event]
+  {:onyx.core/start-lifecycle? true})
+
+(defmethod l-ext/inject-lifecycle-resources :hornetq/read-segments
+  [_ {:keys [onyx.core/task-map] :as event}]
+  (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
+    (let [session-factory (.createSessionFactory locator)
+          session (.createSession session-factory true true 0)
+          consumer (.createConsumer session (:hornetq/queue-name task-map))]
+      (.start session)
+      {:hornetq/pending-messages (atom {})
+       :hornetq/locator locator
+       :hornetq/session-factory session-factory
+       :hornetq/session session
+       :hornetq/consumer consumer})))
+
+(defmethod l-ext/close-temporal-resources :hornetq/read-segments
+  [_ event] event)
+
+(defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
+  [_ event]
+  (.close (:hornetq/consumer event))
+  (.close (:hornetq/session event))
+  (.close (:hornetq/session-factory event))
+  (.close (:hornetq/locator event))
+  event)
+
+(defmethod p-ext/read-batch [:input :hornetq]
+  [{:keys [onyx.core/task-map hornetq/consumer hornetq/pending-messages]}]
+  (let [queue-name (:hornetq/queue-name task-map)
+        timeout (or (:onyx/batch-timeout task-map) 1000)]
+    (let [f (fn [] {:id (java.util.UUID/randomUUID)
+                   :message (.receive consumer timeout)})
           rets (filter (comp not nil? :message)
-                       (take-segments f (:onyx/batch-size task)))]
+                       (take-segments f (:onyx/batch-size task-map)))]
+      (doseq [m rets]
+        (swap! pending-messages assoc (:id m) (:message m)))
       {:onyx.core/batch (or rets [])})))
 
-(defn decompress-segment [segment]
-  (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
+(defmethod p-ext/decompress-batch [:input :hornetq]
+  [{:keys [onyx.core/batch]}]
+  (let [decompress-f #(fressian/read (.toByteBuffer (.getBodyBuffer %)))]
+    {:onyx.core/decompressed (map (comp decompress-f :message) batch)}))
 
-(defn compress-segment [segment]
-  (.array (fressian/write segment)))
+(defmethod p-ext/apply-fn [:input :hornetq]
+  [event]
+  {:onyx.core/results (:onyx.core/decompressed event)})
 
-(defn write-batch [session-factory task compressed]
+(defmethod p-ext/ack-message [:input :hornetq]
+  [{:keys [onyx.core/message-id hornetq/pending-messages] :as event}]
+  (let [message (get @pending-messages message-id)]
+    (.acknowledge message)
+    (swap! pending-messages dissoc message-id)))
+
+(defmethod p-ext/replay-message [:input :hornetq]
+  [{:keys [onyx.core/message-id hornetq/pending-messages] :as event}]
+  (.rollback (:hornetq/session event))
+  (swap! pending-messages dissoc message-id))
+
+(defmethod p-ext/apply-fn [:output :hornetq]
+  [event]
+  {:onyx.core/results (:onyx.core/decompressed event)})
+
+(defmethod p-ext/compress-batch [:output :hornetq]
+  [{:keys [onyx.core/results]}]
+  (let [compress-f #(.array (fressian/write %))]
+    {:onyx.core/compressed (map compress-f results)}))
+
+(defmethod p-ext/write-batch [:output :hornetq]
+  [{:keys [onyx.core/task-map onyx.core/compressed hornetq/session-factory]}]
   (let [session (.createTransactedSession session-factory)
-        queue (:hornetq/queue-name task)
+        queue (:hornetq/queue-name task-map)
         producer (.createProducer session queue)]
     (.start session)
     (doseq [x compressed]
@@ -57,45 +115,29 @@
      :hornetq/producer producer
      :onyx.core/written? true}))
 
-(defn read-batch-shim [{:keys [onyx.core/task-map] :as event}]
-  (merge event (read-batch (:hornetq/consumer event) task-map)))
+(defmethod l-ext/inject-lifecycle-resources :hornetq/write-segments
+  [_ {:keys [onyx.core/task-map] :as pipeline}]
+  (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
+        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
+        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))
+        session-factory (.createSessionFactory locator)]
+    {:hornetq/locator locator
+     :hornetq/session-factory session-factory}))
 
-(defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
-  (let [decompressed (map (comp decompress-segment :message) batch)]
-    (merge event {:onyx.core/decompressed decompressed})))
+(defmethod l-ext/close-temporal-resources :hornetq/write-segments
+  [_ event]
+  (.close (:hornetq/producer event))
+  (.close (:hornetq/session event))
+  {})
 
-(defn strip-sentinel-shim [event]
-  (operation/on-last-batch
-   event
-   (fn [{:keys [onyx.core/task-map hornetq/session]}]
-     (let [queue-name (:hornetq/queue-name task-map)
-           query (.queueQuery session (SimpleString. queue-name))]
-       (.getMessageCount query)))))
+(defmethod l-ext/close-lifecycle-resources :hornetq/write-segments
+  [_ event]
+  (.close (:hornetq/session-factory event))
+  (.close (:hornetq/locator event))
+  {})
 
-(defn requeue-sentinel-shim [{:keys [onyx.core/task-map] :as event}]
-  (let [queue-name (:hornetq/queue-name task-map)]
-    (let [session (:hornetq/session event)]
-      (let [producer (.createProducer session queue-name)
-            message (.createMessage session true)]
-        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
-        (.send producer message)
-        (.close producer)))
-    (merge event {:onyx.core/requeued? true})))
-
-(defn apply-fn-in-shim [event]
-  (merge event {:onyx.core/results (:onyx.core/decompressed event)}))
-
-(defn apply-fn-out-shim [event]
-  (merge event {:onyx.core/results (:onyx.core/decompressed event)}))
-
-(defn compress-batch-shim [{:keys [onyx.core/results] :as event}]
-  (merge event {:onyx.core/compressed (map compress-segment results)}))
-
-(defn write-batch-shim
-  [{:keys [onyx.core/task-map onyx.core/compressed] :as event}]
-  (merge event (write-batch (:hornetq/session-factory event) task-map compressed)))
-
-(defn seal-resource-shim [{:keys [onyx.core/task-map] :as event}]
+(defmethod p-ext/seal-resource [:output :hornetq]
+  [{:keys [onyx.core/task-map] :as event}]
   (let [queue-name (:hornetq/queue-name task-map)]
     (let [session (.createTransactedSession (:hornetq/session-factory event))]
       (let [producer (.createProducer session queue-name)
@@ -104,99 +146,6 @@
         (.send producer message)
         (.close producer))
       (.commit session)
-      (.close session))))
-
-(defmethod l-ext/start-lifecycle? :hornetq/read-segments
-  [_ {:keys [hornetq/session onyx.core/ingress-queues onyx.core/task-map]}]
-  {:onyx.core/start-lifecycle?
-   (if (= (:task/consumption task-map) :sequential)
-     (let [query (.queueQuery session (SimpleString. (:hornetq/queue-name task-map)))]
-       (zero? (.getConsumerCount query)))
-     true)})
-
-(defmethod l-ext/inject-lifecycle-resources :hornetq/read-segments
-  [_ {:keys [onyx.core/task-map] :as pipeline-data}]
-  (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
-        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
-    (let [session-factory (.createSessionFactory locator)
-          session (.createTransactedSession session-factory)]
-      (merge pipeline-data
-             {:onyx.core/holding-pen (atom {})
-              :hornetq/locator locator
-              :hornetq/session-factory session-factory
-              :hornetq/session session
-              :hornetq/consumer (.createConsumer session (:hornetq/queue-name task-map))}))))
-
-(defmethod l-ext/close-temporal-resources :hornetq/read-segments
-  [_ pipeline-data]
-  (.commit (:hornetq/session pipeline-data))
-  pipeline-data)
-
-(defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
-  [_ pipeline-data]
-  (.close (:hornetq/consumer pipeline-data))
-  (.close (:hornetq/session pipeline-data))
-  (.close (:hornetq/session-factory pipeline-data))
-  (.close (:hornetq/locator pipeline-data))
-  pipeline-data)
-
-(defmethod p-ext/read-batch [:input :hornetq]
-  [event] (read-batch-shim event))
-
-(defmethod p-ext/decompress-batch [:input :hornetq]
-  [event] (decompress-batch-shim event))
-
-(defmethod p-ext/apply-fn [:input :hornetq]
-  [event] (apply-fn-in-shim event))
-
-(defmethod p-ext/ack-message [:input :hornetq]
-  [event]
-  (let [state @(:onyx.core/holding-pen event)
-        message (get state (:onyx.core/message-id event))]
-    (.acknowledge message)
-    (swap! (:onyx.core/holding-pen event) dissoc (:onyx.core/message-id event))))
-
-(defmethod p-ext/replay-message [:input :hornetq]
-  [event]
-  (println "Releasing HornetQ message"))
-
-(defmethod p-ext/apply-fn [:output :hornetq]
-  [event] (apply-fn-out-shim event))
-
-(defmethod p-ext/compress-batch [:output :hornetq]
-  [event] (compress-batch-shim event))
-
-(defmethod p-ext/write-batch [:output :hornetq]
-  [event] (write-batch-shim event))
-
-(defmethod l-ext/inject-lifecycle-resources :hornetq/write-segments
-  [_ {:keys [onyx.core/task-map] :as pipeline}]
-  (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
-        tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
-        locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
-
-    (when (= (:onyx/consumption task-map) :sequential)
-      (.setConsumerWindowSize locator 0))
-
-    (let [session-factory (.createSessionFactory locator)]
-      {:hornetq/locator locator
-       :hornetq/session-factory session-factory})))
-
-(defmethod l-ext/close-temporal-resources :hornetq/write-segments
-  [_ pipeline-data]
-  (.close (:hornetq/producer pipeline-data))
-  (.close (:hornetq/session pipeline-data))
-  {})
-
-(defmethod l-ext/close-lifecycle-resources :hornetq/write-segments
-  [_ pipeline-data]
-  (.close (:hornetq/session-factory pipeline-data))
-  (.close (:hornetq/locator pipeline-data))
-  {})
-
-(defmethod p-ext/seal-resource [:output :hornetq]
-  [pipeline-data]
-  (seal-resource-shim pipeline-data)
+      (.close session)))
   {})
 
