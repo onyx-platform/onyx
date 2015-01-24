@@ -154,12 +154,6 @@
 (defmethod p-ext/decompress-batch [:input :hornetq]
   [event] (decompress-batch-shim event))
 
-(defmethod p-ext/strip-sentinel [:input :hornetq]
-  [event] (strip-sentinel-shim event))
-
-(defmethod p-ext/requeue-sentinel [:input :hornetq]
-  [event] (requeue-sentinel-shim event))
-
 (defmethod p-ext/apply-fn [:input :hornetq]
   [event] (apply-fn-in-shim event))
 

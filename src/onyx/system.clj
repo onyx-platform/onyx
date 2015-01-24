@@ -70,13 +70,16 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
+(defn messaging-ctor [config]
+  ((get messaging (:onyx.messaging/impl config)) config))
+
 (defn onyx-development-env
   [config]
   (map->OnyxDevelopmentEnv
    {:logging-config (logging-config/logging-configuration config)
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])}))
+    :messaging (component/using (messaging-ctor config) [:messaging-buffer])}))
 
 (defn onyx-client
   [config]
@@ -84,7 +87,7 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])}))
+    :messaging (component/using (messaging-ctor config) [:messaging-buffer])}))
 
 (defn onyx-peer
   [config]
@@ -92,6 +95,6 @@
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
     :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (get messaging (:onyx.messaging/impl config)) [:messaging-buffer])
+    :messaging (component/using (messaging-ctor config) [:messaging-buffer])
     :virtual-peer (component/using (virtual-peer config) [:log])}))
 

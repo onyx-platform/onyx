@@ -39,14 +39,6 @@
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
 
-(defn munge-strip-sentinel [event]
-  (merge event (p-ext/strip-sentinel event)))
-
-(defn munge-requeue-sentinel [{:keys [onyx.core/requeue?] :as event}]
-  (if requeue?
-    (merge event (p-ext/requeue-sentinel event))
-    event))
-
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
     (merge event (p-ext/apply-fn event))
@@ -131,22 +123,6 @@
          (recur)))
     decompress-ch dead-ch release-f exception-f))
 
-(defn strip-sentinel-loop [strip-ch requeue-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! strip-ch)]
-         (>!! requeue-ch (munge-strip-sentinel event))
-         (recur)))
-    strip-ch dead-ch release-f exception-f))
-
-(defn requeue-sentinel-loop [requeue-ch apply-fn-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! requeue-ch)]
-         (>!! apply-fn-ch (munge-requeue-sentinel event))
-         (recur)))
-    requeue-ch dead-ch release-f exception-f))
-
 (defn apply-fn-loop [apply-fn-ch compress-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
@@ -170,14 +146,6 @@
          (>!! commit-ch (munge-write-batch event))
          (recur)))
     write-ch dead-ch release-f exception-f))
-
-(defn commit-tx-loop [commit-ch close-resources-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! commit-ch)]
-         (>!! close-resources-ch (munge-commit-tx event))
-         (recur)))
-    commit-ch dead-ch release-f exception-f))
 
 (defn close-resources-loop [close-ch close-temporal-ch dead-ch release-f exception-f]
   (with-clean-up
@@ -396,14 +364,6 @@
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
-(dire/with-post-hook! #'munge-strip-sentinel
-  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Attempted to strip sentinel. %s segments left" id lifecycle-id (count decompressed)))))
-
-(dire/with-post-hook! #'munge-requeue-sentinel
-  (fn [{:keys [onyx.core/id onyx.core/tail-batch? onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Requeued sentinel value" id lifecycle-id))))
-
 (dire/with-post-hook! #'munge-decompress-batch
   (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
@@ -419,10 +379,6 @@
 (dire/with-post-hook! #'munge-write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/compressed]}]
     (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count compressed)))))
-
-(dire/with-post-hook! #'munge-commit-tx
-  (fn [{:keys [onyx.core/id onyx.core/commit? onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Committed transaction? %s" id lifecycle-id commit?))))
 
 (dire/with-post-hook! #'munge-close-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]

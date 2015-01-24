@@ -49,10 +49,6 @@
   [{:keys [onyx.core/queue onyx.core/batch] :as event}]
   {})
 
-(defmethod p-ext/strip-sentinel :default
-  [event]
-  {})
-
 (defmethod p-ext/apply-fn :default
   [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
            onyx.core/task-map] :as event}]

@@ -10,21 +10,15 @@
 
 (def scheduler :onyx.job-scheduler/round-robin)
 
+(def messaging :http-kit)
+
 (def env-config
-  {:hornetq/mode :udp
-   :hornetq/server? true
-   :hornetq.server/type :embedded
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :hornetq.embedded/config (:configs (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
+  {:zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id id
-   :onyx.peer/job-scheduler scheduler})
+   :onyx.peer/job-scheduler scheduler
+   :onyx.messaging/impl messaging})
 
 (def peer-config
   {:hornetq/mode :udp
@@ -38,7 +32,8 @@
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/join-failure-back-off 500
-   :onyx.peer/job-scheduler scheduler})
+   :onyx.peer/job-scheduler scheduler
+   :onyx.messaging/impl messaging})
 
 (def env (onyx.api/start-env env-config))
 
