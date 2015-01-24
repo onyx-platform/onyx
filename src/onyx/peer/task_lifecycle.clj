@@ -26,12 +26,8 @@
   (l-ext/start-lifecycle?* event))
 
 (defn munge-inject-temporal [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
-        rets (l-ext/inject-temporal-resources* event)]
-    (if-not (:onyx.core/session rets)
-      (let [session (extensions/create-tx-session (:onyx.core/queue event))]
-        (merge event rets cycle-params {:onyx.core/session session}))
-      (merge event cycle-params rets))))
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
+    (merge event cycle-params (l-ext/inject-temporal-resources* event))))
 
 (defn munge-read-batch [event]
   (merge event (p-ext/read-batch event)))
@@ -54,12 +50,8 @@
   (merge event (l-ext/close-temporal-resources* event)))
 
 (defn munge-close-resources
-  [{:keys [onyx.core/queue onyx.core/session onyx.core/producers
-           onyx.core/consumers onyx.core/reserve?] :as event}]
-  (doseq [producer producers] (extensions/close-resource queue producer))
-  (when-not reserve?
-    (extensions/close-resource queue session))
-  (assoc event :onyx.core/closed? true))
+  [event]
+  event)
 
 (defn munge-seal-resource
   [{:keys [onyx.core/pipeline-state onyx.core/outbox-ch
@@ -115,11 +107,11 @@
          (recur)))
     read-ch dead-ch release-f exception-f))
 
-(defn decompress-batch-loop [decompress-ch strip-ch dead-ch release-f exception-f]
+(defn decompress-batch-loop [decompress-ch apply-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! decompress-ch)]
-         (>!! strip-ch (munge-decompress-batch event))
+         (>!! apply-ch (munge-decompress-batch event))
          (recur)))
     decompress-ch dead-ch release-f exception-f))
 
@@ -139,11 +131,11 @@
          (recur)))
     compress-ch dead-ch release-f exception-f))
 
-(defn write-batch-loop [write-ch commit-ch dead-ch release-f exception-f]
+(defn write-batch-loop [write-ch close-ch dead-ch release-f exception-f]
   (with-clean-up
     #(loop []
        (when-let [event (<!! write-ch)]
-         (>!! commit-ch (munge-write-batch event))
+         (>!! close-ch (munge-write-batch event))
          (recur)))
     write-ch dead-ch release-f exception-f))
 
@@ -187,12 +179,9 @@
 
             read-batch-ch (chan 0)
             decompress-batch-ch (chan 0)
-            strip-sentinel-ch (chan 0)
-            requeue-sentinel-ch (chan 0)
             apply-fn-ch (chan 0)
             compress-batch-ch (chan 0)
             write-batch-ch (chan 0)
-            commit-tx-ch (chan 0)
             close-resources-ch (chan 0)
             close-temporal-ch (chan 0)
             seal-ch (chan 0)
@@ -200,12 +189,9 @@
             open-session-dead-ch (chan (sliding-buffer 1))
             read-batch-dead-ch (chan (sliding-buffer 1))
             decompress-batch-dead-ch (chan (sliding-buffer 1))
-            strip-sentinel-dead-ch (chan (sliding-buffer 1))
-            requeue-sentinel-dead-ch (chan (sliding-buffer 1))
             apply-fn-dead-ch (chan (sliding-buffer 1))
             compress-batch-dead-ch (chan (sliding-buffer 1))
             write-batch-dead-ch (chan (sliding-buffer 1))
-            commit-tx-dead-ch (chan (sliding-buffer 1))
             close-resources-dead-ch (chan (sliding-buffer 1))
             close-temporal-dead-ch (chan (sliding-buffer 1))
             seal-dead-ch (chan (sliding-buffer 1))
@@ -220,12 +206,6 @@
                           (close! decompress-batch-ch)
                           (<!! decompress-batch-dead-ch)
 
-                          (close! strip-sentinel-ch)
-                          (<!! strip-sentinel-dead-ch)
-
-                          (close! requeue-sentinel-ch)
-                          (<!! requeue-sentinel-dead-ch)
-
                           (close! apply-fn-ch)
                           (<!! apply-fn-dead-ch)
 
@@ -234,9 +214,6 @@
 
                           (close! write-batch-ch)
                           (<!! write-batch-dead-ch)
-
-                          (close! commit-tx-ch)
-                          (<!! commit-tx-dead-ch)
 
                           (close! close-resources-ch)
                           (<!! close-resources-dead-ch)
@@ -250,12 +227,9 @@
                           (close! open-session-dead-ch)
                           (close! read-batch-dead-ch)
                           (close! decompress-batch-dead-ch)
-                          (close! strip-sentinel-dead-ch)
-                          (close! requeue-sentinel-dead-ch)
                           (close! apply-fn-dead-ch)
                           (close! compress-batch-dead-ch)
                           (close! write-batch-dead-ch)
-                          (close! commit-tx-dead-ch)
                           (close! close-resources-dead-ch)
                           (close! close-temporal-dead-ch)
                           (close! seal-dead-ch))
@@ -274,8 +248,6 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
-                           :onyx.core/ingress-queues (:ingress-queues task)
-                           :onyx.core/egress-queues (:egress-queues task)
                            :onyx.core/params (resolve-calling-params catalog-entry  opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                            :onyx.core/log log
@@ -294,12 +266,9 @@
           :open-session-kill-ch open-session-kill-ch
           :read-batch-ch read-batch-ch
           :decompress-batch-ch decompress-batch-ch
-          :strip-sentinel-ch strip-sentinel-ch
-          :requeue-sentinel-ch requeue-sentinel-ch
           :apply-fn-ch apply-fn-ch
           :compress-batch-ch compress-batch-ch
           :write-batch-ch write-batch-ch
-          :commit-tx-ch commit-tx-ch
           :close-resources-ch close-resources-ch
           :close-temporal-ch close-temporal-ch
           :seal-ch seal-ch
@@ -307,25 +276,19 @@
           :open-session-dead-ch open-session-dead-ch
           :read-batch-dead-ch read-batch-dead-ch
           :decompress-batch-dead-ch decompress-batch-dead-ch
-          :strip-sentinel-dead-ch strip-sentinel-dead-ch
-          :requeue-sentinel-dead-ch requeue-sentinel-dead-ch
           :apply-fn-dead-ch apply-fn-dead-ch
           :compress-batch-dead-ch compress-batch-dead-ch
           :write-batch-dead-ch write-batch-dead-ch
-          :commit-tx-dead-ch commit-tx-dead-ch
           :close-resources-dead-ch close-resources-dead-ch
           :close-temporal-dead-ch close-temporal-dead-ch
           :seal-dead-ch seal-dead-ch
 
           :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch release-fn! ex-f))
           :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch release-fn! ex-f))
-          :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch strip-sentinel-ch decompress-batch-dead-ch release-fn! ex-f))
-          :strip-sentinel-loop (thread (strip-sentinel-loop strip-sentinel-ch requeue-sentinel-ch strip-sentinel-dead-ch release-fn! ex-f))
-          :requeue-sentinel-loop (thread (requeue-sentinel-loop requeue-sentinel-ch apply-fn-ch requeue-sentinel-dead-ch release-fn! ex-f))
+          :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch decompress-batch-dead-ch release-fn! ex-f))
           :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch release-fn! ex-f))
           :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch release-fn! ex-f))
-          :write-batch-loop (thread (write-batch-loop write-batch-ch commit-tx-ch write-batch-dead-ch release-fn! ex-f))
-          :commit-tx-loop (thread (commit-tx-loop commit-tx-ch close-resources-ch commit-tx-dead-ch release-fn! ex-f))
+          :write-batch-loop (thread (write-batch-loop write-batch-ch close-resources-ch write-batch-dead-ch release-fn! ex-f))
           :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch release-fn! ex-f))
           :close-temporal-loop (thread (close-temporal-loop close-temporal-ch seal-ch close-temporal-dead-ch release-fn! ex-f))
           :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch release-fn! ex-f))

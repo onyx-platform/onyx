@@ -37,18 +37,21 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 15000)
+(def n-messages 500)
 
-(def batch-size 1320)
+(def batch-size 100)
 
-(def echo 1000)
+(def echo 100)
+
+(def hornetq-host "localhost")
+
+(def hornetq-port 5465)
+
+(def hq-config {"host" hornetq-host "port" hornetq-port})
 
 (def in-queue (str (java.util.UUID/randomUUID)))
 
 (def out-queue (str (java.util.UUID/randomUUID)))
-
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)

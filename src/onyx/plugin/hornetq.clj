@@ -29,7 +29,7 @@
                (conj rets segment)
                (recur f n (conj rets segment)))))))))
 
-(defn read-batch [queue session-factory task]
+(defn read-batch [session-factory task]
   (let [session (.createTransactedSession session-factory)
         queue-name (:hornetq/queue-name task)
         consumer (.createConsumer session queue-name)
@@ -38,8 +38,6 @@
     (let [f (fn [] {:message (.receive consumer timeout)})
           rets (filter (comp not nil? :message)
                        (take-segments f (:onyx/batch-size task)))]
-      (doseq [segment rets]
-        (extensions/ack-message queue (:message segment)))
       {:onyx.core/batch (or rets [])
        :hornetq/session session
        :hornetq/consumer consumer})))
@@ -64,8 +62,8 @@
      :hornetq/producer producer
      :onyx.core/written? true}))
 
-(defn read-batch-shim [{:keys [onyx.core/queue onyx.core/task-map] :as event}]
-  (merge event (read-batch queue (:hornetq/session-factory event) task-map)))
+(defn read-batch-shim [{:keys [onyx.core/task-map] :as event}]
+  (merge event (read-batch (:hornetq/session-factory event) task-map)))
 
 (defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
   (let [decompressed (map (comp decompress-segment :message) batch)]
