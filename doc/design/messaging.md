@@ -22,3 +22,28 @@ As of 0.5.0, Onyx uses the HornetQ message broker for communication. There are c
 - Configuring HornetQ is hard
 - Transactional message movement doesn't matter nearly as much as I thought it might
 
+### An alternate solution
+
+One proposed solution is to copy-cat Apache Storm. Storm is very fast, and uses an in-memory algorithm
+to implement fault tolerant using ordinary HTTP messaging. This involves the following:
+
+- Add a lightweight HTTP server and client to every peer
+- Implement back-off policies for peer's failing sending segments to each other
+- Create an interface for what it means to "ack" a segment for a specific input medium
+- Define how to "ack" segments for input mediums that don't provide it out of the box (e.g. SQL)
+- Redefine replica logic to not volunteer peer's for task unless there is at least 1 peer per task
+- Redefine peer logic to not start a peer lifecycle until it receives confirmation that at least one peer per task is ready
+- Implement custom grouping logic to make sure messages are "sticky" for specific peers when grouping is enabled
+- Define peer logic to *never* add new peers to a grouping task after a job has been started - this would throw off the hash-mod'ing algorithm
+- Add an atom to any task lifecycle for an input as a "container-pen" for objects that need to be natively acked. (e.g. real HornetQ ack)
+- Add an "acker" route on *every* peer web server to perform Onyx-specific message acknowledgment
+- Add an atom to every peer's acking machinery as a "container-pen" for segments that need to be ack'ed via Onyx
+- Implement XOR algorithm in peer's acking thread
+- Add a timer-based job to every input task that releases segments in the "container-pen" that time out and need to be replayed
+- Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks
+
+
+How do peers look each other up?
+Pluggable messaging?
+Talk about how this is different from Storm
+Greedy task scheduler needs to go
