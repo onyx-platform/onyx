@@ -25,12 +25,18 @@ As of 0.5.0, Onyx uses the HornetQ message broker for communication. There are c
 ### An alternate solution
 
 One proposed solution is to copy-cat Apache Storm. Storm is very fast, and uses an in-memory algorithm
-to implement fault tolerant using ordinary HTTP messaging. This involves the following:
+to implement fault tolerancy using ordinary HTTP. This boils down to the following large pieces:
 
-- Add a lightweight HTTP server and client to every peer
+- Each peer runs a lightweight HTTP server and client
+- We move what it means to "acknowledge" and "replay" a segment to an interface that the input medium implements
+- We use multiple, independent "acker server routes" across different peers to manage the success and fail of segments
+
+![Summary](images/messaging-summary.png)
+
+- Add a lightweight HTTP server and client to each peer
 - Implement back-off policies for peer's failing sending segments to each other
-- Create an interface for what it means to "ack" a segment for a specific input medium
-- Define how to "ack" segments for input mediums that don't provide it out of the box (e.g. SQL)
+- Create an interface for what it means to "ack" and "replay" a segment for a specific input medium
+- Define how to "ack" and "replay" segments for input mediums that don't provide it out of the box (e.g. SQL)
 - Redefine replica logic to not volunteer peer's for task unless there is at least 1 peer per task
 - Redefine peer logic to not start a peer lifecycle until it receives confirmation that at least one peer per task is ready
 - Implement custom grouping logic to make sure messages are "sticky" for specific peers when grouping is enabled
@@ -47,3 +53,4 @@ How do peers look each other up?
 Pluggable messaging?
 Talk about how this is different from Storm
 Greedy task scheduler needs to go
+How do we ensure that *each* message is getting N seconds before a replay call?
