@@ -31,7 +31,15 @@ to implement fault tolerancy using ordinary HTTP. This boils down to the followi
 - We move what it means to "acknowledge" and "replay" a segment to an interface that the input medium implements
 - We use multiple, independent "acker server routes" across different peers to manage the success and fail of segments
 
+Let's try a visual description. I'll take you through every piece of this below.
+
 ![Summary](images/messaging-summary.png)
+
+There are 5 nodes in this workflow. An input, three functions, and two outputs. Every peer runs an acknowledgment daemon, which runs inside a lightweight webserver. As each message flows into Onyx, it's given a unique ID. The ID is mapped to the segment, and it's held inside the "holding pen" on the input for N seconds. In this example, ID `abcdef` is mapped to a specific segment.
+
+The peer executing the input task then takes the segment and assigns it a random bit pattern. Let's say it starts with bit pattern `837878`. It uses the segment's ID, `abcdef`, and hashes it to a particular peer. In this example, segment `abcdef` hashes to the peer executing `fn 1`. The peer executing the input task sends a message to the peer executing `fn 1` that the input's peer's id is `wxyz`, that the segment's id to report is `abcdef`, and that it should XOR the existing value with the bit patterns `837878`, `23944`, and `993758`. The acker daemon receives this message. When it's processed, it checks to see if the result value of XOR'ing is 0. If it is, it sends a message to the holding pen to acknowledge that segment `abcdef` is finished, and should be released.
+
+If N seconds pass and no one acknowledges the message in the holding pen, the `replay` interface function is invoked to try it again (it timed out), and the segment is removed from the holding pen. If the holding pen receives a message to acknowledge the segment, the `ack` interface function is invoked, and this segment gets removed from the holding pen.
 
 - Add a lightweight HTTP server and client to each peer
 - Implement back-off policies for peer's failing sending segments to each other
