@@ -93,11 +93,7 @@
         bytes (serialize data)]
     (zk/create conn node :data bytes :persistent? true :sequential? true)))
 
-(defmethod extensions/read-log-entry ZooKeeper
-  [{:keys [conn opts prefix] :as log} position]
-  (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-        content (deserialize (:data (zk/data conn node)))]
-    (assoc content :message-id position)))
+(defmethod extensions/read-log-entry ZooKeeper                                                                                           [{:keys [conn opts prefix] :as log} position]                                                                                          (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))                                                                    data (zk/data conn node)                                                                                                               content (deserialize (:data data))]                                                                                                (assoc content :message-id position :created-at (:ctime (:stat data)))))
 
 (defmethod extensions/register-pulse ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
