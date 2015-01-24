@@ -37,11 +37,11 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 500)
+(def n-messages 50)
 
-(def batch-size 100)
+(def batch-size 10)
 
-(def echo 100)
+(def echo 10)
 
 (def hornetq-host "localhost")
 

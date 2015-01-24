@@ -29,18 +29,13 @@
                (conj rets segment)
                (recur f n (conj rets segment)))))))))
 
-(defn read-batch [session-factory task]
-  (let [session (.createTransactedSession session-factory)
-        queue-name (:hornetq/queue-name task)
-        consumer (.createConsumer session queue-name)
+(defn read-batch [consumer task]
+  (let [queue-name (:hornetq/queue-name task)
         timeout (or (:onyx/batch-timeout task) 1000)]
-    (.start session)
     (let [f (fn [] {:message (.receive consumer timeout)})
           rets (filter (comp not nil? :message)
                        (take-segments f (:onyx/batch-size task)))]
-      {:onyx.core/batch (or rets [])
-       :hornetq/session session
-       :hornetq/consumer consumer})))
+      {:onyx.core/batch (or rets [])})))
 
 (defn decompress-segment [segment]
   (fressian/read (.toByteBuffer (.getBodyBuffer segment))))
@@ -63,7 +58,7 @@
      :onyx.core/written? true}))
 
 (defn read-batch-shim [{:keys [onyx.core/task-map] :as event}]
-  (merge event (read-batch (:hornetq/session-factory event) task-map)))
+  (merge event (read-batch (:hornetq/consumer event) task-map)))
 
 (defn decompress-batch-shim [{:keys [onyx.core/batch] :as event}]
   (let [decompressed (map (comp decompress-segment :message) batch)]
@@ -124,24 +119,24 @@
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
-
-    (when (= (:onyx/consumption task-map) :sequential)
-      (.setConsumerWindowSize locator 0))
-
-    (let [session-factory (.createSessionFactory locator)]
+    (let [session-factory (.createSessionFactory locator)
+          session (.createTransactedSession session-factory)]
       (merge pipeline-data
-             {:hornetq/locator locator
-              :hornetq/session-factory session-factory}))))
+             {:onyx.core/holding-pen (atom {})
+              :hornetq/locator locator
+              :hornetq/session-factory session-factory
+              :hornetq/session session
+              :hornetq/consumer (.createConsumer session (:hornetq/queue-name task-map))}))))
 
 (defmethod l-ext/close-temporal-resources :hornetq/read-segments
   [_ pipeline-data]
   (.commit (:hornetq/session pipeline-data))
-  (.close (:hornetq/consumer pipeline-data))
-  (.close (:hornetq/session pipeline-data))
   pipeline-data)
 
 (defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
   [_ pipeline-data]
+  (.close (:hornetq/consumer pipeline-data))
+  (.close (:hornetq/session pipeline-data))
   (.close (:hornetq/session-factory pipeline-data))
   (.close (:hornetq/locator pipeline-data))
   pipeline-data)
@@ -157,7 +152,10 @@
 
 (defmethod p-ext/ack-message [:input :hornetq]
   [event]
-  (println "Acking HornetQ message"))
+  (let [state @(:onyx.core/holding-pen event)
+        message (get state (:onyx.core/message-id event))]
+    (.acknowledge message)
+    (swap! (:onyx.core/holding-pen event) dissoc (:onyx.core/message-id event))))
 
 (defmethod p-ext/replay-message [:input :hornetq]
   [event]

@@ -321,7 +321,7 @@
 
 (dire/with-post-hook! #'munge-inject-temporal
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
+    (taoensso.timbre/info (format "[%s / %s] Created new tx session" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
@@ -329,15 +329,15 @@
 
 (dire/with-post-hook! #'munge-decompress-batch
   (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
+    (taoensso.timbre/info (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
 
 (dire/with-post-hook! #'munge-apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
+    (taoensso.timbre/info (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
 
 (dire/with-post-hook! #'munge-compress-batch
   (fn [{:keys [onyx.core/id onyx.core/compressed onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Compressed %s segments" id lifecycle-id (count compressed)))))
+    (taoensso.timbre/info (format "[%s / %s] Compressed %s segments" id lifecycle-id (count compressed)))))
 
 (dire/with-post-hook! #'munge-write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/compressed]}]
@@ -345,13 +345,13 @@
 
 (dire/with-post-hook! #'munge-close-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed resources" id lifecycle-id))))
+    (taoensso.timbre/info (format "[%s / %s] Closed resources" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-close-temporal-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
+    (taoensso.timbre/info (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
 
 (dire/with-post-hook! #'munge-seal-resource
   (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed? onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
+    (taoensso.timbre/info (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
 

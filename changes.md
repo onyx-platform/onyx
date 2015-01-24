@@ -1,3 +1,7 @@
+#### 0.6.0
+
+- Dropped support for `:sequential` tasks.
+
 #### 0.5.0
 
 - Design change: the Coordinator has been abolished. Onyx is now a fully masterless system. The supporting environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.
