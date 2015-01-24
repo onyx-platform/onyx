@@ -170,7 +170,7 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
-(defrecord TaskLifeCycle [id log message-buffer messaging job-id task-id restart-ch outbox-ch seal-resp-ch opts]
+(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -251,6 +251,7 @@
                            :onyx.core/params (resolve-calling-params catalog-entry  opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                            :onyx.core/log log
+                           :onyx.core/messenger messenger
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
                            :onyx.core/peer-opts opts
@@ -309,8 +310,10 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log queue job task restart-ch outbox-ch seal-ch opts]}]
-  (map->TaskLifeCycle {:id id :log log :queue queue :job-id job
+(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task
+                                   restart-ch outbox-ch seal-ch opts]}]
+  (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
+                       :messenger messenger :job-id job
                        :task-id task :restart-ch restart-ch :outbox-ch outbox-ch
                        :seal-resp-ch seal-ch :opts opts}))
 

@@ -37,7 +37,7 @@
   {:onyx.function/fn (operation/resolve-fn task-map)})
 
 (defmethod p-ext/read-batch :default
-  [{:keys [onyx.core/messaging onyx.core/inbound-ch onyx.core/task-map]}]
+  [{:keys [onyx.core/messenger onyx.core/inbound-ch onyx.core/task-map]}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)]
     {:onyx.core/batch
      (filter
@@ -63,10 +63,10 @@
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defmethod p-ext/write-batch :default
-  [event]
-  {})
+  [{:keys [onyx.core/messenger] :as event}]
+  (onyx.extensions/send-messages messenger event))
 
 (defmethod p-ext/seal-resource :default
-  [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
+  [{:keys [] :as event}]
   {})
 

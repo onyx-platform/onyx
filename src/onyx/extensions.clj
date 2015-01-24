@@ -34,13 +34,13 @@
 
 ;; Messaging interface
 
-(defmulti receive-message (fn [messaging timeout-ms] (type messaging)))
+(defmulti receive-messages (fn [messenger event] (type messenger)))
 
-(defmulti send-message (fn [messaging message] (type messaging)))
+(defmulti send-messages (fn [messenger event] (type messenger)))
 
-(defmulti internal-ack-message (fn [messaging id] (type messaging)))
+(defmulti internal-ack-message (fn [messenger id] (type messenger)))
 
-(defmulti internal-complete-message (fn [messaging id] (type messaging)))
+(defmulti internal-complete-message (fn [messenger id] (type messenger)))
 
 ;; Queue interface
 

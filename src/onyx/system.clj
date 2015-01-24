@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [fatal]]
             [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
-            [onyx.messaging.messaging-buffer :refer [messaging-buffer]]
+            [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.http-kit :refer [http-kit]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
@@ -18,13 +18,13 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]))
 
-(def development-components [:logging-config :log :messaging-buffer :messaging])
+(def development-components [:logging-config :log :messenger-buffer :messenger])
 
-(def client-components [:logging-config :log :messaging-buffer :messaging])
+(def client-components [:logging-config :log :messenger-buffer :messenger])
 
-(def peer-components [:logging-config :log :messaging-buffer :messaging :virtual-peer])
+(def peer-components [:logging-config :log :messenger-buffer :messenger :virtual-peer])
 
-(def messaging
+(def messenger
   {:http-kit http-kit})
 
 (defn rethrow-component [f]
@@ -70,31 +70,34 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
-(defn messaging-ctor [config]
-  ((get messaging (:onyx.messaging/impl config)) config))
+(defn messenger-ctor [config]
+  (let [rets ((get messenger (:onyx.messaging/impl config)) config)]
+    (when-not rets
+      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
+    rets))
 
 (defn onyx-development-env
   [config]
   (map->OnyxDevelopmentEnv
    {:logging-config (logging-config/logging-configuration config)
     :log (component/using (zookeeper config) [:logging-config])
-    :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (messaging-ctor config) [:messaging-buffer])}))
+    :messenger-buffer (component/using (messenger-buffer config) [:log])
+    :messenger (component/using (messenger-ctor config) [:messenger-buffer])}))
 
 (defn onyx-client
   [config]
   (map->OnyxClient
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
-    :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (messaging-ctor config) [:messaging-buffer])}))
+    :messenger-buffer (component/using (messenger-buffer config) [:log])
+    :messenger (component/using (messenger-ctor config) [:messenger-buffer])}))
 
 (defn onyx-peer
   [config]
   (map->OnyxPeer
    {:logging-config (logging-config/logging-configuration (:logging config))
     :log (component/using (zookeeper config) [:logging-config])
-    :messaging-buffer (component/using (messaging-buffer config) [:log])
-    :messaging (component/using (messaging-ctor config) [:messaging-buffer])
-    :virtual-peer (component/using (virtual-peer config) [:log])}))
+    :messenger-buffer (component/using (messenger-buffer config) [:log])
+    :messenger (component/using (messenger-ctor config) [:messenger-buffer])
+    :virtual-peer (component/using (virtual-peer config) [:log :messenger :messenger-buffer])}))
 

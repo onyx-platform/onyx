@@ -17,12 +17,13 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts]
+(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch opts]
   (try
     (loop [replica origin
            state (merge {:id id
                          :log log
-                         :queue queue
+                         :messenger-buffer buffer
+                         :messenger messenger
                          :outbox-ch outbox-ch
                          :opts opts
                          :restart-ch restart-ch
@@ -54,7 +55,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log queue] :as component}]
+  (start [{:keys [log messenger-buffer messenger] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
@@ -69,7 +70,7 @@
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log queue origin inbox-ch outbox-ch restart-ch kill-ch opts))
+        (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch opts))
         (assoc component :id id :inbox-ch inbox-ch
                :outbox-ch outbox-ch :kill-ch kill-ch
                :restart-ch restart-ch))))
