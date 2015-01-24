@@ -37,26 +37,69 @@ Let's try a visual description. I'll take you through every piece of this below.
 
 There are 5 nodes in this workflow. An input, three functions, and two outputs. Every peer runs an acknowledgment daemon, which runs inside a lightweight webserver. As each message flows into Onyx, it's given a unique ID. The ID is mapped to the segment, and it's held inside the "holding pen" on the input for N seconds. In this example, ID `abcdef` is mapped to a specific segment.
 
-The peer executing the input task then takes the segment and assigns it a random bit pattern. Let's say it starts with bit pattern `837878`. It uses the segment's ID, `abcdef`, and hashes it to a particular peer. In this example, segment `abcdef` hashes to the peer executing `fn 1`. The peer executing the input task sends a message to the peer executing `fn 1` that the input's peer's id is `wxyz`, that the segment's id to report is `abcdef`, and that it should XOR the existing value with the bit patterns `837878`, `23944`, and `993758`. `837878` represents acknowledging the completion of the segment on the input task, and the other two values represent two new segments being created. The acker daemon receives this message. When it's processed, it checks to see if the result value of XOR'ing is 0. If it is, it sends a message to the holding pen to acknowledge that segment `abcdef` is finished, and should be released.
+The peer executing the input task then takes the segment and assigns it a random bit pattern. Let's say it starts with bit pattern `837878`. It uses the segment's ID, `abcdef`, and hashes it to a particular peer. In this example, segment `abcdef` hashes to the peer executing `fn 1`. The peer executing the input task sends a message to the peer executing `fn 1` that the input's peer's id is `wxyz`, that the segment's id to report is `abcdef`, and that it should XOR the existing value with the bit patterns `837878`, `23944`, and `993758`. `837878` represents acknowledging the completion of the segment on the input task, and the other two values are new random bit patterns that represent two new segments being created. These bit patterns are repeated when the segments are acked again. The acker daemon receives this message. When it's processed, it checks to see if the result value of XOR'ing is 0. If it is, it sends a message to the holding pen to acknowledge that segment `abcdef` is finished, and should be released.
 
 If N seconds pass and no one acknowledges the message in the holding pen, the `replay` interface function is invoked to try it again (it timed out), and the segment is removed from the holding pen. If the holding pen receives a message to acknowledge the segment, the `ack` interface function is invoked, and this segment gets removed from the holding pen.
 
-- Add a lightweight HTTP server and client to each peer
-- Implement back-off policies for peer's failing sending segments to each other
-- Create an interface for what it means to "ack" and "replay" a segment for a specific input medium
-- Define how to "ack" and "replay" segments for input mediums that don't provide it out of the box (e.g. SQL)
-- Redefine replica logic to not volunteer peer's for task unless there is at least 1 peer per task
-- Redefine peer logic to not start a peer lifecycle until it receives confirmation that at least one peer per task is ready
-- Implement custom grouping logic to make sure messages are "sticky" for specific peers when grouping is enabled
-- Define peer logic to *never* add new peers to a grouping task after a job has been started - this would throw off the hash-mod'ing algorithm
-- Add an atom to any task lifecycle for an input as a "container-pen" for objects that need to be natively acked. (e.g. real HornetQ ack)
-- Add an "acker" route on *every* peer web server to perform Onyx-specific message acknowledgment
-- Add an atom to every peer's acking machinery as a "container-pen" for segments that need to be ack'ed via Onyx
-- Implement XOR algorithm in peer's acking thread
-- Add a timer-based job to every input task that releases segments in the "container-pen" that time out and need to be replayed
-- Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks
+I'll next outline the work that needs to be completed to achieve this approach.
 
+#### Messaging infrastructure on each peer
 
+Add the necessary code to each peer when it starts up with component to receive messages. For the first interation, that means booting up an HTTP-Kit server. Also ensure that any code needed to send messages to other peers get the chance to boot up.
+
+#### Ack/replay interface
+
+Create an interface for what it means to "ack" and "replay" a segment for a specific input medium. This used to be handled by HornetQ, but now we're pushing it right into the input medium.
+
+#### Ack/replay for batch storage
+
+Define how to "ack" and "replay" segments for input mediums that don't provide it out of the box (e.g. SQL).
+
+#### Ensure full execution path
+
+Replica logic needs to be redefined to disallow any peer taking a job unless at least 1 peer per task can also join it. Otherwise messages would just get sent to no where and time out, pointlessly.
+
+#### Stall task lifecycle execution
+
+Redefine peer logic to not start a peer lifecycle until it receives confirmation that at least one peer per task is ready. Even though the job may have enough peers, make sure all peers actually decide to take the job before starting task execution. Otherwise segments will be sent to nowhere and timeout.
+
+#### Back off policies
+
+Implement back-off policies for peer's failing sending segments to each other. A peer might temporarily be unavailable, or slow to respond. We'll use core.async channels on the receiving and sending side of a peer to buffer message flow.
+
+#### Create an interface for sending/receiving messages
+
+We want this to be pluggable, so make sure this is behind an interface.
+
+#### Ensure that grouping is undisturbed
+
+Redefine peer logic to *never* add new peers to a grouping task after a job has been started - this would throw off the hash-mod'ing algorithm. If a peer fails, it can continue though. Storm does the same thing and makes sure all messages will be sticky to a new peer.
+
+#### Implement a holding pen
+
+Add an atom to any task lifecycle for an input as a "container-pen" for objects that need to be natively acked. (e.g. real HornetQ ack)
+
+#### Implement replay timer
+
+Add a timer-based job to every input task that releases segments in the "container-pen" that time out and need to be replayed.
+
+#### Implement an Acker daemon
+
+Add an "acker" route on *every* peer web server to perform Onyx-specific message acknowledgment. Make sure this gets booted up alongside the peer.
+
+#### Add acking atom
+
+Add an atom to every peer's acking machinery as a "container-pen" for segments that need to be ack'ed via Onyx with bit-patterns.
+
+#### XOR algorithm
+
+Implement XOR algorithm in peer's acking thread as described above.
+
+#### Implement load balancing
+
+Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks.
+
+### Open questions
 How do peers look each other up?
 Pluggable messaging?
 Talk about how this is different from Storm
