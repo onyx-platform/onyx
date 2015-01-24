@@ -21,7 +21,7 @@
 
     (let [ch (:inbound-ch (:messenger-buffer component))
           server (server/run-server (partial app ch) {:port 0 :thread 1})]
-      (assoc component :server server)))
+      (assoc component :server server :port (:local-port (meta server)))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping HTTP Kit")

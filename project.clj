@@ -19,7 +19,7 @@
                  [zookeeper-clj "0.9.1" :exclusions [commons-codec]]
                  [prismatic/schema "0.3.1"]
                  [ring "1.2.2" :exclusions [joda-time]]
-                 [http-kit "2.1.16"]
+                 [http-kit "2.1.17"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [com.datomic/datomic-free "0.9.4755"
