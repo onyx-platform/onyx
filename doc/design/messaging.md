@@ -100,8 +100,9 @@ Implement XOR algorithm in peer's acking thread as described above.
 Implement a load balancing algorithm for spreading out messages over a range of peer's for downstream tasks.
 
 ### Open questions
-How do peers look each other up?
-Pluggable messaging?
-Talk about how this is different from Storm
-Greedy task scheduler needs to go
-How do we ensure that *each* message is getting N seconds before a replay call?
+
+- How do peers look each other up?
+- Pluggable messaging?
+- Talk about how this is different from Storm
+- Greedy task scheduler needs to go
+- How do we ensure that *each* message is getting N seconds before a replay call?
