@@ -46,48 +46,10 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
-(defmulti reallocate-from-job?
-  (fn [scheduler old new state]
-    scheduler))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/greedy
-  [scheduler old new state]
-  (not (seq (common/alive-jobs old (:jobs old)))))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/round-robin
-  [scheduler old new state]
-  (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (let [peer-counts (common/balance-jobs new)
-          peers (get (common/job->peers new) (:job allocation))]
-      (when (> (count peers) (get peer-counts (:job allocation)))
-        (let [n (- (count peers) (get peer-counts (:job allocation)))
-              peers-to-drop (common/drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/percentage
-  [scheduler old new state]
-  (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (let [balanced (common/percentage-balanced-workload new)
-          peer-counts (:allocation (get balanced (:job allocation)))
-          peers (get (common/job->peers new) (:job allocation))]
-      (when (> (count peers) peer-counts)
-        (let [n (- (count peers) peer-counts)
-              peers-to-drop (common/drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
-
 (defmethod extensions/reactions :submit-job
   [{:keys [args] :as entry} old new diff peer-args]
-  (when (reallocate-from-job? (:job-scheduler old) old new peer-args)
-    (let [n-tasks (count (get-in new [:tasks (:id args)]))
-          n-volunteering (->> (:peers new)
-                              (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
-                              (count))]
-      (when (>= n-volunteering n-tasks)
-        [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))
+  (when (common/volunteer? old new peer-args (:id args))
+    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]

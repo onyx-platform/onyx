@@ -37,8 +37,9 @@
           state)
       (do (>!! (:seal-response-ch state) false)
           (component/stop (:lifecycle state))
-          (let [entry (create-log-entry :volunteer-for-task {:id (:id state)})]
-            (>!! (:outbox-ch state) entry))
-          (assoc state :lifecycle nil :job nil :task nil)))
+          (when (common/volunteer? old new state (:job state))
+            (let [entry (create-log-entry :volunteer-for-task {:id (:id state)})]
+              (>!! (:outbox-ch state) entry)
+              (assoc state :lifecycle nil :job nil :task nil)))))
     state))
 

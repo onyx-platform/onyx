@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
@@ -55,7 +56,9 @@
                  :subject (or (get (:pairs new) (:observer diff))
                               (:observer diff))}
           :immediate? true}]
-        (and (:instant-join diff) (seq (:jobs new)))
+        (and (:instant-join diff)
+             (seq (:jobs new))
+             (common/volunteer? old new peer-args (:job peer-args)))
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster

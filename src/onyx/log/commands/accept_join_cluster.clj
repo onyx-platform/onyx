@@ -1,6 +1,7 @@
 (ns onyx.log.commands.accept-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.data :refer [diff]]
+            [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
@@ -27,7 +28,8 @@
 
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff peer-args]
-  (when (and (= (:id peer-args) (:subject diff)) (seq (:jobs new)))
+  (when (and (= (:id peer-args) (:subject diff))
+             (common/volunteer? old new peer-args (:job peer-args)))
     [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster

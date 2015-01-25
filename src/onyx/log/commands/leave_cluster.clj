@@ -50,7 +50,8 @@
             (when (> (count peers) (get peer-counts (:job allocation)))
               (let [n (- (count peers) (get peer-counts (:job allocation)))
                     peers-to-drop (common/drop-peers new (:job allocation) n)]
-                (when (some #{(:id peer-args)} (into #{} peers-to-drop))
+                (when (and (some #{(:id peer-args)} (into #{} peers-to-drop))
+                           (common/volunteer? old new peer-args (:job peer-args)))
                   [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))))))
 
 (defmethod extensions/fire-side-effects! :leave-cluster

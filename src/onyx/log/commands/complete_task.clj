@@ -1,5 +1,6 @@
 (ns onyx.log.commands.complete-task
   (:require [com.stuartsierra.component :as component]
+            [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :complete-task
@@ -19,7 +20,8 @@
 (defmethod extensions/reactions :complete-task
   [{:keys [args]} old new diff peer-args]
   (let [allocations (get-in old [:allocations (:job args) (:task args)])]
-    (when (some #{(:id peer-args)} (into #{} allocations))
+    (when (and (some #{(:id peer-args)} (into #{} allocations))
+               (common/volunteer? old new peer-args (:job peer-args)))
       [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :complete-task
