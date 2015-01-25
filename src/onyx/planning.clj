@@ -14,7 +14,7 @@
     (only matches)))
 
 (defn egress-ids-from-children [elements]
-  (into {} (map #(hash-map (:id %) (java.util.UUID/randomUUID)) elements)))
+  (into {} (map #(hash-map (:onyx/name %) (java.util.UUID/randomUUID)) elements)))
 
 (defmulti create-task
   (fn [catalog task-name parents children-names]
@@ -29,10 +29,19 @@
 (defn onyx-function-task [catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
-    {:id (UUID/randomUUID)
-     :name (:onyx/name element)
-     :egress-ids (egress-ids-from-children children)
-     :consumption (:onyx/consumption element)}))
+    (if (= (count (into #{} (map (comp (:onyx/name element) :egress-ids) parents))) 1)
+      [{:id (get (:egress-ids (first parents)) (:onyx/name element))
+        :name (:onyx/name element)
+        :egress-ids (egress-ids-from-children children)
+        :consumption (:onyx/consumption element)}]
+      (concat
+       [{:id (get (:egress-ids (first parents)) (:onyx/name element))
+         :name (:onyx/name element)
+         :egress-ids (egress-ids-from-children children)
+         :consumption (:onyx/consumption element)}]
+       (map #(assoc-in % [:egress-ids (:onyx/name element)]
+                       (get (:egress-ids (first parents)) (:onyx/name element)))
+            (rest parents))))))
 
 (defmethod create-task :function
   [catalog task-name parents children-names]
@@ -48,34 +57,36 @@
 
 (defmethod extensions/create-io-task :input
   [element parent children]
-  {:id (UUID/randomUUID)
-   :name (:onyx/name element)
-   :egress-ids (egress-ids-from-children children)
-   :consumption (:onyx/consumption element)})
+  [{:id (UUID/randomUUID)
+    :name (:onyx/name element)
+    :egress-ids (egress-ids-from-children children)
+    :consumption (:onyx/consumption element)}])
 
 (defmethod extensions/create-io-task :output
   [element parents children]
   (let [task-name (:onyx/name element)]
-    {:id (UUID/randomUUID)
-     :name (:onyx/name element)
-     :consumption (:onyx/consumption element)}))
+    [{:id (get (:egress-ids (first parents)) (:onyx/name element))
+      :name (:onyx/name element)
+      :consumption (:onyx/consumption element)}]))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]
             (apply dep/depend g (reverse edge)))
           (dep/graph) workflow))
 
+(defn remove-dupes [coll]
+  (map last (vals (group-by :name coll))))
+
 (defn discover-tasks [catalog workflow]
   (let [dag (to-dependency-graph workflow)
         sorted-dag (dep/topo-sort dag)]
-    (map-indexed
-     #(assoc %2 :phase %1)
+    (remove-dupes
      (reduce
       (fn [tasks element]
         (let [parents (dep/immediate-dependencies dag element)
               children (dep/immediate-dependents dag element)
               parent-entries (filter #(some #{(:name %)} parents) tasks)]
-          (conj tasks (create-task catalog element parent-entries children))))
+          (concat tasks (create-task catalog element parent-entries children))))
       []
       sorted-dag))))
 

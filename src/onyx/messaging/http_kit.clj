@@ -4,7 +4,6 @@
               [org.httpkit.server :as server]
               [org.httpkit.client :as client]
               [taoensso.timbre :as timbre]
-              [onyx.planning :refer [find-downstream-tasks]]
               [onyx.extensions :as extensions])
     (:import [java.nio ByteBuffer]))
 
@@ -44,7 +43,8 @@
 (defmethod extensions/send-messages HttpKit
   [messenger {:keys [onyx.core/job-id onyx.core/task onyx.core/workflow] :as event}]
   (let [replica @(:onyx.core/replica event)
-        tasks (find-downstream-tasks workflow task)]
+        tasks nil
+        task-id nil]
     (doseq [task tasks]
       (let [peers (get-in [replica :allocations job-id task-id])
             url (get-in replica [:peer-site (rand-nth peers)])]

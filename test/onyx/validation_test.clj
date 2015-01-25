@@ -224,8 +224,6 @@
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
       tasks (onyx.planning/discover-tasks catalog workflow)
 
-      _ (clojure.pprint/pprint tasks)
-
       [a b c d e f g :as sorted-tasks]
       (reduce (fn [all next]
                 (conj all (first (filter #(= (:name %) next) tasks))))
@@ -234,17 +232,10 @@
   (fact "There are 7 tasks"
         (count tasks) => 7)
 
-  (fact "The tasks are topologically sorted into phases"
-        (map :phase sorted-tasks) => (range 7))
-
-  (fact (:f (:egress-queues a)) => (:a (:ingress-queues f)))
-  (fact (:c (:egress-queues b)) => (:b (:ingress-queues c)))
-  (fact (:d (:egress-queues c)) => (:c (:ingress-queues d)))
-  (fact (:e (:egress-queues d)) => (:d (:ingress-queues e)))
-  (fact (:f (:egress-queues e)) => (:e (:ingress-queues f)))
-  (fact (:g (:egress-queues f)) => (:f (:ingress-queues g)))
-
-  (fact ":a has an ingress queue" (:ingress-queues a) =not=> nil?)
-  (fact ":b has an ingress queue" (:ingress-queues b) =not=> nil?)
-  (fact ":g has an egress queue" (:egress-queues g) =not=> empty?))
+  (fact (:f (:egress-ids a)) => (:id f))
+  (fact (:c (:egress-ids b)) => (:id c))
+  (fact (:d (:egress-ids c)) => (:id d))
+  (fact (:e (:egress-ids d)) => (:id e))
+  (fact (:f (:egress-ids e)) => (:id f))
+  (fact (:g (:egress-ids f)) => (:id g)))
 
