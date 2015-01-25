@@ -224,6 +224,8 @@
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
       tasks (onyx.planning/discover-tasks catalog workflow)
 
+      _ (clojure.pprint/pprint tasks)
+
       [a b c d e f g :as sorted-tasks]
       (reduce (fn [all next]
                 (conj all (first (filter #(= (:name %) next) tasks))))

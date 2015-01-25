@@ -170,7 +170,7 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
-(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id restart-ch outbox-ch seal-resp-ch opts]
+(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -255,7 +255,8 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
                            :onyx.core/peer-opts opts
-                           :onyx.core/pipeline-state (atom {})}
+                           :onyx.core/pipeline-state (atom {})
+                           :onyx.core/replica replica}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
@@ -310,12 +311,12 @@
 
     component))
 
-(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task
+(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
                                    restart-ch outbox-ch seal-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job
                        :task-id task :restart-ch restart-ch :outbox-ch outbox-ch
-                       :seal-resp-ch seal-ch :opts opts}))
+                       :replica replica :seal-resp-ch seal-ch :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]

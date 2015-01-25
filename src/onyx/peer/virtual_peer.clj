@@ -19,25 +19,29 @@
 
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch opts]
   (try
-    (loop [replica origin
-           state (merge {:id id
-                         :log log
-                         :messenger-buffer buffer
-                         :messenger messenger
-                         :outbox-ch outbox-ch
-                         :opts opts
-                         :restart-ch restart-ch
-                         :stall-output? true
-                         :task-lifecycle-fn task-lifecycle}
-                        (:onyx.peer/state opts))]
-      (let [position (first (alts!! [kill-ch inbox-ch] :priority? true))]
-        (when position
-          (let [entry (extensions/read-log-entry log position)
-                new-replica (extensions/apply-log-entry entry replica)
-                diff (extensions/replica-diff entry replica new-replica)
-                reactions (extensions/reactions entry replica new-replica diff state)
-                new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
-            (recur new-replica (send-to-outbox new-state reactions))))))
+    (let [replica-atom (atom {})]
+      (reset! replica-atom origin)
+      (loop [state (merge {:id id
+                           :replica replica-atom
+                           :log log
+                           :messenger-buffer buffer
+                           :messenger messenger
+                           :outbox-ch outbox-ch
+                           :opts opts
+                           :restart-ch restart-ch
+                           :stall-output? true
+                           :task-lifecycle-fn task-lifecycle}
+                          (:onyx.peer/state opts))]
+        (let [replica @replica-atom
+              position (first (alts!! [kill-ch inbox-ch] :priority? true))]
+          (when position
+            (let [entry (extensions/read-log-entry log position)
+                  new-replica (extensions/apply-log-entry entry replica)
+                  diff (extensions/replica-diff entry replica new-replica)
+                  reactions (extensions/reactions entry replica new-replica diff state)
+                  new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
+              (reset! replica-atom new-replica)
+              (recur (send-to-outbox new-state reactions)))))))
     (catch Exception e
       (taoensso.timbre/fatal "Fell out of processing loop")
       (taoensso.timbre/fatal e))))
@@ -63,7 +67,8 @@
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
             kill-ch (chan 1)
             restart-ch (chan 1)
-            entry (create-log-entry :prepare-join-cluster {:joiner id})
+            site (onyx.extensions/peer-site messenger)
+            entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site site})
             origin (extensions/subscribe-to-log log inbox-ch)]
         (extensions/register-pulse log id)
 

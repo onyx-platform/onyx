@@ -13,14 +13,8 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn onyx-queue-name []
-  (str "onyx." (UUID/randomUUID)))
-
-(defn ingress-queues-from-parents [parents task-name]
-  (into {} (map #(hash-map (:name %) (get (:egress-queues %) task-name)) parents)))
-
-(defn egress-queues-from-children [elements]
-  (into {} (map #(hash-map (:onyx/name %) (onyx-queue-name)) elements)))
+(defn egress-ids-from-children [elements]
+  (into {} (map #(hash-map (:id %) (java.util.UUID/randomUUID)) elements)))
 
 (defmulti create-task
   (fn [catalog task-name parents children-names]
@@ -37,8 +31,7 @@
         children (map (partial find-task catalog) children-names)]
     {:id (UUID/randomUUID)
      :name (:onyx/name element)
-     :ingress-queues (ingress-queues-from-parents parents task-name)
-     :egress-queues (egress-queues-from-children children)
+     :egress-ids (egress-ids-from-children children)
      :consumption (:onyx/consumption element)}))
 
 (defmethod create-task :function
@@ -57,8 +50,7 @@
   [element parent children]
   {:id (UUID/randomUUID)
    :name (:onyx/name element)
-   :ingress-queues {:self (onyx-queue-name)}
-   :egress-queues (egress-queues-from-children children)
+   :egress-ids (egress-ids-from-children children)
    :consumption (:onyx/consumption element)})
 
 (defmethod extensions/create-io-task :output
@@ -66,8 +58,6 @@
   (let [task-name (:onyx/name element)]
     {:id (UUID/randomUUID)
      :name (:onyx/name element)
-     :ingress-queues (ingress-queues-from-parents parents task-name)
-     :egress-queues {:self (onyx-queue-name)}
      :consumption (:onyx/consumption element)}))
 
 (defn to-dependency-graph [workflow]

@@ -19,12 +19,15 @@
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
                 watcher (nth sorted-candidates index)]
-            (update-in replica [:prepared] merge {watcher joining-peer}))
+            (-> replica
+                (update-in [:prepared] merge {watcher joining-peer})
+                (assoc-in [:peer-site (:joiner args)] (:peer-site args))))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
-          (assoc-in [:peer-state (:joiner args)] :idle)))))
+          (assoc-in [:peer-state (:joiner args)] :idle)
+          (assoc-in [:peer-site (:joiner args)] (:peer-site args))))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
