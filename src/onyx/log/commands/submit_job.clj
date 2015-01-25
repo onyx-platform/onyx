@@ -80,9 +80,14 @@
     true))
 
 (defmethod extensions/reactions :submit-job
-  [entry old new diff peer-args]
+  [{:keys [args] :as entry} old new diff peer-args]
   (when (reallocate-from-job? (:job-scheduler old) old new peer-args)
-    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+    (let [n-tasks (count (get-in new [:tasks (:id args)]))
+          n-volunteering (->> (:peers new)
+                              (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
+                              (count))]
+      (when (>= n-volunteering n-tasks)
+        [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
