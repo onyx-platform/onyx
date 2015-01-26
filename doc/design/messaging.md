@@ -130,6 +130,34 @@ One part of the implementation that requires further analysis are the mechanics 
 
 #### Greedy job scheduler
 
+The Greedy job scheduler has the interesting property that all peers must be assigned to the same job. We can exploit this property and use the number of peers to figure out whether a peer should assign to a new job.
+
+##### Submit new job
+
+When a new job comes in, either a job is already running and *no* peers react with a `volunteer-for-task` call, or there are no jobs currently running. In the latter case, the reactive function should look at the number of tasks in the job and compare it to the number of `:peers` in the replica. If there are at least as many peers are tasks, all peers should react with `volunteer-for-task`. `volunteer-for-task` also needs to perform this check, as the number of peers may have changed since the log entry was appended.
+
+##### Killed job
+
+If the killed job is not the job that all peers are currently executing, no reactions should happen. If it is, look at each job in the order it was submitted. The reactive function should look at the number of tasks in the job and compare it to the number of `:peers` in the replica. If *any* satisy the coverage property, all peers should react with `volunteer-for-task`. `volunteer-for-task` should perform the same check, never assigning a peer to a job who's tasks outnumber the total number of peers. It's critical to do this second check, because inbetween the time the original job was killed and the request for new work was processed, peers may have joined or left the cluster. Consider jobs in the order they were submitted.
+
+##### Completed task
+
+If the task that was completed was not the last task to be finished in the job, no reactions should happen. Otherwise, this job has no tasks left, and should follow the logic of killed job.
+
+##### Accept join cluster
+
+Same logic as submit new job.
+
+##### Seal task
+
+Same as completed task.
+
+##### Leave cluster
+
+If there isn't at least 1 peer per task after a node has left the cluster on this peer's job, this peer should stop executing this job.
+
+
+
 ### Open questions
 
 - How do peers look each other up?
@@ -137,3 +165,4 @@ One part of the implementation that requires further analysis are the mechanics 
 - Talk about how this is different from Storm
 - Greedy task scheduler needs to go
 - How do we ensure that *each* message is getting N seconds before a replay call?
+- How do we handle peers leaving the cluster and sinking below the coverage point?
