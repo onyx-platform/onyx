@@ -1,5 +1,7 @@
 # ![Logo](http://i.imgur.com/zdlOSZD.png?1) Onyx
 
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/MichaelDrogalis/onyx?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ### What is it?
 
 - a masterless, cloud scale, fault tolerant, distributed computation system
