@@ -124,6 +124,12 @@ Implement a load balancing algorithm for spreading out messages over a range of 
   - Do the same as above wrt to reusing messaging components, needs to come through the same interface
 - Implement HornetQ first, straightforward semantics
 
+### Full job coverage notes
+
+One part of the implementation that requires further analysis are the mechanics for ensuring that every job has at least 1 peer assigned to each task while it's executing. If this weren't the case, at least one peer wouldn't have a downstream peer to send messages to - resulting in no work being accomplished. It ends up that the way to handle this is job scheduler specific, and affects any log command who's reactive capabilities include volunteering a peer for a new task. We'll consider each job scheduler in turn, and within construct a plan for handling each command.
+
+#### Greedy job scheduler
+
 ### Open questions
 
 - How do peers look each other up?
