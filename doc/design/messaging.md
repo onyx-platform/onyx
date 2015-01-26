@@ -156,6 +156,37 @@ Same as completed task.
 
 If there isn't at least 1 peer per task after a node has left the cluster on this peer's job, this peer should stop executing this job.
 
+#### Round Robin job scheduler
+
+The Round Robin job scheduler can leverage the deterministic property of reactive functions. Here, we look at how all peers *would* react under particular circumstances, then make an actual decision based off that. It lets us do a bit of time travel, if you will.
+
+##### Submit new job
+
+When a new job drops in, each peer reacts and looks at how many peers in total *would* volunteer for a new task. If that number is less than the number of tasks, no reactions happen. If that number is at least as high, all volunteer reactions go through.
+
+##### Killed job
+
+Volunteer as normal, let the volunteer-for-task command handle this in a reactive manner.
+
+##### Completed task
+
+Same as killed.
+
+##### Accept join cluster
+
+Same as killed.
+
+##### Seal task
+
+Same as killed.
+
+##### Leave cluster
+
+Same as killed.
+
+##### Volunteer for task
+
+Take the total number of peers, and compute the "would be" allocation scheme. If there aren't at least N peers per N tasks for a job, remove that job and repeat. Consider each job in the order it was submitted.
 
 
 ### Open questions
@@ -165,4 +196,3 @@ If there isn't at least 1 peer per task after a node has left the cluster on thi
 - Talk about how this is different from Storm
 - Greedy task scheduler needs to go
 - How do we ensure that *each* message is getting N seconds before a replay call?
-- How do we handle peers leaving the cluster and sinking below the coverage point?
