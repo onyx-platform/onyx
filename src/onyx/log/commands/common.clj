@@ -316,12 +316,27 @@
        (anticipating-coverage? old new job-id)))
 
 (defmulti volunteer-via-new-job?
-  (fn [scheduler old new diff]
+  (fn [scheduler old new diff state]
+    scheduler))
+
+(defmulti volunteer-via-killed-job?
+  (fn [scheduler old new diff state]
     scheduler))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/greedy
-  [scheduler old new diff]
+  [scheduler old new diff state]
   (when (zero? (count (incomplete-jobs old)))
     (let [tasks (get-in new [:tasks (:job diff)])]
       (>= (count (get-in [new :peers])) (count tasks)))))
+
+(defmethod volunteer-via-killed-job? :onyx.job-scheduler/greedy
+  [scheduler old new diff state]
+  (let [peers (get-in [old :allocations (first diff)])]
+    (when (some #{(:id state)} (into #{} peers))
+      (seq
+       (filter
+        (fn [job]
+          (let [tasks (get-in new [:tasks job])]
+            (>= (count (get-in [new :peers])) (count tasks))))
+        (:jobs new))))))
 
