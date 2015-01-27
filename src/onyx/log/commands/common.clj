@@ -315,3 +315,13 @@
   (and (reallocate-from-job? (:job-scheduler old) old new state)
        (anticipating-coverage? old new job-id)))
 
+(defmulti volunteer-via-new-job?
+  (fn [scheduler old new diff]
+    scheduler))
+
+(defmethod volunteer-via-new-job? :onyx.job-scheduler/greedy
+  [scheduler old new diff]
+  (when (zero? (count (incomplete-jobs old)))
+    (let [tasks (get-in new [:tasks (:job diff)])]
+      (>= (count (get-in [new :peers])) (count tasks)))))
+
