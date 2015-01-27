@@ -327,6 +327,14 @@
   (fn [scheduler old new diff state]
     scheduler))
 
+(defmulti volunteer-via-accept?
+  (fn [scheduler old new diff state]
+    scheduler))
+
+(defmulti volunteer-via-seal?
+  (fn [scheduler old new diff state]
+    scheduler))
+
 (defn any-coverable-jobs? [replica]
   (seq
    (filter
@@ -350,4 +358,12 @@
   [scheduler old new diff state]
   (when-not (some #{(:job diff)} (into #{} (incomplete-jobs new)))
     (any-coverable-jobs? new)))
+
+(defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
+  [scheduler old new diff state]
+  (volunteer-via-new-job? scheduler old new diff state))
+
+(defmethod volunteer-via-seal? :onyx.job-scheduler/greedy
+  [scheduler old new diff state]
+  (volunteer-via-completed-task? scheduler old new diff state))
 
