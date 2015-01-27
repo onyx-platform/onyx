@@ -188,6 +188,9 @@ Same as killed.
 
 Take the total number of peers, and compute the "would be" allocation scheme. If there aren't at least N peers per N tasks for a job, remove that job and repeat. Consider each job in the order it was submitted.
 
+#### Percentage job scheduler
+
+We can think of the percentage job scheduler as a special case of Round Robin, and use all of the previously mentioned techniques against this job scheduler also.
 
 ### Open questions
 
