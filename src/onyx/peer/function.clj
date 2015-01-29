@@ -37,13 +37,8 @@
   {:onyx.function/fn (operation/resolve-fn task-map)})
 
 (defmethod p-ext/read-batch :default
-  [{:keys [onyx.core/messenger onyx.core/inbound-ch onyx.core/task-map]}]
-  (let [ms (or (:onyx/batch-timeout task-map) 1000)]
-    {:onyx.core/batch
-     (filter
-      identity
-      (map (fn [_] (second (alts!! [inbound-ch (timeout ms)])))
-           (range (:onyx/batch-size task-map))))}))
+  [{:keys [onyx.core/messenger] :as event}]
+  {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
 
 (defmethod p-ext/decompress-batch :default
   [{:keys [onyx.core/queue onyx.core/batch] :as event}]

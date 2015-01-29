@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.http-kit
-    (:require [clojure.core.async :refer [>!!]]
+    (:require [clojure.core.async :refer [>!! alts!! timeout]]
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
               [org.httpkit.client :as client]
@@ -38,7 +38,13 @@
   {:url (format "%s:%s" (:ip messenger) (:port messenger))})
 
 (defmethod extensions/receive-messages HttpKit
-  [messenger event])
+  [messenger {:keys [onyx.core/task-map] :as event}]
+  (let [ms (or (:onyx/batch-timeout task-map) 1000)
+        ch (:inbound-ch (:onyx.core/messenger-buffer event))]
+    (filter
+     identity
+     (map (fn [_] (second (alts!! [ch (timeout ms)])))
+          (range (:onyx/batch-size task-map))))))
 
 (defmethod extensions/send-messages HttpKit
   [messenger event peer-site]

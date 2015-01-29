@@ -251,6 +251,7 @@
                            :onyx.core/params (resolve-calling-params catalog-entry  opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                            :onyx.core/log log
+                           :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
