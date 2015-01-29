@@ -38,7 +38,7 @@
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
-(defmulti send-messages (fn [messenger event] (type messenger)))
+(defmulti send-messages (fn [messenger event peer-site] (type messenger)))
 
 (defmulti internal-ack-message (fn [messenger id] (type messenger)))
 

@@ -41,12 +41,8 @@
   [messenger event])
 
 (defmethod extensions/send-messages HttpKit
-  [messenger {:keys [onyx.core/job-id onyx.core/task onyx.core/workflow] :as event}]
-  (let [replica @(:onyx.core/replica event)]
-    (doseq [task-id (vals (:onyx.core/serialized-task event))]
-      (let [peers (get-in [replica :allocations job-id task-id])
-            url (get-in replica [:peer-site (rand-nth peers)])]
-        (doseq [c (map :compressed (:onyx.core/compressed event))]
-          (client/post url {:body (ByteBuffer/wrap c)}))))
-    {}))
+  [messenger event peer-site]
+  (doseq [c (map :compressed (:onyx.core/compressed event))]
+    (client/post (:url peer-site) {:body (ByteBuffer/wrap c)}))
+  {})
 

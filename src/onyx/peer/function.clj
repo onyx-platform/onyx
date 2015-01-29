@@ -63,8 +63,13 @@
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defmethod p-ext/write-batch :default
-  [{:keys [onyx.core/messenger] :as event}]
-  (onyx.extensions/send-messages messenger event))
+  [{:keys [onyx.core/messenger onyx.core/job ony.core/task] :as event}]
+  (let [replica @(:onyx.core/replica event)]
+    (doseq [task-id (vals (:egress-ids (:onyx.core/serialized-task event)))]
+      (let [peers (get-in replica [:allocations job task-id])
+            active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
+            target (rand-nth active-peers)]
+        (onyx.extensions/send-messages messenger event (get-in replica [:peer-site target]))))))
 
 (defmethod p-ext/seal-resource :default
   [{:keys [] :as event}]
