@@ -7,7 +7,7 @@
 
 (defmethod extensions/apply-log-entry :signal-ready
   [{:keys [args]} replica]
-  (if (some #{(:id args)} (into #{} (:peer replica)))
+  (if (some #{(:id args)} (into #{} (:peers replica)))
     (assoc-in replica [:peer-state (:id args)] :active)
     replica))
 
