@@ -335,6 +335,9 @@
   (fn [old new diff state]
     (:job-scheduler old)))
 
+(defn job-covered? [replica job]
+  (seq (remove seq (vals (get-in replica [:allocations job])))))
+
 (defn any-coverable-jobs? [replica]
   (seq
    (filter
