@@ -1,9 +1,10 @@
 (ns onyx.log.commands.volunteer-for-task
-  (:require [clojure.core.async :refer [chan go >! <! close!]]
+  (:require [clojure.core.async :refer [chan go >! <! close! >!!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.extensions :as extensions]
             [taoensso.timbre]))
@@ -69,7 +70,7 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :active)))
+            (assoc-in [:peer-state (:id args)] :warming-up)))
       replica)))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
@@ -84,7 +85,7 @@
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
               (update-in [:allocations job task] vec)
-              (assoc-in [:peer-state (:id args)] :active)))
+              (assoc-in [:peer-state (:id args)] :warming-up)))
         replica))
     replica))
 
@@ -107,7 +108,7 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :active)))
+            (assoc-in [:peer-state (:id args)] :warming-up)))
       replica)))
 
 (defmethod select-job :default
@@ -165,6 +166,7 @@
         (let [seal-ch (chan)
               new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
               new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
+          (>!! (:outbox-ch state) (create-log-entry :signal-ready {:id (:id state)}))
           (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 

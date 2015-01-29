@@ -7,8 +7,9 @@
 
 (defn should-seal? [replica args]
   (let [status (common/task-status replica (:job args) (:task args))
-        one-active-peer? (= (get status :active 0) 1)
-        this-peer-is-active? (= (get-in replica [:peer-state (:id args)]) :active)]
+        one-active-peer? (= (+ (get status :warming-up) (get status :active 0)) 1)
+        this-status (get-in replica [:peer-state (:id args)])
+        this-peer-is-active? (or (= this-status :warming-up) (= this-status :active))]
     (boolean (and one-active-peer? this-peer-is-active?))))
 
 (defmethod extensions/apply-log-entry :seal-task
