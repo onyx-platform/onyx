@@ -316,54 +316,54 @@
        (anticipating-coverage? old new job-id)))
 
 (defmulti volunteer-via-new-job?
-  (fn [scheduler old new diff state]
-    scheduler))
+  (fn [old new diff state]
+    (:job-scheduler old)))
 
 (defmulti volunteer-via-killed-job?
-  (fn [scheduler old new diff state]
-    scheduler))
+  (fn [old new diff state]
+    (:job-scheduler old)))
 
 (defmulti volunteer-via-completed-task?
-  (fn [scheduler old new diff state]
-    scheduler))
+  (fn [old new diff state]
+    (:job-scheduler old)))
 
 (defmulti volunteer-via-accept?
-  (fn [scheduler old new diff state]
-    scheduler))
+  (fn [old new diff state]
+    (:job-scheduler old)))
 
 (defmulti volunteer-via-seal?
-  (fn [scheduler old new diff state]
-    scheduler))
+  (fn [old new diff state]
+    (:job-scheduler old)))
 
 (defn any-coverable-jobs? [replica]
   (seq
    (filter
     (fn [job]
       (let [tasks (get-in replica [:tasks job])]
-        (>= (count (get-in [replica :peers])) (count tasks))))
+        (>= (count (get-in replica [:peers])) (count tasks))))
     (:jobs replica))))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/greedy
-  [scheduler old new diff state]
-  (when-not (zero? (count (incomplete-jobs old)))
+  [old new diff state]
+  (when (zero? (count (incomplete-jobs old)))
     (any-coverable-jobs? new)))
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/greedy
-  [scheduler old new diff state]
+  [old new diff state]
   (let [peers (get-in [old :allocations (first diff)])]
     (when (some #{(:id state)} (into #{} peers))
       (any-coverable-jobs? new))))
 
 (defmethod volunteer-via-completed-task? :onyx.job-scheduler/greedy
-  [scheduler old new diff state]
+  [old new diff state]
   (when-not (some #{(:job diff)} (into #{} (incomplete-jobs new)))
     (any-coverable-jobs? new)))
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
-  [scheduler old new diff state]
-  (volunteer-via-new-job? scheduler old new diff state))
+  [old new diff state]
+  (volunteer-via-new-job? old new diff state))
 
 (defmethod volunteer-via-seal? :onyx.job-scheduler/greedy
-  [scheduler old new diff state]
-  (volunteer-via-completed-task? scheduler old new diff state))
+  [old new diff state]
+  (volunteer-via-completed-task? old new diff state))
 
