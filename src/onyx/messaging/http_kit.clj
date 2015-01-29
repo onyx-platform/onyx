@@ -8,7 +8,7 @@
     (:import [java.nio ByteBuffer]))
 
 (defn app [inbound-ch request]
-  (>!! inbound-ch (:body request))
+  (>!! inbound-ch (.bytes (:body request)))
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body ""})
@@ -35,7 +35,7 @@
 
 (defmethod extensions/peer-site HttpKit
   [messenger]
-  {:url (format "%s:%s" (:ip messenger) (:port messenger))})
+  {:url (format "http://%s:%s" (:ip messenger) (:port messenger))})
 
 (defmethod extensions/receive-messages HttpKit
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -43,7 +43,7 @@
         ch (:inbound-ch (:onyx.core/messenger-buffer event))]
     (filter
      identity
-     (map (fn [_] (second (alts!! [ch (timeout ms)])))
+     (map (fn [_] (first (alts!! [ch (timeout ms)])))
           (range (:onyx/batch-size task-map))))))
 
 (defmethod extensions/send-messages HttpKit

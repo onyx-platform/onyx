@@ -42,7 +42,7 @@
 
 (defmethod p-ext/decompress-batch :default
   [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  {})
+  {:onyx.core/decompressed (map fressian/read batch)})
 
 (defmethod p-ext/apply-fn :default
   [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
