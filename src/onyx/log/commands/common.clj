@@ -1,7 +1,8 @@
 (ns onyx.log.commands.common
   (:require [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
 (defn balance-workload [replica jobs p]
   (if (seq jobs)
@@ -335,8 +336,18 @@
   (fn [old new diff state]
     (:job-scheduler old)))
 
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
 (defn job-covered? [replica job]
-  (seq (remove seq (vals (get-in replica [:allocations job])))))
+  ;; TODO - use :tasks, not :allocations
+  (and (not (seq (remove seq (vals (get-in replica [:allocations job])))))
+       (let [peer-groups (vals (get-in replica [:allocations job]))]
+         (every? (partial at-least-one-active? replica) peer-groups)))
+  (not (seq (remove seq (vals (get-in replica [:allocations job]))))))
 
 (defn any-coverable-jobs? [replica]
   (seq
