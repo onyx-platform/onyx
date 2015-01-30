@@ -166,7 +166,6 @@
         (let [seal-ch (chan)
               new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
               new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
-          (>!! (:outbox-ch state) (create-log-entry :signal-ready {:id (:id state)}))
           (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 

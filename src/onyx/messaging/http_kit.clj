@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.http-kit
     (:require [clojure.core.async :refer [>!! alts!! timeout]]
+              [clojure.data.fressian :as fressian]
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
               [org.httpkit.client :as client]
@@ -8,7 +9,8 @@
     (:import [java.nio ByteBuffer]))
 
 (defn app [inbound-ch request]
-  (>!! inbound-ch (.bytes (:body request)))
+  (doseq [message (fressian/read (.bytes (:body request)))]
+    (>!! inbound-ch message))
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body ""})
@@ -48,7 +50,8 @@
 
 (defmethod extensions/send-messages HttpKit
   [messenger event peer-site]
-  (doseq [c (map :compressed (:onyx.core/compressed event))]
-    (client/post (:url peer-site) {:body (ByteBuffer/wrap c)}))
+  (let [messages (map :compressed (:onyx.core/compressed event))
+        compressed-batch (fressian/write messages)]
+    (client/post (:url peer-site) {:body (ByteBuffer/wrap (.array compressed-batch))}))
   {})
 

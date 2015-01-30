@@ -262,12 +262,13 @@
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
-        (while (not (:onyx.core/start-lifecycle? (common/job-covered? @replica job-id)))
-          (prn "Job not covered yet. Backing off and trying again")
-          (Thread/sleep 2000))
-        
         (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
+
+        (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
+        (while (not (common/job-covered? @replica job-id))
+          (prn "Job not covered yet. Backing off and trying again")
+          (Thread/sleep 2000))
 
         (assoc component
           :open-session-kill-ch open-session-kill-ch
