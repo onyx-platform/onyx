@@ -3,6 +3,7 @@
             [taoensso.timbre :refer [fatal]]
             [onyx.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
+            [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.http-kit :refer [http-kit]]
             [onyx.log.zookeeper :refer [zookeeper]]
@@ -23,7 +24,7 @@
 
 (def client-components [:logging-config :log :messenger-buffer :messenger])
 
-(def peer-components [:logging-config :log :messenger-buffer :messenger :virtual-peer])
+(def peer-components [:logging-config :log :messenger-buffer :messenger :acking-daemon :virtual-peer])
 
 (def messenger
   {:http-kit http-kit})
@@ -100,5 +101,6 @@
     :log (component/using (zookeeper config) [:logging-config])
     :messenger-buffer (component/using (messenger-buffer config) [:log])
     :messenger (component/using (messenger-ctor config) [:messenger-buffer])
+    :acking-daemon (component/using (acking-daemon config) [:messenger])
     :virtual-peer (component/using (virtual-peer config) [:log :messenger :messenger-buffer])}))
 

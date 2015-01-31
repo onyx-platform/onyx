@@ -55,3 +55,9 @@
     (client/post (:url peer-site) {:body (ByteBuffer/wrap (.array compressed-batch))}))
   {})
 
+(defmethod extensions/internal-ack-message HttpKit
+  [messenger id])
+
+(defmethod extensions/internal-complete-message HttpKit
+  [messenger id])
+
