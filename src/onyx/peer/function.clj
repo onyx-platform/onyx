@@ -45,10 +45,18 @@
   {:onyx.core/decompressed (map fressian/read batch)})
 
 (defmethod p-ext/apply-fn :default
-  [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
+  [{:keys [onyx.core/batch onyx.core/decompressed onyx.core/params
            onyx.core/task-map] :as event}]
-  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
-    (merge event {:onyx.core/results results})))
+  (let [op (partial operation/apply-fn (:onyx.function/fn event) params)]
+    (reduce
+     (fn [rets [raw thawed]]
+       (let [new-segments (op thawed)
+             result (if coll? new-segments) new-segments (into [] new-segments)]
+         (-> rets
+             (update-in [:results] conj result)
+             (assoc-in [:children] raw result))))
+     {:onyx.core/results [] :onyx.core/children {}}
+     (map vector batch decompressed))))
 
 (defmethod p-ext/compress-batch :default
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
