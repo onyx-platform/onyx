@@ -76,8 +76,8 @@
     {:onyx.core/decompressed (map (comp decompress-f :message) batch)}))
 
 (defmethod p-ext/apply-fn [:input :hornetq]
-  [event]
-  {:onyx.core/results (:onyx.core/decompressed event)})
+  [event segment]
+  segment)
 
 (defmethod p-ext/ack-message [:input :hornetq]
   [{:keys [onyx.core/message-id hornetq/pending-messages] :as event}]

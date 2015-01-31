@@ -32,7 +32,7 @@
     (let [ch (:inbound-ch (:messenger-buffer component))
           daemon (:acker-daemon component)
           ip "0.0.0.0"
-          server (server/run-server (partial app daemon ch) {:ip ip :port 0 :thread 1})]
+          server (server/run-server (partial app daemon ch) {:ip ip :port 0 :thread 1 :queue-size 1000})]
       (assoc component :server server :ip ip :port (:local-port (meta server)))))
 
   (stop [component]

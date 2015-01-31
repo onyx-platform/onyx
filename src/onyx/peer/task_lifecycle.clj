@@ -78,11 +78,23 @@
        (:completion-id raw-segment)
        (:ack-val raw-segment)))))
 
-(defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
+(defn munge-apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (let [result (merge event (p-ext/apply-fn event))]
-      (ack-messages result)
-      result)
+    (let [rets
+          (merge event
+                 (reduce
+                  (fn [rets [raw thawed]]
+                    (let [new-segments (p-ext/apply-fn event thawed)
+                          result (if coll? new-segments) new-segments (into [] new-segments)
+                          tagged (apply acker/prefuse-vals (map (fn [x] (acker/gen-ack-value)) result))
+                          result-segment {:segment result :id (:id raw) :acker-id (:acker-id raw)
+                                          :completion-id (:completion-id raw)}]
+                      (-> rets
+                          (update-in [:onyx.core/results] conj result-segment)
+                          (assoc-in [:onyx.core/children raw] tagged))))
+                  {:onyx.core/results [] :onyx.core/children {}}
+                  (map vector batch decompressed)))]
+      (ack-messages rets))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]

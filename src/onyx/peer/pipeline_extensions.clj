@@ -28,7 +28,8 @@
   "Applies a function to the decompressed segments. Must return a map with
    key :onyx.core/results and value seq representing the application of the function
    to the segments."
-  type-and-medium-dispatch)
+  (fn [event segment]
+    (type-and-medium-dispatch event)))
 
 (defmulti compress-batch
   "Compresses the segments that result from function application. Must return
