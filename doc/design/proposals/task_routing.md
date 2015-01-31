@@ -170,4 +170,5 @@ however maybe some of the receiving tasks want to know where they came from.
 
 Something to do with lifecycle and pipeline extensions that allows the user to
 override the behaviour but which will require them to get into more onyx
-internals.
+internals. Implementing it this way also takes it out of the catalog data and
+puts it somewhere that it is not as data driven.
