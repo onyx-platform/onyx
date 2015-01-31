@@ -90,7 +90,7 @@ is separated into the filter-even and filter-odd function.
 Task entries in catalogs can additionally define a :onyx/route-filter-fn
 with the following definition:
 
-example-router-fn (input-segment, output-segment, catalog, task) 
+example-router-fn (input-segment, output-segment, catalog, task, output-tasks) 
 
 and which returns a list of the tasks that the segment should be routed to.
 These tasks must be all be  tasks with incoming edges from the task, hence the
@@ -136,7 +136,8 @@ Alternative definition under this format:
 and the required routing function:
 
 ```
-(defn even-odd-router [_ output-segment _ _]
+(defn even-odd-router [_ output-segment _ _ output-tasks]
+  {:post [(= % (clojure.set/intersection output-tasks %))]}
   (if (even? (:n output-segment))
       #{:even-out}
       #{:odd-out}))
@@ -147,11 +148,13 @@ open question: it may not be necessary to pass in the input segment to the
 routing tasks. It may also come at the cost of some complexity so this should
 be considered. 
 
-You could also implement a routing function like the following:
+You can also define routing functions that do not return any output tasks, e.g.
+a routing function that randomly drops segments.
 
 ```
-(defn dropping-router [_ output-segment _ _]
-  (if (even? (:n output-segment))
+(defn random-dropping-router [_ output-segment _ _ output-tasks]
+  {:post [(= % (clojure.set/intersection output-tasks %))]}
+  (if (zero? (rand-int 2))
       #{:even-out :odd-out}
       #{}))
 ```
@@ -165,10 +168,10 @@ in this example.
 
 #### ``` :onyx/route-filter-by-key ```
 
-Similar to ``` :onyx/group-by-key ```, routes tasks based on a key in the
-output segment from the task. Probably not as useful as group-by-key as you
-probably don't want the task info in the segments that you send around -
-however maybe some of the receiving tasks want to know where they came from.
+Similar to ``` :onyx/group-by-key ```, routes tasks based on a lookup by key in
+the output segment. This is probably not as useful as group-by-key as you probably
+don't want the task info in the segments that you send around - however maybe
+some of the receiving tasks want to know where else the segment was sent?
 
 ### Alternative proposal
 
