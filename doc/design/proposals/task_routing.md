@@ -136,7 +136,6 @@ and the required routing function:
   (if (even? (:n output-segment))
       #{:even-out}
       #{:odd-out}))
-
 ```
 
 Note that in this case, as :in is an input task, input-segment will be nil. One
@@ -160,7 +159,7 @@ in this example.
 
 ### Additional proposals
 
-#### `` :onyx/route-by-key ```
+#### ``` :onyx/route-by-key ```
 
 Similar to ``` :onyx/group-by-key ```, routes tasks based on a key in the
 output segment from the task. Probably not as useful as group-by-key as you
