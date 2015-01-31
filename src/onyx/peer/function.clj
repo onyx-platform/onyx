@@ -53,8 +53,8 @@
        (let [new-segments (op thawed)
              result (if coll? new-segments) new-segments (into [] new-segments)]
          (-> rets
-             (update-in [:results] conj result)
-             (assoc-in [:children] raw result))))
+             (update-in [:onyx.core/results] conj result)
+             (assoc-in [:oynx.core/children] raw result))))
      {:onyx.core/results [] :onyx.core/children {}}
      (map vector batch decompressed))))
 

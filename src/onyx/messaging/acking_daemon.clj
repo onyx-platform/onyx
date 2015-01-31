@@ -16,7 +16,7 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {}))
 
-(defn ack-message [daemon]
+(defn ack-message [daemon message-id completion-id ack-val]
   (swap!
    (:ack-state daemon)
    (fn [state]

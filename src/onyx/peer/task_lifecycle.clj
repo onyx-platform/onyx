@@ -6,7 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.planning :refer [find-task]]
-              [onyx.messaging.acking-daemon :refer [gen-ack-value gen-message-id]]
+              [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -31,7 +31,10 @@
     (merge event cycle-params (l-ext/inject-temporal-resources* event))))
 
 (defn add-message-id [m]
-  (assoc m :id (gen-message-id)))
+  (assoc m :id (acker/gen-message-id)))
+
+(defn add-ack-value [m]
+  (assoc m :ack-val (acker/gen-ack-value)))
 
 (defn add-acker-id [event m]
   (let [peers (:peers @(:onyx.core/replica event))
@@ -45,6 +48,7 @@
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
     (-> event
         (update-in [:onyx.core/batch] (partial map add-message-id))
+        (update-in [:onyx.core/batch] (partial map add-ack-value))
         (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
         (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))
     event))
@@ -55,8 +59,14 @@
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
 
-(defn ack-message [event]
-  (doseq []))
+(defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
+  (doseq [raw-segment (keys children)
+          child-ack-vals (map :ack-val (get children raw-segment))]
+    (extensions/internal-ack-message
+     (:id raw-segment)
+     (:acker-id raw-segment)
+     (:completion-id raw-segment)
+     (apply acker/prefuse-vals (concat (:ack-val raw-segment) child-ack-vals)))))
 
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)

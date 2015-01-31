@@ -56,7 +56,7 @@
   {})
 
 (defmethod extensions/internal-ack-message HttpKit
-  [messenger id])
+  [messenger message-id acker-id completion-id ack-val])
 
 (defmethod extensions/internal-complete-message HttpKit
   [messenger id])
