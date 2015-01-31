@@ -173,6 +173,10 @@ the output segment. This is probably not as useful as group-by-key as you probab
 don't want the task info in the segments that you send around - however maybe
 some of the receiving tasks want to know where else the segment was sent?
 
+#### Filter on the incoming task
+
+Probably quite difficult to do this right.
+
 ### Alternative proposal
 
 Something to do with lifecycle and pipeline extensions that allows the user to
