@@ -16,3 +16,23 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {}))
 
+(defn ack-message [daemon]
+  (swap!
+   (:ack-state daemon)
+   (fn [state]
+     (if-not (get-in state [message-id])
+       (assoc state message-id [completion-id ack-val])
+       (let [current-val (second (get-in state [message-id]))]
+         (assoc state message-id [completion-id (bit-xor current-val ack-val)]))))))
+
+(defn gen-ack-value
+  "Generate a 64-bit value to bit-xor against the current ack-value."
+  []
+  (.nextLong (java.security.SecureRandom.)))
+
+(defn prefuse-vals
+  "Prefuse values on a peer before sending them to the acking
+   daemon to decrease packet size."
+  [& vals]
+  (apply bit-xor vals))
+
