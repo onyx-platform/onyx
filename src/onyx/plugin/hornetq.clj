@@ -63,8 +63,7 @@
   [{:keys [onyx.core/task-map hornetq/consumer hornetq/pending-messages]}]
   (let [queue-name (:hornetq/queue-name task-map)
         timeout (or (:onyx/batch-timeout task-map) 1000)]
-    (let [f (fn [] {:id (java.util.UUID/randomUUID)
-                   :message (.receive consumer timeout)})
+    (let [f (fn [] {:message (.receive consumer timeout)})
           rets (filter (comp not nil? :message)
                        (take-segments f (:onyx/batch-size task-map)))]
       (doseq [m rets]

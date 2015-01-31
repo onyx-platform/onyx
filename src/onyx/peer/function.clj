@@ -56,7 +56,7 @@
              tagged (apply acker/prefuse-vals (map (fn [x] (acker/gen-ack-value)) result))]
          (-> rets
              (update-in [:onyx.core/results] conj result)
-             (assoc-in [:oynx.core/children raw] tagged))))
+             (assoc-in [:onyx.core/children raw] tagged))))
      {:onyx.core/results [] :onyx.core/children {}}
      (map vector batch decompressed))))
 

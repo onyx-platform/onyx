@@ -109,22 +109,3 @@
 
 (onyx.api/shutdown-env env)
 
-(comment
-
-  (require '[clojure.core.async :refer :all])
-  
-  (def ch (chan 100))
-
-  (def subscription (onyx.api/subscribe-to-log peer-config ch))
-
-  (def log (:log (:env subscription)))
-
-  (def replica
-    (loop [replica (:replica subscription)]
-      (let [position (<!! ch)
-            entry (onyx.extensions/read-log-entry log position)
-            new-replica (onyx.extensions/apply-log-entry entry replica)]
-        (prn entry)
-        (clojure.pprint/pprint new-replica)
-        (recur new-replica))))
-)

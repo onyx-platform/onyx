@@ -54,7 +54,7 @@
     event))
 
 (defn munge-read-batch [event]
-  (merge event (tag-each-message (p-ext/read-batch event))))
+  (merge event (tag-each-message (merge event (p-ext/read-batch event)))))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
@@ -62,6 +62,8 @@
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
   (doseq [raw-segment (keys children)]
     (extensions/internal-ack-message
+     (:onyx.core/messenger event)
+     event
      (:id raw-segment)
      (:acker-id raw-segment)
      (:completion-id raw-segment)
