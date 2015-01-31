@@ -1,6 +1,7 @@
 ## Conditional Task Routing
 
-This design proposal outlines an approach that Onyx could take to routing segments conditionally to tasks.
+This design proposal outlines an approach that Onyx could take to routing
+segments conditionally between tasks.
 
 ### Background
 
@@ -86,11 +87,14 @@ is separated into the filter-even and filter-odd function.
 
 ### Proposal
 
-Task entries in catalogs can additionally define a :onyx/routing-fn with the following definition:
-example-router-fn (input-segment, output-segment, catalog, task)
+Task entries in catalogs can additionally define a :onyx/route-filter-fn
+with the following definition:
 
-and which returns a list of the tasks that the segment should be routed to
-(which must all be tasks with incoming edges from the task).
+example-router-fn (input-segment, output-segment, catalog, task) 
+
+and which returns a list of the tasks that the segment should be routed to.
+These tasks must be all be  tasks with incoming edges from the task, hence the
+"filter" in the name.
 
 Alternative definition under this format:
 
@@ -107,7 +111,7 @@ Alternative definition under this format:
    :onyx/ident :core.async/read-from-chan
    :onyx/type :input
    :onyx/medium :core.async
-   :onyx/routing-fn :filter.core/even-odd-router
+   :onyx/route-filter-fn :filter.core/even-odd-router
    :onyx/consumption :concurrent
    :onyx/batch-size batch-size
    :onyx/doc "Reads segments from a core.async channel"}
@@ -159,7 +163,7 @@ in this example.
 
 ### Additional proposals
 
-#### ``` :onyx/route-by-key ```
+#### ``` :onyx/route-filter-by-key ```
 
 Similar to ``` :onyx/group-by-key ```, routes tasks based on a key in the
 output segment from the task. Probably not as useful as group-by-key as you
