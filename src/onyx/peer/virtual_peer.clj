@@ -34,14 +34,16 @@
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
               position (first (alts!! [kill-ch inbox-ch] :priority? true))]
-          (when position
+          (if position
             (let [entry (extensions/read-log-entry log position)
                   new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
-              (recur (send-to-outbox new-state reactions)))))))
+              (recur (send-to-outbox new-state reactions)))
+            (when (:lifecycle state)
+              (component/stop (:lifecycle state)))))))
     (catch Exception e
       (taoensso.timbre/fatal "Fell out of processing loop")
       (taoensso.timbre/fatal e))))
