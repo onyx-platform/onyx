@@ -23,9 +23,12 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn compress-segment [next-tasks catalog segment]
-  {:compressed (.array (fressian/write segment))
-;;   :hash-group (reduce (fn [groups t] (assoc groups t (group-message segment catalog t))) {} next-tasks)
+(defn compress-segment [next-tasks catalog {:keys [segment id acker-id completion-id]}]
+  {:message segment
+   :id id
+   :acker-id acker-id
+   :completion-id completion-id
+   ;;   :hash-group (reduce (fn [groups t] (assoc groups t (group-message segment catalog t))) {} next-tasks)
    })
 
 (defmethod l-ext/start-lifecycle? :function
@@ -42,7 +45,7 @@
 
 (defmethod p-ext/decompress-batch :default
   [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  {:onyx.core/decompressed (map (comp fressian/read :message) batch)})
+  {:onyx.core/decompressed batch})
 
 (defmethod p-ext/apply-fn :default
   [{:keys [onyx.core/params] :as event} segment]
@@ -52,7 +55,6 @@
 (defmethod p-ext/compress-batch :default
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
     :as event}]
-  (clojure.pprint/pprint (first results))
   (let [next-tasks (:egress-ids serialized-task)
         compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))

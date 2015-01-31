@@ -94,7 +94,8 @@
                           (assoc-in [:onyx.core/children raw] tagged))))
                   {:onyx.core/results [] :onyx.core/children {}}
                   (map vector batch decompressed)))]
-      (ack-messages rets))
+      (ack-messages rets)
+      rets)
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]

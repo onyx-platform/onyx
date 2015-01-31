@@ -17,9 +17,9 @@
       (acker/ack-message daemon
                          (:message-id thawed)
                          (:completion-id thawed)
-                         (:ack-val thawed)))
-    (doseq [message thawed]
-      (>!! inbound-ch message))
+                         (:ack-val thawed))
+      (doseq [message thawed]
+        (>!! inbound-ch message)))
     {:status 200
      :headers {"Content-Type" "text/plain"}}))
 
@@ -30,7 +30,7 @@
     (taoensso.timbre/info "Starting HTTP Kit")
 
     (let [ch (:inbound-ch (:messenger-buffer component))
-          daemon (:acker-daemon component)
+          daemon (:acking-daemon component)
           ip "0.0.0.0"
           server (server/run-server (partial app daemon ch) {:ip ip :port 0 :thread 1 :queue-size 1000})]
       (assoc component :server server :ip ip :port (:local-port (meta server)))))
@@ -59,7 +59,7 @@
 
 (defmethod extensions/send-messages HttpKit
   [messenger event peer-site]
-  (let [messages (map :compressed (:onyx.core/compressed event))
+  (let [messages (:onyx.core/compressed event)
         compressed-batch (fressian/write messages)]
     (client/post (:url peer-site) {:body (ByteBuffer/wrap (.array compressed-batch))}))
   {})
@@ -68,7 +68,7 @@
   [messenger event message-id acker-id completion-id ack-val]
   (let [replica @(:onyx.core/replica event)
         url (:url (get-in replica [:peer-site acker-id]))
-        route (format "%s/%s" url acker-route)
+        route (format "%s%s" url acker-route)
         contents (fressian/write {:id message-id :completion-id completion-id :ack-val ack-val})]
     (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 

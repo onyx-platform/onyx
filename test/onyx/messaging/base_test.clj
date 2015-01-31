@@ -37,9 +37,9 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 5000)
+(def n-messages 1000)
 
-(def batch-size 500)
+(def batch-size 200)
 
 (def echo 100)
 
