@@ -70,6 +70,7 @@
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
     (let [result (merge event (p-ext/apply-fn event))]
+      (ack-messages result)
       result)
     (merge event {:onyx.core/results []})))
 
