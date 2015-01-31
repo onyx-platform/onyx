@@ -56,7 +56,12 @@
   {})
 
 (defmethod extensions/internal-ack-message HttpKit
-  [messenger message-id acker-id completion-id ack-val])
+  [messenger event message-id acker-id completion-id ack-val]
+  (let [replica @(:onyx.core/replica event)
+        url (:url (get-in replica [:peer-site acker-id]))
+        route (format "%s/%s" url "/ack")
+        contents (fressian/write {:id message-id :completion-id completion-id :ack-val ack-val})]
+    (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 
 (defmethod extensions/internal-complete-message HttpKit
   [messenger id])
