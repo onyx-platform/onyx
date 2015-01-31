@@ -91,8 +91,8 @@
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/apply-fn [:output :hornetq]
-  [event]
-  {:onyx.core/results (:onyx.core/decompressed event)})
+  [event segment]
+  segment)
 
 (defmethod p-ext/compress-batch [:output :hornetq]
   [{:keys [onyx.core/results]}]
