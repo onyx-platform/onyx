@@ -1,9 +1,10 @@
 (ns ^:no-doc onyx.peer.function
     (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
               [clojure.data.fressian :as fressian]
+              [onyx.planning :refer [find-task]]
+              [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
-              [onyx.planning :refer [find-task]]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [taoensso.timbre :refer [debug]]
@@ -51,10 +52,11 @@
     (reduce
      (fn [rets [raw thawed]]
        (let [new-segments (op thawed)
-             result (if coll? new-segments) new-segments (into [] new-segments)]
+             result (if coll? new-segments) new-segments (into [] new-segments)
+             tagged (apply acker/prefuse-vals (map (fn [x] (acker/gen-ack-value)) result))]
          (-> rets
              (update-in [:onyx.core/results] conj result)
-             (assoc-in [:oynx.core/children] raw result))))
+             (assoc-in [:oynx.core/children] raw tagged))))
      {:onyx.core/results [] :onyx.core/children {}}
      (map vector batch decompressed))))
 

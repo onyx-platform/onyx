@@ -60,13 +60,12 @@
   (merge event (p-ext/decompress-batch event)))
 
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
-  (doseq [raw-segment (keys children)
-          child-ack-vals (map :ack-val (get children raw-segment))]
+  (doseq [raw-segment (keys children)]
     (extensions/internal-ack-message
      (:id raw-segment)
      (:acker-id raw-segment)
      (:completion-id raw-segment)
-     (apply acker/prefuse-vals (concat (:ack-val raw-segment) child-ack-vals)))))
+     (acker/prefuse-vals (:ack-val raw-segment) (get children raw-segment)))))
 
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
