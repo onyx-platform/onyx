@@ -6,6 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.planning :refer [find-task]]
+              [onyx.messaging.acking-daemon :refer [gen-ack-value gen-message-id]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -29,15 +30,38 @@
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
     (merge event cycle-params (l-ext/inject-temporal-resources* event))))
 
+(defn add-message-id [m]
+  (assoc m :id (gen-message-id)))
+
+(defn add-acker-id [event m]
+  (let [peers (:peers @(:onyx.core/replica event))
+        n (mod (.hashCode (:message m)) (count peers))]
+    (assoc m :acker-id (nth peers n))))
+
+(defn add-completion-id [event m]
+  (assoc m :completion-id (:onyx.core/id event)))
+
+(defn tag-each-message [event]
+  (if (= (:onyx/type (:onyx.core/task-map event)) :input)
+    (-> event
+        (update-in [:onyx.core/batch] (partial map add-message-id))
+        (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
+        (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))
+    event))
+
 (defn munge-read-batch [event]
-  (merge event (p-ext/read-batch event)))
+  (merge event (tag-each-message (p-ext/read-batch event))))
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
 
+(defn ack-message [event]
+  (doseq []))
+
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (p-ext/apply-fn event))
+    (let [applied (p-ext/apply-fn event)]
+      (merge event ))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
