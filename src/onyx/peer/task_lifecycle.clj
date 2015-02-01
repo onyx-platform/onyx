@@ -86,8 +86,8 @@
           (merge event
                  (reduce
                   (fn [rets [raw thawed]]
-                    (let [new-segments (p-ext/apply-fn event thawed)
-                          new-segments (if coll? new-segments) new-segments (into [] new-segments)
+                    (let [new-segments (p-ext/apply-fn event (:message thawed))
+                          new-segments (if coll? new-segments) new-segments (vector new-segments)
                           new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
                           tagged (apply acker/prefuse-vals (conj new-ack-vals (:ack-val raw)))
                           results (map (fn [segment ack-val]

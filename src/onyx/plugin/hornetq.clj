@@ -73,7 +73,7 @@
 (defmethod p-ext/decompress-batch [:input :hornetq]
   [{:keys [onyx.core/batch]}]
   (let [decompress-f #(fressian/read (.toByteBuffer (.getBodyBuffer %)))]
-    {:onyx.core/decompressed (map (comp decompress-f :message) batch)}))
+    {:onyx.core/decompressed (map #(assoc % :message (decompress-f (:message %))) batch)}))
 
 (defmethod p-ext/apply-fn [:input :hornetq]
   [event segment]
