@@ -62,21 +62,23 @@
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
   (if children
     (doseq [raw-segment (keys children)]
-      (extensions/internal-ack-message
-       (:onyx.core/messenger event)
-       event
-       (:id raw-segment)
-       (:acker-id raw-segment)
-       (:completion-id raw-segment)
-       (acker/prefuse-vals (:ack-val raw-segment) (get children raw-segment))))
+      (when (:ack-val raw-segment)
+        (extensions/internal-ack-message
+         (:onyx.core/messenger event)
+         event
+         (:id raw-segment)
+         (:acker-id raw-segment)
+         (:completion-id raw-segment)
+         (acker/prefuse-vals (:ack-val raw-segment) (get children raw-segment)))))
     (doseq [raw-segment (:onyx.core/batch event)]
-      (extensions/internal-ack-message
-       (:onyx.core/messenger event)
-       event
-       (:id raw-segment)
-       (:acker-id raw-segment)
-       (:completion-id raw-segment)
-       (:ack-val raw-segment)))))
+      (when (:ack-val raw-segment)
+        (extensions/internal-ack-message
+         (:onyx.core/messenger event)
+         event
+         (:id raw-segment)
+         (:acker-id raw-segment)
+         (:completion-id raw-segment)
+         (:ack-val raw-segment))))))
 
 (defn munge-apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (if (seq decompressed)

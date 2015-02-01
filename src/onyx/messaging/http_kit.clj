@@ -15,7 +15,7 @@
   (let [thawed (fressian/read (.bytes (:body request)))]
     (if (= (:uri request) acker-route)
       (acker/ack-message daemon
-                         (:message-id thawed)
+                         (:id thawed)
                          (:completion-id thawed)
                          (:ack-val thawed))
       (doseq [message thawed]
