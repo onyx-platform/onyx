@@ -23,13 +23,9 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn compress-segment [next-tasks catalog {:keys [segment id acker-id completion-id]}]
-  {:message segment
-   :id id
-   :acker-id acker-id
-   :completion-id completion-id
-   ;;   :hash-group (reduce (fn [groups t] (assoc groups t (group-message segment catalog t))) {} next-tasks)
-   })
+(defn compress-segment [next-tasks catalog message]
+  ;;   :hash-group (reduce (fn [groups t] (assoc groups t (group-message segment catalog t))) {} next-tasks)
+  message)
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]

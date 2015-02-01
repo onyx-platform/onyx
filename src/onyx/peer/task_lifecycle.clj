@@ -87,12 +87,18 @@
                  (reduce
                   (fn [rets [raw thawed]]
                     (let [new-segments (p-ext/apply-fn event thawed)
-                          result (if coll? new-segments) new-segments (into [] new-segments)
-                          tagged (apply acker/prefuse-vals (map (fn [x] (acker/gen-ack-value)) result))
-                          result-segment {:segment result :id (:id raw) :acker-id (:acker-id raw)
-                                          :completion-id (:completion-id raw)}]
+                          new-segments (if coll? new-segments) new-segments (into [] new-segments)
+                          new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
+                          tagged (apply acker/prefuse-vals (conj new-ack-vals (:ack-val raw)))
+                          results (map (fn [segment ack-val]
+                                         {:id (:id raw)
+                                          :acker-id (:acker-id raw)
+                                          :completion-id (:completion-id raw)
+                                          :message segment
+                                          :ack-val ack-val})
+                                       new-segments new-ack-vals)]
                       (-> rets
-                          (update-in [:onyx.core/results] conj result-segment)
+                          (update-in [:onyx.core/results] concat results)
                           (assoc-in [:onyx.core/children raw] tagged))))
                   {:onyx.core/results [] :onyx.core/children {}}
                   (map vector batch decompressed)))]
