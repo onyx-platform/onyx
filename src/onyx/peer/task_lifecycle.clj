@@ -46,11 +46,21 @@
 
 (defn tag-each-message [event]
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (-> event
-        (update-in [:onyx.core/batch] (partial map add-message-id))
-        (update-in [:onyx.core/batch] (partial map add-ack-value))
-        (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
-        (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))
+    (let [event
+          (-> event
+              (update-in [:onyx.core/batch] (partial map add-message-id))
+              (update-in [:onyx.core/batch] (partial map add-ack-value))
+              (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
+              (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))]
+      (doseq [raw-segment (:onyx.core/batch event)]
+        (extensions/internal-ack-message
+         (:onyx.core/messenger event)
+         event
+         (:id raw-segment)
+         (:acker-id raw-segment)
+         (:completion-id raw-segment)
+         (:ack-val raw-segment)))
+      event)
     event))
 
 (defn munge-read-batch [event]
@@ -58,6 +68,11 @@
 
 (defn munge-decompress-batch [event]
   (merge event (p-ext/decompress-batch event)))
+
+(defn fuse-ack-vals [task parent-ack child-ack]
+  (if (= (:onyx/type task) :output)
+    parent-ack
+    (acker/prefuse-vals parent-ack child-ack)))
 
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
   (if children
@@ -69,16 +84,12 @@
          (:id raw-segment)
          (:acker-id raw-segment)
          (:completion-id raw-segment)
-         (acker/prefuse-vals (:ack-val raw-segment) (get children raw-segment)))))
-    (doseq [raw-segment (:onyx.core/batch event)]
-      (when (:ack-val raw-segment)
-        (extensions/internal-ack-message
-         (:onyx.core/messenger event)
-         event
-         (:id raw-segment)
-         (:acker-id raw-segment)
-         (:completion-id raw-segment)
-         (:ack-val raw-segment))))))
+         (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment)))))))
+
+(defn segments->ack-values [event segments]
+  (if (= :output (:onyx/type (:onyx.core/task-map event)))
+    (repeat (count segments) nil)
+    (map (fn [x] (acker/gen-ack-value)) segments)))
 
 (defn munge-apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (if (seq decompressed)
@@ -89,7 +100,7 @@
                     (let [new-segments (p-ext/apply-fn event (:message thawed))
                           new-segments (if coll? new-segments) new-segments (vector new-segments)
                           new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
-                          tagged (apply acker/prefuse-vals (conj new-ack-vals (:ack-val raw)))
+                          tagged (apply acker/prefuse-vals new-ack-vals)
                           results (map (fn [segment ack-val]
                                          {:id (:id raw)
                                           :acker-id (:acker-id raw)

@@ -17,13 +17,17 @@
   (map->AckingDaemon {}))
 
 (defn ack-message [daemon message-id completion-id ack-val]
-  (swap!
-   (:ack-state daemon)
-   (fn [state]
-     (if-not (get-in state [message-id])
-       (assoc state message-id [completion-id ack-val])
-       (let [current-val (second (get-in state [message-id]))]
-         (assoc state message-id [completion-id (bit-xor current-val ack-val)]))))))
+  (let [rets
+        (swap!
+         (:ack-state daemon)
+         (fn [state]
+           (if-not (get-in state [message-id])
+             (assoc state message-id [completion-id ack-val])
+             (let [current-val (second (get-in state [message-id]))]
+               (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
+    (when-let [x (get rets message-id)]
+      (when (zero? (second x))
+        (prn message-id "complete")))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
