@@ -96,7 +96,7 @@
 
 (defmethod p-ext/compress-batch [:output :hornetq]
   [{:keys [onyx.core/results]}]
-  (let [compress-f #(.array (fressian/write %))]
+  (let [compress-f #(.array (fressian/write (:message %)))]
     {:onyx.core/compressed (map compress-f results)}))
 
 (defmethod p-ext/write-batch [:output :hornetq]
