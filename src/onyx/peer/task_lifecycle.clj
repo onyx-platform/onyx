@@ -353,7 +353,7 @@
           (prn "Job not covered yet. Backing off and trying again")
           (Thread/sleep 2000))
 
-;;        (thread (release-messages! messenger pipeline-data))
+        (thread (release-messages! messenger pipeline-data))
 
         (assoc component
           :open-session-kill-ch open-session-kill-ch

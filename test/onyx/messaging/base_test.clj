@@ -59,7 +59,6 @@
 (hq-util/write! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [segment]
-  (prn segment)
   (if (number? (:n segment))
     (assoc segment :n (inc (:n segment)))
     []))

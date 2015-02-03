@@ -89,7 +89,7 @@
 (defmethod extensions/internal-complete-message HttpKit
   [messenger id peer-id replica]
   (let [snapshot @replica
-        url (:url (get-in replica [:peer-site peer-id]))
+        url (:url (get-in snapshot [:peer-site peer-id]))
         route (format "%s%s" url completion-route)
         contents (fressian/write {:id id})]
     (client/post route {:body (ByteBuffer/wrap (.array contents))})))

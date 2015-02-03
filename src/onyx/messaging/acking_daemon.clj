@@ -29,8 +29,7 @@
                (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
     (when-let [x (get rets message-id)]
       (when (zero? (second x))
-;;        (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})
-        ))))
+        (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
