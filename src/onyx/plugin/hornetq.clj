@@ -86,7 +86,7 @@
     (swap! pending-messages dissoc message-id)))
 
 (defmethod p-ext/replay-message [:input :hornetq]
-  [{:keys [onyx.core/message-id hornetq/pending-messages] :as event}]
+  [{:keys [hornetq/pending-messages] :as event} message-id]
   (.rollback (:hornetq/session event))
   (swap! pending-messages dissoc message-id))
 

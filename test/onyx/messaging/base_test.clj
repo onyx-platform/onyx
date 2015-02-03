@@ -58,12 +58,10 @@
 
 (hq-util/write! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
-(defn my-inc [{:keys [n] :as segment}]
-  (if (number? n)
-    (do
-      (when (zero? (mod n 500))
-        (prn "Got segment: " segment))
-      (assoc segment :n (inc n)))
+(defn my-inc [segment]
+  (prn segment)
+  (if (number? (:n segment))
+    (assoc segment :n (inc (:n segment)))
     []))
 
 (def catalog

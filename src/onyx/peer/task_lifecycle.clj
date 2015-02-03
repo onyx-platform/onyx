@@ -240,6 +240,12 @@
          (recur)))
     seal-ch dead-ch release-f exception-f))
 
+(defn release-messages! [messenger event]
+  (loop []
+    (when-let [id (<!! (:release-ch messenger))]
+      (prn "Finishing off" id)
+      (recur))))
+
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
   (if (some #{(type e)} restartable-exceptions)
@@ -346,6 +352,8 @@
         (while (not (common/job-covered? @replica job-id))
           (prn "Job not covered yet. Backing off and trying again")
           (Thread/sleep 2000))
+
+;;        (thread (release-messages! messenger pipeline-data))
 
         (assoc component
           :open-session-kill-ch open-session-kill-ch

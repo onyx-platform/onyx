@@ -25,9 +25,8 @@
   type-and-medium-dispatch)
 
 (defmulti apply-fn
-  "Applies a function to the decompressed segments. Must return a map with
-   key :onyx.core/results and value seq representing the application of the function
-   to the segments."
+  "Applies a function to a decompressed segment. Returns a segment
+   or vector of new segments."
   (fn [event segment]
     (type-and-medium-dispatch event)))
 
@@ -52,6 +51,7 @@
   type-and-medium-dispatch)
 
 (defmulti replay-message
-  "Releases a message id from storage and tries to replay it. Must return a map."
-  type-and-medium-dispatch)
+  "Releases a message id from storage and replays it."
+  (fn [event message-id]
+    (type-and-medium-dispatch event)))
 

@@ -43,7 +43,7 @@
 (defmulti internal-ack-message (fn [messenger event message-id acker-id completion-id ack-val]
                                  (type messenger)))
 
-(defmulti internal-complete-message (fn [messenger id] (type messenger)))
+(defmulti internal-complete-message (fn [messenger id peer-id replica] (type messenger)))
 
 ;; Queue interface
 

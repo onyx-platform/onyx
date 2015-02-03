@@ -17,10 +17,20 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch opts]
+(defn forward-completion-calls [messenger ch replica]
+  (try
+    (loop []
+      (when-let [{:keys [id peer-id]} (<!! ch)]
+        (extensions/internal-complete-message messenger id peer-id replica)
+        (recur)))
+    (catch Exception e
+      (timbre/fatal e))))
+
+(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts]
   (try
     (let [replica-atom (atom {})]
       (reset! replica-atom origin)
+      (thread (forward-completion-calls messenger completion-ch replica-atom))
       (loop [state (merge {:id id
                            :replica replica-atom
                            :log log
@@ -61,7 +71,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log messenger-buffer messenger] :as component}]
+  (start [{:keys [log acking-daemon messenger-buffer messenger] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
@@ -69,6 +79,7 @@
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
             kill-ch (chan 1)
             restart-ch (chan 1)
+            completion-ch (:completions-ch acking-daemon)
             site (onyx.extensions/peer-site messenger)
             entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site site})
             origin (extensions/subscribe-to-log log inbox-ch)]
@@ -77,7 +88,7 @@
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch opts))
+        (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
         (assoc component :id id :inbox-ch inbox-ch
                :outbox-ch outbox-ch :kill-ch kill-ch
                :restart-ch restart-ch))))

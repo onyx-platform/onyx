@@ -1,17 +1,19 @@
 (ns ^:no-doc onyx.messaging.acking-daemon
-  (:require [com.stuartsierra.component :as component]
-            [taoensso.timbre :as timbre]))
+    (:require [clojure.core.async :refer [chan >!! close!]]
+              [com.stuartsierra.component :as component]
+              [taoensso.timbre :as timbre]))
 
 (defrecord AckingDaemon []
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Acking Daemon")
-    (assoc component :ack-state (atom {})))
+    (assoc component :ack-state (atom {}) :completions-ch (chan 1000)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Acking Daemon")
-    (assoc component :ack-state nil)))
+    (close! (:completions-ch component))
+    (assoc component :ack-state nil :completions-ch nil)))
 
 (defn acking-daemon [config]
   (map->AckingDaemon {}))
@@ -27,7 +29,8 @@
                (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
     (when-let [x (get rets message-id)]
       (when (zero? (second x))
-        (prn message-id "complete")))))
+;;        (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})
+        ))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."

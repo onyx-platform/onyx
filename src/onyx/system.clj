@@ -102,5 +102,5 @@
     :acking-daemon (component/using (acking-daemon config) [:log])
     :messenger-buffer (component/using (messenger-buffer config) [:log :acking-daemon])
     :messenger (component/using (messenger-ctor config) [:acking-daemon :messenger-buffer])
-    :virtual-peer (component/using (virtual-peer config) [:log :messenger :messenger-buffer])}))
+    :virtual-peer (component/using (virtual-peer config) [:log :acking-daemon :messenger-buffer :messenger])}))
 

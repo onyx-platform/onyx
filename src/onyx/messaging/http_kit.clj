@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.http-kit
-    (:require [clojure.core.async :refer [>!! alts!! timeout]]
+    (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
               [clojure.data.fressian :as fressian]
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
@@ -9,17 +9,27 @@
               [onyx.extensions :as extensions])
     (:import [java.nio ByteBuffer]))
 
+(def send-route "/send")
+
 (def acker-route "/ack")
 
-(defn app [daemon inbound-ch request]
-  (let [thawed (fressian/read (.bytes (:body request)))]
-    (if (= (:uri request) acker-route)
-      (acker/ack-message daemon
-                         (:id thawed)
-                         (:completion-id thawed)
-                         (:ack-val thawed))
-      (doseq [message thawed]
-        (>!! inbound-ch message)))
+(def completion-route "/completion")
+
+(defn app [daemon inbound-ch release-ch request]
+  (let [thawed (fressian/read (.bytes (:body request)))
+        uri (:uri request)]
+    (cond (= uri send-route)
+          (doseq [message thawed]
+            (>!! inbound-ch message))
+
+          (= uri acker-route)
+          (acker/ack-message daemon
+                             (:id thawed)
+                             (:completion-id thawed)
+                             (:ack-val thawed))
+
+          (= uri completion-route)
+          (>!! release-ch (:id thawed)))
     {:status 200
      :headers {"Content-Type" "text/plain"}}))
 
@@ -30,16 +40,18 @@
     (taoensso.timbre/info "Starting HTTP Kit")
 
     (let [ch (:inbound-ch (:messenger-buffer component))
+          release-ch (chan (clojure.core.async/dropping-buffer 1000))
           daemon (:acking-daemon component)
           ip "0.0.0.0"
-          server (server/run-server (partial app daemon ch) {:ip ip :port 0 :thread 1 :queue-size 1000})]
-      (assoc component :server server :ip ip :port (:local-port (meta server)))))
+          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 1000})]
+      (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping HTTP Kit")
 
+    (close! (:release-ch component))
     ((:server component))
-    component))
+    (assoc component :release-ch nil)))
 
 (defn http-kit [opts]
   (map->HttpKit {:opts opts}))
@@ -60,8 +72,10 @@
 (defmethod extensions/send-messages HttpKit
   [messenger event peer-site]
   (let [messages (:onyx.core/compressed event)
+        url (:url peer-site)
+        route (format "%s%s" url send-route)
         compressed-batch (fressian/write messages)]
-    (client/post (:url peer-site) {:body (ByteBuffer/wrap (.array compressed-batch))}))
+    (client/post route {:body (ByteBuffer/wrap (.array compressed-batch))}))
   {})
 
 (defmethod extensions/internal-ack-message HttpKit
@@ -73,5 +87,10 @@
     (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 
 (defmethod extensions/internal-complete-message HttpKit
-  [messenger id])
+  [messenger id peer-id replica]
+  (let [snapshot @replica
+        url (:url (get-in replica [:peer-site peer-id]))
+        route (format "%s%s" url completion-route)
+        contents (fressian/write {:id id})]
+    (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 
