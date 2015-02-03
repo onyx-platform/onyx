@@ -1,9 +1,11 @@
 (ns onyx.plugin.hornetq
-  (:require [clojure.data.fressian :as fressian]
+  (:require [clojure.core.async :refer [go timeout <!]]
+            [clojure.data.fressian :as fressian]
             [onyx.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]
+            [onyx.messaging.acking-daemon :as acker]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
             [taoensso.timbre :refer [debug]])
@@ -53,6 +55,7 @@
 
 (defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
   [_ event]
+  (prn "Shut it down")
   (.close (:hornetq/consumer event))
   (.close (:hornetq/session event))
   (.close (:hornetq/session-factory event))
@@ -60,14 +63,21 @@
   event)
 
 (defmethod p-ext/read-batch [:input :hornetq]
-  [{:keys [onyx.core/task-map hornetq/consumer hornetq/pending-messages]}]
+  [{:keys [onyx.core/task-map hornetq/consumer hornetq/pending-messages] :as event}]
   (let [queue-name (:hornetq/queue-name task-map)
-        timeout (or (:onyx/batch-timeout task-map) 1000)]
-    (let [f (fn [] {:message (.receive consumer timeout)})
+        timeout-ms (or (:onyx/batch-timeout task-map) 1000)]
+    (let [f (fn [] {:id (acker/gen-message-id)
+                   :message (.receive consumer timeout-ms)})
           rets (filter (comp not nil? :message)
                        (take-segments f (:onyx/batch-size task-map)))]
       (doseq [m rets]
-        (swap! pending-messages assoc (:id m) (:message m)))
+        (swap! pending-messages assoc (:id m) (:message m))
+        (go (try (<! (timeout 5000))
+                 ;; (prn "Unblock")
+                 ;; (when (get @pending-messages (:id m))
+                 ;;   (p-ext/replay-message event (:id m)))
+                 (catch Exception e
+                   (taoensso.timbre/warn e)))))
       {:onyx.core/batch (or rets [])})))
 
 (defmethod p-ext/decompress-batch [:input :hornetq]
@@ -80,8 +90,9 @@
   segment)
 
 (defmethod p-ext/ack-message [:input :hornetq]
-  [{:keys [onyx.core/message-id hornetq/pending-messages] :as event}]
+  [{:keys [hornetq/pending-messages] :as event} message-id]
   (let [message (get @pending-messages message-id)]
+;;    (prn "Acking " message)
     (.acknowledge message)
     (swap! pending-messages dissoc message-id)))
 

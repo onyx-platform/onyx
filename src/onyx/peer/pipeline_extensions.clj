@@ -48,7 +48,8 @@
 (defmulti ack-message
   "Acknowledges a message at the native level for a batch of message ids.
    Must return a map."
-  type-and-medium-dispatch)
+  (fn [event message-id]
+    (type-and-medium-dispatch event)))
 
 (defmulti replay-message
   "Releases a message id from storage and replays it."

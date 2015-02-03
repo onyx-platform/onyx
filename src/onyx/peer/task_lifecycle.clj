@@ -30,9 +30,6 @@
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
     (merge event cycle-params (l-ext/inject-temporal-resources* event))))
 
-(defn add-message-id [m]
-  (assoc m :id (acker/gen-message-id)))
-
 (defn add-ack-value [m]
   (assoc m :ack-val (acker/gen-ack-value)))
 
@@ -48,7 +45,6 @@
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
     (let [event
           (-> event
-              (update-in [:onyx.core/batch] (partial map add-message-id))
               (update-in [:onyx.core/batch] (partial map add-ack-value))
               (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
               (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))]
@@ -243,7 +239,7 @@
 (defn release-messages! [messenger event]
   (loop []
     (when-let [id (<!! (:release-ch messenger))]
-      (prn "Finishing off" id)
+      (p-ext/ack-message event id)
       (recur))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]

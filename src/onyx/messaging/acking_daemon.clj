@@ -29,6 +29,7 @@
                (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
     (when-let [x (get rets message-id)]
       (when (zero? (second x))
+        (swap! (:ack-state daemon) dissoc message-id)
         (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})))))
 
 (defn gen-message-id

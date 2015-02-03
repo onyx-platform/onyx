@@ -2,6 +2,7 @@
   (:require [midje.sweet :refer :all]
             [onyx.system :refer [onyx-development-env]]
             [onyx.queue.hornetq-utils :as hq-util]
+            [onyx.plugin.hornetq]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -37,11 +38,11 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 1000)
+(def n-messages 100)
 
-(def batch-size 200)
+(def batch-size 10)
 
-(def echo 100)
+(def echo 10)
 
 (def hornetq-host "localhost")
 
@@ -59,9 +60,10 @@
 (hq-util/write! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [segment]
-  (if (number? (:n segment))
-    (assoc segment :n (inc (:n segment)))
-    []))
+  (if (= (:n segment) 50)
+    (do (prn "Chucking " segment)
+        [])
+    (assoc segment :n (inc (:n segment)))))
 
 (def catalog
   [{:onyx/name :in
@@ -101,8 +103,11 @@
 
 (def results (hq-util/read! hq-config out-queue n-messages echo))
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(comment
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
+  (onyx.api/shutdown-env env)
+
+  )
 
