@@ -40,6 +40,7 @@
   (let [config {"host" (:hornetq/host task-map) "port" (:hornetq/port task-map)}
         tc (TransportConfiguration. (.getName NettyConnectorFactory) config)
         locator (HornetQClient/createServerLocatorWithoutHA (into-array [tc]))]
+    (.setBlockOnAcknowledge locator true)
     (let [session-factory (.createSessionFactory locator)
           session (.createSession session-factory true true 0)
           consumer (.createConsumer session (:hornetq/queue-name task-map))]
@@ -55,7 +56,6 @@
 
 (defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
   [_ event]
-  (prn "Shut it down")
   (.close (:hornetq/consumer event))
   (.close (:hornetq/session event))
   (.close (:hornetq/session-factory event))
@@ -71,18 +71,18 @@
           rets (filter (comp not nil? :message)
                        (take-segments f (:onyx/batch-size task-map)))]
       (doseq [m rets]
+        (.acknowledge (:message m))
         (swap! pending-messages assoc (:id m) (:message m))
         (go (try (<! (timeout 5000))
-                 ;; (prn "Unblock")
-                 ;; (when (get @pending-messages (:id m))
-                 ;;   (p-ext/replay-message event (:id m)))
+                 (when (get @pending-messages (:id m))
+                   (p-ext/replay-message event (:id m)))
                  (catch Exception e
                    (taoensso.timbre/warn e)))))
       {:onyx.core/batch (or rets [])})))
 
 (defmethod p-ext/decompress-batch [:input :hornetq]
   [{:keys [onyx.core/batch]}]
-  (let [decompress-f #(fressian/read (.toByteBuffer (.getBodyBuffer %)))]
+  (let [decompress-f #(fressian/read (.toByteBuffer (.getBodyBufferCopy %)))]
     {:onyx.core/decompressed (map #(assoc % :message (decompress-f (:message %))) batch)}))
 
 (defmethod p-ext/apply-fn [:input :hornetq]
