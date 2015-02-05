@@ -47,7 +47,6 @@
 (defmethod p-ext/drained? [:input :core.async]
   [{:keys [core.async/pending-messages]}]
   (let [x @pending-messages]
-    (prn x)
     (and (= (count (keys x)) 1)
          (= (first (vals x)) :done))))
 

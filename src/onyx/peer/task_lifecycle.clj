@@ -61,12 +61,13 @@
 
 (defn munge-read-batch [event]
   (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
-    (doseq [m (:onyx.core/batch rets)]
-      (go (try (<! (timeout 5000))
-               (when (p-ext/pending? rets (:id m))
-                 (p-ext/replay-message event (:id m)))
-               (catch Exception e
-                 (taoensso.timbre/warn e)))))
+    (when (= (:onyx/type (:onyx.core/task-map event)) :input)
+      (doseq [m (:onyx.core/batch rets)]
+        (go (try (<! (timeout 5000))
+                 (when (p-ext/pending? rets (:id m))
+                   (p-ext/replay-message event (:id m)))
+                 (catch Exception e
+                   (taoensso.timbre/warn e))))))
     rets))
 
 (defn sentinel-found? [event]

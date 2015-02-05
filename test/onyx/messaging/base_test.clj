@@ -84,7 +84,7 @@
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(doseq [n (range 25)]
+(doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
 
 (>!! in-chan :done)
