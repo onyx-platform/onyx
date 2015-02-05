@@ -25,7 +25,7 @@
                  (p-ext/replay-message event (:id m)))
                (catch Exception e
                  (taoensso.timbre/warn e))))
-      (swap! pending-messages assoc (:id m) m))
+      (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/decompress-batch [:input :core.async]
@@ -42,12 +42,15 @@
 
 (defmethod p-ext/replay-message [:input :core.async]
   [{:keys [core.async/pending-messages core.async/replay-ch]} message-id]
-  (>!! replay-ch (:message (get @pending-messages message-id)))
+  (>!! replay-ch (get @pending-messages message-id))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/drained? [:input :core.async]
   [{:keys [core.async/pending-messages]}]
-  (not (seq @pending-messages)))
+  (let [x @pending-messages]
+    (prn x)
+    (and (= (count (keys x)) 1)
+         (= (first (vals x)) :done))))
 
 (defmethod p-ext/apply-fn [:output :core.async]
   [event segment]

@@ -63,7 +63,7 @@
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size
     :onyx/max-peers 1
-     :onyx/doc "Writes segments to a core.async channel"}])
+    :onyx/doc "Writes segments to a core.async channel"}])
 
 (def workflow [[:in :inc] [:inc :out]])
 
