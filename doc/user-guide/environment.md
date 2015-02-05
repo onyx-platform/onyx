@@ -1,6 +1,6 @@
 ## Environment
 
-In this chapter, we'll discuss what you need to test up a develop, testing, and production environment.
+In this chapter, we'll discuss what you need to set up a develop, testing, and production environment.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -71,7 +71,7 @@ Add `:zookeeper/address "127.0.0.1:<my port>"` to the peer options as usual. In-
 
 #### Example
 
-Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're not mutually exclusive - you can run, both, or neither.
+Here's an example of using both HornetQ In-VM and ZooKeeper in-memory. They're not mutually exclusive - you can run one, both, or neither.
 
 ```clojure
 (def env-config
@@ -103,7 +103,7 @@ Quick side note when you're starting up HornetQ servers - you might be tempted t
 
 #### Explanation
 
-There are a lot of options for how to run HornetQ in the cloud. If you want an educated understand of all of them, I recommend [the HornetQ 2.4.0-Final documentation](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/). 
+There are a lot of options for how to run HornetQ in the cloud. If you want to understand all of them, I recommend [the HornetQ 2.4.0-Final documentation](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/). 
 
 ##### ZooKeeper clustering
 
@@ -136,7 +136,7 @@ Let's have a look at the three node cluster that the Onyx test suite uses.
 
 There are a few things to take note of, but otherwise you can and should reuse these configuration files for your own cluster. It'll save you a lot of leg work in understanding HornetQ:
 
-- Note that the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you don't want the ports to collide.
+- Note the ports in `hornetq.remoting.netty.port` and `hornetq.remoting.netty.batch.port`. If you're running 2 or more HornetQ servers on the same machine, you don't want the ports to collide.
 - In all nodes, security is turned off via `<security-enabled>false</security-enabled>`. I presume you're running Onyx in a closed, trusted environment.
 - In Node 1 *only*, you'll find `<grouping-handler name="onyx">` with `<type>LOCAL</type>`. In all other nodes, you'll find the same grouping handler with `<type>REMOTE</type>`. Only *one* node should have a local handler. All others *must* be remote. This is used for grouping and aggregation in Onyx. You might notice this creates a single point of failure - which we'll fix later on in the Fault Tolerancy Tuning section. You can read more about why this is necessary [in this section of the HornetQ docs](http://docs.jboss.org/hornetq/2.4.0.Final/docs/user-manual/html_single/#d0e5752).
 
@@ -194,7 +194,7 @@ Remember to always provide a replica for the node running the Local grouping han
 
 #### Explanation
 
-For the most part, you're going to want to write your tests using the options described in the development environment. In the in-memory machine starts up much faster, so you'll get more development cycles. One thing you're unable to simulate with that set up, though, is running an actual HornetQ cluster as the underlying messaging system. It's critical to be able to have this if you want to test idempotency of your workflow, or you're using functionality like grouping that behaves a bit differently with a HornetQ cluster.
+For the most part, you're going to want to write your tests using the options described in the development environment. With the in-memory components, everything starts up much faster, so you'll get more development cycles. One thing you're unable to simulate with that set up, though, is running an actual HornetQ cluster as the underlying messaging system. It's critical to be able to have this if you want to test idempotency of your workflow, or you're using functionality like grouping that behaves a bit differently with a HornetQ cluster.
 
 To handle this, Onyx ships with an embedded option for HornetQ. Embedding HornetQ means spinning up one or more servers inside the application. This allows you to run a cluster without having to configure HornetQ outside your project. We use embedded HornetQ for the Onyx test suite for this reason.
 
@@ -202,13 +202,13 @@ To handle this, Onyx ships with an embedded option for HornetQ. Embedding Hornet
 
 ##### Environment Launch of Embedded HornetQ
 
-To launch one or more embedded HornetQ nodes, pass `:hornetq/server? true` to the environment options, and specify `:hornetq.server/type :embedded` in the options, too. Finally, embedded servers need a real configuration files to operate. Pass `:hornetq.embedded/config <config file 1, config file 2, ...>` to these options as well. The config file names must be available on the classpath.
+To launch one or more embedded HornetQ nodes, pass `:hornetq/server? true` to the environment options, and specify `:hornetq.server/type :embedded` in the options, too. Finally, embedded servers need real configuration files to operate. Pass `:hornetq.embedded/config <config file 1, config file 2, ...>` to these options as well. The config files named must be available on the classpath.
 
 To jump past writing these configuration files, you can use [the configuration files that Onyx uses in the test suite](https://github.com/MichaelDrogalis/onyx/tree/master/resources/hornetq).
 
 ##### Peer Connection to Embedded HornetQ
 
-Embedded HornetQ is invisible to the peer. Simply connect via the normal means as if it were a live cluster. See the example below:
+Embedded HornetQ is transparent to the peer. Simply connect via the normal means as if it were a live cluster. See the example below:
 
 #### Example
 
