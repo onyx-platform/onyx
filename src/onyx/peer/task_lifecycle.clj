@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! chan close! thread go sliding-buffer]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! <! timeout chan close! thread go sliding-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace] :as timbre]
@@ -60,7 +60,14 @@
     event))
 
 (defn munge-read-batch [event]
-  (merge event (tag-each-message (merge event (p-ext/read-batch event)))))
+  (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
+    (doseq [m (:onyx.core/batch rets)]
+      (go (try (<! (timeout 5000))
+               (when (p-ext/pending? rets (:id m))
+                 (p-ext/replay-message event (:id m)))
+               (catch Exception e
+                 (taoensso.timbre/warn e)))))
+    rets))
 
 (defn sentinel-found? [event]
   (seq (filter (partial = :done) (map :message (:onyx.core/decompressed event)))))

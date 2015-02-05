@@ -20,11 +20,6 @@
                                 :message (first (alts!! [replay-ch in-chan (timeout ms)] :priority true))}))
                    (filter (comp not nil? :message)))]
     (doseq [m batch]
-      (go (try (<! (timeout 5000))
-               (when (get @pending-messages (:id m))
-                 (p-ext/replay-message event (:id m)))
-               (catch Exception e
-                 (taoensso.timbre/warn e))))
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
@@ -44,6 +39,10 @@
   [{:keys [core.async/pending-messages core.async/replay-ch]} message-id]
   (>!! replay-ch (get @pending-messages message-id))
   (swap! pending-messages dissoc message-id))
+
+(defmethod p-ext/pending? [:input :core.async]
+  [{:keys [core.async/pending-messages]} message-id]
+  (get @pending-messages message-id))
 
 (defmethod p-ext/drained? [:input :core.async]
   [{:keys [core.async/pending-messages]}]

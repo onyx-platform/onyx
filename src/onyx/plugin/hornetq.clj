@@ -72,12 +72,7 @@
                        (take-segments f (:onyx/batch-size task-map)))]
       (doseq [m rets]
         (.acknowledge (:message m))
-        (swap! pending-messages assoc (:id m) (:message m))
-        (go (try (<! (timeout 5000))
-                 (when (get @pending-messages (:id m))
-                   (p-ext/replay-message event (:id m)))
-                 (catch Exception e
-                   (taoensso.timbre/warn e)))))
+        (swap! pending-messages assoc (:id m) (:message m)))
       {:onyx.core/batch (or rets [])})))
 
 (defmethod p-ext/decompress-batch [:input :hornetq]
@@ -100,6 +95,14 @@
   [{:keys [hornetq/pending-messages] :as event} message-id]
   (.rollback (:hornetq/session event))
   (swap! pending-messages dissoc message-id))
+
+(defmethod p-ext/pending? [:input :hornetq]
+  [{:keys [hornetq/pending-messages]} message-id]
+  (get @pending-messages message-id))
+
+(defmethod p-ext/drained? [:input :hornetq]
+  [event message-id]
+  (throw (Exception. "Not yet implemented")))
 
 (defmethod p-ext/apply-fn [:output :hornetq]
   [event segment]

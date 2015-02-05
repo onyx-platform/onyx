@@ -56,6 +56,11 @@
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 
+(defmulti pending?
+  "Returns true if this message ID is pending."
+  (fn [event messsage-id]
+    (type-and-medium-dispatch event)))
+
 (defmulti drained?
   "Returns true if this input resource has been exhausted."
   type-and-medium-dispatch)
