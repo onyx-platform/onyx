@@ -1,5 +1,5 @@
 (ns onyx.messaging.base-test
-  (:require [clojure.core.async :refer [chan >!! <!!]]
+  (:require [clojure.core.async :refer [chan >!! <!! dropping-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async]
@@ -32,9 +32,9 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 100)
+(def n-messages 1000)
 
-(def batch-size 10)
+(def batch-size 100)
 
 (defn my-inc [segment]
   (prn "-->" segment)
@@ -67,9 +67,9 @@
 
 (def workflow [[:in :inc] [:inc :out]])
 
-(def in-chan (chan 100))
+(def in-chan (chan (inc batch-size)))
 
-(def out-chan (chan 100))
+(def out-chan (chan (dropping-buffer (inc batch-size))))
 
 (defmethod l-ext/inject-lifecycle-resources :in
   [_ _] {:core.async/in-chan in-chan})
