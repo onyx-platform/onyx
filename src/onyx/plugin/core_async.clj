@@ -1,21 +1,23 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [>!! <!! alts!! timeout go <!]]
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <!]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [taoensso.timbre :refer [debug] :as timbre]))
 
 (defmethod l-ext/inject-lifecycle-resources :core.async/read-from-chan
   [_ event]
-  {:core.async/pending-messages (atom {})})
+  {:core.async/pending-messages (atom {})
+   :core.async/replay-ch (chan 1000)})
 
 (defmethod p-ext/read-batch [:input :core.async]
-  [{:keys [onyx.core/task-map core.async/in-chan core.async/pending-messages] :as event}]
+  [{:keys [onyx.core/task-map core.async/in-chan core.async/replay-ch
+           core.async/pending-messages] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         ms (or (:onyx/batch-timeout task-map) 1000)
         batch (->> (range batch-size)
                    (map (fn [_] {:id (java.util.UUID/randomUUID)
                                 :input :core.async
-                                :message (first (alts!! [in-chan (timeout ms)]))}))
+                                :message (first (alts!! [replay-ch in-chan (timeout ms)] :priority true))}))
                    (filter (comp not nil? :message)))]
     (doseq [m batch]
       (go (try (<! (timeout 5000))
@@ -36,14 +38,16 @@
 
 (defmethod p-ext/ack-message [:input :core.async]
   [{:keys [core.async/pending-messages]} message-id]
-;;  (swap! pending-messages dissoc message-id)
-  )
+  (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/replay-message [:input :core.async]
-  [{:keys [core.async/pending-messages core.async/in-chan]} message-id]
-  (timbre/info (str "Replaying " message-id))
-  (>!! in-chan (:message (get @pending-messages message-id)))
+  [{:keys [core.async/pending-messages core.async/replay-ch]} message-id]
+  (>!! replay-ch (:message (get @pending-messages message-id)))
   (swap! pending-messages dissoc message-id))
+
+(defmethod p-ext/drained? [:input :core.async]
+  [{:keys [core.async/pending-messages]}]
+  (not (seq @pending-messages)))
 
 (defmethod p-ext/apply-fn [:output :core.async]
   [event segment]

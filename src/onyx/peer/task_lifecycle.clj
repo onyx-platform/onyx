@@ -62,8 +62,31 @@
 (defn munge-read-batch [event]
   (merge event (tag-each-message (merge event (p-ext/read-batch event)))))
 
+(defn sentinel-found? [event]
+  (seq (filter (partial = :done) (:onyx.core/decompressed event))))
+
+(defn complete-job [event]
+  (prn "Job is done!"))
+
+(defn sentinel-id [event]
+  (:id (first (filter (partial = :done) (:onyx.core/decompressed event)))))
+
+(defn drop-nth [n coll]
+  (keep-indexed #(if (not= %1 n) %2) coll))
+
+(defn strip-sentinel [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+  (if-let [k (.indexOf decompressed :done)]
+    (merge event {:onyx.core/batch (drop-nth batch k)
+                  :onyx.core/decompressed (drop-nth decompressed k)})))
+
 (defn munge-decompress-batch [event]
-  (merge event (p-ext/decompress-batch event)))
+  (let [rets (merge event (p-ext/decompress-batch event))]
+    (if (sentinel-found? rets)
+      (do (if (p-ext/drained? rets)
+            (complete-job rets)
+            (p-ext/replay-message rets (sentinel-id rets)))
+          (strip-sentinel rets))
+      rets)))
 
 (defn fuse-ack-vals [task parent-ack child-ack]
   (if (= (:onyx/type task) :output)

@@ -87,6 +87,8 @@
 (doseq [n (range 25)]
   (>!! in-chan {:n n}))
 
+(>!! in-chan :done)
+
 (comment
   (doseq [v-peer v-peers]
     (onyx.api/shutdown-peer v-peer))

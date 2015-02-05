@@ -56,3 +56,7 @@
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 
+(defmulti drained?
+  "Returns true if this input resource has been exhausted."
+  type-and-medium-dispatch)
+
