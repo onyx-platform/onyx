@@ -4,7 +4,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :complete-task
-  [{:keys [args message-id]} replica]
+  [{:keys [args]} replica]
   (let [peers (get-in replica [:allocations (:job args) (:task args)])]
     (-> replica
         (update-in [:completions (:job args)] conj (:task args))
