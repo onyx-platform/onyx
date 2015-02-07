@@ -49,7 +49,7 @@ A Virtual Peer refers to a single peer process running on a single physical mach
 
 #### ZooKeeper
 
-Apache ZooKeeper is used as storage and communication layer. ZooKeeper takes care of things like CAS, consensus, leader election, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers detect machine failure.
+Apache ZooKeeper is used as both storage and communication layer. ZooKeeper takes care of things like CAS, consensus, leader election, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers detect machine failure.
 
 #### HornetQ
 
@@ -57,23 +57,23 @@ HornetQ is employed for shuttling segments between virtual peers for processing.
 
 #### The Log
 
-This design centers around a totally ordered sequence of commands using a log structure. The log acts as an immutable history and arbiter. It's maintained through ZooKeeper using a directory of persistent, sequential znodes. Virtual peers act as processes that consume from the log. At the time a peer starts up, it initializes its *local replica* to the "empty state". Log entries represent deterministic, idempotent functions to be applied to the local replica. The peer plays the log from the beginning, applying each log entry to its local replica. The local replica is transformed from one value to another. As a reaction to each replica transformation, the peer may send more commands to the tail of the log. Peers may play the log at any rate. After each peer has played `k` log entries, all peers at time `k` will have *exactly* the same local replica. Peers store everything in memory - so if a peer fails, it simply reboots from scratch with a new identifier and plays the log forward from the beginning. Since it has a new identifier, it has no association to its the commands it previously issued - preventing live lock issues.
+This design centers around a totally ordered sequence of commands using a log structure. The log acts as an immutable history and arbiter. It's maintained through ZooKeeper using a directory of persistent, sequential znodes. Virtual peers act as processes that consume from the log. At the time a peer starts up, it initializes its *local replica* to the "empty state". Log entries represent deterministic, idempotent functions to be applied to the local replica. The peer plays the log from the beginning, applying each log entry to its local replica. The local replica is transformed from one value to another. As a reaction to each replica transformation, the peer may send more commands to the tail of the log. Peers may play the log at any rate. After each peer has played `k` log entries, all peers at time `k` will have *exactly* the same local replica. Peers store everything in memory - so if a peer fails, it simply reboots from scratch with a new identifier and plays the log forward from the beginning. Since it has a new identifier, it has no association to the commands it previously issued; this prevents live lock issues.
 
 #### The Inbox and Outbox
 
 Every virtual peer maintains its own inbox and output. Messages received appear in order on the inbox, and messages to-be-sent are placed in order on the outbox.
 
-Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's current processing - hence the inbox will probably be configured with a size greater than one.
+Messages arrive in the inbox as commands are proposed into the ZooKeeper log. Technically, the inbox need only be size 1 since all log entries are processed strictly in order. As an optimization, the peer can choose to read a few extra commands behind the one it's currently processing. In practice, the inbox will probably be configured with a size greater than one.
 
 The outbox is used to send commands to the log. Certain commands processed by the peer will generate *other* commands. For example, if a peer is idle and it receives a command notifying it about a new job, the peer will *react* by sending a command to the log that it gets allocated for work. Each peer can choose to *pause* or *resume* the sending of its outbox messages. This is useful when the peer is just acquiring membership to the cluster. It will have to play log commands to join the cluster fully, but it cannot volunteer to be allocated for work since it's not officially yet a member of the cluster.
 
 ### Applying Log Entries
 
-This section describes how log entries are applied to the peer's local replica. A log entry is a persistent, sequential znode. It's content is a map with keys `:fn` and `:args`. `:fn` is mapped to a keyword that finds this log entries implementation. `:args` is mapped to another map with any data needed to apply the log entry to the replica.
+This section describes how log entries are applied to the peer's local replica. A log entry is a persistent, sequential znode. Its content is a map with keys `:fn` and `:args`. `:fn` is mapped to a keyword that finds this log entry's implementation. `:args` is mapped to another map with any data needed to apply the log entry to the replica.
 
 Peers begin with the empty state value, and local state. Local state maintains a mapping of things like the inbox and outbox - things that are specific to *this* peer, and presumably can't be serialized as EDN.
 
-Each virtual peer starts a thread that listens for additions to the log. When it the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
+Each virtual peer starts a thread that listens for additions to the log. When the log gets a new entry, the peer calls `onyx.extensions/apply-log-entry`. This is a function that takes a log entry and the replica, and returns a new replica with the log entry applied to it. This is a value-to-value transformation.
 
 <img src="/doc/design/images/diagram-1.png" height="75%" width="75%">
 
@@ -87,26 +87,26 @@ Each virtual peer starts a thread that listens for additions to the log. When it
 
 *Because application of functions from the log against the replica are deterministic and free of side effects, peers do not need to coordinate about the speed that each plays the log. Peers read the log on completely independent timelines*
 
-Peers affect change in the world by reacting to log entries. When a log entry is applied, the peer calls `onyx.extensions/replica-diff`, passing it the old and new replicas. The peer produces a value summarization of what changed. This diff is used in subsequent sections to decide how to react and what side-effects to carry out.
+Peers effect change in the world by reacting to log entries. When a log entry is applied, the peer calls `onyx.extensions/replica-diff`, passing it the old and new replicas. The peer produces a value summarizing what changed. This diff is used in subsequent sections to decide how to react and what side-effects to carry out.
 
-Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the diff, and it's local state. The peer can decide to submit new entries back to the log as a reaction to the log entry it just saw. It might react to "submit-job" with "volunteer-for-task", for instance.
+Next, the peer calls `onyx.extensions/reactions` on the old/new replicas, the diff, and its local state. The peer can decide to submit new entries back to the log as a reaction to the log entry it just saw. It might react to "submit-job" with "volunteer-for-task", for instance.
 
 <img src="/doc/design/images/diagram-5.png" height="85%" width="85%">
 
-*After a peer reads a lot entry and applies it to the log replica, it will (deterministically!) react by appending zero or more log entries to the tail of the log.*
+*After a peer reads a log entry and applies it to the log replica, it will (deterministically!) react by appending zero or more log entries to the tail of the log.*
 
 Finally, the peer can carry out side-effects by invoking `onyx.extensions/fire-side-effects!`. This function will do things like talking to ZooKeeper or writing to core.async channels. Isolating side effects means that a subset of the test suite can operate on pure functions alone. Each peer is tagged with a unique ID, and it looks for this ID in changes to its replica. The ID acts very much like the object orientated "this", in that it uses the ID to differentiate itself to conditionally perform side effects across an otherwise uniformly behaving distributed system.
 
 ### Joining the Cluster
 
-Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper will maintains another directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
+Aside from the log structure and any strictly data/storage centric znodes, ZooKeeper maintains another directory for pulses. Each virtual peer registers exactly one ephemeral node in the pulses directory. The name of this znode is a UUID.
 
 #### 3-Phase Cluster Join Strategy
 
 When a peer wishes to join the cluster, it must engage in a 3 phase protocol. Three phases are required because the peer that is joining needs to coordinate with another peer to change its ZooKeeper watch. I call this process "stitching" a peer into the cluster.
 
 The technique needs peers to play by the following rules:
-  - Every peer must be watched by another peer in ZooKeeper, unless there is exactly one peer in the cluster - in which cases there are no watches.
+  - Every peer must be watched by another peer in ZooKeeper, unless there is exactly one peer in the cluster - in which case there are no watches.
   - When a peer joins the cluster, all peers must form a "ring" in terms of who-watches-who. This makes failure repair very easy because peers can transitively close any gaps in the ring after machine failure.
   - As a peer joining the cluster begins playing the log, it must buffer all reactive messages unless otherwise specified. The buffered messages are flushed after the peer has fully joined the cluster. This is because a peer could volunteer to perform work, but later abort its attempt to join the cluster, and therefore not be able to carry out any work.
   - A peer picks another peer to watch by determining a candidate list of peers it can stitch into. This candidate list is sorted by peer ID. The target peer is chosen by taking the message id modulo the number of peers in the sorted candidate list. The peer chosen can't be random because all peers will play the message to select a peer to stitch with, and they must all determine the same peer. Hence, the message modulo piece is a sort of "random seed" trick.
@@ -120,6 +120,9 @@ The algorithm works as follows:
 - S sends a `prepare-join-cluster` command to the log, indicating its peer ID
 - S plays the log forward
 - Eventually, all peers encounter `prepare-join-cluster` message that was sent by it
+- if the cluster size is `0`:
+  - S instantly becomes part of the cluster
+  - S flushes its outbox of commands
 - if the cluster size (`n`) is `>= 1`:
   - let Q = this peer playing the log entry
   - let A = the set of all peers in the fully joined in the cluster
@@ -139,10 +142,7 @@ The algorithm works as follows:
     - it sends a `accept-join-cluster` command, removing S from P, adding S to A
   - when `accept-join-cluster` has been encountered, this peer is part of the cluster
   - S flushes its outbox of commands
-  - T drops it watch from W - it is now redundant, as S is watching Q
-- if the cluster size is `0`:
-  - S instantly becomes part of the cluster
-  - S flushes its outbox of commands
+  - T drops its watch from W - it is now redundant, as S is watching W
 
 <img src="/doc/design/images/diagram-13.png" height="85%" width="85%">
 
@@ -158,7 +158,7 @@ The algorithm works as follows:
 
 <img src="/doc/design/images/diagram-16.png" height="85%" width="85%">
 
-*Peer 5 has been fully stitched into the cluster, and the ring is in tact*
+*Peer 5 has been fully stitched into the cluster, and the ring is intact*
 
 #### Examples
 
@@ -183,7 +183,7 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 
 <img src="/doc/design/images/diagram-8.png" height="55%" width="55%">
 
-*The nodes form a typical ring pattern. Peer 5 dies, and it's connection with ZooKeeper is severed. Peer 1 reacts by reporting Peer 5's death to the log. Continued below...*
+*The nodes form a typical ring pattern. Peer 5 dies, and its connection with ZooKeeper is severed. Peer 1 reacts by reporting Peer 5's death to the log. Continued below...*
 
 <img src="/doc/design/images/diagram-9.png" height="85%" width="85%">
 
@@ -199,7 +199,7 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 
 <img src="/doc/design/images/diagram-12.png" height="85%" width="85%">
 
-*Peer 1 signals peer 4's death, and further closes to the ring by adding a watch to Peer 3. The ring is now fully in-tact.*
+*Peer 1 signals peer 4's death, and further closes to the ring by adding a watch to Peer 3. The ring is now fully intact.*
 
 #### Examples
 
@@ -238,7 +238,7 @@ As long as a HornetQ consumer is connected to a queue on a HornetQ server, it wi
 
 ### Virtual Peer Task Execution
 
-One virtual peer may be executing at most executing one task. This section describes what activities the peer carries out during execution.
+One virtual peer may be executing at most one task. This section describes what activities the peer carries out during execution.
 
 #### Phases of Execution
 
@@ -262,7 +262,7 @@ The Peer process is extensively pipelined for performance reasons. As it turns o
 
 To talk about why this helps, we need an understanding of what properties Onyx requires to be correct and how HornetQ works. Onyx offers both concurrent and sequential processing. In the case of sequential processing, it's critical that we never jumble up the order that the messages are streamed in.
 
-When we produce and consume messages using HornetQ, we do so in the context of a "session". Onyx strictly uses transactional HornetQ sessions. That means we can move messages between queues *atomically*. That's how Onyx is able to offer it's transactional semantics. HornetQ sessions, as it ends up, are hostile to being accessed by multiple threads. In fact, HornetQ sessions have built in detection for being accessed concurrently. An exception will be thrown indicating that this is happening.
+When we produce and consume messages using HornetQ, we do so in the context of a "session". Onyx strictly uses transactional HornetQ sessions. That means we can move messages between queues *atomically*. That's how Onyx is able to offer its transactional semantics. HornetQ sessions, as it ends up, are hostile to being accessed by multiple threads. In fact, HornetQ sessions have built in detection for being accessed concurrently. An exception will be thrown indicating that this is happening.
 
 So in order to go fast and preserve message order for sequential processing, we *pipeline* the virtual peer. The trick with HornetQ is to understand that it's not the case that a session only ever needs to run on one thread - but that only a single thread can be using the session at an instance in time. In the case of using a session strictly serially as you suggested, we would: open the session, start the transaction, read messages off the queue, decompress messages, apply functions to messages, compress messages, and write messages back to the queue. There are more steps, but the point is that each of these steps can run on their *own* thread. The first step of the pipeline is to create a HornetQ session. Since each stage of the pipeline can only operate on one thing at a time, we're guaranteed that each HornetQ session is isolated to one thread at a time. At the same time, the process is still basically serial. Messages are processed in order. This is how Onyx efficiently utilizes all the cores of the box. If the box has 4 cores with 4 hyper-threads, 16 concurrent activities can run without much CPU contention.
 
@@ -274,7 +274,7 @@ Each virtual peer's task lifecycle maintains one atom that it uses for local sta
 
 ### Sentinel Values in a Distributed Setting
 
-One of the challenges in working with distributed systems is the property that messages can be delayed, duplicated, dropped, and reordered. For the most part, HornetQ's transactions aid with a lot of these concerns. One particularly difficult point, though, is the notion of "sealing". In order to propagate the sentinel value from one queue to the next, all of the segments must be processed. This is the key attribute that allows for at-least-once processing semantics. Unfortunately, in-between the time that each peer asks if it can seal, and by time it actually does seal and reports back, the peer can be fail. Worse yet, we have no way of knowing whether it successfully wrote the sentinel to the next queue. Therefore, we need to make this operation idempotent and handle multiple sentinel values. We also need to be able to handle sentinel values that appear in the middle of the queue due to the way HornetQ load balances.
+One of the challenges in working with distributed systems is the property that messages can be delayed, duplicated, dropped, and reordered. For the most part, HornetQ's transactions aid with a lot of these concerns. One particularly difficult point, though, is the notion of "sealing". In order to propagate the sentinel value from one queue to the next, all of the segments must be processed. This is the key attribute that allows for at-least-once processing semantics. Unfortunately, in-between the time that each peer asks if it can seal, and by time it actually does seal and reports back, the peer can fail. Worse yet, we have no way of knowing whether it successfully wrote the sentinel to the next queue. Therefore, we need to make this operation idempotent and handle multiple sentinel values. We also need to be able to handle sentinel values that appear in the middle of the queue due to the way HornetQ load balances.
 
 #### Sentinel-in-the-Middle
 
@@ -284,7 +284,7 @@ We could requeue this sentinel and place it at the back of the queue. If we did 
 
 #### Leader Election
 
-Each sentinel value is marked with metadata when it is put on HornetQ. Specifically, each sentinel carries a UUID to uniquely identify it. When a peer encounters a sentinel for the first time in its lifecycle of a task, it tries to write the UUID of the sentinel to ZooKeeper. The semantics of ZooKeeper are such that multiple writers can try to write to the same znode, but only one will succeed. This guarantees that exactly one leader will be picked. After the peer writes, or votes, for the UUID, it immediately reads from ZooKeeper to see what the leaders UUID is. It caches the leader's UUID locally, since it will not change. If the sentinel it is holding matches the leader's UUID, it requeues the sentinel so that others may find it. If it does not match, the sentinel is discarded. Hence, the number of sentinels on an ingress queue converges towards 1.
+Each sentinel value is marked with metadata when it is put on HornetQ. Specifically, each sentinel carries a UUID to uniquely identify it. When a peer encounters a sentinel for the first time in its lifecycle of a task, it tries to write the UUID of the sentinel to ZooKeeper. The semantics of ZooKeeper are such that multiple writers can try to write to the same znode, but only one will succeed. This guarantees that exactly one leader will be picked. After the peer writes, or votes, for the UUID, it immediately reads from ZooKeeper to see what the leader's UUID is. It caches the leader's UUID locally, since it will not change. If the sentinel it is holding matches the leader's UUID, it requeues the sentinel so that others may find it. If it does not match, the sentinel is discarded. Hence, the number of sentinels on an ingress queue converges towards 1.
 
 ![Election](img/election.png)
 
@@ -308,7 +308,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Submitter: peer (P) that wants to join the cluster
 - Purpose: determines which peer (Q) that will watch P. If P is the only peer, it instantly fully joins the cluster
 - Arguments: P's ID
-- Replica update: assoc `{Q P}` to `:prepare` key. If P is the only P, P is immediately added to the `:peers` key, and no further reactions are taken
+- Replica update: assoc `{Q P}` to `:prepare` key. If P is the only peer, P is immediately added to the `:peers` key, and no further reactions are taken
 - Side effects: Q adds a ZooKeeper watch to P's pulse node
 - Reactions: Q sends `notify-join-cluster` to the log, with args P and R (R being the peer Q watches currently)
 

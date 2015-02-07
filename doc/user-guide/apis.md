@@ -74,10 +74,6 @@ to Onyx, the peer might need to block and wait for another event. This function 
 `:onyx.core/start-lifecycle?` and a boolean value. If true, the task will begin executing. If false, the peer will back off
 for `:onyx.peer/retry-start-interval` before recalling `start-lifecycle?`.
 
-##### `start-lifecycle?`
-
-Returns true if it's okay for this peer to start this task. If false, the peer will back off and sleep for a configurable period of time before calling this function again. Useful for lock acquisition.
-
 ##### `inject-lifecycle-resources`
 
 Adds data once to the start of a peer's task execution. This data can be accessed in every iteration of the pipeline.
