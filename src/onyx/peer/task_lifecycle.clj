@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! timeout chan close! thread go sliding-buffer]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! <! timeout chan close! thread go dropping-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace] :as timbre]
@@ -15,9 +15,7 @@
               [onyx.extensions :as extensions]
               [onyx.plugin.hornetq]))
 
-(def restartable-exceptions
-  [org.hornetq.api.core.HornetQNotConnectedException
-   org.hornetq.api.core.HornetQInternalErrorException])
+(def restartable-exceptions [])
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
@@ -25,10 +23,6 @@
 
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
-
-(defn munge-inject-temporal [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params (l-ext/inject-temporal-resources* event))))
 
 (defn add-ack-value [m]
   (assoc m :ack-val (acker/gen-ack-value)))
@@ -59,17 +53,6 @@
       event)
     event))
 
-(defn munge-read-batch [event]
-  (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
-    (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-      (doseq [m (:onyx.core/batch rets)]
-        (go (try (<! (timeout 5000))
-                 (when (p-ext/pending? rets (:id m))
-                   (p-ext/replay-message event (:id m)))
-                 (catch Exception e
-                   (taoensso.timbre/warn e))))))
-    rets))
-
 (defn sentinel-found? [event]
   (seq (filter (partial = :done) (map :message (:onyx.core/decompressed event)))))
 
@@ -86,15 +69,6 @@
   (if-let [k (.indexOf (map :message decompressed) :done)]
     (merge event {:onyx.core/batch (drop-nth k batch)
                   :onyx.core/decompressed (drop-nth k decompressed)})))
-
-(defn munge-decompress-batch [event]
-  (let [rets (merge event (p-ext/decompress-batch event))]
-    (if (sentinel-found? rets)
-      (do (if (p-ext/drained? rets)
-            (complete-job rets)
-            (p-ext/replay-message rets (sentinel-id rets)))
-          (strip-sentinel rets))
-      rets)))
 
 (defn fuse-ack-vals [task parent-ack child-ack]
   (if (= (:onyx/type task) :output)
@@ -118,7 +92,43 @@
     (repeat (count segments) nil)
     (map (fn [x] (acker/gen-ack-value)) segments)))
 
-(defn munge-apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn with-clean-up [f ch dead-ch release-f exception-f]
+  (try
+    (f)
+    (catch Exception e
+      (exception-f e)
+      (close! ch)
+      ;; Unblock any blocked puts
+      (<!! ch))
+    (finally
+     (>!! dead-ch true)
+     (release-f))))
+
+(defn inject-temporal-resources [event]
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
+    (merge event cycle-params (l-ext/inject-temporal-resources* event))))
+
+(defn read-batch [event]
+  (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
+    (when (= (:onyx/type (:onyx.core/task-map event)) :input)
+      (doseq [m (:onyx.core/batch rets)]
+        (go (try (<! (timeout 5000))
+                 (when (p-ext/pending? rets (:id m))
+                   (p-ext/replay-message event (:id m)))
+                 (catch Exception e
+                   (taoensso.timbre/warn e))))))
+    rets))
+
+(defn decompress-batch [event]
+  (let [rets (merge event (p-ext/decompress-batch event))]
+    (if (sentinel-found? rets)
+      (do (if (p-ext/drained? rets)
+            (complete-job rets)
+            (p-ext/replay-message rets (sentinel-id rets)))
+          (strip-sentinel rets))
+      rets)))
+
+(defn apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (if (seq decompressed)
     (let [rets
           (merge event
@@ -144,20 +154,16 @@
       rets)
     (merge event {:onyx.core/results []})))
 
-(defn munge-compress-batch [event]
+(defn compress-batch [event]
   (merge event (p-ext/compress-batch event)))
 
-(defn munge-write-batch [event]
+(defn write-batch [event]
   (merge event (p-ext/write-batch event)))
 
-(defn munge-close-temporal-resources [event]
+(defn close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
 
-(defn munge-close-resources
-  [event]
-  event)
-
-(defn munge-seal-resource
+(defn seal-output-targets
   [{:keys [onyx.core/pipeline-state onyx.core/outbox-ch
            onyx.core/seal-response-ch] :as event}]
   (when (:onyx.core/tail-batch? event)
@@ -177,93 +183,7 @@
                         :job (:onyx.core/job-id event)
                         :task (:onyx.core/task-id event)}
                   entry (entry/create-log-entry :complete-task args)]
-              (>!! outbox-ch entry)))))))
-  event)
-
-(defn with-clean-up [f ch dead-ch release-f exception-f]
-  (try
-    (f)
-    (catch Exception e
-      (exception-f e)
-      (close! ch)
-      ;; Unblock any blocked puts
-      (<!! ch))
-    (finally
-     (>!! dead-ch true)
-     (release-f))))
-
-(defn inject-temporal-loop [read-ch kill-ch pipeline-data dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when (first (alts!! [kill-ch] :default true))
-         (let [state @(:onyx.core/pipeline-state pipeline-data)]
-           (>!! read-ch (munge-inject-temporal pipeline-data)))
-         (recur)))
-    kill-ch dead-ch release-f exception-f))
-
-(defn read-batch-loop [read-ch decompress-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! read-ch)]
-         (>!! decompress-ch (munge-read-batch event))
-         (recur)))
-    read-ch dead-ch release-f exception-f))
-
-(defn decompress-batch-loop [decompress-ch apply-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! decompress-ch)]
-         (>!! apply-ch (munge-decompress-batch event))
-         (recur)))
-    decompress-ch dead-ch release-f exception-f))
-
-(defn apply-fn-loop [apply-fn-ch compress-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! apply-fn-ch)]
-         (>!! compress-ch (munge-apply-fn event))
-         (recur)))
-    apply-fn-ch dead-ch release-f exception-f))
-
-(defn compress-batch-loop [compress-ch write-batch-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! compress-ch)]
-         (>!! write-batch-ch (munge-compress-batch event))
-         (recur)))
-    compress-ch dead-ch release-f exception-f))
-
-(defn write-batch-loop [write-ch close-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! write-ch)]
-         (>!! close-ch (munge-write-batch event))
-         (recur)))
-    write-ch dead-ch release-f exception-f))
-
-(defn close-resources-loop [close-ch close-temporal-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! close-ch)]
-         (>!! close-temporal-ch (munge-close-resources event))
-         (recur)))
-    close-ch dead-ch release-f exception-f))
-
-(defn close-temporal-loop [close-temporal-ch seal-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! close-temporal-ch)]
-         (>!! seal-ch (munge-close-temporal-resources event))
-         (recur)))
-    close-temporal-ch dead-ch release-f exception-f))
-
-(defn seal-resource-loop [seal-ch dead-ch release-f exception-f]
-  (with-clean-up
-    #(loop []
-       (when-let [event (<!! seal-ch)]
-         (munge-seal-resource event)
-         (recur)))
-    seal-ch dead-ch release-f exception-f))
+              (>!! outbox-ch entry))))))))
 
 (defn release-messages! [messenger event]
   (loop []
@@ -278,73 +198,30 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
+(defn run-task-lifecycle [init-event kill-ch]
+  (loop [event init-event]
+    (when [alts!! [kill-ch] :default false]
+      (-> event
+          (inject-temporal-resources)
+          (read-batch)
+          (decompress-batch)
+          (apply-fn)
+          (compress-batch)
+          (write-batch)
+          (close-temporal-resources)
+          (seal-output-targets))
+      (recur init-event))))
+
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
   (start [component]
     (try
-      (let [open-session-kill-ch (chan 0)
-
-            read-batch-ch (chan 0)
-            decompress-batch-ch (chan 0)
-            apply-fn-ch (chan 0)
-            compress-batch-ch (chan 0)
-            write-batch-ch (chan 0)
-            close-resources-ch (chan 0)
-            close-temporal-ch (chan 0)
-            seal-ch (chan 0)
-
-            open-session-dead-ch (chan (sliding-buffer 1))
-            read-batch-dead-ch (chan (sliding-buffer 1))
-            decompress-batch-dead-ch (chan (sliding-buffer 1))
-            apply-fn-dead-ch (chan (sliding-buffer 1))
-            compress-batch-dead-ch (chan (sliding-buffer 1))
-            write-batch-dead-ch (chan (sliding-buffer 1))
-            close-resources-dead-ch (chan (sliding-buffer 1))
-            close-temporal-dead-ch (chan (sliding-buffer 1))
-            seal-dead-ch (chan (sliding-buffer 1))
-
-            release-fn! (fn []
-                          (close! open-session-kill-ch)
-                          (<!! open-session-dead-ch)
-
-                          (close! read-batch-ch)
-                          (<!! read-batch-dead-ch)
-
-                          (close! decompress-batch-ch)
-                          (<!! decompress-batch-dead-ch)
-
-                          (close! apply-fn-ch)
-                          (<!! apply-fn-dead-ch)
-
-                          (close! compress-batch-ch)
-                          (<!! compress-batch-dead-ch)
-
-                          (close! write-batch-ch)
-                          (<!! write-batch-dead-ch)
-
-                          (close! close-resources-ch)
-                          (<!! close-resources-dead-ch)
-    
-                          (close! close-temporal-ch)
-                          (<!! close-temporal-dead-ch)
-
-                          (close! seal-ch)
-                          (<!! seal-dead-ch)
-
-                          (close! open-session-dead-ch)
-                          (close! read-batch-dead-ch)
-                          (close! decompress-batch-dead-ch)
-                          (close! apply-fn-dead-ch)
-                          (close! compress-batch-dead-ch)
-                          (close! write-batch-dead-ch)
-                          (close! close-resources-dead-ch)
-                          (close! close-temporal-dead-ch)
-                          (close! seal-dead-ch))
-
-            catalog (extensions/read-chunk log :catalog job-id)
+      (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             catalog-entry (find-task catalog (:name task))
+
+            kill-ch (chan (dropping-buffer 1))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
 
@@ -379,51 +256,18 @@
           (Thread/sleep 2000))
 
         (thread (release-messages! messenger pipeline-data))
+        (thread (run-task-lifecycle pipeline-data kill-ch))
 
-        (assoc component
-          :open-session-kill-ch open-session-kill-ch
-          :read-batch-ch read-batch-ch
-          :decompress-batch-ch decompress-batch-ch
-          :apply-fn-ch apply-fn-ch
-          :compress-batch-ch compress-batch-ch
-          :write-batch-ch write-batch-ch
-          :close-resources-ch close-resources-ch
-          :close-temporal-ch close-temporal-ch
-          :seal-ch seal-ch
-
-          :open-session-dead-ch open-session-dead-ch
-          :read-batch-dead-ch read-batch-dead-ch
-          :decompress-batch-dead-ch decompress-batch-dead-ch
-          :apply-fn-dead-ch apply-fn-dead-ch
-          :compress-batch-dead-ch compress-batch-dead-ch
-          :write-batch-dead-ch write-batch-dead-ch
-          :close-resources-dead-ch close-resources-dead-ch
-          :close-temporal-dead-ch close-temporal-dead-ch
-          :seal-dead-ch seal-dead-ch
-
-          :inject-temporal-loop (thread (inject-temporal-loop read-batch-ch open-session-kill-ch pipeline-data open-session-dead-ch release-fn! ex-f))
-          :read-batch-loop (thread (read-batch-loop read-batch-ch decompress-batch-ch read-batch-dead-ch release-fn! ex-f))
-          :decompress-batch-loop (thread (decompress-batch-loop decompress-batch-ch apply-fn-ch decompress-batch-dead-ch release-fn! ex-f))
-          :apply-fn-loop (thread (apply-fn-loop apply-fn-ch compress-batch-ch apply-fn-dead-ch release-fn! ex-f))
-          :compress-batch-loop (thread (compress-batch-loop compress-batch-ch write-batch-ch compress-batch-dead-ch release-fn! ex-f))
-          :write-batch-loop (thread (write-batch-loop write-batch-ch close-resources-ch write-batch-dead-ch release-fn! ex-f))
-          :close-resources-loop (thread (close-resources-loop close-resources-ch close-temporal-ch close-resources-dead-ch release-fn! ex-f))
-          :close-temporal-loop (thread (close-temporal-loop close-temporal-ch seal-ch close-temporal-dead-ch release-fn! ex-f))
-          :seal-resource-loop (thread (seal-resource-loop seal-ch seal-dead-ch release-fn! ex-f))
-
-          :release-fn! release-fn!
-          :pipeline-data pipeline-data))
+        (assoc component :pipeline-data pipeline-data :kill-ch kill-ch))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
-
-    (when-let [f (:release-fn! component)]
-      (f))
-    
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
+
+    (>!! (:kill-ch component))
 
     component))
 
@@ -439,39 +283,35 @@
     (when-not start-lifecycle?
       (timbre/info (format "[%s / %s] Sequential task currently has queue consumers. Backing off and retrying..." id lifecycle-id)))))
 
-(dire/with-post-hook! #'munge-inject-temporal
+(dire/with-post-hook! #'inject-temporal-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
 
-(dire/with-post-hook! #'munge-read-batch
+(dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
-(dire/with-post-hook! #'munge-decompress-batch
+(dire/with-post-hook! #'decompress-batch
   (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
 
-(dire/with-post-hook! #'munge-apply-fn
+(dire/with-post-hook! #'apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
 
-(dire/with-post-hook! #'munge-compress-batch
+(dire/with-post-hook! #'compress-batch
   (fn [{:keys [onyx.core/id onyx.core/compressed onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Compressed %s segments" id lifecycle-id (count compressed)))))
 
-(dire/with-post-hook! #'munge-write-batch
+(dire/with-post-hook! #'write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/compressed]}]
     (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count compressed)))))
 
-(dire/with-post-hook! #'munge-close-resources
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed resources" id lifecycle-id))))
-
-(dire/with-post-hook! #'munge-close-temporal-resources
+(dire/with-post-hook! #'close-temporal-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
 
-(dire/with-post-hook! #'munge-seal-resource
+(dire/with-post-hook! #'seal-output-targets
   (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed? onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
 
