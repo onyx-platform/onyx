@@ -1,10 +1,10 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-  (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close!]]
-            [com.stuartsierra.component :as component]
-            [taoensso.timbre :as timbre]
-            [onyx.extensions :as extensions]
-            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
-            [onyx.log.entry :refer [create-log-entry]]))
+    (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close!]]
+              [com.stuartsierra.component :as component]
+              [taoensso.timbre :as timbre]
+              [onyx.extensions :as extensions]
+              [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+              [onyx.log.entry :refer [create-log-entry]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (if (:stall-output? state)
@@ -58,6 +58,11 @@
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
+      ;; Race to write the job scheduler to durable storage so that
+      ;; non-peers subscribers can discover which job scheduler to use.
+      ;; Only one peer will succeed, and only one needs to.
+      (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
+
       (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
             kill-ch (chan 1)
@@ -65,7 +70,6 @@
             entry (create-log-entry :prepare-join-cluster {:joiner id})
             origin (extensions/subscribe-to-log log inbox-ch)]
         (extensions/register-pulse log id)
-
         (>!! outbox-ch entry)
 
         (thread (outbox-loop id log outbox-ch))
