@@ -23,13 +23,7 @@
    :onyx.messaging/impl messaging})
 
 (def peer-config
-  {:hornetq/mode :udp
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
+  {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
@@ -95,7 +89,7 @@
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def results (repeatedly n-messages (fn [] (<!! out-chan))))
+(def results (doall (repeatedly n-messages (fn [] (<!! out-chan)))))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

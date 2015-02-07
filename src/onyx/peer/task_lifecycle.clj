@@ -200,7 +200,7 @@
 
 (defn run-task-lifecycle [init-event kill-ch]
   (loop [event init-event]
-    (when [alts!! [kill-ch] :default false]
+    (when (first (alts!! [kill-ch] :default true))
       (-> event
           (inject-temporal-resources)
           (read-batch)
@@ -267,7 +267,7 @@
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
-    (>!! (:kill-ch component))
+    (close! (:kill-ch component))
 
     component))
 
