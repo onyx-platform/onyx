@@ -1,8 +1,9 @@
 (ns onyx.peer.single-peer-test
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.system :refer [onyx-development-env]]
+            [onyx.plugin.core-async]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -74,7 +75,7 @@
 
 (def in-chan (chan (inc n-messages)))
 
-(def out-chan (chan (inc n-messages)))
+(def out-chan (chan (sliding-buffer (inc n-messages))))
 
 (defmethod l-ext/inject-lifecycle-resources :in
   [_ _] {:core.async/in-chan in-chan})
@@ -93,6 +94,9 @@
  peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
+
+(doseq [_ (range n-messages)]
+  (prn (<!! out-chan)))
 
 (comment
  (doseq [v-peer v-peers]
