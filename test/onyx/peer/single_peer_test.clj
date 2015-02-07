@@ -95,16 +95,15 @@
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(doseq [_ (range n-messages)]
-  (prn (<!! out-chan)))
+(def results (repeatedly n-messages (fn [] (<!! out-chan))))
 
-(comment
- (doseq [v-peer v-peers]
-   (onyx.api/shutdown-peer v-peer))
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
 
- #_(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-     (fact (set (butlast results)) => expected)
-     (fact (last results) => :done))
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set results) => expected)
+;  (fact (last results) => :done)
+  )
 
- (onyx.api/shutdown-env env))
+(onyx.api/shutdown-env env)
 
