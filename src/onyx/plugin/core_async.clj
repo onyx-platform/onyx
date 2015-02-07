@@ -13,7 +13,7 @@
   [{:keys [onyx.core/task-map core.async/in-chan core.async/replay-ch
            core.async/pending-messages] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
-        ms (or (:onyx/batch-timeout task-map) 1000)
+        ms (or (:onyx/batch-timeout task-map) 50)
         batch (->> (range batch-size)
                    (map (fn [_] {:id (java.util.UUID/randomUUID)
                                 :input :core.async

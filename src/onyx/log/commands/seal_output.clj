@@ -2,7 +2,9 @@
   (:require [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :seal-output
-  [{:keys [args]} replica])
+  [{:keys [args]} replica]
+  ;;; All outputs sealed? Job is done
+  (assoc-in replica [:sealed-outputs (:job args) (:task args)] true))
 
 (defmethod extensions/replica-diff :seal-output
   [entry old new]

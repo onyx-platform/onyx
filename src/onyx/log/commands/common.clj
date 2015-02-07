@@ -381,3 +381,20 @@
   [old new diff state]
   (volunteer-via-completed-task? old new diff state))
 
+(defn all-inputs-exhausted? [replica id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)
+        all (get-in replica [:input-tasks job])
+        exhausted (get-in replica [:exhausted-inputs job])]
+    (= (into #{} all) (into #{} exhausted))))
+
+(defn executing-output-task? [replica id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)]
+    (some #{task} (get-in replica [:output-tasks job]))))
+
+(defn elected-sealer? [replica id message-id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)
+        peers (get-in replica [:allocations job task])]
+    (when (pos? (count peers))
+      (let [n (mod message-id (count peers))]
+        (= (nth peers n) id)))))
+

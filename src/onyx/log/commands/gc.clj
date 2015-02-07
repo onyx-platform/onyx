@@ -20,7 +20,9 @@
           (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:saturation] dissoc job)) x jobs))))
+          (reduce (fn [new job] (update-in new [:saturation] dissoc job)) x jobs)
+          (reduce (fn [new job] (update-in new [:input-tasks] dissoc job)) x jobs)
+          (reduce (fn [new job] (update-in new [:output-tasks] dissoc job)) x jobs))))
 
 (defmethod extensions/replica-diff :gc
   [entry old new]

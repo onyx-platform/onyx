@@ -56,8 +56,12 @@
 (defn sentinel-found? [event]
   (seq (filter (partial = :done) (map :message (:onyx.core/decompressed event)))))
 
-(defn complete-job [event]
-  (prn "Job is done!"))
+(defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event}]
+  (when-not (:exhausted? @(:onyx.core/pipeline-state event))
+    (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
+      (>!! (:onyx.core/outbox-ch event) entry)
+      (prn "Sent complete job log entry")
+      (swap! (:onyx.core/pipeline-state event) assoc :exhausted? true))))
 
 (defn sentinel-id [event]
   (:id (first (filter #(= :done (:message %)) (:onyx.core/decompressed event)))))

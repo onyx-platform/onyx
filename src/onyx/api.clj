@@ -81,6 +81,18 @@
   (let [job-updated (add-job-percentage config job args)]
     (add-task-percentage job-updated job-id tasks catalog)))
 
+(defn find-input-tasks [catalog tasks]
+  (map :id (filter (fn [task]
+                     (let [task (planning/find-task catalog (:name task))]
+                       (= :input (:onyx/type task))))
+                   tasks)))
+
+(defn find-output-tasks [catalog tasks]
+  (map :id (filter (fn [task]
+                     (let [task (planning/find-task catalog (:name task))]
+                       (= :output (:onyx/type task))))
+                   tasks)))
+
 (defn submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
@@ -93,8 +105,11 @@
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)
+        input-task-ids (find-input-tasks (:catalog job) tasks)
+        output-task-ids (find-output-tasks (:catalog job) tasks)
         args {:id id :tasks task-ids :task-scheduler scheduler
-              :saturation sat :task-saturation task-saturation}
+              :saturation sat :task-saturation task-saturation
+              :inputs input-task-ids :outputs output-task-ids}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
