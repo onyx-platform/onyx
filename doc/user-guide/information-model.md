@@ -40,11 +40,11 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 
 #### All maps may optionally have these keys
 
-| key name             | type       | choices   | default
-|----------------------|------------|---------------------
-|`:onyx/ident`         | `keyword`  | `any`     |
-|`:onyx/batch-timeout` | `integer`  | `>= 0`    | 1000
-|`:onyx/max-peers`     | `integer`  | `> 0`     |
+| key name             | type       | choices                          | default
+|----------------------|------------|----------------------------------|--------
+|`:onyx/ident`         | `keyword`  | `any`                            |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`                           | 1000
+|`:onyx/max-peers`     | `integer`  | `> 0`                            |
 
 #### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 

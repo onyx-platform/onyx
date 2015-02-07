@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal]]
+            [taoensso.timbre :refer [fatal warn]]
             [zookeeper :as zk]
             [onyx.extensions :as extensions])
   (:import [org.apache.curator.test TestingServer]))
@@ -33,6 +33,9 @@
 (defn origin-path [prefix]
   (str (prefix-path prefix) "/origin"))
 
+(defn job-scheduler-path [prefix]
+  (str (prefix-path prefix) "/job-scheduler"))
+
 (defn serialize [x]
   (.array (fressian/write x)))
 
@@ -41,7 +44,7 @@
 
 (defn initialize-origin! [conn config prefix]
   (let [node (str (origin-path prefix) "/origin")
-        bytes (serialize {:message-id -1 :replica {:job-scheduler (:onyx.peer/job-scheduler config)}})]
+        bytes (serialize {:message-id -1 :replica {}})]
     (zk/create conn node :data bytes :persistent? true)))
 
 (defrecord ZooKeeper [config]
@@ -61,6 +64,7 @@
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
+      (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id)))
@@ -96,8 +100,9 @@
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} position]
   (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-        content (deserialize (:data (zk/data conn node)))]
-    (assoc content :message-id position)))
+        data (zk/data conn node)
+        content (deserialize (:data data))]
+    (assoc content :message-id position :created-at (:ctime (:stat data)))))
 
 (defmethod extensions/register-pulse ZooKeeper
   [{:keys [conn opts prefix] :as log} id]
@@ -116,14 +121,28 @@
         ;; Node doesn't exist.
         (>!! ch true)))))
 
+(defn find-job-scheduler [log]
+  (loop []
+    (if-let [chunk
+             (try
+               (extensions/read-chunk log :job-scheduler nil)
+               (catch Exception e
+                 (warn e)
+                 (warn "Job scheduler couldn't be discovered. Backing off 500ms and trying again...")
+                 nil))]
+      (:job-scheduler chunk)
+      (do (Thread/sleep 500)
+          (recur)))))
+
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
-       (let [origin (extensions/read-chunk log :origin nil)
+       (let [job-scheduler (find-job-scheduler log)
+             origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (>!! rets (:replica origin))
+         (>!! rets (assoc (:replica origin) :job-scheduler job-scheduler))
          (close! rets)
          (loop [position starting-position]
            (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
@@ -172,6 +191,12 @@
         bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
+(defmethod extensions/write-chunk [ZooKeeper :job-scheduler]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (let [node (str (job-scheduler-path prefix) "/scheduler")
+        bytes (serialize chunk)]
+    (zk/create conn node :persistent? true :data bytes)))
+
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (catalog-path prefix) "/" id)]
@@ -195,6 +220,11 @@
 (defmethod extensions/read-chunk [ZooKeeper :origin]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (origin-path prefix) "/origin")]
+    (deserialize (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :job-scheduler]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (job-scheduler-path prefix) "/scheduler")]
     (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/update-origin! ZooKeeper
