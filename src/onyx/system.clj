@@ -11,6 +11,8 @@
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
             [onyx.log.commands.notify-join-cluster]
+            [onyx.log.commands.exhaust-input]
+            [onyx.log.commands.seal-output]
             [onyx.log.commands.signal-ready]
             [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
