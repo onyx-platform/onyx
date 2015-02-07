@@ -66,8 +66,7 @@
 
 (defmethod p-ext/seal-resource [:output :core.async]
   [{:keys [core.async/out-chan]}]
-  (>!! out-chan :done)
-  {})
+  (>!! out-chan :done))
 
 (defn take-segments!
   "Takes segments off the channel until :done is found.

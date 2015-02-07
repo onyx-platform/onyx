@@ -84,20 +84,21 @@
 
 (def v-peers (onyx.api/start-peers! 3 peer-config))
 
+(Thread/sleep 250)
+
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def results (doall (repeatedly n-messages (fn [] (<!! out-chan)))))
+(def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
+
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set results) => expected)
-;  (fact (last results) => :done)
-  )
 
 (onyx.api/shutdown-env env)
 

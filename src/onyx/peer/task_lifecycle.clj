@@ -60,7 +60,6 @@
   (when-not (:exhausted? @(:onyx.core/pipeline-state event))
     (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
       (>!! (:onyx.core/outbox-ch event) entry)
-      (prn "Sent complete job log entry")
       (swap! (:onyx.core/pipeline-state event) assoc :exhausted? true))))
 
 (defn sentinel-id [event]
@@ -167,28 +166,6 @@
 (defn close-temporal-resources [event]
   (merge event (l-ext/close-temporal-resources* event)))
 
-(defn seal-output-targets
-  [{:keys [onyx.core/pipeline-state onyx.core/outbox-ch
-           onyx.core/seal-response-ch] :as event}]
-  (when (:onyx.core/tail-batch? event)
-    (let [state @pipeline-state]
-      (if (:tried-to-seal? state)
-        (merge event {:onyx.core/sealed? false})
-        (let [args {:id (:onyx.core/id event)
-                    :job (:onyx.core/job-id event)
-                    :task (:onyx.core/task-id event)}
-              entry (entry/create-log-entry :seal-task args)
-              _ (>!! outbox-ch entry)
-              seal? (<!! seal-response-ch)]
-          (swap! pipeline-state assoc :tried-to-seal? true)
-          (when seal?
-            (p-ext/seal-resource event)
-            (let [args {:id (:onyx.core/id event)
-                        :job (:onyx.core/job-id event)
-                        :task (:onyx.core/task-id event)}
-                  entry (entry/create-log-entry :complete-task args)]
-              (>!! outbox-ch entry))))))))
-
 (defn release-messages! [messenger event]
   (loop []
     (when-let [id (<!! (:release-ch messenger))]
@@ -212,9 +189,16 @@
           (apply-fn)
           (compress-batch)
           (write-batch)
-          (close-temporal-resources)
-          (seal-output-targets))
+          (close-temporal-resources))
       (recur init-event))))
+
+(defn listen-for-sealer [init-event ch]
+  ;; TODO: only launch for output tasks
+  (try
+    (when (<!! ch)
+      (p-ext/seal-resource init-event))
+    (catch Exception e
+      (warn e))))
 
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
@@ -261,8 +245,9 @@
 
         (thread (release-messages! messenger pipeline-data))
         (thread (run-task-lifecycle pipeline-data kill-ch))
+        (thread (listen-for-sealer pipeline-data seal-resp-ch))
 
-        (assoc component :pipeline-data pipeline-data :kill-ch kill-ch))
+        (assoc component :pipeline-data pipeline-data :kill-ch kill-ch :seal-ch seal-resp-ch))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
@@ -272,6 +257,7 @@
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
     (close! (:kill-ch component))
+    (close! (:seal-ch component))
 
     component))
 
@@ -314,8 +300,4 @@
 (dire/with-post-hook! #'close-temporal-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
-
-(dire/with-post-hook! #'seal-output-targets
-  (fn [{:keys [onyx.core/id onyx.core/task onyx.core/sealed? onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Sealing resource for %s? %s" id lifecycle-id task sealed?))))
 
