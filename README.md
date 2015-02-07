@@ -110,6 +110,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Malcolm Sparks](https://github.com/malcolmsparks)
 - [Lucas Bradstreet](https://github.com/lbradstreet)
 - [Bryce Blanton](https://github.com/bblanton)
+- [David Rupp](https://github.com/davidrupp)
 
 #### Performance Benchmarks
 
