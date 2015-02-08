@@ -4,6 +4,7 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.system :refer [onyx-development-env]]
             [onyx.plugin.core-async]
+            [onyx.test-helpers :refer [with-env-peers]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -30,8 +31,6 @@
    :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler scheduler
    :onyx.messaging/impl messaging})
-
-(def env (onyx.api/start-env env-config))
 
 (def n-messages 50)
 
@@ -82,23 +81,14 @@
 
 (>!! in-chan :done)
 
-(def v-peers (onyx.api/start-peers! 3 peer-config))
-
-(Thread/sleep 2000)
-
-(onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :task-scheduler :onyx.task-scheduler/round-robin})
-
-(def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-env env)
-
+(with-env-peers env-config peer-config 3 
+  (fn [] 
+    (Thread/sleep 2000)
+    (onyx.api/submit-job
+      peer-config
+      {:catalog catalog :workflow workflow
+       :task-scheduler :onyx.task-scheduler/round-robin})
+    (time (let [results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan))))
+          expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+      (fact (set (butlast results)) => expected)
+      (fact (last results) => :done)))))
