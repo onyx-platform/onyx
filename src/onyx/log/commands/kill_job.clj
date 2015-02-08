@@ -30,8 +30,8 @@
     state))
 
 (defmethod extensions/reactions :kill-job
-  [{:keys [args]} old new diff peer-args]
-  (when (and (executing-killed-job? diff old (:job args) (:id peer-args))
-             (common/volunteer-via-killed-job? old new diff peer-args))
-    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+  [{:keys [args]} old new diff state]
+  (when (and (executing-killed-job? diff old (:job args) (:id state))
+             (common/volunteer-via-killed-job? old new diff state))
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 

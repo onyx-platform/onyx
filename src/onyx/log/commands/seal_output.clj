@@ -38,11 +38,9 @@
    :job (:job args)})
 
 (defmethod extensions/reactions :seal-output
-  [{:keys [args]} old new diff peer-args]
-  (let [allocations (get-in old [:allocations (:job args) (:task args)])]
-    (when (and (some #{(:id peer-args)} (into #{} allocations))
-               (common/volunteer? old new peer-args (:job peer-args)))
-      [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
+  [{:keys [args]} old new diff state]
+  (when (common/volunteer-via-sealed-output? old new diff state)
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :seal-output
   [{:keys [args]} old new diff state]

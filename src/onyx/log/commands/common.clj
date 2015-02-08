@@ -324,7 +324,7 @@
   (fn [old new diff state]
     (:job-scheduler old)))
 
-(defmulti volunteer-via-completed-task?
+(defmulti volunteer-via-sealed-output?
   (fn [old new diff state]
     (:job-scheduler old)))
 
@@ -368,10 +368,11 @@
     (when (some #{(:id state)} (into #{} peers))
       (any-coverable-jobs? new))))
 
-(defmethod volunteer-via-completed-task? :onyx.job-scheduler/greedy
+(defmethod volunteer-via-sealed-output? :onyx.job-scheduler/greedy
   [old new diff state]
-  (when-not (some #{(:job diff)} (into #{} (incomplete-jobs new)))
-    (any-coverable-jobs? new)))
+  (and (:job-completed? diff)
+       (seq (incomplete-jobs new))
+       (any-coverable-jobs? new)))
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
