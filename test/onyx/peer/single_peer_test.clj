@@ -32,6 +32,8 @@
    :onyx.peer/job-scheduler scheduler
    :onyx.messaging/impl messaging})
 
+(def env (onyx.api/start-env env-config))
+
 (def n-messages 100)
 
 (def batch-size 20)
@@ -81,15 +83,21 @@
 
 (>!! in-chan :done)
 
-(with-env-peers env-config peer-config 3 
-  (fn [] 
-    (Thread/sleep 2000)
-    (onyx.api/submit-job
-      peer-config
-      {:catalog catalog :workflow workflow
-       :task-scheduler :onyx.task-scheduler/round-robin})
-    (time (let [results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan))))
-          expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (fact (set (butlast results)) => expected)
-      (fact (last results) => :done)))))
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :task-scheduler :onyx.task-scheduler/round-robin})
+
+(def v-peers (onyx.api/start-peers! 1 peer-config))
+
+(def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
+
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
+
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-env env)
 

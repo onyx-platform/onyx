@@ -345,6 +345,10 @@
          (every? (partial at-least-one-active? replica) peer-groups)))
   (not (seq (remove seq (vals (get-in replica [:allocations job]))))))
 
+(defn job-coverable? [replica job]
+  (let [tasks (get-in replica [:tasks job])]
+    (>= (count (get-in replica [:peers])) (count tasks))))
+
 (defn any-coverable-jobs? [replica]
   (seq
    (filter
@@ -372,7 +376,7 @@
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
-  (volunteer-via-new-job? old new diff state))
+  (job-coverable? new (first (incomplete-jobs new))))
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])

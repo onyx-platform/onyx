@@ -49,9 +49,9 @@
   {:job (:id args)})
 
 (defmethod extensions/reactions :submit-job
-  [{:keys [args] :as entry} old new diff peer-args]
-  (when (common/volunteer-via-new-job? old new diff peer-args)
-    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+  [{:keys [args] :as entry} old new diff state]
+  (when (common/volunteer-via-new-job? old new diff state)
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
