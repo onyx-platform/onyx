@@ -20,7 +20,7 @@
   [{:keys [args message-id]} old new diff state]
   (when (and (common/all-inputs-exhausted? new (:job args))
              (common/executing-output-task? new (:job args) (:task args))
-             (common/elected-sealer? new message-id) (:job args) (:task args) (:id state))
+             (common/elected-sealer? new message-id (:job args) (:task args) (:id state)))
     (>!! (:seal-response-ch state) true))
   state)
 
