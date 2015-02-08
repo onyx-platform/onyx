@@ -32,8 +32,6 @@
    :onyx.peer/job-scheduler scheduler
    :onyx.messaging/impl messaging})
 
-(def env (onyx.api/start-env env-config))
-
 (def n-messages 100)
 
 (def batch-size 20)
