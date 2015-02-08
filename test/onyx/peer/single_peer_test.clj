@@ -88,7 +88,7 @@
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def v-peers (onyx.api/start-peers! 1 peer-config))
+(def v-peers (onyx.api/start-peers! 3 peer-config))
 
 (def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
 
