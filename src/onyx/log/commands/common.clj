@@ -332,10 +332,6 @@
   (fn [old new diff state]
     (:job-scheduler old)))
 
-(defmulti volunteer-via-seal?
-  (fn [old new diff state]
-    (:job-scheduler old)))
-
 (defn at-least-one-active? [replica peers]
   (->> peers
        (map #(get-in replica [:peer-state %]))
@@ -377,10 +373,6 @@
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
   (volunteer-via-new-job? old new diff state))
-
-(defmethod volunteer-via-seal? :onyx.job-scheduler/greedy
-  [old new diff state]
-  (volunteer-via-completed-task? old new diff state))
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])

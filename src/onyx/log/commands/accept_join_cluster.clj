@@ -27,10 +27,9 @@
        :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :accept-join-cluster
-  [entry old new diff peer-args]
-  (when (and (= (:id peer-args) (:subject diff))
-             (common/volunteer? old new peer-args (:job peer-args)))
-    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+  [entry old new diff state]
+  (when (common/volunteer-via-accept? old new diff state)
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
