@@ -18,9 +18,9 @@
 
 (defmethod extensions/fire-side-effects! :exhaust-input
   [{:keys [args message-id]} old new diff state]
-  (when (and (common/all-inputs-exhausted? new (:id state))
-             (common/executing-output-task? new (:id state))
-             (common/elected-sealer? new (:id state) message-id))
+  (when (and (common/all-inputs-exhausted? new (:job args))
+             (common/executing-output-task? new (:job args) (:task args))
+             (common/elected-sealer? new message-id) (:job args) (:task args) (:id state))
     (>!! (:seal-response-ch state) true))
   state)
 
