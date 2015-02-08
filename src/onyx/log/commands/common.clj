@@ -364,7 +364,7 @@
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/greedy
   [old new diff state]
-  (let [peers (get-in [old :allocations (first diff)])]
+  (let [peers (apply concat (vals (get-in [old :allocations (first diff)])))]
     (when (some #{(:id state)} (into #{} peers))
       (any-coverable-jobs? new))))
 
