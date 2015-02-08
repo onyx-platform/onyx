@@ -386,11 +386,13 @@
         exhausted (get-in replica [:exhausted-inputs job])]
     (= (into #{} all) (into #{} exhausted))))
 
-(defn executing-output-task? [replica job task]
-  (some #{task} (get-in replica [:output-tasks job])))
+(defn executing-output-task? [replica id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)]
+    (some #{task} (get-in replica [:output-tasks job]))))
 
-(defn elected-sealer? [replica message-id job task id]
-  (let [peers (get-in replica [:allocations job task])]
+(defn elected-sealer? [replica message-id id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)
+        peers (get-in replica [:allocations job task])]
     (when (pos? (count peers))
       (let [n (mod message-id (count peers))]
         (= (nth peers n) id)))))
