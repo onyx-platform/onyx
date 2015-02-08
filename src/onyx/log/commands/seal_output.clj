@@ -33,8 +33,8 @@
 
 (defmethod extensions/replica-diff :seal-output
   [{:keys [args]} old new]
-  {:job-completed? (= (get-in old [:allocations (:job args)])
-                      (get-in new [:allocations (:job args)]))
+  {:job-completed? (not= (get-in old [:allocations (:job args)])
+                         (get-in new [:allocations (:job args)]))
    :job (:job args)})
 
 (defmethod extensions/reactions :seal-output
@@ -46,7 +46,7 @@
 
 (defmethod extensions/fire-side-effects! :seal-output
   [{:keys [args]} old new diff state]
-  (let [{:keys [job]} (common/peer->allocated-job (:allocated old) (:id state))]
+  (let [{:keys [job]} (common/peer->allocated-job (:allocations old) (:id state))]
     (if (and (:job-completed? diff) (= (:job diff) job))
       (do (component/stop (:lifecycle state))
           (assoc state :lifecycle nil))

@@ -84,7 +84,7 @@
 
 (def v-peers (onyx.api/start-peers! 3 peer-config))
 
-(Thread/sleep 250)
+(Thread/sleep 2000)
 
 (onyx.api/submit-job
  peer-config
