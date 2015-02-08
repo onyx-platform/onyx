@@ -33,9 +33,9 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 50)
+(def n-messages 100)
 
-(def batch-size 10)
+(def batch-size 20)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))

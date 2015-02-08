@@ -115,7 +115,7 @@
   (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
     (when (= (:onyx/type (:onyx.core/task-map event)) :input)
       (doseq [m (:onyx.core/batch rets)]
-        (go (try (<! (timeout 5000))
+        (go (try (<! (timeout 60000))
                  (when (p-ext/pending? rets (:id m))
                    (p-ext/replay-message event (:id m)))
                  (catch Exception e

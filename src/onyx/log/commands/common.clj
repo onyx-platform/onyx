@@ -402,3 +402,8 @@
         sealed (get-in replica [:sealed-outputs job])]
     (= (into #{} all) (into #{} sealed))))
 
+(defn should-seal? [replica args state message-id]
+  (and (all-inputs-exhausted? replica (:job args))
+       (executing-output-task? replica (:id state))
+       (elected-sealer? replica message-id (:id state))))
+
