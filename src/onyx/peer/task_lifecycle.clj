@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! timeout chan close! thread go dropping-buffer]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace] :as timbre]
@@ -167,10 +167,11 @@
   (merge event (l-ext/close-temporal-resources* event)))
 
 (defn release-messages! [messenger event]
-  (loop []
-    (when-let [id (<!! (:release-ch messenger))]
-      (p-ext/ack-message event id)
-      (recur))))
+  (go
+   (loop []
+     (when-let [id (<! (:release-ch messenger))]
+       (p-ext/ack-message event id)
+       (recur)))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
@@ -192,13 +193,16 @@
           (close-temporal-resources))
       (recur init-event))))
 
-(defn listen-for-sealer [init-event ch]
+(defn listen-for-sealer [job task init-event seal-ch outbox-ch]
   ;; TODO: only launch for output tasks
-  (try
-    (when (<!! ch)
-      (p-ext/seal-resource init-event))
-    (catch Exception e
-      (warn e))))
+  (go
+   (try
+     (when (<! seal-ch)
+       (p-ext/seal-resource init-event)
+       (let [entry (entry/create-log-entry :seal-output {:job job :task task})]
+         (>!! outbox-ch entry)))
+     (catch Exception e
+       (warn e)))))
 
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
@@ -243,9 +247,9 @@
           (prn "Job not covered yet. Backing off and trying again")
           (Thread/sleep 2000))
 
-        (thread (release-messages! messenger pipeline-data))
+        (release-messages! messenger pipeline-data)
+        (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
         (thread (run-task-lifecycle pipeline-data kill-ch))
-        (thread (listen-for-sealer pipeline-data seal-resp-ch))
 
         (assoc component :pipeline-data pipeline-data :kill-ch kill-ch :seal-ch seal-resp-ch))
       (catch Exception e
