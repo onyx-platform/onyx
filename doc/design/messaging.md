@@ -101,28 +101,28 @@ Implement a load balancing algorithm for spreading out messages over a range of 
 
 ### Implementation plan
 
-- Add a new component to all peers - MessagingBuffer.
-  - Two channels: inbound & outbound
-  - Fixed sized buffers on both, make configurable
-- Add `send-message` and `receive-message` to `onyx.extensions`.
-  - Implement in folder named `messaging`.
-  - Add an `http-kit` file to this folder, implement send/receive message
-- Make a map of keyword to function that returns a new Component
-  - `:http-kit` -> New HttpKit server
-  - Use this for when the peers boots up
-  - Make sure the result of this gets passed into the peer task lifecycle
-  - Use this for receiving messages
-  - Do the same, make a Component for sending messages, make sure it gets the receiver as a parameter in case it needs it
-- Strip out all pipelining. I want to start from scratch and tune performance from the ground up
-- Add an Acker component to every peer
-  - Listens for ack messages, contains an atom as described above
-  - This should be part of the interface for any messaging implementations
-  - Reuse existing booted up messaging components
-- Add a holding pen to all input tasks
-  - Add an atom to maintain the holding pen
-  - Make sure a future is running to periodically clear the atom out
-  - Do the same as above wrt to reusing messaging components, needs to come through the same interface
-- Implement HornetQ first, straightforward semantics
+- [x] Add a new component to all peers - MessagingBuffer.
+  - [x] New channel for inbound messages
+  - [x] Fixed sized buffer, make configurable
+- [x] Add `send-message` and `receive-message` to `onyx.extensions`.
+  - [x] Implement in folder named `messaging`.
+  - [x] Add an `http-kit` file to this folder, implement send/receive message
+- [x] Make a map of keyword to function that returns a new Component
+  - [x] `:http-kit` -> New HttpKit server
+  - [x] Use this for when the peers boots up
+  - [x] Make sure the result of this gets passed into the peer task lifecycle
+  - [x] Use this for receiving messages
+  - [x] Do the same, make a Component for sending messages, make sure it gets the receiver as a parameter in case it needs it
+- [x] Strip out all pipelining. I want to start from scratch and tune performance from the ground up
+- [x] Add an Acker component to every peer
+  - [x] Listens for ack messages, contains an atom as described above
+  - [x] This should be part of the interface for any messaging implementations
+  - [x] Reuse existing booted up messaging components
+- [x] Add a holding pen to all input tasks
+  - [x] Add an atom to maintain the holding pen
+  - [x] Make sure a future is running to periodically clear the atom out
+  - [x] Do the same as above wrt to reusing messaging components, needs to come through the same interface
+- [x] Implement HornetQ first, straightforward semantics
 
 ### Full job coverage notes
 
