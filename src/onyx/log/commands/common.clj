@@ -339,11 +339,9 @@
        (seq)))
 
 (defn job-covered? [replica job]
-  ;; TODO - use :tasks, not :allocations
-  (and (not (seq (remove seq (vals (get-in replica [:allocations job])))))
-       (let [peer-groups (vals (get-in replica [:allocations job]))]
-         (every? (partial at-least-one-active? replica) peer-groups)))
-  (not (seq (remove seq (vals (get-in replica [:allocations job]))))))
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations %])) tasks))))
 
 (defn job-coverable? [replica job]
   (let [tasks (get-in replica [:tasks job])]
