@@ -60,7 +60,7 @@ Code level API documentation [can be found here](http://michaeldrogalis.github.i
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.2` goes with `onyx` version `0.5.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.0.1`). If a version doesn't have a corresponding version for the plugin, use the lowest version. Sometimes we lag a little behind on non-backwards breaking releases, but we try not to most of the time.
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.2` goes with `onyx` version `0.5.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.2.1`). If a version doesn't have a corresponding version for the plugin, use the lowest version. Sometimes we lag a little behind on non-backwards breaking releases, but we try not to most of the time.
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
