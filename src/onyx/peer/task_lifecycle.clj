@@ -243,9 +243,12 @@
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
-        (while (not (common/job-covered? @replica job-id))
+        
+        #_(while (not (common/job-covered? @replica job-id))
           (prn "Job not covered yet. Backing off and trying again")
           (Thread/sleep 2000))
+
+        (Thread/sleep 5000)
 
         (release-messages! messenger pipeline-data)
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)

@@ -83,12 +83,12 @@
 
 (>!! in-chan :done)
 
+(def v-peers (onyx.api/start-peers! 3 peer-config))
+
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
-
-(def v-peers (onyx.api/start-peers! 3 peer-config))
 
 (def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
 
