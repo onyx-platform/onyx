@@ -341,7 +341,9 @@
 (defn job-covered? [replica job]
   (let [tasks (get-in replica [:tasks job])
         active? (partial at-least-one-active? replica)]
-    (every? identity (map #(active? (get-in replica [:allocations %])) tasks))))
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
+
 
 (defn job-coverable? [replica job]
   (let [tasks (get-in replica [:tasks job])]
