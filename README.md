@@ -70,6 +70,10 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
+### Offical Dashboard
+
+You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard).
+
 ### lib-onyx
 
 [lib-onyx](https://github.com/MichaelDrogalis/lib-onyx) is a library created to support extra functionality in Onyx. It provides pluggable functionality such as in-memory streaming joins, automatic message retry, and interval-based actions.
