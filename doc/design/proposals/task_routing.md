@@ -226,9 +226,11 @@ Predicate functions should have one arity:
 
 We need a way to compose predicates at runtime with `and`, `or`, and `not`.
 
+```clojure
 {:route/from :a
  :route/to :all
  :route/exclude-keys [:my-side-effects-result-key]
  :route/predicate [:or [:my-pred-1 [:and :my-pred-1 :my-pred-3] [:not :my-pred-4]]]}
+```
 
 TBD: How to parameterize these predicate functions?
