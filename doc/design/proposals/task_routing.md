@@ -213,15 +213,22 @@ If any `:route/to` matches that *are not* sequences, the scan of which routes to
 
 Since the predicate function needs to access things like side effect results, we use a `:route/exclude-keys` to strip out any keys from the result *before* passing the segmnt downstream.
 
-Predicate functions should have two arities:
+Predicate functions should have one arity:
 
 ```clojure
 (defn my-pred
-  ([old-segment new-segment])
-  ([old-segment all-new-semgents this-new-segment]))
+  ([event old-segment all-new-semgents this-new-segment]))
 ```
 
-The latter artity is for tranformations that create multiple segments from one segment.
+`event` is the event context map passed to all pipeline multimethods.
 
+#### Composition
+
+We need a way to compose predicates at runtime with `and`, `or`, and `not`.
+
+{:route/from :a
+ :route/to :all
+ :route/exclude-keys [:my-side-effects-result-key]
+ :route/predicate [:or [:my-pred-1 [:and :my-pred-1 :my-pred-3] [:not :my-pred-4]]]}
 
 TBD: How to parameterize these predicate functions?
