@@ -115,6 +115,7 @@
   {:catalog [(schema/pred map? 'map?)]
    :workflow workflow-validator
    :task-scheduler schema/Keyword
+   (schema/optional-key :flow-conditions) schema/Any
    (schema/optional-key :percentage) schema/Int})
 
 (defn validate-job
@@ -122,7 +123,6 @@
   (schema/validate job-validator job)
   (validate-catalog (:catalog job))
   (validate-workflow job))
-
 
 (defn validate-flow-structure [flow-schema]
   (doseq [entry flow-schema]
