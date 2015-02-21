@@ -97,7 +97,7 @@
     :flow/predicate :segment-even?
     :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}])
 
-(defn segment-even? [{:keys [n]}]
+(defn segment-even? [event old all-new {:keys [n]}]
   (even? n))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))

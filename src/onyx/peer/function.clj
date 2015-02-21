@@ -133,6 +133,17 @@
         compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
+(defn choose-output-paths [flow-conditions event old all-new new]
+  (reduce
+   (fn [all entry]
+     (if ((:flow/predicate entry) [event old all-new new])
+       (if (:flow/short-circuit? entry)
+         (reduced (conj all (:flow/to entry)))
+         (conj all (:flow/to entry)))
+       all))
+   #{}
+   flow-conditions))
+
 (defn write-batch-shim
   [{:keys [onyx.core/queue onyx.core/egress-queues onyx.core/serialized-task
            onyx.core/catalog onyx.core/session onyx.core/compressed] :as event}]
