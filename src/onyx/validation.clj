@@ -202,7 +202,7 @@
       (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
                       {:entry entry})))))
 
-(defn validate-flow-schema [flow-conditions-schema workflow]
+(defn validate-flow-conditions [flow-conditions-schema workflow]
   (validate-flow-structure flow-conditions-schema)
   (validate-flow-connections flow-conditions-schema workflow)
   (validate-flow-pred-all-kws flow-conditions-schema)

@@ -87,7 +87,8 @@
         normalized-workflow (if (map? (:workflow job))
                               (unpack-map-workflow (:workflow job))
                               (:workflow job))
-        _  (validator/validate-job (assoc job :workflow normalized-workflow))
+        _ (validator/validate-job (assoc job :workflow normalized-workflow))
+        _ (validator/validate-flow-conditions (:flow-conditions job) normalized-workflow)
         tasks (planning/discover-tasks (:catalog job) normalized-workflow)
         task-ids (map :id tasks)
         scheduler (:task-scheduler job)
@@ -99,6 +100,7 @@
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow normalized-workflow id)
+    (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
 
     (doseq [task tasks]
       (extensions/write-chunk (:log client) :task task id)
