@@ -6,7 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.queue.hornetq :refer [hornetq]]
-              [onyx.planning :refer [find-task]]
+              [onyx.planning :refer [find-task build-pred-fn]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -216,6 +216,16 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
+(defn only-relevant-branches [flow task]
+  (filter #(= (:flow/from (:name task)) %) flow task))
+
+(defn compile-flow-conditions [flow-conditions task-name]
+  (let [conditions (only-relevant-branches flow-conditions task-name)]
+    (map
+     (fn [condition]
+       (update-in condition [:flow/predicate] build-pred-fn))
+     conditions)))
+
 (defrecord TaskLifeCycle [id log queue job-id task-id restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
@@ -300,6 +310,7 @@
 
             catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
+            flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             catalog-entry (find-task catalog (:name task))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
@@ -310,6 +321,8 @@
                            :onyx.core/task (:name task)
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
+                           :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/compiled-flow-conditions (compile-flow-conditions flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
                            :onyx.core/ingress-queues (:ingress-queues task)
