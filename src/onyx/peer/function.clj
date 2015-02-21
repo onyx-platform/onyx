@@ -80,14 +80,13 @@
                          (assoc groups t (group-message segment catalog t)))
                        {} next-tasks)})
 
-(defn write-batch [queue session producers msgs catalog queue-name->task]
-  (dorun
-   (for [p producers msg msgs]
-     (let [queue-name (extensions/producer->queue-name queue p)
-           task (get queue-name->task queue-name)]
-       (if-let [group (get (:hash-group msg) task)]
-         (extensions/produce-message queue p session (:compressed msg) {:group group})
-         (extensions/produce-message queue p session (:compressed msg))))))
+(defn write-batch [queue session msgs paths task->producer]
+  (doseq [[msg path] (map vector msgs paths)]
+    (doseq [output-path path]
+      (let [p (get task->producer output-path)]
+        (if-let [group (get (:hash-group msg) output-path)]
+          (extensions/produce-message queue p session (:compressed msg) {:group group})
+          (extensions/produce-message queue p session (:compressed msg))))))
   {:onyx.core/written? true})
 
 (defn read-batch-shim
@@ -121,18 +120,6 @@
       (requeue-sentinel queue session queue-name uuid)))
   (merge event {:onyx.core/requeued? true}))
 
-(defn apply-fn-shim
-  [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
-           onyx.core/task-map] :as event}]
-  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
-    (merge event {:onyx.core/results results})))
-
-(defn compress-batch-shim
-  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
-  (let [next-tasks (keys (:egress-queues serialized-task))
-        compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
-    (merge event {:onyx.core/compressed compressed-msgs})))
-
 (defn choose-output-paths [flow-conditions event old all-new new]
   (reduce
    (fn [all entry]
@@ -144,13 +131,39 @@
    #{}
    flow-conditions))
 
+(defn apply-fn-shim
+  [{:keys [onyx.core/decompressed onyx.core/params
+           onyx.core/task-map onyx.core/compiled-flow-conditions] :as event}]
+  (reduce
+   (fn [result input-segment]
+     (let [new-segments (operation/apply-fn (:onyx.function/fn event) params input-segment)
+           new-segments (if coll? new-segments) new-segments (vector new-segments)
+           paths (map (fn [segment]
+                        (choose-output-paths compiled-flow-conditions
+                                             event input-segment new-segments
+                                             segment))
+                      new-segments)]
+       (-> result
+           (update-in [:onyx.core/results] concat new-segments)
+           (update-in [:onyx.core/result-paths concat paths]))))
+   {:onyx.core/results [] :onyx.core/result-paths []}
+   decompressed))
+
+(defn compress-batch-shim
+  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
+  (let [next-tasks (keys (:egress-queues serialized-task))
+        compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
+    (merge event {:onyx.core/compressed compressed-msgs})))
+
 (defn write-batch-shim
   [{:keys [onyx.core/queue onyx.core/egress-queues onyx.core/serialized-task
-           onyx.core/catalog onyx.core/session onyx.core/compressed] :as event}]
-  (let [queue-name->task (clojure.set/map-invert (:egress-queues serialized-task))
-        producers (map (partial extensions/create-producer queue session) (vals egress-queues))
-        batch (write-batch queue session producers compressed catalog queue-name->task)]
-    (merge event {:onyx.core/producers producers})))
+           onyx.core/catalog onyx.core/session onyx.core/compressed
+           onyx.core/result-paths] :as event}]
+  (let [task->producer (into {} (fn [[task queue-name]]
+                                  {task (extensions/create-producer queue session queue-name)})
+                             (:egress-queues serialized-task))
+        batch (write-batch queue session compressed result-paths task->producer)]
+    (merge event {:onyx.core/producers (vals task->producer)})))
 
 (defn seal-resource-shim [{:keys [onyx.core/queue onyx.core/egress-queues] :as event}]
   (merge event (seal-queue queue (vals egress-queues))))
