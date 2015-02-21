@@ -158,7 +158,7 @@
 (defn validate-flow-pred-all-kws [flow-schema]
   (prewalk
    (fn [x]
-     (when-not (or (keyword? x) (coll? x))
+     (when-not (or (keyword? x) (coll? x) (nil? x))
        (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
      x)
    (:flow/predicate (last flow-schema))))
