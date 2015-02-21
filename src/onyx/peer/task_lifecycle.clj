@@ -217,7 +217,7 @@
       (>!! outbox-ch entry))))
 
 (defn only-relevant-branches [flow task]
-  (filter #(= (:flow/from (:name task)) %) flow task))
+  (filter #(= (:flow/from (:name task)) %) flow))
 
 (defn compile-flow-conditions [flow-conditions task-name]
   (let [conditions (only-relevant-branches flow-conditions task-name)]
