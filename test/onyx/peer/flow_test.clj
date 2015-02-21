@@ -39,9 +39,9 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 15000)
+(def n-messages 100)
 
-(def batch-size 1320)
+(def batch-size 10)
 
 (def echo 1000)
 
@@ -94,11 +94,16 @@
 (def flow-conditions
   [{:flow/from :in
     :flow/to [:inc]
-    :flow/predicate :onyx.peer.flow-test/segment-even?
+    :flow/predicate [:and
+                     :onyx.peer.flow-test/segment-even?
+                     :onyx.peer.flow-test/gt?]
     :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}])
 
 (defn segment-even? [event {:keys [n]}]
   (even? n))
+
+(defn gt? [event {:keys [n]}]
+  (> n 10))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 
@@ -113,7 +118,7 @@
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (filter even? (range n-messages))))]
+(let [expected (set (map (fn [x] {:n (inc x)}) (filter even? (range 11 n-messages))))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
