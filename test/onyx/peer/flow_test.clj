@@ -58,7 +58,7 @@
 (hq-util/write-and-cap! hq-config in-queue (map (fn [x] {:n x}) (range n-messages)) echo)
 
 (defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
+  (assoc segment :n (inc n) :extra-key :blah))
 
 (def catalog
   [{:onyx/name :in
@@ -97,13 +97,19 @@
     :flow/predicate [:and
                      :onyx.peer.flow-test/segment-even?
                      :onyx.peer.flow-test/gt?]
-    :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}])
+    :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}
+   {:flow/from :inc
+    :flow/to [:out]
+    :flow/exclude-keys [:extra-key]
+    :flow/predicate :onyx.peer.flow-test/constantly-true}])
 
 (defn segment-even? [event {:keys [n]}]
   (even? n))
 
 (defn gt? [event {:keys [n]}]
   (> n 10))
+
+(def constantly-true (constantly true))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 

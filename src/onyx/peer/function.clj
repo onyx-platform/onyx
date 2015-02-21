@@ -74,15 +74,16 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn compress-segment [next-tasks catalog segment]
-  {:compressed (.array (fressian/write segment))
-   :hash-group (reduce (fn [groups t]
-                         (assoc groups t (group-message segment catalog t)))
-                       {} next-tasks)})
+(defn compress-segment [next-tasks catalog segment path]
+  (let [segment (apply dissoc segment (:exclusions path))]
+    {:compressed (.array (fressian/write segment))
+     :hash-group (reduce (fn [groups t]
+                           (assoc groups t (group-message segment catalog t)))
+                         {} next-tasks)}))
 
 (defn write-batch [queue session msgs paths task->producer]
   (doseq [[msg path] (map vector msgs paths)]
-    (doseq [output-path path]
+    (doseq [output-path (:paths path)]
       (let [p (get task->producer output-path)]
         (if-let [group (get (:hash-group msg) output-path)]
           (extensions/produce-message queue p session (:compressed msg) {:group group})
@@ -127,9 +128,11 @@
     (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim
-  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
+  [{:keys [onyx.core/results onyx.core/catalog
+           onyx.core/serialized-task onyx.core/result-paths] :as event}]
   (let [next-tasks (keys (:egress-queues serialized-task))
-        compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
+        compressed-msgs (map (fn [[result path]] (compress-segment next-tasks catalog result path))
+                             (map vector results result-paths))]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defn write-batch-shim

@@ -56,15 +56,17 @@
 (defn choose-output-paths [flow-conditions event new downstream]
   (if (seq flow-conditions)
     (reduce
-     (fn [all entry]
+     (fn [{:keys [paths exclusions] :as all} entry]
        (if ((:flow/predicate entry) [event new])
          (if (:flow/short-circuit? entry)
-           (reduced (join-output-paths all (:flow/to entry) downstream))
-           (join-output-paths all (:flow/to entry) downstream))
+           (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+                     :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
+           {:paths (join-output-paths paths (:flow/to entry) downstream)
+            :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
          all))
-     #{}
+     {:paths #{} :exclusions #{}}
      flow-conditions)
-    downstream))
+    {:paths downstream}))
 
 (defn output-paths
   [{:keys [onyx.core/serialized-task onyx.core/compiled-flow-conditions] :as event}]
