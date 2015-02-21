@@ -48,9 +48,31 @@
     (merge event (p-ext/requeue-sentinel event))
     event))
 
+(defn choose-output-paths [flow-conditions event new downstream]
+  (if (seq flow-conditions)
+    (reduce
+     (fn [all entry]
+       (if ((:flow/predicate entry) [event new])
+         (if (:flow/short-circuit? entry)
+           (reduced (conj all (:flow/to entry)))
+           (conj all (:flow/to entry)))
+         all))
+     #{}
+     flow-conditions)
+    downstream))
+
+(defn output-paths
+  [{:keys [onyx.core/serialized-task onyx.core/compiled-flow-conditions] :as event}]
+  {:onyx.core/result-paths
+   (map
+    (fn [segment]
+      (choose-output-paths compiled-flow-conditions event segment
+                           (keys (:egress-queues serialized-task))))
+    (:onyx.core/results event))})
+
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (p-ext/apply-fn event))
+    (merge event (output-paths (p-ext/apply-fn event)))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]

@@ -120,34 +120,11 @@
       (requeue-sentinel queue session queue-name uuid)))
   (merge event {:onyx.core/requeued? true}))
 
-(defn choose-output-paths [flow-conditions event old all-new new]
-  (reduce
-   (fn [all entry]
-     (if ((:flow/predicate entry) [event old all-new new])
-       (if (:flow/short-circuit? entry)
-         (reduced (conj all (:flow/to entry)))
-         (conj all (:flow/to entry)))
-       all))
-   #{}
-   flow-conditions))
-
 (defn apply-fn-shim
-  [{:keys [onyx.core/decompressed onyx.core/params
-           onyx.core/task-map onyx.core/compiled-flow-conditions] :as event}]
-  (reduce
-   (fn [result input-segment]
-     (let [new-segments (operation/apply-fn (:onyx.function/fn event) params input-segment)
-           new-segments (if coll? new-segments) new-segments (vector new-segments)
-           paths (map (fn [segment]
-                        (choose-output-paths compiled-flow-conditions
-                                             event input-segment new-segments
-                                             segment))
-                      new-segments)]
-       (-> result
-           (update-in [:onyx.core/results] concat new-segments)
-           (update-in [:onyx.core/result-paths concat paths]))))
-   {:onyx.core/results [] :onyx.core/result-paths []}
-   decompressed))
+  [{:keys [onyx.core/decompressed onyx.function/fn onyx.core/params
+           onyx.core/task-map] :as event}]
+  (let [results (flatten (map (partial operation/apply-fn fn params) decompressed))]
+    (merge event {:onyx.core/results results})))
 
 (defn compress-batch-shim
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task] :as event}]
