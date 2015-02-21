@@ -79,7 +79,7 @@
 
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (output-paths (p-ext/apply-fn event)))
+    (merge event (output-paths (merge event (p-ext/apply-fn event))))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
