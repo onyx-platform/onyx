@@ -1,5 +1,6 @@
 (ns onyx.validation
-  (:require [clojure.data.fressian :as fressian]
+  (:require [clojure.walk :refer [prewalk]]
+            [clojure.data.fressian :as fressian]
             [com.stuartsierra.dependency :as dep]
             [onyx.planning :as planning]
             [schema.core :as schema]))
@@ -121,4 +122,92 @@
   (schema/validate job-validator job)
   (validate-catalog (:catalog job))
   (validate-workflow job))
+
+
+(defn validate-flow-structure [flow-schema]
+  (doseq [entry flow-schema]
+    (let [entry (select-keys entry
+                             [:flow/from :flow/to :flow/short-circuit?
+                              :flow/exclude-keys :flow/doc :flow/params
+                              :flow/predicate])]
+      (schema/validate
+       {:flow/from schema/Keyword
+        :flow/to (schema/either schema/Keyword [schema/Keyword])
+        (schema/optional-key :flow/short-circuit?) schema/Bool
+        (schema/optional-key :flow/exclude-keys) [schema/Keyword]
+        (schema/optional-key :flow/doc) schema/Str
+        (schema/optional-key :flow/params) [schema/Keyword]
+        :flow/predicate (schema/either schema/Keyword [schema/Any])}
+       entry))))
+
+(defn validate-flow-connections [flow-schema workflow]
+  (let [all (into #{} (concat (map first workflow) (map second workflow)))]
+    (doseq [entry flow-schema]
+      (let [from (:flow/from entry)]
+        (when-not (some #{from} all)
+          (throw (ex-info ":flow/from value doesn't name a node in the workflow"
+                          {:entry entry}))))
+
+      (let [to (:flow/to entry)]
+        (when-not (or (= :all to)
+                      (= :none to)
+                      (clojure.set/subset? to all))
+          (throw (ex-info ":flow/to value doesn't name a node in the workflow, :all, or :none"
+                          {:entry entry})))))))
+
+(defn validate-flow-pred-all-kws [flow-schema]
+  (prewalk
+   (fn [x]
+     (when-not (or (keyword? x) (coll? x))
+       (throw (ex-info "Token in :flow/predicate was not a keyword or collection" {:token x})))
+     x)
+   (:flow/predicate (last flow-schema))))
+
+(defn validate-all-position [flow-schema]
+  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+    (doseq [node flow-nodes]
+      (doseq [entry (rest (filter #(= node (:flow/from %)) flow-schema))]
+        (when (= :all (:flow/to entry))
+          (throw (ex-info ":flow/to mapped to :all value must appear first flow ordering" {:entry entry})))))))
+
+(defn using-all-clause? [flow-schema]
+  (seq (filter #(= :all (:flow/to %)) flow-schema)))
+
+(defn validate-none-position [flow-schema]
+  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+    (doseq [node flow-nodes]
+      (let [entries (filter #(= node (:flow/from %)) flow-schema)]
+        (let [entries (if (using-all-clause? entries)
+                        (rest (rest entries))
+                        (rest entries))]
+          (doseq [entry entries]
+            (when (= :none (:flow/to entry))
+              (throw (ex-info ":flow/to mapped to :none value must exactly proceed :all entry" {:entry entry})))))))))
+
+(defn validate-short-circuit [flow-schema]
+  (let [flow-nodes (into #{} (map :flow/from flow-schema))]
+    (doseq [node flow-nodes]
+      (let [entries (filter #(= node (:flow/from %)) flow-schema)
+            chunks (partition-by true? (map :flow/short-circuit? entries))]
+        (when (or (> (count chunks) 2)
+                  (seq (filter identity (apply concat (rest chunks)))))
+          (throw (ex-info ":flow/short-circuit entries must proceed all entries that aren't :flow/short-circuit"
+                          {:entry entries})))))))
+
+(defn validate-auto-short-circuit [flow-schema]
+  (doseq [entry flow-schema]
+    (when (and (or (= (:flow/to entry) :all)
+                   (= (:flow/to entry) :none))
+               (not (:flow/short-circuit? entry)))
+      (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
+                      {:entry entry})))))
+
+(defn validate-flow-schema [flow-conditions-schema workflow]
+  (validate-flow-structure flow-conditions-schema)
+  (validate-flow-connections flow-conditions-schema workflow)
+  (validate-flow-pred-all-kws flow-conditions-schema)
+  (validate-all-position flow-conditions-schema)
+  (validate-none-position flow-conditions-schema)
+  (validate-short-circuit flow-conditions-schema)
+  (validate-auto-short-circuit flow-conditions-schema))
 

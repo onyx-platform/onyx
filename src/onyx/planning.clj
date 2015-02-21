@@ -105,3 +105,24 @@
                   roots))
          result))))
 
+(defn build-pred-fn [expr]
+  (if (fn? expr)
+    (fn [xs] (apply expr xs))
+    (let [[op & more :as full-expr] expr]
+      (cond (= op :and)
+            (do (assert (> (count more) 1) ":and takes at least two predicates")
+                (fn [xs]
+                  (every? identity (map (fn [token] ((build-pred-fn token) xs)) more))))
+
+            (= op :or)
+            (do (assert (> (count more) 1) ":or takes at least two predicates")
+                (fn [xs]
+                  (some identity (map (fn [token] ((build-pred-fn token) xs)) more))))
+
+            (= op :not)
+            (do (assert (= 1 (count more)) ":not only takes one predicate")
+                (fn [xs]
+                  (not ((build-pred-fn (first more)) xs))))
+
+            :else (throw (ex-info "Unknown routing composition operator" {:op op :more more}))))))
+
