@@ -159,9 +159,9 @@
   [{:keys [onyx.core/queue onyx.core/egress-queues onyx.core/serialized-task
            onyx.core/catalog onyx.core/session onyx.core/compressed
            onyx.core/result-paths] :as event}]
-  (let [task->producer (into {} (fn [[task queue-name]]
-                                  {task (extensions/create-producer queue session queue-name)})
-                             (:egress-queues serialized-task))
+  (let [task->producer (into {} (map (fn [[task queue-name]]
+                                       {task (extensions/create-producer queue session queue-name)})
+                                     (:egress-queues serialized-task)))
         batch (write-batch queue session compressed result-paths task->producer)]
     (merge event {:onyx.core/producers (vals task->producer)})))
 
