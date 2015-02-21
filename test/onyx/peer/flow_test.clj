@@ -94,10 +94,10 @@
 (def flow-conditions
   [{:flow/from :in
     :flow/to [:inc]
-    :flow/predicate :segment-even?
+    :flow/predicate :onyx.peer.flow-test/segment-even?
     :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}])
 
-(defn segment-even? [event old all-new {:keys [n]}]
+(defn segment-even? [event {:keys [n]}]
   (even? n))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
@@ -113,7 +113,7 @@
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n (inc x)}) (filter even? (range n-messages))))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 

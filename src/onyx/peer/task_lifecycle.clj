@@ -48,14 +48,19 @@
     (merge event (p-ext/requeue-sentinel event))
     event))
 
+(defn join-output-paths [all to-add downstream]
+  (cond (= to-add :all) (into #{} downstream)
+        (= to-add :none) #{}
+        :else (clojure.set/union all to-add)))
+
 (defn choose-output-paths [flow-conditions event new downstream]
   (if (seq flow-conditions)
     (reduce
      (fn [all entry]
        (if ((:flow/predicate entry) [event new])
          (if (:flow/short-circuit? entry)
-           (reduced (conj all (:flow/to entry)))
-           (conj all (:flow/to entry)))
+           (reduced (join-output-paths all (:flow/to entry) downstream))
+           (join-output-paths all (:flow/to entry) downstream))
          all))
      #{}
      flow-conditions)
@@ -241,7 +246,7 @@
       (>!! outbox-ch entry))))
 
 (defn only-relevant-branches [flow task]
-  (filter #(= (:flow/from (:name task)) %) flow))
+  (filter #(= (:flow/from %) task) flow))
 
 (defn compile-flow-conditions [flow-conditions task-name]
   (let [conditions (only-relevant-branches flow-conditions task-name)]

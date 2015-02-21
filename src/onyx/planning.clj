@@ -1,6 +1,7 @@
 (ns onyx.planning
   (:require [com.stuartsierra.dependency :as dep]
-            [onyx.extensions :as extensions])
+            [onyx.extensions :as extensions]
+            [onyx.peer.operation :refer [kw->fn]])
   (:import [java.util UUID]))
 
 (defn only [coll]
@@ -105,9 +106,15 @@
                   roots))
          result))))
 
+(defn pred-fn? [expr]
+  (and (keyword? expr)
+       (not= :and expr)
+       (not= :or expr)
+       (not= :not expr)))
+
 (defn build-pred-fn [expr]
-  (if (fn? expr)
-    (fn [xs] (apply expr xs))
+  (if (pred-fn? expr)
+    (fn [xs] (apply (kw->fn expr) xs))
     (let [[op & more :as full-expr] expr]
       (cond (= op :and)
             (do (assert (> (count more) 1) ":and takes at least two predicates")
