@@ -2,6 +2,22 @@
 
 This section covers flow conditions. Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [Flow Conditions](#flow-conditions)
+  - [Summary](#summary)
+  - [Motivating Example](#motivating-example)
+  - [Predicate Function Signatures](#predicate-function-signatures)
+  - [Predicate Parameters](#predicate-parameters)
+  - [Key Exclusion](#key-exclusion)
+  - [Predicate Composition](#predicate-composition)
+  - [Match All/None](#match-allnone)
+  - [Short Circuiting](#short-circuiting)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ### Summary
 
 Workflows specify the structure of your computation as a directed, acyclic graph. A workflow describes all *possible* routes that a segment can take as it enters your workflow. On the other hand, we often have the need to articulate how an *individual* segment moves throughout your workflow. Many times, a segment conditionally moves from one task to another. This is a concept that Onyx takes apart and turns into its own idea, independent of the rest of your computation. They're called Flow Conditions.
@@ -11,10 +27,10 @@ Workflows specify the structure of your computation as a directed, acyclic graph
 The easiest way to learn how to use flow conditions is to see an example. Suppose we have the following workflow snippet:
 
 ```clojure
-[[:input-stream :children]
- [:input-stream :adults]
- [:input-stream :western-females]
- [:input-stream :everyone]
+[[:input-stream :process-children]
+ [:input-stream :process-adults]
+ [:input-stream :process-western-females]
+ [:input-stream :process-everyone]
  ...]
 ```
 
@@ -79,6 +95,23 @@ Predicate functions can take parameters at runtime. In this first flow condition
 
 Sometimes, the decision of whether to allow a segment to pass through to the next task depends on some side effects that were a result of the original segment transformation. Onyx allows you to handle this case by adding extra keys to your segment that comes out of the transformation function. These extra keys are visible in your predicate function, and then stripped off before being sent to the next task. You can indicate these "extra keys" by the setting `:onyx/exclude-keys` to a vector of keys.
 
+For example, if we had the following transformation function:
+
+```clojure
+(defn my-function [x]
+  (assoc x :result 42 :side-effects-result :blah))
+```
+
+Our predicate for flow conditions might need to use the `:side-effects-result` to make a decision. We don't want to actually send that information over out to the next task, though - so we `:flow/exclude-keys` on `:side-effects-results` to make it disappear after the predicate result has been realized.
+
+```clojure
+{:flow/from :input-stream
+ :flow/to [:process-adults]
+ :flow/predicate :my.ns/adult?
+ :flow/exclude-keys [:side-effects-result]
+ :flow/doc "Emits segment if this segment is an adult."}
+```
+
 ### Predicate Composition
 
 One extraordinarily powerful feature of Flow Conditions is its composition characters. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and western living in `[:and :my.ns/female? :my.ns/western?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/western? :my/state-param]]` Parameters *may not* specify logical functions.
@@ -109,4 +142,5 @@ If a flow condition specifies `:all` as its `:flow/to`, it must come before any 
 
 ### Short Circuiting
 
-If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are combined, as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.
+If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are unioned (duplicates aren't acknowledged), as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.
+

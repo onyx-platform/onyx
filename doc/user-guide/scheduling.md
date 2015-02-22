@@ -6,19 +6,18 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Scheduling](#scheduling)
-  - [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
-    - [Job Schedulers](#job-schedulers)
-      - [Greedy Job Scheduler](#greedy-job-scheduler)
-      - [Round Robin Job Scheduler](#round-robin-job-scheduler)
-      - [Round Robin Rebalancing Strategy](#round-robin-rebalancing-strategy)
-      - [Percentage Job Scheduler](#percentage-job-scheduler)
-      - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
-    - [Task Schedulers](#task-schedulers)
-      - [Greedy Task Scheduler](#greedy-task-scheduler)
-      - [Round Robin Task Scheduler](#round-robin-task-scheduler)
-      - [Percentage Task Scheduler](#percentage-task-scheduler)
-    - [Examples](#examples)
+- [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
+  - [Job Schedulers](#job-schedulers)
+    - [Greedy Job Scheduler](#greedy-job-scheduler)
+    - [Round Robin Job Scheduler](#round-robin-job-scheduler)
+    - [Round Robin Rebalancing Strategy](#round-robin-rebalancing-strategy)
+    - [Percentage Job Scheduler](#percentage-job-scheduler)
+    - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
+  - [Task Schedulers](#task-schedulers)
+    - [Greedy Task Scheduler](#greedy-task-scheduler)
+    - [Round Robin Task Scheduler](#round-robin-task-scheduler)
+    - [Percentage Task Scheduler](#percentage-task-scheduler)
+  - [Examples](#examples)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

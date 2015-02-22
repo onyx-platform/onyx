@@ -15,7 +15,6 @@ Onyx ships with three distinct APIs to accommodate different needs. A descriptio
     - [`shutdown-env`](#shutdown-env)
 - [Task Lifecycle API](#task-lifecycle-api)
     - [`start-lifecycle?`](#start-lifecycle)
-    - [`start-lifecycle?`](#start-lifecycle)
     - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
     - [`inject-temporal-resources`](#inject-temporal-resources)
     - [`close-temporal-resources`](#close-temporal-resources)
