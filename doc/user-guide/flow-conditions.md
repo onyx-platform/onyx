@@ -11,10 +11,10 @@ Workflows specify the structure of your computation as a directed, acyclic graph
 The easiest way to learn how to use flow conditions is to see an example. Suppose we have the following workflow snippet:
 
 ```clojure
-[[:input-stream :children]
- [:input-stream :adults]
- [:input-stream :western-females]
- [:input-stream :everyone]
+[[:input-stream :process-children]
+ [:input-stream :process-adults]
+ [:input-stream :process-western-females]
+ [:input-stream :process-everyone]
  ...]
 ```
 
