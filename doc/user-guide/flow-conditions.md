@@ -29,7 +29,8 @@ This workflow takes some input in (presumably a stream of people), and directs s
   
  {:flow/from :input-stream
   :flow/to [:process-adults]
-  :flow/predicate :my.ns/adult?}
+  :flow/predicate :my.ns/adult?
+  :flow/doc "Emits segment if this segment is an adult."}
 
  {:flow/from :input-stream
   :flow/to [:process-western-females]
