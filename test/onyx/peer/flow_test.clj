@@ -97,17 +97,19 @@
     :flow/predicate [:and
                      :onyx.peer.flow-test/segment-even?
                      :onyx.peer.flow-test/gt?]
+    :my/param 10
+    :flow/params [:my/param]
     :flow/doc "Emits segments to :inc if the segment's :n key is an even number."}
    {:flow/from :inc
     :flow/to [:out]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/constantly-true}])
 
-(defn segment-even? [event {:keys [n]}]
+(defn segment-even? [event my-param {:keys [n]}]
   (even? n))
 
-(defn gt? [event {:keys [n]}]
-  (> n 10))
+(defn gt? [event my-param {:keys [n]}]
+  (> n my-param))
 
 (def constantly-true (constantly true))
 

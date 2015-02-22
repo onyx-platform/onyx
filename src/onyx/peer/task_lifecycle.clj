@@ -23,6 +23,9 @@
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
+(defn resolve-predicate-params [flow-entry]
+  (map (fn [param] (get flow-entry param)) (:flow/params flow-entry)))
+
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
 
@@ -57,13 +60,14 @@
   (if (seq flow-conditions)
     (reduce
      (fn [{:keys [paths exclusions] :as all} entry]
-       (if ((:flow/predicate entry) [event new])
-         (if (:flow/short-circuit? entry)
-           (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
-                     :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
-           {:paths (join-output-paths paths (:flow/to entry) downstream)
-            :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
-         all))
+       (let [params (resolve-predicate-params entry)]
+         (if ((:flow/predicate entry) (concat [event] params [new]))
+           (if (:flow/short-circuit? entry)
+             (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+                       :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
+             {:paths (join-output-paths paths (:flow/to entry) downstream)
+              :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
+           all)))
      {:paths #{} :exclusions #{}}
      flow-conditions)
     {:paths downstream}))
