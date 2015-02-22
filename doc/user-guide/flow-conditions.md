@@ -105,6 +105,8 @@ Similarly, sometimes you want to emit to no downstream tasks:
 
 If a flow condition specifies `:all` as its `:flow/to`, it must come before any other flow conditions. If a flow condition specifies `:none` as its `:flow/to`, it must come directly behind an `:all` condition, or first if there is no `:all` condition. This is because of the semantics of short circuiting. We'll discuss what short circuiting means later in this section.
 
+`:flow/to` set to `:all` or `:none` must always set `:flow/short-circuit?` to `true`.
+
 ### Short Circuiting
 
 If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are combined, as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.
