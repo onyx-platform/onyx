@@ -1,3 +1,7 @@
+#### 0.5.2
+
+- Development environment doesn't required that the job scheduler be known ahead of time. It's now discovered dynamically.
+
 #### 0.5.1
 
 - Adds ctime to log entries. Useful for things like the dashboard and other log subscribers.

@@ -25,10 +25,11 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx.peer/job-scheduler scheduler
    :onyx/id onyx-id})
 
 (def env (onyx.api/start-env env-config))
+
+(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
 
 (facts
  "We can write to the log and read the entries back out"
@@ -40,6 +41,8 @@
 (onyx.api/shutdown-env env)
 
 (def env (onyx.api/start-env env-config))
+
+(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
 
 (def entries 10000)
 

@@ -25,14 +25,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.5.0"]
+[com.mdrogalis/onyx "0.5.2"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.5.0
+### User Guide 0.5.2
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -43,6 +43,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Peer Configuration](doc/user-guide/peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
+- [Flow Conditions](doc/user-guide/flow-conditions.md)
 - [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Error Handling](doc/user-guide/error-handling.md)
@@ -54,13 +55,13 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.5.0
+### API Docs 0.5.2
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.0` goes with `onyx` version `0.5.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.0.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.2` goes with `onyx` version `0.5.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.2.1`). If a version doesn't have a corresponding version for the plugin, use the lowest version. Sometimes we lag a little behind on non-backwards breaking releases, but we try not to most of the time.
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
