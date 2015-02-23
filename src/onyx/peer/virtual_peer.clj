@@ -50,13 +50,15 @@
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
+              (taoensso.timbre/info entry)
               (reset! replica-atom new-replica)
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
-              (component/stop (:lifecycle state)))))))
+              (component/stop @(:lifecycle state)))))))
     (catch Exception e
-      (taoensso.timbre/fatal "Fell out of processing loop")
-      (taoensso.timbre/fatal e))))
+      (taoensso.timbre/fatal e))
+    (finally
+     (taoensso.timbre/fatal "Fell out of processing loop"))))
 
 (defn outbox-loop [id log outbox-ch]
   (try
@@ -65,8 +67,9 @@
         (extensions/write-log-entry log entry)
         (recur)))
     (catch Exception e
-      (taoensso.timbre/fatal "Fell out of outbox loop")
-      (taoensso.timbre/fatal e))))
+      (taoensso.timbre/fatal e))
+    (finally
+     (taoensso.timbre/fatal "Fell out of outbox loop"))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle

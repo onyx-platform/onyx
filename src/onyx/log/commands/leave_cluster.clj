@@ -59,7 +59,7 @@
   [{:keys [message-id args]} old new {:keys [updated-watch]} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (cond (not (common/job-covered? new job))
-          (do (component/stop (:lifecycle state))
+          (do (component/stop @(:lifecycle state))
               (assoc state :lifecycle nil))
 
           (common/should-seal? new {:job job} state message-id)

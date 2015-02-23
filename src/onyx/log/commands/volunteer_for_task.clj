@@ -165,7 +165,7 @@
           (component/stop (:lifecycle state)))
         (let [seal-ch (chan)
               new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
-              new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
+              new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
           (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 
