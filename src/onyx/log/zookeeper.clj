@@ -1,8 +1,8 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
-            [clojure.data.fressian :as fressian]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal]]
+            [taoensso.nippy :as nippy]
             [zookeeper :as zk]
             [onyx.extensions :as extensions])
   (:import [org.apache.curator.test TestingServer]))
@@ -34,10 +34,10 @@
   (str (prefix-path prefix) "/origin"))
 
 (defn serialize [x]
-  (.array (fressian/write x)))
+  (nippy/freeze x))
 
 (defn deserialize [x]
-  (fressian/read x))
+  (nippy/thaw x))
 
 (defn initialize-origin! [conn config prefix]
   (let [node (str (origin-path prefix) "/origin")

@@ -39,8 +39,8 @@
       (assoc-in [:allocations (:id args)] {})
       (assoc-in [:saturation (:id args)] (:saturation args))
       (assoc-in [:task-saturation (:id args)] (:task-saturation args))
-      (assoc-in [:input-tasks (:id args)] (:inputs args))
-      (assoc-in [:output-tasks (:id args)] (:outputs args))
+      (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
+      (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
       (job-scheduler-replica-update entry)
       (task-scheduler-replica-update entry)))
 
