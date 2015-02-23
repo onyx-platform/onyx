@@ -10,4 +10,4 @@
 
 ##### What does Onyx use internally for compression by default?
 
-Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Fressian](https://github.com/Datomic/fressian).
+Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Nippy](https://github.com/ptaoussanis/nippy).

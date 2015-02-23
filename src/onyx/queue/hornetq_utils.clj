@@ -1,6 +1,6 @@
 (ns onyx.queue.hornetq-utils
-  (:require [clojure.data.fressian :as fressian]
-            [taoensso.timbre :refer [info]])
+  (:require [taoensso.timbre :refer [info]]
+            [taoensso.nippy :as nippy])
   (:import [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]
@@ -43,7 +43,7 @@
             (info (format "Wrote %s segments" i))
             (.commit session))
           (let [message (.createMessage session true)]
-            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.writeBytes (.getBodyBuffer message) (nippy/freeze x))
             (.send producer message)))
         messages))
 
@@ -69,12 +69,12 @@
             (info (format "Wrote %s segments" i))
             (.commit session))
           (let [message (.createMessage session true)]
-            (.writeBytes (.getBodyBuffer message) (.array (fressian/write x)))
+            (.writeBytes (.getBodyBuffer message) (nippy/freeze x))
             (.send producer message)))
         messages))
 
       (let [sentinel (.createMessage session true)]
-        (.writeBytes (.getBodyBuffer sentinel) (.array (fressian/write :done)))
+        (.writeBytes (.getBodyBuffer sentinel) (nippy/freeze :done))
         (.send producer sentinel)
         (.commit session))
       
@@ -99,7 +99,7 @@
         (let [message (.receive consumer)]
           (when message
             (.acknowledge message)
-            (swap! results conj (fressian/read (.toByteBuffer (.getBodyBuffer message)))))))
+            (swap! results conj (nippy/thaw (.toByteBuffer (.getBodyBuffer message)))))))
 
       (info "Done reading")
       (.commit session)
@@ -126,7 +126,7 @@
             (.commit session))
           (let [message (.receive consumer)]
             (when message
-              (let [decompressed (fressian/read (.toByteBuffer (.getBodyBuffer message)))]
+              (let [decompressed (nippy/thaw (.toByteBuffer (.getBodyBuffer message)))]
                 (.acknowledge message)
                 (swap! results conj decompressed)
                 (recur decompressed))))))

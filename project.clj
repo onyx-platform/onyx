@@ -6,7 +6,6 @@
   :jvm-opts ["-Xmx4g" "-Djava.net.preferIPv4Stack=true"]
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [org.clojure/data.fressian "0.2.0"]
                  [org.hornetq/hornetq-commons "2.4.0.Final"]
                  [org.hornetq/hornetq-core-client "2.4.0.Final"]
                  [org.hornetq/hornetq-server "2.4.0.Final"]
@@ -22,8 +21,7 @@
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [org.clojure/data.generators "0.1.2"]
                                   [com.datomic/datomic-free "0.9.4755"
-                                   :exclusions [com.fasterxml.jackson.core/jackson-core]
-                                   :exclusions [org.fressian/fressian]]
+                                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
                                   [com.datomic/simulant "0.1.6"]
                                   [org.clojure/tools.nrepl "0.2.3"]]
                    :plugins [[lein-midje "3.1.1"]

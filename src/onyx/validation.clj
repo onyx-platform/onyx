@@ -1,8 +1,8 @@
 (ns onyx.validation
-  (:require [clojure.data.fressian :as fressian]
-            [com.stuartsierra.dependency :as dep]
+  (:require [com.stuartsierra.dependency :as dep]
             [onyx.planning :as planning]
-            [schema.core :as schema]))
+            [schema.core :as schema]
+            [taoensso.nippy :as nippy]))
 
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
@@ -31,7 +31,7 @@
 
 (defn serializable? [x]
   (try
-    (do (fressian/write x)
+    (do (nippy/freeze x)
         true)
     (catch Exception e
       false)))

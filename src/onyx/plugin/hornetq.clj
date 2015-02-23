@@ -1,6 +1,5 @@
 (ns onyx.plugin.hornetq
   (:require [clojure.core.async :refer [go timeout <!]]
-            [clojure.data.fressian :as fressian]
             [onyx.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
@@ -8,13 +7,14 @@
             [onyx.messaging.acking-daemon :as acker]
             [onyx.extensions :as extensions]
             [dire.core :refer [with-post-hook!]]
-            [taoensso.timbre :refer [debug]])
+            [taoensso.timbre :refer [debug]]
+            [taoensso.nippy :as nippy])
   (:import [org.hornetq.api.core SimpleString]
            [org.hornetq.api.core.client HornetQClient]
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def sentinel-byte-array (.limit (fressian/write :done) 32))
+(def sentinel-byte-array (.limit (nippy/freeze :done) 32))
 
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
@@ -77,7 +77,7 @@
 
 (defmethod p-ext/decompress-batch [:input :hornetq]
   [{:keys [onyx.core/batch]}]
-  (let [decompress-f #(fressian/read (.toByteBuffer (.getBodyBufferCopy %)))]
+  (let [decompress-f #(nippy/thaw (.toByteBuffer (.getBodyBufferCopy %)))]
     {:onyx.core/decompressed (map #(assoc % :message (decompress-f (:message %))) batch)}))
 
 (defmethod p-ext/apply-fn [:input :hornetq]
@@ -110,7 +110,7 @@
 
 (defmethod p-ext/compress-batch [:output :hornetq]
   [{:keys [onyx.core/results]}]
-  (let [compress-f #(.array (fressian/write (:message %)))]
+  (let [compress-f #(nippy/freeze (:message %))]
     {:onyx.core/compressed (map compress-f results)}))
 
 (defmethod p-ext/write-batch [:output :hornetq]
@@ -155,7 +155,7 @@
     (let [session (.createTransactedSession (:hornetq/session-factory event))]
       (let [producer (.createProducer session queue-name)
             message (.createMessage session true)]
-        (.writeBytes (.getBodyBuffer message) (.array (fressian/write :done)))
+        (.writeBytes (.getBodyBuffer message) (nippy/freeze :done))
         (.send producer message)
         (.close producer))
       (.commit session)

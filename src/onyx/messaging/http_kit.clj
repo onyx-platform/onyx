@@ -1,10 +1,10 @@
 (ns ^:no-doc onyx.messaging.http-kit
     (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
-              [clojure.data.fressian :as fressian]
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
               [org.httpkit.client :as client]
               [taoensso.timbre :as timbre]
+              [taoensso.nippy :as nippy]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.extensions :as extensions])
     (:import [java.nio ByteBuffer]))
@@ -16,7 +16,7 @@
 (def completion-route "/completion")
 
 (defn app [daemon inbound-ch release-ch request]
-  (let [thawed (fressian/read (.bytes (:body request)))
+  (let [thawed (nippy/thaw (.bytes (:body request)))
         uri (:uri request)]
     (cond (= uri send-route)
           (doseq [message thawed]
@@ -74,7 +74,7 @@
   (let [messages (:onyx.core/compressed event)
         url (:url peer-site)
         route (format "%s%s" url send-route)
-        compressed-batch (fressian/write messages)]
+        compressed-batch (nippy/freeze messages)]
     (client/post route {:body (ByteBuffer/wrap (.array compressed-batch))}))
   {})
 
@@ -83,7 +83,7 @@
   (let [replica @(:onyx.core/replica event)
         url (:url (get-in replica [:peer-site acker-id]))
         route (format "%s%s" url acker-route)
-        contents (fressian/write {:id message-id :completion-id completion-id :ack-val ack-val})]
+        contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
     (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 
 (defmethod extensions/internal-complete-message HttpKit
@@ -91,6 +91,6 @@
   (let [snapshot @replica
         url (:url (get-in snapshot [:peer-site peer-id]))
         route (format "%s%s" url completion-route)
-        contents (fressian/write {:id id})]
+        contents (nippy/freeze {:id id})]
     (client/post route {:body (ByteBuffer/wrap (.array contents))})))
 
