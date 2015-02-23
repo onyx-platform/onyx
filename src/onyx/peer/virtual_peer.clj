@@ -50,7 +50,6 @@
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
-              (taoensso.timbre/info entry)
               (reset! replica-atom new-replica)
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)

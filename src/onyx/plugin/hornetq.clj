@@ -14,7 +14,7 @@
            [org.hornetq.api.core TransportConfiguration HornetQQueueExistsException]
            [org.hornetq.core.remoting.impl.netty NettyConnectorFactory]))
 
-(def sentinel-byte-array (.limit (nippy/freeze :done) 32))
+(def sentinel-byte-array (nippy/freeze :done))
 
 (defn take-segments
   ;; Set limit of 32 to match HornetQ's byte buffer. If they don't
@@ -26,7 +26,7 @@
        (let [segment (f)]
          (if (nil? (:message segment))
            rets
-           (let [m (.toByteBuffer (.getBodyBufferCopy (:message segment)))]
+           (let [m (.array (.toByteBuffer (.getBodyBufferCopy (:message segment))))]
              (if (= m sentinel-byte-array)
                (conj rets segment)
                (recur f n (conj rets segment)))))))))
