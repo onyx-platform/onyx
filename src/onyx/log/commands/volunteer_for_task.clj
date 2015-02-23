@@ -47,9 +47,10 @@
 
 (defmethod select-task :default
   [replica job peer-id]
-  (throw (ex-info (format "Task scheduler %s not recognized"
-                          (get-in replica [:task-schedulers job]))
-                  {:replica replica})))
+  (throw (ex-info 
+           (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead."
+                   (get-in replica [:task-schedulers job]))
+           {:replica replica})))
 
 (defmulti select-job
   (fn [{:keys [args]} replica]
@@ -113,8 +114,10 @@
 
 (defmethod select-job :default
   [_ replica]
-  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
-                  {:replica replica})))
+  (throw (ex-info 
+           (format "Job scheduler %s not recognized. Check that you have not supplied a task scheduler instead." 
+                   (:job-scheduler replica))
+           {:replica replica})))
 
 (defmethod extensions/apply-log-entry :volunteer-for-task
   [entry replica]
