@@ -75,7 +75,7 @@
         url (:url peer-site)
         route (format "%s%s" url send-route)
         compressed-batch (nippy/freeze messages)]
-    (client/post route {:body (ByteBuffer/wrap (.array compressed-batch))}))
+    (client/post route {:body (ByteBuffer/wrap compressed-batch)}))
   {})
 
 (defmethod extensions/internal-ack-message HttpKit
@@ -84,7 +84,7 @@
         url (:url (get-in replica [:peer-site acker-id]))
         route (format "%s%s" url acker-route)
         contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
-    (client/post route {:body (ByteBuffer/wrap (.array contents))})))
+    (client/post route {:body (ByteBuffer/wrap contents)})))
 
 (defmethod extensions/internal-complete-message HttpKit
   [messenger id peer-id replica]
@@ -92,5 +92,5 @@
         url (:url (get-in snapshot [:peer-site peer-id]))
         route (format "%s%s" url completion-route)
         contents (nippy/freeze {:id id})]
-    (client/post route {:body (ByteBuffer/wrap (.array contents))})))
+    (client/post route {:body (ByteBuffer/wrap contents)})))
 
