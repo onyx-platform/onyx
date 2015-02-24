@@ -9,7 +9,7 @@
             [onyx.validation :as validator]
             [onyx.planning :as planning]))
 
-(defn saturation [catalog]
+(defn ^{:no-doc true} saturation [catalog]
   (let [rets
         (reduce #(+ %1 (or (:onyx/max-peers %2)
                            Double/POSITIVE_INFINITY))
@@ -19,7 +19,7 @@
       Double/POSITIVE_INFINITY
       rets)))
 
-(defn task-saturation [catalog tasks]
+(defn ^{:no-doc true} task-saturation [catalog tasks]
   (into
    {}
    (map
@@ -29,7 +29,7 @@
            Double/POSITIVE_INFINITY)})
     tasks)))
 
-(defn map-set-workflow->workflow
+(defn ^{:added "0.6.0"} map-set-workflow->workflow
   "Converts a workflow in format:
    {:a #{:b :c}
     :b #{:d}}
@@ -45,7 +45,7 @@
               []
               workflow)))
 
-(defn unpack-map-workflow
+(defn ^{:added "0.6.0"} unpack-map-workflow
   ([workflow] (vec (unpack-map-workflow workflow [])))
   ([workflow result]
      (let [roots (keys workflow)]
@@ -61,39 +61,40 @@
                   roots))
          result))))
 
-(defn add-job-percentage [config job args]
+(defn ^{:no-doc true} add-job-percentage [config job args]
   (if (= (:onyx.peer/job-scheduler config) :onyx.job-scheduler/percentage)
     (assoc args :percentage (:percentage job))
     args))
 
-(defn task-id->pct [catalog task]
+(defn ^{:no-doc true} task-id->pct [catalog task]
   (let [task-map (planning/find-task catalog (:name task))]
     {(:id task) (:onyx/percentage task-map)}))
 
-(defn add-task-percentage [args job-id tasks catalog]
+(defn ^{:no-doc true} add-task-percentage [args job-id tasks catalog]
   (if (= (:task-scheduler args) :onyx.task-scheduler/percentage)
     (assoc-in args
               [:task-percentages]
               (into {} (map (fn [t] (task-id->pct catalog t)) tasks)))
     args))
 
-(defn add-percentages-to-log-entry [config job args tasks catalog job-id]
+(defn ^{:no-doc true} add-percentages-to-log-entry
+  [config job args tasks catalog job-id]
   (let [job-updated (add-job-percentage config job args)]
     (add-task-percentage job-updated job-id tasks catalog)))
 
-(defn find-input-tasks [catalog tasks]
+(defn ^{:no-doc true} find-input-tasks [catalog tasks]
   (map :id (filter (fn [task]
                      (let [task (planning/find-task catalog (:name task))]
                        (= :input (:onyx/type task))))
                    tasks)))
 
-(defn find-output-tasks [catalog tasks]
+(defn ^{:no-doc true} find-output-tasks [catalog tasks]
   (map :id (filter (fn [task]
                      (let [task (planning/find-task catalog (:name task))]
                        (= :output (:onyx/type task))))
                    tasks)))
 
-(defn submit-job [config job]
+(defn ^{:added "0.6.0"} submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
         normalized-workflow (if (map? (:workflow job))
@@ -125,7 +126,7 @@
     (component/stop client)
     id))
 
-(defn kill-job
+(defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
    tasks for this job cleanly stop executing and volunteer to work on other jobs.
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
@@ -137,7 +138,7 @@
     (component/stop client)
     true))
 
-(defn subscribe-to-log
+(defn ^{:added "0.6.0"} subscribe-to-log
   "Sends all events from the log to the provided core.async channel.
    Starts at the origin of the log and plays forward monotonically.
 
@@ -150,7 +151,7 @@
     {:replica (extensions/subscribe-to-log (:log env) ch)
      :env env}))
 
-(defn gc
+(defn ^{:added "0.6.0"} gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
    for peers, decreasing memory usage. Also deletes old log entries from
    ZooKeeper, freeing up disk space.
@@ -175,7 +176,7 @@
     (component/stop client)
     true))
 
-(defn await-job-completion
+(defn ^{:added "0.6.0"} await-job-completion
   "Blocks until job-id has had all of its tasks completed."
   [config job-id]
   (let [client (component/start (system/onyx-client config))
@@ -191,7 +192,7 @@
           (do (component/stop client)
               true))))))
 
-(defn peer-lifecycle [started-peer config shutdown-ch ack-ch]
+(defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
     (loop [live started-peer]
       (let [restart-ch (:restart-ch (:virtual-peer live))
@@ -208,7 +209,7 @@
       (fatal "Peer lifecycle threw an exception")
       (fatal e))))
 
-(defn start-peers!
+(defn ^{:added "0.6.0"} start-peers!
   "Launches n virtual peers. Each peer may be stopped
    by passing it to the shutdown-peer function."
   ([n config]
@@ -226,19 +227,23 @@
             :ack-ch ack-ch}))
        (range n)))))
 
-(defn shutdown-peer
-  "Spins down the virtual peer"
+(defn ^{:added "0.6.0"} shutdown-peer
+  "Shuts down the virtual peer, which releases all of its resources
+   and removes it from the execution of any tasks. This peer will
+   not longer volunteer for tasks."
   [peer]
   (>!! (:shutdown-ch peer) true)
-  (<!! (:ack-ch peer)))
+  (<!! (:ack-ch peer))
+  (close! (:shutdown-ch peer))
+  (close! (:ack-ch peer)))
 
-(defn start-env
-  "Spins up a development environment, using in-memory ZooKeeper and HornetQ"
+(defn ^{:added "0.6.0"} start-env
+  "Starts a development environment using an in-memory implementation ZooKeeper."
   [env-config]
   (component/start (system/onyx-development-env env-config)))
 
-(defn shutdown-env
-  "Spins down the given development environment"
+(defn ^{:added "0.6.0"} shutdown-env
+  "Shuts down the given development environment."
   [env]
   (component/stop env))
 

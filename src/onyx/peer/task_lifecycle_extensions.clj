@@ -21,7 +21,7 @@
    event
    [name-dispatch ident-dispatch type-and-medium-dispatch type-dispatch]))
 
-(defmulti start-lifecycle?
+(defmulti ^{:added "0.6.0"} start-lifecycle?
   "Sometimes znode ephemerality is not enough to signal that a task
    can begin executing due to external conditions. Onyx addresses this
    concern by providing this check just before task execution begin.
@@ -33,25 +33,25 @@
    This operation will be retried after a back-off period."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti inject-lifecycle-resources
+(defmulti ^{:added "0.6.0"} inject-lifecycle-resources
   "Adds keys to the event map. This function is called once
    at the start of each task each for each virtual peer.
    Keys added may be accessed later in the lifecycle.
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti inject-temporal-resources
+(defmulti ^{:added "0.6.0"} inject-temporal-resources
   "Adds keys to the event map. This function is called once
    per pipeline execution per virtual peer. Keys added may
    be accessed later in the lifecycle. Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti close-temporal-resources
+(defmulti ^{:added "0.6.0"} close-temporal-resources
   "Closes any resources that were opened during a particular lifecycle run.
    Called once for each lifecycle run. Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti close-lifecycle-resources
+(defmulti ^{:added "0.6.0"} close-lifecycle-resources
   "Closes any resources that were opened during the execution of a task by a
    virtual peer. Called once at the end of a task for each virtual peer.
    Must return a map."

@@ -1,6 +1,7 @@
 #### 0.6.0
 
 - Dropped support for `:sequential` tasks.
+- Added metadata to all public API functions indicating which Onyx version they were added in.
 
 #### 0.5.0
 
