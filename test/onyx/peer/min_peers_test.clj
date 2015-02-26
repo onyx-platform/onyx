@@ -1,10 +1,8 @@
-(ns onyx.peer.single-peer-test
+(ns onyx.peer.min-peers-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.system :refer [onyx-development-env]]
             [onyx.plugin.core-async]
-            [onyx.test-helpers :refer [with-env-peers]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -13,15 +11,12 @@
 
 (def scheduler :onyx.job-scheduler/greedy)
 
-(def messaging :http-kit)
-
 (def env-config
   {:zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id id
-   :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl messaging})
+   :onyx.peer/job-scheduler scheduler})
 
 (def peer-config
   {:zookeeper/address (:address (:zookeeper config))
@@ -30,7 +25,7 @@
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl messaging})
+   :onyx.messaging/impl :http-kit})
 
 (def env (onyx.api/start-env env-config))
 
@@ -52,7 +47,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.single-peer-test/my-inc
+    :onyx/fn :onyx.peer.min-peers-test/my-inc
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}

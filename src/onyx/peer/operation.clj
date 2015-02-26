@@ -33,9 +33,7 @@
        (into #{} (keys (:onyx.core/ingress-queues event))))))
 
 (defn on-last-batch
-  [{:keys [onyx.core/log onyx.core/queue onyx.core/decompressed
-           onyx.core/task-id onyx.core/pipeline-state onyx.core/task-node]
-    :as event} f]
+  [event f]
   {})
 
 (defn start-lifecycle?

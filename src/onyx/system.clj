@@ -20,9 +20,9 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]))
 
-(def development-components [:logging-config :log :messenger-buffer :messenger])
+(def development-components [:logging-config :log])
 
-(def client-components [:logging-config :log :messenger-buffer :messenger])
+(def client-components [:logging-config :log])
 
 (def peer-components [:logging-config :log :messenger-buffer :messenger :acking-daemon :virtual-peer])
 
@@ -63,15 +63,6 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
-(defrecord OnyxFakePeer []
-  component/Lifecycle
-  (start [this]
-    (rethrow-component
-     #(component/start-system this peer-components)))
-  (stop [this]
-    (rethrow-component
-     #(component/stop-system this peer-components))))
-
 (defn messenger-ctor [config]
   (let [rets ((get messenger (:onyx.messaging/impl config)) config)]
     (when-not rets
@@ -82,17 +73,13 @@
   [config]
   (map->OnyxDevelopmentEnv
    {:logging-config (logging-config/logging-configuration config)
-    :log (component/using (zookeeper config) [:logging-config])
-    :messenger-buffer (component/using (messenger-buffer config) [:log])
-    :messenger (component/using (messenger-ctor config) [:messenger-buffer])}))
+    :log (component/using (zookeeper config) [:logging-config])}))
 
 (defn onyx-client
   [config]
   (map->OnyxClient
    {:logging-config (logging-config/logging-configuration (:logging config))
-    :log (component/using (zookeeper config) [:logging-config])
-    :messenger-buffer (component/using (messenger-buffer config) [:log])
-    :messenger (component/using (messenger-ctor config) [:messenger-buffer])}))
+    :log (component/using (zookeeper config) [:logging-config])}))
 
 (defn onyx-peer
   [config]

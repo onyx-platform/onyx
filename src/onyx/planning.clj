@@ -1,7 +1,10 @@
 (ns onyx.planning
-  (:require [com.stuartsierra.dependency :as dep]
-            [onyx.extensions :as extensions])
+  (:require [com.stuartsierra.dependency :as dep])
   (:import [java.util UUID]))
+
+(defmulti create-io-task
+  (fn [element parents children]
+    (:onyx/type element)))
 
 (defn only [coll]
   (assert (not (next coll)))
@@ -55,14 +58,14 @@
   [catalog task-name parents children-names]
   (onyx-function-task catalog task-name parents children-names))
 
-(defmethod extensions/create-io-task :input
+(defmethod create-io-task :input
   [element parent children]
   [{:id (UUID/randomUUID)
     :name (:onyx/name element)
     :egress-ids (egress-ids-from-children children)
     :consumption (:onyx/consumption element)}])
 
-(defmethod extensions/create-io-task :output
+(defmethod create-io-task :output
   [element parents children]
   (let [task-name (:onyx/name element)]
     [{:id (get (:egress-ids (first parents)) (:onyx/name element))

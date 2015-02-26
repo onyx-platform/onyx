@@ -57,10 +57,8 @@
   (seq (filter (partial = :done) (map :message (:onyx.core/decompressed event)))))
 
 (defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event}]
-  (when-not (:exhausted? @(:onyx.core/pipeline-state event))
-    (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
-      (>!! (:onyx.core/outbox-ch event) entry)
-      (swap! (:onyx.core/pipeline-state event) assoc :exhausted? true))))
+  (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
+    (>!! (:onyx.core/outbox-ch event) entry)))
 
 (defn sentinel-id [event]
   (:id (first (filter #(= :done (:message %)) (:onyx.core/decompressed event)))))
@@ -233,7 +231,6 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
                            :onyx.core/peer-opts opts
-                           :onyx.core/pipeline-state (atom {})
                            :onyx.core/replica replica}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
@@ -245,8 +242,8 @@
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (while (not (common/job-covered? @replica job-id))
-          (prn "Job not covered yet. Backing off and trying again")
-          (Thread/sleep 2000))
+          (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+          (Thread/sleep 500))
 
         (release-messages! messenger pipeline-data)
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)

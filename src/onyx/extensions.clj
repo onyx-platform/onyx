@@ -36,6 +36,8 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
+(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
+
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
 (defmulti send-messages (fn [messenger event peer-site] (type messenger)))
@@ -45,48 +47,4 @@
 
 (defmulti internal-complete-message (fn [messenger id peer-id replica] (type messenger)))
 
-;; Queue interface
-
-(defmulti create-tx-session (fn [queue] (type queue)))
-
-(defmulti create-consumer (fn [queue session queue-name] (type queue)))
-
-(defmulti create-producer (fn [queue session queue-name] (type queue)))
-
-(defmulti consume-message (fn [queue consumer] (type queue)))
-
-(defmulti read-message (fn [queue message] (type queue)))
-
-(defmulti message-uuid (fn [queue message] (type queue)))
-
-(defmulti ack-message (fn [queue message] (type queue)))
-
-(defmulti produce-message (fn ([queue producer session msg] (type queue))
-                            ([queue producer session msg group] (type queue))))
-
-(defmulti commit-tx (fn [queue session] (type queue)))
-
-(defmulti rollback-tx (fn [queue session] (type queue)))
-
-(defmulti create-queue (fn [queue task] (type queue)))
-
-(defmulti create-queue-on-session (fn [queue session queue-name] (type queue)))
-
-(defmulti n-messages-remaining (fn [queue session queue-name] (type queue)))
-
-(defmulti n-consumers (fn [queue queue-name] (type queue)))
-
-(defmulti optimize-concurrently (fn [queue event] (type queue)))
-
-(defmulti bootstrap-queue (fn [queue task] (type queue)))
-
-(defmulti close-resource (fn [queue resource] (type queue)))
-
-(defmulti bind-active-session (fn [queue queue-name] (type queue)))
-
-(defmulti producer->queue-name (fn [queue queue-name] (type queue)))
-
-(defmulti create-io-task
-  (fn [element parents children]
-    (:onyx/type element)))
 
