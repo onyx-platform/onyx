@@ -324,10 +324,10 @@
 (defn washington-resident? [event {:keys [location]}]
   (= location "Washington"))
 
-(defn black? [{:keys [color]}]
+(defn black? [event {:keys [color]}]
   (= color "black"))
 
-(defn white? [{:keys [color]}]
+(defn white? [event {:keys [color]}]
   (= color "white"))
 
 (defn red? [event {:keys [color]}]
@@ -369,7 +369,7 @@
   :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def results (hq-util/consume-queue! hq-config out-queue echo))
+(def results (hq-util/consume-queue! hq-config everyone-out-queue echo))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

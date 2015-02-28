@@ -51,7 +51,7 @@
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
-        :else (clojure.set/union all to-add)))
+        :else (clojure.set/union (into #{} all) (into #{} to-add))))
 
 (defn choose-output-paths [flow-conditions event new downstream]
   (if (seq flow-conditions)
@@ -62,7 +62,7 @@
            (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
                      :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
            {:paths (join-output-paths paths (:flow/to entry) downstream)
-            :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
+            :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
          all))
      {:paths #{} :exclusions #{}}
      flow-conditions)
