@@ -49,7 +49,7 @@ This workflow takes some input in (presumably a stream of people), and directs s
   :flow/doc "Emits segment if this segment is an adult."}
 
  {:flow/from :input-stream
-  :flow/to [:process-western-females]
+  :flow/to [:process-female-athletes]
   :flow/predicate [:and :my.ns/female? :my.ns/athlete?]
   :flow/doc "Emits segment if this segment is a female athlete."}
   
