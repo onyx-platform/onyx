@@ -97,9 +97,6 @@
   {:color "yellow"}]
  echo)
 
-(defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n) :extra-key :blah))
-
 (def catalog
   [{:onyx/name :people-in
     :onyx/ident :hornetq/read-segments
@@ -157,7 +154,7 @@
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
-   {:onyx/name :process-blue
+   {:onyx/name :process-green
     :onyx/fn :onyx.peer.flow-test/process-green
     :onyx/type :function
     :onyx/consumption :concurrent
@@ -221,17 +218,17 @@
     :hornetq/queue-name blue-out-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}]
+    :onyx/batch-size batch-size}
 
-  {:onyx/name :green-out
-   :onyx/ident :hornetq/write-segments
-   :onyx/type :output
-   :onyx/medium :hornetq
-   :onyx/consumption :concurrent
-   :hornetq/queue-name green-out-queue
-   :hornetq/host (:host (:non-clustered (:hornetq config)))
-   :hornetq/port (:port (:non-clustered (:hornetq config)))
-   :onyx/batch-size batch-size})
+   {:onyx/name :green-out
+    :onyx/ident :hornetq/write-segments
+    :onyx/type :output
+    :onyx/medium :hornetq
+    :onyx/consumption :concurrent
+    :hornetq/queue-name green-out-queue
+    :hornetq/host (:host (:non-clustered (:hornetq config)))
+    :hornetq/port (:port (:non-clustered (:hornetq config)))
+    :onyx/batch-size batch-size}])
 
 (def workflow
   [[:people-in :process-children]
@@ -253,20 +250,20 @@
    [:process-green :green-out]])
 
 (def flow-conditions
-  [{:flow/from :in
+  [{:flow/from :people-in
     :flow/to [:process-children]
     :child/age 17
     :flow/predicate [:onyx.peer.flow-test/child? :child/age]}
 
-   {:flow/from :in
+   {:flow/from :people-in
     :flow/to [:process-adults]
     :flow/predicate :onyx.peer.flow-test/adult?}
 
-   {:flow/from :in
+   {:flow/from :people-in
     :flow/to [:process-athletes-in-washington]
     :flow/predicate [:and :onyx.peer.flow-test/athlete? :onyx.peer.flow-test/washington-resident?]}
 
-   {:flow/from :in
+   {:flow/from :people-in
     :flow/to [:process-everyone]
     :flow/predicate :onyx.peer.flow-test/constantly-true}
 
@@ -327,6 +324,12 @@
 (defn washington-resident? [event {:keys [location]}]
   (= location "Washington"))
 
+(defn black? [{:keys [color]}]
+  (= color "black"))
+
+(defn white? [{:keys [color]}]
+  (= color "white"))
+
 (defn red? [event {:keys [color]}]
   (= color "red"))
 
@@ -355,7 +358,7 @@
 (defn process-blue [segment]
   (assoc segment :extra-key "Some extra context for the predicates"))
 
-(def process-green [segment]
+(defn process-green [segment]
   (assoc segment :extra-key "Some extra context for the predicates"))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
