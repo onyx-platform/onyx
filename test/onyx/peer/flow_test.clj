@@ -369,7 +369,19 @@
   :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def results (hq-util/consume-queue! hq-config everyone-out-queue echo))
+(def children (hq-util/consume-queue! hq-config children-out-queue))
+
+(def adults (hq-util/consume-queue! hq-config adults-out-queue))
+
+(def athletes-wa (hq-util/consume-queue! hq-config athletes-wa-out-queue))
+
+(def everyone (hq-util/consume-queue! hq-config everyone-out-queue))
+
+(def red (hq-util/consume-queue! hq-config red-out-queue))
+
+(def blue (hq-util/consume-queue! hq-config blue-out-queue))
+
+(def green (hq-util/consume-queue! hq-config green-out-queue))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

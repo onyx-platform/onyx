@@ -170,6 +170,8 @@
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
          (close! ch))
+       (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+         (close! ch))
        (catch Exception e
          (fatal e))))
     (<!! rets)))
