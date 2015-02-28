@@ -20,7 +20,7 @@ This section covers flow conditions. Flow conditions are used for isolating logi
 
 ### Summary
 
-Workflows specify the structure of your computation as a directed, acyclic graph. A workflow describes all *possible* routes that a segment can take as it enters your workflow. On the other hand, we often have the need to articulate how an *individual* segment moves throughout your workflow. Many times, a segment conditionally moves from one task to another. This is a concept that Onyx takes apart and turns into its own idea, independent of the rest of your computation. They're called Flow Conditions.
+Workflows specify the structure of your computation as a directed, acyclic graph. A workflow describes all *possible* routes that a segment can take as it enters your workflow. On the other hand, we often have the need to specify how an *individual* segment moves throughout your workflow. Many times, a segment conditionally moves from one task to another. This is a concept that Onyx takes apart and turns into its own idea, independent of the rest of your computation. They're called Flow Conditions. It should be mentioned straight away that Flow Conditions are entirely optional, and your program can ignore them entirely if you'd like. Omitting them leads to the default behavior, which sends a segment to all immediate downstream tasks.
 
 ### Motivating Example
 
@@ -29,15 +29,15 @@ The easiest way to learn how to use flow conditions is to see an example. Suppos
 ```clojure
 [[:input-stream :process-children]
  [:input-stream :process-adults]
- [:input-stream :process-western-females]
+ [:input-stream :process-female-athletes]
  [:input-stream :process-everyone]
  ...]
 ```
 
-This workflow takes some input in (presumably a stream of people), and directs segments to four possible tasks - `:process-children`, `:process-adults`, `:process-western-females`, and `:process-everyone`. Suppose we want to *conditionally* direct a segment to zero or more of these tasks, depending on some predicates. We use flow conditions to carry out this work. Flow conditions are their own data structure that are bundled along with the workflow and catalog to `onyx.api/submit-job`. Here's an example of what a flow conditions data structure would look like for our proposed workflow:
+This workflow takes some input in (presumably a stream of people), and directs segments to four possible tasks - `:process-children`, `:process-adults`, `:process-athlete-females`, and `:process-everyone`. Suppose we want to *conditionally* direct a segment to zero or more of these tasks, depending on some predicates. We use flow conditions to carry out this work. Flow conditions are their own data structure that are bundled along with the workflow and catalog to `onyx.api/submit-job`. Here's an example of what a flow conditions data structure would look like for our proposed workflow:
 
 ```clojure
-[{:flow/from :input-stream                                                                                                                                  
+[{:flow/from :input-stream
   :flow/to [:process-children]
   :my/max-child-age 17
   :flow/predicate [:my.ns/child? :my/max-child-age]
@@ -50,8 +50,8 @@ This workflow takes some input in (presumably a stream of people), and directs s
 
  {:flow/from :input-stream
   :flow/to [:process-western-females]
-  :flow/predicate [:and :my.ns/female? :my.ns/western?]
-  :flow/doc "Emits segment if this segment is a western female."}
+  :flow/predicate [:and :my.ns/female? :my.ns/athlete?]
+  :flow/doc "Emits segment if this segment is a female athlete."}
   
  {:flow/from :input-stream
   :flow/to [:process-everyone]
@@ -62,8 +62,6 @@ This workflow takes some input in (presumably a stream of people), and directs s
 The basic idea is that every entry in the Flow Conditions data structure denotes a relationship between a task and its downstream tasks. `:flow/from` indicates the task that the segment is leaving, and `:flow/to` indicates the tasks that the segment should be sent to if the predicate evaluates to true. The predicate is denoted by `:flow/predicate`, which is a keyword or sequence of keywords that are resolved to a function. Later in this section, we'll cover how exactly the predicate function is constructed.
 
 There is *one* flow conditions data structure per job - that is, there is one vector of maps. The order that you specify the flow conditions in matters. More on that later in this section.
-
-Flow Conditions are entirely optional! Omitting them leads to the default behavior, which sends a segment to all immediate downstream tasks.
 
 ### Predicate Function Signatures
 
@@ -81,8 +79,8 @@ Predicates for the above examples can be seen below:
 (defn female? [event segment]
   (= (:gender segment) "Female"))
 
-(defn western? [event segment]
-  (some #{(:state segment)} #{"CA" "WA" "AZ" ...}))
+(defn athlete? [event segment]
+  (= (:job segment) "athlete"))
 
 (def constantly-true (constantly true))
 ```
@@ -114,26 +112,26 @@ Our predicate for flow conditions might need to use the `:side-effects-result` t
 
 ### Predicate Composition
 
-One extraordinarily powerful feature of Flow Conditions is its composition characters. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and western living in `[:and :my.ns/female? :my.ns/western?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/western? :my/state-param]]` Parameters *may not* specify logical functions.
+One extraordinarily powerful feature of Flow Conditions is its composition characters. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and an athlete in `[:and :my.ns/female? :my.ns/athlete?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/athlete? :my/state-param]]` Parameters *may not* specify logical functions.
 
 ### Match All/None
 
 Sometimes, you want a flow condition that emits a value to all tasks if the predicate is true. You can use short hand to emit to all downstream tasks:
 
 ```clojure
- {:flow/from :input-stream
-  :flow/to :all
-  :flow/short-circuit? true
-  :flow/predicate :my.ns/adult?}
+{:flow/from :input-stream
+ :flow/to :all
+ :flow/short-circuit? true
+ :flow/predicate :my.ns/adult?}
 ```
 
 Similarly, sometimes you want to emit to no downstream tasks:
 
 ```clojure
- {:flow/from :input-stream
-  :flow/to :none
-  :flow/short-circuit? true
-  :flow/predicate :my.ns/adult?}
+{:flow/from :input-stream
+ :flow/to :none
+ :flow/short-circuit? true
+ :flow/predicate :my.ns/adult?}
 ```
 
 If a flow condition specifies `:all` as its `:flow/to`, it must come before any other flow conditions. If a flow condition specifies `:none` as its `:flow/to`, it must come directly behind an `:all` condition, or first if there is no `:all` condition. This is because of the semantics of short circuiting. We'll discuss what short circuiting means later in this section.
