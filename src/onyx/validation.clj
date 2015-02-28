@@ -203,7 +203,6 @@
                       {:entry entry})))))
 
 (defn validate-flow-conditions [flow-conditions-schema workflow]
-  ;; TODO: no flow conditions on output tasks allowed
   (validate-flow-structure flow-conditions-schema)
   (validate-flow-connections flow-conditions-schema workflow)
   (validate-flow-pred-all-kws flow-conditions-schema)
