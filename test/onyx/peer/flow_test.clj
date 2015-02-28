@@ -273,38 +273,46 @@
    {:flow/from :colors-in
     :flow/to :all
     :flow/short-circuit? true
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/white?}
 
    {:flow/from :colors-in
     :flow/to :none
     :flow/short-circuit? true
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/black?}
 
    {:flow/from :colors-in
     :flow/to [:process-red]
     :flow/short-circuit? true
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/red?}
 
    {:flow/from :colors-in
     :flow/to [:process-blue]
     :flow/short-circuit? true
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/blue?}
 
    {:flow/from :colors-in
     :flow/to [:process-green]
     :flow/short-circuit? true
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/green?}
 
    {:flow/from :colors-in
     :flow/to [:process-red]
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/orange?}
 
    {:flow/from :colors-in
     :flow/to [:process-blue]
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/orange?}
 
    {:flow/from :colors-in
     :flow/to [:process-green]
+    :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/orange?}])
 
 (defn child? [event {:keys [age]} max-child-age]
@@ -332,6 +340,23 @@
   (= color "orange"))
 
 (def constantly-true (constantly true))
+
+(def process-children identity)
+
+(def process-adults identity)
+
+(def process-athletes-in-washington identity)
+
+(def process-everyone identity)
+
+(defn process-red [segment]
+  (assoc segment :extra-key "Some extra context for the predicates"))
+
+(defn process-blue [segment]
+  (assoc segment :extra-key "Some extra context for the predicates"))
+
+(def process-green [segment]
+  (assoc segment :extra-key "Some extra context for the predicates"))
 
 (def v-peers (onyx.api/start-peers! 1 peer-config))
 
