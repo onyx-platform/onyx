@@ -60,7 +60,7 @@
        (if ((:flow/predicate entry) [event new])
          (if (:flow/short-circuit? entry)
            (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
-                     :exclusions (clojure.set/union exclusions (:flow/exclude-keys entry))})
+                     :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
            {:paths (join-output-paths paths (:flow/to entry) downstream)
             :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
          all))

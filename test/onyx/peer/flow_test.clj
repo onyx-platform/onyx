@@ -86,15 +86,15 @@
 
 (hq-util/write-and-cap!
  hq-config colors-in-queue
- [{:color "red"}
-  {:color "blue"}
-  {:color "white"}
-  {:color "green"}
-  {:color "orange"}
-  {:color "black"}
-  {:color "purple"}
-  {:color "cyan"}
-  {:color "yellow"}]
+ [{:color "red" :extra-key "Some extra context for the predicates"}
+  {:color "blue" :extra-key "Some extra context for the predicates"}
+  {:color "white" :extra-key "Some extra context for the predicates"}
+  {:color "green" :extra-key "Some extra context for the predicates"}
+  {:color "orange" :extra-key "Some extra context for the predicates"}
+  {:color "black" :extra-key "Some extra context for the predicates"}
+  {:color "purple" :extra-key "Some extra context for the predicates"}
+  {:color "cyan" :extra-key "Some extra context for the predicates"}
+  {:color "yellow" :extra-key "Some extra context for the predicates"}]
  echo)
 
 (def catalog
@@ -352,16 +352,13 @@
 
 (def process-everyone identity)
 
-(defn process-red [segment]
-  (assoc segment :extra-key "Some extra context for the predicates"))
+(def process-red identity)
 
-(defn process-blue [segment]
-  (assoc segment :extra-key "Some extra context for the predicates"))
+(def process-blue identity)
 
-(defn process-green [segment]
-  (assoc segment :extra-key "Some extra context for the predicates"))
+(def process-green identity)
 
-(def v-peers (onyx.api/start-peers! 1 peer-config))
+(def v-peers (onyx.api/start-peers! 16 peer-config))
 
 (onyx.api/submit-job
  peer-config
@@ -369,26 +366,80 @@
   :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def children (hq-util/consume-queue! hq-config children-out-queue))
+(def children (hq-util/consume-queue! hq-config children-out-queue 10))
 
-(def adults (hq-util/consume-queue! hq-config adults-out-queue))
+(def adults (hq-util/consume-queue! hq-config adults-out-queue 10))
 
-(def athletes-wa (hq-util/consume-queue! hq-config athletes-wa-out-queue))
+(def athletes-wa (hq-util/consume-queue! hq-config athletes-wa-out-queue 10))
 
-(def everyone (hq-util/consume-queue! hq-config everyone-out-queue))
+(def everyone (hq-util/consume-queue! hq-config everyone-out-queue 10))
 
-(def red (hq-util/consume-queue! hq-config red-out-queue))
+(def red (hq-util/consume-queue! hq-config red-out-queue 10))
 
-(def blue (hq-util/consume-queue! hq-config blue-out-queue))
+(def blue (hq-util/consume-queue! hq-config blue-out-queue 10))
 
-(def green (hq-util/consume-queue! hq-config green-out-queue))
+(def green (hq-util/consume-queue! hq-config green-out-queue 10))
+
+(def children-expectatations
+  #{{:age 17 :job "programmer" :location "Washington"}
+    {:age 13 :job "student" :location "Maine"}        
+    :done})
+
+(def adults-expectatations
+  #{{:age 24 :job "athlete" :location "Washington"}
+    {:age 18 :job "mechanic" :location "Vermont"}
+    {:age 42 :job "doctor" :location "Florida"}
+    {:age 64 :job "athlete" :location "Pennsylvania"}
+    {:age 35 :job "bus driver" :location "Texas"}
+    {:age 50 :job "lawyer" :location "California"}
+    {:age 25 :job "psychologist" :location "Washington"}
+    :done})
+
+(def athletes-wa-expectatations
+  #{{:age 24 :job "athlete" :location "Washington"}
+    :done})
+
+(def everyone-expectatations
+  #{{:age 24 :job "athlete" :location "Washington"}
+    {:age 17 :job "programmer" :location "Washington"}
+    {:age 18 :job "mechanic" :location "Vermont"}
+    {:age 13 :job "student" :location "Maine"}
+    {:age 42 :job "doctor" :location "Florida"}
+    {:age 64 :job "athlete" :location "Pennsylvania"}
+    {:age 35 :job "bus driver" :location "Texas"}
+    {:age 50 :job "lawyer" :location "California"}
+    {:age 25 :job "psychologist" :location "Washington"}
+    :done})
+
+(def red-expectatations
+  #{{:color "white"}
+    {:color "red"}
+    {:color "orange"}
+    :done})
+
+(def blue-expectatations
+  #{{:color "white"}
+    {:color "blue"}
+    {:color "orange"}
+    :done})
+
+(def green-expectatations
+  #{{:color "white"}
+    {:color "green"}
+    {:color "orange"}
+    :done})
+
+(fact (into #{} children) => children-expectatations)
+(fact (into #{} adults) => adults-expectatations)
+(fact (into #{} athletes-wa) => athletes-wa-expectatations)
+(fact (into #{} everyone) => everyone-expectatations)
+
+(fact (into #{} green) => green-expectatations)
+(fact (into #{} red) => red-expectatations)
+(fact (into #{} blue) => blue-expectatations)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (filter even? (range 11 n-messages))))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
 
 (onyx.api/shutdown-env env)
 

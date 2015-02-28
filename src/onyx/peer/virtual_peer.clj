@@ -37,6 +37,12 @@
                 reactions (extensions/reactions entry replica new-replica diff state)
                 new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
             (recur new-replica (send-to-outbox new-state reactions))))))
+    (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+      ;; Subscriber fell out while reading. Intentionally pass and fall out.
+      )
+    (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+      ;; Same deal.
+      )
     (catch Exception e
       (taoensso.timbre/fatal "Fell out of processing loop")
       (taoensso.timbre/fatal e))))
