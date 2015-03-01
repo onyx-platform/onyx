@@ -33,11 +33,11 @@
     {:status 200
      :headers {"Content-Type" "text/plain"}}))
 
-(defrecord HttpKit [opts]
+(defrecord HttpKitWebSockets [opts]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting HTTP Kit")
+    (taoensso.timbre/info "Starting HTTP Kit WebSockets")
 
     (let [ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000))
@@ -47,20 +47,20 @@
       (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping HTTP Kit")
+    (taoensso.timbre/info "Stopping HTTP Kit WebSockets")
 
     (close! (:release-ch component))
     ((:server component))
     (assoc component :release-ch nil)))
 
-(defn http-kit [opts]
-  (map->HttpKit {:opts opts}))
+(defn http-kit-web-sockets [opts]
+  (map->HttpKitWebSockets {:opts opts}))
 
-(defmethod extensions/peer-site HttpKit
+(defmethod extensions/peer-site HttpKitWebSockets
   [messenger]
   {:url (format "http://%s:%s" (:ip messenger) (:port messenger))})
 
-(defmethod extensions/receive-messages HttpKit
+(defmethod extensions/receive-messages HttpKitWebSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
         ch (:inbound-ch (:onyx.core/messenger-buffer event))]
@@ -69,7 +69,7 @@
      (map (fn [_] (first (alts!! [ch (timeout ms)])))
           (range (:onyx/batch-size task-map))))))
 
-(defmethod extensions/send-messages HttpKit
+(defmethod extensions/send-messages HttpKitWebSockets
   [messenger event peer-site]
   (let [messages (:onyx.core/compressed event)
         url (:url peer-site)
@@ -78,7 +78,7 @@
     (client/post route {:body (ByteBuffer/wrap compressed-batch)}))
   {})
 
-(defmethod extensions/internal-ack-message HttpKit
+(defmethod extensions/internal-ack-message HttpKitWebSockets
   [messenger event message-id acker-id completion-id ack-val]
   (let [replica @(:onyx.core/replica event)
         url (:url (get-in replica [:peer-site acker-id]))
@@ -86,7 +86,7 @@
         contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
     (client/post route {:body (ByteBuffer/wrap contents)})))
 
-(defmethod extensions/internal-complete-message HttpKit
+(defmethod extensions/internal-complete-message HttpKitWebSockets
   [messenger id peer-id replica]
   (let [snapshot @replica
         url (:url (get-in snapshot [:peer-site peer-id]))
