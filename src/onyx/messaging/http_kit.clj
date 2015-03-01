@@ -16,22 +16,24 @@
 (def completion-route "/completion")
 
 (defn app [daemon inbound-ch release-ch request]
-  (let [thawed (nippy/thaw (.bytes (:body request)))
-        uri (:uri request)]
-    (cond (= uri send-route)
-          (doseq [message thawed]
-            (>!! inbound-ch message))
+  (server/with-channel request channel
+    (server/on-receive
+     channel
+     (fn [data]
+       (let [thawed (nippy/thaw data)
+             uri (:uri request)]
+         (cond (= uri send-route)
+               (doseq [message thawed]
+                 (>!! inbound-ch message))
 
-          (= uri acker-route)
-          (acker/ack-message daemon
-                             (:id thawed)
-                             (:completion-id thawed)
-                             (:ack-val thawed))
+               (= uri acker-route)
+               (acker/ack-message daemon
+                                  (:id thawed)
+                                  (:completion-id thawed)
+                                  (:ack-val thawed))
 
-          (= uri completion-route)
-          (>!! release-ch (:id thawed)))
-    {:status 200
-     :headers {"Content-Type" "text/plain"}}))
+               (= uri completion-route)
+               (>!! release-ch (:id thawed))))))))
 
 (defrecord HttpKitWebSockets [opts]
   component/Lifecycle
@@ -58,7 +60,10 @@
 
 (defmethod extensions/peer-site HttpKitWebSockets
   [messenger]
-  {:url (format "http://%s:%s" (:ip messenger) (:port messenger))})
+  {:url (format "ws://%s:%s" (:ip messenger) (:port messenger))})
+
+(defmethod extensions/connect-to-peer HttpKitWebSockets
+  [messenger event peer-site])
 
 (defmethod extensions/receive-messages HttpKitWebSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
