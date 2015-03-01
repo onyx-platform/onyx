@@ -120,7 +120,8 @@
       (extensions/write-chunk (:log client) :task task id)
       (let [task-map (planning/find-task (:catalog job) (:name task))]
         (when (:onyx/bootstrap? task-map)
-          (extensions/bootstrap-queue (:queue client) task))))
+          ;; TODO: reimplment bootstrapping.
+          )))
 
     (extensions/write-log-entry (:log client) entry)
     (component/stop client)

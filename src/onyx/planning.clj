@@ -27,7 +27,7 @@
   [catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
         children (map (partial find-task catalog) children-names)]
-    (extensions/create-io-task element parents children)))
+    (create-io-task element parents children)))
 
 (defn onyx-function-task [catalog task-name parents children-names]
   (let [element (find-task catalog task-name)
