@@ -62,6 +62,25 @@
        (common/alive-jobs replica)
        (common/jobs-with-available-tasks replica)))
 
+(defn exempt-from-acker? [replica job task args]
+  (or (some #{task} (:acker-exempt-tasks replica))
+      (when (:acker-exclude-input-tasks replica)
+        (some #{task} (get-in replica [:input-tasks job])))
+      (when (:acker-exclude-output-tasks replica)
+        (some #{task} (get-in replica [:output-tasks job]))
+        true)))
+
+(defn offer-acker [replica job task args]
+  (let [peers (count (apply concat (vals (get-in replica [:allocations job]))))
+        ackers (count (get-in replica [:ackers job]))
+        pct (get-in replica [:acker-percentage job])
+        current-pct (int (Math/ceil (* 10 (double (/ ackers peers)))))]
+    (if (and (< current-pct pct) (exempt-from-acker? replica job task args))
+      (-> replica
+          (update-in [:ackers job] conj (:id args))
+          (update-in [:ackers job] vec))
+      replica)))
+
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (universally-executable-jobs replica))]
@@ -71,7 +90,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job task args)))
       replica)))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
@@ -86,7 +106,8 @@
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
               (update-in [:allocations job task] vec)
-              (assoc-in [:peer-state (:id args)] :warming-up)))
+              (assoc-in [:peer-state (:id args)] :warming-up)
+              (offer-acker job task args)))
         replica))
     replica))
 
@@ -109,7 +130,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job task args)))
       replica)))
 
 (defmethod select-job :default
