@@ -28,7 +28,7 @@
   (assoc m :ack-val (acker/gen-ack-value)))
 
 (defn add-acker-id [event m]
-  (let [peers (:peers @(:onyx.core/replica event))
+  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
         n (mod (.hashCode (:message m)) (count peers))]
     (assoc m :acker-id (nth peers n))))
 
