@@ -62,6 +62,17 @@
        (common/alive-jobs replica)
        (common/jobs-with-available-tasks replica)))
 
+(defn offer-acker [replica job args]
+  (let [peers (count (apply concat (vals (get-in replica [:allocations job]))))
+        ackers (count (get-in replica [:ackers job]))
+        pct (get-in replica [:acker-percentage job])
+        current-pct (int (Math/ceil (* 10 (double (/ ackers peers)))))]
+    (if (< current-pct pct)
+      (-> replica
+          (update-in [:ackers job] conj (:id args))
+          (update-in [:ackers job] vec))
+      replica)))
+
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (universally-executable-jobs replica))]
@@ -71,7 +82,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job args)))
       replica)))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
@@ -86,7 +98,8 @@
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
               (update-in [:allocations job task] vec)
-              (assoc-in [:peer-state (:id args)] :warming-up)))
+              (assoc-in [:peer-state (:id args)] :warming-up)
+              (offer-acker job args)))
         replica))
     replica))
 
@@ -109,7 +122,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job args)))
       replica)))
 
 (defmethod select-job :default
