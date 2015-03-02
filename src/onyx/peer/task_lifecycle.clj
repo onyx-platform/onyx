@@ -37,11 +37,13 @@
 
 (defn tag-each-message [event]
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (let [event
-          (-> event
-              (update-in [:onyx.core/batch] (partial map add-ack-value))
-              (update-in [:onyx.core/batch] (partial map (partial add-acker-id event)))
-              (update-in [:onyx.core/batch] (partial map (partial add-completion-id event))))]
+    (let [event (update-in event 
+                           [:onyx.core/batch]
+                           (fn [batch]
+                             (map (comp (partial add-completion-id event)
+                                        (partial add-acker-id event)
+                                        add-ack-value)
+                                  batch)))]
       (doseq [raw-segment (:onyx.core/batch event)]
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
