@@ -63,12 +63,15 @@
 (defmethod extensions/receive-messages HttpKit
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
-        ch (:inbound-ch (:onyx.core/messenger-buffer event))]
-    (repeatedly (:onyx/batch-size task-map) #(<!! ch))
-    #_(filter
-     identity
-     (map (fn [_] (first (alts!! [ch (timeout ms)])))
-          (range (:onyx/batch-size task-map))))))
+        ch (:inbound-ch (:onyx.core/messenger-buffer event))
+        timeout-ch (timeout ms)]
+    (loop [segments [] i 0]
+      (if (< i (:onyx/batch-size task-map)) 
+        (let [[v c] (alts!! [ch timeout-ch])] 
+          (if (= ch c)
+            (recur (conj segments v) (inc i))
+            segments))
+        segments))))
 
 (defmethod extensions/send-messages HttpKit
   [messenger event peer-site]
