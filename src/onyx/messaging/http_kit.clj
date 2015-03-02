@@ -67,10 +67,9 @@
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
       (if (< i (:onyx/batch-size task-map)) 
-        (let [[v c] (alts!! [ch timeout-ch])] 
-          (if (= ch c)
-            (recur (conj segments v) (inc i))
-            segments))
+        (if-let [v (first (alts!! [ch timeout-ch]))] 
+          (recur (conj segments v) (inc i))
+          segments)
         segments))))
 
 (defmethod extensions/send-messages HttpKit
