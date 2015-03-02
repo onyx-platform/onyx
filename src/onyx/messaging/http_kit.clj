@@ -64,7 +64,8 @@
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
         ch (:inbound-ch (:onyx.core/messenger-buffer event))]
-    (filter
+    (repeatedly (:onyx/batch-size task-map) #(<!! ch))
+    #_(filter
      identity
      (map (fn [_] (first (alts!! [ch (timeout ms)])))
           (range (:onyx/batch-size task-map))))))
