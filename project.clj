@@ -14,7 +14,7 @@
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
-                 [zookeeper-clj "0.9.1" :exclusions [commons-codec]]
+                 [zookeeper-clj "0.9.1"]
                  [prismatic/schema "0.3.1"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
