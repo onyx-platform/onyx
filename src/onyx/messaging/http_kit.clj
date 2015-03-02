@@ -42,10 +42,10 @@
     (taoensso.timbre/info "Starting HTTP Kit WebSockets")
 
     (let [ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (clojure.core.async/dropping-buffer 1000))
+          release-ch (chan (clojure.core.async/dropping-buffer 100000))
           daemon (:acking-daemon component)
           ip "0.0.0.0"
-          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 1000})]
+          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 100000})]
       (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
 
   (stop [component]
@@ -68,11 +68,14 @@
 (defmethod extensions/receive-messages HttpKitWebSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
-        ch (:inbound-ch (:onyx.core/messenger-buffer event))]
-    (filter
-     identity
-     (map (fn [_] (first (alts!! [ch (timeout ms)])))
-          (range (:onyx/batch-size task-map))))))
+        ch (:inbound-ch (:onyx.core/messenger-buffer event))
+        timeout-ch (timeout ms)]
+    (loop [segments [] i 0]
+      (if (< i (:onyx/batch-size task-map)) 
+        (if-let [v (first (alts!! [ch timeout-ch]))] 
+          (recur (conj segments v) (inc i))
+          segments)
+        segments))))
 
 (defmethod extensions/send-messages HttpKitWebSockets
   [messenger event peer-site]

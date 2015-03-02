@@ -44,8 +44,7 @@
 
 (defmethod p-ext/apply-fn :default
   [{:keys [onyx.core/params] :as event} segment]
-  (let [op (partial operation/apply-fn (:onyx.function/fn event) params)]
-    (op segment)))
+  (operation/apply-fn (:onyx.function/fn event) params segment))
 
 (defmethod p-ext/compress-batch :default
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
