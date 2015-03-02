@@ -18,7 +18,7 @@ This is a brain dump on my ideas for tackling fast message acknowledgment.
 - Can ackers be pulled out into their own service?
 - Could use the log to mark acker values, but writing to disk is a lot slower than a network call, and will eat up disk space very fast.
 
-### Possible Solution 1 - Configurable Ackers
+### Solution 1 - Configurable Ackers
 
 This solution relies on the user setting and tuning a value that indicates what percentage of peers will act as ackers.
 
@@ -27,3 +27,26 @@ This solution relies on the user setting and tuning a value that indicates what 
   - `:acker/exempt-input-tasks`, mapped to a boolean. Any peer executing an `:input` task is not elligible to be an acker. This is useful is the amount of network IO that this peer is doing is already too high to be useful as an acker. Default is `false`.
   - `:acker/exempt-output-tasks`, mapped to a boolean. Any peer executing an `:output` task is not elliginle to be an acker. Default is `false`.
   - `:acker/exempt-tasks`, mapped to a vector of keywords that represent task names. Any peer executing one of these task names is not elligble to be an acker. Default is `[]`.
+
+#### Who becomes an acker?
+
+- The first peers that *can* become ackers *will* become ackers via `volunteer-for-task`.
+- If a peer dies, the earliest peer (topologically sorted by tasks) that isn't an acker will become an acker.
+- If the number of ackers ever shrinks to zero, stop the job.
+
+#### Acker service
+
+The Acker service is always up for every peer, but it doesn't receive load unless other peers know about it. It should drop messages that it is wrongly ssent, or if it's overloaded. The segment will be replayed from the origin task if a message is dropped.
+
+#### Handshake
+
+Most protocols require an initial handshake. Per task lifecycle, maintain an atom with a map of peer ID to connection. If there's no connection, make one and store it. This lets us lazily acquire connections. We trade off predicatable latency for an easier to understand design. We lose the predicatability, because each time a peer is first contacted we lose some time establishing the connection. I think this is acceptable, and can be deemed a "warm up" period for the cluster, which is a pretty normal thing.
+
+### Solution 2 - Eventual Consistency
+
+Half baked idea. Store up acking bitsets for a period of time and eventually merge them back to the origin input node.
+
+### Solution 3 - Gossip Protocol
+
+Half baked idea. Trade increased number of messages for increased cluster capacity. If a peer can't directly route a message to another peer, find one that can and ask it to send it on your behalf.
+
