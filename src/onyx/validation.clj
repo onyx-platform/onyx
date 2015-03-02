@@ -114,7 +114,11 @@
   {:catalog [(schema/pred map? 'map?)]
    :workflow workflow-validator
    :task-scheduler schema/Keyword
-   (schema/optional-key :percentage) schema/Int})
+   (schema/optional-key :percentage) schema/Int
+   (schema/optional-key :acker/percentage) schema/Int
+   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
 
 (defn validate-job
   [job]
