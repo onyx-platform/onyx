@@ -62,17 +62,20 @@
        (common/alive-jobs replica)
        (common/jobs-with-available-tasks replica)))
 
-(defn allowed-to-be-acker? [replica job task args]
+(defn exempt-from-acker? [replica job task args]
   (or (some #{task} (:acker-exempt-tasks replica))
-      (some #{task} (get-in replica [:input-tasks job]))
-      (some #{task} (get-in replica [:output-tasks job]))))
+      (when (:acker-exclude-input-tasks replica)
+        (some #{task} (get-in replica [:input-tasks job])))
+      (when (:acker-exclude-output-tasks replica)
+        (some #{task} (get-in replica [:output-tasks job]))
+        true)))
 
 (defn offer-acker [replica job task args]
   (let [peers (count (apply concat (vals (get-in replica [:allocations job]))))
         ackers (count (get-in replica [:ackers job]))
         pct (get-in replica [:acker-percentage job])
         current-pct (int (Math/ceil (* 10 (double (/ ackers peers)))))]
-    (if (and (< current-pct pct) (allowed-to-be-acker? replica job task args))
+    (if (and (< current-pct pct) (exempt-from-acker? replica job task args))
       (-> replica
           (update-in [:ackers job] conj (:id args))
           (update-in [:ackers job] vec))
