@@ -48,8 +48,8 @@
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
+         (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) (:acker-id raw-segment) :acker)
          (:id raw-segment)
-         (:acker-id raw-segment)
          (:completion-id raw-segment)
          (:ack-val raw-segment)))
       event)
@@ -82,13 +82,14 @@
   (if children
     (doseq [raw-segment (keys children)]
       (when (:ack-val raw-segment)
-        (extensions/internal-ack-message
-         (:onyx.core/messenger event)
-         event
-         (:id raw-segment)
-         (:acker-id raw-segment)
-         (:completion-id raw-segment)
-         (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment)))))))
+        (let [link (operation/peer-link  (:onyx.core/state event) (:onyx.core/messenger event) (:acker-id raw-segment) :acker)]
+          (extensions/internal-ack-message
+           (:onyx.core/messenger event)
+           event
+           link
+           (:id raw-segment)
+           (:completion-id raw-segment)
+           (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment))))))))
 
 (defn segments->ack-values [event segments]
   (if (= :output (:onyx/type (:onyx.core/task-map event)))
@@ -173,6 +174,16 @@
        (p-ext/ack-message event id)
        (recur)))))
 
+(defn forward-completion-calls! [event completion-ch]
+  (try
+    (loop []
+      (when-let [{:keys [id peer-id]} (<!! completion-ch)]
+        (let [peer-link (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) )]
+          (extensions/internal-complete-message (:onyx.core/messenger event) id peer-link)
+          (recur))))
+    (catch Exception e
+      (timbre/fatal e))))
+
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
   (if (some #{(type e)} restartable-exceptions)
@@ -204,7 +215,7 @@
      (catch Exception e
        (warn e)))))
 
-(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch opts]
+(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch completion-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -233,7 +244,8 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
                            :onyx.core/peer-opts opts
-                           :onyx.core/replica replica}
+                           :onyx.core/replica replica
+                           :onyx.core/state (atom {})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
@@ -251,6 +263,7 @@
             (recur @replica)))
 
         (release-messages! messenger pipeline-data)
+        (forward-completion-calls! pipeline-data completion-ch)
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
         (thread (run-task-lifecycle pipeline-data kill-ch))
 
@@ -269,11 +282,12 @@
     component))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
-                                   restart-ch outbox-ch seal-ch opts]}]
+                                   restart-ch outbox-ch seal-ch completion-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job
                        :task-id task :restart-ch restart-ch :outbox-ch outbox-ch
-                       :replica replica :seal-resp-ch seal-ch :opts opts}))
+                       :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
+                       :opts opts}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]

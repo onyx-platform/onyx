@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]
+            [onyx.extensions :as operation]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.log.entry :refer [create-log-entry]]))
 
@@ -17,26 +18,17 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn forward-completion-calls [messenger ch replica]
-  (try
-    (loop []
-      (when-let [{:keys [id peer-id]} (<!! ch)]
-        (extensions/internal-complete-message messenger id peer-id replica)
-        (recur)))
-    (catch Exception e
-      (timbre/fatal e))))
-
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts]
   (try
     (let [replica-atom (atom {})]
       (reset! replica-atom origin)
-      (thread (forward-completion-calls messenger completion-ch replica-atom))
       (loop [state (merge {:id id
                            :replica replica-atom
                            :log log
                            :messenger-buffer buffer
                            :messenger messenger
                            :outbox-ch outbox-ch
+                           :completion-ch completion-ch
                            :opts opts
                            :restart-ch restart-ch
                            :stall-output? true
@@ -85,8 +77,7 @@
             kill-ch (chan 1)
             restart-ch (chan 1)
             completion-ch (:completions-ch acking-daemon)
-            site (onyx.extensions/peer-site messenger)
-            entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site site})
+            entry (create-log-entry :prepare-join-cluster {:joiner id})
             origin (extensions/subscribe-to-log log inbox-ch)]
         (extensions/register-pulse log id)
 

@@ -34,17 +34,20 @@
 
 ;; Messaging interface
 
-(defmulti peer-site (fn [messenger] (type messenger)))
+(defmulti send-peer-site (fn [messenger event] (type messenger)))
+
+(defmulti acker-peer-site (fn [messenger event] (type messenger)))
+
+(defmulti completion-peer-site (fn [messenger event] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
-(defmulti send-messages (fn [messenger event peer-site] (type messenger)))
+(defmulti send-messages (fn [messenger event peer-link] (type messenger)))
 
-(defmulti internal-ack-message (fn [messenger event message-id acker-id completion-id ack-val]
+(defmulti internal-ack-message (fn [messenger event peer-link message-id completion-id ack-val]
                                  (type messenger)))
 
-(defmulti internal-complete-message (fn [messenger id peer-id replica] (type messenger)))
-
+(defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 

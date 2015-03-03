@@ -59,8 +59,9 @@
     (doseq [task-id (vals (:egress-ids (:onyx.core/serialized-task event)))]
       (let [peers (get-in replica [:allocations job-id task-id])
             active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-            target (rand-nth active-peers)]
-        (onyx.extensions/send-messages messenger event (get-in replica [:peer-site target]))))))
+            target (rand-nth active-peers)
+            link (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) target :send)]
+        (onyx.extensions/send-messages messenger event link)))))
 
 (defmethod p-ext/seal-resource :default
   [{:keys [] :as event}]

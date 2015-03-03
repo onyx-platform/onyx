@@ -2,11 +2,11 @@
     (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
-              [org.httpkit.client :as client]
               [taoensso.timbre :as timbre]
               [taoensso.nippy :as nippy]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.extensions :as extensions])
+              [onyx.extensions :as extensions]
+              [gniazdo.core :as ws])
     (:import [java.nio ByteBuffer]))
 
 (def send-route "/send")
@@ -58,12 +58,21 @@
 (defn http-kit-websockets [opts]
   (map->HttpKitWebSockets {:opts opts}))
 
-(defmethod extensions/peer-site HttpKitWebSockets
-  [messenger]
-  {:url (format "ws://%s:%s" (:ip messenger) (:port messenger))})
+(defmethod extensions/send-peer-site HttpKitWebSockets
+  [messenger event]
+  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) send-route)})
+
+(defmethod extensions/acker-peer-site HttpKitWebSockets
+  [messenger event]
+  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) acker-route)})
+
+(defmethod extensions/completion-peer-site HttpKitWebSockets
+  [messenger event]
+  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) completion-route)})
 
 (defmethod extensions/connect-to-peer HttpKitWebSockets
-  [messenger event peer-site])
+  [messenger event peer-site]
+  (ws/connect (:url peer-site)))
 
 (defmethod extensions/receive-messages HttpKitWebSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -78,27 +87,18 @@
         segments))))
 
 (defmethod extensions/send-messages HttpKitWebSockets
-  [messenger event peer-site]
+  [messenger event peer-link]
   (let [messages (:onyx.core/compressed event)
-        url (:url peer-site)
-        route (format "%s%s" url send-route)
         compressed-batch (nippy/freeze messages)]
-    (client/post route {:body (ByteBuffer/wrap compressed-batch)}))
-  {})
+    (ws/send-msg peer-link compressed-batch)))
 
 (defmethod extensions/internal-ack-message HttpKitWebSockets
-  [messenger event message-id acker-id completion-id ack-val]
-  (let [replica @(:onyx.core/replica event)
-        url (:url (get-in replica [:peer-site acker-id]))
-        route (format "%s%s" url acker-route)
-        contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
-    (client/post route {:body (ByteBuffer/wrap contents)})))
+  [messenger event peer-link message-id completion-id ack-val]
+  (let [contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
+    (ws/send-msg peer-link contents)))
 
 (defmethod extensions/internal-complete-message HttpKitWebSockets
-  [messenger id peer-id replica]
-  (let [snapshot @replica
-        url (:url (get-in snapshot [:peer-site peer-id]))
-        route (format "%s%s" url completion-route)
-        contents (nippy/freeze {:id id})]
-    (client/post route {:body (ByteBuffer/wrap contents)})))
+  [messenger event id peer-link]
+  (let [contents (nippy/freeze {:id id})]
+    (ws/send-msg peer-link contents)))
 
