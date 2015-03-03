@@ -63,10 +63,10 @@
        (common/jobs-with-available-tasks replica)))
 
 (defn exempt-from-acker? [replica job task args]
-  (or (some #{task} (:acker-exempt-tasks replica))
-      (when (:acker-exclude-input-tasks replica)
+  (or (some #{task} (get-in replica [:exempt-tasks job]))
+      (when (get-in replica [:acker-exclude-inputs job])
         (some #{task} (get-in replica [:input-tasks job])))
-      (when (:acker-exclude-output-tasks replica)
+      (when (get-in replica [:acker-exclude-outputs job])
         (some #{task} (get-in replica [:output-tasks job]))
         true)))
 

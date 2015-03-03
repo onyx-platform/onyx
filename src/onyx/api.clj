@@ -94,6 +94,11 @@
                        (= :output (:onyx/type task))))
                    tasks)))
 
+(defn ^{:no-doc true} find-exempt-tasks [tasks exempt-task-names]
+  (let [exempt-set (into #{} exempt-task-names)
+        exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
+    (map :id exempt-tasks)))
+
 (defn ^{:added "0.6.0"} submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
@@ -108,9 +113,14 @@
         task-saturation (task-saturation (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
+        exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
         args {:id id :tasks task-ids :task-scheduler scheduler
               :saturation sat :task-saturation task-saturation
-              :inputs input-task-ids :outputs output-task-ids}
+              :inputs input-task-ids :outputs output-task-ids
+              :exempt-tasks exempt-task-ids
+              :acker-percentage (:acker/percentage job)
+              :acker-exclude-inputs (:acker/exempt-input-tasks? job)
+              :acker-exclude-outputs (:acker/exempt-output-tasks? job)}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)

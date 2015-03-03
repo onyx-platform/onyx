@@ -55,7 +55,7 @@
     ((:server component))
     (assoc component :release-ch nil)))
 
-(defn http-kit-web-sockets [opts]
+(defn http-kit-websockets [opts]
   (map->HttpKitWebSockets {:opts opts}))
 
 (defmethod extensions/peer-site HttpKitWebSockets

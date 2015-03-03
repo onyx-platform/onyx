@@ -405,3 +405,6 @@
        (executing-output-task? replica (:id state))
        (elected-sealer? replica message-id (:id state))))
 
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
+

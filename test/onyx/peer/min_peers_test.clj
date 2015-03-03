@@ -25,7 +25,7 @@
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl :http-kit})
+   :onyx.messaging/impl :http-kit-websockets})
 
 (def env (onyx.api/start-env env-config))
 

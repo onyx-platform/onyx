@@ -41,6 +41,10 @@
       (assoc-in [:task-saturation (:id args)] (:task-saturation args))
       (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
       (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
+      (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
+      (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
+      (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
+      (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
       (job-scheduler-replica-update entry)
       (task-scheduler-replica-update entry)))
 

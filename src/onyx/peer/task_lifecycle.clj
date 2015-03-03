@@ -243,9 +243,12 @@
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
-        (while (not (common/job-covered? @replica job-id))
-          (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
-          (Thread/sleep 500))
+        (loop [replica-state @replica]
+          (when-not (and (common/job-covered? replica-state job-id)
+                         (common/any-ackers? replica-state job-id))
+            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+            (Thread/sleep 500)
+            (recur @replica)))
 
         (release-messages! messenger pipeline-data)
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
