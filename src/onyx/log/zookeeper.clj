@@ -24,6 +24,9 @@
 (defn workflow-path [prefix]
   (str (prefix-path prefix) "/workflow"))
 
+(defn flow-path [prefix]
+  (str (prefix-path prefix) "/flow"))
+
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
@@ -61,6 +64,7 @@
       (zk/create conn (log-path onyx-id) :persistent? true)
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
+      (zk/create conn (flow-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
@@ -166,6 +170,8 @@
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
          (close! ch))
+       (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+         (close! ch))
        (catch Exception e
          (fatal e))))
     (<!! rets)))
@@ -179,6 +185,12 @@
 (defmethod extensions/write-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (workflow-path prefix) "/" id)
+        bytes (serialize chunk)]
+    (zk/create conn node :persistent? true :data bytes)))
+
+(defmethod extensions/write-chunk [ZooKeeper :flow-conditions]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (let [node (str (flow-path prefix) "/" id)
         bytes (serialize chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
@@ -208,6 +220,11 @@
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (workflow-path prefix) "/" id)]
+    (deserialize (:data (zk/data conn node)))))
+
+(defmethod extensions/read-chunk [ZooKeeper :flow-conditions]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (let [node (str (flow-path prefix) "/" id)]
     (deserialize (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]

@@ -5,13 +5,16 @@
 (defn apply-fn [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
 
-(defn resolve-fn [task-map]
+(defn kw->fn [kw]
   (try
-    (let [user-ns (symbol (name (namespace (:onyx/fn task-map))))
-          user-fn (symbol (name (:onyx/fn task-map)))]
+    (let [user-ns (symbol (name (namespace kw)))
+          user-fn (symbol (name kw))]
       (or (ns-resolve user-ns user-fn) (throw (Exception.))))
     (catch Exception e
-      (throw (ex-info "Could not resolve function in catalog" {:fn (:onyx/fn task-map)})))))
+      (throw (ex-info "Could not resolve function" {:fn kw})))))
+
+(defn resolve-fn [task-map]
+  (kw->fn (:onyx/fn task-map)))
 
 (defn sentinel-node-name [task-id input-name]
   (format "%s-%s" task-id input-name))

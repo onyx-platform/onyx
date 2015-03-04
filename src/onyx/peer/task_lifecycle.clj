@@ -6,7 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.queue.hornetq :refer [hornetq]]
-              [onyx.planning :refer [find-task]]
+              [onyx.planning :refer [find-task build-pred-fn]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -48,9 +48,40 @@
     (merge event (p-ext/requeue-sentinel event))
     event))
 
+(defn join-output-paths [all to-add downstream]
+  (cond (= to-add :all) (into #{} downstream)
+        (= to-add :none) #{}
+        :else (clojure.set/union (into #{} all) (into #{} to-add))))
+
+(defn choose-output-paths [flow-conditions event new downstream]
+  (if (seq flow-conditions)
+    (reduce
+     (fn [{:keys [paths exclusions] :as all} entry]
+       (if ((:flow/predicate entry) [event new])
+         (if (:flow/short-circuit? entry)
+           (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+                     :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+           {:paths (join-output-paths paths (:flow/to entry) downstream)
+            :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+         all))
+     {:paths #{} :exclusions #{}}
+     flow-conditions)
+    {:paths downstream}))
+
+(defn output-paths
+  [{:keys [onyx.core/serialized-task onyx.core/compiled-flow-conditions] :as event}]
+  (merge
+   event
+   {:onyx.core/result-paths
+    (map
+     (fn [segment]
+       (choose-output-paths compiled-flow-conditions event segment
+                            (keys (:egress-queues serialized-task))))
+     (:onyx.core/results event))}))
+
 (defn munge-apply-fn [{:keys [onyx.core/decompressed] :as event}]
   (if (seq decompressed)
-    (merge event (p-ext/apply-fn event))
+    (merge event (output-paths (merge event (p-ext/apply-fn event))))
     (merge event {:onyx.core/results []})))
 
 (defn munge-compress-batch [event]
@@ -216,6 +247,16 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
+(defn only-relevant-branches [flow task]
+  (filter #(= (:flow/from %) task) flow))
+
+(defn compile-flow-conditions [flow-conditions task-name]
+  (let [conditions (only-relevant-branches flow-conditions task-name)]
+    (map
+     (fn [condition]
+       (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
+     conditions)))
+
 (defrecord TaskLifeCycle [id log queue job-id task-id restart-ch outbox-ch seal-resp-ch opts]
   component/Lifecycle
 
@@ -300,6 +341,7 @@
 
             catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
+            flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             catalog-entry (find-task catalog (:name task))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
@@ -310,6 +352,8 @@
                            :onyx.core/task (:name task)
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
+                           :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/compiled-flow-conditions (compile-flow-conditions flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
                            :onyx.core/ingress-queues (:ingress-queues task)
