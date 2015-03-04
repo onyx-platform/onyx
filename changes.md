@@ -1,3 +1,8 @@
+#### 0.5.3
+
+- New feature: Flow Conditions. Flow Conditions let you manage predicates that route segments across tasks in your workflow.
+- Fixed extraneous ZooKeeper error messages.
+
 #### 0.5.2
 
 - Development environment doesn't required that the job scheduler be known ahead of time. It's now discovered dynamically.
