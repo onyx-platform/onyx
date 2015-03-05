@@ -36,6 +36,9 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
+(defn my-identity [segment]
+  segment)
+
 (def catalog
   [{:onyx/name :in
     :onyx/ident :core.async/read-from-chan
@@ -53,7 +56,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :identity
-    :onyx/fn :clojure.core/identity
+    :onyx/fn :onyx.peer.acker-test/my-identity
     :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size batch-size}

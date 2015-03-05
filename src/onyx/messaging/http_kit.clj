@@ -80,7 +80,7 @@
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
-      (if (< i (:onyx/batch-size task-map)) 
+      (if (< i (:onyx/batch-size task-map))
         (if-let [v (first (alts!! [ch timeout-ch]))]
           (recur (conj segments v) (inc i))
           segments)
