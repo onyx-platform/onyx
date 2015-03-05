@@ -60,7 +60,7 @@
       (let [peers (get-in replica [:allocations job-id task-id])
             active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
             target (rand-nth active-peers)
-            link (operation/peer-link event target :send)]
+            link (operation/peer-link event target :send-peer-site)]
         (onyx.extensions/send-messages messenger event link)))))
 
 (defmethod p-ext/seal-resource :default

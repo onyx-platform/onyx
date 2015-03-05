@@ -9,7 +9,7 @@
   (-> replica
       (assoc-in [:send-peer-site (:joiner args)] (:send-site args))
       (assoc-in [:acker-peer-site (:joiner args)] (:acker-site args))
-      (assoc-in [:completion-site (:joiner args)] (:completion-site args))))
+      (assoc-in [:completion-peer-site (:joiner args)] (:completion-site args))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]

@@ -48,7 +48,7 @@
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
-         (operation/peer-link event (:acker-id raw-segment) :acker)
+         (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)
          (:id raw-segment)
          (:completion-id raw-segment)
          (:ack-val raw-segment)))
@@ -82,7 +82,7 @@
   (if children
     (doseq [raw-segment (keys children)]
       (when (:ack-val raw-segment)
-        (let [link (operation/peer-link event (:acker-id raw-segment) :acker)]
+        (let [link (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)]
           (extensions/internal-ack-message
            (:onyx.core/messenger event)
            event
@@ -178,7 +178,7 @@
   (try
     (loop []
       (when-let [{:keys [id peer-id]} (<!! completion-ch)]
-        (let [peer-link (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) )]
+        (let [peer-link (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) peer-id :completion-peer-site)]
           (extensions/internal-complete-message (:onyx.core/messenger event) id peer-link)
           (recur))))
     (catch Exception e

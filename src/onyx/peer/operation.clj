@@ -40,11 +40,6 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
-(def site-fns
-  {:send-peer-site extensions/send-peer-site
-   :acker-peer-site extensions/acker-peer-site
-   :completion-site extensions/completion-peer-site})
-
 (defn peer-link
   [{:keys [onyx.core/messenger onyx.core/state onyx.core/replica] :as event} peer-id link-type]
   (if-let [link (get-in @state [peer-id link-type])]
