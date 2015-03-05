@@ -34,11 +34,11 @@
 
 ;; Messaging interface
 
-(defmulti send-peer-site (fn [messenger event] (type messenger)))
+(defmulti send-peer-site (fn [messenger] (type messenger)))
 
-(defmulti acker-peer-site (fn [messenger event] (type messenger)))
+(defmulti acker-peer-site (fn [messenger] (type messenger)))
 
-(defmulti completion-peer-site (fn [messenger event] (type messenger)))
+(defmulti completion-peer-site (fn [messenger] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
 

@@ -41,19 +41,17 @@
   true)
 
 (def site-fns
-  {:send extensions/send-peer-site
-   :acker extensions/acker-peer-site
-   :completion extensions/completion-peer-site})
+  {:send-peer-site extensions/send-peer-site
+   :acker-peer-site extensions/acker-peer-site
+   :completion-site extensions/completion-peer-site})
 
 (defn peer-link
-  [{:keys [onyx.core/messenger onyx.core/state] :as event} peer-id link-type]
-  (try
-    (if-let [link (get-in @state [peer-id link-type])]
-      link
-      (let [site ((get site-fns link-type) messenger event)
-            link (extensions/connect-to-peer messenger event site)]
-        (swap! state assoc-in [peer-id link-type] link)
-        link))
-    (catch Exception e
-      (.printStackTrace e))))
+  [{:keys [onyx.core/messenger onyx.core/state onyx.core/replica] :as event} peer-id link-type]
+  (if-let [link (get-in @state [peer-id link-type])]
+    link
+    (let [site (get-in @replica [link-type peer-id])
+          link (extensions/connect-to-peer messenger event site)]
+      (taoensso.timbre/info (str (:onyx.core/task event) " is sending to " site " <- Mike"))
+      (swap! state assoc-in [peer-id link-type] link)
+      link)))
 

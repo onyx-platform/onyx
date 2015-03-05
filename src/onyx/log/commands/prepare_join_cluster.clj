@@ -5,6 +5,12 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
+(defn add-peer-sites [replica args]
+  (-> replica
+      (assoc-in [:send-peer-site (:joiner args)] (:send-site args))
+      (assoc-in [:acker-peer-site (:joiner args)] (:acker-site args))
+      (assoc-in [:completion-site (:joiner args)] (:completion-site args))))
+
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]
   (let [n (count (:peers replica))]
@@ -22,13 +28,13 @@
                 watcher (nth sorted-candidates index)]
             (-> replica
                 (update-in [:prepared] merge {watcher joining-peer})
-                (assoc-in [:peer-site (:joiner args)] (:peer-site args))))
+                (add-peer-sites args)))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
           (assoc-in [:peer-state (:joiner args)] :idle)
-          (assoc-in [:peer-site (:joiner args)] (:peer-site args))))))
+          (add-peer-sites args)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
