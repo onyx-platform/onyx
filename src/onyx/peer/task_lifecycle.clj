@@ -48,7 +48,7 @@
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
-         (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) (:acker-id raw-segment) :acker)
+         (operation/peer-link event (:acker-id raw-segment) :acker)
          (:id raw-segment)
          (:completion-id raw-segment)
          (:ack-val raw-segment)))
@@ -82,7 +82,7 @@
   (if children
     (doseq [raw-segment (keys children)]
       (when (:ack-val raw-segment)
-        (let [link (operation/peer-link  (:onyx.core/state event) (:onyx.core/messenger event) (:acker-id raw-segment) :acker)]
+        (let [link (operation/peer-link event (:acker-id raw-segment) :acker)]
           (extensions/internal-ack-message
            (:onyx.core/messenger event)
            event
@@ -108,9 +108,9 @@
      (>!! dead-ch true)
      (release-f))))
 
-(defn inject-temporal-resources [event]
+(defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params (l-ext/inject-temporal-resources* event))))
+    (merge event cycle-params (l-ext/inject-batch-resources* event))))
 
 (defn read-batch [event]
   (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
@@ -164,8 +164,8 @@
 (defn write-batch [event]
   (merge event (p-ext/write-batch event)))
 
-(defn close-temporal-resources [event]
-  (merge event (l-ext/close-temporal-resources* event)))
+(defn close-batch-resources [event]
+  (merge event (l-ext/close-batch-resources* event)))
 
 (defn release-messages! [messenger event]
   (go
@@ -195,13 +195,13 @@
   (loop [event init-event]
     (when (first (alts!! [kill-ch] :default true))
       (-> event
-          (inject-temporal-resources)
+          (inject-batch-resources)
           (read-batch)
           (decompress-batch)
           (apply-fn)
           (compress-batch)
           (write-batch)
-          (close-temporal-resources))
+          (close-batch-resources))
       (recur init-event))))
 
 (defn listen-for-sealer [job task init-event seal-ch outbox-ch]
@@ -263,7 +263,7 @@
             (recur @replica)))
 
         (release-messages! messenger pipeline-data)
-        (forward-completion-calls! pipeline-data completion-ch)
+        (thread (forward-completion-calls! pipeline-data completion-ch))
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
         (thread (run-task-lifecycle pipeline-data kill-ch))
 
@@ -294,7 +294,7 @@
     (when-not start-lifecycle?
       (timbre/info (format "[%s / %s] Sequential task currently has queue consumers. Backing off and retrying..." id lifecycle-id)))))
 
-(dire/with-post-hook! #'inject-temporal-resources
+(dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
 
@@ -318,7 +318,7 @@
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/compressed]}]
     (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count compressed)))))
 
-(dire/with-post-hook! #'close-temporal-resources
+(dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed temporal plugin resources" id lifecycle-id))))
+    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id))))
 

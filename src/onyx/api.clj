@@ -220,11 +220,11 @@
       (fatal "Peer lifecycle threw an exception")
       (fatal e))))
 
-(defn ^{:added "0.6.0"} start-peers!
+(defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped
    by passing it to the shutdown-peer function."
   ([n config]
-     (start-peers! n config system/onyx-peer))
+     (start-peers n config system/onyx-peer))
   ([n config peer-f]
      (doall
       (map

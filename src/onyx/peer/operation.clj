@@ -45,11 +45,15 @@
    :acker extensions/acker-peer-site
    :completion extensions/completion-peer-site})
 
-(defn peer-link [state messenger peer-id link-type]
-  (if-let [link (get-in @state [peer-id link-type])]
-    link
-    (let [site ((get site-fns link-type) messenger)
-          link (extensions/connect-to-peer messenger site)]
-      (swap! state assoc-in [peer-id link-type] link)
-      link)))
+(defn peer-link
+  [{:keys [onyx.core/messenger onyx.core/state] :as event} peer-id link-type]
+  (try
+    (if-let [link (get-in @state [peer-id link-type])]
+      link
+      (let [site ((get site-fns link-type) messenger event)
+            link (extensions/connect-to-peer messenger event site)]
+        (swap! state assoc-in [peer-id link-type] link)
+        link))
+    (catch Exception e
+      (.printStackTrace e))))
 

@@ -51,7 +51,7 @@
        :hornetq/session session
        :hornetq/consumer consumer})))
 
-(defmethod l-ext/close-temporal-resources :hornetq/read-segments
+(defmethod l-ext/close-batch-resources :hornetq/read-segments
   [_ event] event)
 
 (defmethod l-ext/close-lifecycle-resources :hornetq/read-segments
@@ -137,7 +137,7 @@
     {:hornetq/locator locator
      :hornetq/session-factory session-factory}))
 
-(defmethod l-ext/close-temporal-resources :hornetq/write-segments
+(defmethod l-ext/close-batch-resources :hornetq/write-segments
   [_ event]
   (.close (:hornetq/producer event))
   (.close (:hornetq/session event))

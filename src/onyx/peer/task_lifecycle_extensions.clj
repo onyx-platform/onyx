@@ -40,13 +40,13 @@
    Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti ^{:added "0.6.0"} inject-temporal-resources
+(defmulti ^{:added "0.6.0"} inject-batch-resources
   "Adds keys to the event map. This function is called once
    per pipeline execution per virtual peer. Keys added may
    be accessed later in the lifecycle. Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
 
-(defmulti ^{:added "0.6.0"} close-temporal-resources
+(defmulti ^{:added "0.6.0"} close-batch-resources
   "Closes any resources that were opened during a particular lifecycle run.
    Called once for each lifecycle run. Must return a map."
   (fn [dispatch-fn event] (dispatch-fn event)))
@@ -63,11 +63,11 @@
 (defn inject-lifecycle-resources* [event]
   (merge-api-levels inject-lifecycle-resources event))
 
-(defn inject-temporal-resources* [event]
-  (merge-api-levels inject-temporal-resources event))
+(defn inject-batch-resources* [event]
+  (merge-api-levels inject-batch-resources event))
 
-(defn close-temporal-resources* [event]
-  (merge-api-levels close-temporal-resources event))
+(defn close-batch-resources* [event]
+  (merge-api-levels close-batch-resources event))
 
 (defn close-lifecycle-resources* [event]
   (merge-api-levels close-lifecycle-resources event))
@@ -78,10 +78,10 @@
 (defmethod inject-lifecycle-resources :default
   [_ event] {})
 
-(defmethod inject-temporal-resources :default
+(defmethod inject-batch-resources :default
   [_ event] {})
 
-(defmethod close-temporal-resources :default
+(defmethod close-batch-resources :default
   [_ event] {})
 
 (defmethod close-lifecycle-resources :default

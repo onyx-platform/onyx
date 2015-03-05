@@ -87,7 +87,9 @@
 
 (>!! in-chan :done)
 
-(def v-peers (onyx.api/start-peers! 4 peer-config))
+(def v-peers (onyx.api/start-peers 4 peer-config))
+
+(Thread/sleep 1000)
 
 (onyx.api/submit-job
  peer-config

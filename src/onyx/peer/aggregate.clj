@@ -12,7 +12,7 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map] :as event}]
   {})
 
-(defn inject-temporal-resource-shim
+(defn inject-batch-resource-shim
   [event]
   {})
 
@@ -22,7 +22,7 @@
 (defn write-batch-shim [event]
   {})
 
-(defn close-temporal-resources-shim [event]
+(defn close-batch-resources-shim [event]
   {})
 
 (defn close-pipeline-resources-shim [{:keys [onyx.core/queue] :as event}]
@@ -36,7 +36,7 @@
   [_ event]
   {})
 
-(defmethod l-ext/inject-temporal-resources :aggregator
+(defmethod l-ext/inject-batch-resources :aggregator
   [_ event]
   {})
 
@@ -48,7 +48,7 @@
   [event]
   {})
 
-(defmethod l-ext/close-temporal-resources :aggregator
+(defmethod l-ext/close-batch-resources :aggregator
   [_ event]
   {})
 
