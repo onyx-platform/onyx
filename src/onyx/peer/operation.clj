@@ -46,7 +46,6 @@
     link
     (let [site (get-in @replica [link-type peer-id])
           link (extensions/connect-to-peer messenger event site)]
-      (taoensso.timbre/info (str (:onyx.core/task event) " is sending to " site " <- Mike"))
       (swap! state assoc-in [peer-id link-type] link)
       link)))
 
