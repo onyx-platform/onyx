@@ -178,7 +178,7 @@
   (try
     (loop []
       (when-let [{:keys [id peer-id]} (<!! completion-ch)]
-        (let [peer-link (operation/peer-link (:onyx.core/state event) (:onyx.core/messenger event) peer-id :completion-peer-site)]
+        (let [peer-link (operation/peer-link event peer-id :completion-peer-site)]
           (extensions/internal-complete-message (:onyx.core/messenger event) id peer-link)
           (recur))))
     (catch Exception e
