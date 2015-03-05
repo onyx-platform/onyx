@@ -60,15 +60,15 @@
 
 (defmethod extensions/send-peer-site HttpKitWebSockets
   [messenger event]
-  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) send-route)})
+  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) send-route)})
 
 (defmethod extensions/acker-peer-site HttpKitWebSockets
   [messenger event]
-  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) acker-route)})
+  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) acker-route)})
 
 (defmethod extensions/completion-peer-site HttpKitWebSockets
   [messenger event]
-  {:url (format "ws://%s:%s/%s" (:ip messenger) (:port messenger) completion-route)})
+  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) completion-route)})
 
 (defmethod extensions/connect-to-peer HttpKitWebSockets
   [messenger event peer-site]
