@@ -37,7 +37,9 @@
          :allocations {:j2 {:t3 [:p1]}}
          :percentages nil
          :saturation nil
-         :task-percentages nil})
+         :task-percentages nil
+         :input-tasks nil
+         :output-tasks nil})
   (fact reactions => [])
   (fact diff => {:jobs #{:j1 :j3}
                  :killed-jobs #{:j1}
