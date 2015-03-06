@@ -25,14 +25,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.5.2"]
+[com.mdrogalis/onyx "0.5.3"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.5.2
+### User Guide 0.5.3
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -55,13 +55,13 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.5.2
+### API Docs 0.5.3
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.2` goes with `onyx` version `0.5.2`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.2.1`). If a version doesn't have a corresponding version for the plugin, use the lowest version. Sometimes we lag a little behind on non-backwards breaking releases, but we try not to most of the time.
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.3` goes with `onyx` version `0.5.3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.3.1`).
 
 - [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
@@ -81,7 +81,7 @@ You can run a dashboard to monitor Onyx cluster activity, found [here](https://g
 
 ### Release Notes
 
-You can find [the release notes here](doc/release-notes/0.5.0.md).
+You can find [the lastest major release notes here](doc/release-notes/0.5.0.md).
 
 ### Need help?
 
