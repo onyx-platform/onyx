@@ -1,6 +1,5 @@
 (ns onyx.peer.multi-peer-mem-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [com.stuartsierra.component :as component]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async]
@@ -23,25 +22,13 @@
   {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl :http-kit})
+   :onyx.messaging/impl :http-kit-websockets})
 
 (def env (onyx.api/start-env env-config))
 
 (def n-messages 100000)
 
-(def batch-size 1320)
-
-(def echo 1000)
-
-(def in-chan (chan (inc n-messages)))
-
-(def out-chan (chan (sliding-buffer (inc n-messages))))
-
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/in-chan in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/out-chan out-chan})
+(def batch-size 40)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -73,12 +60,24 @@
 
 (def workflow [[:in :inc] [:inc :out]])
 
+(def in-chan (chan (inc n-messages)))
+
+(def out-chan (chan (sliding-buffer (inc n-messages))))
+
+(defmethod l-ext/inject-lifecycle-resources :in
+  [_ _] {:core.async/in-chan in-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :out
+  [_ _] {:core.async/out-chan out-chan})
+
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
 
 (>!! in-chan :done)
 
-(def v-peers (onyx.api/start-peers! 8 peer-config))
+(def v-peers (onyx.api/start-peers 8 peer-config))
+
+(Thread/sleep 1000)
 
 (onyx.api/submit-job
  peer-config

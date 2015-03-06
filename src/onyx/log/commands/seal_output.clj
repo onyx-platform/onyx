@@ -46,7 +46,8 @@
   [{:keys [args]} old new diff state]
   (let [{:keys [job]} (common/peer->allocated-job (:allocations old) (:id state))]
     (if (and (:job-completed? diff) (= (:job diff) job))
-      (do (component/stop @(:lifecycle state))
-          (assoc state :lifecycle nil))
+      (do (when-let [lc (:lifecycle state)]
+            (component/stop @lc)
+            (assoc state :lifecycle nil)))
       state)))
 

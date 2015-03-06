@@ -118,9 +118,9 @@
               :saturation sat :task-saturation task-saturation
               :inputs input-task-ids :outputs output-task-ids
               :exempt-tasks exempt-task-ids
-              :acker-percentage (:acker/percentage job)
-              :acker-exclude-inputs (:acker/exempt-input-tasks? job)
-              :acker-exclude-outputs (:acker/exempt-output-tasks? job)}
+              :acker-percentage (or (:acker/percentage job) 1)
+              :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
+              :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)

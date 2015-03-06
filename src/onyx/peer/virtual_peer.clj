@@ -50,9 +50,9 @@
         ;; ZooKeeper connection dropped, close out cleanly.
         )
     (catch Exception e
-      (taoensso.timbre/fatal e))
+      (taoensso.timbre/info e))
     (finally
-     (taoensso.timbre/fatal "Fell out of processing loop"))))
+     (taoensso.timbre/info "Fell out of processing loop"))))
 
 (defn outbox-loop [id log outbox-ch]
   (try
@@ -61,9 +61,9 @@
         (extensions/write-log-entry log entry)
         (recur)))
     (catch Exception e
-      (taoensso.timbre/fatal e))
+      (taoensso.timbre/info e))
     (finally
-     (taoensso.timbre/fatal "Fell out of outbox loop"))))
+     (taoensso.timbre/info "Fell out of outbox loop"))))
 
 (defrecord VirtualPeer [opts]
   component/Lifecycle

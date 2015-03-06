@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.plugin.core-async]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -21,9 +21,6 @@
 (def peer-config
   {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
-   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
-   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/join-failure-back-off 500
    :onyx.peer/job-scheduler scheduler
    :onyx.messaging/impl :http-kit-websockets})
 
@@ -78,14 +75,17 @@
 
 (>!! in-chan :done)
 
-(def v-peers (onyx.api/start-peers! 3 peer-config))
+(def v-peers (onyx.api/start-peers 3 peer-config))
+
+(Thread/sleep 1000)
 
 (onyx.api/submit-job
  peer-config
- {:catalog catalog :workflow workflow
+ {:catalog catalog
+  :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
+(def results (take-segments! out-chan))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
