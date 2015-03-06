@@ -5,5 +5,5 @@
   (nippy/freeze x))
 
 (defn decompress [x]
-  (nippy/thaw x :v1-compatibility? false))
+  (nippy/thaw x {:v1-compatibility? false}))
 
