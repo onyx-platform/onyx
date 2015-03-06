@@ -80,7 +80,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -91,14 +90,12 @@
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-key :name
-    :onyx/consumption :concurrent
     :onyx/batch-size 1000}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))

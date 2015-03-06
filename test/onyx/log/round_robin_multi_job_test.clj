@@ -1,7 +1,6 @@
 (ns onyx.log.round-robin-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -52,20 +51,17 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :c
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def catalog-2
@@ -73,20 +69,17 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :e
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :f
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def j1
@@ -103,7 +96,7 @@
 
 (def n-peers 36)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
+(def v-peers (onyx.api/start-peers n-peers peer-config))
 
 (def ch (chan n-peers))
 

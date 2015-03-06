@@ -1,6 +1,7 @@
 (ns onyx.log.prepare-join-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.system]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :prepare-join-cluster {:joiner :d}))
@@ -11,7 +12,8 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]})
+(def old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]
+                  :job-scheduler :onyx.job-scheduler/round-robin})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -45,11 +47,13 @@
                        :args {:id :d}
                        :immediate? true}]))
 
-(let [old-replica {:peers []}
+(let [old-replica {:peers []
+                   :job-scheduler :onyx.job-scheduler/round-robin}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact new-replica => {:peers [:d] :peer-state {:d :idle}})
+  (fact (:peers new-replica) => [:d])
+  (fact (:peer-state new-replica) => {:d :idle})
   (fact diff => {:instant-join :d})
   (fact reactions => nil))
 
@@ -57,7 +61,8 @@
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :a})]
-  (fact new-replica => {:peers [:a] :prepared {:a :d}})
+  (fact (:peers new-replica) => [:a])
+  (fact (:prepared new-replica) => {:a :d})
   (fact diff => {:observer :a :subject :d})
   (fact reactions => [{:fn :notify-join-cluster
                        :args {:observer :d :subject :a}
@@ -66,7 +71,8 @@
 (let [old-replica {:pairs {:a :b :b :a}
                    :accepted {}
                    :prepared {:a :c}
-                   :peers [:a :b]}
+                   :peers [:a :b]
+                   :job-scheduler :onyx.job-scheduler/round-robin}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d})]

@@ -86,7 +86,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name in-queue-1
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -95,14 +94,12 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.automatic-kill-test/my-invalid-fn-name
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue-1
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -113,7 +110,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name "bad-queue-name"
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -122,14 +118,12 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.automatic-kill-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue-2
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -140,7 +134,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name in-queue-3
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -149,14 +142,12 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.automatic-kill-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue-3
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -180,8 +171,6 @@
          peer-config
          {:catalog catalog-3 :workflow workflow
           :task-scheduler :onyx.task-scheduler/round-robin}))
-
-(def results (hq-util/consume-queue! hq-config out-queue-3 echo))
 
 (def ch (chan 100))
 

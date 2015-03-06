@@ -1,9 +1,10 @@
 (ns onyx.log.commands.volunteer-for-task
-  (:require [clojure.core.async :refer [chan go >! <! close!]]
+  (:require [clojure.core.async :refer [chan go >! <! close! >!!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
+            [onyx.log.entry :refer [create-log-entry]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.extensions :as extensions]
             [taoensso.timbre]))
@@ -61,6 +62,24 @@
        (common/alive-jobs replica)
        (common/jobs-with-available-tasks replica)))
 
+(defn exempt-from-acker? [replica job task args]
+  (or (some #{task} (get-in replica [:exempt-tasks job]))
+      (and (get-in replica [:acker-exclude-inputs job])
+           (some #{task} (get-in replica [:input-tasks job])))
+      (and (get-in replica [:acker-exclude-outputs job])
+           (some #{task} (get-in replica [:output-tasks job])))))
+
+(defn offer-acker [replica job task args]
+  (let [peers (count (apply concat (vals (get-in replica [:allocations job]))))
+        ackers (count (get-in replica [:ackers job]))
+        pct (get-in replica [:acker-percentage job])
+        current-pct (int (Math/ceil (* 10 (double (/ ackers peers)))))]
+    (if (and (< current-pct pct) (not (exempt-from-acker? replica job task args)))
+      (-> replica
+          (update-in [:ackers job] conj (:id args))
+          (update-in [:ackers job] vec))
+      replica)))
+
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (universally-executable-jobs replica))]
@@ -70,7 +89,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :active)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job task args)))
       replica)))
 
 (defmethod select-job :onyx.job-scheduler/round-robin
@@ -85,7 +105,8 @@
               (common/remove-peers args)
               (update-in [:allocations job task] conj (:id args))
               (update-in [:allocations job task] vec)
-              (assoc-in [:peer-state (:id args)] :active)))
+              (assoc-in [:peer-state (:id args)] :warming-up)
+              (offer-acker job task args)))
         replica))
     replica))
 
@@ -108,7 +129,8 @@
             (common/remove-peers args)
             (update-in [:allocations job task] conj (:id args))
             (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :active)))
+            (assoc-in [:peer-state (:id args)] :warming-up)
+            (offer-acker job task args)))
       replica)))
 
 (defmethod select-job :default
@@ -154,7 +176,8 @@
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args]
   (let [scheduler (get-in new [:task-schedulers (:job diff)])]
-    (when (reallocate-from-task? scheduler old new (:job diff) peer-args)
+    (when (and (reallocate-from-task? scheduler old new (:job diff) peer-args)
+               (common/volunteer? old new peer-args (:job peer-args)))
       [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task
@@ -166,7 +189,7 @@
           (component/stop (:lifecycle state)))
         (let [seal-ch (chan)
               new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
-              new-lifecycle (component/start ((:task-lifecycle-fn state) diff new-state))]
+              new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
           (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
     state))
 

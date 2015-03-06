@@ -1,7 +1,8 @@
 (ns onyx.log.commands.common
   (:require [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]))
 
 (defn balance-workload [replica jobs p]
   (if (seq jobs)
@@ -272,4 +273,138 @@
              (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead." 
                      scheduler)
              {:replica replica}))))
+
+(defmulti reallocate-from-job?
+  (fn [scheduler old new state]
+    scheduler))
+
+(defmethod reallocate-from-job? :onyx.job-scheduler/greedy
+  [scheduler old new state]
+  (not (seq (alive-jobs old (:jobs old)))))
+
+(defmethod reallocate-from-job? :onyx.job-scheduler/round-robin
+  [scheduler old new state]
+  (if-let [allocation (peer->allocated-job (:allocations new) (:id state))]
+    (let [peer-counts (balance-jobs new)
+          peers (get (job->peers new) (:job allocation))]
+      (when (> (count peers) (get peer-counts (:job allocation)))
+        (let [n (- (count peers) (get peer-counts (:job allocation)))
+              peers-to-drop (drop-peers new (:job allocation) n)]
+          (when (some #{(:id state)} (into #{} peers-to-drop))
+            true))))
+    true))
+
+(defmethod reallocate-from-job? :onyx.job-scheduler/percentage
+  [scheduler old new state]
+  (if-let [allocation (peer->allocated-job (:allocations new) (:id state))]
+    (let [balanced (percentage-balanced-workload new)
+          peer-counts (:allocation (get balanced (:job allocation)))
+          peers (get (job->peers new) (:job allocation))]
+      (when (> (count peers) peer-counts)
+        (let [n (- (count peers) peer-counts)
+              peers-to-drop (drop-peers new (:job allocation) n)]
+          (when (some #{(:id state)} (into #{} peers-to-drop))
+            true))))
+    true))
+
+(defn anticipating-coverage? [old new job-id]
+  (let [n-tasks (count (get-in new [:tasks job-id]))
+        n-volunteering (->> (:peers new)
+                            (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
+                            (count))]
+    (>= n-volunteering n-tasks)))
+
+(defn volunteer? [old new state job-id]
+  (and (reallocate-from-job? (:job-scheduler old) old new state)
+       (anticipating-coverage? old new job-id)))
+
+(defmulti volunteer-via-new-job?
+  (fn [old new diff state]
+    (:job-scheduler old)))
+
+(defmulti volunteer-via-killed-job?
+  (fn [old new diff state]
+    (:job-scheduler old)))
+
+(defmulti volunteer-via-sealed-output?
+  (fn [old new diff state]
+    (:job-scheduler old)))
+
+(defmulti volunteer-via-accept?
+  (fn [old new diff state]
+    (:job-scheduler old)))
+
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)
+        rets (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))]
+    rets))
+
+(defn job-coverable? [replica job]
+  (let [tasks (get-in replica [:tasks job])]
+    (>= (count (get-in replica [:peers])) (count tasks))))
+
+(defn any-coverable-jobs? [replica]
+  (seq
+   (filter
+    (fn [job]
+      (let [tasks (get-in replica [:tasks job])]
+        (>= (count (get-in replica [:peers])) (count tasks))))
+    (:jobs replica))))
+
+(defmethod volunteer-via-new-job? :onyx.job-scheduler/greedy
+  [old new diff state]
+  (when (zero? (count (incomplete-jobs old)))
+    (any-coverable-jobs? new)))
+
+(defmethod volunteer-via-killed-job? :onyx.job-scheduler/greedy
+  [old new diff state]
+  (let [peers (apply concat (vals (get-in [old :allocations (first diff)])))]
+    (when (some #{(:id state)} (into #{} peers))
+      (any-coverable-jobs? new))))
+
+(defmethod volunteer-via-sealed-output? :onyx.job-scheduler/greedy
+  [old new diff state]
+  (and (:job-completed? diff)
+       (seq (incomplete-jobs new))
+       (any-coverable-jobs? new)))
+
+(defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
+  [old new diff state]
+  (job-coverable? new (first (incomplete-jobs new))))
+
+(defn all-inputs-exhausted? [replica job]
+  (let [all (get-in replica [:input-tasks job])
+        exhausted (get-in replica [:exhausted-inputs job])]
+    (= (into #{} all) (into #{} exhausted))))
+
+(defn executing-output-task? [replica id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)]
+    (some #{task} (get-in replica [:output-tasks job]))))
+
+(defn elected-sealer? [replica message-id id]
+  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)
+        peers (get-in replica [:allocations job task])]
+    (when (pos? (count peers))
+      (let [n (mod message-id (count peers))]
+        (= (nth peers n) id)))))
+
+(defn all-outputs-sealed? [replica job]
+  (let [all (get-in replica [:output-tasks job])
+        sealed (get-in replica [:sealed-outputs job])]
+    (= (into #{} all) (into #{} sealed))))
+
+(defn should-seal? [replica args state message-id]
+  (and (all-inputs-exhausted? replica (:job args))
+       (executing-output-task? replica (:id state))
+       (elected-sealer? replica message-id (:id state))))
+
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
 

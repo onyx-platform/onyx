@@ -1,7 +1,6 @@
 (ns onyx.log.peer-rebalance-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -52,14 +51,12 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def catalog-2
@@ -67,14 +64,12 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :d
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def j1
@@ -91,7 +86,7 @@
 
 (def n-peers 12)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
+(def v-peers (onyx.api/start-peers n-peers peer-config))
 
 (def ch (chan n-peers))
 

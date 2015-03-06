@@ -1,6 +1,5 @@
 (ns onyx.log.percentage-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -51,14 +50,12 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def catalog-2
@@ -66,14 +63,12 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :d
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def j1
@@ -92,7 +87,7 @@
 
 (def n-peers 10)
 
-(def v-peers-1 (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
+(def v-peers-1 (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 
@@ -108,7 +103,7 @@
 
 (fact "70/30% split for percentage job scheduler succeeded" true => true)
 
-(def v-peers-2 (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
+(def v-peers-2 (onyx.api/start-peers! n-peers peer-config))
 
 (def ch (chan n-peers))
 

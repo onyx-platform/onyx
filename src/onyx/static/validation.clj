@@ -1,14 +1,13 @@
-(ns onyx.validation
+(ns onyx.static.validation
   (:require [clojure.walk :refer [prewalk]]
-            [clojure.data.fressian :as fressian]
             [com.stuartsierra.dependency :as dep]
-            [onyx.planning :as planning]
+            [onyx.static.planning :as planning]
+            [onyx.compression.nippy :refer [compress decompress]]
             [schema.core :as schema]))
 
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
-   :onyx/consumption (schema/enum :sequential :concurrent)
    :onyx/batch-size (schema/pred pos? 'pos?)
    schema/Keyword schema/Any})
 
@@ -32,7 +31,7 @@
 
 (defn serializable? [x]
   (try
-    (do (fressian/write x)
+    (do (compress x)
         true)
     (catch Exception e
       false)))
@@ -115,8 +114,12 @@
   {:catalog [(schema/pred map? 'map?)]
    :workflow workflow-validator
    :task-scheduler schema/Keyword
+   (schema/optional-key :percentage) schema/Int
    (schema/optional-key :flow-conditions) schema/Any
-   (schema/optional-key :percentage) schema/Int})
+   (schema/optional-key :acker/percentage) schema/Int
+   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
 
 (defn validate-job
   [job]

@@ -65,21 +65,18 @@
   [{:onyx/name :in-bootstrapped
     :onyx/type :input
     :onyx/medium :onyx-memory-test-plugin
-    :onyx/consumption :concurrent
     :onyx/bootstrap? true
     :onyx/batch-size 2}
 
    {:onyx/name :inc
     :onyx/fn :onyx.peer.bootstrap-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size 5}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))

@@ -39,6 +39,12 @@
       (assoc-in [:allocations (:id args)] {})
       (assoc-in [:saturation (:id args)] (:saturation args))
       (assoc-in [:task-saturation (:id args)] (:task-saturation args))
+      (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
+      (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
+      (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
+      (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
+      (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
+      (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
       (job-scheduler-replica-update entry)
       (task-scheduler-replica-update entry)))
 
@@ -46,43 +52,10 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
-(defmulti reallocate-from-job?
-  (fn [scheduler old new state]
-    scheduler))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/greedy
-  [scheduler old new state]
-  (not (seq (common/alive-jobs old (:jobs old)))))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/round-robin
-  [scheduler old new state]
-  (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (let [peer-counts (common/balance-jobs new)
-          peers (get (common/job->peers new) (:job allocation))]
-      (when (> (count peers) (get peer-counts (:job allocation)))
-        (let [n (- (count peers) (get peer-counts (:job allocation)))
-              peers-to-drop (common/drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
-
-(defmethod reallocate-from-job? :onyx.job-scheduler/percentage
-  [scheduler old new state]
-  (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (let [balanced (common/percentage-balanced-workload new)
-          peer-counts (:allocation (get balanced (:job allocation)))
-          peers (get (common/job->peers new) (:job allocation))]
-      (when (> (count peers) peer-counts)
-        (let [n (- (count peers) peer-counts)
-              peers-to-drop (common/drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
-
 (defmethod extensions/reactions :submit-job
-  [entry old new diff peer-args]
-  (when (reallocate-from-job? (:job-scheduler old) old new peer-args)
-    [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+  [{:keys [args] :as entry} old new diff state]
+  (when (common/volunteer-via-new-job? old new diff state)
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]

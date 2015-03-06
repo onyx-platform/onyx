@@ -1,3 +1,10 @@
+#### 0.6.0
+
+- Dropped support for `:sequential` tasks.
+- Added metadata to all public API functions indicating which Onyx version they were added in.
+- "onyx.api/start-peers!" API renamed to "onyx.api/start-peers"
+- "onyx.api/shutdown-peers" is now idempotent
+
 #### 0.5.3
 
 - New feature: Flow Conditions. Flow Conditions let you manage predicates that route segments across tasks in your workflow.

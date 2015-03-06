@@ -36,7 +36,6 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |----------------------|------------|----------------------------------|--------
 |`:onyx/name`          | `keyword`  | `any`                            |
 |`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
-|`:onyx/consumption`   | `keyword`  | `:sequential`, `:concurrent`     |
 |`:onyx/batch-size`    | `integer`  | `>= 0`                           |
 
 #### All maps may optionally have these keys

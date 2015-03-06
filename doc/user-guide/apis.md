@@ -16,8 +16,8 @@ Onyx ships with three distinct APIs to accommodate different needs. A descriptio
 - [Task Lifecycle API](#task-lifecycle-api)
     - [`start-lifecycle?`](#start-lifecycle)
     - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
-    - [`inject-temporal-resources`](#inject-temporal-resources)
-    - [`close-temporal-resources`](#close-temporal-resources)
+    - [`inject-batch-resources`](#inject-batch-resources)
+    - [`close-batch-resources`](#close-batch-resources)
     - [`close-lifecycle-resources`](#close-lifecycle-resources)
 - [Peer Pipeline API](#peer-pipeline-api)
     - [`read-batch`](#read-batch)
@@ -77,11 +77,11 @@ for `:onyx.peer/retry-start-interval` before recalling `start-lifecycle?`.
 
 Adds data once to the start of a peer's task execution. This data can be accessed in every iteration of the pipeline.
 
-##### `inject-temporal-resources`
+##### `inject-batch-resources`
 
 Adds data to each iteration of the pipeline per peer task execution. Called at the start of each pipeline.
 
-##### `close-temporal-resources`
+##### `close-batch-resources`
 
 Hook for closing out any stateful data injected into the pipeline. Called once at the end of each iteration.
 

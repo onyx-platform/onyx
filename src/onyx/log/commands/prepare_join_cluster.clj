@@ -2,7 +2,14 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
+
+(defn add-peer-sites [replica args]
+  (-> replica
+      (assoc-in [:send-peer-site (:joiner args)] (:send-site args))
+      (assoc-in [:acker-peer-site (:joiner args)] (:acker-site args))
+      (assoc-in [:completion-peer-site (:joiner args)] (:completion-site args))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]
@@ -19,12 +26,15 @@
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
                 watcher (nth sorted-candidates index)]
-            (update-in replica [:prepared] merge {watcher joining-peer}))
+            (-> replica
+                (update-in [:prepared] merge {watcher joining-peer})
+                (add-peer-sites args)))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
-          (assoc-in [:peer-state (:joiner args)] :idle)))))
+          (assoc-in [:peer-state (:joiner args)] :idle)
+          (add-peer-sites args)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
@@ -52,7 +62,9 @@
                  :subject (or (get (:pairs new) (:observer diff))
                               (:observer diff))}
           :immediate? true}]
-        (and (:instant-join diff) (seq (:jobs new)))
+        (and (:instant-join diff)
+             (seq (:jobs new))
+             (common/volunteer? old new peer-args (:job peer-args)))
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster

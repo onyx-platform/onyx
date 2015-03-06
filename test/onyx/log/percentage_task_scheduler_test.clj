@@ -1,7 +1,6 @@
 (ns onyx.log.percentage-task-scheduler-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.log.util :as util]
@@ -49,21 +48,19 @@
 
 (def n-peers 10)
 
-(def v-peers (onyx.api/start-peers! n-peers peer-config system/onyx-fake-peer))
+(def v-peers (onyx.api/start-peers n-peers peer-config))
 
 (def catalog
   [{:onyx/name :a
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/percentage 50
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.percentage-task-scheduler/fn
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/percentage 30
     :onyx/batch-size 20}
 
@@ -71,7 +68,6 @@
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/percentage 20
     :onyx/batch-size 20}])
 

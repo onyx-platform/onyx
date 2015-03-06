@@ -32,48 +32,22 @@
 
 (defmulti gc-log-entry (fn [log position] (type log)))
 
-;; Queue interface
+;; Messaging interface
 
-(defmulti create-tx-session (fn [queue] (type queue)))
+(defmulti send-peer-site (fn [messenger] (type messenger)))
 
-(defmulti create-consumer (fn [queue session queue-name] (type queue)))
+(defmulti acker-peer-site (fn [messenger] (type messenger)))
 
-(defmulti create-producer (fn [queue session queue-name] (type queue)))
+(defmulti completion-peer-site (fn [messenger] (type messenger)))
 
-(defmulti consume-message (fn [queue consumer] (type queue)))
+(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
 
-(defmulti read-message (fn [queue message] (type queue)))
+(defmulti receive-messages (fn [messenger event] (type messenger)))
 
-(defmulti message-uuid (fn [queue message] (type queue)))
+(defmulti send-messages (fn [messenger event peer-link] (type messenger)))
 
-(defmulti ack-message (fn [queue message] (type queue)))
+(defmulti internal-ack-message (fn [messenger event peer-link message-id completion-id ack-val]
+                                 (type messenger)))
 
-(defmulti produce-message (fn ([queue producer session msg] (type queue))
-                            ([queue producer session msg group] (type queue))))
-
-(defmulti commit-tx (fn [queue session] (type queue)))
-
-(defmulti rollback-tx (fn [queue session] (type queue)))
-
-(defmulti create-queue (fn [queue task] (type queue)))
-
-(defmulti create-queue-on-session (fn [queue session queue-name] (type queue)))
-
-(defmulti n-messages-remaining (fn [queue session queue-name] (type queue)))
-
-(defmulti n-consumers (fn [queue queue-name] (type queue)))
-
-(defmulti optimize-concurrently (fn [queue event] (type queue)))
-
-(defmulti bootstrap-queue (fn [queue task] (type queue)))
-
-(defmulti close-resource (fn [queue resource] (type queue)))
-
-(defmulti bind-active-session (fn [queue queue-name] (type queue)))
-
-(defmulti producer->queue-name (fn [queue queue-name] (type queue)))
-
-(defmulti create-io-task
-  (fn [element parents children]
-    (:onyx/type element)))
+(defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 
