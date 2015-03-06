@@ -2,9 +2,9 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal]]
-            [taoensso.nippy :as nippy]
             [zookeeper :as zk]
-            [onyx.extensions :as extensions])
+            [onyx.extensions :as extensions]
+            [onyx.compression.nippy :refer [compress decompress]])
   (:import [org.apache.curator.test TestingServer]))
 
 (def root-path "/onyx")
@@ -33,15 +33,9 @@
 (defn origin-path [prefix]
   (str (prefix-path prefix) "/origin"))
 
-(defn serialize [x]
-  (nippy/freeze x))
-
-(defn deserialize [x]
-  (nippy/thaw x))
-
 (defn initialize-origin! [conn config prefix]
   (let [node (str (origin-path prefix) "/origin")
-        bytes (serialize {:message-id -1 :replica {:job-scheduler (:onyx.peer/job-scheduler config)}})]
+        bytes (compress {:message-id -1 :replica {:job-scheduler (:onyx.peer/job-scheduler config)}})]
     (zk/create conn node :data bytes :persistent? true)))
 
 (defrecord ZooKeeper [config]
@@ -90,13 +84,13 @@
 (defmethod extensions/write-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} data]
   (let [node (str (log-path prefix) "/entry-")
-        bytes (serialize data)]
+        bytes (compress data)]
     (zk/create conn node :data bytes :persistent? true :sequential? true)))
 
 (defmethod extensions/read-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} position]
   (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))
-        content (deserialize (:data (zk/data conn node)))]
+        content (decompress (:data (zk/data conn node)))]
     (assoc content :message-id position)))
 
 (defmethod extensions/register-pulse ZooKeeper
@@ -155,60 +149,60 @@
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (catalog-path prefix) "/" id)
-        bytes (serialize chunk)]
+        bytes (compress chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (workflow-path prefix) "/" id)
-        bytes (serialize chunk)]
+        bytes (compress chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (task-path prefix) "/" (:id chunk))
-        bytes (serialize chunk)]
+        bytes (compress chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/write-chunk [ZooKeeper :sentinel]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (let [node (str (sentinel-path prefix) "/" id)
-        bytes (serialize chunk)]
+        bytes (compress chunk)]
     (zk/create conn node :persistent? true :data bytes)))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (catalog-path prefix) "/" id)]
-    (deserialize (:data (zk/data conn node)))))
+    (decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (workflow-path prefix) "/" id)]
-    (deserialize (:data (zk/data conn node)))))
+    (decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (task-path prefix) "/" id)]
-    (deserialize (:data (zk/data conn node)))))
+    (decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :sentinel]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (sentinel-path prefix) "/" id)]
-    (deserialize (:data (zk/data conn node)))))
+    (decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
   [{:keys [conn opts prefix] :as log} kw id]
   (let [node (str (origin-path prefix) "/origin")]
-    (deserialize (:data (zk/data conn node)))))
+    (decompress (:data (zk/data conn node)))))
 
 (defmethod extensions/update-origin! ZooKeeper
   [{:keys [conn opts prefix] :as log} replica message-id]
   (let [node (str (origin-path prefix) "/origin")
         version (:version (zk/exists conn node))
-        content (deserialize (:data (zk/data conn node)))]
+        content (decompress (:data (zk/data conn node)))]
     (when (< (:message-id content) message-id)
       (let [new-content {:message-id message-id :replica replica}]
-        (zk/set-data conn node (serialize new-content) version)))))
+        (zk/set-data conn node (compress new-content) version)))))
 
 (defmethod extensions/gc-log-entry ZooKeeper
   [{:keys [conn opts prefix] :as log} position]

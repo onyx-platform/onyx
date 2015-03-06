@@ -3,8 +3,8 @@
               [com.stuartsierra.component :as component]
               [org.httpkit.server :as server]
               [taoensso.timbre :as timbre]
-              [taoensso.nippy :as nippy]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions]
               [gniazdo.core :as ws])
     (:import [java.nio ByteBuffer]))
@@ -20,7 +20,7 @@
     (server/on-receive
      channel
      (fn [data]
-       (let [thawed (nippy/thaw data)
+       (let [thawed (decompress data)
              uri (:uri request)]
          (cond (= uri send-route)
                (doseq [message thawed]
@@ -89,16 +89,16 @@
 (defmethod extensions/send-messages HttpKitWebSockets
   [messenger event peer-link]
   (let [messages (:onyx.core/compressed event)
-        compressed-batch (nippy/freeze messages)]
+        compressed-batch (compress messages)]
     (ws/send-msg peer-link compressed-batch)))
 
 (defmethod extensions/internal-ack-message HttpKitWebSockets
   [messenger event peer-link message-id completion-id ack-val]
-  (let [contents (nippy/freeze {:id message-id :completion-id completion-id :ack-val ack-val})]
+  (let [contents (compress {:id message-id :completion-id completion-id :ack-val ack-val})]
     (ws/send-msg peer-link contents)))
 
 (defmethod extensions/internal-complete-message HttpKitWebSockets
   [messenger event id peer-link]
-  (let [contents (nippy/freeze {:id id})]
+  (let [contents (compress {:id id})]
     (ws/send-msg peer-link contents)))
 

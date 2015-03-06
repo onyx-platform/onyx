@@ -1,8 +1,8 @@
 (ns onyx.validation
   (:require [com.stuartsierra.dependency :as dep]
             [onyx.planning :as planning]
-            [schema.core :as schema]
-            [taoensso.nippy :as nippy]))
+            [onyx.compression.nippy :refer [compress decompress]]
+            [schema.core :as schema]))
 
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
@@ -30,7 +30,7 @@
 
 (defn serializable? [x]
   (try
-    (do (nippy/freeze x)
+    (do (compress x)
         true)
     (catch Exception e
       false)))
