@@ -133,6 +133,8 @@ Distributed under the Eclipse Public License, the same as Clojure.
 
 ### Profiler
 
+![YourKit](https://github.com/michaeldrogalis/onyx/tree/master/resources/logo/yourkit.png)
+
 YourKit supports open source projects with its full-featured Java Profiler.
 YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>
 and <a href="https://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>,
