@@ -13,7 +13,7 @@
                  [com.taoensso/nippy "2.8.0"]
                  [stylefruits/gniazdo "0.3.1"]
                  [prismatic/schema "0.3.1"]
-                 [zookeeper-clj "0.9.1"
+                 [zookeeper-clj "0.9.1"]
                  [http-kit "2.1.17"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
