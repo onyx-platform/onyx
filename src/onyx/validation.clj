@@ -7,7 +7,6 @@
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
-   :onyx/consumption (schema/enum :sequential :concurrent)
    :onyx/batch-size (schema/pred pos? 'pos?)
    schema/Keyword schema/Any})
 

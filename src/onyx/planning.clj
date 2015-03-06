@@ -35,13 +35,11 @@
     (if (= (count (into #{} (map (comp (:onyx/name element) :egress-ids) parents))) 1)
       [{:id (get (:egress-ids (first parents)) (:onyx/name element))
         :name (:onyx/name element)
-        :egress-ids (egress-ids-from-children children)
-        :consumption (:onyx/consumption element)}]
+        :egress-ids (egress-ids-from-children children)}]
       (concat
        [{:id (get (:egress-ids (first parents)) (:onyx/name element))
          :name (:onyx/name element)
-         :egress-ids (egress-ids-from-children children)
-         :consumption (:onyx/consumption element)}]
+         :egress-ids (egress-ids-from-children children)}]
        (map #(assoc-in % [:egress-ids (:onyx/name element)]
                        (get (:egress-ids (first parents)) (:onyx/name element)))
             (rest parents))))))
@@ -62,15 +60,13 @@
   [element parent children]
   [{:id (UUID/randomUUID)
     :name (:onyx/name element)
-    :egress-ids (egress-ids-from-children children)
-    :consumption (:onyx/consumption element)}])
+    :egress-ids (egress-ids-from-children children)}])
 
 (defmethod create-io-task :output
   [element parents children]
   (let [task-name (:onyx/name element)]
     [{:id (get (:egress-ids (first parents)) (:onyx/name element))
-      :name (:onyx/name element)
-      :consumption (:onyx/consumption element)}]))
+      :name (:onyx/name element)}]))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]
