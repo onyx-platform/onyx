@@ -1,6 +1,6 @@
 ## Information Model
 
-This chapter specifies what a valid catalog and workflow look like, as well as how the underlying ZooKeeper representation is realized.
+This section specifies what a valid catalog, workflow, and flow conditions look like.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -13,6 +13,7 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
   - [Maps with `:onyx/type` set to `:input` or `:output` must have these keys](#maps-with-onyxtype-set-to-input-or-output-must-have-these-keys)
   - [Maps with `:onyx/type` set to `:function` must have these keys](#maps-with-onyxtype-set-to-function-must-have-these-keys)
   - [Maps with `:onyx/type` set to `:function` may optionally have these keys](#maps-with-onyxtype-set-to-function-may-optionally-have-these-keys)
+- [Flow Conditions](#flow-conditions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -39,11 +40,11 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 
 #### All maps may optionally have these keys
 
-| key name             | type       | choices   | default
-|----------------------|------------|---------------------
-|`:onyx/ident`         | `keyword`  | `any`     |
-|`:onyx/batch-timeout` | `integer`  | `>= 0`    | 1000
-|`:onyx/max-peers`     | `integer`  | `> 0`     |
+| key name             | type       | choices                          | default
+|----------------------|------------|----------------------------------|--------
+|`:onyx/ident`         | `keyword`  | `any`                            |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`                           | 1000
+|`:onyx/max-peers`     | `integer`  | `> 0`                            |
 
 #### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 
@@ -63,4 +64,18 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 |--------------------|------------|----------
 |`:onyx/group-by-key`| `keyword`  | `any`
 |`:onyx/group-by-fn` | `keyword`  | `any`
+
+
+### Flow Conditions
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+
+| key name             |type                          | optional?| default
+|----------------------|------------------------------|----------|--------
+|`:flow/from`          |`keyword`                     | no       |
+|`:flow/to`            |`:all`, `:none` or `[keyword]`| no       |
+|`:flow/predicate`     |`keyword` or `[keyword]`      | no       |
+|`:flow/exclude-keys`  |`[keyword]`                   | yes      | `[]`
+|`:flow/short-circuit?`|`boolean`                     | yes      |`false`
 

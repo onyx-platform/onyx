@@ -87,6 +87,7 @@
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
         _  (validator/validate-job (assoc job :workflow (:workflow job)))
+        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
         task-ids (map :id tasks)
         scheduler (:task-scheduler job)
@@ -106,6 +107,7 @@
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
+    (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
 
     (doseq [task tasks]
       (extensions/write-chunk (:log client) :task task id)

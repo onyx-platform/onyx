@@ -5,6 +5,19 @@
 - "onyx.api/start-peers!" API renamed to "onyx.api/start-peers"
 - "onyx.api/shutdown-peers" is now idempotent
 
+#### 0.5.3
+
+- New feature: Flow Conditions. Flow Conditions let you manage predicates that route segments across tasks in your workflow.
+- Fixed extraneous ZooKeeper error messages.
+
+#### 0.5.2
+
+- Development environment doesn't required that the job scheduler be known ahead of time. It's now discovered dynamically.
+
+#### 0.5.1
+
+- Adds ctime to log entries. Useful for things like the dashboard and other log subscribers.
+
 #### 0.5.0
 
 - Design change: the Coordinator has been abolished. Onyx is now a fully masterless system. The supporting environment now only requires Zookeeper, HornetQ, and a shared Onyx ID across cluster members.

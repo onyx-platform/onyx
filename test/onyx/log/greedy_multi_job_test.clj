@@ -12,8 +12,6 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def scheduler :onyx.job-scheduler/greedy)
-
 (def env-config
   {:hornetq/mode :udp
    :hornetq/server? true
@@ -27,7 +25,6 @@
    :zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx.peer/job-scheduler scheduler
    :onyx/id onyx-id})
 
 (def peer-config
@@ -41,7 +38,7 @@
    :onyx/id onyx-id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/job-scheduler scheduler
+   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
 
 (def env (onyx.api/start-env env-config))

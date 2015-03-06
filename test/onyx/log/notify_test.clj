@@ -30,6 +30,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
+
 (def a-id "a")
 
 (def b-id "b")

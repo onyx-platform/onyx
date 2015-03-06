@@ -10,6 +10,7 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
   - [Task](#task)
   - [Workflow](#workflow)
   - [Catalog](#catalog)
+  - [Flow Conditions](#flow-conditions)
   - [Segment](#segment)
   - [Function](#function)
   - [Plugin](#plugin)
@@ -27,11 +28,11 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 #### Workflow
 
-A workflow is the structural specification of an Onyx program. It's purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acyclic graph.
+A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acyclic graph.
 
 In the case of a tree, the workflow is a Clojure map representing a multi-rooted tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything in-between must name a function. Elements of a workflow must be Clojure keywords.
 
-In the case of a directed acyclic graph, the workflow is a Clojure vector of vectors. The inner vectors contain exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge between from the first node to the second.
+In the case of a directed acyclic graph, the workflow is a Clojure vector of vectors. Each inner vector contains exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge from the first node to the second.
 
 Tree Examples:
 
@@ -137,6 +138,19 @@ Example:
  :hornetq/port hornetq-port
  :onyx/batch-size batch-size
  :onyx/doc "A HornetQ output stream"}]
+```
+
+#### Flow Conditions
+
+In contrast to a workflow, flow conditions specify on a segment-by-segment basis which direction data should flow determined by predicate functions. This is helpful for conditionally processing a segment based off of its content.
+
+Example:
+
+```clojure
+[{:flow/from :input-stream
+  :flow/to [:process-adults]
+  :flow/predicate :my.ns/adult?
+  :flow/doc "Emits segment if this segment is an adult."}
 ```
 
 #### Segment
