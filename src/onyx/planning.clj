@@ -89,19 +89,3 @@
       []
       sorted-dag))))
 
-(defn unpack-map-workflow
-  ([workflow] (vec (unpack-map-workflow workflow [])))
-  ([workflow result]
-     (let [roots (keys workflow)]
-       (if roots
-         (concat result
-                 (mapcat
-                  (fn [k]
-                    (let [child (get workflow k)]
-                      (if (map? child)
-                        (concat (map (fn [x] [k x]) (keys child))
-                                (unpack-map-workflow child result))
-                        [[k child]])))
-                  roots))
-         result))))
-

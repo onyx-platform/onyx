@@ -45,22 +45,6 @@
               []
               workflow)))
 
-(defn ^{:added "0.6.0"} unpack-map-workflow
-  ([workflow] (vec (unpack-map-workflow workflow [])))
-  ([workflow result]
-     (let [roots (keys workflow)]
-       (if roots
-         (concat result
-                 (mapcat
-                  (fn [k]
-                    (let [child (get workflow k)]
-                      (if (map? child)
-                        (concat (map (fn [x] [k x]) (keys child))
-                                (unpack-map-workflow child result))
-                        [[k child]])))
-                  roots))
-         result))))
-
 (defn ^{:no-doc true} add-job-percentage [config job args]
   (if (= (:onyx.peer/job-scheduler config) :onyx.job-scheduler/percentage)
     (assoc args :percentage (:percentage job))
@@ -102,11 +86,8 @@
 (defn ^{:added "0.6.0"} submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
-        normalized-workflow (if (map? (:workflow job))
-                              (unpack-map-workflow (:workflow job))
-                              (:workflow job))
-        _  (validator/validate-job (assoc job :workflow normalized-workflow))
-        tasks (planning/discover-tasks (:catalog job) normalized-workflow)
+        _  (validator/validate-job (assoc job :workflow (:workflow job)))
+        tasks (planning/discover-tasks (:catalog job) (:workflow job))
         task-ids (map :id tasks)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
@@ -124,7 +105,7 @@
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
         entry (create-log-entry :submit-job args)]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-    (extensions/write-chunk (:log client) :workflow normalized-workflow id)
+    (extensions/write-chunk (:log client) :workflow (:workflow job) id)
 
     (doseq [task tasks]
       (extensions/write-chunk (:log client) :task task id)
