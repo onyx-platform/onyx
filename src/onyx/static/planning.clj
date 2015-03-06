@@ -1,4 +1,4 @@
-(ns onyx.planning
+(ns onyx.static.planning
   (:require [com.stuartsierra.dependency :as dep])
   (:import [java.util UUID]))
 

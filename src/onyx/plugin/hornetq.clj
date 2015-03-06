@@ -1,6 +1,6 @@
 (ns onyx.plugin.hornetq
   (:require [clojure.core.async :refer [go timeout <!]]
-            [onyx.planning :as planning]
+            [onyx.static.planning :as planning]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]

@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.function
     (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
-              [onyx.planning :refer [find-task]]
+              [onyx.static.planning :refer [find-task]]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]

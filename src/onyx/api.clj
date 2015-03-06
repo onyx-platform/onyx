@@ -6,8 +6,8 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
-            [onyx.validation :as validator]
-            [onyx.planning :as planning]))
+            [onyx.static.validation :as validator]
+            [onyx.static.planning :as planning]))
 
 (defn ^{:no-doc true} saturation [catalog]
   (let [rets

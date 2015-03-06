@@ -1,6 +1,6 @@
-(ns onyx.validation
+(ns onyx.static.validation
   (:require [com.stuartsierra.dependency :as dep]
-            [onyx.planning :as planning]
+            [onyx.static.planning :as planning]
             [onyx.compression.nippy :refer [compress decompress]]
             [schema.core :as schema]))
 

@@ -1,7 +1,7 @@
 (ns onyx.system
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal]]
-            [onyx.logging-configuration :as logging-config]
+            [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]

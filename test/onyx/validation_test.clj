@@ -1,4 +1,4 @@
-(ns onyx.validation-test
+(ns onyx.static.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [midje.sweet :refer :all]
@@ -205,7 +205,7 @@
         :onyx/type :output
         :onyx/medium :hornetq}]
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
-      tasks (onyx.planning/discover-tasks catalog workflow)
+      tasks (onyx.static.planning/discover-tasks catalog workflow)
 
       [a b c d e f g :as sorted-tasks]
       (reduce (fn [all next]
