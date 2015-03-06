@@ -9,22 +9,16 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def scheduler :onyx.job-scheduler/greedy)
-
 (def env-config
   {:zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id id
-   :onyx.peer/job-scheduler scheduler})
+   :onyx/id id})
 
 (def peer-config
   {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
-   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
-   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/join-failure-back-off 500
-   :onyx.peer/job-scheduler scheduler
+   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :http-kit-websockets})
 
 (def env (onyx.api/start-env env-config))
