@@ -41,7 +41,6 @@
     :onyx/ident :core.async/read-from-chan
     :onyx/type :input
     :onyx/medium :core.async
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments from a core.async channel"}
@@ -49,14 +48,12 @@
    {:onyx/name :add
     :onyx/fn :onyx.peer.params-test/my-adder
     :onyx/type :function
-    :onyx/consumption :sequential
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
     :onyx/ident :core.async/write-to-chan
     :onyx/type :output
     :onyx/medium :core.async
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])

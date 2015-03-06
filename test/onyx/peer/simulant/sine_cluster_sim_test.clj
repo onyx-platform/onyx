@@ -140,7 +140,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name in-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -149,20 +148,18 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.simulant.sine-cluster-sim-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
     :onyx/batch-size batch-size}])
 
-(def workflow {:in {:inc :out}})
+(def workflow [[:in :inc] [:inc :out]])
 
 (hq-util/create-queue! hq-config in-queue)
 (hq-util/create-queue! hq-config out-queue)

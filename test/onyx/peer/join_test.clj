@@ -94,7 +94,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name name-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -104,7 +103,6 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name age-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
@@ -113,7 +111,6 @@
    {:onyx/name :join-person
     :onyx/fn :onyx.peer.join-test/join-person
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/group-by-key :id
     :onyx/batch-size batch-size}
 
@@ -121,7 +118,6 @@
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :hornetq/queue-name out-queue
     :hornetq/host (:host (:non-clustered (:hornetq config)))
     :hornetq/port (:port (:non-clustered (:hornetq config)))
