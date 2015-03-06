@@ -74,8 +74,6 @@
 
 (def v-peers (onyx.api/start-peers 8 peer-config))
 
-(Thread/sleep 1000)
-
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
