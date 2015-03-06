@@ -116,7 +116,6 @@ Example:
  :onyx/ident :hornetq/read-segments
  :onyx/type :input
  :onyx/medium :hornetq
- :onyx/consumption :concurrent
  :hornetq/queue-name in-queue
  :hornetq/host hornetq-host
  :hornetq/port hornetq-port
@@ -126,7 +125,6 @@ Example:
 {:onyx/name :inc
  :onyx/fn :my.namespace/my-function-name
  :onyx/type :function
- :onyx/consumption :concurrent
  :onyx/batch-size batch-size
  :onyx/doc "A function to increment integers"}
 
@@ -134,7 +132,6 @@ Example:
  :onyx/ident :hornetq/write-segments
  :onyx/type :output
  :onyx/medium :hornetq
- :onyx/consumption :concurrent
  :hornetq/queue-name out-queue
  :hornetq/host hornetq-host
  :hornetq/port hornetq-port

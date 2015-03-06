@@ -35,7 +35,6 @@ In your peer boot-up namespace:
  :onyx/ident :hornetq/read-segments
  :onyx/type :input
  :onyx/medium :hornetq
- :onyx/consumption :concurrent
  :hornetq/queue-name in-queue
  :hornetq/host hornetq-host
  :hornetq/port hornetq-port
@@ -50,7 +49,6 @@ In your peer boot-up namespace:
  :onyx/ident :hornetq/write-segments
  :onyx/type :output
  :onyx/medium :hornetq
- :onyx/consumption :concurrent
  :hornetq/queue-name out-queue
  :hornetq/host hornetq-host
  :hornetq/port hornetq-port

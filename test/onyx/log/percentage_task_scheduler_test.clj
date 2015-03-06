@@ -56,14 +56,12 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/percentage 50
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.percentage-task-scheduler/fn
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/percentage 30
     :onyx/batch-size 20}
 
@@ -71,7 +69,6 @@
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/percentage 20
     :onyx/batch-size 20}])
 

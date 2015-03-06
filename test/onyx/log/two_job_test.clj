@@ -56,20 +56,17 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :b
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :c
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (def catalog-2
@@ -77,20 +74,17 @@
     :onyx/ident :hornetq/read-segments
     :onyx/type :input
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :e
     :onyx/fn :onyx.peer.single-peer-test/my-inc
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}
 
    {:onyx/name :f
     :onyx/ident :hornetq/write-segments
     :onyx/type :output
     :onyx/medium :hornetq
-    :onyx/consumption :concurrent
     :onyx/batch-size 20}])
 
 (onyx.api/submit-job peer-config

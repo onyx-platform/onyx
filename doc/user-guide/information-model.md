@@ -35,7 +35,6 @@ This chapter specifies what a valid catalog and workflow look like, as well as h
 |----------------------|------------|----------------------------------|--------
 |`:onyx/name`          | `keyword`  | `any`                            |
 |`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
-|`:onyx/consumption`   | `keyword`  | `:sequential`, `:concurrent`     |
 |`:onyx/batch-size`    | `integer`  | `>= 0`                           |
 
 #### All maps may optionally have these keys
