@@ -22,7 +22,7 @@
   {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl :http-kit-websockets})
+   :onyx.messaging/impl :aleph-tcp})
 
 (def env (onyx.api/start-env env-config))
 
