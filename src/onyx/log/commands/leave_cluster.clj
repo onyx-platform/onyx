@@ -25,7 +25,9 @@
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
-        (update-in [:peer-site] dissoc id)
+        (update-in [:send-peer-site] dissoc id)
+        (update-in [:acker-peer-site] dissoc id)
+        (update-in [:completion-peer-site] dissoc id)
         (common/remove-sealing-tasks args)
         (common/remove-peers args))))
 
