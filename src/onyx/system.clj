@@ -6,6 +6,7 @@
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.http-kit :refer [http-kit-websockets]]
+            [onyx.messaging.aleph :refer [aleph-tcp-sockets]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -27,7 +28,8 @@
 (def peer-components [:logging-config :log :messenger-buffer :messenger :acking-daemon :virtual-peer])
 
 (def messenger
-  {:http-kit-websockets http-kit-websockets})
+  {:http-kit-websockets http-kit-websockets
+   :aleph-tcp aleph-tcp-sockets})
 
 (defn rethrow-component [f]
   (try
