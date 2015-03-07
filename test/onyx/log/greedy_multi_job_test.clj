@@ -92,13 +92,13 @@
     :catalog catalog-2
     :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(def n-peers 4)
+(def n-peers 40)
 
 (def v-peers (onyx.api/start-peers n-peers peer-config))
 
 (def ch (chan n-peers))
 
-(def replica
+(def replica-1
   (loop [replica (extensions/subscribe-to-log (:log env) ch)]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
@@ -107,8 +107,8 @@
           task-b (second (get-in new-replica [:tasks j1]))
           task-c (first (get-in new-replica [:tasks j2]))
           task-d (second (get-in new-replica [:tasks j2]))]
-      (if-not (and (= (count (get-in new-replica [:allocations j1 task-a])) 2)
-                   (= (count (get-in new-replica [:allocations j1 task-b])) 2)
+      (if-not (and (= (count (get-in new-replica [:allocations j1 task-a])) 20)
+                   (= (count (get-in new-replica [:allocations j1 task-b])) 20)
                    (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
         (recur new-replica)
         new-replica))))
@@ -117,23 +117,22 @@
 
 (fact "20 peers were allocated to job 1, task B" true => true)
 
-(def task-a (first (get-in replica [:tasks j1])))
+(def task-a (first (get-in replica-1 [:tasks j1])))
 
-(def task-b (second (get-in replica [:tasks j1])))
+(def task-b (second (get-in replica-1 [:tasks j1])))
 
-(def task-c (first (get-in replica [:tasks j2])))
+(def task-c (first (get-in replica-1 [:tasks j2])))
 
-(def task-d (second (get-in replica [:tasks j2])))
+(def task-d (second (get-in replica-1 [:tasks j2])))
 
 (>!! a-chan :done)
 (close! a-chan)
 
-(def replica-3
-  (loop [replica replica-2]
+(def replica-2
+  (loop [replica replica-1]
     (let [position (<!! ch)
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)]
-      (prn (count (get (get (:allocations new-replica) j2) task-c)) ":: " (count (get (get (:allocations new-replica) j2) task-d)))
       (if (and (= (count (get (get (:allocations new-replica) j2) task-c)) 20)
                (= (count (get (get (:allocations new-replica) j2) task-d)) 20))
         new-replica
@@ -143,58 +142,25 @@
 
 (fact "20 peers were reallocated to job 2, task D" true => true)
 
-;; (def entry (create-log-entry :complete-task {:job j2 :task task-c}))
+(>!! c-chan :done)
+(close! c-chan)
 
-;; (extensions/write-log-entry (:log env) entry)
+(def replica-3
+  (loop [replica replica-2]
+    (let [position (<!! ch)
+          entry (extensions/read-log-entry (:log env) position)
+          new-replica (extensions/apply-log-entry entry replica)]
+      (if (zero? (apply + (map count (vals (get (:allocations new-replica) j2)))))
+        new-replica
+        (recur new-replica)))))
 
-;; (def replica-4
-;;   (loop [replica replica-3]
-;;     (let [position (<!! ch)
-;;           entry (extensions/read-log-entry (:log env) position)
-;;           new-replica (extensions/apply-log-entry entry replica)]
-;;       (if (= (count (get (get (:allocations new-replica) j2) task-d)) 40)
-;;         new-replica
-;;         (recur new-replica)))))
+(fact "No peers are executing any tasks" true => true)
 
-;; (fact "All peers were reallocated to job 2, task D" true => true)
-
-;; (def entry (create-log-entry :complete-task {:job j2 :task task-d}))
-
-;; (extensions/write-log-entry (:log env) entry)
-
-;; (def replica-5
-;;   (loop [replica replica-4]
-;;     (let [position (<!! ch)
-;;           entry (extensions/read-log-entry (:log env) position)
-;;           new-replica (extensions/apply-log-entry entry replica)]
-;;       (if (zero? (apply + (map count (vals (get (:allocations new-replica) j2)))))
-;;         new-replica
-;;         (recur new-replica)))))
-
-;; (fact "No peers are executing any tasks" true => true)
-
-;; (close! b-chan)
-;; (close! c-chan)
-;; (close! d-chan)
+(close! b-chan)
+(close! d-chan)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
 
-
-
-
-(comment
-  (require '[clojure.core.async :refer :all])
-  (def ch (chan 1000))
-  (future
-    (def replica
-      (loop [replica (onyx.extensions/subscribe-to-log (:log env) ch)]
-        (let [position (<!! ch)
-              entry (onyx.extensions/read-log-entry (:log env) position)
-              new-replica (onyx.extensions/apply-log-entry entry replica)]
-          (prn "===")
-          (prn entry)
-          (clojure.pprint/pprint new-replica)
-          (recur new-replica))))))

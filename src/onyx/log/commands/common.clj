@@ -372,7 +372,8 @@
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
   (when-let [job (first (incomplete-jobs new))]
-    (job-coverable? new job)))
+    (and (not (job-coverable? old job))
+         (job-coverable? new job))))
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
