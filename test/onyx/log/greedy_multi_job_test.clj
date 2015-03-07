@@ -34,7 +34,6 @@
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/max-peers 1
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :b
@@ -42,7 +41,6 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
 (def catalog-2
@@ -51,7 +49,6 @@
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/max-peers 1
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :d
@@ -59,7 +56,6 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
 (def a-chan (chan))

@@ -287,15 +287,12 @@
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
-          (let [x (first (alts!! [kill-ch] :default true))]
-            (taoensso.timbre/info (format "[%s] %s / %s / %s" id (common/job-covered? replica-state job-id) (common/any-ackers? replica-state job-id)
-                                          x))
-            (when (and x
-                       (or (not (common/job-covered? replica-state job-id))
-                           (not (common/any-ackers? replica-state job-id))))
-              (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
-              (Thread/sleep 500)
-              (recur @replica))))
+          (when (and (first (alts!! [kill-ch] :default true))
+                     (or (not (common/job-covered? replica-state job-id))
+                         (not (common/any-ackers? replica-state job-id))))
+            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+            (Thread/sleep 500)
+            (recur @replica)))
 
         (release-messages! messenger pipeline-data)
         (thread (forward-completion-calls! pipeline-data completion-ch))
