@@ -40,9 +40,9 @@
 (fact
  (reallocate-from-job? :onyx.job-scheduler/percentage nil
                        {:jobs [:a :b :c]
-                        :task-schedulers {:a :onyx.task-scheduler/greedy
-                                          :b :onyx.task-scheduler/greedy
-                                          :c :onyx.task-scheduler/greedy}
+                        :task-schedulers {:a :onyx.task-scheduler/round-robin
+                                          :b :onyx.task-scheduler/round-robin
+                                          :c :onyx.task-scheduler/round-robin}
                         :peers [:p1 :p2 :p3 :p4 :p5]
                         :allocations {:a {:t1 [:p1 :p2 :p3 :p4 :p5]}}
                         :percentages {:a 70 :b 30 :c 20}}

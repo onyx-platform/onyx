@@ -89,12 +89,12 @@
 (onyx.api/submit-job peer-config
                      {:workflow [[:a :b] [:b :c]]
                       :catalog catalog-1
-                      :task-scheduler :onyx.task-scheduler/greedy})
+                      :task-scheduler :onyx.task-scheduler/round-robin})
 
 (onyx.api/submit-job peer-config
                      {:workflow [[:d :e] [:e :f]]
                       :catalog catalog-2
-                      :task-scheduler :onyx.task-scheduler/greedy})
+                      :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def ch (chan n-peers))
 

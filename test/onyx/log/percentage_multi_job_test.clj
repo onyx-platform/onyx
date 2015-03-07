@@ -76,14 +76,14 @@
                        {:workflow [[:a :b]]
                         :catalog catalog-1
                         :percentage 70
-                        :task-scheduler :onyx.task-scheduler/greedy}))
+                        :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
   (onyx.api/submit-job peer-config
                        {:workflow [[:c :d]]
                         :catalog catalog-2
                         :percentage 30
-                        :task-scheduler :onyx.task-scheduler/greedy}))
+                        :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def n-peers 10)
 

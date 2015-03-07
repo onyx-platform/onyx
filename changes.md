@@ -1,6 +1,7 @@
 #### 0.6.0
 
 - Dropped support for `:sequential` tasks.
+- Dropped support for `onyx.task-scheduler/greedy`.
 - Added metadata to all public API functions indicating which Onyx version they were added in.
 - "onyx.api/start-peers!" API renamed to "onyx.api/start-peers"
 - "onyx.api/shutdown-peers" is now idempotent

@@ -160,7 +160,7 @@
  peer-config
  {:catalog catalog
   :workflow workflow
-  :task-scheduler :onyx.task-scheduler/greedy})
+  :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def linear-model-id (d/tempid :model))
 

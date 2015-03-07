@@ -237,11 +237,6 @@
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
 
-(defmethod drop-peers :onyx.task-scheduler/greedy
-  [replica job n]
-  (let [tasks (get (:allocations replica) job)]
-    (take-last n (apply concat (vals tasks)))))
-
 (defmethod drop-peers :onyx.task-scheduler/round-robin
   [replica job n]
   (let [task-seq (cycle (reverse (get-in replica [:tasks job])))]

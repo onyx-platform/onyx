@@ -1,9 +1,9 @@
 (ns onyx.log.greedy-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
-            [onyx.log.util :as util]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -13,75 +13,86 @@
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
 (def env-config
-  {:hornetq/mode :udp
-   :hornetq/server? true
-   :hornetq.server/type :embedded
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :hornetq.embedded/config (:configs (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
+  {:zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id onyx-id})
 
 (def peer-config
-  {:hornetq/mode :udp
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
+  {:zookeeper/address (:address (:zookeeper config))
    :onyx/id onyx-id
-   :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
-   :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
+   :onyx.messaging/impl :http-kit-websockets})
 
 (def env (onyx.api/start-env env-config))
 
 (def catalog-1
   [{:onyx/name :a
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :onyx/batch-size 20}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :b
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/batch-size 20}])
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
 
 (def catalog-2
   [{:onyx/name :c
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :onyx/batch-size 20}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :d
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/batch-size 20}])
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
+
+(def a-chan (chan))
+
+(def b-chan (chan))
+
+(def c-chan (chan))
+
+(def d-chan (chan))
+
+(defmethod l-ext/inject-lifecycle-resources :a
+  [_ _] {:core.async/in-chan a-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :b
+  [_ _] {:core.async/in-chan b-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :c
+  [_ _] {:core.async/out-chan c-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :d
+  [_ _] {:core.async/out-chan d-chan})
 
 (def j1
   (onyx.api/submit-job
    peer-config
    {:workflow [[:a :b]]
     :catalog catalog-1
-    :task-scheduler :onyx.task-scheduler/greedy}))
+    :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
   (onyx.api/submit-job
    peer-config
    {:workflow [[:c :d]]
     :catalog catalog-2
-    :task-scheduler :onyx.task-scheduler/greedy}))
+    :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def n-peers 40)
 
@@ -173,6 +184,11 @@
         (recur new-replica)))))
 
 (fact "No peers are executing any tasks" true => true)
+
+(close! a-chan)
+(close! b-chan)
+(close! c-chan)
+(close! d-chan)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
