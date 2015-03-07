@@ -183,10 +183,7 @@
 
 (defmethod reallocate-from-task? :default
   [scheduler old new job state]
-  (throw (ex-info 
-          (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead." 
-                  scheduler)
-          {:scheduler scheduler})))
+  false)
 
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args]
