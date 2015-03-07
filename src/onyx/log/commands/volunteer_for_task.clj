@@ -75,15 +75,19 @@
 
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
-  (let [job (first (universally-executable-jobs replica))]
+  (let [job (first (universally-executable-jobs replica))
+        allocation (common/peer->allocated-job (:allocations replica) (:id args))]
     (if job
       (if-let [task (select-task replica job (:id args))]
-        (-> replica
-            (common/remove-peers args)
-            (update-in [:allocations job task] conj (:id args))
-            (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)
-            (offer-acker job task args))
+        (if (or (not= task (:task allocation))
+                (not= job (:job allocation)))
+          (-> replica
+              (common/remove-peers args)
+              (update-in [:allocations job task] conj (:id args))
+              (update-in [:allocations job task] vec)
+              (assoc-in [:peer-state (:id args)] :warming-up)
+              (offer-acker job task args))
+          replica)
         replica)
       replica)))
 
@@ -91,16 +95,20 @@
   [{:keys [args]} replica]
   (if-not (common/saturated-cluster? replica)
     (let [candidates (universally-executable-jobs replica)
+          allocation (common/peer->allocated-job (:allocations replica) (:id args))
           job (or (common/find-job-needing-peers replica candidates)
                   (common/round-robin-next-job replica candidates))]
       (if job
         (if-let [task (select-task replica job (:id args))]
-          (-> replica
-              (common/remove-peers args)
-              (update-in [:allocations job task] conj (:id args))
-              (update-in [:allocations job task] vec)
-              (assoc-in [:peer-state (:id args)] :warming-up)
-              (offer-acker job task args))
+          (if (or (not= task (:task allocation))
+                  (not= job (:job allocation)))
+            (-> replica
+                (common/remove-peers args)
+                (update-in [:allocations job task] conj (:id args))
+                (update-in [:allocations job task] vec)
+                (assoc-in [:peer-state (:id args)] :warming-up)
+                (offer-acker job task args))
+            replica)
           replica)
         replica))
     replica))
@@ -109,6 +117,7 @@
   [{:keys [args]} replica]
   (let [candidates (universally-executable-jobs replica)
         balanced (common/percentage-balanced-workload replica)
+        allocation (common/peer->allocated-job (:allocations replica) (:id args))
         job
         (reduce
          (fn [_ job]
@@ -120,12 +129,15 @@
          candidates)]
     (if job
       (if-let [task (select-task replica job (:id args))]
-        (-> replica
-            (common/remove-peers args)
-            (update-in [:allocations job task] conj (:id args))
-            (update-in [:allocations job task] vec)
-            (assoc-in [:peer-state (:id args)] :warming-up)
-            (offer-acker job task args))
+        (if (or (not= task (:task allocation))
+                (not= job (:job allocation)))
+          (-> replica
+              (common/remove-peers args)
+              (update-in [:allocations job task] conj (:id args))
+              (update-in [:allocations job task] vec)
+              (assoc-in [:peer-state (:id args)] :warming-up)
+              (offer-acker job task args))
+          replica)
         replica)
       replica)))
 
