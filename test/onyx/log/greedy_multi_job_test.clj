@@ -26,6 +26,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def batch-size 20)
+
 (def catalog-1
   [{:onyx/name :a
     :onyx/ident :core.async/read-from-chan

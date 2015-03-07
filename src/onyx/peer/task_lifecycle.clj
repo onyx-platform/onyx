@@ -282,14 +282,16 @@
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
-        (while (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data)))
+        (while (and (first (alts!! [kill-ch] :default true))
+                    (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
-          (when-not (and (common/job-covered? replica-state job-id)
-                         (common/any-ackers? replica-state job-id))
+          (when (and (first (alts!! [kill-ch] :default true))
+                     (or (not (common/job-covered? replica-state job-id))
+                         (not (common/any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))
