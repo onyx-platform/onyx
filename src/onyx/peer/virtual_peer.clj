@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-    (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close!]]
+    (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
@@ -30,6 +30,7 @@
                            :outbox-ch outbox-ch
                            :completion-ch completion-ch
                            :opts opts
+                           :kill-ch kill-ch
                            :restart-ch restart-ch
                            :stall-output? true
                            :task-lifecycle-fn task-lifecycle}
@@ -82,7 +83,7 @@
 
       (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
-            kill-ch (chan 1)
+            kill-ch (chan (dropping-buffer 1))
             restart-ch (chan 1)
             completion-ch (:completions-ch acking-daemon)
             send-peer-site (extensions/send-peer-site messenger)

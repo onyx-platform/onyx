@@ -74,10 +74,10 @@
   [_ _] {:core.async/in-chan a-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :b
-  [_ _] {:core.async/in-chan b-chan})
+  [_ _] {:core.async/out-chan b-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/out-chan c-chan})
+  [_ _] {:core.async/in-chan c-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :d
   [_ _] {:core.async/out-chan d-chan})
@@ -96,7 +96,11 @@
     :catalog catalog-2
     :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(def n-peers 40)
+(prn "j1: " j1)
+
+(prn "j2: " j2)
+
+(def n-peers 4)
 
 (def v-peers (onyx.api/start-peers n-peers peer-config))
 

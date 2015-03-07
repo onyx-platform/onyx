@@ -244,7 +244,7 @@
      (catch Exception e
        (warn e)))))
 
-(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch outbox-ch seal-resp-ch completion-ch opts]
+(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
   component/Lifecycle
 
   (start [component]
@@ -254,9 +254,7 @@
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             catalog-entry (find-task catalog (:name task))
 
-            kill-ch (chan (dropping-buffer 1))
-
-            _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for %s" id (:name task)))
+            _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -289,19 +287,22 @@
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
-          (when (and (first (alts!! [kill-ch] :default true))
-                     (or (not (common/job-covered? replica-state job-id))
-                         (not (common/any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
-            (Thread/sleep 500)
-            (recur @replica)))
+          (let [x (first (alts!! [kill-ch] :default true))]
+            (taoensso.timbre/info (format "[%s] %s / %s / %s" id (common/job-covered? replica-state job-id) (common/any-ackers? replica-state job-id)
+                                          x))
+            (when (and x
+                       (or (not (common/job-covered? replica-state job-id))
+                           (not (common/any-ackers? replica-state job-id))))
+              (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+              (Thread/sleep 500)
+              (recur @replica))))
 
         (release-messages! messenger pipeline-data)
         (thread (forward-completion-calls! pipeline-data completion-ch))
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
         (thread (run-task-lifecycle pipeline-data kill-ch))
 
-        (assoc component :pipeline-data pipeline-data :kill-ch kill-ch :seal-ch seal-resp-ch))
+        (assoc component :pipeline-data pipeline-data :seal-ch seal-resp-ch))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
@@ -310,16 +311,15 @@
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (l-ext/close-lifecycle-resources* (:pipeline-data component))
 
-    (close! (:kill-ch component))
     (close! (:seal-ch component))
 
     component))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
-                                   restart-ch outbox-ch seal-ch completion-ch opts]}]
+                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
-                       :messenger messenger :job-id job
-                       :task-id task :restart-ch restart-ch :outbox-ch outbox-ch
+                       :messenger messenger :job-id job :task-id task :restart-ch restart-ch
+                       :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
                        :opts opts}))
 
