@@ -150,6 +150,10 @@
   (fn [scheduler old new job state]
     scheduler))
 
+(defmethod reallocate-from-task? :onyx.task-scheduler/round-robin
+  [scheduler old new job state]
+  false)
+
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
   (let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
@@ -167,7 +171,10 @@
 
 (defmethod reallocate-from-task? :default
   [scheduler old new job state]
-  false)
+  (throw (ex-info 
+          (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead." 
+                  scheduler)
+          {:scheduler scheduler})))
 
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args]
