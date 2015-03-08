@@ -56,7 +56,9 @@
   [{:keys [args] :as entry} old new diff state]
   (let [scheduler (get-in new [:task-schedulers (:job diff)])]
     (when (and (common/volunteer-via-new-job? old new diff state)
-               (common/reallocate-from-task? scheduler old new (:job diff) state))
+               (if (:job state)
+                 (common/reallocate-from-task? scheduler old new (:job diff) state)
+                 true))
       [{:fn :volunteer-for-task :args {:id (:id state)}}])))
 
 (defmethod extensions/fire-side-effects! :submit-job
