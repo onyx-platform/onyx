@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as component]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
-            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))

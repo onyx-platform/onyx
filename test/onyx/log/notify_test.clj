@@ -4,7 +4,6 @@
             [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
-            [onyx.log.util :as util]
             [onyx.api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
