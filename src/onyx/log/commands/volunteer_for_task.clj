@@ -164,7 +164,13 @@
 
 (defmethod reallocate-from-task? :onyx.task-scheduler/round-robin
   [scheduler old new job state]
-  false)
+  (let [allocations (common/balance-jobs new)
+        allocation (common/peer->allocated-job (:allocations new) (:id state))
+        required (get allocations job)
+        actual (count (vals (get-in old [:allocations (:job allocation)])))]
+    (when (> actual required)
+      (let [peers-to-drop (common/drop-peers new job (- actual required))]
+        (some #{(:id state)} (into #{} peers-to-drop))))))
 
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
@@ -188,8 +194,8 @@
 (defmethod extensions/reactions :volunteer-for-task
   [{:keys [args]} old new diff peer-args]
   (let [scheduler (get-in new [:task-schedulers (:job diff)])]
-    (when (and (reallocate-from-task? scheduler old new (:job diff) peer-args)
-               (common/volunteer? old new peer-args (:job peer-args)))
+    (when (and (common/volunteer? old new peer-args (:job peer-args))
+               (reallocate-from-task? scheduler old new (:job diff) peer-args))
       [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task

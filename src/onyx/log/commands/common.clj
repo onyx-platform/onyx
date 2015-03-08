@@ -329,6 +329,10 @@
   (fn [old new diff state]
     (:job-scheduler old)))
 
+(defmulti volunteer-via-leave?
+  (fn [old new diff state]
+    (:job-scheduler old)))
+
 (defn at-least-one-active? [replica peers]
   (->> peers
        (map #(get-in replica [:peer-state %]))
@@ -357,6 +361,17 @@
   (when (zero? (count (incomplete-jobs old)))
     (any-coverable-jobs? new)))
 
+(defmethod volunteer-via-leave? :onyx.job-scheduler/greedy
+  [old new diff state]
+  (let [allocation (peer->allocated-job (:allocations new) (:id state))
+        peer-counts (balance-jobs new)
+        peers (get (job->peers new) (:job allocation))]
+    (when (> (count peers) (get peer-counts (:job allocation)))
+      (let [n (- (count peers) (get peer-counts (:job allocation)))
+            peers-to-drop (drop-peers new (:job allocation) n)]
+        (when (some #{(:id state)} (into #{} peers-to-drop))
+          [{:fn :volunteer-for-task :args {:id (:id state)}}])))))
+
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/greedy
   [old new diff state]
   (let [peers (apply concat (vals (get-in old [:allocations (first diff)])))]
@@ -374,6 +389,29 @@
   (when-let [job (first (incomplete-jobs new))]
     (and (not (job-coverable? old job))
          (job-coverable? new job))))
+
+(defmethod volunteer-via-new-job? :onyx.job-scheduler/round-robin
+  [old new diff state]
+  (let [allocations (balance-jobs new)
+        new-job (last (:jobs new))
+        n-tasks (count (get-in new [:tasks new-job]))]
+    (>= (get allocations new-job) n-tasks)))
+
+(defmethod volunteer-via-leave? :onyx.job-scheduler/round-robin
+  [old new diff state]
+  true)
+
+(defmethod volunteer-via-killed-job? :onyx.job-scheduler/round-robin
+  [old new diff state]
+  true)
+
+(defmethod volunteer-via-sealed-output? :onyx.job-scheduler/round-robin
+  [old new diff state]
+  true)
+
+(defmethod volunteer-via-accept? :onyx.job-scheduler/round-robin
+  [old new diff state]
+  true)
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
