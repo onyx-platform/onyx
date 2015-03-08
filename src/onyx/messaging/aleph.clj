@@ -12,6 +12,7 @@
               [gloss.io :as io]
               [gloss.core :as gloss]
               [clojure.edn :as edn]
+              [aleph.netty :as aleph-netty]
               [aleph.tcp :as tcp])
     (:import [java.nio ByteBuffer]))
 
@@ -50,7 +51,6 @@
    {:port port}))
 
 (defn app [daemon net-ch inbound-ch release-ch]
-  ; TODO: Need a way to stop this loop
   (go-loop []
            (let [[msg-type payload] (<!! net-ch)]
              (try 
@@ -79,21 +79,20 @@
           release-ch (chan (clojure.core.async/dropping-buffer 10000))
           daemon (:acking-daemon component)
           ip "0.0.0.0"
-          port (+ 5000 (rand-int 45000))
-          server (start-server (ch-handler net-ch) port)
-          _ (app daemon net-ch inbound-ch release-ch)]
-      (assoc component :server server :ip ip :port port :release-ch release-ch)))
+          server (start-server (ch-handler net-ch) 0)
+          app-loop (app daemon net-ch inbound-ch release-ch)]
+      (assoc component :app-loop app-loop :server server :ip ip :port (aleph-netty/port server) :release-ch release-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Aleph TCP Sockets")
-    ; NEED TO STOP APP GO LOOP HERE
+    (close! (:app-loop component))
     (close! (:release-ch component))
     (assoc component :release-ch nil)))
 
 (defn aleph-tcp-sockets [opts]
   (map->AlephTcpSockets {:opts opts}))
 
-; not much need for these in aleph
+; Not much need for these in aleph
 (defmethod extensions/send-peer-site AlephTcpSockets
   [messenger]
   [(:ip messenger) (:port messenger)])
@@ -110,7 +109,7 @@
   [messenger event [host port]]
   @(create-client host port))
 
-; Should be able to reuse as is from httpkit
+; Reused as is from HttpKitWebSockets. Probably something to extract.
 (defmethod extensions/receive-messages AlephTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
