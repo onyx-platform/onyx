@@ -4,25 +4,18 @@
               [org.httpkit.server :as server]
               [taoensso.timbre :as timbre]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.messaging.protocol :as protocol]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions]
-              [taoensso.nippy :as nippy]
               [manifold.deferred :as d]
               [manifold.stream :as s]
               [gloss.io :as io]
-              [gloss.core :as gloss]
               [clojure.edn :as edn]
               [aleph.netty :as aleph-netty]
               [aleph.tcp :as tcp])
     (:import [java.nio ByteBuffer]))
 
-(def protocol
-  (gloss/compile-frame
-   (gloss/finite-frame :int32 (gloss/repeated :byte :prefix :none))
-   compress
-   (comp decompress
-         ; would prefer having to convert from a vec to a byte array here
-         (partial into-array Byte/TYPE))))
+(def protocol protocol/codec-protocol)
 
 (defn wrap-duplex-stream
   [protocol s]
@@ -40,7 +33,7 @@
 
 (defn create-client
   [host port]
-  (d/chain (tcp/client {:host host, :port port})
+  (d/chain (tcp/client {:host host :port port})
                #(wrap-duplex-stream protocol %)))
 
 (defn start-server
@@ -52,20 +45,22 @@
 
 (defn app [daemon net-ch inbound-ch release-ch]
   (go-loop []
-           (let [[msg-type payload] (<!! net-ch)]
-             (try 
-               (case msg-type
-                 :send (doseq [message payload]
-                              (>!! inbound-ch message))
+           (try (let [{:keys [type] :as msg} (<!! net-ch)]
+                  (cond (= type protocol/send-id) 
+                        (doseq [message (:messages msg)]
+                          (>!! inbound-ch message))
 
-                 :ack (acker/ack-message daemon
-                                                (:id payload)
-                                                (:completion-id payload)
-                                                (:ack-val payload))
-                 :completion (>!! release-ch (:id payload)))
-               (catch Exception e
-                 (taoensso.timbre/error e)
-                 (throw e))))
+                        (= type protocol/ack-id)
+                        (acker/ack-message daemon
+                                           (:id msg)
+                                           (:completion-id msg)
+                                           (:ack-val msg))
+
+                        (= type protocol/completion-id)
+                        (>!! release-ch (:id msg))))
+             (catch Exception e
+               (taoensso.timbre/error e)
+               (throw e)))
            (recur)))
 
 (defrecord AlephTcpSockets [opts]
@@ -74,9 +69,9 @@
   (start [component]
     (taoensso.timbre/info "Starting Aleph TCP Sockets")
 
-    (let [net-ch (chan (clojure.core.async/dropping-buffer 10000))
+    (let [net-ch (chan (clojure.core.async/dropping-buffer 1000000))
           inbound-ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (clojure.core.async/dropping-buffer 10000))
+          release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
           ip "0.0.0.0"
           server (start-server (ch-handler net-ch) 0)
@@ -125,12 +120,12 @@
 (defmethod extensions/send-messages AlephTcpSockets
   [messenger event peer-link]
   (let [messages (:onyx.core/compressed event)]
-    (s/put! peer-link [:send messages])))
+    (s/put! peer-link (protocol/send-messages->frame messages))))
 
 (defmethod extensions/internal-ack-message AlephTcpSockets
   [messenger event peer-link message-id completion-id ack-val]
-  (s/put! peer-link [:ack {:id message-id :completion-id completion-id :ack-val ack-val}]))
+  (s/put! peer-link (protocol/ack-msg->frame {:id message-id :completion-id completion-id :ack-val ack-val})))
 
 (defmethod extensions/internal-complete-message AlephTcpSockets
   [messenger event id peer-link]
-  (s/put! peer-link [:completion {:id id}]))
+  (s/put! peer-link (protocol/completion-msg->frame {:id id})))
