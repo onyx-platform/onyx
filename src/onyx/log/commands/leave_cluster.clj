@@ -41,12 +41,13 @@
 
 (defmethod extensions/reactions :leave-cluster
   [{:keys [args]} old new diff state]
-  (if (or (= (:id state) (get (:prepared old) (:id args)))
-          (= (:id state) (get (:accepted old) (:id args))))
-    [{:fn :abort-join-cluster
-      :args {:id (:id state)}
-      :immediate? true}]
-    (common/volunteer-via-leave? old new diff state)))
+  (cond (or (= (:id state) (get (:prepared old) (:id args)))
+            (= (:id state) (get (:accepted old) (:id args))))
+        [{:fn :abort-join-cluster
+          :args {:id (:id state)}
+          :immediate? true}]
+        (common/volunteer-via-leave? old new diff state)
+        [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [message-id args]} old new {:keys [updated-watch]} state]
