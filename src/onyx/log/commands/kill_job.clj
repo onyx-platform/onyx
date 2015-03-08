@@ -22,16 +22,16 @@
 (defn executing-killed-job? [diff replica job-id peer-id]
   (and diff (= (:job (peer->allocated-job (:allocations replica) peer-id)) job-id)))
 
+(defmethod extensions/reactions :kill-job
+  [{:keys [args]} old new diff state]
+  (when (and (executing-killed-job? diff old (:job args) (:id state))
+             (common/volunteer-via-killed-job? old new diff state))
+    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
+
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]
   (if (executing-killed-job? diff old (:job args) (:id state))
     (do (component/stop @(:lifecycle state))
         (assoc state :lifecycle nil))
     state))
-
-(defmethod extensions/reactions :kill-job
-  [{:keys [args]} old new diff state]
-  (when (and (executing-killed-job? diff old (:job args) (:id state))
-             (common/volunteer-via-killed-job? old new diff state))
-    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 

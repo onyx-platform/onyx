@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as component]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
-            [onyx.log.util :as util]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]
@@ -45,8 +44,7 @@
    :onyx/id onyx-id
    :onyx.peer/inbox-capacity (:inbox-capacity (:peer config))
    :onyx.peer/outbox-capacity (:outbox-capacity (:peer config))
-   :onyx.peer/job-scheduler scheduler
-   :onyx.peer/state {:task-lifecycle-fn util/stub-task-lifecycle}})
+   :onyx.peer/job-scheduler scheduler})
 
 (def env (onyx.api/start-env env-config))
 
