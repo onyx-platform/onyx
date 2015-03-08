@@ -1,12 +1,10 @@
 (ns onyx.log.greedy-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
-            [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [midje.sweet :refer :all]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
