@@ -7,7 +7,7 @@
 - New messaging transport: Netty websockets
 - New messaging transport: Aeron
 - Added metadata to all public API functions indicating which Onyx version they were added in.
-- `onyx.api/start-peers!` API renamed to "onyx.api/start-peers"
+- `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent
 
 #### 0.5.3
