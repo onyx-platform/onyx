@@ -392,14 +392,21 @@
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/round-robin
   [old new diff state]
-  (let [allocations (balance-jobs new)
-        new-job (last (:jobs new))
-        n-tasks (count (get-in new [:tasks new-job]))]
-    (>= (get allocations new-job) n-tasks)))
+  (let [allocations (balance-jobs new)]
+    (every?
+     (fn [job]
+       (let [n-tasks (count (get-in new [:tasks job]))]
+         (>= (get allocations job) n-tasks)))
+     (:jobs new))))
 
 (defmethod volunteer-via-leave? :onyx.job-scheduler/round-robin
   [old new diff state]
-  true)
+  (let [allocations (balance-jobs new)]
+    (every?
+     (fn [job]
+       (let [n-tasks (count (get-in new [:tasks job]))]
+         (>= (get allocations job) n-tasks)))
+     (:jobs new))))
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/round-robin
   [old new diff state]
@@ -411,7 +418,8 @@
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/round-robin
   [old new diff state]
-  true)
+  (and (nil? (:job state))
+       (every? (partial job-coverable? new) (:jobs new))))
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
@@ -441,4 +449,37 @@
 
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
+
+(defmulti reallocate-from-task?
+  (fn [scheduler old new job state]
+    scheduler))
+
+(defmethod reallocate-from-task? :onyx.task-scheduler/round-robin
+  [scheduler old new job state]
+  (let [allocations (balance-jobs new)
+        allocation (peer->allocated-job (:allocations new) (:id state))
+        required (get allocations job)
+        actual (count (vals (get-in old [:allocations (:job allocation)])))]
+    (when (> actual required)
+      (let [peers-to-drop (drop-peers new job (- actual required))]
+        (some #{(:id state)} (into #{} peers-to-drop))))))
+
+(defmethod reallocate-from-task? :onyx.task-scheduler/percentage
+  [scheduler old new job state]
+  (let [allocation (peer->allocated-job (:allocations new) (:id state))]
+    (when (= (:job allocation) job)
+      (let [candidate-tasks (keys (get-in new [:allocations job]))
+            n-peers (count (apply concat (vals (get-in new [:allocations job]))))
+            balanced (percentage-balanced-taskload new job candidate-tasks n-peers)
+            required (:allocation (get balanced (:task allocation)))
+            actual (count (get-in new [:allocations job (:task allocation)]))]
+        (when (> actual required)
+          (let [n (- actual required)
+                peers-to-drop (drop-peers new job n)]
+            (when (some #{(:id state)} (into #{} peers-to-drop))
+              true)))))))
+
+(defmethod reallocate-from-task? :default
+  [scheduler old new job state]
+  false)
 

@@ -54,8 +54,10 @@
 
 (defmethod extensions/reactions :submit-job
   [{:keys [args] :as entry} old new diff state]
-  (when (common/volunteer-via-new-job? old new diff state)
-    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
+  (let [scheduler (get-in new [:task-schedulers (:job diff)])]
+    (when (and (common/volunteer-via-new-job? old new diff state)
+               (common/reallocate-from-task? scheduler old new (:job diff) state))
+      [{:fn :volunteer-for-task :args {:id (:id state)}}])))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
