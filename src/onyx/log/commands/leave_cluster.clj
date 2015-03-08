@@ -41,15 +41,16 @@
 
 (defmethod extensions/reactions :leave-cluster
   [{:keys [args]} old new diff state]
-  (let [allocation (common/peer->allocated-job (:allocations old) (:died args))
+  (let [allocation (common/peer->allocated-job (:allocations old) (:id state))
         scheduler (get-in new [:task-schedulers (:job allocation)])]
     (cond (or (= (:id state) (get (:prepared old) (:id args)))
               (= (:id state) (get (:accepted old) (:id args))))
           [{:fn :abort-join-cluster
             :args {:id (:id state)}
             :immediate? true}]
-          (and (common/volunteer-via-leave? old new diff state)
-               (common/reallocate-from-task? scheduler old new (:job diff) state))
+          (and allocation
+               (common/volunteer-via-leave? old new diff state)
+               (common/reallocate-from-task? scheduler old new (:job allocation) state))
           [{:fn :volunteer-for-task :args {:id (:id state)}}])))
 
 (defmethod extensions/fire-side-effects! :leave-cluster

@@ -401,12 +401,12 @@
 
 (defmethod volunteer-via-leave? :onyx.job-scheduler/round-robin
   [old new diff state]
-  (let [allocations (balance-jobs new)]
-    (every?
-     (fn [job]
-       (let [n-tasks (count (get-in new [:tasks job]))]
-         (>= (get allocations job) n-tasks)))
-     (:jobs new))))
+  (let [allocations (balance-jobs new)
+        allocation (peer->allocated-job (:allocations new) (:id state))]
+    (when allocation
+      (let [n-required (get allocations (:job allocation))
+            n-actual (count (apply concat (vals (get-in new [:allocations (:job allocation)]))))]
+        (> n-actual n-required)))))
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/round-robin
   [old new diff state]
@@ -459,7 +459,7 @@
   (let [allocations (balance-jobs new)
         allocation (peer->allocated-job (:allocations new) (:id state))
         required (get allocations job)
-        actual (count (vals (get-in old [:allocations (:job allocation)])))]
+        actual (count (apply concat (vals (get-in old [:allocations (:job allocation)]))))]
     (when (> actual required)
       (let [peers-to-drop (drop-peers new job (- actual required))]
         (some #{(:id state)} (into #{} peers-to-drop))))))
