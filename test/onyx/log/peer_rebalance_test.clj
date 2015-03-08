@@ -89,7 +89,7 @@
     :catalog catalog-2
     :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(def n-peers 6)
+(def n-peers 12)
 
 (def v-peers (onyx.api/start-peers n-peers peer-config))
 
@@ -148,17 +148,3 @@
 
 (onyx.api/shutdown-env env)
 
-(comment
-  (require '[clojure.core.async :refer [chan <!!]])
-  
-  (def ch (chan 1000))
-  
-  (def replica
-    (loop [replica (onyx.extensions/subscribe-to-log (:log env) ch)]
-      (let [position (<!! ch)
-            entry (onyx.extensions/read-log-entry (:log env) position)
-            new-replica (onyx.extensions/apply-log-entry entry replica)]
-        (prn "===")
-        (prn entry)
-        (clojure.pprint/pprint new-replica)
-        (recur new-replica)))))
