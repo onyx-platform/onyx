@@ -1,7 +1,7 @@
 (ns onyx.log.percentage-job-scheduler-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.log.commands.submit-job :refer [reallocate-from-job?]]
+            [onyx.log.commands.common :refer [reallocate-from-job?]]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :submit-job {:id :a :percentage 70}))
@@ -40,6 +40,7 @@
 (fact
  (reallocate-from-job? :onyx.job-scheduler/percentage nil
                        {:jobs [:a :b :c]
+                        :tasks {:a [:t1] :b [:t2] :c [:t3]}
                         :task-schedulers {:a :onyx.task-scheduler/round-robin
                                           :b :onyx.task-scheduler/round-robin
                                           :c :onyx.task-scheduler/round-robin}

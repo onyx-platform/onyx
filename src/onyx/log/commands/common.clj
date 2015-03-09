@@ -421,6 +421,37 @@
   (and (nil? (:job state))
        (every? (partial job-coverable? new) (:jobs new))))
 
+(defmethod volunteer-via-new-job? :onyx.job-scheduler/percentage
+  [old new diff state]
+  (let [allocations (percentage-balanced-workload new)]
+    (every?
+     (fn [job]
+       (let [n-tasks (count (get-in new [:tasks job]))]
+         (>= (:allocation (get allocations job)) n-tasks)))
+     (:jobs new))))
+
+(defmethod volunteer-via-leave? :onyx.job-scheduler/percentage
+  [old new diff state]
+  (let [allocations (percentage-balanced-workload new)
+        allocation (peer->allocated-job (:allocations new) (:id state))]
+    (when allocation
+      (let [n-required (:allocation (get allocations (:job allocation)))
+            n-actual (count (apply concat (vals (get-in new [:allocations (:job allocation)]))))]
+        (> n-actual n-required)))))
+
+(defmethod volunteer-via-killed-job? :onyx.job-scheduler/percentage
+  [old new diff state]
+  true)
+
+(defmethod volunteer-via-sealed-output? :onyx.job-scheduler/percentage
+  [old new diff state]
+  true)
+
+(defmethod volunteer-via-accept? :onyx.job-scheduler/percentage
+  [old new diff state]
+  (and (nil? (:job state))
+       (every? (partial job-coverable? new) (:jobs new))))
+
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
         exhausted (get-in replica [:exhausted-inputs job])]
