@@ -1,9 +1,9 @@
 (ns onyx.log.pulse-test
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
-            [onyx.system :as system]
-            [onyx.log.entry :refer [create-log-entry]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
 
@@ -12,16 +12,7 @@
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
 (def env-config
-  {:hornetq/mode :udp
-   :hornetq/server? true
-   :hornetq.server/type :embedded
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :hornetq.embedded/config (:configs (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
+  {:zookeeper/address (:address (:zookeeper config))
    :zookeeper/server? true
    :zookeeper.server/port (:spawn-port (:zookeeper config))
    :onyx/id onyx-id})
