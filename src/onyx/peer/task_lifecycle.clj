@@ -306,10 +306,18 @@
 
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
-    (l-ext/close-lifecycle-resources* (:pipeline-data component))
+    (let [event (:pipeline-data component)]
+      (l-ext/close-lifecycle-resources* event)
 
-    (close! (:seal-ch component))
+      (close! (:seal-ch component))
 
+      (let [state @(:onyx.core/state event)]
+        (doseq [[_ link] (get-in state [:links :send-peer-site])]
+          (extensions/close-peer-connection (:onyx.core/messenger event) event link))
+        (doseq [[_ link] (get-in state [:links :acker-peer-site])]
+          (extensions/close-peer-connection (:onyx.core/messenger event) event link))
+        (doseq [[_ link] (get-in state [:links :completion-peer-site])]
+          (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
     component))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
