@@ -26,7 +26,7 @@
 (defn adjust-with-overflow [replica balanced]
   (reduce
    (fn [result [job n]]
-     (let [sat (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
+     (let [sat (or (get-in replica [:saturation job]) Double/POSITIVE_INFINITY)
            extra (- n sat)]
        (if (pos? extra)
          (-> result

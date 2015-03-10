@@ -1,6 +1,7 @@
 (ns onyx.log.submit-job-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.system]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :submit-job {:id :a}))
@@ -18,10 +19,10 @@
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:jobs new-replica) => [:a])
   (fact diff => {:job :a})
-  (fact reactions => [{:fn :volunteer-for-task
-                       :args {:id :x}}]))
+  (fact reactions => [{:fn :volunteer-for-task :args {:id :x}}]))
 
-(let [old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:b]}
+(let [old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
+                   :tasks {:b [:t1 :t2]}}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
