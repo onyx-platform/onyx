@@ -1,7 +1,7 @@
 test:
   override:
     - lein with-profile dev,circle-ci midje 'onyx.log.*':
-        timeout: 600
+        timeout: 60
 notify:
   webhooks:
     # A list of hook hashes, containing the url field
