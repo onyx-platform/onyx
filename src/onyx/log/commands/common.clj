@@ -354,7 +354,7 @@
     (fn [job]
       (let [tasks (get-in replica [:tasks job])]
         (>= (count (get-in replica [:peers])) (count tasks))))
-    (:jobs replica))))
+    (incomplete-jobs replica))))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/greedy
   [old new diff state]
@@ -397,7 +397,7 @@
      (fn [job]
        (let [n-tasks (count (get-in new [:tasks job]))]
          (>= (get allocations job) n-tasks)))
-     (:jobs new))))
+     (incomplete-jobs new))))
 
 (defmethod volunteer-via-leave? :onyx.job-scheduler/round-robin
   [old new diff state]
@@ -410,16 +410,18 @@
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/round-robin
   [old new diff state]
-  true)
+  (seq (incomplete-jobs new)))
 
 (defmethod volunteer-via-sealed-output? :onyx.job-scheduler/round-robin
   [old new diff state]
-  true)
+  (seq (incomplete-jobs new)))
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/round-robin
   [old new diff state]
-  (and (nil? (:job state))
-       (every? (partial job-coverable? new) (:jobs new))))
+  (let [allocation (peer->allocated-job (:allocations new) (:id state))]
+    (and (seq (incomplete-jobs new))
+         (nil? (:job allocation))
+         (every? (partial job-coverable? new) (incomplete-jobs new)))))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/percentage
   [old new diff state]
@@ -428,29 +430,29 @@
      (fn [job]
        (let [n-tasks (count (get-in new [:tasks job]))]
          (>= (:allocation (get allocations job)) n-tasks)))
-     (:jobs new))))
+     (incomplete-jobs new))))
 
 (defmethod volunteer-via-leave? :onyx.job-scheduler/percentage
   [old new diff state]
   (let [allocations (percentage-balanced-workload new)
         allocation (peer->allocated-job (:allocations new) (:id state))]
-    (when allocation
+    (when (and allocation (seq (incomplete-jobs new)))
       (let [n-required (:allocation (get allocations (:job allocation)))
             n-actual (count (apply concat (vals (get-in new [:allocations (:job allocation)]))))]
         (> n-actual n-required)))))
 
 (defmethod volunteer-via-killed-job? :onyx.job-scheduler/percentage
   [old new diff state]
-  true)
+  (seq (incomplete-jobs new)))
 
 (defmethod volunteer-via-sealed-output? :onyx.job-scheduler/percentage
   [old new diff state]
-  true)
+  (seq (incomplete-jobs new)))
 
 (defmethod volunteer-via-accept? :onyx.job-scheduler/percentage
   [old new diff state]
   (and (nil? (:job state))
-       (every? (partial job-coverable? new) (:jobs new))))
+       (every? (partial job-coverable? new) (incomplete-jobs new))))
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])

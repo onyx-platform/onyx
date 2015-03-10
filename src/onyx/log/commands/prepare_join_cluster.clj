@@ -63,6 +63,7 @@
                               (:observer diff))}
           :immediate? true}]
         (and (:instant-join diff)
+             (= (:id peer-args) (:joiner (:args entry)))
              (seq (:jobs new))
              (common/volunteer? old new peer-args (:job peer-args)))
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))

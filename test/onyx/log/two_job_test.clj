@@ -24,7 +24,7 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-peers 10)
+(def n-peers 12)
 
 (def v-peers (onyx.api/start-peers n-peers peer-config))
 
@@ -70,6 +70,26 @@
 
 (def my-inc identity)
 
+(def a-chan (chan 100))
+
+(def c-chan (chan (sliding-buffer 100)))
+
+(def d-chan (chan 100))
+
+(def f-chan (chan (sliding-buffer 100)))
+
+(defmethod l-ext/inject-lifecycle-resources :a
+  [_ _] {:core.async/in-chan a-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :c
+  [_ _] {:core.async/out-chan c-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :d
+  [_ _] {:core.async/in-chan d-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :f
+  [_ _] {:core.async/out-chan f-chan})
+
 (onyx.api/submit-job
  peer-config
  {:workflow [[:a :b] [:b :c]]
@@ -90,7 +110,8 @@
           entry (extensions/read-log-entry (:log env) position)
           new-replica (extensions/apply-log-entry entry replica)
           counts (map count (mapcat vals (vals (:allocations new-replica))))]
-      (when-not (= counts [5 5])
+      (prn counts)
+      (when-not (= counts [2 2 2 2 2 2])
         (recur new-replica)))))
 
 (fact "peers balanced on 2 jobs" true => true)
