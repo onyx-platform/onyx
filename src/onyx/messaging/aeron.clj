@@ -66,31 +66,21 @@
           acker-stream-id (rand-stream-id)
           completion-stream-id (rand-stream-id)
 
-          _ (prn "Driver ...")
           driver (MediaDriver/launch)
-          _ (prn "Ctd ...")
           ctx (Aeron$Context.)
-          _ (prn "Aeron ...")
           aeron (Aeron/connect ctx)
-          _ (prn "Done")
 
           send-handler (data-handler (partial handle-sent-message inbound-ch))
           acker-handler (data-handler (partial handle-acker-message daemon))
           completion-handler (data-handler (partial handle-completion-message release-ch))
 
-          _ (prn "Add")
           send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
-          _ (prn "Next")
           acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
           completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
 
-      (prn "La")
       (future (.accept (consumer 10) send-subscriber))
-      (prn "Ba")
       (future (.accept (consumer 10) acker-subscriber))
-      (prn "Ma")
       (future (.accept (consumer 10) completion-subscriber))
-      (prn "Eee")
       
       (assoc component :driver driver :channel channel :send-stream-id send-stream-id
              :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id)))
