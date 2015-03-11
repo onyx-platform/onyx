@@ -10,6 +10,10 @@
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
+             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
+             [uk.co.real_logic.aeron.common BackoffIdleStrategy]
+             [java.util.function Consumer]
+             [java.util.concurrent TimeUnit]
              [java.nio ByteBuffer]))
 
 (defn handle-sent-message [inbound-ch buffer offset length header]
@@ -28,7 +32,23 @@
   (let [thawed (decompress buffer)]
     (>!! release-ch (:id thawed))))
 
-(defrecord HttpKitWebSockets [opts]
+(defn data-handler [f]
+  (proxy [DataHandler] []
+    (onData [buffer offset length header]
+      (f buffer offset length header))))
+
+(defn consumer [limit]
+  (proxy [Consumer] []
+    (accept [subscription]
+      (let [idle-strategy (BackoffIdleStrategy.
+                           100 10
+                           (.toNanos TimeUnit/MICROSECONDS 1)
+                           (.toNanos TimeUnit/MICROSECONDS 100))]
+        (while true
+          (let [fragments-read (.poll subscription limit)]
+            (.idle idle-strategy fragments-read)))))))
+
+(defrecord AeronConnection [opts]
   component/Lifecycle
 
   (start [component]
@@ -38,61 +58,74 @@
           daemon (:acking-daemon component)
           release-ch (chan (clojure.core.async/dropping-buffer 100000))
 
-          rand-stream-id (fn [] (rand-int 100000000))
+          port (+ 40000 (rand-int 250))
+          channel (str "udp://localhost:" port)
+
+          rand-stream-id (fn [] (rand-int 1000000))
           send-stream-id (rand-stream-id)
           acker-stream-id (rand-stream-id)
           completion-stream-id (rand-stream-id)
 
+          _ (prn "Driver ...")
           driver (MediaDriver/launch)
+          _ (prn "Ctd ...")
           ctx (Aeron$Context.)
+          _ (prn "Aeron ...")
           aeron (Aeron/connect ctx)
+          _ (prn "Done")
 
-          send-handler (AeronSubscriberShim/handleMessage (partial handle-sent-message inbound-ch))
-          acker-handler (AeronSubscriberShim/handleMessage (partial handle-acker-message daemon))
-          completion-handler (AeronSubscriberShim/handleMessage (partial handle-completion-message release-ch))
+          send-handler (data-handler (partial handle-sent-message inbound-ch))
+          acker-handler (data-handler (partial handle-acker-message daemon))
+          completion-handler (data-handler (partial handle-completion-message release-ch))
 
-          send-subscriber (.addSubscription aeron "udp://localhost:40123" send-stream-id send-handler)
-          acker-subscriber (.addSubscription aeron "udp://localhost:40123" acker-stream-id acker-handler)
-          completion-subscriber (.addSubscription aeron "udp://localhost:40123" completion-stream-id completion-handler)]
+          _ (prn "Add")
+          send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
+          _ (prn "Next")
+          acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
+          completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
 
-      (.accept (SamplesUtil/subscriberLoop 10 running) subscription)
+      (prn "La")
+      (future (.accept (consumer 10) send-subscriber))
+      (prn "Ba")
+      (future (.accept (consumer 10) acker-subscriber))
+      (prn "Ma")
+      (future (.accept (consumer 10) completion-subscriber))
+      (prn "Eee")
       
-      (assoc component :driver driver))
-
-    (let [ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (clojure.core.async/dropping-buffer 100000))
-          daemon (:acking-daemon component)
-          ip "0.0.0.0"
-          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 100000})]
-      (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
+      (assoc component :driver driver :channel channel :send-stream-id send-stream-id
+             :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Aeron")
 
-    (close! (:release-ch component))
-    ((:server component))
-    (assoc component :release-ch nil)))
+    (CloseHelper/quietClose (:driver component))
+    (assoc component :driver nil :channel nil)))
 
 (defn aeron [opts]
-  (map->Aeron {:opts opts}))
+  (map->AeronConnection {:opts opts}))
 
-(defmethod extensions/send-peer-site HttpKitWebSockets
+(defmethod extensions/send-peer-site AeronConnection
   [messenger]
-  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) send-route)})
+  {:channel (:channel messenger)
+   :send-stream-id (:send-stream-id messenger)})
 
-(defmethod extensions/acker-peer-site HttpKitWebSockets
+(defmethod extensions/acker-peer-site AeronConnection
   [messenger]
-  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) acker-route)})
+  {:channel (:channel messenger)
+   :acker-stream-id (:acker-stream-id messenger)})
 
-(defmethod extensions/completion-peer-site HttpKitWebSockets
+(defmethod extensions/completion-peer-site AeronConnection
   [messenger]
-  {:url (format "ws://%s:%s%s" (:ip messenger) (:port messenger) completion-route)})
+  {:channel (:channel messenger)
+   :completion-stream-id (:completion-stream-id messenger)})
 
-(defmethod extensions/connect-to-peer HttpKitWebSockets
-  [messenger event peer-site]
-  (ws/connect (:url peer-site)))
+(defmethod extensions/connect-to-peer AeronConnection
+  [messenger event {:keys [channel send-stream-id]}]
+  (let [ctx (Aeron$Context.)
+        aeron (Aeron/connect ctx)]
+    (.addPublication aeron channel send-stream-id))  )
 
-(defmethod extensions/receive-messages HttpKitWebSockets
+(defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
@@ -104,23 +137,29 @@
           segments)
         segments))))
 
-(defmethod extensions/send-messages HttpKitWebSockets
+(defmethod extensions/send-messages AeronConnection
   [messenger event peer-link]
   (let [messages (:onyx.core/compressed event)
-        compressed-batch (compress messages)]
-    (ws/send-msg peer-link compressed-batch)))
+        compressed-batch (compress messages)
+        len (count (.getBytes compressed-batch))
+        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+    (.offer peer-link unsafe-buffer 0 len)))
 
-(defmethod extensions/internal-ack-message HttpKitWebSockets
+(defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
-  (let [contents (compress {:id message-id :completion-id completion-id :ack-val ack-val})]
-    (ws/send-msg peer-link contents)))
+  (let [contents (compress {:id message-id :completion-id completion-id :ack-val ack-val})
+        len (count (.getBytes contents))
+        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+    (.offer peer-link unsafe-buffer 0 len)))
 
-(defmethod extensions/internal-complete-message HttpKitWebSockets
+(defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
-  (let [contents (compress {:id id})]
-    (ws/send-msg peer-link contents)))
+  (let [contents (compress {:id id})
+        len (count (.getBytes contents))
+        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+    (.offer peer-link unsafe-buffer 0 len)))
 
-(defmethod extensions/close-peer-connection HttpKitWebSockets
+(defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
-  (ws/close peer-link))
+  {})
 

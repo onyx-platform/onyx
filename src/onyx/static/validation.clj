@@ -56,17 +56,6 @@
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
 
-
-
-(defn validate-workflow-names [{:keys [workflow catalog]}]
-  (when-let [missing-names (->> workflow
-                                (mapcat identity)
-                                (remove (set (map :onyx/name catalog)))
-                                seq)]
-    (throw (Exception. (str "Catalog is missing :onyx/name values "
-                            "for the following workflow keywords: "
-                            (apply str (interpose ", " missing-names)))))))
-
 (defn catalog->type-task-names [catalog type-pred]
   (set (map :onyx/name
             (filter (fn [task]
