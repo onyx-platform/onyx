@@ -73,7 +73,7 @@
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
-          ip "0.0.0.0"
+          ip "127.0.0.1"
           server (start-server (ch-handler net-ch) 0)
           app-loop (app daemon net-ch inbound-ch release-ch)]
       (assoc component :app-loop app-loop :server server :ip ip :port (aleph-netty/port server) :release-ch release-ch)))

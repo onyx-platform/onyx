@@ -13,7 +13,7 @@
                  [com.taoensso/nippy "2.8.0"]
                  [stylefruits/gniazdo "0.3.1"]
                  [prismatic/schema "0.3.1"]
-                 [zookeeper-clj "0.9.1"]
+                 [zookeeper-clj "0.9.1" :exclusions [io.netty/netty]]
                  [http-kit "2.1.17"]
                  [gloss "0.2.4" :exclusions [manifold]]
                  [org.hornetq/hornetq-core-client "2.4.0.Final" :exclusions [io.netty/netty-all]]
@@ -22,7 +22,7 @@
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [org.clojure/data.generators "0.1.2"]
                                   [com.datomic/datomic-free "0.9.4755"
-                                   :exclusions [com.fasterxml.jackson.core/jackson-core]]
+                                   :exclusions [com.fasterxml.jackson.core/jackson-core io.netty/netty]]
                                   [com.datomic/simulant "0.1.6"]
                                   [org.clojure/tools.nrepl "0.2.3"]]
                    :plugins [[lein-midje "3.1.1"]
