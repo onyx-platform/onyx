@@ -7,6 +7,7 @@
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.http-kit :refer [http-kit-websockets]]
             [onyx.messaging.aleph :refer [aleph-tcp-sockets]]
+            [onyx.messaging.aeron :refer [aeron]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -29,7 +30,8 @@
 
 (def messenger
   {:http-kit-websockets http-kit-websockets
-   :aleph-tcp aleph-tcp-sockets})
+   :aleph-tcp aleph-tcp-sockets
+   :aeron aeron})
 
 (defn rethrow-component [f]
   (try
