@@ -13,13 +13,14 @@
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.aeron.common BackoffIdleStrategy]
              [java.util.function Consumer]
-             [java.util.concurrent TimeUnit]
-             [java.nio ByteBuffer]))
+             [java.util.concurrent TimeUnit]))
 
 (defn handle-sent-message [inbound-ch buffer offset length header]
-  (let [thawed (decompress buffer)]
-    (doseq [message thawed]
-      (>!! inbound-ch message))))
+  (let [dst (byte-array length)]
+    (.getBytes buffer offset dst)
+    (let [thawed (decompress dst)]
+      (doseq [message thawed]
+        (>!! inbound-ch message)))))
 
 (defn handle-acker-message [daemon buffer offset length header]
   (let [thawed (decompress buffer)]
@@ -113,7 +114,7 @@
   [messenger event {:keys [channel send-stream-id]}]
   (let [ctx (Aeron$Context.)
         aeron (Aeron/connect ctx)]
-    (.addPublication aeron channel send-stream-id))  )
+    (.addPublication aeron channel send-stream-id)))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -130,23 +131,23 @@
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link]
   (let [messages (:onyx.core/compressed event)
-        compressed-batch (compress messages)
-        len (count (.getBytes compressed-batch))
-        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+        compressed (compress messages)
+        len (count compressed)
+        unsafe-buffer (UnsafeBuffer. compressed)]
     (.offer peer-link unsafe-buffer 0 len)))
 
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
-  (let [contents (compress {:id message-id :completion-id completion-id :ack-val ack-val})
-        len (count (.getBytes contents))
-        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+  (let [compressed (compress {:id message-id :completion-id completion-id :ack-val ack-val})
+        len (count compressed)
+        unsafe-buffer (UnsafeBuffer. compressed)]
     (.offer peer-link unsafe-buffer 0 len)))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
-  (let [contents (compress {:id id})
-        len (count (.getBytes contents))
-        unsafe-buffer (UnsafeBuffer. (ByteBuffer/allocateDirect len))]
+  (let [compressed (compress {:id id})
+        len (count compressed)
+        unsafe-buffer (UnsafeBuffer. compressed)]
     (.offer peer-link unsafe-buffer 0 len)))
 
 (defmethod extensions/close-peer-connection AeronConnection
