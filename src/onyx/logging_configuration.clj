@@ -20,7 +20,9 @@
         (timbre/set-config!
           [:shared-appender-config :rotor]
           {:path file :max-size (* 512 10240) :backlog 5})
-        (timbre/set-config! [:appenders :standard-out :enabled?] true)
+        (timbre/set-config! [:appenders :standard-out]
+                            {:min-level :error
+                             :enabled? true})
         (timbre/set-config! [:appenders :spit :enabled?] false)))
 
     (info "Starting Logging Configuration")
