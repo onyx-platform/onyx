@@ -5,11 +5,11 @@
               [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
-    (:import [uk.co.real_logic.aeron.driver MediaDriver]
-             [uk.co.real_logic.aeron Aeron]
+    (:import [uk.co.real_logic.aeron Aeron]
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
+             [uk.co.real_logic.aeron.driver MediaDriver]
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.aeron.common BackoffIdleStrategy]
              [java.util.function Consumer]
