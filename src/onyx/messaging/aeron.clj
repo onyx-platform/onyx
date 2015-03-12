@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.aeron
     (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :as timbre]
+              [taoensso.timbre :refer [warn] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
@@ -23,15 +23,19 @@
         (>!! inbound-ch message)))))
 
 (defn handle-acker-message [daemon buffer offset length header]
-  (let [thawed (decompress buffer)]
-    (acker/ack-message daemon
-                       (:id thawed)
-                       (:completion-id thawed)
-                       (:ack-val thawed))))
+  (let [dst (byte-array length)]
+    (.getBytes buffer offset dst)
+    (let [thawed (decompress dst)]
+      (acker/ack-message daemon
+                         (:id thawed)
+                         (:completion-id thawed)
+                         (:ack-val thawed)))))
 
 (defn handle-completion-message [release-ch buffer offset length header]
-  (let [thawed (decompress buffer)]
-    (>!! release-ch (:id thawed))))
+  (let [dst (byte-array length)]
+    (.getBytes buffer offset dst)
+    (let [thawed (decompress dst)]
+      (>!! release-ch (:id thawed)))))
 
 (defn data-handler [f]
   (proxy [DataHandler] []
@@ -49,6 +53,10 @@
           (let [fragments-read (.poll subscription limit)]
             (.idle idle-strategy fragments-read)))))))
 
+(def no-op-error-handler
+  (proxy [Consumer] []
+    (accept [_] (prn "Conductor is down."))))
+
 (defrecord AeronConnection [opts]
   component/Lifecycle
 
@@ -59,7 +67,7 @@
           daemon (:acking-daemon component)
           release-ch (chan (clojure.core.async/dropping-buffer 100000))
 
-          port (+ 40000 (rand-int 250))
+          port (+ 40000 (rand-int 10000))
           channel (str "udp://localhost:" port)
 
           rand-stream-id (fn [] (rand-int 1000000))
@@ -68,7 +76,7 @@
           completion-stream-id (rand-stream-id)
 
           driver (MediaDriver/launch)
-          ctx (Aeron$Context.)
+          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
           aeron (Aeron/connect ctx)
 
           send-handler (data-handler (partial handle-sent-message inbound-ch))
@@ -79,18 +87,20 @@
           acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
           completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
 
-      (future (.accept (consumer 10) send-subscriber))
-      (future (.accept (consumer 10) acker-subscriber))
-      (future (.accept (consumer 10) completion-subscriber))
+      (future (try (.accept (consumer 10) send-subscriber) (catch Exception e (warn e))))
+      (future (try (.accept (consumer 10) acker-subscriber) (catch Exception e (warn e))))
+      (future (try (.accept (consumer 10) completion-subscriber) (catch Exception e (warn e))))
       
       (assoc component :driver driver :channel channel :send-stream-id send-stream-id
-             :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id)))
+             :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id
+             :release-ch release-ch)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Aeron")
 
     (CloseHelper/quietClose (:driver component))
-    (assoc component :driver nil :channel nil)))
+    (close! (:release-ch component))
+    (assoc component :driver nil :channel nil :release-ch nil)))
 
 (defn aeron [opts]
   (map->AeronConnection {:opts opts}))
@@ -98,23 +108,23 @@
 (defmethod extensions/send-peer-site AeronConnection
   [messenger]
   {:channel (:channel messenger)
-   :send-stream-id (:send-stream-id messenger)})
+   :stream-id (:send-stream-id messenger)})
 
 (defmethod extensions/acker-peer-site AeronConnection
   [messenger]
   {:channel (:channel messenger)
-   :acker-stream-id (:acker-stream-id messenger)})
+   :stream-id (:acker-stream-id messenger)})
 
 (defmethod extensions/completion-peer-site AeronConnection
   [messenger]
   {:channel (:channel messenger)
-   :completion-stream-id (:completion-stream-id messenger)})
+   :stream-id (:completion-stream-id messenger)})
 
 (defmethod extensions/connect-to-peer AeronConnection
-  [messenger event {:keys [channel send-stream-id]}]
-  (let [ctx (Aeron$Context.)
+  [messenger event {:keys [channel stream-id]}]
+  (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)]
-    (.addPublication aeron channel send-stream-id)))
+    (.addPublication aeron channel stream-id)))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
