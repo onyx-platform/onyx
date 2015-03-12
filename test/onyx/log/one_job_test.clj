@@ -55,10 +55,10 @@
 (def out-chan (chan (sliding-buffer 100)))
 
 (defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/in-chan in-chan})
+  [_ _] {:core.async/chan in-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/out-chan out-chan})
+  [_ _] {:core.async/chan out-chan})
 
 (defn my-inc [segment]
   {:n (inc (:n segment))})

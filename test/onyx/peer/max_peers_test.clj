@@ -52,10 +52,10 @@
 (def out-chan (chan (sliding-buffer (inc n-messages))))
 
 (defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/in-chan in-chan})
+  [_ _] {:core.async/chan in-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/out-chan out-chan})
+  [_ _] {:core.async/chan out-chan})
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))

@@ -65,16 +65,16 @@
 (def d-chan (chan (sliding-buffer 100)))
 
 (defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/in-chan a-chan})
+  [_ _] {:core.async/chan a-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :b
-  [_ _] {:core.async/out-chan b-chan})
+  [_ _] {:core.async/chan b-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/in-chan c-chan})
+  [_ _] {:core.async/chan c-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :d
-  [_ _] {:core.async/out-chan d-chan})
+  [_ _] {:core.async/chan d-chan})
 
 (def j1
   (onyx.api/submit-job

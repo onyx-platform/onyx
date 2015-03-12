@@ -32,22 +32,22 @@
 (def l-chan (chan (sliding-buffer (inc n-messages))))
 
 (defmethod l-ext/inject-lifecycle-resources :A
-  [_ _] {:core.async/in-chan a-chan})
+  [_ _] {:core.async/chan a-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :B
-  [_ _] {:core.async/in-chan b-chan})
+  [_ _] {:core.async/chan b-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :C
-  [_ _] {:core.async/in-chan c-chan})
+  [_ _] {:core.async/chan c-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :J
-  [_ _] {:core.async/out-chan j-chan})
+  [_ _] {:core.async/chan j-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :K
-  [_ _] {:core.async/out-chan k-chan})
+  [_ _] {:core.async/chan k-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :L
-  [_ _] {:core.async/out-chan l-chan})
+  [_ _] {:core.async/chan l-chan})
 
 (def a-segments
   (map (fn [n] {:n n})
