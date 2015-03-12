@@ -56,9 +56,6 @@
               GenericFutureListener 
               Future 
               DefaultThreadFactory]
-             [io.netty.handler.codec.protobuf 
-              ProtobufDecoder
-              ProtobufEncoder]  
              [io.netty.bootstrap Bootstrap ServerBootstrap]
              [io.netty.channel.socket.nio NioServerSocketChannel]
              [org.jboss.netty.buffer ChannelBuffers]))
