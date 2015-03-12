@@ -10,14 +10,14 @@
    :core.async/retry-ch (chan 1000)})
 
 (defmethod p-ext/read-batch [:input :core.async]
-  [{:keys [onyx.core/task-map core.async/in-chan core.async/retry-ch
+  [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
            core.async/pending-messages] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         ms (or (:onyx/batch-timeout task-map) 50)
         batch (->> (range batch-size)
                    (map (fn [_] {:id (java.util.UUID/randomUUID)
                                 :input :core.async
-                                :message (first (alts!! [retry-ch in-chan (timeout ms)] :priority true))}))
+                                :message (first (alts!! [retry-ch chan (timeout ms)] :priority true))}))
                    (filter (comp not nil? :message)))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
@@ -59,14 +59,14 @@
   {:onyx.core/compressed results})
 
 (defmethod p-ext/write-batch [:output :core.async]
-  [{:keys [onyx.core/compressed core.async/out-chan]}]
+  [{:keys [onyx.core/compressed core.async/chan]}]
   (doseq [segment compressed]
-    (>!! out-chan (:message segment)))
+    (>!! chan (:message segment)))
   {})
 
 (defmethod p-ext/seal-resource [:output :core.async]
-  [{:keys [core.async/out-chan]}]
-  (>!! out-chan :done))
+  [{:keys [core.async/chan]}]
+  (>!! cchan :done))
 
 (defn take-segments!
   "Takes segments off the channel until :done is found.
