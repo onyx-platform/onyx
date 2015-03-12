@@ -18,42 +18,52 @@
   (java.util.UUID. (.readLong buf)
                    (.readLong buf)))
 
-(def messages-id ^byte (byte 0))
-(def ack-id ^byte (byte 1))
-(def completion-id ^byte (byte 2))
+(def messages-type-id ^byte (byte 0))
+(def ack-type-id ^byte (byte 1))
+(def completion-type-id ^byte (byte 2))
 
+; msg type byte, id uuid 
 (def completion-msg-length 17)
+; msg type byte, id uuid, completion-id uuid, ack-val long
 (def ack-msg-length 41)
+; message length without nippy segments
+; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long), nippy-byte-count (int)
+(def message-base-length 60)
 
-(defn write-completion-msg [msg] 
-  (let [buf ^ByteBuf (byte-buffer 17)] 
-    (.writeByte buf completion-id)
-    (write-uuid buf (:id msg))))
+; minimum amount of data we can possibly successfully read from a buf
+; is message type + a completion msg
+(def min-readable-buf-size completion-msg-length)
+
+(defn build-completion-msg-buf [id] 
+  (let [buf ^ByteBuf (byte-buffer completion-msg-length)] 
+    (.writeByte buf completion-type-id)
+    (write-uuid buf id)))
 
 (defn write-message-msg [^ByteBuf buf {:keys [id acker-id completion-id ack-val message]}]
   (write-uuid buf id)
   (write-uuid buf acker-id)
   (write-uuid buf completion-id)
   (.writeLong buf ack-val)
-  (.writeInt buf (int (count message)))
+  ; this could probably be a short
+  (.writeInt buf (int (count message))) 
   (doall
     (map (fn [b]
            (.writeByte buf b))
          message)))
 
-(defn write-messages-msg [{:keys [messages]}] 
+(defn build-messages-msg-buf [messages] 
   (let [compressed-messages (map (fn [msg]
                                    (update-in msg [:message] compress))
                                  messages)
         buf-size (+ 1 ; message type 
+                    4 ; full payload size
                     4 ; message count
-                    ; id, acker-id, completion-id, ack-val, nippy byte count
-                    (* (count messages) 56)
+                    (* (count messages) message-base-length)
                     ; fressian compressed segments
                     (apply + (map (comp count :message) compressed-messages)))
         buf ^ByteBuf (byte-buffer buf-size)] 
     ; Might have to write total length here so we can tell whether the whole message is in
-    (.writeByte buf messages-id) ; message type
+    (.writeByte buf messages-type-id) ; message type
     ; need the buf-size so we know whether the full payload has arrived
     (.writeInt buf (int buf-size))
     (.writeInt buf (int (count compressed-messages))) ; number of messages
@@ -62,19 +72,19 @@
            compressed-messages))
     buf))
 
-(defn write-ack-msg [msg] 
+(defn build-ack-msg-buf [id completion-id ack-val] 
   (let [buf ^ByteBuf (byte-buffer ack-msg-length)] 
-    (.writeByte buf 1)
-    (write-uuid buf (:id msg))
-    (write-uuid buf (:completion-id msg))
-    (.writeLong buf (:ack-val msg))))
+    (.writeByte buf ack-type-id)
+    (write-uuid buf id)
+    (write-uuid buf completion-id)
+    (.writeLong buf ack-val)))
 
-(defn write-msg [msg]
+(defn build-msg-buf [msg]
   (let [t ^byte (:type msg)] 
     (cond 
-      (= t messages-id) (write-messages-msg msg)
-      (= t ack-id) (write-ack-msg msg)
-      (= t completion-id) (write-completion-msg msg))))
+      (= t messages-type-id) (build-messages-msg-buf (:messages msg))
+      (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
+      (= t completion-type-id) (build-completion-msg-buf (:id msg)))))
 
 (defn read-message-buf [^ByteBuf buf]
   (let [id (take-uuid buf)
@@ -91,29 +101,34 @@
      :message message}))
 
 (defn read-messages-buf [^ByteBuf buf]
-  (let [message-count (.readInt buf)]
-    (repeatedly message-count #(read-message-buf buf))))
+  {:type messages-type-id 
+   :messages (let [message-count (.readInt buf)]
+               (repeatedly message-count #(read-message-buf buf)))})
 
 (defn read-ack-buf [^ByteBuf buf]
-  {:type ack-id
+  {:type ack-type-id
    :id (take-uuid buf)
    :completion-id (take-uuid buf)
    :ack-val (.readLong buf)})
 
 (defn read-completion-buf [^ByteBuf buf]
-  {:type completion-id 
+  {:type completion-type-id 
    :id (take-uuid buf)})
 
+
 (defn read-buf [^ByteBuf buf]
-  (let [msg-type (.readByte buf)
-        n-received (.writerIndex buf)] 
-    (case msg-type
-      0 (if (<= (.readInt buf) n-received)
-          {:type messages-id :messages (read-messages-buf buf)})
-      1 (if (<= ack-msg-length n-received)
-          (read-ack-buf buf))
-      2 (if (<= completion-msg-length n-received)
-          (read-completion-buf buf)))))
+  (let [n-left (- (.writerIndex buf) (.readerIndex buf))]
+    (if (>= n-left min-readable-buf-size)
+      (let [msg-type ^byte (.readByte buf)] 
+        (cond (= msg-type messages-type-id) 
+              (if (<= (.readInt buf) n-left)
+                (read-messages-buf buf))
+              (= msg-type ack-type-id) 
+              (if (<= ack-msg-length n-left)
+                (read-ack-buf buf))
+              (= msg-type completion-type-id) 
+              (if (<= completion-msg-length n-left)
+                (read-completion-buf buf)))))))
 
 ;;; GLOSS IMPL
 ;;;;;; USED BY ALEPH MESSAGING
@@ -150,25 +165,21 @@
   (g/compile-frame {:type :byte
                     :id [:int64 :int64]}))
 
-(def send-id (byte 0))
-(def ack-id (byte 1))
-(def completion-id (byte 2))
-
 (g/defcodec onyx-codec
   (g/compile-frame
    (g/header
     :ubyte
     (fn [header-byte]
-      (cond (= header-byte send-id)
+      (cond (= header-byte messages-type-id)
             send-frame
-            (= header-byte ack-id)
+            (= header-byte ack-type-id)
             ack-frame 
-            (= header-byte completion-id)
+            (= header-byte completion-type-id)
             completion-frame))
     :type)))
 
 (defn send-messages->frame [messages]
-  {:type send-id
+  {:type messages-type-id
    :messages (map (fn [msg] 
                     (-> msg 
                         (update-in [:id] uuid->longs)
@@ -194,7 +205,7 @@
   (-> msg 
       (update-in [:id] uuid->longs)
       (update-in [:completion-id] uuid->longs)
-      (assoc :type ack-id)))
+      (assoc :type ack-type-id)))
 
 (defn frame->ack-message [msg]
   (-> msg 
@@ -204,18 +215,18 @@
 (defn completion-msg->frame [msg]
   (-> msg
       (update-in [:id] uuid->longs)
-      (assoc :type completion-id)))
+      (assoc :type completion-type-id)))
 
 (defn frame->completion-msg [msg]
   (-> msg 
       (update-in [:id] longs->uuid)))
 
 (defn frame->msg [{:keys [type] :as frame}]
-  (cond (= send-id type) 
+  (cond (= messages-type-id type) 
         (frame->send-messages frame)
-        (= ack-id type)
+        (= ack-type-id type)
         (frame->ack-message frame)
-        (= completion-id type) 
+        (= completion-type-id type) 
         (frame->completion-msg frame)))
 
 (def codec-protocol

@@ -2,19 +2,19 @@
   (:require [onyx.messaging.protocol :as protocol]
             [midje.sweet :refer :all]))
 
-(fact (let [message {:type protocol/completion-id
+(fact (let [message {:type protocol/completion-type-id
                      :id #uuid "11837bd7-2de5-4b62-888d-171c4c47845c"}] 
-        (= message (protocol/read-buf (protocol/write-msg message))))
+        (= message (protocol/read-buf (protocol/build-msg-buf message))))
       => true)
 
-(fact (let [message {:type protocol/ack-id
+(fact (let [message {:type protocol/ack-type-id
                      :id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a" 
                      :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
                      :ack-val 3323130347050513529}] 
-        (= message (protocol/read-buf (protocol/write-msg message))))
+        (= message (protocol/read-buf (protocol/build-msg-buf message))))
       => true)
 
-(fact (let [messages {:type protocol/messages-id
+(fact (let [messages {:type protocol/messages-type-id
                       :messages '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
                                    :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
                                    :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
@@ -25,7 +25,7 @@
                                    :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
                                    :message {:n 2}
                                    :ack-val 729233382010058362})}]
-        (= messages (protocol/read-buf (protocol/write-msg messages))))
+        (= messages (protocol/read-buf (protocol/build-msg-buf messages))))
       => true)
 
 

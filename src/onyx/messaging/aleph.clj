@@ -46,17 +46,17 @@
 (defn app [daemon net-ch inbound-ch release-ch]
   (go-loop []
            (try (let [{:keys [type] :as msg} (<!! net-ch)]
-                  (cond (= type protocol/send-id) 
+                  (cond (= type protocol/messages-type-id) 
                         (doseq [message (:messages msg)]
                           (>!! inbound-ch message))
 
-                        (= type protocol/ack-id)
+                        (= type protocol/ack-type-id)
                         (acker/ack-message daemon
                                            (:id msg)
                                            (:completion-id msg)
                                            (:ack-val msg))
 
-                        (= type protocol/completion-id)
+                        (= type protocol/completion-type-id)
                         (>!! release-ch (:id msg))))
              (catch Exception e
                (taoensso.timbre/error e)
