@@ -7,17 +7,17 @@
 (defmethod l-ext/inject-lifecycle-resources :core.async/read-from-chan
   [_ event]
   {:core.async/pending-messages (atom {})
-   :core.async/replay-ch (chan 1000)})
+   :core.async/retry-ch (chan 1000)})
 
 (defmethod p-ext/read-batch [:input :core.async]
-  [{:keys [onyx.core/task-map core.async/in-chan core.async/replay-ch
+  [{:keys [onyx.core/task-map core.async/in-chan core.async/retry-ch
            core.async/pending-messages] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         ms (or (:onyx/batch-timeout task-map) 50)
         batch (->> (range batch-size)
                    (map (fn [_] {:id (java.util.UUID/randomUUID)
                                 :input :core.async
-                                :message (first (alts!! [replay-ch in-chan (timeout ms)] :priority true))}))
+                                :message (first (alts!! [retry-ch in-chan (timeout ms)] :priority true))}))
                    (filter (comp not nil? :message)))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
@@ -35,9 +35,9 @@
   [{:keys [core.async/pending-messages]} message-id]
   (swap! pending-messages dissoc message-id))
 
-(defmethod p-ext/replay-message [:input :core.async]
-  [{:keys [core.async/pending-messages core.async/replay-ch]} message-id]
-  (>!! replay-ch (get @pending-messages message-id))
+(defmethod p-ext/retry-message [:input :core.async]
+  [{:keys [core.async/pending-messages core.async/retry-ch]} message-id]
+  (>!! retry-ch (get @pending-messages message-id))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/pending? [:input :core.async]
