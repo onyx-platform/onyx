@@ -1,4 +1,4 @@
-(ns onyx.static.validation-test
+(ns onyx.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [midje.sweet :refer :all]
