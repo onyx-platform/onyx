@@ -143,22 +143,25 @@
   (let [messages (:onyx.core/compressed event)
         compressed (compress messages)
         len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)]
-    (.offer peer-link unsafe-buffer 0 len)))
+        unsafe-buffer (UnsafeBuffer. compressed)
+        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+    (while (not (offer-f)))))
 
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
   (let [compressed (compress {:id message-id :completion-id completion-id :ack-val ack-val})
         len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)]
-    (.offer peer-link unsafe-buffer 0 len)))
+        unsafe-buffer (UnsafeBuffer. compressed)
+        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+    (while (not (offer-f)))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
   (let [compressed (compress {:id id})
         len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)]
-    (.offer peer-link unsafe-buffer 0 len)))
+        unsafe-buffer (UnsafeBuffer. compressed)
+        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+    (while (not (offer-f)))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
