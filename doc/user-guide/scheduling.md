@@ -14,7 +14,6 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
     - [Percentage Job Scheduler](#percentage-job-scheduler)
     - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
   - [Task Schedulers](#task-schedulers)
-    - [Greedy Task Scheduler](#greedy-task-scheduler)
     - [Round Robin Task Scheduler](#round-robin-task-scheduler)
     - [Percentage Task Scheduler](#percentage-task-scheduler)
   - [Examples](#examples)
@@ -149,20 +148,6 @@ And now, for the reassignment phase:
 
 Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are a few different Task Scheduler implementations, listed below. To use each, call `onyx.api/submit-job`. The second argument of this function is a map. Supply a `:task-scheduler` key and map it to the value specified below.
 
-##### Greedy Task Scheduler
-
-The Greedy Task Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler always assigns the next peer to the *earliest* task in the sorted workflow that is not complete. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to task A.
-
-To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/greedy`.
-
-**Task Completion**
-
-When a task is complete, this scheduler moves all peers executing that task to the next task in the topologically sorted workflow. If there are no more tasks, these peers are eligible to execute tasks for another job. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns all peers *from the completed task* to task B.
-
-**Peer Removal**
-
-If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is added to the currently executing task that all peers are greedily assigned to.
-
 ##### Round Robin Task Scheduler
 
 The Round Robin Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to tasks A, B, C, D, A, B, C, D, ... and so on.
@@ -203,8 +188,5 @@ This task scheduler is *not* composable with `:onyx/max-peers`.
 
 #### Examples
 
-- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Greedy task scheduler](/doc/design/allocate-examples/example-1.md)
-- [Example 2: 3 node cluster, 1 job, Greedy job scheduler, Round Robin task scheduler](/doc/design/allocate-examples/example-2.md)
-- [Example 3: 7 node cluster, 2 jobs, Round Robin job scheduler, Greedy task schedulers](/doc/design/allocate-examples/example-3.md)
-- [Example 4: 7 node cluster, Round Robin job scheduler, Greedy task schedulers, 2 job cluster shift](/doc/design/allocate-examples/example-4.md)
+- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Round Robin task scheduler](/doc/design/allocate-examples/example-1.md)
 

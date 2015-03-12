@@ -51,8 +51,8 @@
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 
-(defmulti ^{:added "0.6.0"} replay-message
-  "Releases a message id from storage and replays it."
+(defmulti ^{:added "0.6.0"} retry-message
+  "Releases a message id from the pending message pool and retries it."
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 

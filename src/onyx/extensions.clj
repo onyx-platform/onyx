@@ -46,6 +46,8 @@
 
 (defmulti send-messages (fn [messenger event peer-link] (type messenger)))
 
+(defmulti close-peer-connection (fn [messenger event link] (type messenger)))
+
 (defmulti internal-ack-message (fn [messenger event peer-link message-id completion-id ack-val]
                                  (type messenger)))
 

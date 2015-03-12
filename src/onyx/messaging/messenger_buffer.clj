@@ -9,8 +9,7 @@
   (start [component]
     (taoensso.timbre/info "Starting Messenger Buffer")
 
-    (let [inbound-ch (chan (or (:onyx.messenger/inbound-capacity opts) 20000))
-          ]
+    (let [inbound-ch (chan (or (:onyx.messenger/inbound-capacity opts) 20000))]
       (assoc component :inbound-ch inbound-ch)))
 
   (stop [component]

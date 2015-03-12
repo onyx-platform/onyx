@@ -25,7 +25,9 @@
         (update-in [:pairs] dissoc id)
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
-        (update-in [:peer-site] dissoc id)
+        (update-in [:send-peer-site] dissoc id)
+        (update-in [:acker-peer-site] dissoc id)
+        (update-in [:completion-peer-site] dissoc id)
         (common/remove-sealing-tasks args)
         (common/remove-peers args))))
 
@@ -37,23 +39,19 @@
      :updated-watch {:observer observer
                      :subject subject}}))
 
-;; (let [peer-counts (common/balance-jobs new)
-;;       peers (get (common/job->peers new) (:job allocation))]
-;;   (when (> (count peers) (get peer-counts (:job allocation)))
-;;     (let [n (- (count peers) (get peer-counts (:job allocation)))
-;;           peers-to-drop (common/drop-peers new (:job allocation) n)]
-;;       (when (and (some #{(:id peer-args)} (into #{} peers-to-drop))
-;;                  (common/volunteer? old new peer-args (:job peer-args)))
-;;         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))))
-
 (defmethod extensions/reactions :leave-cluster
   [{:keys [args]} old new diff state]
-  (let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (when (or (= (:id state) (get (:prepared old) (:id args)))
+  (let [allocation (common/peer->allocated-job (:allocations old) (:id state))
+        scheduler (get-in new [:task-schedulers (:job allocation)])]
+    (cond (or (= (:id state) (get (:prepared old) (:id args)))
               (= (:id state) (get (:accepted old) (:id args))))
-      [{:fn :abort-join-cluster
-        :args {:id (:id state)}
-        :immediate? true}])))
+          [{:fn :abort-join-cluster
+            :args {:id (:id state)}
+            :immediate? true}]
+          (and allocation
+               (common/volunteer-via-leave? old new diff state)
+               (common/reallocate-from-task? scheduler old new (:job allocation) state))
+          [{:fn :volunteer-for-task :args {:id (:id state)}}])))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [message-id args]} old new {:keys [updated-watch]} state]

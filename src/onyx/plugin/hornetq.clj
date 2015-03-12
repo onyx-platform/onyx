@@ -91,7 +91,7 @@
     (.acknowledge message)
     (swap! pending-messages dissoc message-id)))
 
-(defmethod p-ext/replay-message [:input :hornetq]
+(defmethod p-ext/retry-message [:input :hornetq]
   [{:keys [hornetq/pending-messages] :as event} message-id]
   (.rollback (:hornetq/session event))
   (swap! pending-messages dissoc message-id))

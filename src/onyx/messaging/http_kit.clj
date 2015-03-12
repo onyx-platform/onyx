@@ -102,3 +102,7 @@
   (let [contents (compress {:id id})]
     (ws/send-msg peer-link contents)))
 
+(defmethod extensions/close-peer-connection HttpKitWebSockets
+  [messenger event peer-link]
+  (ws/close peer-link))
+

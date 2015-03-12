@@ -8,7 +8,7 @@
 
   (start [component]
     (if config
-      (reset! timbre/config config)
+      (timbre/merge-config! config)
       (do
         (timbre/set-config!
           [:appenders :rotor]

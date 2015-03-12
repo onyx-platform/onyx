@@ -16,7 +16,10 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {:a :b :b :c :c :a} :accepted {:a :d} :peers [:a :b :c]})
+(def old-replica {:pairs {:a :b :b :c :c :a}
+                  :accepted {:a :d}
+                  :peers [:a :b :c]
+                  :job-scheduler :onyx.job-scheduler/greedy})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
@@ -33,7 +36,8 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:pairs {} :accepted {:a :d} :peers [:a]})
+(def old-replica {:pairs {} :accepted {:a :d} :peers [:a]
+                  :job-scheduler :onyx.job-scheduler/greedy})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
