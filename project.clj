@@ -17,6 +17,7 @@
                  [http-kit "2.1.17"]
                  [gloss "0.2.4" :exclusions [manifold]]
                  [org.hornetq/hornetq-core-client "2.4.0.Final" :exclusions [io.netty/netty-all]]
+                 [com.google.protobuf/protobuf-java "2.6.1"]
                  [aleph "0.4.0-beta3"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
