@@ -137,7 +137,7 @@
       (doseq [m (:onyx.core/batch rets)]
         (go (try (<! (timeout 60000))
                  (when (p-ext/pending? rets (:id m))
-                   (p-ext/replay-message event (:id m)))
+                   (p-ext/retry-message event (:id m)))
                  (catch Exception e
                    (taoensso.timbre/warn e))))))
     rets))
@@ -147,7 +147,7 @@
     (if (sentinel-found? rets)
       (do (if (p-ext/drained? rets)
             (complete-job rets)
-            (p-ext/replay-message rets (sentinel-id rets)))
+            (p-ext/retry-message rets (sentinel-id rets)))
           (strip-sentinel rets))
       rets)))
 
