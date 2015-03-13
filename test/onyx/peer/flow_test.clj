@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.plugin.core-async]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -17,25 +17,23 @@
 
 (def batch-size 10)
 
-(def echo 1000)
+(def people-in-chan (chan 100))
 
-(def people-in-chan (chan (inc n-messages)))
+(def colors-in-chan (chan 100))
 
-(def colors-in-chan (chan (inc n-messages)))
+(def children-out-chan (chan (sliding-buffer 100)))
 
-(def children-out-chan (chan (sliding-buffer (inc n-messages))))
+(def adults-out-chan (chan (sliding-buffer 100)))
 
-(def adults-out-chan (chan (sliding-buffer (inc n-messages))))
+(def athletes-wa-out-chan (chan (sliding-buffer 100)))
 
-(def athletes-wa-out-chan (chan (sliding-buffer (inc n-messages))))
+(def everyone-out-chan (chan (sliding-buffer 100)))
 
-(def everyone-out-chan (chan (sliding-buffer (inc n-messages))))
+(def red-out-chan (chan (sliding-buffer 100)))
 
-(def red-out-chan (chan (sliding-buffer (inc n-messages))))
+(def blue-out-chan (chan (sliding-buffer 100)))
 
-(def blue-out-chan (chan (sliding-buffer (inc n-messages))))
-
-(def green-out-chan (chan (sliding-buffer (inc n-messages))))
+(def green-out-chan (chan (sliding-buffer 100)))
 
 (doseq [x [{:age 24 :job "athlete" :location "Washington"}
            {:age 17 :job "programmer" :location "Washington"}
@@ -336,7 +334,7 @@
 
 (def process-green identity)
 
-(def v-peers (onyx.api/start-peers! 16 peer-config))
+(def v-peers (onyx.api/start-peers 16 peer-config))
 
 (onyx.api/submit-job
  peer-config
@@ -344,19 +342,19 @@
   :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/round-robin})
 
-(def children (hq-util/consume-queue! hq-config children-out-queue 10))
+(def children (take-segments! children-out-chan))
 
-(def adults (hq-util/consume-queue! hq-config adults-out-queue 10))
+(def adults (take-segments! adults-out-chan))
 
-(def athletes-wa (hq-util/consume-queue! hq-config athletes-wa-out-queue 10))
+(def athletes-wa (take-segments! athletes-wa-out-chan))
 
-(def everyone (hq-util/consume-queue! hq-config everyone-out-queue 10))
+(def everyone (take-segments! everyone-out-chan))
 
-(def red (hq-util/consume-queue! hq-config red-out-queue 10))
+(def red (take-segments! red-out-chan))
 
-(def blue (hq-util/consume-queue! hq-config blue-out-queue 10))
+(def blue (take-segments! blue-out-chan))
 
-(def green (hq-util/consume-queue! hq-config green-out-queue 10))
+(def green (take-segments! green-out-chan))
 
 (def children-expectatations
   #{{:age 17 :job "programmer" :location "Washington"}
