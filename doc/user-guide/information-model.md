@@ -19,11 +19,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 ### Workflow
 
-- a single Clojure map which is EDN serializable/deserializable
-- all elements in the map are keywords
-- all elements in the map must correspond to an `:onyx/name` entry in the catalog
-- the outer-most keys of the map must have catalog entries of `:onyx/type` that map to `:input`
-- only innermost values of the map may have catalog entries of `:onyx/type` that map to `:output`
+- a single Clojure vector of vectores which is EDN serializable/deserializable
+- all elements in the inner vectors are keywords
+- all keywords must correspond to an `:onyx/name` entry in the catalog
+- the "root" keywords of the workflow must have catalog entries of `:onyx/type` that map to `:input`
+- the "leaf" values of the workflow must have catalog entries of `:onyx/type` that map to `:output`
 
 ### Catalog
 
@@ -51,6 +51,13 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/medium`     | `keyword`  | `any`
+
+#### Maps with `:onyx/type` set to `:input` may optionally have these keys
+
+| key name              | type     | default
+|-----------------------|----------|--------
+|`:onyx/pending-timeout`|`integer` | 60000
+
 
 #### Maps with `:onyx/type` set to `:function` must have these keys
 
