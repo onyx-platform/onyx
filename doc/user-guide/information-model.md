@@ -71,11 +71,14 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - a single Clojure vector which is EDN serializable/deserializable
 - all elements in the vector must be Clojure maps
 
-| key name             |type                          | optional?| default
-|----------------------|------------------------------|----------|--------
-|`:flow/from`          |`keyword`                     | no       |
-|`:flow/to`            |`:all`, `:none` or `[keyword]`| no       |
-|`:flow/predicate`     |`keyword` or `[keyword]`      | no       |
-|`:flow/exclude-keys`  |`[keyword]`                   | yes      | `[]`
-|`:flow/short-circuit?`|`boolean`                     | yes      |`false`
+| key name                |type                          | optional?| default
+|-------------------------|------------------------------|----------|--------
+|`:flow/from`             |`keyword`                     | no       |
+|`:flow/to`               |`:all`, `:none` or `[keyword]`| no       |
+|`:flow/predicate`        |`keyword` or `[keyword]`      | no       |
+|`:flow/exclude-keys`     |`[keyword]`                   | yes      | `[]`
+|`:flow/short-circuit?`   |`boolean`                     | yes      |`false`
+|`:flow/thrown-exception?`|`boolean`                     | yes      |`false`
+|`:flow/post-transform?`  |`keyword`                     | yes      |`nil`
+|`:flow/action?`          |`keyword`                     | yes      |`nil`
 
