@@ -1,7 +1,8 @@
 (ns onyx.peer.flow-test
-  (:require [midje.sweet :refer :all]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.queue.hornetq-utils :as hq-util]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
+            [midje.sweet :refer :all]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -18,83 +19,69 @@
 
 (def echo 1000)
 
-(def people-in-queue (str (java.util.UUID/randomUUID)))
+(def people-in-chan (chan (inc n-messages)))
 
-(def colors-in-queue (str (java.util.UUID/randomUUID)))
+(def colors-in-chan (chan (inc n-messages)))
 
-(def children-out-queue (str (java.util.UUID/randomUUID)))
+(def children-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def adults-out-queue (str (java.util.UUID/randomUUID)))
+(def adults-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def athletes-wa-out-queue (str (java.util.UUID/randomUUID)))
+(def athletes-wa-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def everyone-out-queue (str (java.util.UUID/randomUUID)))
+(def everyone-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def red-out-queue (str (java.util.UUID/randomUUID)))
+(def red-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def blue-out-queue (str (java.util.UUID/randomUUID)))
+(def blue-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def green-out-queue (str (java.util.UUID/randomUUID)))
+(def green-out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
+(doseq [x [{:age 24 :job "athlete" :location "Washington"}
+           {:age 17 :job "programmer" :location "Washington"}
+           {:age 18 :job "mechanic" :location "Vermont"}
+           {:age 13 :job "student" :location "Maine"}
+           {:age 42 :job "doctor" :location "Florida"}
+           {:age 64 :job "athlete" :location "Pennsylvania"}
+           {:age 35 :job "bus driver" :location "Texas"}
+           {:age 50 :job "lawyer" :location "California"}
+           {:age 25 :job "psychologist" :location "Washington"}]]
+  (>!! people-in-chan x))
 
-(hq-util/create-queue! hq-config people-in-queue)
-(hq-util/create-queue! hq-config colors-in-queue)
-(hq-util/create-queue! hq-config children-out-queue)
-(hq-util/create-queue! hq-config adults-out-queue)
-(hq-util/create-queue! hq-config athletes-wa-out-queue)
-(hq-util/create-queue! hq-config everyone-out-queue)
-(hq-util/create-queue! hq-config red-out-queue)
-(hq-util/create-queue! hq-config blue-out-queue)
-(hq-util/create-queue! hq-config green-out-queue)
+(>!! people-in-chan :done)
 
-(hq-util/write-and-cap!
- hq-config people-in-queue
- [{:age 24 :job "athlete" :location "Washington"}
-  {:age 17 :job "programmer" :location "Washington"}
-  {:age 18 :job "mechanic" :location "Vermont"}
-  {:age 13 :job "student" :location "Maine"}
-  {:age 42 :job "doctor" :location "Florida"}
-  {:age 64 :job "athlete" :location "Pennsylvania"}
-  {:age 35 :job "bus driver" :location "Texas"}
-  {:age 50 :job "lawyer" :location "California"}
-  {:age 25 :job "psychologist" :location "Washington"}]
- echo)
+(doseq [x [{:color "red" :extra-key "Some extra context for the predicates"}
+           {:color "blue" :extra-key "Some extra context for the predicates"}
+           {:color "white" :extra-key "Some extra context for the predicates"}
+           {:color "green" :extra-key "Some extra context for the predicates"}
+           {:color "orange" :extra-key "Some extra context for the predicates"}
+           {:color "black" :extra-key "Some extra context for the predicates"}
+           {:color "purple" :extra-key "Some extra context for the predicates"}
+           {:color "cyan" :extra-key "Some extra context for the predicates"}
+           {:color "yellow" :extra-key "Some extra context for the predicates"}]]
+  (>!! colors-in-chan x))
 
-(hq-util/write-and-cap!
- hq-config colors-in-queue
- [{:color "red" :extra-key "Some extra context for the predicates"}
-  {:color "blue" :extra-key "Some extra context for the predicates"}
-  {:color "white" :extra-key "Some extra context for the predicates"}
-  {:color "green" :extra-key "Some extra context for the predicates"}
-  {:color "orange" :extra-key "Some extra context for the predicates"}
-  {:color "black" :extra-key "Some extra context for the predicates"}
-  {:color "purple" :extra-key "Some extra context for the predicates"}
-  {:color "cyan" :extra-key "Some extra context for the predicates"}
-  {:color "yellow" :extra-key "Some extra context for the predicates"}]
- echo)
+(>!! colors-in-chan :done)
+
+(close! people-in-chan)
+(close! colors-in-chan)
 
 (def catalog
   [{:onyx/name :people-in
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name people-in-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :colors-in
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name colors-in-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :process-children
     :onyx/fn :onyx.peer.flow-test/process-children
@@ -139,74 +126,87 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :children-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name children-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :adults-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name adults-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :athletes-wa-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name athletes-wa-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :everyone-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name everyone-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :red-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name red-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :blue-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name blue-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :green-out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :onyx/consumption :concurrent
-    :hornetq/queue-name green-out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}])
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
+
+(defmethod l-ext/inject-lifecycle-resources :people-in
+  [_ _] {:core.async/chan people-in-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :colors-in
+  [_ _] {:core.async/chan colors-in-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :children-out
+  [_ _] {:core.async/chan children-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :adults-out
+  [_ _] {:core.async/chan adults-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :athletes-wa-out
+  [_ _] {:core.async/chan athletes-wa-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :everyone-out
+  [_ _] {:core.async/chan everyone-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :red-out
+  [_ _] {:core.async/chan red-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :blue-out
+  [_ _] {:core.async/chan blue-out-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :green-out
+  [_ _] {:core.async/chan green-out-chan})
 
 (def workflow
   [[:people-in :process-children]
