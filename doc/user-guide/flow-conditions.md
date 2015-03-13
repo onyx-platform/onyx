@@ -15,6 +15,9 @@ This section covers flow conditions. Flow conditions are used for isolating logi
   - [Predicate Composition](#predicate-composition)
   - [Match All/None](#match-allnone)
   - [Short Circuiting](#short-circuiting)
+  - [Exceptions](#exceptions)
+  - [Post-transform](#post-transform)
+  - [Actions](#actions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -141,4 +144,27 @@ If a flow condition specifies `:all` as its `:flow/to`, it must come before any 
 ### Short Circuiting
 
 If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are unioned (duplicates aren't acknowledged), as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.
+
+### Exceptions
+
+### Post-transform
+
+### Actions
+
+After a set of flow conditons has been evaluated for a segment, you usually want to send the segment downstream to the next set of tasks. Other times, you want to retry to process the segment because something went wrong. Perhaps a database connection wasn't available, or an email couldn't be sent.
+
+Onyx provides Flow Conditions `:flow/action` to accomplish this. By setting `:flow/action` to `:retry`, a segment will expire from the internal pool of pending messages and be automatically retried from its input task. If any of the `:flow/action`s from the matching flow conditions are `:retry`, the segment will be retried and *will not* be sent downstream. This parameter is optional, and it's default value is `nil`. `nil` will cause the segment to be sent to all downstream tasks that were selected from evaluating the flow conditions. Any flow condition clauses with `:flow/action` set to `:retry` must also have `:flow/short-circuit?` set to `true`, and `:flow/to` set to `:none`.
+
+Here's a quick example:
+
+```clojure
+[{:flow/from :input-stream
+  :flow/to :none
+  :flow/short-circuit? true
+  :flow/predicate :my.ns/adult?
+  :flow/action :retry}
+ {:flow/from :input-stream
+  :flow/to [:task-a]
+  :flow/predicate :my.ns/child?}]
+```
 
