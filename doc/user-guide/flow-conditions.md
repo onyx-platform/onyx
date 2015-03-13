@@ -163,6 +163,7 @@ Here's a quick example:
   :flow/short-circuit? true
   :flow/predicate :my.ns/adult?
   :flow/action :retry}
+
  {:flow/from :input-stream
   :flow/to [:task-a]
   :flow/predicate :my.ns/child?}]
