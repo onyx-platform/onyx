@@ -147,6 +147,22 @@ If multiple flow condition entries evaluate to a true predicate, their `:flow/to
 
 ### Exceptions
 
+Flow Conditions give you leverage for handling exceptions without miring your code in `try`/`catch` logic. If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting `:flow/thrown-exception?` to `true`. It's default value is `false`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Exception flow conditions don't need to short circuit, and hence can be composed.
+
+```clojure
+{:flow/from :input-stream
+ :flow/to [:error-task]
+ :flow/thrown-exception? true
+ :flow/predicate :my.ns/handle-error?}
+```
+
+And the predicate might be:
+
+```clojure
+(defn handle-error? [event exception-obj]
+  (= (type exception-obj) java.lang.NullPointerException))
+```
+
 ### Post-transform
 
 ### Actions
