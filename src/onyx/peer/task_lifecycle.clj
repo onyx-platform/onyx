@@ -142,7 +142,8 @@
     rets))
 
 (defn decompress-batch [event]
-  (let [rets (merge event (p-ext/decompress-batch event))]
+  ;; TODO: Messages are already decompressed, need to rework the interface.
+  (let [rets (merge event {:onyx.core/decompressed (:onyx.core/batch event)})]
     (if (sentinel-found? rets)
       (do (if (p-ext/drained? rets)
             (complete-job rets)

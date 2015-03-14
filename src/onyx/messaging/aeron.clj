@@ -3,7 +3,7 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.compression.nippy :refer [compress decompress]]
+              [onyx.compression.nippy :refer [decompress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron]
              [uk.co.real_logic.aeron Aeron$Context]
@@ -19,7 +19,7 @@
   (let [dst (byte-array length)]
     (.getBytes buffer offset dst)
     (let [thawed (decompress dst)]
-      (doseq [message thawed]
+      (doseq [message dst]
         (>!! inbound-ch message)))))
 
 (defn handle-acker-message [daemon buffer offset length header]
@@ -145,8 +145,7 @@
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link]
-  (let [messages (:onyx.core/compressed event)
-        compressed (compress messages)
+  (let [compressed (:onyx.core/compressed event)
         len (count compressed)
         unsafe-buffer (UnsafeBuffer. compressed)
         offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]

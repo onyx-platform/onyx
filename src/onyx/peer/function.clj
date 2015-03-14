@@ -2,6 +2,7 @@
     (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
               [onyx.static.planning :refer [find-task]]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.compression.nippy :refer [compress decompress]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
@@ -22,9 +23,12 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn compress-segment [next-tasks catalog message]
-  ;;   :hash-group (reduce (fn [groups t] (assoc groups t (group-message segment catalog t))) {} next-tasks)
-  message)
+(defn compress-segment [next-tasks catalog segment path]
+  (let [segment (apply dissoc segment (:exclusions path))]
+    {:compressed (compress segment)
+     :hash-group (reduce (fn [groups t]
+                           (assoc groups t (group-message segment catalog t)))
+                         {} next-tasks)}))
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
@@ -38,19 +42,18 @@
   [{:keys [onyx.core/messenger] :as event}]
   {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
 
-(defmethod p-ext/decompress-batch :default
-  [{:keys [onyx.core/queue onyx.core/batch] :as event}]
-  {:onyx.core/decompressed batch})
-
 (defmethod p-ext/apply-fn :default
   [{:keys [onyx.core/params] :as event} segment]
   (operation/apply-fn (:onyx.function/fn event) params segment))
 
 (defmethod p-ext/compress-batch :default
-  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
+  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task
+           onyx.core/result-paths]
     :as event}]
   (let [next-tasks (:egress-ids serialized-task)
-        compressed-msgs (map (partial compress-segment next-tasks catalog) results)]
+        compressed-msgs (map (fn [[result path]]
+                               (compress-segment next-tasks catalog result path))
+                             (map vector results result-paths))]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defmethod p-ext/write-batch :default
