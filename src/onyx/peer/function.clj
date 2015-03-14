@@ -73,7 +73,8 @@
                 (let [messages (get grouped k)
                       target (nth active-peers (mod (.hashCode k) (count active-peers)))
                       target-link (operation/peer-link event target :send-peer-site)]
-                  (onyx.extensions/send-messages messenger event target-link (compress (map :segment messages))))))))))
+                  (onyx.extensions/send-messages messenger event target-link (compress (map :segment messages)))))))))
+      {})
     {}))
 
 (defmethod p-ext/seal-resource :default

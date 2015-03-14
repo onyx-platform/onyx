@@ -75,7 +75,7 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def size 3)
+(def size 3000)
 
 (def data
   (concat
@@ -131,7 +131,7 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 6 peer-config))
+(def v-peers (onyx.api/start-peers 3 peer-config))
 
 (onyx.api/submit-job
  peer-config
@@ -139,11 +139,6 @@
   :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (take-segments! out-chan))
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-env env)
 
 (def out-val @output)
 
@@ -154,4 +149,9 @@
       (count (into #{} (filter identity (mapcat keys out-val)))))
 
 (fact results => [:done])
+
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-env env)
 
