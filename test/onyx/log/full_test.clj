@@ -17,7 +17,7 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-peers 50)
+(def n-peers 20)
 
 (def v-peers (onyx.api/start-peers n-peers peer-config))
 
