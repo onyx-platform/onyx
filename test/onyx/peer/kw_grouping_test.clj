@@ -1,10 +1,8 @@
 (ns onyx.peer.kw-grouping-test
-  (:require [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [taoensso.timbre :refer [info]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.queue.hornetq-utils :as hq-util]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -22,15 +20,15 @@
 
 (def output (atom []))
 
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
+(def in-chan (chan 1000))
 
-(def in-queue (str (java.util.UUID/randomUUID)))
+(def out-chan (chan (sliding-buffer 1000)))
 
-(def out-queue (str (java.util.UUID/randomUUID)))
+(defmethod l-ext/inject-lifecycle-resources :in
+  [_ _] {:core.async/chan in-chan})
 
-(hq-util/create-queue! hq-config in-queue)
-(hq-util/create-queue! hq-config out-queue)
+(defmethod l-ext/inject-lifecycle-resources :out
+  [_ _] {:core.async/chan out-chan})
 
 (defmethod l-ext/inject-lifecycle-resources
   :onyx.peer.kw-grouping-test/sum-balance
@@ -49,35 +47,35 @@
   (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
   [])
 
-(def workflow {:in {:sum-balance :out}})
+(def workflow
+  [[:in :sum-balance]
+   [:sum-balance :out]])
 
 (def catalog
   [{:onyx/name :in
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :hornetq/queue-name in-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size 1000}
+    :onyx/medium :core.async
+    :onyx/batch-size 40
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :sum-balance
     :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-key :name
-    :onyx/batch-size 1000}
+    :onyx/batch-size 40}
 
    {:onyx/name :out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :hornetq/queue-name out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size 1000}])
+    :onyx/medium :core.async
+    :onyx/batch-size 40
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
 
-(def size 3000)
+(def size 3)
 
 (def data
   (concat
@@ -127,15 +125,20 @@
    (map (fn [_] {:name "Eusebia" :amount 10}) (range size))
    (map (fn [_] {:name "Fletcher" :amount 10}) (range size))))
 
-(hq-util/write-and-cap! hq-config in-queue data 100)
+(doseq [x data]
+  (>!! in-chan x))
 
-(def v-peers (onyx.api/start-peers! 6 peer-config))
+(>!! in-chan :done)
+(close! in-chan)
 
-(onyx.api/submit-job peer-config
-                     {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+(def v-peers (onyx.api/start-peers 6 peer-config))
 
-(def results (hq-util/consume-queue! hq-config out-queue 1))
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :task-scheduler :onyx.task-scheduler/round-robin})
+
+(def results (take-segments! out-chan))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
