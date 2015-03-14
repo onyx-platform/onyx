@@ -69,13 +69,6 @@
                                           input-tasks)))]
     (throw (Exception. (str "Input task " invalid " has incoming edge.")))))
 
-(defn validate-workflow-outputs [g output-tasks]
-  (when-let [invalid (ffirst (filter (comp seq second)
-                                     (map (juxt identity
-                                                (partial dep/immediate-dependents g))
-                                          output-tasks)))]
-    (throw (Exception. (str "Output task " invalid " has outgoing edge.")))))
-
 (defn validate-workflow-intermediates [g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
                                 (let [dependencies? (empty? dependencies)
@@ -92,8 +85,7 @@
 (defn validate-workflow-graph [{:keys [catalog workflow]}]
   (let [g (planning/to-dependency-graph workflow)]
     (validate-workflow-intermediates g (catalog->type-task-names catalog #{:function}))
-    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))
-    (validate-workflow-outputs g (catalog->type-task-names catalog #{:output}))))
+    (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))))
 
 (defn validate-workflow [job]
   (validate-workflow-graph job)
