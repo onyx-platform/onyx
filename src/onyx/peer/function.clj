@@ -24,11 +24,10 @@
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
 (defn compress-segment [next-tasks catalog segment path]
-  (let [segment (apply dissoc segment (:exclusions path))]
-    {:compressed (compress segment)
-     :hash-group (reduce (fn [groups t]
-                           (assoc groups t (group-message segment catalog t)))
-                         {} next-tasks)}))
+  {:segment (assoc segment :message (apply dissoc (:message segment) (:exclusions path)))
+   :hash-group (reduce (fn [groups t]
+                         (assoc groups t (group-message (:message segment) catalog t)))
+                       {} next-tasks)})
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
@@ -50,7 +49,7 @@
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task
            onyx.core/result-paths]
     :as event}]
-  (let [next-tasks (:egress-ids serialized-task)
+  (let [next-tasks (keys (:egress-ids serialized-task))
         compressed-msgs (map (fn [[result path]]
                                (compress-segment next-tasks catalog result path))
                              (map vector results result-paths))]
@@ -60,21 +59,21 @@
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
   (if (seq (:onyx.core/compressed event))
     (let [replica @(:onyx.core/replica event)]
-      (doseq [task-id (vals (:egress-ids (:onyx.core/serialized-task event)))]
+      (doseq [[task-name task-id] (:egress-ids (:onyx.core/serialized-task event))]
         (let [peers (get-in replica [:allocations job-id task-id])
               active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)]
           (when (seq active-peers)
-            (let [grouped (group-by :hash-group (:onyx.core/compressed event))
+            (let [grouped (group-by (comp #(get % task-name) :hash-group) (:onyx.core/compressed event))
                   scattered (get grouped nil)
                   scattered-target (rand-nth active-peers)
                   scattered-link (operation/peer-link event scattered-target :send-peer-site)]
-              (onyx.extensions/send-messages messenger event scattered-link (map :compressed scattered))
+              (onyx.extensions/send-messages messenger event scattered-link (compress (map :segment scattered)))
 
               (doseq [k (filter identity (keys grouped))]
                 (let [messages (get grouped k)
                       target (nth active-peers (mod (.hashCode k) (count active-peers)))
                       target-link (operation/peer-link event target :send-peer-site)]
-                  (onyx.extensions/send-messages messenger event target-link (map :compressed messages)))))))))
+                  (onyx.extensions/send-messages messenger event target-link (compress (map :segment messages))))))))))
     {}))
 
 (defmethod p-ext/seal-resource :default

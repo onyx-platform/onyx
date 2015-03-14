@@ -123,7 +123,7 @@
     (map
      (fn [segment]
        (choose-output-paths compiled-flow-conditions event segment
-                            (keys (:egress-queues serialized-task))))
+                            (keys (:egress-ids serialized-task))))
      (:onyx.core/results event))}))
 
 (defn inject-batch-resources [event]
@@ -174,7 +174,7 @@
                   {:onyx.core/results [] :onyx.core/children {}}
                   (map vector batch decompressed)))]
       (ack-messages rets)
-      rets)
+      (merge rets (output-paths rets)))
     (merge event {:onyx.core/results []})))
 
 (defn compress-batch [event]
