@@ -219,18 +219,21 @@
        (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
           conditions)))
 
-(defn run-task-lifecycle [init-event kill-ch]
-  (loop [event init-event]
-    (when (first (alts!! [kill-ch] :default true))
-      (-> event
-          (inject-batch-resources)
-          (read-batch)
-          (decompress-batch)
-          (apply-fn)
-          (compress-batch)
-          (write-batch)
-          (close-batch-resources))
-      (recur init-event))))
+(defn run-task-lifecycle [init-event kill-ch ex-f]
+  (try
+    (loop [event init-event]
+      (when (first (alts!! [kill-ch] :default true))
+        (-> event
+            (inject-batch-resources)
+            (read-batch)
+            (decompress-batch)
+            (apply-fn)
+            (compress-batch)
+            (write-batch)
+            (close-batch-resources))
+        (recur init-event)))
+    (catch Exception e
+      (ex-f e))))
 
 (defn listen-for-sealer [job task init-event seal-ch outbox-ch]
   ;; TODO: only launch for output tasks
@@ -296,7 +299,7 @@
         (release-messages! messenger pipeline-data)
         (thread (forward-completion-calls! pipeline-data completion-ch))
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
-        (thread (run-task-lifecycle pipeline-data kill-ch))
+        (thread (run-task-lifecycle pipeline-data kill-ch ex-f))
 
         (assoc component :pipeline-data pipeline-data :seal-ch seal-resp-ch))
       (catch Exception e
