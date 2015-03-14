@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.aeron
     (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [warn] :as timbre]
+              [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
@@ -87,19 +87,22 @@
           acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
           completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
 
-      (future (try (.accept (consumer 10) send-subscriber) (catch Exception e (warn e))))
-      (future (try (.accept (consumer 10) acker-subscriber) (catch Exception e (warn e))))
-      (future (try (.accept (consumer 10) completion-subscriber) (catch Exception e (warn e))))
+      (future (try (.accept (consumer 10) send-subscriber) (catch Exception e (fatal e))))
+      (future (try (.accept (consumer 10) acker-subscriber) (catch Exception e (fatal e))))
+      (future (try (.accept (consumer 10) completion-subscriber) (catch Exception e (fatal e))))
       
       (assoc component :driver driver :channel channel :send-stream-id send-stream-id
              :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id
-             :release-ch release-ch)))
+             :release-ch release-ch :context ctx :aeron aeron)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Aeron")
 
+    (.close (:aeron component))
     (CloseHelper/quietClose (:driver component))
+
     (close! (:release-ch component))
+
     (assoc component :driver nil :channel nil :release-ch nil)))
 
 (defn aeron [opts]
@@ -124,7 +127,9 @@
   [messenger event {:keys [channel stream-id]}]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)]
-    (.addPublication aeron channel stream-id)))
+    {:ctx ctx
+     :conn aeron
+     :pub (.addPublication aeron channel stream-id)}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -144,7 +149,7 @@
         compressed (compress messages)
         len (count compressed)
         unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
     (while (not (offer-f)))))
 
 (defmethod extensions/internal-ack-message AeronConnection
@@ -152,7 +157,7 @@
   (let [compressed (compress {:id message-id :completion-id completion-id :ack-val ack-val})
         len (count compressed)
         unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
     (while (not (offer-f)))))
 
 (defmethod extensions/internal-complete-message AeronConnection
@@ -160,10 +165,11 @@
   (let [compressed (compress {:id id})
         len (count compressed)
         unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer peer-link unsafe-buffer 0 len))]
+        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
     (while (not (offer-f)))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
-  {})
+  (.close (:pub peer-link))
+  (.close (:conn peer-link)) {})
 
