@@ -20,9 +20,9 @@
 
 (def output (atom []))
 
-(def in-chan (chan 1000))
+(def in-chan (chan 1000000))
 
-(def out-chan (chan (sliding-buffer 1000)))
+(def out-chan (chan (sliding-buffer 1000000)))
 
 (defmethod l-ext/inject-lifecycle-resources :in
   [_ _] {:core.async/chan in-chan})
