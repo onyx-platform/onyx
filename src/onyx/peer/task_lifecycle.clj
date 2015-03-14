@@ -12,8 +12,7 @@
               [onyx.peer.function :as function]
               [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
-              [onyx.extensions :as extensions]
-              [onyx.plugin.hornetq]))
+              [onyx.extensions :as extensions]))
 
 (def restartable-exceptions [])
 
