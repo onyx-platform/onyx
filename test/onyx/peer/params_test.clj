@@ -11,7 +11,9 @@
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config (assoc (:peer-config config) :onyx/id id))
+(def peer-config (assoc (:peer-config config)
+                   :onyx/id id
+                   :onyx.peer/fn-params {:add [42]}))
 
 (def env (onyx.api/start-env env-config))
 

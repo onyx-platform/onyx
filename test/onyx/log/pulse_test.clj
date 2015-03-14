@@ -12,11 +12,7 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id})
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def env (onyx.api/start-env env-config))
 
@@ -61,7 +57,7 @@
 
 (extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id a-id})
 
-(def conn (zk/connect (:address (:zookeeper config))))
+(def conn (zk/connect (:zookeeper/address (:env-config config))))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
 

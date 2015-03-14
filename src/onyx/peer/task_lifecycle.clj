@@ -10,10 +10,8 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
-              [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
-              [onyx.extensions :as extensions]
-              [onyx.plugin.hornetq]))
+              [onyx.extensions :as extensions]))
 
 (def restartable-exceptions [])
 
@@ -124,7 +122,7 @@
     (map
      (fn [segment]
        (choose-output-paths compiled-flow-conditions event segment
-                            (keys (:egress-queues serialized-task))))
+                            (keys (:egress-ids serialized-task))))
      (:onyx.core/results event))}))
 
 (defn inject-batch-resources [event]
@@ -135,19 +133,20 @@
   (let [rets (tag-each-message (merge event (p-ext/read-batch event)))]
     (when (= (:onyx/type (:onyx.core/task-map event)) :input)
       (doseq [m (:onyx.core/batch rets)]
-        (go (try (<! (timeout 60000))
+        (go (try (<! (timeout (or (:onyx/pending-timeout (:onyx.core/task-map event)) 60000)))
                  (when (p-ext/pending? rets (:id m))
-                   (p-ext/replay-message event (:id m)))
+                   (p-ext/retry-message event (:id m)))
                  (catch Exception e
                    (taoensso.timbre/warn e))))))
     rets))
 
 (defn decompress-batch [event]
-  (let [rets (merge event (p-ext/decompress-batch event))]
+  ;; TODO: Messages are already decompressed, need to rework the interface.
+  (let [rets (merge event {:onyx.core/decompressed (:onyx.core/batch event)})]
     (if (sentinel-found? rets)
       (do (if (p-ext/drained? rets)
             (complete-job rets)
-            (p-ext/replay-message rets (sentinel-id rets)))
+            (p-ext/retry-message rets (sentinel-id rets)))
           (strip-sentinel rets))
       rets)))
 
@@ -158,7 +157,7 @@
                  (reduce
                   (fn [rets [raw thawed]]
                     (let [new-segments (p-ext/apply-fn event (:message thawed))
-                          new-segments (if coll? new-segments) new-segments (vector new-segments)
+                          new-segments (if (sequential? new-segments) new-segments (vector new-segments))
                           new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
                           tagged (apply acker/prefuse-vals new-ack-vals)
                           results (map (fn [segment ack-val]
@@ -174,7 +173,7 @@
                   {:onyx.core/results [] :onyx.core/children {}}
                   (map vector batch decompressed)))]
       (ack-messages rets)
-      rets)
+      (merge rets (output-paths rets)))
     (merge event {:onyx.core/results []})))
 
 (defn compress-batch [event]
@@ -220,18 +219,21 @@
        (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
           conditions)))
 
-(defn run-task-lifecycle [init-event kill-ch]
-  (loop [event init-event]
-    (when (first (alts!! [kill-ch] :default true))
-      (-> event
-          (inject-batch-resources)
-          (read-batch)
-          (decompress-batch)
-          (apply-fn)
-          (compress-batch)
-          (write-batch)
-          (close-batch-resources))
-      (recur init-event))))
+(defn run-task-lifecycle [init-event kill-ch ex-f]
+  (try
+    (loop [event init-event]
+      (when (first (alts!! [kill-ch] :default true))
+        (-> event
+            (inject-batch-resources)
+            (read-batch)
+            (decompress-batch)
+            (apply-fn)
+            (compress-batch)
+            (write-batch)
+            (close-batch-resources))
+        (recur init-event)))
+    (catch Exception e
+      (ex-f e))))
 
 (defn listen-for-sealer [job task init-event seal-ch outbox-ch]
   ;; TODO: only launch for output tasks
@@ -297,7 +299,7 @@
         (release-messages! messenger pipeline-data)
         (thread (forward-completion-calls! pipeline-data completion-ch))
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
-        (thread (run-task-lifecycle pipeline-data kill-ch))
+        (thread (run-task-lifecycle pipeline-data kill-ch ex-f))
 
         (assoc component :pipeline-data pipeline-data :seal-ch seal-resp-ch))
       (catch Exception e

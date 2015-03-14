@@ -87,10 +87,8 @@
         segments))))
 
 (defmethod extensions/send-messages HttpKitWebSockets
-  [messenger event peer-link]
-  (let [messages (:onyx.core/compressed event)
-        compressed-batch (compress messages)]
-    (ws/send-msg peer-link compressed-batch)))
+  [messenger event peer-link compressed-batch]
+  (ws/send-msg peer-link compressed-batch))
 
 (defmethod extensions/internal-ack-message HttpKitWebSockets
   [messenger event peer-link message-id completion-id ack-val]

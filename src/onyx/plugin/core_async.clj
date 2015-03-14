@@ -12,9 +12,12 @@
 (defmethod p-ext/read-batch [:input :core.async]
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
            core.async/pending-messages] :as event}]
-  (let [batch-size (:onyx/batch-size task-map)
+  (let [pending (count (keys @pending-messages))
+        max-pending (or (:onyx/max-pending task-map) 10000)
+        batch-size (:onyx/batch-size task-map)
+        max-segments (min (- max-pending pending) batch-size)
         ms (or (:onyx/batch-timeout task-map) 50)
-        batch (->> (range batch-size)
+        batch (->> (range max-segments)
                    (map (fn [_] {:id (java.util.UUID/randomUUID)
                                 :input :core.async
                                 :message (first (alts!! [retry-ch chan (timeout ms)] :priority true))}))
@@ -66,7 +69,7 @@
 
 (defmethod p-ext/seal-resource [:output :core.async]
   [{:keys [core.async/chan]}]
-  (>!! cchan :done))
+  (>!! chan :done))
 
 (defn take-segments!
   "Takes segments off the channel until :done is found.

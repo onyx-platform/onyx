@@ -4,7 +4,7 @@
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(def entry (create-log-entry :submit-job {:id :a}))
+(def entry (create-log-entry :submit-job {:id :a :tasks [:t1]}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
 
@@ -12,7 +12,8 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/greedy})
+(def old-replica {:job-scheduler :onyx.job-scheduler/greedy
+                  :peers [:p1]})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
