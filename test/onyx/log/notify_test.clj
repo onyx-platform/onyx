@@ -12,7 +12,7 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def env (onyx.api/start-env env-config))
 
