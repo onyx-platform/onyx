@@ -10,7 +10,6 @@
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
-              [onyx.peer.aggregate :as aggregate]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]))
 
@@ -158,7 +157,7 @@
                  (reduce
                   (fn [rets [raw thawed]]
                     (let [new-segments (p-ext/apply-fn event (:message thawed))
-                          new-segments (if coll? new-segments) new-segments (vector new-segments)
+                          new-segments (if (sequential? new-segments) new-segments (vector new-segments))
                           new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
                           tagged (apply acker/prefuse-vals new-ack-vals)
                           results (map (fn [segment ack-val]
