@@ -3,7 +3,7 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.compression.nippy :refer [decompress]]
+              [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron]
              [uk.co.real_logic.aeron Aeron$Context]
