@@ -21,7 +21,6 @@
                  [io.netty/netty-all "4.0.26.Final"]
                  [http-kit "2.1.17"]
                  [gloss "0.2.4" :exclusions [manifold]]
-                 [org.hornetq/hornetq-core-client "2.4.0.Final" :exclusions [io.netty/netty-all]]
                  [aleph "0.4.0-beta3"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
