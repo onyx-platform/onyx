@@ -11,17 +11,12 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id})
+(def env-config (assoc (:env-config config) :onyx/id id))
 
 (def peer-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :onyx/id onyx-id
-   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
-   :onyx.messaging/impl :http-kit-websockets})
+  (assoc (:peer-config config)
+    :onyx/id id
+    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
 
@@ -121,7 +116,7 @@
 
 (fact "the peers evenly balance" true => true)
 
-(def conn (zk/connect (:address (:zookeeper config))))
+(def conn (zk/connect (:zookeeper/address (:env-config config))))
 
 (def id (last (get (get (:allocations replica-1) j1) task-b)))
 

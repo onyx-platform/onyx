@@ -106,7 +106,7 @@
                              :subject "b"
                              :observer "d"})
 
-(def conn (zk/connect (:address (:zookeeper config))))
+(def conn (zk/connect (:zookeeper/address (:env-config config))))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
 
