@@ -28,6 +28,20 @@
         (= messages (protocol/read-buf (protocol/build-msg-buf messages))))
       => true)
 
+(fact (let [messages {:type protocol/messages-type-id
+                      :messages '({:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
+                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
+                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
+                                   :message {}
+                                   :ack-val 729233382010058362})}]
+        (= messages (protocol/read-buf (protocol/build-msg-buf messages))))
+      => true)
+
+;; TODO: investigate why a payload with 0 segments would ever be sent
+(fact (let [messages {:type protocol/messages-type-id
+                      :messages '()}]
+        (= messages (protocol/read-buf (protocol/build-msg-buf messages))))
+      => true)
 
 ;;;;
 ;;; GLOSS TESTS

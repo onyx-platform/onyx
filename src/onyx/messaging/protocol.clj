@@ -1,11 +1,16 @@
 (ns ^:no-doc onyx.messaging.protocol
   (:require [onyx.compression.nippy :refer [compress decompress]]
             [gloss.io :as io]
+            [taoensso.timbre :as timbre]
             [gloss.core :as g])
   (:import [java.util UUID]
            [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator ByteBufAllocator]))
 
+;; FIXME: CAN USE HEADERLESS?!
 ;; RAW NIO IMPL
+
+
+;; TODO should be able to use unsigneds on size fields etc
 
 (defn byte-buffer [size]
   (.heapBuffer ^ByteBufAllocator UnpooledByteBufAllocator/DEFAULT size))
@@ -22,88 +27,103 @@
 (def ack-type-id ^byte (byte 1))
 (def completion-type-id ^byte (byte 2))
 
-; msg type byte, id uuid 
-(def completion-msg-length 17)
-; msg type byte, id uuid, completion-id uuid, ack-val long
-(def ack-msg-length 41)
+(def type-header-length ^int (int 1))
+; id uuid 
+(def completion-msg-length ^int (int 16))
+; id uuid, completion-id uuid, ack-val long
+(def ack-msg-length ^int (int 40))
 ; message length without nippy segments
 ; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long), nippy-byte-count (int)
-(def message-base-length 60)
+(def message-base-length ^int (int 60))
+(def messages-base-length ^int (int 8)) ; messages packet with 0 messages in it
 
 ; minimum amount of data we can possibly successfully read from a buf
 ; is message type + a completion msg
-(def min-readable-buf-size completion-msg-length)
+(def min-readable-buf-size (+ type-header-length messages-base-length))
+
+(def completion-payload-length ^int (+ completion-msg-length type-header-length))
 
 (defn build-completion-msg-buf [id] 
-  (let [buf ^ByteBuf (byte-buffer completion-msg-length)] 
+  (let [buf ^ByteBuf (byte-buffer completion-payload-length)] 
     (.writeByte buf completion-type-id)
     (write-uuid buf id)))
 
-(defn write-message-msg [^ByteBuf buf {:keys [id acker-id completion-id ack-val message]}]
-  (write-uuid buf id)
-  (write-uuid buf acker-id)
-  (write-uuid buf completion-id)
-  (.writeLong buf ack-val)
-  ; this could probably be a short
-  (.writeInt buf (int (count message))) 
-  (doall
-    (map (fn [b]
-           (.writeByte buf b))
-         message)))
-
-(defn build-messages-msg-buf [messages] 
-  (let [compressed-messages (map (fn [msg]
-                                   (update-in msg [:message] compress))
-                                 messages)
-        buf-size (+ 1 ; message type 
-                    4 ; full payload size
-                    4 ; message count
-                    (* (count messages) message-base-length)
-                    ; fressian compressed segments
-                    (apply + (map (comp count :message) compressed-messages)))
-        buf ^ByteBuf (byte-buffer buf-size)] 
-    ; Might have to write total length here so we can tell whether the whole message is in
-    (.writeByte buf messages-type-id) ; message type
-    ; need the buf-size so we know whether the full payload has arrived
-    (.writeInt buf (int buf-size))
-    (.writeInt buf (int (count compressed-messages))) ; number of messages
-    (doall
-      (map (partial write-message-msg buf)
-           compressed-messages))
-    buf))
+(def ack-payload-length ^int (+ ack-msg-length type-header-length))
 
 (defn build-ack-msg-buf [id completion-id ack-val] 
-  (let [buf ^ByteBuf (byte-buffer ack-msg-length)] 
+  (let [^ByteBuf buf (byte-buffer ack-payload-length)] 
     (.writeByte buf ack-type-id)
     (write-uuid buf id)
     (write-uuid buf completion-id)
     (.writeLong buf ack-val)))
 
-(defn build-msg-buf [msg]
-  (let [t ^byte (:type msg)] 
-    (cond 
-      (= t messages-type-id) (build-messages-msg-buf (:messages msg))
-      (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
-      (= t completion-type-id) (build-completion-msg-buf (:id msg)))))
+
+(defn write-message-msg [^ByteBuf buf {:keys [id acker-id completion-id ack-val message old-message]}]
+  (write-uuid buf id)
+  (write-uuid buf acker-id)
+  (write-uuid buf completion-id)
+  (.writeLong buf ack-val)
+  ; this could probably be a short
+  (.writeInt buf (alength ^bytes message)) 
+  (.writeBytes buf ^bytes message))
 
 (defn read-message-buf [^ByteBuf buf]
+  ;(timbre/info t-id "Before any reads on buf:" buf)
   (let [id (take-uuid buf)
+        ;_ (timbre/info t-id " Message read, id: " id " from buf " buf)
         acker-id (take-uuid buf)
         completion-id (take-uuid buf)
         ack-val (.readLong buf)
+        ;_ (timbre/info t-id " id " id " Ack val is " ack-val)
         message-size (.readInt buf)
-        ; may be slow
-        message (decompress (into-array Byte/TYPE (repeatedly message-size #(.readByte buf))))]
+        ;_ (timbre/info "Message size is " message-size)
+        arr (byte-array message-size)
+        _ (.readBytes buf arr)
+        message (decompress arr)]
     {:id id 
      :acker-id acker-id 
      :completion-id completion-id 
      :ack-val ack-val 
      :message message}))
 
+(defn build-messages-msg-buf [messages] 
+  (let [compressed-messages (map (fn [msg]
+                                   (update-in msg [:message] compress))
+                                 messages)
+        buf-size-without-header (+ 4 ; message count int
+                                   (* (count messages) message-base-length)
+                                   ; nippy compressed segments
+                                   (apply + (map (fn [m]
+                                                   (alength ^bytes (:message m)))  
+                                                 compressed-messages)))
+        ;_ (timbre/info "Wrote bytes after header: " buf-size-without-header)
+        buf-size (+ type-header-length
+                    4 ; payload size int
+                    buf-size-without-header)
+        buf ^ByteBuf (byte-buffer buf-size)] 
+    ; Might have to write total length here so we can tell whether the whole message is in
+    (.writeByte buf messages-type-id) ; message type header
+    ; need the buf-size so we know whether the full payload has arrived
+    ;(timbre/info "Buf size without header " buf-size-without-header)
+    (.writeInt buf (int buf-size-without-header))
+    (.writeInt buf (int (count compressed-messages))) ; number of messages
+    (doseq [msg compressed-messages]
+      (write-message-msg buf msg))
+    ;(timbre/info "Should have been " (= buf-size (.writerIndex buf)))
+    buf))
+
 (defn read-messages-buf [^ByteBuf buf]
-  {:type messages-type-id 
-   :messages (let [message-count (.readInt buf)]
-               (repeatedly message-count #(read-message-buf buf)))})
+  (let [bytes-after-header (.readInt buf)
+        ;_ (timbre/info id "READ: 4, bytes after header byte ")
+        n-after-header (.readableBytes buf)
+        ;_ (timbre/info id "READ MESSAGES BUF, after header: " bytes-after-header " vs " n-after-header " buf " buf " id ")
+        ] 
+    (if (<= bytes-after-header n-after-header)
+      {:type messages-type-id 
+       :messages (let [;_ (timbre/info id "Before message count has " buf " id ")
+                       message-count (.readInt buf)]
+                   ;(timbre/info id "Payload has " message-count " messages " buf " id ")
+                   (doall (repeatedly message-count #(read-message-buf buf))))})))
 
 (defn read-ack-buf [^ByteBuf buf]
   {:type ack-type-id
@@ -115,20 +135,29 @@
   {:type completion-type-id 
    :id (take-uuid buf)})
 
+(defn build-msg-buf [msg]
+  (let [t ^byte (:type msg)] 
+    (cond 
+      (= t messages-type-id) (build-messages-msg-buf (:messages msg))
+      (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
+      (= t completion-type-id) (build-completion-msg-buf (:id msg)))))
 
 (defn read-buf [^ByteBuf buf]
-  (let [n-left (- (.writerIndex buf) (.readerIndex buf))]
+  ;(timbre/info id "ENTER READ BYTE " buf " id ")
+  (let [n-left (.readableBytes buf)]
     (if (>= n-left min-readable-buf-size)
-      (let [msg-type ^byte (.readByte buf)] 
-        (cond (= msg-type messages-type-id) 
-              (if (<= (.readInt buf) n-left)
-                (read-messages-buf buf))
-              (= msg-type ack-type-id) 
-              (if (<= ack-msg-length n-left)
-                (read-ack-buf buf))
-              (= msg-type completion-type-id) 
-              (if (<= completion-msg-length n-left)
-                (read-completion-buf buf)))))))
+      (do ;(timbre/info id "READ: 1, reading header type byte" buf)
+          (let [msg-type ^byte (.readByte buf)] 
+            ;(timbre/info "Reading msg type " msg-type)
+            (cond (= msg-type messages-type-id) 
+                  (read-messages-buf buf)
+                  (= msg-type ack-type-id) 
+                  (if (<= ack-msg-length (.readableBytes buf))
+                    (read-ack-buf buf))
+                  (= msg-type completion-type-id) 
+                  (if (<= completion-msg-length (.readableBytes buf))
+                    (read-completion-buf buf))
+                  :else (throw (Exception. (str "Invalid message type: " msg-type)))))))))
 
 ;;; GLOSS IMPL
 ;;;;;; USED BY ALEPH MESSAGING

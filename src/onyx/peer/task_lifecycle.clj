@@ -144,6 +144,7 @@
 
 (defn decompress-batch [event]
   (let [rets (merge event (p-ext/decompress-batch event))]
+    ;(println "decompress batch " event " rets " rets)
     (if (sentinel-found? rets)
       (do (if (p-ext/drained? rets)
             (complete-job rets)
