@@ -55,13 +55,16 @@
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
-  (let [replica @(:onyx.core/replica event)]
-    (doseq [task-id (vals (:egress-ids (:onyx.core/serialized-task event)))]
-      (let [peers (get-in replica [:allocations job-id task-id])
-            active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-            target (rand-nth active-peers)
-            link (operation/peer-link event target :send-peer-site)]
-        (onyx.extensions/send-messages messenger event link)))))
+  (if (seq (:onyx.core/compressed event))
+    (let [replica @(:onyx.core/replica event)]
+      (doseq [task-id (vals (:egress-ids (:onyx.core/serialized-task event)))]
+        (let [peers (get-in replica [:allocations job-id task-id])
+              active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)]
+          (when (seq active-peers)
+            (let [target (rand-nth active-peers)
+                  link (operation/peer-link event target :send-peer-site)]
+              (onyx.extensions/send-messages messenger event link))))))
+    {}))
 
 (defmethod p-ext/seal-resource :default
   [{:keys [] :as event}]
