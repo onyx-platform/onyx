@@ -144,9 +144,8 @@
         segments))))
 
 (defmethod extensions/send-messages AeronConnection
-  [messenger event peer-link]
-  (let [compressed (:onyx.core/compressed event)
-        len (count compressed)
+  [messenger event peer-link compressed]
+  (let [len (count compressed)
         unsafe-buffer (UnsafeBuffer. compressed)
         offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
     (while (not (offer-f)))))

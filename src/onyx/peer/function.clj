@@ -64,9 +64,17 @@
         (let [peers (get-in replica [:allocations job-id task-id])
               active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)]
           (when (seq active-peers)
-            (let [target (rand-nth active-peers)
-                  link (operation/peer-link event target :send-peer-site)]
-              (onyx.extensions/send-messages messenger event link))))))
+            (let [grouped (group-by :hash-group (:onyx.core/compressed event))
+                  scattered (get grouped nil)
+                  scattered-target (rand-nth active-peers)
+                  scattered-link (operation/peer-link event scattered-target :send-peer-site)]
+              (onyx.extensions/send-messages messenger event scattered-link (map :compressed scattered))
+
+              (doseq [k (filter identity (keys grouped))]
+                (let [messages (get grouped k)
+                      target (nth active-peers (mod (.hashCode k) (count active-peers)))
+                      target-link (operation/peer-link event target :send-peer-site)]
+                  (onyx.extensions/send-messages messenger event target-link (map :compressed messages)))))))))
     {}))
 
 (defmethod p-ext/seal-resource :default
