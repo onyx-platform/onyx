@@ -4,11 +4,14 @@
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
 - New messaging transport: http-kit websockets
-- New messaging transport: Netty websockets
+- New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
-- New feature: functions can take an entire batch of segments as their input with catalog key `:onyx/batch?` true
+- New feature: Functions can take an entire batch of segments as their input with catalog key `:onyx/batch?` true
+- New feature: Flow conditions handle exceptions as predicates
+- New feature: Flow conditions may post-transform exception values into new segments
+- New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value
 - Added metadata to all public API functions indicating which Onyx version they were added in
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent

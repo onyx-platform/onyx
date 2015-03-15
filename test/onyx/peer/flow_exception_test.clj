@@ -1,4 +1,4 @@
-(ns onyx.peer.batch-function-test
+(ns onyx.peer.flow-exception-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -15,12 +15,24 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 100)
+(def batch-size 10)
 
-(def batch-size 5)
+(def in-chan (chan 100))
 
-(defn my-inc [segments]
-  :ignored)
+(def out-chan (chan (sliding-buffer 100)))
+
+(doseq [x (range 20)]
+  (>!! in-chan x))
+
+(>!! in-chan :done)
+(close! in-chan)
+
+(defn my-inc [{:keys [n] :as segment}]
+  (cond (even? n)
+        (throw (ex-info "Number was even" {:error :even :n n}))
+        (= 5 n)
+        (throw (ex-info "Number was 5" {:error :five :n n}))
+        :else segment))
 
 (def catalog
   [{:onyx/name :in
@@ -32,9 +44,9 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.batch-function-test/my-inc
+    :onyx/fn :onyx.peer.flow-exception-test/my-inc
     :onyx/type :function
-    :onyx/side-effects-only? true
+    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -45,36 +57,54 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def workflow [[:in :inc] [:inc :out]])
-
-(def in-chan (chan (inc n-messages)))
-
-(def out-chan (chan (sliding-buffer (inc n-messages))))
-
 (defmethod l-ext/inject-lifecycle-resources :in
   [_ _] {:core.async/chan in-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :out
   [_ _] {:core.async/chan out-chan})
 
-(doseq [n (range n-messages)]
-  (>!! in-chan {:n n}))
+(def workflow
+  [[:in :inc]
+   [:inc :out]])
 
-(>!! in-chan :done)
+(def flow-conditions
+  [{:flow/from :inc
+    :flow/to [:out]
+    :flow/short-circuit? true
+    :flow/thrown-exception? true
+    :flow/predicate [:onyx.peer.flow-exception-test/even-exception?]
+    :flow/post-transform :onyx.peer.flow-exception-test/transform-even}
+
+   {:flow/from :inc
+    :flow/to [:out]
+    :flow/short-circuit? true
+    :flow/thrown-exception? true
+    :flow/predicate [:onyx.peer.flow-exception-test/five-exception?]
+    :flow/post-transform :onyx.peer.flow-exception-test/transform-five}])
+
+(defn even-exception? [event e]
+  (= (:error e) :even))
+
+(defn five-exception? [event e]
+  (= (:error e) :five))
+
+(defn transform-even [event e]
+  {:error? true :value (:n (ex-data e))})
+
+(defn transform-five [event e]
+  {:error? true :value "abc"})
 
 (def v-peers (onyx.api/start-peers 3 peer-config))
 
 (onyx.api/submit-job
  peer-config
- {:catalog catalog
-  :workflow workflow
+ {:catalog catalog :workflow workflow
+  :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (take-segments! out-chan))
 
-(let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
+(prn results)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
