@@ -20,7 +20,7 @@
 (def batch-size 5)
 
 (defn my-inc [segments]
-  (map (fn [segment] (update-in segment [:n] inc)) segments))
+  :ignored)
 
 (def catalog
   [{:onyx/name :in
@@ -34,7 +34,7 @@
    {:onyx/name :inc
     :onyx/fn :onyx.peer.batch-function-test/my-inc
     :onyx/type :function
-    :onyx/batch? true
+    :onyx/side-effects-only? true
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -72,7 +72,7 @@
 
 (def results (take-segments! out-chan))
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 

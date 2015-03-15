@@ -54,25 +54,17 @@
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
   (merge
    event
-   (if children
-     (do
-       (doseq [raw-segment (keys children)]
-         (when (:ack-val raw-segment)
-           (let [link (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)]
-             (extensions/internal-ack-message
-              (:onyx.core/messenger event)
-              event
-              link
-              (:id raw-segment)
-              (:completion-id raw-segment)
-              (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment))))))
-       {})
-     {})))
-
-(defn segments->ack-values [event segments]
-  (if (= :output (:onyx/type (:onyx.core/task-map event)))
-    (repeat (count segments) nil)
-    (map (fn [x] (acker/gen-ack-value)) segments)))
+   (when (and children (not (:onyx/side-effects-only? (:onyx.core/task-map event))))
+     (doseq [raw-segment (keys children)]
+       (when (:ack-val raw-segment)
+         (let [link (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)]
+           (extensions/internal-ack-message
+            (:onyx.core/messenger event)
+            event
+            link
+            (:id raw-segment)
+            (:completion-id raw-segment)
+            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment)))))))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
@@ -164,16 +156,20 @@
    :message next-seg
    :ack-val (acker/gen-ack-value)})
 
-(defn collect-next-segments [event seg]
-  (let [segments (p-ext/apply-fn event (:message seg))]
+(defn copy-segment [prev-seg]
+  (assoc (build-next-segment prev-seg (:message prev-seg))
+    :ack-val (:ack-val prev-seg)))
+
+(defn collect-next-segments [event input]
+  (let [segments (p-ext/apply-fn event input)]
     (if (sequential? segments) segments (vector segments))))
 
-(defn apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (merge
    event
    (reduce
     (fn [rets thawed]
-      (let [segments (collect-next-segments event thawed)
+      (let [segments (collect-next-segments event (:message thawed))
             results (map (partial build-next-segment thawed) segments)
             tagged (apply acker/prefuse-vals (map :ack-val results))]
         (-> rets
@@ -182,6 +178,18 @@
     {:onyx.core/results []
      :onyx.core/children {}}
     decompressed)))
+
+(defn apply-fn-batch [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+  ;; Batched functions intentionally ignore their outputs.
+  (let [segments (map :message decompressed)]
+    (p-ext/apply-fn event segments)
+    (let [results (map copy-segment decompressed)]
+      (merge event {:onyx.core/results results}))))
+
+(defn apply-fn [event]
+  (if (:onyx/side-effects-only? (:onyx.core/task-map event))
+    (apply-fn-batch event)
+    (apply-fn-single event)))
 
 (defn compress-batch [event]
   (merge event (p-ext/compress-batch event)))
