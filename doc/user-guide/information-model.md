@@ -67,10 +67,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### Maps with `:onyx/type` set to `:function` may optionally have these keys
 
-| key name           | type       | choices
-|--------------------|------------|----------
-|`:onyx/group-by-key`| `keyword`  | `any`
-|`:onyx/group-by-fn` | `keyword`  | `any`
+| key name           | type       | choices | default
+|--------------------|------------|---------|--------
+|`:onyx/group-by-key`| `keyword`  | `any`   |
+|`:onyx/group-by-fn` | `keyword`  | `any`   |
+|`:onyx/batch?`      | `boolean`  |         | `false`
 
 
 ### Flow Conditions

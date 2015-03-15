@@ -150,14 +150,14 @@
           (strip-sentinel rets))
       rets)))
 
-(defn apply-fn [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn apply-fn* [{:keys [onyx.core/batch onyx.core/decompressed] :as event} batch-f single-f]
   (if (seq decompressed)
-    (let [rets
+    (let [batch-result (batch-f event)
+          rets
           (merge event
                  (reduce
                   (fn [rets [raw thawed]]
-                    (let [new-segments (p-ext/apply-fn event (:message thawed))
-                          new-segments (if (sequential? new-segments) new-segments (vector new-segments))
+                    (let [new-segments (single-f event thawed batch-result)
                           new-ack-vals (map (fn [x] (acker/gen-ack-value)) new-segments)
                           tagged (apply acker/prefuse-vals new-ack-vals)
                           results (map (fn [segment ack-val]
@@ -175,6 +175,22 @@
       (ack-messages rets)
       (merge rets (output-paths rets)))
     (merge event {:onyx.core/results []})))
+
+(defn apply-fn [event]
+  (if (:onyx/batch? (:onyx.core/task-map event))
+    (apply-fn*
+     event
+     (fn [{:keys [onyx.core/decompressed] :as event}]
+       (let [new-segments (p-ext/apply-fn event (map :message decompressed))]
+         (if (sequential? new-segments) new-segments (vector new-segments))))
+     (fn [event thawed batch-result]
+       batch-result))
+    (apply-fn*
+     event
+     (fn [_] nil)
+     (fn [event thawed batch-result]
+       (let [new-segments (p-ext/apply-fn event (:message thawed))]
+         (if (sequential? new-segments) new-segments (vector new-segments)))))))
 
 (defn compress-batch [event]
   (merge event (p-ext/compress-batch event)))

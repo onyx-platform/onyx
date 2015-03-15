@@ -11,6 +11,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 - [Grouping & Aggregation](#grouping-&-aggregation)
 - [Group By Key](#group-by-key)
 - [Group By Function](#group-by-function)
+- [Batching](#batching)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -90,4 +91,27 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
  :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
  :onyx/batch-size 1000}
 ```
+
+#### Batching
+
+Sometimes you might be able to perform a function more efficiently over a batch of segments rather than processing one segment at a time, such as writing segments to a database in a non-output task. You can review the entire batch of segments as an argument to your task by setting `:onyx/batch?` to `true` in your catalog entry for your function.
+
+An example catalog entry:
+
+```clojure
+{:onyx/name :inc
+ :onyx/fn :onyx.peer.batch-function-test/my-inc
+ :onyx/type :function
+ :onyx/batch? true
+ :onyx/batch-size batch-size}
+```
+
+And an example catalog function to correspond to this entry:
+
+```clojure
+(defn my-inc [segments]
+  (map (fn [segment] (update-in segment [:n] inc)) segments))
+```
+
+The default value for this option is `false`.
 

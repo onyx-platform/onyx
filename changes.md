@@ -8,10 +8,11 @@
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
-- Added metadata to all public API functions indicating which Onyx version they were added in.
+- New feature: functions can take an entire batch of segments as their input with catalog key `:onyx/batch?` true
+- Added metadata to all public API functions indicating which Onyx version they were added in
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent
-- The last task in a workflow no longer needs to be an `output` task.
+- The last task in a workflow no longer needs to be an `output` task
 
 #### 0.5.3
 
