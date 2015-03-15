@@ -4,7 +4,7 @@
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
 - New messaging transport: http-kit websockets
-- New messaging transport: Netty websockets
+- New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
