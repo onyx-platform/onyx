@@ -13,7 +13,14 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]))
 
+;; TODO: Might want to allow a peer to reboot from an
+;; exception without killing the job, e.g. transient
+;; connection failure to ZooKeeper.
 (def restartable-exceptions [])
+
+(defn exception? [e]
+  (let [classes (supers (class e))]
+    (boolean (some #{java.lang.Exception} classes))))
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
@@ -55,43 +62,54 @@
   (merge
    event
    (when (and children (not (:onyx/side-effects-only? (:onyx.core/task-map event))))
-     (doseq [raw-segment (keys children)]
-       (when (:ack-val raw-segment)
-         (let [link (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)]
+     (doseq [message (keys children)]
+       (when (and (:ack-val message) (not (exception? (:message message))))
+         (let [link (operation/peer-link event (:acker-id message) :acker-peer-site)]
            (extensions/internal-ack-message
             (:onyx.core/messenger event)
             event
             link
-            (:id raw-segment)
-            (:completion-id raw-segment)
-            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment)))))))))
+            (:id message)
+            (:completion-id message)
+            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val message) (get children message)))))))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
         :else (clojure.set/union (into #{} all) (into #{} to-add))))
 
+(defn route-success-output-paths
+  [event compiled-flow-conditions segment serialized-task downstream]
+  (reduce
+   (fn [{:keys [paths exclusions] :as all} entry]
+     (if ((:flow/predicate entry) [event segment])
+       (if (:flow/short-circuit? entry)
+         (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+                   :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+         {:paths (join-output-paths paths (:flow/to entry) downstream)
+          :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+       all))
+   {:paths #{} :exclusions #{}}
+   compiled-flow-conditions))
+
+(defn route-exception-output-paths
+  [event compiled-flow-conditions segment serialized-task downstream]
+  )
+
 (defn route-output-paths
-  [{:keys [onyx.core/serialized-task onyx.core/compiled-flow-conditions] :as event}]
-  (merge
-   event
-   {:onyx.core/result-paths
-    (let [downstream (keys (:egress-ids serialized-task))]
+  [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
+    :as event}]
+  (let [downstream (keys (:egress-ids serialized-task))]
+    (merge
+     event
+     {:onyx.core/result-paths
       (map
        (fn [segment]
-         (reduce
-          (fn [{:keys [paths exclusions] :as all} entry]
-            (if ((:flow/predicate entry) [event segment])
-              (if (:flow/short-circuit? entry)
-                (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
-                          :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
-                {:paths (join-output-paths paths (:flow/to entry) downstream)
-                 :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
-              all))
-          {:paths #{} :exclusions #{}}
-          compiled-flow-conditions)
+         (if (exception? segment)
+           (route-exception-output-paths event compiled-ex-fcs segment serialized-task downstream)
+           (route-success-output-paths event compiled-norm-fcs segment serialized-task downstream))
          {:paths downstream})
-       (:onyx.core/results event)))}))
+       (:onyx.core/results event))})))
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
@@ -161,7 +179,7 @@
     :ack-val (:ack-val prev-seg)))
 
 (defn collect-next-segments [event input]
-  (let [segments (p-ext/apply-fn event input)]
+  (let [segments (try (p-ext/apply-fn event input) (catch Exception e e))]
     (if (sequential? segments) segments (vector segments))))
 
 (defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
