@@ -116,11 +116,6 @@
           (.addLast "int32-frame-encoder" (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
-(defn add-component! [^CompositeByteBuf composite ^ByteBuf buf]
-  (.addComponent composite buf)
-  (.writerIndex composite (+ ^int (.writerIndex buf)
-                             ^int (.writerIndex composite))))
-
 (defn handle [buf-recvd-ch msg]
   (.retain ^ByteBuf msg)
   (>!! buf-recvd-ch msg))
@@ -137,38 +132,14 @@
     #_(when-let [response (handle buf-recvd-ch message)]
         (.writeAndFlush ctx response))))
 
-; "Provide native implementation of Netty for improved performance on
-; Linux only. Provide pure-Java implementation of Netty on all other
-; platforms. See http://netty.io/wiki/native-transports.html"
-(def netty-implementation
-  (if (and (.contains (. System getProperty "os.name") "Linux")
-           (.contains (. System getProperty "os.arch") "amd64"))
-    {:event-loop-group-fn #(EpollEventLoopGroup.)
-     :channel EpollServerSocketChannel}
-    {:event-loop-group-fn #(NioEventLoopGroup.)
-     :channel NioServerSocketChannel}))
-
-(defn derefable
-  "A simple wrapper for a netty future which on deref just calls
-  (syncUninterruptibly f), and returns the future's result."
-  [^Future f]
-  (reify clojure.lang.IDeref
-    (deref [_]
-      (.syncUninterruptibly f)
-      (.get f))))
-
 (defn get-default-event-loop-threads
   "Determines the default number of threads to use for a Netty EventLoopGroup.
    This mimics the default used by Netty as of version 4.1."
   []
   (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
+    ; TODO: evaluate whether too many threads are used.
+    ; reducing can improve performance
     (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" (* cpu-count 2)))))
-
-(defn ^Future shutdown-event-executor-group
-  "Gracefully shut down an event executor group. Returns a derefable future."
-  [^EventExecutorGroup g]
-  ; 10ms quiet period, 10s timeout.
-  (derefable (.shutdownGracefully g 10 1000 TimeUnit/MILLISECONDS)))
 
 (def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
 
@@ -201,14 +172,17 @@
 (defn start-netty-server
   [host port buf-recvd-ch]
   (let [bootstrap (ServerBootstrap.)
-        event-loop-group-fn (:event-loop-group-fn netty-implementation)
+        channel (if (epoll?)
+                  EpollServerSocketChannel
+                  NioServerSocketChannel)
+
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
                                             (ImmediateEventExecutor/INSTANCE))
         initializer (channel-initializer-done (gen-tcp-handler channel-group (create-server-handler buf-recvd-ch)))] 
     ; Configure bootstrap
     (doto bootstrap
       (.group boss-group worker-group)
-      (.channel (:channel netty-implementation))
+      (.channel channel)
       (.option ChannelOption/SO_REUSEADDR true)
       (.option ChannelOption/TCP_NODELAY true)
       (.option ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
@@ -296,8 +270,8 @@
              (try 
                (let [decompressed (protocol/read-buf buf)]
                  (>!! parsed-ch decompressed)
-                 (.release ^ByteBuf buf) ; undo retain added in server handler
-                 )
+                 ; undo retain added in server handler
+                 (.release ^ByteBuf buf))
                (catch Throwable t
                  (println t)
                  (timbre/fatal t (str "exception in go loop." buf " " (.getId (Thread/currentThread))))))
@@ -313,7 +287,7 @@
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
-          ip "127.0.0.1"
+          ip "0.0.0.0"
           {:keys [port server-shutdown-fn]} (start-netty-server ip 0 buf-recv-ch)
           buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
           app-loop (app daemon parsed-ch inbound-ch release-ch)]
@@ -367,38 +341,15 @@
           segments)
         segments))))
 
-;;; TODO, try this?
-;;;; (defn allocate [x]
-;  (if  (instance? Channel x)
-;        (-> ^Channel x .alloc .ioBuffer)
-;            (-> ^ChannelHandlerContext x .alloc .ioBuffer)))
-
-(defn wrap-future
-  [^Future f]
-  (when f
-    (if (.isSuccess f)
-      (timbre/info (.getId (Thread/currentThread)) " was successful top level")
-      (.addListener f
-                    (reify GenericFutureListener
-                      (operationComplete [_ _]
-                        (cond
-                          (.isSuccess f)
-                          (timbre/info (.getId (Thread/currentThread)) " was succesful")
-
-                          (.isCancelled f)
-                          (timbre/info (.getId (Thread/currentThread))" was cancelled")
-
-                          (some? (.cause f))
-                          (timbre/info (.getId (Thread/currentThread)) (.cause f))
-
-                          :else
-                          (timbre/info (.getId (Thread/currentThread)) " future in unknown state"))))))))
+(defn allocator [^Channel x]
+  (.alloc x))
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
   (try
     (.writeAndFlush peer-link 
-                    ^ByteBuf (protocol/build-messages-msg-buf messages) 
+                    ^ByteBuf (protocol/build-messages-msg-buf (allocator peer-link) 
+                                                              messages) 
                     (.voidPromise ^Channel peer-link))
     (catch Exception e 
       (timbre/error e))))
@@ -406,13 +357,16 @@
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)
+                  ^ByteBuf (protocol/build-ack-msg-buf (allocator peer-link) 
+                                                       message-id 
+                                                       completion-id 
+                                                       ack-val)
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
   [messenger event id ^Channel peer-link]
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-completion-msg-buf id)
+                  ^ByteBuf (protocol/build-completion-msg-buf (allocator peer-link) id)
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
