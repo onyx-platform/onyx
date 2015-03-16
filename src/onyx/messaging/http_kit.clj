@@ -87,8 +87,8 @@
         segments))))
 
 (defmethod extensions/send-messages HttpKitWebSockets
-  [messenger event peer-link compressed-batch]
-  (ws/send-msg peer-link compressed-batch))
+  [messenger event peer-link batch]
+  (ws/send-msg peer-link (compress batch)))
 
 (defmethod extensions/internal-ack-message HttpKitWebSockets
   [messenger event peer-link message-id completion-id ack-val]
