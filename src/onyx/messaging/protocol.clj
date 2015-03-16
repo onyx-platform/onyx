@@ -1,12 +1,9 @@
 (ns ^:no-doc onyx.messaging.protocol
   (:require [onyx.compression.nippy :refer [compress decompress]]
-            [gloss.io :as io]
-            [taoensso.timbre :as timbre]
-            [gloss.core :as g])
+            [taoensso.timbre :as timbre])
   (:import [java.util UUID]
            [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator]))
 
-;; FIXME: CAN USE HEADERLESS?!
 ;; RAW NIO IMPL
 ;; TODO should be able to use unsigneds on size fields etc
 
@@ -141,108 +138,3 @@
           (if (<= completion-msg-length (.readableBytes buf))
             (read-completion-buf buf))
           :else (throw (Exception. (str "Invalid message type: " msg-type))))))
-
-;;; GLOSS IMPL
-;;;;;; USED BY ALEPH MESSAGING
-
-(defn longs->uuid [[lsbs msbs]]
-  (java.util.UUID. msbs lsbs))
-
-(defn uuid->longs [^UUID uuid]
-  (vector (.getLeastSignificantBits uuid)
-          (.getMostSignificantBits uuid)))
-
-(def char-frame
-  (g/compile-frame (g/repeated :byte :prefix :none)))
-
-(def send-frame
-  (g/compile-frame 
-    {:type :byte
-     :messages (g/finite-frame :int32 (g/repeated 
-                                        {:id [:int64 :int64]
-                                         :acker-id [:int64 :int64]
-                                         :completion-id [:int64 :int64]
-                                         :message (g/finite-frame :int32 (g/repeated :byte :prefix :none))
-                                         :ack-val :int64}                        
-                                        :prefix :none))}))
-
-(def ack-frame
-  (g/compile-frame {:type :byte
-                    :id [:int64 :int64]
-                    :completion-id [:int64 :int64]
-                    :ack-val :int64}))
-
-
-(def completion-frame
-  (g/compile-frame {:type :byte
-                    :id [:int64 :int64]}))
-
-(g/defcodec onyx-codec
-  (g/compile-frame
-   (g/header
-    :ubyte
-    (fn [header-byte]
-      (cond (= header-byte messages-type-id)
-            send-frame
-            (= header-byte ack-type-id)
-            ack-frame 
-            (= header-byte completion-type-id)
-            completion-frame))
-    :type)))
-
-(defn send-messages->frame [messages]
-  {:type messages-type-id
-   :messages (map (fn [msg] 
-                    (-> msg 
-                        (update-in [:id] uuid->longs)
-                        (update-in [:acker-id] uuid->longs)
-                        (update-in [:completion-id] uuid->longs)
-                        (update-in [:message] compress)))
-                  messages)})
-
-(defn frame->send-messages [frame]
-  (update-in frame
-             [:messages]
-             (fn [messages] 
-               (map (fn [msg]
-                      (-> msg 
-                          (update-in [:id] longs->uuid)
-                          (update-in [:acker-id] longs->uuid)
-                          (update-in [:completion-id] longs->uuid)
-                          (update-in [:message] (comp decompress
-                                                      (partial into-array Byte/TYPE)))))
-                    messages))))
-
-(defn ack-msg->frame [msg]
-  (-> msg 
-      (update-in [:id] uuid->longs)
-      (update-in [:completion-id] uuid->longs)
-      (assoc :type ack-type-id)))
-
-(defn frame->ack-message [msg]
-  (-> msg 
-      (update-in [:id] longs->uuid)
-      (update-in [:completion-id] longs->uuid)))
-
-(defn completion-msg->frame [msg]
-  (-> msg
-      (update-in [:id] uuid->longs)
-      (assoc :type completion-type-id)))
-
-(defn frame->completion-msg [msg]
-  (-> msg 
-      (update-in [:id] longs->uuid)))
-
-(defn frame->msg [{:keys [type] :as frame}]
-  (cond (= messages-type-id type) 
-        (frame->send-messages frame)
-        (= ack-type-id type)
-        (frame->ack-message frame)
-        (= completion-type-id type) 
-        (frame->completion-msg frame)))
-
-(def codec-protocol
-  (g/compile-frame
-    onyx-codec
-    identity
-    frame->msg))

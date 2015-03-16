@@ -1,17 +1,11 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
     (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop]]
               [com.stuartsierra.component :as component]
-              [org.httpkit.server :as server]
               [taoensso.timbre :as timbre]
-              [gloss.io :as io]
-              [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.protocol :as protocol]
+              [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [compress decompress]]
-              [onyx.extensions :as extensions]
-              [manifold.deferred :as d]
-              [manifold.stream :as s]
-              [gloss.io :as io]
-              [clojure.edn :as edn])
+              [onyx.extensions :as extensions])
     (:import [java.net InetSocketAddress]
              [java.util.concurrent TimeUnit Executors]
              [io.netty.channel.epoll 
@@ -57,8 +51,7 @@
               DefaultThreadFactory]
              [io.netty.util ResourceLeakDetector ResourceLeakDetector$Level]
              [io.netty.bootstrap Bootstrap ServerBootstrap]
-             [io.netty.channel.socket.nio NioServerSocketChannel]
-             [org.jboss.netty.buffer ChannelBuffers]))
+             [io.netty.channel.socket.nio NioServerSocketChannel]))
 
 (defn leak-detector-level! [level]
   (ResourceLeakDetector/setLevel
