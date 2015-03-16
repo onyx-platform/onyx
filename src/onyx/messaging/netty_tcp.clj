@@ -13,15 +13,13 @@
               [gloss.io :as io]
               [clojure.edn :as edn])
     (:import [java.net InetSocketAddress]
-             [java.util.concurrent Executors]
+             [java.util.concurrent TimeUnit Executors]
              [io.netty.channel.epoll 
               Epoll 
               EpollEventLoopGroup
               EpollServerSocketChannel
               EpollSocketChannel]
-             [io.netty.util.concurrent GenericFutureListener Future DefaultThreadFactory]
-             [java.util.concurrent TimeUnit Executors]
-             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator ByteBufAllocator CompositeByteBuf]
+             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator CompositeByteBuf]
              [java.nio ByteBuffer]
              [io.netty.channel.socket.nio 
               NioServerSocketChannel
@@ -78,15 +76,23 @@
 (defn epoll? []
   (Epoll/isAvailable))
 
+(defn int32-frame-decoder
+  []
+  ; Offset 0, 4 byte header, skip those 4 bytes.
+  (LengthFieldBasedFrameDecoder. Integer/MAX_VALUE, 0, 4, 0, 4))
+
+(defn int32-frame-encoder
+  []
+  (LengthFieldPrepender. 4))
+
 (defn gen-tcp-handler
   [^ChannelGroup channel-group handler]
   (proxy [ChannelInboundHandlerAdapter] []
-    (channelActive [^ChannelHandlerContext ctx]
+    (channelActive [ctx]
       (timbre/info "Channel active")
       (.add channel-group (.channel ctx)))
     (channelRead [^ChannelHandlerContext ctx ^Object message]
       (try
-        ;(timbre/info "Channel read " message)
         (handler ctx message)
         (catch java.nio.channels.ClosedChannelException e
           (timbre/warn "channel closed"))))
@@ -96,8 +102,8 @@
     (isSharable [] true)))
 
 (defn event-executor
-  "Creates a new netty execution handler for processing events. Defaults to 1
-  thread per core."
+  "Creates a new netty execution handler for processing events. 
+  Defaults to 1 thread per core."
   []
   (DefaultEventExecutorGroup. (.. Runtime getRuntime availableProcessors)))
 
@@ -109,32 +115,29 @@
     (initChannel [ch]
       (let [pipeline (.pipeline ^Channel ch)]
         (doto pipeline 
+          (.addLast "int32-frame-decoder" (int32-frame-decoder))
+          (.addLast "int32-frame-encoder" (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
 (defn add-component! [^CompositeByteBuf composite ^ByteBuf buf]
-  ;(timbre/info "Added to composite buf: " composite buf)
   (.addComponent composite buf)
   (.writerIndex composite (+ ^int (.writerIndex buf)
                              ^int (.writerIndex composite))))
 
 (defn handle [buf-recvd-ch msg]
-  (println "got message " msg)
   (.retain ^ByteBuf msg)
   (>!! buf-recvd-ch msg))
-
-(defn new-composite-buffer [] 
-  ;(timbre/info "creating new composite buffer")
-  (.compositeBuffer (UnpooledByteBufAllocator. false)))
 
 (defn create-server-handler
   "Given a core, a channel, and a message, applies the message to 
   core and writes a response back on this channel."
   [buf-recvd-ch] 
-  (timbre/info "CREATED SERVER HANDLER")
-    (fn [^ChannelHandlerContext ctx ^Object message]
-      ;(timbre/info "TCP HANDLER MESSAGE " message)
-      ; Actually handle request and reply if any
-      (when-let [response (handle buf-recvd-ch message)]
+  (fn [^ChannelHandlerContext ctx ^Object message]
+    ;(timbre/info "TCP HANDLER MESSAGE " message)
+
+    ; No need for any reply
+    (handle buf-recvd-ch message)
+    #_(when-let [response (handle buf-recvd-ch message)]
         (.writeAndFlush ctx response))))
 
 ; "Provide native implementation of Netty for improved performance on
@@ -157,11 +160,78 @@
       (.syncUninterruptibly f)
       (.get f))))
 
+(defn get-default-event-loop-threads
+  "Determines the default number of threads to use for a Netty EventLoopGroup.
+   This mimics the default used by Netty as of version 4.1."
+  []
+  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
+    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" (* cpu-count 2)))))
+
 (defn ^Future shutdown-event-executor-group
   "Gracefully shut down an event executor group. Returns a derefable future."
   [^EventExecutorGroup g]
   ; 10ms quiet period, 10s timeout.
   (derefable (.shutdownGracefully g 10 1000 TimeUnit/MILLISECONDS)))
+
+(def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
+
+(def client-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
+
+(def ^String server-event-thread-pool-name "onyx-netty-worker-event-pool")
+
+(def worker-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
+
+(def ^String server-event-thread-pool-name "onyx-netty-boss-event-pool")
+
+(def boss-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
+
+
+(defn start-netty-server
+  [host port buf-recvd-ch]
+  (let [bootstrap (ServerBootstrap.)
+        event-loop-group-fn (:event-loop-group-fn netty-implementation)
+        channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
+                                            (ImmediateEventExecutor/INSTANCE))
+        initializer (channel-initializer-done (gen-tcp-handler channel-group (create-server-handler buf-recvd-ch)))] 
+    ; Configure bootstrap
+    (doto bootstrap
+      (.group boss-group worker-group)
+      (.channel (:channel netty-implementation))
+      (.option ChannelOption/SO_REUSEADDR true)
+      (.option ChannelOption/TCP_NODELAY true)
+      (.option ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
+      (.childOption ChannelOption/SO_REUSEADDR true)
+      (.childOption ChannelOption/TCP_NODELAY true)
+      (.childOption ChannelOption/SO_KEEPALIVE true)
+      (.childOption ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
+      (.childHandler initializer))
+    ; Start bootstrap
+    (let [ch (->> (InetSocketAddress. host port)
+                  (.bind bootstrap)
+                  (.sync)
+                  (.channel))
+          _ (.add channel-group ch)
+          assigned-port (.. ch localAddress getPort)]
+      (timbre/info "TCP server" host assigned-port "online")
+      {:port assigned-port
+       :server-shutdown-fn (fn killer []
+                             (.. channel-group close awaitUninterruptibly)
+                             (timbre/info "TCP server" host port "shut down"))})))
 
 (defn client-handler [msg]
   (timbre/info "TCP client handler"))
@@ -182,34 +252,11 @@
       (timbre/info "Initializing client channel")
       (try (let [pipeline (.pipeline ^Channel ch)]
              (doto pipeline 
+               (.addLast "int32-frame-decoder" (int32-frame-decoder))
+               (.addLast "int32-frame-encoder" (int32-frame-encoder))
                (.addLast "handler" handler)))
            (catch Exception e
              (timbre/fatal e))))))
-
-(defn get-default-event-loop-threads
-  "Determines the default number of threads to use for a Netty EventLoopGroup.
-  This mimics the default used by Netty as of version 4.1."
-  []
-  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
-    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" (* cpu-count 2)))))
-
-(def ^String client-event-thread-pool-name "aleph-netty-client-event-pool")
-
-(def client-group
-  (let [thread-count (get-default-event-loop-threads)
-        thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)]
-    (if (epoll?)
-      (EpollEventLoopGroup. (long thread-count) thread-factory)
-      (NioEventLoopGroup. (long thread-count) thread-factory))))
-
-(def ^String server-event-thread-pool-name "aleph-netty-server-event-pool")
-
-(def server-group
-  (let [thread-count (get-default-event-loop-threads)
-        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
-    (if (epoll?)
-      (EpollEventLoopGroup. (long thread-count) thread-factory)
-      (NioEventLoopGroup. (long thread-count) thread-factory))))
 
 (defn create-client [host port]
   (let [channel (if (epoll?)
@@ -228,8 +275,6 @@
     (go-loop []
              (try (let [msg (<!! parsed-ch)
                         t ^byte (:type msg)]
-                    (timbre/info "RECEIVED PARSED: " msg)
-                    (println "RECEIVED PARSED: " msg)
                     (cond (= t protocol/messages-type-id) 
                           (doseq [message (:messages msg)]
                             (>!! inbound-ch message))
@@ -247,74 +292,18 @@
                     (throw e)))
              (recur)))
 
-(defn start-netty-server
-  [host port buf-recvd-ch]
-  (let [channel (if (epoll?)
-                  EpollSocketChannel
-                  NioSocketChannel)
-        bootstrap (ServerBootstrap.)
-        event-loop-group-fn (:event-loop-group-fn netty-implementation)
-        boss-group (event-loop-group-fn)
-        worker-group (event-loop-group-fn)
-        channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
-                                            (ImmediateEventExecutor/INSTANCE))
-        initializer (channel-initializer-done (gen-tcp-handler channel-group (create-server-handler buf-recvd-ch)))] 
-    ; Configure bootstrap
-    (doto bootstrap
-      ;(.group server-group)
-      (.group worker-group boss-group)
-      (.channel channel)
-      (.option ChannelOption/SO_REUSEADDR true)
-      (.option ChannelOption/TCP_NODELAY true)
-      (.childOption ChannelOption/SO_REUSEADDR true)
-      (.childOption ChannelOption/TCP_NODELAY true)
-      (.childOption ChannelOption/SO_KEEPALIVE true)
-      (.childHandler initializer))
-    ; Start bootstrap
-    (let [ch (->> (InetSocketAddress. host port)
-                  (.bind bootstrap)
-                  (.sync)
-                  (.channel))
-          _ (.add channel-group ch)
-          assigned-port (.. ch localAddress getPort)]
-      (timbre/info "TCP server" host assigned-port "online")
-      {:port assigned-port
-       :server-shutdown-fn (fn killer []
-                             (.. channel-group close awaitUninterruptibly)
-                             ; Shut down workers and boss concurrently.
-                             (let [w (shutdown-event-executor-group worker-group)
-                                   b (shutdown-event-executor-group boss-group)]
-                               @w
-                               @b)
-                             (timbre/info "TCP server" host port "shut down"))})))
-
-(defn buf-recv-loop [buf-recv-ch composite-buf parsed-ch]
+; FIXME; don't want a whole go-loop here, can probably parse above in the handler
+(defn buf-recv-loop [buf-recv-ch parsed-ch]
   (go-loop []
            (let [buf (<!! buf-recv-ch)]
              (try 
-               (add-component! composite-buf buf)
-               (.release ^ByteBuf buf) ; undo retain added in server handler
-               (.markReaderIndex ^CompositeByteBuf composite-buf)
-               ;(timbre/info "Making a read on " id " buf " composite-buf)
-               (loop [decompressed (protocol/read-buf composite-buf)]
-                 (if decompressed
-                   (do (timbre/info "Read message " decompressed)
-                       ;(timbre/info "After buf: " composite-buf)
-                       ;(timbre/info "Readable bytes after: " (.readableBytes composite-buf) composite-buf)
-                       ;(timbre/info "After read on id " id composite-buf)
-                       (.discardReadComponents ^CompositeByteBuf composite-buf)
-                       ;(timbre/info "After clear on id " id composite-buf)
-                       ;(timbre/info "Decompressed is " decompressed)
-                       ;(timbre/info "Readable bytes after discard : " (.readableBytes composite-buf) composite-buf)
-                       (>!! parsed-ch decompressed)
-                       (when-not (zero? (.readableBytes ^CompositeByteBuf composite-buf))
-                         (.markReaderIndex ^CompositeByteBuf composite-buf)
-                         (recur (protocol/read-buf composite-buf))))
-                   (.resetReaderIndex ^CompositeByteBuf composite-buf)))
-               ;(do (timbre/info "Can't perform a full read: " composite-buf)))) 
+               (let [decompressed (protocol/read-buf buf)]
+                 (>!! parsed-ch decompressed)
+                 (.release ^ByteBuf buf) ; undo retain added in server handler
+                 )
                (catch Throwable t
                  (println t)
-                 (timbre/fatal t (str "exception in go loop." composite-buf))))
+                 (timbre/fatal t (str "exception in go loop." buf " " (.getId (Thread/currentThread))))))
                  (recur))))
 
 (defrecord NettyTcpSockets [opts]
@@ -329,14 +318,12 @@
           daemon (:acking-daemon component)
           ip "127.0.0.1"
           {:keys [port server-shutdown-fn]} (start-netty-server ip 0 buf-recv-ch)
-          composite-buf (.retain ^CompositeByteBuf (new-composite-buffer))
-          buf-loop (buf-recv-loop buf-recv-ch composite-buf parsed-ch)
+          buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
           app-loop (app daemon parsed-ch inbound-ch release-ch)]
       (assoc component 
              :app-loop app-loop 
              :server-shutdown-fn server-shutdown-fn 
              :buf-loop buf-loop
-             :composite-buf composite-buf
              :ip ip 
              :port port 
              :release-ch release-ch)))
@@ -346,7 +333,6 @@
     ((:server-shutdown-fn component))
     (close! (:app-loop component))
     (close! (:buf-loop component))
-    (.release ^CompositeByteBuf (:composite-buf component))
     (close! (:release-ch component))
     (assoc component :release-ch nil)))
 
@@ -368,6 +354,7 @@
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event [host port]]
+  ;(timbre/info "Created client " host port)
   (create-client host port))
 
 ; Reused as is from HttpKitWebSockets. Probably something to extract.
@@ -383,21 +370,53 @@
           segments)
         segments))))
 
+;;; TODO, try this?
+;;;; (defn allocate [x]
+;  (if  (instance? Channel x)
+;        (-> ^Channel x .alloc .ioBuffer)
+;            (-> ^ChannelHandlerContext x .alloc .ioBuffer)))
+
+(defn wrap-future
+  [^Future f]
+  (when f
+    (if (.isSuccess f)
+      (timbre/info (.getId (Thread/currentThread)) " was successful top level")
+      (.addListener f
+                    (reify GenericFutureListener
+                      (operationComplete [_ _]
+                        (cond
+                          (.isSuccess f)
+                          (timbre/info (.getId (Thread/currentThread)) " was succesful")
+
+                          (.isCancelled f)
+                          (timbre/info (.getId (Thread/currentThread))" was cancelled")
+
+                          (some? (.cause f))
+                          (timbre/info (.getId (Thread/currentThread)) (.cause f))
+
+                          :else
+                          (timbre/info (.getId (Thread/currentThread)) " future in unknown state"))))))))
+
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link]
-  (timbre/info "Sending messages: " (:onyx.core/compressed event))
-  (.writeAndFlush peer-link ^ByteBuf (protocol/build-messages-msg-buf (:onyx.core/compressed event))))
+  (try
+    (.writeAndFlush peer-link 
+                    ^ByteBuf (protocol/build-messages-msg-buf (:onyx.core/compressed event)) 
+                    (.voidPromise ^Channel peer-link))
+    (catch Exception e 
+      (timbre/error e))))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]
-  (timbre/info "Sending ack message: " {:id message-id :completion-id completion-id :ack-val ack-val})
-  (.writeAndFlush peer-link ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)))
+  (.writeAndFlush peer-link 
+                  ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)
+                  (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
   [messenger event id ^Channel peer-link]
-  (timbre/info "Sending completion message: " {:id id})
   (.writeAndFlush peer-link 
-                  (protocol/build-completion-msg-buf id)))
+                  ^ByteBuf (protocol/build-completion-msg-buf id)
+                  (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
   [messenger event ^Channel peer-link]

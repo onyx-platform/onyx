@@ -267,7 +267,7 @@
                            :onyx.core/compiled-flow-conditions (compile-flow-conditions flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
-                           :onyx.core/params (resolve-calling-params catalog-entry  opts)
+                           :onyx.core/params (resolve-calling-params catalog-entry opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer

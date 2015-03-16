@@ -19,7 +19,8 @@
   {:zookeeper/address (:address (:zookeeper config))
    :onyx/id id
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :http-kit-websockets})
+   :onyx.messaging/impl :netty-tcp})
+   ;:onyx.messaging/impl :http-kit-websockets})
 
 (def env (onyx.api/start-env env-config))
 
