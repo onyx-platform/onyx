@@ -7,7 +7,7 @@
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.http-kit :refer [http-kit-websockets]]
             [onyx.messaging.aleph :refer [aleph-tcp-sockets]]
-            ;[onyx.messaging.aeron :refer [aeron]]
+            [onyx.messaging.aeron :refer [aeron]]
             [onyx.messaging.netty-tcp :refer [netty-tcp-sockets]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
@@ -33,8 +33,7 @@
   {:http-kit-websockets http-kit-websockets
    :netty-tcp netty-tcp-sockets
    :aleph-tcp aleph-tcp-sockets
-   ;:aeron aeron
-   })
+   :aeron aeron})
 
 (defn rethrow-component [f]
   (try
