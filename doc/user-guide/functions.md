@@ -11,6 +11,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 - [Grouping & Aggregation](#grouping-&-aggregation)
 - [Group By Key](#group-by-key)
 - [Group By Function](#group-by-function)
+- [Side Effects](#side-effects)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -90,4 +91,28 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
  :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
  :onyx/batch-size 1000}
 ```
+
+#### Side Effects
+
+Sometimes you might be able to perform a function more efficiently over a batch of segments rather than processing one segment at a time, such as writing segments to a database in a non-output task. You can receive the entire batch of segments as an argument to your task by setting `:onyx/side-effects-only?` to `true` in your catalog entry for your function. Onyx will *ignore* the output of your function and pass the same segments that you received downstream. Hence, functions with this option set to `true` may *not* appear as the leaf node in a workflow. Note that you can perform side effects in *any* function, but the utility of this feature is that you receive the entire batch in one shot. Onyx ignores your output because it would make it impossible to track which specific messages are children of particular upstream messages - breaking Onyx's fault tolerance feature.
+
+An example catalog entry:
+
+```clojure
+{:onyx/name :inc
+ :onyx/fn :onyx.peer.batch-function-test/my-inc
+ :onyx/type :function
+ :onyx/side-effects-only? true
+ :onyx/batch-size batch-size}
+```
+
+And an example catalog function to correspond to this entry:
+
+```clojure
+(defn my-inc [segments]
+  (prn segments)
+  :ignored)
+```
+
+The default value for this option is `false`.
 

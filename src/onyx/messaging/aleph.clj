@@ -118,9 +118,8 @@
         segments))))
 
 (defmethod extensions/send-messages AlephTcpSockets
-  [messenger event peer-link]
-  (let [messages (:onyx.core/compressed event)]
-    (s/put! peer-link (protocol/send-messages->frame messages))))
+  [messenger event peer-link messages]
+  (s/put! peer-link (protocol/send-messages->frame messages)))
 
 (defmethod extensions/internal-ack-message AlephTcpSockets
   [messenger event peer-link message-id completion-id ack-val]

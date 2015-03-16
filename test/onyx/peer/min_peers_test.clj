@@ -9,18 +9,9 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id id})
+(def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :onyx/id id
-   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :netty-tcp})
-   ;:onyx.messaging/impl :http-kit-websockets})
+(def peer-config (assoc (:peer-config config) :onyx/id id))
 
 (def env (onyx.api/start-env env-config))
 
@@ -60,10 +51,10 @@
 (def out-chan (chan (sliding-buffer (inc n-messages))))
 
 (defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/in-chan in-chan})
+  [_ _] {:core.async/chan in-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/out-chan out-chan})
+  [_ _] {:core.async/chan out-chan})
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))

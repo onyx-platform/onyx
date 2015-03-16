@@ -2,9 +2,7 @@
   "Public API extensions for the virtual peer data pipeline.")
 
 (defn task-type [task-map]
-  (if (or (:onyx/group-by-key task-map) (:onyx/group-by-fn task-map))
-    :aggregator
-    (:onyx/type task-map)))
+  (:onyx/type task-map))
 
 (defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
   [(task-type task-map) (:onyx/medium task-map)])
@@ -51,8 +49,8 @@
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 
-(defmulti ^{:added "0.6.0"} replay-message
-  "Releases a message id from storage and replays it."
+(defmulti ^{:added "0.6.0"} retry-message
+  "Releases a message id from the pending message pool and retries it."
   (fn [event message-id]
     (type-and-medium-dispatch event)))
 

@@ -47,11 +47,8 @@
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
-    (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+    (catch clojure.lang.ExceptionInfo e
       ;; ZooKeeper connection dropped, close out cleanly.
-      )
-    (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
-      ;; Same deal.
       )
     (catch Exception e
       (taoensso.timbre/info e))

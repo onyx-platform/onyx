@@ -9,20 +9,9 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def scheduler :onyx.job-scheduler/greedy)
+(def env-config (assoc (:env-config config) :onyx/id id))
 
-(def env-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id id
-   :onyx.peer/job-scheduler scheduler})
-
-(def peer-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :onyx/id id
-   :onyx.peer/job-scheduler scheduler
-   :onyx.messaging/impl :http-kit-websockets})
+(def peer-config (assoc (:peer-config config) :onyx/id id))
 
 (def env (onyx.api/start-env env-config))
 
@@ -43,22 +32,22 @@
 (def l-chan (chan (sliding-buffer (inc n-messages))))
 
 (defmethod l-ext/inject-lifecycle-resources :A
-  [_ _] {:core.async/in-chan a-chan})
+  [_ _] {:core.async/chan a-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :B
-  [_ _] {:core.async/in-chan b-chan})
+  [_ _] {:core.async/chan b-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :C
-  [_ _] {:core.async/in-chan c-chan})
+  [_ _] {:core.async/chan c-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :J
-  [_ _] {:core.async/out-chan j-chan})
+  [_ _] {:core.async/chan j-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :K
-  [_ _] {:core.async/out-chan k-chan})
+  [_ _] {:core.async/chan k-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :L
-  [_ _] {:core.async/out-chan l-chan})
+  [_ _] {:core.async/chan l-chan})
 
 (def a-segments
   (map (fn [n] {:n n})

@@ -55,9 +55,6 @@
               GenericFutureListener 
               Future 
               DefaultThreadFactory]
-             [io.netty.handler.codec.protobuf 
-              ProtobufDecoder
-              ProtobufEncoder]  
              [io.netty.util ResourceLeakDetector ResourceLeakDetector$Level]
              [io.netty.bootstrap Bootstrap ServerBootstrap]
              [io.netty.channel.socket.nio NioServerSocketChannel]
@@ -354,7 +351,7 @@
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event [host port]]
-  ;(timbre/info "Created client " host port)
+  (timbre/info "Created client " host port)
   (create-client host port))
 
 ; Reused as is from HttpKitWebSockets. Probably something to extract.
@@ -398,10 +395,10 @@
                           (timbre/info (.getId (Thread/currentThread)) " future in unknown state"))))))))
 
 (defmethod extensions/send-messages NettyTcpSockets
-  [messenger event ^Channel peer-link]
+  [messenger event ^Channel peer-link messages]
   (try
     (.writeAndFlush peer-link 
-                    ^ByteBuf (protocol/build-messages-msg-buf (:onyx.core/compressed event)) 
+                    ^ByteBuf (protocol/build-messages-msg-buf messages) 
                     (.voidPromise ^Channel peer-link))
     (catch Exception e 
       (timbre/error e))))

@@ -19,11 +19,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 ### Workflow
 
-- a single Clojure map which is EDN serializable/deserializable
-- all elements in the map are keywords
-- all elements in the map must correspond to an `:onyx/name` entry in the catalog
-- the outer-most keys of the map must have catalog entries of `:onyx/type` that map to `:input`
-- only innermost values of the map may have catalog entries of `:onyx/type` that map to `:output`
+- a single Clojure vector of vectores which is EDN serializable/deserializable
+- all elements in the inner vectors are keywords
+- all keywords must correspond to an `:onyx/name` entry in the catalog
+- the "root" keywords of the workflow must have catalog entries of `:onyx/type` that map to `:input`
+- the "leaf" values of the workflow must have catalog entries of `:onyx/type` that map to `:output`
 
 ### Catalog
 
@@ -40,17 +40,24 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### All maps may optionally have these keys
 
-| key name             | type       | choices                          | default
-|----------------------|------------|----------------------------------|--------
-|`:onyx/ident`         | `keyword`  | `any`                            |
-|`:onyx/batch-timeout` | `integer`  | `>= 0`                           | 1000
-|`:onyx/max-peers`     | `integer`  | `> 0`                            |
+| key name             | type       | choices    | default
+|----------------------|------------|------------|--------
+|`:onyx/ident`         | `keyword`  | `any`      |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`     | `1000`
+|`:onyx/max-peers`     | `integer`  | `> 0`      |
 
 #### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/medium`     | `keyword`  | `any`
+
+#### Maps with `:onyx/type` set to `:input` may optionally have these keys
+
+| key name              | type     | default
+|-----------------------|----------|--------
+|`:onyx/pending-timeout`|`integer` | `60000`
+|`:onyx/max-pending`    |`integer` | `10000`
 
 #### Maps with `:onyx/type` set to `:function` must have these keys
 
@@ -60,10 +67,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### Maps with `:onyx/type` set to `:function` may optionally have these keys
 
-| key name           | type       | choices
-|--------------------|------------|----------
-|`:onyx/group-by-key`| `keyword`  | `any`
-|`:onyx/group-by-fn` | `keyword`  | `any`
+| key name                 | type       | choices | default
+|--------------------------|------------|---------|--------
+|`:onyx/group-by-key`      | `keyword`  | `any`   |
+|`:onyx/group-by-fn`       | `keyword`  | `any`   |
+|`:onyx/side-effects-only?`| `boolean`  |         | `false`
 
 
 ### Flow Conditions
@@ -71,11 +79,14 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - a single Clojure vector which is EDN serializable/deserializable
 - all elements in the vector must be Clojure maps
 
-| key name             |type                          | optional?| default
-|----------------------|------------------------------|----------|--------
-|`:flow/from`          |`keyword`                     | no       |
-|`:flow/to`            |`:all`, `:none` or `[keyword]`| no       |
-|`:flow/predicate`     |`keyword` or `[keyword]`      | no       |
-|`:flow/exclude-keys`  |`[keyword]`                   | yes      | `[]`
-|`:flow/short-circuit?`|`boolean`                     | yes      |`false`
+| key name                |type                          | optional?| default
+|-------------------------|------------------------------|----------|--------
+|`:flow/from`             |`keyword`                     | no       |
+|`:flow/to`               |`:all`, `:none` or `[keyword]`| no       |
+|`:flow/predicate`        |`keyword` or `[keyword]`      | no       |
+|`:flow/exclude-keys`     |`[keyword]`                   | yes      | `[]`
+|`:flow/short-circuit?`   |`boolean`                     | yes      |`false`
+|`:flow/thrown-exception?`|`boolean`                     | yes      |`false`
+|`:flow/post-transform?`  |`keyword`                     | yes      |`nil`
+|`:flow/action?`          |`keyword`                     | yes      |`nil`
 

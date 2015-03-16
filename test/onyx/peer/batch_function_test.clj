@@ -1,8 +1,8 @@
-(ns onyx.peer.params-test
+(ns onyx.peer.batch-function-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -11,20 +11,16 @@
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config (assoc (:peer-config config)
-                   :onyx/id id
-                   :onyx.peer/fn-params {:add [42]}))
+(def peer-config (assoc (:peer-config config) :onyx/id id))
 
 (def env (onyx.api/start-env env-config))
 
-(def n-messages 1000)
+(def n-messages 100)
 
-(def batch-size 100)
+(def batch-size 5)
 
-(defn my-adder [factor {:keys [n] :as segment}]
-  (assoc segment :n (+ n factor)))
-
-(def workflow [[:in :add] [:add :out]])
+(defn my-inc [segments]
+  :ignored)
 
 (def catalog
   [{:onyx/name :in
@@ -35,9 +31,10 @@
     :onyx/max-peers 1
     :onyx/doc "Reads segments from a core.async channel"}
 
-   {:onyx/name :add
-    :onyx/fn :onyx.peer.params-test/my-adder
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.batch-function-test/my-inc
     :onyx/type :function
+    :onyx/side-effects-only? true
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -47,6 +44,8 @@
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
+
+(def workflow [[:in :inc] [:inc :out]])
 
 (def in-chan (chan (inc n-messages)))
 
@@ -67,12 +66,15 @@
 
 (onyx.api/submit-job
  peer-config
- {:catalog catalog :workflow workflow
+ {:catalog catalog
+  :workflow workflow
   :task-scheduler :onyx.task-scheduler/round-robin})
 
 (def results (take-segments! out-chan))
 
-(fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
+(let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

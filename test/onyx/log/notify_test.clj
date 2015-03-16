@@ -12,20 +12,7 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config
-  {:hornetq/mode :udp
-   :hornetq/server? true
-   :hornetq.server/type :embedded
-   :hornetq.udp/cluster-name (:cluster-name (:hornetq config))
-   :hornetq.udp/group-address (:group-address (:hornetq config))
-   :hornetq.udp/group-port (:group-port (:hornetq config))
-   :hornetq.udp/refresh-timeout (:refresh-timeout (:hornetq config))
-   :hornetq.udp/discovery-timeout (:discovery-timeout (:hornetq config))
-   :hornetq.embedded/config (:configs (:hornetq config))
-   :zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id})
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def env (onyx.api/start-env env-config))
 
@@ -119,7 +106,7 @@
                              :subject "b"
                              :observer "d"})
 
-(def conn (zk/connect (:address (:zookeeper config))))
+(def conn (zk/connect (:zookeeper/address (:env-config config))))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
 

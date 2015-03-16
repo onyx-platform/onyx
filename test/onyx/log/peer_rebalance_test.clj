@@ -11,17 +11,12 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :zookeeper/server? true
-   :zookeeper.server/port (:spawn-port (:zookeeper config))
-   :onyx/id onyx-id})
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def peer-config
-  {:zookeeper/address (:address (:zookeeper config))
-   :onyx/id onyx-id
-   :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
-   :onyx.messaging/impl :http-kit-websockets})
+  (assoc (:peer-config config)
+    :onyx/id onyx-id
+    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
 
@@ -64,16 +59,16 @@
 (def d-chan (chan (sliding-buffer 100)))
 
 (defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/in-chan a-chan})
+  [_ _] {:core.async/chan a-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :b
-  [_ _] {:core.async/out-chan b-chan})
+  [_ _] {:core.async/chan b-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/in-chan c-chan})
+  [_ _] {:core.async/chan c-chan})
 
 (defmethod l-ext/inject-lifecycle-resources :d
-  [_ _] {:core.async/out-chan d-chan})
+  [_ _] {:core.async/chan d-chan})
 
 (def j1
   (onyx.api/submit-job
@@ -121,7 +116,7 @@
 
 (fact "the peers evenly balance" true => true)
 
-(def conn (zk/connect (:address (:zookeeper config))))
+(def conn (zk/connect (:zookeeper/address (:env-config config))))
 
 (def id (last (get (get (:allocations replica-1) j1) task-b)))
 
