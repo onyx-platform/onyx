@@ -27,7 +27,7 @@
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
-        n (mod (.hashCode (:message m)) (count peers))]
+        n (mod (hash (:message m)) (count peers))]
     (assoc m :acker-id (nth peers n))))
 
 (defn add-completion-id [event m]
@@ -145,7 +145,7 @@
 (defn strip-sentinel [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (merge
    event
-   (when-let [k (.indexOf (map :message decompressed) :done)]
+   (when-let [k (.indexOf ^clojure.lang.LazySeq (map :message decompressed) :done)]
      {:onyx.core/batch (drop-nth k batch)
       :onyx.core/decompressed (drop-nth k decompressed)})))
 
