@@ -2,6 +2,7 @@
     (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close!]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
+              [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
@@ -15,27 +16,28 @@
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
-(defn handle-sent-message [inbound-ch buffer offset length header]
+(defn handle-sent-message-nippy-only [inbound-ch ^UnsafeBuffer buffer offset length header]
   (let [dst (byte-array length)]
     (.getBytes buffer offset dst)
     (let [thawed (decompress dst)]
-      (doseq [message dst]
+      (doseq [message thawed]
         (>!! inbound-ch message)))))
 
+(defn handle-sent-message [inbound-ch ^UnsafeBuffer buffer offset length header]
+  (let [messages (protocol/read-messages-buf buffer offset length)]
+    (doseq [message messages]
+      (>!! inbound-ch message))))
+
 (defn handle-acker-message [daemon buffer offset length header]
-  (let [dst (byte-array length)]
-    (.getBytes buffer offset dst)
-    (let [thawed (decompress dst)]
-      (acker/ack-message daemon
-                         (:id thawed)
-                         (:completion-id thawed)
-                         (:ack-val thawed)))))
+  (let [thawed (protocol/read-acker-message buffer offset)]
+    (acker/ack-message daemon
+                       (:id thawed)
+                       (:completion-id thawed)
+                       (:ack-val thawed))))
 
 (defn handle-completion-message [release-ch buffer offset length header]
-  (let [dst (byte-array length)]
-    (.getBytes buffer offset dst)
-    (let [thawed (decompress dst)]
-      (>!! release-ch (:id thawed)))))
+  (let [completion-id (protocol/read-completion buffer offset)]
+    (>!! release-ch completion-id)))
 
 (defn data-handler [f]
   (proxy [DataHandler] []
@@ -45,17 +47,22 @@
 (defn consumer [limit]
   (proxy [Consumer] []
     (accept [subscription]
+      ;; TODO: evaluate different backoff strategy and timings
       (let [idle-strategy (BackoffIdleStrategy.
-                           100 10
+                           100 
+                           10
                            (.toNanos TimeUnit/MICROSECONDS 1)
                            (.toNanos TimeUnit/MICROSECONDS 100))]
         (while true
-          (let [fragments-read (.poll subscription limit)]
+          (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
             (.idle idle-strategy fragments-read)))))))
 
 (def no-op-error-handler
   (proxy [Consumer] []
     (accept [_] (prn "Conductor is down."))))
+
+(def media-driver
+  (MediaDriver/launch))
 
 (defrecord AeronConnection [opts]
   component/Lifecycle
@@ -75,7 +82,6 @@
           acker-stream-id (rand-stream-id)
           completion-stream-id (rand-stream-id)
 
-          driver (MediaDriver/launch)
           ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
           aeron (Aeron/connect ctx)
 
@@ -87,11 +93,11 @@
           acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
           completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
 
-      (future (try (.accept (consumer 10) send-subscriber) (catch Exception e (fatal e))))
-      (future (try (.accept (consumer 10) acker-subscriber) (catch Exception e (fatal e))))
-      (future (try (.accept (consumer 10) completion-subscriber) (catch Exception e (fatal e))))
+      (future (try (.accept ^Consumer (consumer 10) send-subscriber) (catch Exception e (fatal e))))
+      (future (try (.accept ^Consumer (consumer 10) acker-subscriber) (catch Exception e (fatal e))))
+      (future (try (.accept ^Consumer (consumer 10) completion-subscriber) (catch Exception e (fatal e))))
       
-      (assoc component :driver driver :channel channel :send-stream-id send-stream-id
+      (assoc component :channel channel :send-stream-id send-stream-id
              :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id
              :release-ch release-ch :context ctx :aeron aeron)))
 
@@ -99,7 +105,7 @@
     (taoensso.timbre/info "Stopping Aeron")
 
     (.close (:aeron component))
-    (CloseHelper/quietClose (:driver component))
+    ;(CloseHelper/quietClose (:driver component))
 
     (close! (:release-ch component))
 
@@ -126,10 +132,9 @@
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger event {:keys [channel stream-id]}]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-        aeron (Aeron/connect ctx)]
-    {:ctx ctx
-     :conn aeron
-     :pub (.addPublication aeron channel stream-id)}))
+        aeron (Aeron/connect ctx)
+        pub (.addPublication aeron channel stream-id)]
+    {:ctx ctx :conn aeron :pub pub}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -143,32 +148,37 @@
           segments)
         segments))))
 
+; (defmethod extensions/send-messages AeronConnection
+;   [messenger event peer-link batch]
+;   (let [compressed ^bytes (compress batch)
+;         len (count compressed)
+;         unsafe-buffer (UnsafeBuffer. compressed)
+;         pub ^uk.co.real_logic.aeron.Publication (:pub peer-link)
+;         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
+;     (while (not (offer-f)))))
+
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
-  (let [compressed (compress batch)
-        len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
+  (let [[len unsafe-buffer] (protocol/build-messages-msg-buf batch)
+        pub ^uk.co.real_logic.aeron.Publication (:pub peer-link)
+        offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
     (while (not (offer-f)))))
 
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
-  (let [compressed (compress {:id message-id :completion-id completion-id :ack-val ack-val})
-        len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
+  (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
+        pub ^uk.co.real_logic.aeron.Publication (:pub peer-link)
+        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
     (while (not (offer-f)))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
-  (let [compressed (compress {:id id})
-        len (count compressed)
-        unsafe-buffer (UnsafeBuffer. compressed)
-        offer-f (fn [] (.offer (:pub peer-link) unsafe-buffer 0 len))]
+  (let [unsafe-buffer (protocol/build-completion-msg-buf id)
+        pub ^uk.co.real_logic.aeron.Publication (:pub peer-link) 
+        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
     (while (not (offer-f)))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
   (.close (:pub peer-link))
   (.close (:conn peer-link)) {})
-
