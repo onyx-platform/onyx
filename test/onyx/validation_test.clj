@@ -2,7 +2,6 @@
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [midje.sweet :refer :all]
-            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -138,11 +137,6 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (onyx.api/unpack-map-workflow {:a :b}) => [[:a :b]])
-(fact (onyx.api/unpack-map-workflow {:a {:b :c}}) => [[:a :b] [:b :c]])
-(fact (onyx.api/unpack-map-workflow {:a {:b {:c :d}}}) => [[:a :b] [:b :c] [:c :d]])
-(fact (onyx.api/unpack-map-workflow {:a {:b :c :d :e}}) => [[:a :b] [:a :d] [:b :c] [:d :e]])
-
 (fact (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
                                                   :b #{:d}
                                                   :c #{:d :e}}))
@@ -152,15 +146,6 @@
              [:b :d]
              [:c :d]
              [:c :e]]))
-
-
-(fact (into #{} (onyx.api/unpack-map-workflow {:a {:b :c} :d {:e :f :g :h}}))
-      => #{[:a :b]
-           [:b :c]
-           [:d :e]
-           [:d :g]
-           [:e :f]
-           [:g :h]})
 
 (let [catalog
       [{:onyx/name :a
