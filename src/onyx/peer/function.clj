@@ -23,11 +23,26 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn compress-segment [next-tasks catalog segment path]
-  {:segment (assoc segment :message (apply dissoc (:message segment) (:exclusions path)))
-   :hash-group (reduce (fn [groups t]
-                         (assoc groups t (group-message (:message segment) catalog t)))
-                       {} next-tasks)})
+(defn build-next-segment [prev-seg next-seg]
+  {:id (:id prev-seg)
+   :acker-id (:acker-id prev-seg)
+   :completion-id (:completion-id prev-seg)
+   :message next-seg
+   :ack-val (acker/gen-ack-value)})
+
+(defn compress-segments [next-tasks catalog result event]
+  (assoc result :leaves
+         (map (fn [leaf]
+                (let [msg (if (and (operation/exception? (:message leaf))
+                                   (:post-transformation (:routes leaf)))
+                            (operation/apply-fn (operation/kw->fn (:post-transformation (:routes leaf))) [event] (:message leaf))
+                            (:message leaf))]
+                  {:segment (assoc leaf :message (apply dissoc msg (:exclusions (:routes leaf))))
+                   :routes (:routes leaf)
+                   :hash-group (reduce (fn [groups t]
+                                         (assoc groups t (group-message msg catalog t)))
+                                       {} next-tasks)}))
+              (:leaves result))))
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
@@ -46,14 +61,16 @@
   (operation/apply-fn (:onyx.function/fn event) params segment))
 
 (defmethod p-ext/compress-batch :default
-  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task
-           onyx.core/result-paths]
+  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
     :as event}]
   (let [next-tasks (keys (:egress-ids serialized-task))
-        compressed-msgs (map (fn [[result path]]
-                               (compress-segment next-tasks catalog result path))
-                             (map vector results result-paths))]
+        compressed-msgs (mapcat #(compress-segments next-tasks catalog % event) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))
+
+(defn filter-by-route [messages task-name]
+  (->> messages
+       (filter (fn [msg] (some #{task-name} (:paths msg))))
+       (map :segment)))
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
@@ -67,13 +84,13 @@
                   scattered (get grouped nil)
                   scattered-target (rand-nth active-peers)
                   scattered-link (operation/peer-link event scattered-target :send-peer-site)]
-              (onyx.extensions/send-messages messenger event scattered-link (compress (map :segment scattered)))
+              (onyx.extensions/send-messages messenger event scattered-link (compress (filter-by-route scattered task-name)))
 
               (doseq [k (filter identity (keys grouped))]
                 (let [messages (get grouped k)
                       target (nth active-peers (mod (.hashCode k) (count active-peers)))
                       target-link (operation/peer-link event target :send-peer-site)]
-                  (onyx.extensions/send-messages messenger event target-link (compress (map :segment messages)))))))))
+                  (onyx.extensions/send-messages messenger event target-link (compress (filter-by-route messages task-name)))))))))
       {})
     {}))
 

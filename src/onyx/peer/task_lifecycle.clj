@@ -18,19 +18,12 @@
 ;; connection failure to ZooKeeper.
 (def restartable-exceptions [])
 
-(defn exception? [e]
-  (let [classes (supers (class e))]
-    (boolean (some #{java.lang.Exception} classes))))
-
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
   (l-ext/start-lifecycle?* event))
-
-(defn add-ack-value [m]
-  (assoc m :ack-val (acker/gen-ack-value)))
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
@@ -58,58 +51,62 @@
     parent-ack
     (acker/prefuse-vals parent-ack child-ack)))
 
-(defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
+(defn ack-messages [{:keys [onyx.core/results] :as event}]
   (merge
    event
-   (when (and children (not (:onyx/side-effects-only? (:onyx.core/task-map event))))
-     (doseq [message (keys children)]
-       (when (and (:ack-val message) (not (exception? (:message message))))
-         (let [link (operation/peer-link event (:acker-id message) :acker-peer-site)]
-           (extensions/internal-ack-message
-            (:onyx.core/messenger event)
-            event
-            link
-            (:id message)
-            (:completion-id message)
-            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val message) (get children message)))))))))
+   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
+     (doseq [result results]
+       (let [leaves (filter (fn [leaf] (seq (:routes leaf))) (:leaves result))
+             leaf-vals (repeat (count leaves) (acker/gen-ack-value))
+             fused-leaves (acker/prefuse-vals leaf-vals)
+             link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
+         (extensions/internal-ack-message
+          (:onyx.core/messenger event)
+          event
+          link
+          (:id (:root result))
+          (:completion-id (:root result))
+          (fuse-ack-vals (:onyx.core/task-map event) (:ack-val (:root result)) fused-leaves)))))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
         :else (clojure.set/union (into #{} all) (into #{} to-add))))
 
-(defn route-success-output-paths
+(defn choose-output-paths
   [event compiled-flow-conditions segment serialized-task downstream]
-  (reduce
-   (fn [{:keys [paths exclusions] :as all} entry]
-     (if ((:flow/predicate entry) [event segment])
-       (if (:flow/short-circuit? entry)
-         (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
-                   :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
-         {:paths (join-output-paths paths (:flow/to entry) downstream)
-          :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
-       all))
-   {:paths #{} :exclusions #{}}
-   compiled-flow-conditions))
+  (if (seq compiled-flow-conditions)
+    (reduce
+     (fn [{:keys [paths exclusions] :as all} entry]
+       (if ((:flow/predicate entry) [event (:message segment)])
+         (if (:flow/short-circuit? entry)
+           (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+                     :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))
+                     :post-transformation (:flow/post-transform entry)})
+           {:paths (join-output-paths paths (:flow/to entry) downstream)
+            :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+         all))
+     {:paths #{} :exclusions #{}}
+     compiled-flow-conditions)
+    {:paths downstream}))
 
-(defn route-exception-output-paths
-  [event compiled-flow-conditions segment serialized-task downstream]
-  )
+(defn add-route-data
+  [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
+    :as event} segment downstream]
+  (if (operation/exception? (:message segment))
+    (choose-output-paths event compiled-ex-fcs segment serialized-task downstream)
+    (choose-output-paths event compiled-norm-fcs segment serialized-task downstream)))
 
 (defn route-output-paths
-  [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
-    :as event}]
+  [{:keys [onyx.core/serialized-task onyx.core/results] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))]
-    (merge
+    (reduce
+     (fn [evt result]
+       (let [leaves (get-in evt [(:id result) :leaf])
+             routed-leaves (map #(assoc % :routes (add-route-data event % downstream)) leaves)]
+         (assoc-in evt [(:id result) :leaf] routed-leaves)))
      event
-     {:onyx.core/result-paths
-      (map
-       (fn [segment]
-         (if (exception? segment)
-           (route-exception-output-paths event compiled-ex-fcs segment serialized-task downstream)
-           (route-success-output-paths event compiled-norm-fcs segment serialized-task downstream))
-         {:paths downstream})
-       (:onyx.core/results event))})))
+     results)))
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
@@ -121,24 +118,14 @@
 (defn tag-messages [event]
   (merge
    event
-   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-     (let [event (update-in event 
-                            [:onyx.core/batch]
-                            (fn [batch]
-                              (map (comp (partial add-completion-id event)
-                                         (partial add-acker-id event)
-                                         add-ack-value)
-                                   batch)))]
-       (doseq [raw-segment (:onyx.core/batch event)]
-         (extensions/internal-ack-message
-          (:onyx.core/messenger event)
-          event
-          (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)
-          (:id raw-segment)
-          (:completion-id raw-segment)
-          (:ack-val raw-segment)))
-       event)
-     event)))
+   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
+     (update-in
+      event
+      [:onyx.core/batch]
+      (fn [batch]
+        (map (comp (partial add-completion-id event)
+                   (partial add-acker-id event))
+             batch))))))
 
 (defn start-message-timeout-monitors [event]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
@@ -150,8 +137,8 @@
                  (taoensso.timbre/warn e))))))
   event)
 
-(defn decompress-batch [event]
-  (merge event {:onyx.core/decompressed (:onyx.core/batch event)}))
+(defn decompress-batch [{:keys [onyx.core/batch] :as event}]
+  (merge event {:onyx.core/decompressed batch}))
 
 (defn try-complete-job [event]
   (when (sentinel-found? event)
@@ -160,23 +147,13 @@
       (p-ext/retry-message event (sentinel-id event))))
   event)
 
-(defn strip-sentinel [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn strip-sentinel
+  [{:keys [onyx.core/batch onyx.core/decompressed onyx.core/message-tree] :as event}]
   (merge
    event
    (when-let [k (.indexOf (map :message decompressed) :done)]
-     {:onyx.core/batch (drop-nth k batch)
-      :onyx.core/decompressed (drop-nth k decompressed)})))
-
-(defn build-next-segment [prev-seg next-seg]
-  {:id (:id prev-seg)
-   :acker-id (:acker-id prev-seg)
-   :completion-id (:completion-id prev-seg)
-   :message next-seg
-   :ack-val (acker/gen-ack-value)})
-
-(defn copy-segment [prev-seg]
-  (assoc (build-next-segment prev-seg (:message prev-seg))
-    :ack-val (:ack-val prev-seg)))
+     {:onyx.core/decompressed (drop-nth k decompressed)
+      :onyx.core/batch (drop-nth k batch)})))
 
 (defn collect-next-segments [event input]
   (let [segments (try (p-ext/apply-fn event input) (catch Exception e e))]
@@ -185,24 +162,28 @@
 (defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   (merge
    event
-   (reduce
-    (fn [rets thawed]
-      (let [segments (collect-next-segments event (:message thawed))
-            results (map (partial build-next-segment thawed) segments)
-            tagged (apply acker/prefuse-vals (map :ack-val results))]
-        (-> rets
-            (update-in [:onyx.core/results] concat results)
-            (assoc-in [:onyx.core/children thawed] tagged))))
-    {:onyx.core/results []
-     :onyx.core/children {}}
-    decompressed)))
+   {:onyx.core/results
+    (reduce
+     (fn [coll segment]
+       (let [segments (collect-next-segments event (:message segment))
+             leaves (map (partial apply hash-map) (map vector (repeat :segment) segments))]
+         (conj coll {:root segment :leaves leaves})))
+     []
+     (:onyx.core/decompressed event))}))
 
 (defn apply-fn-batch [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
   ;; Batched functions intentionally ignore their outputs.
   (let [segments (map :message decompressed)]
     (p-ext/apply-fn event segments)
-    (let [results (map copy-segment decompressed)]
-      (merge event {:onyx.core/results results}))))
+    (merge
+     event
+     {:onyx.core/results
+      (reduce
+       (fn [coll segment]
+         (let [leaves (map (partial apply hash-map) (map vector (repeat :segment) segments))]
+           (conj coll {:root segment :leaves leaves})))
+       []
+       (:onyx.core/decompressed event))})))
 
 (defn apply-fn [event]
   (if (:onyx/side-effects-only? (:onyx.core/task-map event))
@@ -270,8 +251,8 @@
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
-          (ack-messages)
           (route-output-paths)
+          (ack-messages)
           (compress-batch)
           (write-batch)
           (close-batch-resources)))

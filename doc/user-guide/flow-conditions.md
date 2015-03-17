@@ -166,7 +166,7 @@ And the predicate might be:
 
 ### Post-transform
 
-Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with the same parameters to the predicate that was evaluated. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
+Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with two parameters: the event map and the exception object. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
 
 Example:
 
