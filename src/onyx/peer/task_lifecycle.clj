@@ -55,7 +55,7 @@
   (merge
    event
    (when (and children (not (:onyx/side-effects-only? (:onyx.core/task-map event))))
-     (doseq [raw-segment (keys children)]
+     (doseq [[raw-segment tagged] children]
        (when (:ack-val raw-segment)
          (let [link (operation/peer-link event (:acker-id raw-segment) :acker-peer-site)]
            (extensions/internal-ack-message
@@ -64,7 +64,7 @@
             link
             (:id raw-segment)
             (:completion-id raw-segment)
-            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) (get children raw-segment)))))))))
+            (fuse-ack-vals (:onyx.core/task-map event) (:ack-val raw-segment) tagged))))))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
@@ -164,7 +164,9 @@
   (let [segments (p-ext/apply-fn event input)]
     (if (sequential? segments) segments (vector segments))))
 
+
 (defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+  ; PERF: Tight inner loop where a lot of time is spent 
   (merge
    event
    (reduce
@@ -173,10 +175,10 @@
             results (map (partial build-next-segment thawed) segments)
             tagged (acker/prefuse-vals (map :ack-val results))]
         (-> rets
-            (update-in [:onyx.core/results] concat results)
-            (assoc-in [:onyx.core/children thawed] tagged))))
+            (update-in [:onyx.core/results] into results)
+            (update-in [:onyx.core/children] conj [thawed tagged]))))
     {:onyx.core/results []
-     :onyx.core/children {}}
+     :onyx.core/children []}
     decompressed)))
 
 (defn apply-fn-batch [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
