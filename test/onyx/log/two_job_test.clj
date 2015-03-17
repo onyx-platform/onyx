@@ -10,11 +10,11 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def peer-config
   (assoc (:peer-config config)
-    :onyx/id id
+    :onyx/id onyx-id
     :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
