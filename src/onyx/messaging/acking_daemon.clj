@@ -45,7 +45,7 @@
 (defn prefuse-vals
   "Prefuse values on a peer before sending them to the acking
    daemon to decrease packet size."
-  [& vals]
+  [vals]
   (let [vals (filter identity vals)]
     (cond (zero? (count vals)) nil
           (= 1 (count vals)) (first vals)

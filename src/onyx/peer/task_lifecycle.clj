@@ -49,7 +49,7 @@
 (defn fuse-ack-vals [task parent-ack child-ack]
   (if (= (:onyx/type task) :output)
     parent-ack
-    (acker/prefuse-vals parent-ack child-ack)))
+    (acker/prefuse-vals (vector parent-ack child-ack))))
 
 (defn ack-messages [{:keys [onyx.core/acking-daemon onyx.core/children] :as event}]
   (merge
@@ -171,7 +171,7 @@
     (fn [rets thawed]
       (let [segments (collect-next-segments event (:message thawed))
             results (map (partial build-next-segment thawed) segments)
-            tagged (apply acker/prefuse-vals (map :ack-val results))]
+            tagged (acker/prefuse-vals (map :ack-val results))]
         (-> rets
             (update-in [:onyx.core/results] concat results)
             (assoc-in [:onyx.core/children thawed] tagged))))
