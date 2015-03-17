@@ -44,7 +44,7 @@
 
 (def completion-payload-length (int (+ completion-msg-length type-header-length)))
 
-(defn build-completion-msg-buf [allocator id] 
+(defn build-completion-msg-buf [^ByteBufAllocator allocator id] 
   (let [buf ^ByteBuf (.ioBuffer allocator completion-payload-length) #_(byte-buffer completion-payload-length)] 
     (.writeByte buf completion-type-id)
     (write-uuid buf id)
@@ -56,7 +56,7 @@
 
 (def ack-payload-length ^int (+ ack-msg-length type-header-length))
 
-(defn build-ack-msg-buf [allocator id completion-id ack-val] 
+(defn build-ack-msg-buf [^ByteBufAllocator allocator id completion-id ack-val] 
   (let [^ByteBuf buf (.ioBuffer allocator ack-payload-length) #_(byte-buffer ack-payload-length)] 
     (.writeByte buf ack-type-id)
     (write-uuid buf id)
@@ -97,7 +97,7 @@
      :ack-val ack-val 
      :message message}))
 
-(defn build-messages-msg-buf [allocator messages] 
+(defn build-messages-msg-buf [^ByteBufAllocator allocator messages] 
   (let [compressed-messages (map (fn [msg]
                                    (update-in msg [:message] compress))
                                  messages)
@@ -132,9 +132,9 @@
     (cond (= msg-type messages-type-id) 
           (read-messages-buf buf)
           (= msg-type ack-type-id) 
-          (if (<= ack-msg-length (.readableBytes buf))
-            (read-ack-buf buf))
+          (read-ack-buf buf)
           (= msg-type completion-type-id) 
-          (if (<= completion-msg-length (.readableBytes buf))
-            (read-completion-buf buf))
+          (read-completion-buf buf)
           :else (throw (Exception. (str "Invalid message type: " msg-type))))))
+
+
