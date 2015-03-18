@@ -41,12 +41,19 @@
 (defn consumer [limit]
   (proxy [Consumer] []
     (accept [subscription]
-      ;; TODO: evaluate different backoff strategy and timings
-      (let [idle-strategy (BackoffIdleStrategy.
-                           100 
-                           10
-                           (.toNanos TimeUnit/MICROSECONDS 1)
-                           (.toNanos TimeUnit/MICROSECONDS 100))]
+      ;; TODO, evaluate different idle strategies.
+      (let [strategy :high-latency-restart
+            idle-strategy (case strategy 
+                            :high-latency-restart (BackoffIdleStrategy.
+                                                    100
+                                                    10
+                                                    (.toNanos TimeUnit/MICROSECONDS 10000)
+                                                    (.toNanos TimeUnit/MICROSECONDS 100000))
+                            :low-latency-restart (BackoffIdleStrategy.
+                                                   100 
+                                                   10
+                                                   (.toNanos TimeUnit/MICROSECONDS 1)
+                                                   (.toNanos TimeUnit/MICROSECONDS 100)))]
         (while true
           (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
             (.idle idle-strategy fragments-read)))))))
