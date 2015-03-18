@@ -46,7 +46,7 @@
      :ack-val ack-val}))
 
 (defn read-completion [^UnsafeBuffer buf offset]
-  (get-uuid buf 0))
+  (get-uuid buf offset))
 
 (defn build-completion-msg-buf [id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
@@ -105,7 +105,8 @@
         meta-offsets (meta-message-offsets (+ message-count-size offset) message-count)
         metas (doall (map (partial read-message-meta buf)
                           (butlast meta-offsets)))
-        message-payload-bytes (byte-array (- (+ offset length) (last meta-offsets)))
+        segments-size  (- (+ offset length) (last meta-offsets))
+        message-payload-bytes (byte-array segments-size)
         _ (.getBytes buf (last meta-offsets) message-payload-bytes)
         message-payloads (decompress message-payload-bytes)]
     (map (fn [m message]
