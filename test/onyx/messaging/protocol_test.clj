@@ -2,7 +2,7 @@
   (:require [onyx.messaging.protocol :as protocol]
             [midje.sweet :refer :all]))
 
-(fact (let [message {:type protocol/completion-type-id
+(comment (fact (let [message {:type protocol/completion-type-id
                      :id #uuid "11837bd7-2de5-4b62-888d-171c4c47845c"}] 
         (= message (protocol/read-buf (protocol/build-msg-buf message))))
       => true)
@@ -41,79 +41,4 @@
 (fact (let [messages {:type protocol/messages-type-id
                       :messages '()}]
         (= messages (protocol/read-buf (protocol/build-msg-buf messages))))
-      => true)
-
-;;;;
-;;; GLOSS TESTS
-
-(comment 
-  ; (io/decode
-  ;   onyx-protocol 
-  ;   (io/encode onyx-protocol 
-  ;              (send-messages->frame '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-  ;                                       :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-  ;                                       :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-  ;                                       :message {:n 1}
-  ;                                       :ack-val 7292143382010058362}))))
-
-  (alength (compress '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                        :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                        :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                        :message {:n 1}
-                        :ack-val 7292143382010058362}
-                       {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                        :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                        :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                        :message {:n 1}
-                        :ack-val 7292143382010058362})))
-
-  (reduce + (map (fn [a] (alength (.array a))) 
-                 (io/encode onyx-protocol 
-                            (send-messages->frame '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                                                     :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                                                     :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                                                     :message {:n 1}
-                                                     :ack-val 7292143382010058362}
-
-                                                    {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                                                     :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                                                     :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                                                     :message {:n 1}
-                                                     :ack-val 7292143382010058362})))))
-
-
-
-  (frame->msg 
-    (io/decode
-      onyx-protocol
-      (io/encode onyx-protocol 
-                 (send-messages->frame '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                                          :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                                          :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                                          :message {:n 1}
-                                          :ack-val 7292143382010058362})))))
-
-  (frame->send-messages 
-    (io/decode
-      onyx-protocol
-      (io/encode onyx-protocol 
-                 (send-messages->frame '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                                          :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                                          :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                                          :message {:n 1}
-                                          :ack-val 7292143382010058362})))))
-
-  (io/encode onyx-protocol 
-             (send-messages->frame '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-                                      :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-                                      :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                                      :message {:n 1}
-                                      :ack-val 7292143382010058362})))
-  
-  (io/encode onyx-protocol 
-             (completion-msg->frame {:id #uuid "7bdac75d-9fc8-47fb-92b2-73eb885beeea"}))
-
-  (io/encode onyx-protocol
-             (ack-msg->frame {:id #uuid  "e2ba38dd-b523-4e63-ba74-645fb91c231a" 
-                              :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                              :ack-val 3323130347050513529})))
+      => true))
