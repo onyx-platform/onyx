@@ -16,13 +16,6 @@
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
-(defn handle-sent-message-nippy-only [inbound-ch ^UnsafeBuffer buffer offset length header]
-  (let [dst (byte-array length)]
-    (.getBytes buffer offset dst)
-    (let [thawed (decompress dst)]
-      (doseq [message thawed]
-        (>!! inbound-ch message)))))
-
 (defn handle-sent-message [inbound-ch ^UnsafeBuffer buffer offset length header]
   (let [messages (protocol/read-messages-buf buffer offset length)]
     (doseq [message messages]
@@ -147,15 +140,6 @@
           (recur (conj segments v) (inc i))
           segments)
         segments))))
-
-; (defmethod extensions/send-messages AeronConnection
-;   [messenger event peer-link batch]
-;   (let [compressed ^bytes (compress batch)
-;         len (count compressed)
-;         unsafe-buffer (UnsafeBuffer. compressed)
-;         pub ^uk.co.real_logic.aeron.Publication (:pub peer-link)
-;         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
-;     (while (not (offer-f)))))
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
