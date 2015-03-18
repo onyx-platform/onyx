@@ -60,18 +60,18 @@
   [event compiled-flow-conditions segment serialized-task downstream]
   (if (seq compiled-flow-conditions)
     (reduce
-     (fn [{:keys [paths exclusions] :as all} entry]
+     (fn [{:keys [flow exclusions] :as all} entry]
        (if ((:flow/predicate entry) [event (:message segment)])
          (if (:flow/short-circuit? entry)
-           (reduced {:paths (join-output-paths paths (:flow/to entry) downstream)
+           (reduced {:flow (join-output-paths flow (:flow/to entry) downstream)
                      :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))
                      :post-transformation (:flow/post-transform entry)})
-           {:paths (join-output-paths paths (:flow/to entry) downstream)
+           {:flow (join-output-paths flow (:flow/to entry) downstream)
             :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
          all))
-     {:paths #{} :exclusions #{}}
+     {:flow #{} :exclusions #{}}
      compiled-flow-conditions)
-    {:paths downstream}))
+    {:flow downstream}))
 
 (defn add-route-data
   [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
@@ -80,16 +80,20 @@
     (choose-output-paths event compiled-ex-fcs segment serialized-task downstream)
     (choose-output-paths event compiled-norm-fcs segment serialized-task downstream)))
 
-(defn route-output-paths
+(defn route-output-flow
   [{:keys [onyx.core/serialized-task onyx.core/results] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))]
-    (reduce
-     (fn [evt result]
-       (let [leaves (get-in evt [(:id result) :leaves])
-             routed-leaves (map #(assoc % :routes (add-route-data event % downstream)) leaves)]
-         (assoc-in evt [(:id result) :leaves] routed-leaves)))
+    (merge
      event
-     results)))
+     {:onyx.core/results
+      (mapv
+       (fn [{:keys [root leaves] :as result}]
+         (assoc result :leaves
+                (mapv
+                 (fn [leaf]
+                   (assoc leaf :routes (add-route-data event leaf downstream)))
+                 leaves)))
+       results)})))
 
 (defn build-new-segments [{:keys [onyx.core/results] :as event}]
   (merge
@@ -100,11 +104,10 @@
        (assoc result :leaves
               (mapv
                (fn [leaf]
-                 {:id (:id root)
-                  :acker-id (:acker-id root)
-                  :completion-id (:completion-id root)
-                  :message leaf
-                  :ack-val (acker/gen-ack-value)})
+                 (merge leaf
+                        {:id (:id root)
+                         :acker-id (:acker-id root)
+                         :completion-id (:completion-id root)}))
                leaves)))
      results)}))
 
@@ -113,9 +116,9 @@
    event
    (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
      (doseq [result results]
-       (let [leaves (filter (fn [leaf] (seq (:routes leaf))) (:leaves result))
+       (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
              leaf-vals (repeat (count leaves) (acker/gen-ack-value))
-             fused-leaves (acker/prefuse-vals leaf-vals)
+             fused-vals (apply acker/prefuse-vals (concat (:ack-val (:root result)) leaf-vals))
              link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
          (extensions/internal-ack-message
           (:onyx.core/messenger event)
@@ -123,7 +126,7 @@
           link
           (:id (:root result))
           (:completion-id (:root result))
-          (fuse-ack-vals (:onyx.core/task-map event) (:ack-val (:root result)) fused-leaves)))))))
+          fused-vals))))))
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
@@ -268,7 +271,7 @@
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
-          (route-output-paths)
+          (route-output-flow)
           (build-new-segments)
           (ack-messages)
           (compress-batch)
