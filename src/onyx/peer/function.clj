@@ -24,18 +24,20 @@
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
 (defn compress-segments [next-tasks catalog result event]
-  (assoc result :leaves
-         (map (fn [leaf]
-                (let [msg (if (and (operation/exception? (:message leaf))
-                                   (:post-transformation (:routes leaf)))
-                            (operation/apply-fn (operation/kw->fn (:post-transformation (:routes leaf))) [event] (:message leaf))
-                            (:message leaf))]
-                  {:segment (assoc leaf :message (apply dissoc msg (:exclusions (:routes leaf))))
-                   :routes (:routes leaf)
-                   :hash-group (reduce (fn [groups t]
-                                         (assoc groups t (group-message msg catalog t)))
-                                       {} next-tasks)}))
-              (:leaves result))))
+  (assoc result
+    :leaves
+    (mapv
+     (fn [leaf]
+       (let [msg (if (and (operation/exception? (:segment leaf))
+                          (:post-transformation (:routes leaf)))
+                   (operation/apply-fn
+                    (operation/kw->fn (:post-transformation (:routes leaf)))
+                    [event] (:segment leaf))
+                   (:segment leaf))]
+         (assoc leaf :hash-group (reduce (fn [groups t]
+                                           (assoc groups t (group-message msg catalog t)))
+                                         {} next-tasks))))
+     (:leaves result))))
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
@@ -57,23 +59,23 @@
   [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
     :as event}]
   (let [next-tasks (keys (:egress-ids serialized-task))
-        compressed-msgs (mapcat #(compress-segments next-tasks catalog % event) results)]
+        compressed-msgs (map #(compress-segments next-tasks catalog % event) results)]
     (merge event {:onyx.core/compressed compressed-msgs})))
 
 (defn filter-by-route [messages task-name]
   (->> messages
-       (filter (fn [msg] (some #{task-name} (:paths msg))))
+       (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
        (map :segment)))
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
-  (if (seq (:onyx.core/compressed event))
+  (if (seq (mapcat :leaves (:onyx.core/compressed event)))
     (let [replica @(:onyx.core/replica event)]
       (doseq [[task-name task-id] (:egress-ids (:onyx.core/serialized-task event))]
         (let [peers (get-in replica [:allocations job-id task-id])
               active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)]
           (when (seq active-peers)
-            (let [grouped (group-by (comp #(get % task-name) :hash-group) (:onyx.core/compressed event))
+            (let [grouped (group-by (comp #(get % task-name) :hash-group) (mapcat :leaves (:onyx.core/compressed event)))
                   scattered (get grouped nil)
                   scattered-target (rand-nth active-peers)
                   scattered-link (operation/peer-link event scattered-target :send-peer-site)]
@@ -86,8 +88,4 @@
                   (onyx.extensions/send-messages messenger event target-link (compress (filter-by-route messages task-name)))))))))
       {})
     {}))
-
-(defmethod p-ext/seal-resource :default
-  [{:keys [] :as event}]
-  {})
 
