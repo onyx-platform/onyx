@@ -6,7 +6,7 @@
               [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
-    (:import [uk.co.real_logic.aeron Aeron]
+    (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
@@ -33,9 +33,10 @@
     (>!! release-ch completion-id)))
 
 (defn data-handler [f]
-  (proxy [DataHandler] []
-    (onData [buffer offset length header]
-      (f buffer offset length header))))
+  (FragmentAssemblyAdapter. 
+    (proxy [DataHandler] []
+      (onData [buffer offset length header]
+        (f buffer offset length header)))))
 
 (defn consumer [limit]
   (proxy [Consumer] []
