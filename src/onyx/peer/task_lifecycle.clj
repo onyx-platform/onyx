@@ -51,23 +51,6 @@
     parent-ack
     (acker/prefuse-vals parent-ack child-ack)))
 
-(defn ack-messages [{:keys [onyx.core/results] :as event}]
-  (merge
-   event
-   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
-     (doseq [result results]
-       (let [leaves (filter (fn [leaf] (seq (:routes leaf))) (:leaves result))
-             leaf-vals (repeat (count leaves) (acker/gen-ack-value))
-             fused-leaves (acker/prefuse-vals leaf-vals)
-             link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
-         (extensions/internal-ack-message
-          (:onyx.core/messenger event)
-          event
-          link
-          (:id (:root result))
-          (:completion-id (:root result))
-          (fuse-ack-vals (:onyx.core/task-map event) (:ack-val (:root result)) fused-leaves)))))))
-
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
@@ -102,11 +85,45 @@
   (let [downstream (keys (:egress-ids serialized-task))]
     (reduce
      (fn [evt result]
-       (let [leaves (get-in evt [(:id result) :leaf])
+       (let [leaves (get-in evt [(:id result) :leaves])
              routed-leaves (map #(assoc % :routes (add-route-data event % downstream)) leaves)]
-         (assoc-in evt [(:id result) :leaf] routed-leaves)))
+         (assoc-in evt [(:id result) :leaves] routed-leaves)))
      event
      results)))
+
+(defn build-new-segments [{:keys [onyx.core/results] :as event}]
+  (merge
+   event
+   {:onyx.core/results
+    (mapv
+     (fn [{:keys [root leaves] :as result}]
+       (assoc result :leaves
+              (mapv
+               (fn [leaf]
+                 {:id (:id root)
+                  :acker-id (:acker-id root)
+                  :completion-id (:completion-id root)
+                  :message leaf
+                  :ack-val (acker/gen-ack-value)})
+               leaves)))
+     results)}))
+
+(defn ack-messages [{:keys [onyx.core/results] :as event}]
+  (merge
+   event
+   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
+     (doseq [result results]
+       (let [leaves (filter (fn [leaf] (seq (:routes leaf))) (:leaves result))
+             leaf-vals (repeat (count leaves) (acker/gen-ack-value))
+             fused-leaves (acker/prefuse-vals leaf-vals)
+             link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
+         (extensions/internal-ack-message
+          (:onyx.core/messenger event)
+          event
+          link
+          (:id (:root result))
+          (:completion-id (:root result))
+          (fuse-ack-vals (:onyx.core/task-map event) (:ack-val (:root result)) fused-leaves)))))))
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
@@ -252,6 +269,7 @@
           (strip-sentinel)
           (apply-fn)
           (route-output-paths)
+          (build-new-segments)
           (ack-messages)
           (compress-batch)
           (write-batch)

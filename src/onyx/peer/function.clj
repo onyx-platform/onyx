@@ -23,13 +23,6 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn build-next-segment [prev-seg next-seg]
-  {:id (:id prev-seg)
-   :acker-id (:acker-id prev-seg)
-   :completion-id (:completion-id prev-seg)
-   :message next-seg
-   :ack-val (acker/gen-ack-value)})
-
 (defn compress-segments [next-tasks catalog result event]
   (assoc result :leaves
          (map (fn [leaf]
