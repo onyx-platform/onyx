@@ -54,7 +54,7 @@
                                                    10
                                                    (.toNanos TimeUnit/MICROSECONDS 1)
                                                    (.toNanos TimeUnit/MICROSECONDS 100)))]
-        (while true
+        (while (not (Thread/interrupted))
           (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
             (.idle idle-strategy fragments-read)))))))
 
@@ -75,6 +75,7 @@
           daemon (:acking-daemon component)
           release-ch (chan (clojure.core.async/dropping-buffer 100000))
 
+          ;; TODO, correct port allocation
           port (+ 40000 (rand-int 10000))
           channel (str "udp://localhost:" port)
 
@@ -92,25 +93,52 @@
 
           send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
           acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
-          completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)]
+          completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)
+          accept-send-fut (future (try (.accept ^Consumer (consumer 10) send-subscriber) 
+                                       (catch Exception e (fatal e))))
+          accept-acker-fut (future (try (.accept ^Consumer (consumer 10) acker-subscriber) 
+                                        (catch Exception e (fatal e))))
+          accept-completion-fut (future (try (.accept ^Consumer (consumer 10) completion-subscriber) 
+                                             (catch Exception e (fatal e))))]
+      (assoc component 
+             :channel channel 
+             :send-stream-id send-stream-id
+             :acker-stream-id acker-stream-id 
+             :completion-stream-id completion-stream-id
+             :accept-send-fut accept-send-fut
+             :accept-acker-fut accept-acker-fut
+             :accept-completion-fut accept-completion-fut
+             :send-subscriber send-subscriber
+             :acker-subscriber acker-subscriber
+             :completion-subscriber completion-subscriber
+             :release-ch release-ch 
+             :context ctx 
+             :aeron aeron)))
 
-      (future (try (.accept ^Consumer (consumer 10) send-subscriber) (catch Exception e (fatal e))))
-      (future (try (.accept ^Consumer (consumer 10) acker-subscriber) (catch Exception e (fatal e))))
-      (future (try (.accept ^Consumer (consumer 10) completion-subscriber) (catch Exception e (fatal e))))
-      
-      (assoc component :channel channel :send-stream-id send-stream-id
-             :acker-stream-id acker-stream-id :completion-stream-id completion-stream-id
-             :release-ch release-ch :context ctx :aeron aeron)))
-
-  (stop [component]
+  (stop [{:keys [aeron send-subscriber acker-subscriber 
+                 completion-subscriber accept-send-fut accept-acker-fut
+                 accept-completion-fut release-ch] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
 
-    (.close (:aeron component))
-    ;(CloseHelper/quietClose (:driver component))
+    (try 
+      (future-cancel accept-send-fut)
+      (future-cancel accept-acker-fut)
+      (future-cancel accept-completion-fut)
+      (when send-subscriber (.close send-subscriber))
+      (when acker-subscriber (.close acker-subscriber))
+      (when completion-subscriber (.close completion-subscriber))
+      (when aeron (.close aeron))
+      (close! (:release-ch component))
+      ;; FIXME, need to startup and shutdown aeron resources properly
+      ;; however, this can't be done per connection
+      ;(CloseHelper/quietClose (:driver component))
 
-    (close! (:release-ch component))
+      (catch Exception e
+        (fatal e)))
 
-    (assoc component :driver nil :channel nil :release-ch nil)))
+    (assoc component :driver nil :channel nil :release-ch nil :aeron nil 
+           :accept-send-fut nil :accept-acker-fut nil :accept-completion-fut nil 
+           :send-subscriber nil :acker-subscriber nil :completion-subscriber nil)))
 
 (defn aeron [opts]
   (map->AeronConnection {:opts opts}))
