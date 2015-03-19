@@ -1,26 +1,19 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
     (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop]]
               [com.stuartsierra.component :as component]
-              [org.httpkit.server :as server]
               [taoensso.timbre :as timbre]
-              [gloss.io :as io]
-              [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.protocol :as protocol]
+              [onyx.messaging.acking-daemon :as acker]
               [onyx.compression.nippy :refer [compress decompress]]
-              [onyx.extensions :as extensions]
-              [manifold.deferred :as d]
-              [manifold.stream :as s]
-              [gloss.io :as io]
-              [clojure.edn :as edn])
+              [onyx.extensions :as extensions])
     (:import [java.net InetSocketAddress]
-             [java.util.concurrent Executors]
+             [java.util.concurrent TimeUnit Executors]
              [io.netty.channel.epoll 
               Epoll 
               EpollEventLoopGroup
               EpollServerSocketChannel
               EpollSocketChannel]
-             [java.util.concurrent TimeUnit Executors]
-             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator ByteBufAllocator]
+             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator CompositeByteBuf]
              [java.nio ByteBuffer]
              [io.netty.channel.socket.nio 
               NioServerSocketChannel
@@ -56,14 +49,31 @@
               GenericFutureListener 
               Future 
               DefaultThreadFactory]
+             [io.netty.util ResourceLeakDetector ResourceLeakDetector$Level]
              [io.netty.bootstrap Bootstrap ServerBootstrap]
-             [io.netty.channel.socket.nio NioServerSocketChannel]
-             [org.jboss.netty.buffer ChannelBuffers]))
+             [io.netty.channel.socket.nio NioServerSocketChannel]))
 
-(def protocol protocol/codec-protocol)
+(defn leak-detector-level! [level]
+  (ResourceLeakDetector/setLevel
+    (case level
+      :disabled ResourceLeakDetector$Level/DISABLED
+      :simple ResourceLeakDetector$Level/SIMPLE
+      :advanced ResourceLeakDetector$Level/ADVANCED
+      :paranoid ResourceLeakDetector$Level/PARANOID)))
+
+;(leak-detector-level! :paranoid)
 
 (defn epoll? []
   (Epoll/isAvailable))
+
+(defn int32-frame-decoder
+  []
+  ; Offset 0, 4 byte header, skip those 4 bytes.
+  (LengthFieldBasedFrameDecoder. Integer/MAX_VALUE, 0, 4, 0, 4))
+
+(defn int32-frame-encoder
+  []
+  (LengthFieldPrepender. 4))
 
 (defn gen-tcp-handler
   [^ChannelGroup channel-group handler]
@@ -73,149 +83,122 @@
       (.add channel-group (.channel ctx)))
     (channelRead [^ChannelHandlerContext ctx ^Object message]
       (try
-        (timbre/info "Channel read " message)
         (handler ctx message)
         (catch java.nio.channels.ClosedChannelException e
           (timbre/warn "channel closed"))))
     (exceptionCaught [^ChannelHandlerContext ctx ^Throwable cause]
-      (println cause "TCP handler caught")
+      (timbre/error cause "TCP handler caught")
       (.close (.channel ctx)))
     (isSharable [] true)))
 
 (defn event-executor
-  "Creates a new netty execution handler for processing events. Defaults to 1
-  thread per core."
+  "Creates a new netty execution handler for processing events. 
+  Defaults to 1 thread per core."
   []
   (DefaultEventExecutorGroup. (.. Runtime getRuntime availableProcessors)))
 
 (defonce ^DefaultEventExecutorGroup shared-event-executor
   (event-executor))
 
-(defn int32-frame-decoder []
-    ; Offset 0, 4 byte header, skip those 4 bytes.
-    (LengthFieldBasedFrameDecoder. Integer/MAX_VALUE, 0, 4, 0, 4))
-
-(defn int32-frame-encoder []
-  (LengthFieldPrepender. 4))
-
 (defn channel-initializer-done [handler]
   (proxy [ChannelInitializer] []
     (initChannel [ch]
       (let [pipeline (.pipeline ^Channel ch)]
         (doto pipeline 
-          ;(.addLast pipeline-name nil "msg-encoder" msg-encoder)
-          ; These could be shared?
-          ;(.addLast nil "int-32-frame-decoder" (int32-frame-decoder))
-          ;(.addLast nil "int-32-frame-encoder" (int32-frame-encoder))
+          (.addLast "int32-frame-decoder" (int32-frame-decoder))
+          (.addLast "int32-frame-encoder" (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
-(defn handle [msg]
-  ; FIXME: should read as many messages as possible 
-  ; here given the number of bytes
-  (timbre/info "Handling message " msg)
-  (if-let [decompressed (protocol/read-buf msg)]
-    (timbre/info "Read message " decompressed)
-    (.resetReaderIndex msg))
+(defn handle [buf-recvd-ch msg]
+  (.retain ^ByteBuf msg)
+  (>!! buf-recvd-ch msg))
 
-  (timbre/info "Message now looks like: " msg)
-  msg)
+(defn create-server-handler
+  "Given a core, a channel, and a message, applies the message to 
+  core and writes a response back on this channel."
+  [buf-recvd-ch] 
+  (fn [^ChannelHandlerContext ctx ^Object message]
+    ;(timbre/info "TCP HANDLER MESSAGE " message)
 
-(defn tcp-handler
-  "Given a core, a channel, and a message, applies the message to core and
-  writes a response back on this channel."
-  [^ChannelHandlerContext ctx ^Object message]
-  (timbre/info "TCP HANDLER MESSAGE " message)
+    ; No need for any reply
+    (handle buf-recvd-ch message)
+    #_(when-let [response (handle buf-recvd-ch message)]
+        (.writeAndFlush ctx response))))
 
-  (.. ctx
-      ; Actually handle request
-      (writeAndFlush (handle message))))
+(defn get-default-event-loop-threads
+  "Determines the default number of threads to use for a Netty EventLoopGroup.
+   This mimics the default used by Netty as of version 4.1."
+  []
+  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
+    ; TODO: evaluate whether too many threads are used.
+    ; reducing can improve performance
+    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" (* cpu-count 2)))))
 
-(def netty-implementation
-  "Provide native implementation of Netty for improved performance on
-  Linux only. Provide pure-Java implementation of Netty on all other
-  platforms. See http://netty.io/wiki/native-transports.html"
-  (if (and (.contains (. System getProperty "os.name") "Linux")
-           (.contains (. System getProperty "os.arch") "amd64"))
-    {:event-loop-group-fn #(EpollEventLoopGroup.)
-     :channel EpollServerSocketChannel}
-    {:event-loop-group-fn #(NioEventLoopGroup.)
-     :channel NioServerSocketChannel}))
+(def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
 
-(defn derefable
-  "A simple wrapper for a netty future which on deref just calls
-  (syncUninterruptibly f), and returns the future's result."
-  [^Future f]
-  (reify clojure.lang.IDeref
-    (deref [_]
-      (.syncUninterruptibly f)
-      (.get f))))
+(def client-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
 
-(defn ^Future shutdown-event-executor-group
-  "Gracefully shut down an event executor group. Returns a derefable future."
-  [^EventExecutorGroup g]
-  ; 10ms quiet period, 10s timeout.
-  (derefable (.shutdownGracefully g 10 1000 TimeUnit/MILLISECONDS)))
+(def ^String server-event-thread-pool-name "onyx-netty-worker-event-pool")
+
+(def worker-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
+
+(def ^String server-event-thread-pool-name "onyx-netty-boss-event-pool")
+
+(def boss-group
+  (let [thread-count (get-default-event-loop-threads)
+        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
+    (if (epoll?)
+      (EpollEventLoopGroup. (long thread-count) thread-factory)
+      (NioEventLoopGroup. (long thread-count) thread-factory))))
+
 
 (defn start-netty-server
-  [host port]
+  [host port buf-recvd-ch]
   (let [bootstrap (ServerBootstrap.)
-        event-loop-group-fn (:event-loop-group-fn netty-implementation)
-        boss-group (event-loop-group-fn)
-        worker-group (event-loop-group-fn)
+        channel (if (epoll?)
+                  EpollServerSocketChannel
+                  NioServerSocketChannel)
+
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
                                             (ImmediateEventExecutor/INSTANCE))
-        initializer (channel-initializer-done (gen-tcp-handler channel-group tcp-handler))] 
+        initializer (channel-initializer-done (gen-tcp-handler channel-group (create-server-handler buf-recvd-ch)))] 
     ; Configure bootstrap
     (doto bootstrap
       (.group boss-group worker-group)
-      (.channel (:channel netty-implementation))
+      (.channel channel)
       (.option ChannelOption/SO_REUSEADDR true)
       (.option ChannelOption/TCP_NODELAY true)
+      (.option ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
       (.childOption ChannelOption/SO_REUSEADDR true)
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
+      (.childOption ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
       (.childHandler initializer))
-
     ; Start bootstrap
-    (->> (InetSocketAddress. host port)
-         (.bind bootstrap)
-         (.sync)
-         (.channel)
-         (.add channel-group))
-
-    (timbre/info "TCP server" host port "online")
-
-    (fn killer []
-      (.. channel-group close awaitUninterruptibly)
-      ; Shut down workers and boss concurrently.
-      (let [w (shutdown-event-executor-group worker-group)
-            b (shutdown-event-executor-group boss-group)]
-        @w
-        @b)
-      (timbre/info "TCP server" host port "shut down"))))
-
-(defn tcp-client-handler [])
+    (let [ch (->> (InetSocketAddress. host port)
+                  (.bind bootstrap)
+                  (.sync)
+                  (.channel))
+          _ (.add channel-group ch)
+          assigned-port (.. ch localAddress getPort)]
+      (timbre/info "TCP server" host assigned-port "online")
+      {:port assigned-port
+       :server-shutdown-fn (fn killer []
+                             (.. channel-group close awaitUninterruptibly)
+                             (timbre/info "TCP server" host port "shut down"))})))
 
 (defn client-handler [msg]
   (timbre/info "TCP client handler"))
-
-; (defn read-adaptor [handler]
-;   (proxy [ChannelInboundHandlerAdapter] []
-;     (channelRead [^ChannelHandlerContext ctx ^Object msg]
-;       (timbre/info "Channel read?" msg)
-;       )
-;     (exceptionCaught 
-;       [^ChannelHandlerContext ctx ^Throwable cause]
-;       (timbre/error "ChannelInboundHandlerAdapter: " cause)
-;       (.close ctx))))
-
-; (defn new-handler []
-;   (proxy [ChannelInboundByteHandlerAdapter] []
-;     (inboundBufferUpdated [context, in]
-;       (.clear in))
-;     (exceptionCaught [context, cause]
-;       (.printStackTrace cause)
-;       (.close context))))
 
 (defn new-client-handler []
   (proxy [ChannelHandler] []
@@ -233,149 +216,78 @@
       (timbre/info "Initializing client channel")
       (try (let [pipeline (.pipeline ^Channel ch)]
              (doto pipeline 
-               (.addLast handler)))
+               (.addLast "int32-frame-decoder" (int32-frame-decoder))
+               (.addLast "int32-frame-encoder" (int32-frame-encoder))
+               (.addLast "handler" handler)))
            (catch Exception e
              (timbre/fatal e))))))
 
 (defn create-client [host port]
   (let [channel (if (epoll?)
                   EpollSocketChannel
-                  NioSocketChannel)
-        ; replace?
-        worker-group (NioEventLoopGroup.)]
+                  NioSocketChannel)]
     (try
       (let [b (doto (Bootstrap.)
                 (.option ChannelOption/SO_REUSEADDR true)
                 (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
-                (.group worker-group)
+                (.group client-group)
                 (.channel channel)
                 (.handler (client-channel-initializer (new-client-handler))))]
         (.channel ^ChannelFuture (.connect b host port))))))
 
-; (def client 
-;   (create-client "127.0.0.1" 10009))
-; (.remoteAddress client)
-; (.isActive client)
-; (.writeAndFlush client
-;                 (protocol/write-msg {:type 0 
-;                                      :messages '({:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362}
-;                                                  {:id #uuid  "ac39bc62-8f06-46a0-945e-3a17642a619f"
-;                                                   :acker-id #uuid  "11837bd7-2de5-4b62-888d-171c4c47845c"
-;                                                   :completion-id #uuid  "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-;                                                   :message {:n 1}
-;                                                   :ack-val 8892143382010058362}
-;                                                  {:id #uuid "010a1688-47ff-4055-8da5-1f02247351e1"
-;                                                   :acker-id #uuid "bf8fd5fc-30fd-424c-af6a-0b32568581a4"
-;                                                   :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
-;                                                   :message {:n 2}
-;                                                   :ack-val 729233382010058362})})) 
+(defn app [daemon parsed-ch inbound-ch release-ch]
+    (go-loop []
+             (try (let [msg (<!! parsed-ch)
+                        t ^byte (:type msg)]
+                    (cond (= t protocol/messages-type-id) 
+                          (doseq [message (:messages msg)]
+                            (>!! inbound-ch message))
 
-(defn app [daemon net-ch inbound-ch release-ch]
+                          (= t protocol/ack-type-id)
+                          (acker/ack-message daemon
+                                             (:id msg)
+                                             (:completion-id msg)
+                                             (:ack-val msg))
+
+                          (= t protocol/completion-type-id)
+                          (>!! release-ch (:id msg))))
+                  (catch Exception e
+                    (taoensso.timbre/error e)
+                    (throw e)))
+             (recur)))
+
+; FIXME; don't want a whole go-loop here, can probably parse above in the handler
+(defn buf-recv-loop [buf-recv-ch parsed-ch]
   (go-loop []
-           (try (let [{:keys [type] :as msg} (<!! net-ch)]
-                  (cond (= type protocol/send-id) 
-                        (doseq [message (:messages msg)]
-                          (>!! inbound-ch message))
-
-                        (= type protocol/ack-id)
-                        (acker/ack-message daemon
-                                           (:id msg)
-                                           (:completion-id msg)
-                                           (:ack-val msg))
-
-                        (= type protocol/completion-id)
-                        (>!! release-ch (:id msg))))
-             (catch Exception e
-               (taoensso.timbre/error e)
-               (throw e)))
-           (recur)))
+           (let [buf (<!! buf-recv-ch)]
+             (try 
+               (let [decompressed (protocol/read-buf buf)]
+                 (>!! parsed-ch decompressed)
+                 ; undo retain added in server handler
+                 (.release ^ByteBuf buf))
+               (catch Throwable t
+                 (println t)
+                 (timbre/fatal t (str "exception in go loop." buf " " (.getId (Thread/currentThread))))))
+                 (recur))))
 
 (defrecord NettyTcpSockets [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Netty TCP Sockets")
-
-    (let [net-ch (chan (clojure.core.async/dropping-buffer 1000000))
+    (let [buf-recv-ch (chan 10000)
+          parsed-ch (chan (clojure.core.async/dropping-buffer 1000000))
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
-          ip "127.0.0.1"
-          port (+ 5000 (rand-int 45000))
-          server-shutdown-fn (start-netty-server ip port)
-          app-loop (app daemon net-ch inbound-ch release-ch)]
+          ip "0.0.0.0"
+          {:keys [port server-shutdown-fn]} (start-netty-server ip 0 buf-recv-ch)
+          buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
+          app-loop (app daemon parsed-ch inbound-ch release-ch)]
       (assoc component 
              :app-loop app-loop 
              :server-shutdown-fn server-shutdown-fn 
+             :buf-loop buf-loop
              :ip ip 
              :port port 
              :release-ch release-ch)))
@@ -384,6 +296,7 @@
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
     ((:server-shutdown-fn component))
     (close! (:app-loop component))
+    (close! (:buf-loop component))
     (close! (:release-ch component))
     (assoc component :release-ch nil)))
 
@@ -403,16 +316,10 @@
   [messenger]
   [(:ip messenger) (:port messenger)])
 
-;; FIXME: these are just for client for now
-(defn wrap-duplex-stream
-  [protocol s]
-  (let [out (s/stream)]
-    (s/connect
-     (s/map #(io/encode protocol %) out)
-     s)
-    (s/splice
-     out
-     (io/decode-stream s protocol))))
+(defmethod extensions/connect-to-peer NettyTcpSockets
+  [messenger event [host port]]
+  (timbre/info "Created client " host port)
+  (create-client host port))
 
 ; Reused as is from HttpKitWebSockets. Probably something to extract.
 (defmethod extensions/receive-messages NettyTcpSockets
@@ -427,14 +334,34 @@
           segments)
         segments))))
 
+(defn allocator [^Channel x]
+  (.alloc x))
+
 (defmethod extensions/send-messages NettyTcpSockets
-  [messenger event peer-link messages]
-  (s/put! peer-link (protocol/send-messages->frame messages)))
+  [messenger event ^Channel peer-link messages]
+  (try
+    (.writeAndFlush peer-link 
+                    ^ByteBuf (protocol/build-messages-msg-buf (allocator peer-link) 
+                                                              messages) 
+                    (.voidPromise ^Channel peer-link))
+    (catch Exception e 
+      (timbre/error e))))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
-  [messenger event peer-link message-id completion-id ack-val]
-  (s/put! peer-link (protocol/ack-msg->frame {:id message-id :completion-id completion-id :ack-val ack-val})))
+  [messenger event ^Channel peer-link message-id completion-id ack-val]
+  (.writeAndFlush peer-link 
+                  ^ByteBuf (protocol/build-ack-msg-buf (allocator peer-link) 
+                                                       message-id 
+                                                       completion-id 
+                                                       ack-val)
+                  (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
-  [messenger event id peer-link]
-  (s/put! peer-link (protocol/completion-msg->frame {:id id})))
+  [messenger event id ^Channel peer-link]
+  (.writeAndFlush peer-link 
+                  ^ByteBuf (protocol/build-completion-msg-buf (allocator peer-link) id)
+                  (.voidPromise ^Channel peer-link)))
+
+(defmethod extensions/close-peer-connection NettyTcpSockets
+  [messenger event ^Channel peer-link]
+  (.close peer-link))

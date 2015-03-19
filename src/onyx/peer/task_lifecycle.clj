@@ -27,7 +27,7 @@
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
-        n (mod (.hashCode (:message m)) (count peers))]
+        n (mod (hash (:message m)) (count peers))]
     (assoc m :acker-id (nth peers n))))
 
 (defn add-completion-id [event m]
@@ -49,7 +49,7 @@
 (defn fuse-ack-vals [task parent-ack child-ack]
   (if (= (:onyx/type task) :output)
     parent-ack
-    (acker/prefuse-vals parent-ack child-ack)))
+    (acker/prefuse-vals (vector parent-ack child-ack))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
@@ -183,7 +183,9 @@
   (let [segments (try (p-ext/apply-fn event input) (catch Exception e e))]
     (if (sequential? segments) segments (vector segments))))
 
+
 (defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+  ; PERF: Tight inner loop where a lot of time is spent 
   (merge
    event
    {:onyx.core/results
@@ -318,7 +320,7 @@
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
-                           :onyx.core/params (resolve-calling-params catalog-entry  opts)
+                           :onyx.core/params (resolve-calling-params catalog-entry opts)
                            :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer

@@ -7,7 +7,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
-              [taoensso.timbre :refer [debug]]
+              [taoensso.timbre :as timbre :refer [debug]]
               [dire.core :refer [with-post-hook!]])
     (:import [java.util UUID]
              [java.security MessageDigest]))

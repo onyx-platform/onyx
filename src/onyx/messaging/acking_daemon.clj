@@ -42,12 +42,12 @@
 (defn gen-ack-value
   "Generate a 64-bit value to bit-xor against the current ack-value."
   []
-  (.nextLong (java.security.SecureRandom.)))
+  (.nextLong (java.util.concurrent.ThreadLocalRandom/current)))
 
 (defn prefuse-vals
   "Prefuse values on a peer before sending them to the acking
    daemon to decrease packet size."
-  [& vals]
+  [vals]
   (let [vals (filter identity vals)]
     (cond (zero? (count vals)) nil
           (= 1 (count vals)) (first vals)

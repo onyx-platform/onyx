@@ -45,10 +45,10 @@
     (taoensso.timbre/info "Starting HTTP Kit WebSockets")
 
     (let [ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (clojure.core.async/dropping-buffer 100000))
+          release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
           ip "0.0.0.0"
-          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 100000})]
+          server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 1000000})]
       (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
 
   (stop [component]
@@ -90,8 +90,8 @@
         segments))))
 
 (defmethod extensions/send-messages HttpKitWebSockets
-  [messenger event peer-link compressed-batch]
-  (ws/send-msg peer-link compressed-batch))
+  [messenger event peer-link batch]
+  (ws/send-msg peer-link (compress batch)))
 
 (defmethod extensions/internal-ack-message HttpKitWebSockets
   [messenger event peer-link message-id completion-id ack-val]

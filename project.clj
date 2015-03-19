@@ -20,8 +20,6 @@
                  [zookeeper-clj "0.9.1" :exclusions [io.netty/netty]]
                  [io.netty/netty-all "4.0.26.Final"]
                  [http-kit "2.1.17"]
-                 [gloss "0.2.4" :exclusions [manifold]]
-                 [aleph "0.4.0-beta3"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [org.clojure/data.generators "0.1.2"]
