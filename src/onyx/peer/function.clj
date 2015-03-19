@@ -82,13 +82,13 @@
                   scattered (get grouped nil)
                   scattered-target (rand-nth active-peers)
                   scattered-link (operation/peer-link event scattered-target :send-peer-site)]
-              (onyx.extensions/send-messages messenger event scattered-link (compress (filter-by-route scattered task-name)))
+              (onyx.extensions/send-messages messenger event scattered-link (filter-by-route scattered task-name))
 
               (doseq [k (filter identity (keys grouped))]
                 (let [messages (get grouped k)
                       target (nth active-peers (mod (.hashCode k) (count active-peers)))
                       target-link (operation/peer-link event target :send-peer-site)]
-                  (onyx.extensions/send-messages messenger event target-link (compress (filter-by-route messages task-name)))))))))
+                  (onyx.extensions/send-messages messenger event target-link (filter-by-route messages task-name))))))))
       {})
     {}))
 
