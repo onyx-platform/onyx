@@ -60,7 +60,7 @@
 
 (def no-op-error-handler
   (proxy [Consumer] []
-    (accept [_] (prn "Conductor is down."))))
+    (accept [_] (taoensso.timbre/warn "Conductor is down."))))
 
 (def media-driver
   (MediaDriver/launch))
