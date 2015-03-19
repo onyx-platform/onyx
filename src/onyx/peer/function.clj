@@ -28,15 +28,18 @@
     :leaves
     (mapv
      (fn [leaf]
-       (let [msg (if (and (operation/exception? (:segment leaf))
+       (let [msg (if (and (operation/exception? (:message leaf))
                           (:post-transformation (:routes leaf)))
                    (operation/apply-fn
                     (operation/kw->fn (:post-transformation (:routes leaf)))
-                    [event] (:segment leaf))
-                   (:segment leaf))]
-         (assoc leaf :hash-group (reduce (fn [groups t]
-                                           (assoc groups t (group-message msg catalog t)))
-                                         {} next-tasks))))
+                    [event] (:message leaf))
+                   (:message leaf))]
+         (assoc leaf
+           :hash-group
+           (reduce (fn [groups t]
+                     (assoc groups t (group-message msg catalog t)))
+                   {} next-tasks)
+           :message msg)))
      (:leaves result))))
 
 (defmethod l-ext/start-lifecycle? :function
