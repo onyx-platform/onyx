@@ -12,7 +12,7 @@
              [uk.co.real_logic.agrona CloseHelper]
              [uk.co.real_logic.aeron.driver MediaDriver]
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
-             [uk.co.real_logic.aeron.common BackoffIdleStrategy]
+             [uk.co.real_logic.agrona.concurrent BackoffIdleStrategy]
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
