@@ -39,7 +39,7 @@
            (reduce (fn [groups t]
                      (assoc groups t (group-message msg catalog t)))
                    {} next-tasks)
-           :message msg)))
+           :message (apply dissoc msg (:exclusions (:routes leaf))))))
      (:leaves result))))
 
 (defmethod l-ext/start-lifecycle? :function
