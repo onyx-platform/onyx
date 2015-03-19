@@ -107,26 +107,30 @@
                  (merge leaf
                         {:id (:id root)
                          :acker-id (:acker-id root)
-                         :completion-id (:completion-id root)}))
+                         :completion-id (:completion-id root)
+                         :ack-val (acker/gen-ack-value)}))
                leaves)))
      results)}))
 
-(defn ack-messages [{:keys [onyx.core/results] :as event}]
-  (merge
-   event
-   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
-     (doseq [result results]
-       (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
-             leaf-vals (repeat (count leaves) (acker/gen-ack-value))
-             fused-vals (apply acker/prefuse-vals (concat (:ack-val (:root result)) leaf-vals))
-             link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
-         (extensions/internal-ack-message
-          (:onyx.core/messenger event)
-          event
-          link
-          (:id (:root result))
-          (:completion-id (:root result))
-          fused-vals))))))
+(defn gen-ack-fusion-vals [task-map leaves]
+  (when-not (= (:onyx/type task-map) :output)
+    (map :ack-val leaves)))
+
+(defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
+  (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
+    (doseq [result results]
+      (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
+            leaf-vals (gen-ack-fusion-vals task-map leaves)
+            fused-vals (apply acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
+            link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
+        (extensions/internal-ack-message
+         (:onyx.core/messenger event)
+         event
+         link
+         (:id (:root result))
+         (:completion-id (:root result))
+         fused-vals))))
+  event)
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
@@ -186,7 +190,7 @@
     (reduce
      (fn [coll segment]
        (let [segments (collect-next-segments event (:message segment))
-             leaves (map (partial apply hash-map) (map vector (repeat :segment) segments))]
+             leaves (map (partial apply hash-map) (map vector (repeat :message) segments))]
          (conj coll {:root segment :leaves leaves})))
      []
      (:onyx.core/decompressed event))}))
@@ -200,7 +204,7 @@
      {:onyx.core/results
       (reduce
        (fn [coll segment]
-         (let [leaves (map (partial apply hash-map) (map vector (repeat :segment) segments))]
+         (let [leaves (map (partial apply hash-map) (map vector (repeat :message) segments))]
            (conj coll {:root segment :leaves leaves})))
        []
        (:onyx.core/decompressed event))})))

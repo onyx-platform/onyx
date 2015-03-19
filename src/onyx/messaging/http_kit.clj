@@ -20,20 +20,23 @@
     (server/on-receive
      channel
      (fn [data]
-       (let [thawed (decompress data)
-             uri (:uri request)]
-         (cond (= uri send-route)
-               (doseq [message thawed]
-                 (>!! inbound-ch message))
+       (try
+         (let [thawed (decompress data)
+               uri (:uri request)]
+           (cond (= uri send-route)
+                 (doseq [message thawed]
+                   (>!! inbound-ch message))
 
-               (= uri acker-route)
-               (acker/ack-message daemon
-                                  (:id thawed)
-                                  (:completion-id thawed)
-                                  (:ack-val thawed))
+                 (= uri acker-route)
+                 (acker/ack-message daemon
+                                    (:id thawed)
+                                    (:completion-id thawed)
+                                    (:ack-val thawed))
 
-               (= uri completion-route)
-               (>!! release-ch (:id thawed))))))))
+                 (= uri completion-route)
+                 (>!! release-ch (:id thawed))))
+         (catch Exception e
+           (timbre/warn e)))))))
 
 (defrecord HttpKitWebSockets [opts]
   component/Lifecycle

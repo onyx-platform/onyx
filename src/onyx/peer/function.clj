@@ -65,7 +65,7 @@
 (defn filter-by-route [messages task-name]
   (->> messages
        (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
-       (map :segment)))
+       (map #(dissoc % :routes :hash-group))))
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
