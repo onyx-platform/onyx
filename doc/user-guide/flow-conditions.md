@@ -147,7 +147,7 @@ If multiple flow condition entries evaluate to a true predicate, their `:flow/to
 
 ### Exceptions
 
-Flow Conditions give you leverage for handling exceptions without miring your code in `try`/`catch` logic. If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting `:flow/thrown-exception?` to `true`. It's default value is `false`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Exception flow conditions must have `:flow/short-circuit?` set to `true`. Note that exceptions don't serialize. See Post-transformations for sending exception values to downstream tasks.
+Flow Conditions give you leverage for handling exceptions without miring your code in `try`/`catch` logic. If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting `:flow/thrown-exception?` to `true`. It's default value is `false`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Exception flow conditions must have `:flow/short-circuit?` set to `true`. Note that exceptions don't serialize. This feature is meant to be used in conjunction with Post-transformations and Actions for sending exception values to downstream tasks.
 
 ```clojure
 {:flow/from :input-stream
@@ -166,7 +166,7 @@ And the predicate might be:
 
 ### Post-transform
 
-Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with the same parameters to the predicate that was evaluated. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
+Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with two parameters: the event map and the exception object. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
 
 Example:
 

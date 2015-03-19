@@ -60,5 +60,7 @@ Clojure functions again serve as a huge win. [Dire](https://github.com/MichaelDr
 
 #### AOT Nothing
 
-Onyx AOT's absolutely nothing on your behalf. When you're ready to stand your jar up, simply uberjar and start executing on the target machine. Hadoop and Storm cause dependency hell (In Storm's case, you're restricted to Clojure 1.5.1 because you're locked in by the Executor) by providing their own dependencies on top of yours. Onyx won't mess with your dependencies.
+Onyx AOT's absolutely nothing on your behalf. When you're ready to stand your jar up, simply uberjar and start executing on the target machine. Hadoop and Storm cause dependency hell (In Storm's case, you're restricted to a particular version of Clojure because you're locked in by the Executor) by providing their own dependencies on top of yours. Onyx won't mess with your dependencies.
+
+You can, however, AOT Onyx yourself to speed up compilation times.
 

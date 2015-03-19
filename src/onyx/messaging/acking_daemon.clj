@@ -28,7 +28,9 @@
              (let [current-val (second (get-in state [message-id]))]
                (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
     (when-let [x (get rets message-id)]
-      (when (zero? (second x))
+      ;; The "or" handles the case where an input task receives a segment
+      ;; that is routed to zero downstream tasks.
+      (when (zero? (or (second x) 0))
         (swap! (:ack-state daemon) dissoc message-id)
         (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})))))
 

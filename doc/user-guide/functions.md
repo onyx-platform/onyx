@@ -96,6 +96,8 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 Sometimes you might be able to perform a function more efficiently over a batch of segments rather than processing one segment at a time, such as writing segments to a database in a non-output task. You can receive the entire batch of segments as an argument to your task by setting `:onyx/side-effects-only?` to `true` in your catalog entry for your function. Onyx will *ignore* the output of your function and pass the same segments that you received downstream. Hence, functions with this option set to `true` may *not* appear as the leaf node in a workflow. Note that you can perform side effects in *any* function, but the utility of this feature is that you receive the entire batch in one shot. Onyx ignores your output because it would make it impossible to track which specific messages are children of particular upstream messages - breaking Onyx's fault tolerance feature.
 
+Functions with this key enabled may *not* be used with flow conditions. These segments are passed to the immediate downstream tasks.
+
 An example catalog entry:
 
 ```clojure

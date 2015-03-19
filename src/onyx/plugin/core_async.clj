@@ -64,8 +64,9 @@
 
 (defmethod p-ext/write-batch [:output :core.async]
   [{:keys [onyx.core/compressed core.async/chan]}]
-  (doseq [segment compressed]
-    (>!! chan (:message segment)))
+  (doseq [msg compressed]
+    (doseq [leaf (:leaves msg)]
+      (>!! chan (:message leaf))))
   {})
 
 (defmethod p-ext/seal-resource [:output :core.async]

@@ -22,7 +22,7 @@
 (def out-chan (chan (sliding-buffer 100)))
 
 (doseq [x (range 20)]
-  (>!! in-chan x))
+  (>!! in-chan {:n x}))
 
 (>!! in-chan :done)
 (close! in-chan)
@@ -83,10 +83,10 @@
     :flow/post-transform :onyx.peer.flow-exception-test/transform-five}])
 
 (defn even-exception? [event e]
-  (= (:error e) :even))
+  (= (:error (ex-data e)) :even))
 
 (defn five-exception? [event e]
-  (= (:error e) :five))
+  (= (:error (ex-data e)) :five))
 
 (defn transform-even [event e]
   {:error? true :value (:n (ex-data e))})
@@ -104,7 +104,30 @@
 
 (def results (take-segments! out-chan))
 
-(prn results)
+(fact
+ (into #{} results)
+ =>
+ #{{:error? true :value 0}
+   {:n 1}
+   {:error? true :value 2}
+   {:n 3}
+   {:error? true :value 4}
+   {:error? true :value "abc"}
+   {:error? true :value 6}
+   {:n 7}
+   {:error? true :value 8} 
+   {:n 9}
+   {:error? true :value 10}
+   {:n 11}
+   {:error? true :value 12}
+   {:n 13}
+   {:error? true :value 14}
+   {:n 15}
+   {:error? true :value 16}
+   {:n 17}
+   {:error? true :value 18}
+   {:n 19}
+   :done})
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

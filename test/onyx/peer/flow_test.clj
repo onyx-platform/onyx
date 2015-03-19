@@ -61,9 +61,6 @@
 
 (>!! colors-in-chan :done)
 
-(close! people-in-chan)
-(close! colors-in-chan)
-
 (def catalog
   [{:onyx/name :people-in
     :onyx/ident :core.async/read-from-chan
@@ -413,6 +410,9 @@
 (fact (into #{} green) => green-expectatations)
 (fact (into #{} red) => red-expectatations)
 (fact (into #{} blue) => blue-expectatations)
+
+(close! colors-in-chan)
+(close! people-in-chan)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
