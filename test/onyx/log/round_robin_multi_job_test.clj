@@ -137,13 +137,6 @@
           task-d (nth (get-in new-replica [:tasks j2]) 0)
           task-e (nth (get-in new-replica [:tasks j2]) 1)
           task-f (nth (get-in new-replica [:tasks j2]) 2)]
-      (println "round robin multi job test " task-d task-e task-f
-                   (count (get (get (:allocations new-replica) j1) task-a))
-                   (count (get (get (:allocations new-replica) j1) task-b))
-                   (count (get (get (:allocations new-replica) j1) task-c))
-                   (count (get (get (:allocations new-replica) j2) task-d))
-                   (count (get (get (:allocations new-replica) j2) task-e))
-                   (count (get (get (:allocations new-replica) j2) task-f)))
       (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
                    (= (count (get (get (:allocations new-replica) j1) task-b)) 0)
                    (= (count (get (get (:allocations new-replica) j1) task-c)) 0)
@@ -157,5 +150,5 @@
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
-(fact true => true)
+(fact "Peers balanced after job killed in multi-job test" true => true)
 
