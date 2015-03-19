@@ -129,7 +129,9 @@
          link
          (:id (:root result))
          (:completion-id (:root result))
-         fused-vals))))
+         ;; or'ing by zero covers the case of flow conditions where an
+         ;; input task produces a segment that goes nowhere.
+         (or fused-vals 0)))))
   event)
 
 (defn inject-batch-resources [event]
