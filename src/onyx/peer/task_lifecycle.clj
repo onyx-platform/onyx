@@ -121,7 +121,7 @@
     (doseq [result results]
       (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
             leaf-vals (gen-ack-fusion-vals task-map leaves)
-            fused-vals (apply acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
+            fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
             link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
