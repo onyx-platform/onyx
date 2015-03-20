@@ -267,9 +267,9 @@
 (defn compile-fc-exs [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
-(defn run-task-lifecycle [init-event kill-ch ex-f]
+(defn run-task-lifecycle [init-event seal-ch kill-ch ex-f]
   (try
-    (while (first (alts!! [kill-ch] :default true))
+    (while (first (alts!! [seal-ch kill-ch] :default true))
       (-> init-event
           (inject-batch-resources)
           (read-batch)
@@ -353,7 +353,7 @@
         (release-messages! messenger pipeline-data)
         (thread (forward-completion-calls! pipeline-data completion-ch))
         (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
-        (thread (run-task-lifecycle pipeline-data kill-ch ex-f))
+        (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
 
         (assoc component :pipeline-data pipeline-data :seal-ch seal-resp-ch))
       (catch Exception e
@@ -416,4 +416,6 @@
 (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id))))
+
+
 
