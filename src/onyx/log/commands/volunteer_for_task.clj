@@ -171,7 +171,7 @@
            (or (not= (:job state) (:job diff))
                (not= (:task state) (:task diff))))
     (do (when (:lifecycle state)
-          (component/stop (:lifecycle state)))
+          (component/stop @(:lifecycle state)))
         (let [seal-ch (chan)
               new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
               new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
