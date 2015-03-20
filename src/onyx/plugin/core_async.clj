@@ -63,7 +63,7 @@
   {:onyx.core/compressed results})
 
 (defmethod p-ext/write-batch [:output :core.async]
-  [{:keys [onyx.core/compressed core.async/chan]}]
+  [{:keys [onyx.core/compressed core.async/chan] :as event}]
   (doseq [msg compressed]
     (doseq [leaf (:leaves msg)]
       (>!! chan (:message leaf))))

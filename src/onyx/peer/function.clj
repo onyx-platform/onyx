@@ -70,25 +70,47 @@
        (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
        (map #(dissoc % :routes :hash-group))))
 
+(defn build-segments-to-send [leaves]
+  (reduce
+   (fn [all {:keys [routes ack-vals hash-group message] :as leaf}]
+     (concat
+      all
+      (map
+       (fn [route ack-val]
+         {:id (:id leaf)
+          :acker-id (:acker-id leaf)
+          :completion-id (:completion-id leaf)
+          :message (:message leaf)
+          :ack-val ack-val
+          :route route
+          :hash-group (get hash-group route)})
+       (:flow routes) ack-vals)))
+   []
+   leaves))
+
+(defn strip-message [segment]
+  (select-keys segment [:id :acker-id :completion-id :ack-val :message]))
+
+(defn pick-peer [active-peers hash-group]
+  (if (nil? hash-group)
+    (rand-nth active-peers)
+    (nth active-peers
+         (mod (.hashCode hash-group)
+              (count active-peers)))))
+
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
-  (if (seq (mapcat :leaves (:onyx.core/compressed event)))
-    (let [replica @(:onyx.core/replica event)]
-      (doseq [[task-name task-id] (:egress-ids (:onyx.core/serialized-task event))]
-        (let [peers (get-in replica [:allocations job-id task-id])
-              active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)]
-          (when (seq active-peers)
-            (let [grouped (group-by (comp #(get % task-name) :hash-group) (mapcat :leaves (:onyx.core/compressed event)))
-                  scattered (get grouped nil)
-                  scattered-target (rand-nth active-peers)
-                  scattered-link (operation/peer-link event scattered-target :send-peer-site)]
-              (onyx.extensions/send-messages messenger event scattered-link (filter-by-route scattered task-name))
-
-              (doseq [k (filter identity (keys grouped))]
-                (let [messages (get grouped k)
-                      target (nth active-peers (mod (.hashCode k) (count active-peers)))
-                      target-link (operation/peer-link event target :send-peer-site)]
-                  (onyx.extensions/send-messages messenger event target-link (filter-by-route messages task-name))))))))
-      {})
-    {}))
+  (let [leaves (mapcat :leaves (:onyx.core/compressed event))
+        egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
+    (when (seq leaves)
+      (let [replica @(:onyx.core/replica event)
+            segments (build-segments-to-send leaves)
+            groups (group-by #(select-keys % [:route :hash-group]) segments)]
+        (doseq [[{:keys [route hash-group]} segs] groups]
+          (let [peers (get-in replica [:allocations job-id (get egress-tasks route)])
+                active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
+                target (pick-peer active-peers hash-group)
+                link (operation/peer-link event target :send-peer-site)]
+            (onyx.extensions/send-messages messenger event link (map strip-message segs))))
+        {}))))
 

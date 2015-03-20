@@ -108,13 +108,13 @@
                         {:id (:id root)
                          :acker-id (:acker-id root)
                          :completion-id (:completion-id root)
-                         :ack-val (acker/gen-ack-value)}))
+                         :ack-vals (repeatedly (count (:flow (:routes leaf))) (fn [] (acker/gen-ack-value)))}))
                leaves)))
      results)}))
 
 (defn gen-ack-fusion-vals [task-map leaves]
   (when-not (= (:onyx/type task-map) :output)
-    (map :ack-val leaves)))
+    (mapcat :ack-vals leaves)))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
@@ -187,7 +187,7 @@
 
 
 (defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
-  ; PERF: Tight inner loop where a lot of time is spent 
+  ;; PERF: Tight inner loop where a lot of time is spent
   (merge
    event
    {:onyx.core/results
@@ -281,9 +281,9 @@
           (apply-fn)
           (route-output-flow)
           (build-new-segments)
-          (ack-messages)
           (compress-batch)
           (write-batch)
+          (ack-messages)
           (close-batch-resources)))
     (catch Exception e
       (ex-f e))))
