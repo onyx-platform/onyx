@@ -19,7 +19,7 @@
            :fn rotor/appender-fn})
         (timbre/set-config!
           [:shared-appender-config :rotor]
-          {:path file :max-size (* 512 10240) :backlog 5})
+          {:path file :max-size (* 512 102400) :backlog 5})
         (timbre/set-config! [:appenders :standard-out]
                             {:min-level :error
                              :enabled? true})
