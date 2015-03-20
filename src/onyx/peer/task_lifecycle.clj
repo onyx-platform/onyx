@@ -350,12 +350,17 @@
             (Thread/sleep 500)
             (recur @replica)))
 
-        (release-messages! messenger pipeline-data)
-        (thread (forward-completion-calls! pipeline-data completion-ch))
-        (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)
-        (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
-
-        (assoc component :pipeline-data pipeline-data :seal-ch seal-resp-ch))
+        (let [release-messages-ch (release-messages! messenger pipeline-data)
+              forward-completion-ch (thread (forward-completion-calls! pipeline-data completion-ch))
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
+              listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
+          (assoc component 
+                 :pipeline-data pipeline-data 
+                 :seal-ch seal-resp-ch
+                 :release-messages-ch release-messages-ch
+                 :forward-completion-ch forward-completion-ch 
+                 :task-lifecycle-ch task-lifecycle-ch
+                 :listen-for-sealer-ch listen-for-sealer-ch)))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
@@ -366,6 +371,12 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
+      
+      ;; Ensure task operations are finished before closing peer connections
+      (<!! (:task-lifecycle-ch component))
+      (<!! (:listen-for-sealer-ch component))
+      (<!! (:forward-completion-ch component))
+      (<!! (:release-messages-ch component))
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (get-in state [:links :send-peer-site])]
@@ -374,7 +385,14 @@
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))
         (doseq [[_ link] (get-in state [:links :completion-peer-site])]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
-    component))
+
+    (assoc component 
+           :pipeline-data nil 
+           :seal-ch nil
+           :release-messages-ch nil
+           :forward-completion-ch nil 
+           :task-lifecycle-ch nil
+           :listen-for-sealer-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts]}]
