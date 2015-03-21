@@ -4,6 +4,7 @@
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.messaging.common :refer [choose-ip]]
               [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
@@ -77,7 +78,7 @@
 
           ;; TODO, correct port allocation
           port (+ 40000 (rand-int 10000))
-          channel (str "udp://localhost:" port)
+          channel (format "udp://%s:%s" (choose-ip opts) port)
 
           rand-stream-id (fn [] (rand-int 1000000))
           send-stream-id (rand-stream-id)
