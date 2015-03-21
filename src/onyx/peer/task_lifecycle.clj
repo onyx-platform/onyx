@@ -57,11 +57,11 @@
         :else (clojure.set/union (into #{} all) (into #{} to-add))))
 
 (defn choose-output-paths
-  [event compiled-flow-conditions segment serialized-task downstream]
+  [event compiled-flow-conditions result leaf serialized-task downstream]
   (if (seq compiled-flow-conditions)
     (reduce
      (fn [{:keys [flow exclusions] :as all} entry]
-       (if ((:flow/predicate entry) [event (:message segment)])
+       (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
          (if (:flow/short-circuit? entry)
            (reduced {:flow (join-output-paths flow (:flow/to entry) downstream)
                      :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))
@@ -75,10 +75,10 @@
 
 (defn add-route-data
   [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
-    :as event} segment downstream]
-  (if (operation/exception? (:message segment))
-    (choose-output-paths event compiled-ex-fcs segment serialized-task downstream)
-    (choose-output-paths event compiled-norm-fcs segment serialized-task downstream)))
+    :as event} result leaf downstream]
+  (if (operation/exception? (:message leaf))
+    (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
+    (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
 (defn route-output-flow
   [{:keys [onyx.core/serialized-task onyx.core/results] :as event}]
@@ -91,7 +91,7 @@
          (assoc result :leaves
                 (mapv
                  (fn [leaf]
-                   (assoc leaf :routes (add-route-data event leaf downstream)))
+                   (assoc leaf :routes (add-route-data event result leaf downstream)))
                  leaves)))
        results)})))
 

@@ -82,10 +82,10 @@
     :flow/predicate [:onyx.peer.flow-exception-test/five-exception?]
     :flow/post-transform :onyx.peer.flow-exception-test/transform-five}])
 
-(defn even-exception? [event e]
+(defn even-exception? [event old e all-new]
   (= (:error (ex-data e)) :even))
 
-(defn five-exception? [event e]
+(defn five-exception? [event old e all-new]
   (= (:error (ex-data e)) :five))
 
 (defn transform-even [event e]

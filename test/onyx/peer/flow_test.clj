@@ -285,34 +285,34 @@
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.flow-test/orange?}])
 
-(defn child? [event {:keys [age]} max-child-age]
+(defn child? [event old {:keys [age]} all-new max-child-age]
   (<= age max-child-age))
 
-(defn adult? [event {:keys [age]}]
+(defn adult? [event old {:keys [age]} all-new]
   (>= age 18))
 
-(defn athlete? [event {:keys [job]}]
+(defn athlete? [event old {:keys [job]} all-new]
   (= job "athlete"))
 
-(defn washington-resident? [event {:keys [location]}]
+(defn washington-resident? [event old {:keys [location]} all-new]
   (= location "Washington"))
 
-(defn black? [event {:keys [color]}]
+(defn black? [event old {:keys [color]} all-new]
   (= color "black"))
 
-(defn white? [event {:keys [color]}]
+(defn white? [event old {:keys [color]} all-new]
   (= color "white"))
 
-(defn red? [event {:keys [color]}]
+(defn red? [event old {:keys [color]} all-new]
   (= color "red"))
 
-(defn blue? [event {:keys [color]}]
+(defn blue? [event old {:keys [color]} all-new]
   (= color "blue"))
 
-(defn green? [event {:keys [color]}]
+(defn green? [event old {:keys [color]} all-new]
   (= color "green"))
 
-(defn orange? [event {:keys [color]}]
+(defn orange? [event old {:keys [color]} all-new]
   (= color "orange"))
 
 (def constantly-true (constantly true))

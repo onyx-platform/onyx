@@ -68,7 +68,7 @@ There is *one* flow conditions data structure per job - that is, there is one ve
 
 ### Predicate Function Signatures
 
-A predicate function is a Clojure function that takes at least two parameters - a context map, and a segment. Predicates can take parameters at runtime. They will be appended to the end of the function invocation. See Predicate Parameters for further discussion of how to use runtime parameters.
+A predicate function is a Clojure function that takes at least four parameters - a context map, the old segment, the new semgent, and the collection of all new segments produced from the old segment. Predicates can take parameters at runtime. They will be appended to the end of the function invocation. See Predicate Parameters for further discussion of how to use runtime parameters.
 
 Predicates for the above examples can be seen below:
 
