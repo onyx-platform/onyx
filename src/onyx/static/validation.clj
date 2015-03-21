@@ -42,10 +42,15 @@
     (throw (Exception. (str "Task " (:onyx/name task)
                             " cannot use the same value for :onyx/name as :onyx/type.")))))
 
+(defn name-and-type-not-equal [entry]
+  (when (= (:onyx/name entry) (:onyx/type entry))
+    (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
+
 (defn validate-catalog
   [catalog]
   (doseq [entry catalog]
-    (schema/validate catalog-entry-validator entry)))
+    (schema/validate catalog-entry-validator entry)
+    (name-and-type-not-equal entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
