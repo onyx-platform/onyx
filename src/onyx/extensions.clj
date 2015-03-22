@@ -36,13 +36,11 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
-(defmulti send-peer-site (fn [messenger] (type messenger)))
+(defmulti assign-site-resources (fn [messenger peer-sites] (type messenger)))
 
-(defmulti acker-peer-site (fn [messenger] (type messenger)))
+(defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
-(defmulti completion-peer-site (fn [messenger] (type messenger)))
-
-(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
+(defmulti connect-to-peer (fn [messenger event peer-site site-resources] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
