@@ -62,7 +62,9 @@
             (Thread/sleep 10)
             [{:fn :accept-join-cluster
               :args diff
-              :site-resources (extensions/assign-site-resources (:messenger peer-args) (:peer-sites new))
+              :site-resources (extensions/assign-site-resources (:messenger peer-args) 
+                                                                (:peer-sites new) 
+                                                                (:peer-site-resources new))
               :immediate? true}]))))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster

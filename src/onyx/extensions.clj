@@ -36,7 +36,7 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
-(defmulti assign-site-resources (fn [messenger peer-sites] (type messenger)))
+(defmulti assign-site-resources (fn [messenger peer-sites peer-site-resources] (type messenger)))
 
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 

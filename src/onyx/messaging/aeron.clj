@@ -74,10 +74,7 @@
 
     (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
           ip (choose-ip opts)]
-      (assoc component 
-             :ip ip
-             :site-resources (atom nil)
-             :release-ch release-ch)))
+      (assoc component :ip ip :site-resources (atom nil) :release-ch release-ch)))
 
   (stop [{:keys [aeron site-resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
@@ -107,10 +104,7 @@
       (catch Exception e
         (fatal e)))
 
-    (assoc component 
-           :ip nil 
-           :site-resources nil
-           :release-ch nil)))
+    (assoc component :ip nil :site-resources nil :release-ch nil)))
 
 (defn aeron [opts]
   (map->AeronConnection {:opts opts}))
@@ -122,7 +116,9 @@
 (def allc (atom 40200))
 
 (defmethod extensions/assign-site-resources AeronConnection
-  [messenger peer-sites]
+  [messenger peer-sites peer-site-resources]
+  ; Port allocation scheme will eventually look at peer-sites
+  ; and peer-site-resources and find an unallocated port for this ip/addr
   {:aeron/port (swap! allc inc)})
 
 (def send-stream-id 1)
