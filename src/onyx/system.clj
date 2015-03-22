@@ -88,10 +88,9 @@
 (defn onyx-peer
   [config]
   (map->OnyxPeer
-   {:logging-config (logging-config/logging-configuration (:logging config))
-    :log (component/using (zookeeper config) [:logging-config])
-    :acking-daemon (component/using (acking-daemon config) [:log])
-    :messenger-buffer (component/using (messenger-buffer config) [:log :acking-daemon])
-    :messenger (component/using (messenger-ctor config) [:acking-daemon :messenger-buffer])
-    :virtual-peer (component/using (virtual-peer config) [:log :acking-daemon :messenger-buffer :messenger])}))
+    {:log (component/using (zookeeper config) [:logging-config])
+     :acking-daemon (component/using (acking-daemon config) [:log])
+     :messenger-buffer (component/using (messenger-buffer config) [:log :acking-daemon])
+     :messenger (component/using (messenger-ctor config) [:acking-daemon :messenger-buffer])
+     :virtual-peer (component/using (virtual-peer config) [:log :acking-daemon :messenger-buffer :messenger])}))
 
