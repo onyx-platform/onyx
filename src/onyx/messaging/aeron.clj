@@ -55,7 +55,6 @@
                                                    10
                                                    (.toNanos TimeUnit/MICROSECONDS 1)
                                                    (.toNanos TimeUnit/MICROSECONDS 100)))]
-        (timbre/info "Started reading")
         (while (not (Thread/interrupted))
           (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
             (.idle idle-strategy fragments-read)))))))
