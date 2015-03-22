@@ -24,7 +24,7 @@
 
 (def development-components [:logging-config :log])
 
-(def client-components [:logging-config :log])
+(def client-components [:log])
 
 (def peer-components [:log :messenger-buffer :messenger :acking-daemon :virtual-peer])
 
@@ -82,8 +82,7 @@
 (defn onyx-client
   [config]
   (map->OnyxClient
-   {:logging-config (logging-config/logging-configuration (:logging config))
-    :log (component/using (zookeeper config) [:logging-config])}))
+   {:log (zookeeper config)}))
 
 (defn onyx-peer
   [config]
