@@ -34,6 +34,8 @@
 
 ;; Messaging interface
 
+(defmulti peer-site (fn [messenger] (type messenger)))
+
 (defmulti send-peer-site (fn [messenger] (type messenger)))
 
 (defmulti acker-peer-site (fn [messenger] (type messenger)))

@@ -79,6 +79,7 @@
           ;; TODO, correct port allocation
           port (+ 40000 (rand-int 10000))
           channel (format "udp://%s:%s" (choose-ip opts) port)
+          ip (choose-ip opts)
 
           rand-stream-id (fn [] (rand-int 1000000))
           send-stream-id (rand-stream-id)
@@ -103,6 +104,7 @@
                                              (catch Exception e (fatal e))))]
       (assoc component 
              :channel channel 
+             :ip ip
              :send-stream-id send-stream-id
              :acker-stream-id acker-stream-id 
              :completion-stream-id completion-stream-id
@@ -137,12 +139,16 @@
       (catch Exception e
         (fatal e)))
 
-    (assoc component :driver nil :channel nil :release-ch nil :aeron nil 
+    (assoc component :driver nil :ip nil :channel nil :release-ch nil :aeron nil 
            :accept-send-fut nil :accept-acker-fut nil :accept-completion-fut nil 
            :send-subscriber nil :acker-subscriber nil :completion-subscriber nil)))
 
 (defn aeron [opts]
   (map->AeronConnection {:opts opts}))
+
+(defmethod extensions/peer-site AeronConnection
+  [messenger]
+  {:ip (:ip messenger)})
 
 (defmethod extensions/send-peer-site AeronConnection
   [messenger]

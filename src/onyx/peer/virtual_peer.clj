@@ -83,14 +83,10 @@
             kill-ch (chan (dropping-buffer 1))
             restart-ch (chan 1)
             completion-ch (:completions-ch acking-daemon)
-            send-peer-site (extensions/send-peer-site messenger)
-            acker-peer-site (extensions/acker-peer-site messenger)
-            completion-peer-site (extensions/completion-peer-site messenger)
+            peer-site (extensions/peer-site messenger)
             entry (create-log-entry :prepare-join-cluster
-                                    {:joiner id
-                                     :send-site send-peer-site
-                                     :acker-site acker-peer-site
-                                     :completion-site completion-peer-site})
+                                    {:joiner id 
+                                     :peer-site peer-site})
             origin (extensions/subscribe-to-log log inbox-ch)]
         (extensions/register-pulse log id)
         (>!! outbox-ch entry)
