@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :abort-join-cluster
@@ -28,8 +29,10 @@
 
 (defmethod extensions/reactions :abort-join-cluster
   [{:keys [args]} old new diff peer-args]
+  (timbre/info "in abort join preparing ")
   (when (= (:id args) (:id peer-args))
     [{:fn :prepare-join-cluster
-      :args {:joiner (:id peer-args)}
+      :args {:joiner (:id peer-args)
+             :peer-site (extensions/peer-site (:messenger peer-args))}
       :immediate? true}]))
 

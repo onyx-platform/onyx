@@ -1,6 +1,7 @@
 (ns onyx.log.commands.notify-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
+            [taoensso.timbre :refer [info] :as timbre]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
@@ -26,6 +27,7 @@
   (when (= (:id peer-args) (:observer diff))
     [{:fn :accept-join-cluster
       :args diff
+      :site-resources (extensions/assign-site-resources (:messenger peer-args) (:peer-sites new))
       :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
