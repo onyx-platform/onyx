@@ -305,17 +305,17 @@
   (map->NettyTcpSockets {:opts opts}))
 
 ; Not much need for these in aleph
-(defmethod extensions/send-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/send-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
-(defmethod extensions/acker-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/acker-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
-(defmethod extensions/completion-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/completion-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event [host port]]
