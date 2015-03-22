@@ -110,7 +110,7 @@
           (let [peers (get-in replica [:allocations job-id (get egress-tasks route)])
                 active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
                 target (pick-peer active-peers hash-group)
-                link (operation/peer-link event target :send-peer-site)]
+                link (operation/peer-link event target)]
             (onyx.extensions/send-messages messenger event link (map strip-message segs))))
         {}))))
 
