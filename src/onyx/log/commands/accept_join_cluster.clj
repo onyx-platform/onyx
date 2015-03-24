@@ -5,26 +5,30 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
+(defn handle-join-observation [replica self-stitched observer joiner]
+  (if self-stitched
+    replica
+    (-> replica
+        (assoc-in [:pairs observer] joiner)
+        (assoc-in [:pairs joiner] (or (get-in replica [:pairs observer]) 
+                                      observer))
+        (update-in [:accepted] dissoc observer))))
+
 (defmethod extensions/apply-log-entry :accept-join-cluster
   [{:keys [args site-resources]} replica]
   (let [observer (:accepted-observer args)
         self-stitched (:self-stitched args)
         joiner (or (:accepted-joiner args) self-stitched)]
-    (-> (if self-stitched
-          replica
-          (-> replica
-              (assoc-in [:pairs observer] joiner)
-              (assoc-in [:pairs joiner] (or (get-in replica [:pairs observer]) 
-                                            observer))
-              (update-in [:accepted] dissoc observer)))
-        (update-in [:peers] set)
+    (-> replica
+        (handle-join-observation self-stitched observer joiner)
+        (update-in [:peers] vec)
         (update-in [:peers] conj joiner)
         (assoc-in [:peer-state joiner] :idle)
         (assoc-in [:peer-site-resources joiner] site-resources))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
-  (let [subject (first (second (diff (:peers old) (:peers new))))]
+  (let [subject (first (second (diff (set (:peers old)) (set (:peers new)))))]
     (if-let [observer (get (:pairs new) subject)]
       {:subject subject :observer observer}
       {:subject subject})))
