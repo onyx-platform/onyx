@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :notify-join-cluster
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (let [prepared (get (map-invert (:prepared replica)) (:observer args))]
     (-> replica
         (update-in [:accepted] merge {prepared (:observer args)})
@@ -27,9 +27,6 @@
   (when (= (:id peer-args) (:observer diff))
     [{:fn :accept-join-cluster
       :args diff
-      :site-resources (extensions/assign-site-resources (:messenger peer-args) 
-                                                        (:peer-sites new)
-                                                        (:peer-site-resources new))
       :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
@@ -45,4 +42,3 @@
       (close! (or (:watch-ch state) (chan)))
       (assoc state :watch-ch ch))
     state))
-

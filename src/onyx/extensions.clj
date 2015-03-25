@@ -4,7 +4,7 @@
 
 ;; Replica interface
 
-(defmulti apply-log-entry (fn [entry replica] (:fn entry)))
+(defmulti apply-log-entry (fn [entry replica messenger] (:fn entry)))
 
 (defmulti replica-diff (fn [entry old new] (:fn entry)))
 
@@ -36,11 +36,11 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
-(defmulti assign-site-resources (fn [messenger peer-sites peer-site-resources] (type messenger)))
+(defmulti assign-site-resources (fn [messenger peer-site peer-sites] (type messenger)))
 
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
-(defmulti connect-to-peer (fn [messenger event peer-site site-resources] (type messenger)))
+(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 

@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :kill-job
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (let [peers (mapcat identity (vals (get-in replica [:allocations (:job args)])))]
     (if (some #{(:job args)} (into #{} (incomplete-jobs replica)))
       (-> replica

@@ -22,7 +22,7 @@
    tasks))
 
 (defmethod extensions/apply-log-entry :seal-output
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (let [new (update-in replica [:sealed-outputs (:job args)] union #{(:task args)})]
     (if (common/all-outputs-sealed? new (:job args))
       (let [tasks (get-in replica [:tasks (:job args)])]

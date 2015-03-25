@@ -30,7 +30,7 @@
   replica)
 
 (defmethod extensions/apply-log-entry :submit-job
-  [{:keys [args] :as entry} replica]
+  [{:keys [args] :as entry} replica messenger]
   (-> replica
       (update-in [:jobs] conj (:id args))
       (update-in [:jobs] vec)

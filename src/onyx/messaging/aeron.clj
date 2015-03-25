@@ -73,20 +73,25 @@
     (taoensso.timbre/info "Starting Aeron")
 
     (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
-          ip (choose-ip opts)]
-      (assoc component :ip ip :site-resources (atom nil) :release-ch release-ch)))
+          bind-addr (bind-addr opts)
+          external-addr (external-addr opts)]
+      (assoc component 
+             :bind-addr bind-addr 
+             :external-addr external-addr
+             :resources (atom nil) 
+             :release-ch release-ch)))
 
-  (stop [{:keys [aeron site-resources release-ch] :as component}]
+  (stop [{:keys [aeron resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try 
-      (when-let [resources @site-resources]
+      (when-let [rs @resources]
         (let [{:keys [conn
                       send-subscriber 
                       acker-subscriber 
                       completion-subscriber 
                       accept-send-fut 
                       accept-acker-fut
-                      accept-completion-fut]} resources] 
+                      accept-completion-fut]} rs] 
           (future-cancel accept-send-fut)
           (future-cancel accept-acker-fut)
           (future-cancel accept-completion-fut)
@@ -94,7 +99,7 @@
           (when acker-subscriber (.close acker-subscriber))
           (when completion-subscriber (.close completion-subscriber))
           (when conn (.close conn)))
-        (reset! site-resources nil))
+        (reset! resources nil))
       (close! (:release-ch component))
 
       ;; FIXME, need to startup and shutdown aeron resources properly
@@ -114,13 +119,23 @@
   {:aeron/bind-addr (:bind-addr messenger)
    :aeron/external-addr (:external-addr messenger)})
 
-(def allc (atom 40200))
+(def start-port 40200)
+(def max-port 50000)
 
 (defmethod extensions/assign-site-resources AeronConnection
-  [messenger peer-sites peer-site-resources]
-  ; Port allocation scheme will eventually look at peer-sites
-  ; and peer-site-resources and find an unallocated port for this ip/addr
-  {:aeron/port (swap! allc inc)})
+  [messenger peer-site peer-sites]
+  (let [ports (->> (vals peer-sites)
+                   (filter 
+                     (fn [s]
+                       (and (= (:aeron/bind-addr peer-site) 
+                               (:aeron/bind-addr s))
+                            (= (:aeron/external-addr peer-site) 
+                               (:aeron/external-addr s)))))
+                   (map :aeron/port)
+                   set)
+        port (first (remove ports (range start-port max-port)))]
+    (assert port)
+    {:aeron/port port}))
 
 (def send-stream-id 1)
 (def acker-stream-id 2)

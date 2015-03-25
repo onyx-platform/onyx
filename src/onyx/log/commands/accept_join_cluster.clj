@@ -5,33 +5,26 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
-(defn handle-join-observation [replica self-stitched observer joiner]
-  (if self-stitched
-    replica
-    (-> replica
-        (assoc-in [:pairs observer] joiner)
-        (assoc-in [:pairs joiner] (or (get-in replica [:pairs observer]) 
-                                      observer))
-        (update-in [:accepted] dissoc observer))))
-
 (defmethod extensions/apply-log-entry :accept-join-cluster
-  [{:keys [args site-resources]} replica]
-  (let [observer (:accepted-observer args)
-        self-stitched (:self-stitched args)
-        joiner (or (:accepted-joiner args) self-stitched)]
+  [{:keys [args]} replica _]
+  (let [{:keys [accepted-joiner accepted-observer]} args
+        target (or (get-in replica [:pairs accepted-observer])
+                   accepted-observer)]
     (-> replica
-        (handle-join-observation self-stitched observer joiner)
+        (update-in [:pairs] merge {accepted-observer accepted-joiner})
+        (update-in [:pairs] merge {accepted-joiner target})
+        (update-in [:accepted] dissoc accepted-observer)
         (update-in [:peers] vec)
-        (update-in [:peers] conj joiner)
-        (assoc-in [:peer-state joiner] :idle)
-        (assoc-in [:peer-site-resources joiner] site-resources))))
+        (update-in [:peers] conj accepted-joiner)
+        (assoc-in [:peer-state accepted-joiner] :idle))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
-  (let [subject (first (second (diff (set (:peers old)) (set (:peers new)))))]
-    (if-let [observer (get (:pairs new) subject)]
-      {:subject subject :observer observer}
-      {:subject subject})))
+  (let [rets (first (diff (:accepted old) (:accepted new)))]
+    (assert (<= (count rets) 1))
+    (when (seq rets)
+      {:observer (first (keys rets))
+       :subject (first (vals rets))})))
 
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff state]
@@ -41,10 +34,9 @@
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
   (if (= (:id state) (:subject diff))
-    (let [site-resources (get-in new [:peer-site-resources (:subject diff)])] 
-      (extensions/open-peer-site (:messenger state) site-resources)
-      (doseq [entry (:buffered-outbox state)]
+    (do (extensions/open-peer-site (:messenger state) 
+                                   (get-in new [:peer-sites (:id state)]))
+        (doseq [entry (:buffered-outbox state)]
           (>!! (:outbox-ch state) entry))
         (assoc (dissoc state :buffered-outbox) :stall-output? false))
     state))
-

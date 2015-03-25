@@ -5,7 +5,7 @@
             [onyx.log.commands.common :as common]))
 
 (defmethod extensions/apply-log-entry :exhaust-input
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (update-in replica [:exhausted-inputs (:job args)] union #{(:task args)}))
 
 (defmethod extensions/replica-diff :exhaust-input

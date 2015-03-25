@@ -29,7 +29,6 @@
   (if-let [link (get-in @state [:links peer-id])]
     link
     (let [site (get-in @replica [:peer-sites peer-id])
-          site-resources (get-in @replica [:peer-site-resources peer-id])
-          link (extensions/connect-to-peer messenger event site site-resources)]
+          link (extensions/connect-to-peer messenger event site)]
       (swap! state assoc-in [:links peer-id] link)
       link)))

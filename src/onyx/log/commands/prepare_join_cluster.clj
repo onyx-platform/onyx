@@ -2,15 +2,21 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
-            [taoensso.timbre :refer [info] :as timbre]
             [onyx.log.commands.common :as common]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info] :as timbre]))
 
-(defn add-peer-site [replica args]
-  (assoc-in replica [:peer-sites (:joiner args)] (:peer-site args)))
+(defn add-site [replica {:keys [joiner peer-site]} messenger]
+  (-> replica 
+      (assoc-in [:peer-sites joiner] 
+                (merge
+                  peer-site
+                  (extensions/assign-site-resources messenger
+                                                    peer-site
+                                                    (:peer-sites replica))))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
-  [{:keys [args message-id]} replica]
+  [{:keys [args message-id]} replica messenger]
   (let [n (count (:peers replica))]
     (if (> n 0)
       (let [joining-peer (:joiner args)
@@ -26,46 +32,45 @@
                 watcher (nth sorted-candidates index)]
             (-> replica
                 (update-in [:prepared] merge {watcher joining-peer})
-                (add-peer-site args)))
+                (add-site args messenger)))
           replica))
       (-> replica
-          (add-peer-site args)))))
+          (update-in [:peers] conj (:joiner args))
+          (update-in [:peers] vec)
+          (assoc-in [:peer-state (:joiner args)] :idle)
+          (add-site args messenger)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
-    (if (seq rets)
-      {:observer (first (keys rets))
-       :subject (first (vals rets))}
-      ;;; FIXME grabbing from peer sites isn't fantastic
-      {:self-stitched (first (keys (second (diff (:peer-sites old) (:peer-sites new)))))})))
+    (cond (seq rets)
+          {:observer (first (keys rets))
+           :subject (first (vals rets))}
+          (and (not (seq (:peers old))) (seq (:peers new)))
+          (let [lone-peer (first (:peers new))]
+            (assert (= (count (:peers old)) 0))
+            (assert (= (count (:peers new)) 1))
+            {:instant-join lone-peer}))))
 
 (defmethod extensions/reactions :prepare-join-cluster
   [entry old new diff peer-args]
-  (let [observer (:observer diff)
-        joiner (:joiner (:args entry))
-        id (:id peer-args)] 
-    (cond (and (= id joiner) (nil? diff))
-            [{:fn :abort-join-cluster
-              :args {:id id}
-              :immediate? true}]
-          (= id observer)
-          [{:fn :notify-join-cluster
-            :args {:observer (:subject diff)
-                   :subject (or (get (:pairs new) observer)
-                                observer)}
-            :immediate? true}]
-          (and (:self-stitched diff) 
-               (= id joiner))
-          (do
-            (Thread/sleep 10)
-            [{:fn :accept-join-cluster
-              :args diff
-              :site-resources (extensions/assign-site-resources (:messenger peer-args) 
-                                                                (:peer-sites new) 
-                                                                (:peer-site-resources new))
-              :immediate? true}]))))
+  (cond (and (= (:id peer-args) (:joiner (:args entry)))
+             (nil? diff))
+        [{:fn :abort-join-cluster
+          :args {:id (:id peer-args)}
+          :immediate? true}]
+        (= (:id peer-args) (:observer diff))
+        [{:fn :notify-join-cluster
+          :args {:observer (:subject diff)
+                 :subject (or (get (:pairs new) (:observer diff))
+                              (:observer diff))}
+          :immediate? true}]
+        (and (:instant-join diff)
+             (= (:id peer-args) (:joiner (:args entry)))
+             (seq (:jobs new))
+             (common/volunteer? old new peer-args (:job peer-args)))
+        [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
@@ -87,5 +92,10 @@
                  {:fn :leave-cluster :args {:id (:observer diff)}}))
               (close! ch))
           (assoc state :watch-ch ch))
+        (= (:id state) (:instant-join diff))
+        (do (extensions/open-peer-site (:messenger state) 
+                                       (get-in new [:peer-sites (:id state)]))
+            (doseq [entry (:buffered-outbox state)]
+              (>!! (:outbox-ch state) entry))
+            (assoc (dissoc state :buffered-outbox) :stall-output? false))
         :else state))
-

@@ -164,7 +164,7 @@
             entry (extensions/read-log-entry (:log client) position)
             new-replica (extensions/apply-log-entry entry replica)]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica)]
+          (let [diff (extensions/replica-diff entry replica new-replica (:messenger client))]
             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
           (recur new-replica))))
     (component/stop client)
@@ -178,7 +178,7 @@
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [position (<!! ch)
             entry (extensions/read-log-entry (:log client) position)
-            new-replica (extensions/apply-log-entry entry replica)
+            new-replica (extensions/apply-log-entry entry replica (:messenger client))
             tasks (get (:tasks new-replica) job-id)
             complete-tasks (get (:completions new-replica) job-id)]
         (if (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))

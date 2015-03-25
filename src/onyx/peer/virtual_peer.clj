@@ -39,7 +39,7 @@
               position (first (alts!! [kill-ch inbox-ch] :priority? true))]
           (if position
             (let [entry (extensions/read-log-entry log position)
-                  new-replica (extensions/apply-log-entry entry replica)
+                  new-replica (extensions/apply-log-entry entry replica messenger)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]

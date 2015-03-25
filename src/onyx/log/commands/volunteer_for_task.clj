@@ -149,7 +149,7 @@
            {:replica replica})))
 
 (defmethod extensions/apply-log-entry :volunteer-for-task
-  [entry replica]
+  [entry replica _]
   (select-job entry replica))
 
 (defmethod extensions/replica-diff :volunteer-for-task

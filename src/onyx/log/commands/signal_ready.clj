@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :signal-ready
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (if (some #{(:id args)} (into #{} (:peers replica)))
     (assoc-in replica [:peer-state (:id args)] :active)
     replica))

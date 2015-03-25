@@ -7,7 +7,7 @@
             [onyx.log.commands.common :as common]))
 
 (defmethod extensions/apply-log-entry :leave-cluster
-  [{:keys [args]} replica]
+  [{:keys [args]} replica _]
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)
@@ -26,7 +26,6 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (update-in [:peer-site-resources] dissoc id)
         (common/remove-sealing-tasks args)
         (common/remove-peers args))))
 

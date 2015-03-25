@@ -10,9 +10,8 @@
   (:peer-config (read-string (slurp (clojure.java.io/resource "test-config.edn")))))
 
 (def messaging 
-  (aeron/aeron {:opts peer-config}))
+  (component/start (aeron/aeron {:opts peer-config})))
 
-(component/start messaging)
 (try
   (let [entry (create-log-entry :notify-join-cluster {:observer :d :subject :a})
         f (partial extensions/apply-log-entry entry)
