@@ -5,9 +5,6 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
-            [onyx.messaging.http-kit :refer [http-kit-websockets]]
-            [onyx.messaging.aeron :refer [aeron]]
-            [onyx.messaging.netty-tcp :refer [netty-tcp-sockets]]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -28,10 +25,14 @@
 
 (def peer-components [:log :messenger-buffer :messenger :acking-daemon :virtual-peer])
 
-(def messenger
-  {:http-kit-websockets http-kit-websockets
-   :netty-tcp netty-tcp-sockets
-   :aeron aeron})
+(defn messenger [k]
+  (case k
+    :aeron (do (require 'onyx.messaging.aeron)
+               (ns-resolve 'onyx.messaging.aeron 'aeron))
+    :http-kit-websockets (do (require 'onyx.messaging.http-kit)
+                             (ns-resolve 'onyx.messaging.http-kit 'http-kit-websockets))
+    :netty-tcp (do (require 'onyx.messaging.netty-tcp)
+                   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))))
 
 (defn rethrow-component [f]
   (try
@@ -68,7 +69,7 @@
      #(component/stop-system this peer-components))))
 
 (defn messenger-ctor [config]
-  (let [rets ((get messenger (:onyx.messaging/impl config)) config)]
+  (let [rets ((messenger (:onyx.messaging/impl config)) config)]
     (when-not rets
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
     rets))
