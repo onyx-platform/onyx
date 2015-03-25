@@ -22,6 +22,8 @@
                  [http-kit "2.1.17"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
+                                  [org.clojure/test.check "0.7.0"]
+                                  [com.gfredericks/test.chuck "0.1.16"]
                                   [org.clojure/data.generators "0.1.2"]
                                   [com.datomic/datomic-free "0.9.4755"
                                    :exclusions [com.fasterxml.jackson.core/jackson-core io.netty/netty]]
