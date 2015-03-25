@@ -30,7 +30,6 @@
 
 (defmethod extensions/reactions :abort-join-cluster
   [{:keys [args]} old new diff peer-args]
-  (timbre/info "in abort join preparing ")
   (when (= (:id args) (:id peer-args))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)

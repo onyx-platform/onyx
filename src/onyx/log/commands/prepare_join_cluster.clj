@@ -21,12 +21,12 @@
     (if (> n 0)
       (let [joining-peer (:joiner args)
             cluster (:peers replica)
-            all-joined-peers (into #{} (concat (keys (:pairs replica)) cluster))
-            all-prepared-deps (into #{} (keys (:prepared replica)))
-            prep-watches (into #{} (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
-            accepting-deps (into #{} (keys (:accepted replica)))
+            all-joined-peers (set (concat (keys (:pairs replica)) cluster))
+            all-prepared-deps (set (keys (:prepared replica)))
+            prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
+            accepting-deps (set (keys (:accepted replica)))
             candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches)
-            sorted-candidates (sort (filter identity candidates))]
+            sorted-candidates (sort (remove nil? candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
                 watcher (nth sorted-candidates index)]
