@@ -95,7 +95,7 @@
   (if (nil? hash-group)
     (rand-nth active-peers)
     (nth active-peers
-         (mod (.hashCode hash-group)
+         (mod (hash hash-group)
               (count active-peers)))))
 
 (defmethod p-ext/write-batch :default
