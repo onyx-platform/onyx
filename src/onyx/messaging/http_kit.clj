@@ -4,7 +4,7 @@
               [org.httpkit.server :as server]
               [taoensso.timbre :as timbre]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [choose-ip]]
+              [onyx.messaging.common :refer [bind-addr]]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions]
               [gniazdo.core :as ws])
@@ -48,7 +48,7 @@
     (let [ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
-          ip (choose-ip opts)
+          ip (bind-addr opts)
           server (server/run-server (partial app daemon ch release-ch) {:ip ip :port 0 :thread 1 :queue-size 1000000})]
       (assoc component :server server :ip ip :port (:local-port (meta server)) :release-ch release-ch)))
 

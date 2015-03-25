@@ -4,7 +4,7 @@
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [choose-ip]]
+              [onyx.messaging.common :refer [bind-addr external-addr]]
               [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
@@ -104,14 +104,15 @@
       (catch Exception e
         (fatal e)))
 
-    (assoc component :ip nil :site-resources nil :release-ch nil)))
+    (assoc component :bind-addr nil :external-addr nil :site-resources nil :release-ch nil)))
 
 (defn aeron [opts]
   (map->AeronConnection {:opts opts}))
 
 (defmethod extensions/peer-site AeronConnection
   [messenger]
-  {:aeron/ip (:ip messenger)})
+  {:aeron/bind-addr (:bind-addr messenger)
+   :aeron/external-addr (:external-addr messenger)})
 
 (def allc (atom 40200))
 
@@ -125,8 +126,8 @@
 (def acker-stream-id 2)
 (def completion-stream-id 3)
 
-(defn aeron-channel [ip port]
-  (format "udp://%s:%s" ip port))
+(defn aeron-channel [addr port]
+  (format "udp://%s:%s" addr port))
 
 (defmethod extensions/open-peer-site AeronConnection
   [messenger assigned]
@@ -138,7 +139,7 @@
         ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
 
-        channel (aeron-channel (:ip messenger) (:aeron/port assigned))
+        channel (aeron-channel (:bind-addr messenger) (:aeron/port assigned))
 
         send-handler (data-handler (partial handle-sent-message inbound-ch))
         acker-handler (data-handler (partial handle-acker-message daemon))
@@ -153,7 +154,7 @@
                                       (catch Exception e (fatal e))))
         accept-completion-fut (future (try (.accept ^Consumer (consumer 10) completion-subscriber) 
                                            (catch Exception e (fatal e))))]
-    (reset! (:site-resources messenger)
+    (reset! (:resources messenger)
             {:conn aeron
              :accept-send-fut accept-send-fut
              :accept-acker-fut accept-acker-fut
@@ -163,11 +164,11 @@
              :completion-subscriber completion-subscriber})))
 
 (defmethod extensions/connect-to-peer AeronConnection
-  [messenger event {:keys [aeron/ip]} {:keys [aeron/port]}]
-  (timbre/info "Connect to peer " ip port)
+  [messenger event {:keys [aeron/external-addr aeron/port]}]
+  (timbre/info "Connect to peer " external-addr port)
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
-        channel (aeron-channel ip port)
+        channel (aeron-channel external-addr port)
         send-pub (.addPublication aeron channel send-stream-id)
         acker-pub (.addPublication aeron channel acker-stream-id)
         completion-pub (.addPublication aeron channel completion-stream-id)]

@@ -3,6 +3,9 @@
 (defn my-remote-ip []
   (apply str (butlast (slurp "http://checkip.amazonaws.com"))))
 
-(defn choose-ip [opts]
-  (or (:onyx.messaging/ip opts) (my-remote-ip)))
+(defn bind-addr [opts]
+  (:onyx.messaging/bind-addr opts))
 
+(defn external-addr [opts]
+  (or (:onyx.messaging/external-addr opts)
+      (bind-addr opts)))
