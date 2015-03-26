@@ -239,3 +239,12 @@
   [env]
   (component/stop env))
 
+(defn ^{:added "0.6.0"} start-peer-group
+  "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
+  [peer-config]
+  (component/start (system/onyx-peer-group peer-config)))
+
+(defn ^{:added "0.6.0"} shutdown-peer-group
+  "Shuts down the given peer-group"
+  [peer-group]
+  (component/stop peer-group))

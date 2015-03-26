@@ -19,6 +19,20 @@
 
 (def max-port 50000)
 
+(defrecord AeronPeerGroup [opts]
+  component/Lifecycle
+  (start [component]
+    (taoensso.timbre/info "Starting Aeron")
+    (let [media-driver (MediaDriver/launch)]
+      (assoc component :media-driver media-driver)))
+
+  (stop [{:keys [media-driver] :as component}]
+    (.close media-driver)
+    (assoc component :media-driver nil)))
+
+(defn aeron-peer-group [opts]
+  (map->AeronPeerGroup {:opts opts}))
+
 (defmethod extensions/assign-site-resources :aeron
   [config peer-site peer-sites]
   (let [start-port (:aeron/start-port config)
@@ -81,8 +95,7 @@
   (proxy [Consumer] []
     (accept [_] (taoensso.timbre/warn "Conductor is down."))))
 
-(def media-driver
-  (MediaDriver/launch))
+
 
 (defrecord AeronConnection [opts]
   component/Lifecycle
@@ -120,13 +133,7 @@
           (when conn (.close conn)))
         (reset! resources nil))
       (close! (:release-ch component))
-
-      ;; FIXME, need to startup and shutdown aeron resources properly
-      ;; however, this can't be done per connection
-      ;(CloseHelper/quietClose (:driver component))
-
-      (catch Exception e
-        (fatal e)))
+      (catch Exception e (fatal e)))
 
     (assoc component :bind-addr nil :external-addr nil :site-resources nil :release-ch nil)))
 
@@ -137,7 +144,6 @@
   [messenger]
   {:aeron/bind-addr (:bind-addr messenger)
    :aeron/external-addr (:external-addr messenger)})
-
 
 (def send-stream-id 1)
 (def acker-stream-id 2)
