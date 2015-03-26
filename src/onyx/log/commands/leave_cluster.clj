@@ -7,7 +7,7 @@
             [onyx.log.commands.common :as common]))
 
 (defmethod extensions/apply-log-entry :leave-cluster
-  [{:keys [args]} replica _]
+  [{:keys [args]} replica]
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)

@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :notify-join-cluster
-  [{:keys [args]} replica _]
+  [{:keys [args]} replica]
   (let [prepared (get (map-invert (:prepared replica)) (:observer args))]
     (-> replica
         (update-in [:accepted] merge {prepared (:observer args)})

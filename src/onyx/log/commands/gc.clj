@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :gc
-  [{:keys [args message-id]} replica _]
+  [{:keys [args message-id]} replica]
   (let [completed (difference (into #{} (:jobs replica))
                               (into #{} (common/incomplete-jobs replica)))
         killed (:killed-jobs replica)

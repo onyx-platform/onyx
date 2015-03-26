@@ -39,6 +39,9 @@
 (defn job-scheduler-path [prefix]
   (str (prefix-path prefix) "/job-scheduler"))
 
+(defn messaging-path [prefix]
+  (str (prefix-path prefix) "/messaging"))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed from disconnecting to ZooKeeper" {})))
 
@@ -76,6 +79,7 @@
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
       (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
+      (zk/create conn (messaging-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id)))
@@ -151,15 +155,31 @@
       (do (Thread/sleep 500)
           (recur)))))
 
+(defn find-messaging [log]
+  (loop []
+    (if-let [chunk
+             (try
+               (extensions/read-chunk log :messaging nil)
+               (catch Exception e
+                 (warn e)
+                 (warn "Messaging couldn't be discovered. Backing off 500ms and trying again...")
+                 nil))]
+      (:messaging chunk)
+      (do (Thread/sleep 500)
+          (recur)))))
+
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]
   (let [rets (chan)]
     (thread
      (try
        (let [job-scheduler (find-job-scheduler log)
+             messaging (find-messaging log)
              origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (>!! rets (assoc (:replica origin) :job-scheduler job-scheduler))
+         (>!! rets (assoc (:replica origin) 
+                          :job-scheduler job-scheduler
+                          :messaging messaging))
          (close! rets)
          (loop [position starting-position]
            (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
@@ -237,6 +257,14 @@
            bytes (compress chunk)]
        (zk/create conn node :persistent? true :data bytes)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :messaging]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (messaging-path prefix) "/messaging")
+           bytes (compress chunk)]
+       (zk/create conn node :persistent? true :data bytes)))))
+
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id]
   (clean-up-broken-connections
@@ -286,6 +314,13 @@
      (let [node (str (job-scheduler-path prefix) "/scheduler")]
        (decompress (:data (zk/data conn node)))))))
 
+(defmethod extensions/read-chunk [ZooKeeper :messaging]
+  [{:keys [conn opts prefix] :as log} kw id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (messaging-path prefix) "/messaging")]
+       (decompress (:data (zk/data conn node)))))))
+
 (defmethod extensions/update-origin! ZooKeeper
   [{:keys [conn opts prefix] :as log} replica message-id]
   (clean-up-broken-connections
@@ -303,4 +338,3 @@
    (fn []
      (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))]
        (zk/delete conn node)))))
-

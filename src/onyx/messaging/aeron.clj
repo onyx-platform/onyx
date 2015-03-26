@@ -17,6 +17,24 @@
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
+(def max-port 50000)
+
+(defmethod extensions/assign-site-resources :aeron
+  [config peer-site peer-sites]
+  (let [start-port (:aeron/start-port config)
+        existing-ports (->> (vals peer-sites)
+                            (filter 
+                              (fn [s]
+                                (and (= (:aeron/bind-addr peer-site) 
+                                        (:aeron/bind-addr s))
+                                     (= (:aeron/external-addr peer-site) 
+                                        (:aeron/external-addr s)))))
+                            (map :aeron/port)
+                            set)
+        port (first (remove existing-ports (range start-port max-port)))]
+    (assert port)
+    {:aeron/port port}))
+
 (defn handle-sent-message [inbound-ch ^UnsafeBuffer buffer offset length header]
   (let [messages (protocol/read-messages-buf buffer offset length)]
     (doseq [message messages]
@@ -73,8 +91,9 @@
     (taoensso.timbre/info "Starting Aeron")
 
     (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
-          bind-addr (bind-addr opts)
-          external-addr (external-addr opts)]
+          peer-messaging-config (:onyx.messaging/peer-config opts)
+          bind-addr (bind-addr peer-messaging-config)
+          external-addr (external-addr peer-messaging-config)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
@@ -119,23 +138,6 @@
   {:aeron/bind-addr (:bind-addr messenger)
    :aeron/external-addr (:external-addr messenger)})
 
-(def start-port 40200)
-(def max-port 50000)
-
-(defmethod extensions/assign-site-resources AeronConnection
-  [messenger peer-site peer-sites]
-  (let [ports (->> (vals peer-sites)
-                   (filter 
-                     (fn [s]
-                       (and (= (:aeron/bind-addr peer-site) 
-                               (:aeron/bind-addr s))
-                            (= (:aeron/external-addr peer-site) 
-                               (:aeron/external-addr s)))))
-                   (map :aeron/port)
-                   set)
-        port (first (remove ports (range start-port max-port)))]
-    (assert port)
-    {:aeron/port port}))
 
 (def send-stream-id 1)
 (def acker-stream-id 2)

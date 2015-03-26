@@ -4,19 +4,20 @@
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
+            [onyx.peer.operation :as operation]
             [taoensso.timbre :refer [info] :as timbre]))
 
-(defn add-site [replica {:keys [joiner peer-site]} messenger]
+(defn add-site [replica {:keys [joiner peer-site]}]
   (-> replica 
       (assoc-in [:peer-sites joiner] 
                 (merge
                   peer-site
-                  (extensions/assign-site-resources messenger
+                  (extensions/assign-site-resources (:messaging replica)
                                                     peer-site
                                                     (:peer-sites replica))))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
-  [{:keys [args message-id]} replica messenger]
+  [{:keys [args message-id]} replica]
   (let [n (count (:peers replica))]
     (if (> n 0)
       (let [joining-peer (:joiner args)
@@ -32,13 +33,13 @@
                 watcher (nth sorted-candidates index)]
             (-> replica
                 (update-in [:prepared] merge {watcher joining-peer})
-                (add-site args messenger)))
+                (add-site args)))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
           (assoc-in [:peer-state (:joiner args)] :idle)
-          (add-site args messenger)))))
+          (add-site args)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]

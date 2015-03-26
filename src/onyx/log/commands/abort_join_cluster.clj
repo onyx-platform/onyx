@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :abort-join-cluster
-  [{:keys [args message-id]} replica _]
+  [{:keys [args message-id]} replica]
   (-> replica
       (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
       (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))

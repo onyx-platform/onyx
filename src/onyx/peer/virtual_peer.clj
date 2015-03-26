@@ -39,7 +39,7 @@
               position (first (alts!! [kill-ch inbox-ch] :priority? true))]
           (if position
             (let [entry (extensions/read-log-entry log position)
-                  new-replica (extensions/apply-log-entry entry replica messenger)
+                  new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
@@ -73,10 +73,11 @@
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
 
-      ;; Race to write the job scheduler to durable storage so that
-      ;; non-peers subscribers can discover which job scheduler to use.
+      ;; Race to write the job scheduler and messaging to durable storage so that
+      ;; non-peers subscribers can discover which messaging to use.
       ;; Only one peer will succeed, and only one needs to.
       (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
+      (extensions/write-chunk log :messaging {:messaging (:onyx.messaging/config opts)} nil)
 
       (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
             outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))

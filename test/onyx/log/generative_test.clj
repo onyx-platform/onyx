@@ -32,7 +32,7 @@
                  (remove :immediate? entries)))))
 
 (defn apply-entry [replica entries entry]
-  (let [new-replica (extensions/apply-log-entry entry replica messaging)
+  (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
         peers (cond-> (set (concat (:peers replica)
                                    ; might not need these with the below entries
@@ -90,13 +90,6 @@
                                  (or (:immediate? entry)
                                      (contains? peers peer)))
                                (:entries state))))))))
-
-; (defn apply-entries [replica message-id entries]
-;   (loop [replica start-replica message-id start-message-id entries start-entries] 
-;     (if (empty? entries)
-;       replica
-;       (let [[new-replica new-message-id new-entries] (apply-peer-queue-entry replica message-id entries (first (keys entries)))]
-;         (recur new-replica new-message-id new-entries)))))
 
 (defn apply-entry-gen [replica-state-gen]
   (gen/fmap

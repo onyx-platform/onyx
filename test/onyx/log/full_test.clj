@@ -29,8 +29,7 @@
                  replica (loop [replica (extensions/subscribe-to-log (:log env) ch)]
                            (let [position (<!! ch)
                                  entry (extensions/read-log-entry (:log env) position)
-                                 new-replica (extensions/apply-log-entry entry replica messaging)]
-                             ;(println (:pairs new-replica) (count (:pairs new-replica)) (count (:peers new-replica)))
+                                 new-replica (extensions/apply-log-entry entry replica)]
                              (if (< (count (:pairs new-replica)) n-peers)
                                (recur new-replica)
                                new-replica)))]

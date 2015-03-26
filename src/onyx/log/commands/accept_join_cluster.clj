@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
-  [{:keys [args]} replica _]
+  [{:keys [args]} replica]
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)]
