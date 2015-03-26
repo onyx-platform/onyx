@@ -1,5 +1,5 @@
 (ns onyx.log.peer-rebalance-test
-  (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.log.helper :refer [playback-log]]
