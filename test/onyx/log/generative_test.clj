@@ -27,21 +27,27 @@
 (def messaging 
   (component/start (aeron/aeron {:opts peer-config})))
 
-(defn bump-forward-immediates [entries peers peer-id]
+(defn bump-forward-immediates 
+  "If peer hasn't finished joining yet, bump all their 
+  log entries to the head of their queue. Order is otherwise stable."
+  [entries peers peer-id]
   (if ((set peers) peer-id)
     entries
     (vec (concat (filter :immediate? entries)
                  (remove :immediate? entries)))))
 
+(defn active-peers [replica entry]
+  (cond-> (set (concat (:peers replica)
+                       ; might not need these with the below entries
+                       (vals (or (:prepared replica) {})) 
+                       (vals (or (:accepted replica) {}))))
+    (:id (:args entry)) (conj (:id (:args entry)))
+    (:joiner (:args entry)) (conj (:joiner (:args entry)))))
+
 (defn apply-entry [replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
-        peers (cond-> (set (concat (:peers replica)
-                                   ; might not need these with the below entries
-                                   (vals (or (:prepared replica) {})) 
-                                   (vals (or (:accepted replica) {}))))
-                (:id (:args entry)) (conj (:id (:args entry)))
-                (:joiner (:args entry)) (conj (:joiner (:args entry))))
+        peers (active-peers replica entry)
         peer-reactions (keep (fn [peer-id] 
                                (if-let [reactions (extensions/reactions entry 
                                                                         replica 
@@ -64,7 +70,10 @@
                           peer-reactions)]
     (vector new-replica unapplied)))
 
-(defn apply-peer-queue-entry [{:keys [replica message-id entries peer-choices log]} next-peer] 
+(defn apply-peer-queue-entry 
+  "Applies the next log message in the selected peer's queue.
+  Effectively, the next peer that wrote its message to ZK"
+  [{:keys [replica message-id entries peer-choices log]} next-peer] 
   (let [peer-queue (entries next-peer)
         next-entry (first peer-queue)
         new-peer-queue (vec (rest peer-queue))
@@ -79,7 +88,10 @@
      :log (conj log message)
      :peer-choices (conj peer-choices next-peer)}))
 
-(defn peer-gen [replica-state-gen]
+(defn peer-gen 
+  "Generator to look into all of the peer's write queues
+  and pick an entry to get fake written next"
+  [replica-state-gen]
   (gen/bind replica-state-gen 
             (fn [state]
               ; we only play back log messages from peers who have
@@ -93,14 +105,22 @@
                                      (contains? peers peer)))
                                (:entries state))))))))
 
-(defn apply-entry-gen [replica-state-gen]
+(defn apply-entry-gen 
+  "Apply an entry from one of the peers log queues
+  to a replica generator "
+  [replica-state-gen]
   (gen/fmap
     (fn [[state peer-id]]
       (apply-peer-queue-entry state peer-id))
     (gen/tuple replica-state-gen
                (peer-gen replica-state-gen))))
 
-(defn apply-entries-gen [replica-state-gen]
+(defn apply-entries-gen 
+  "Recurse over replica generator until entries
+  are exhausted. Return the final replica, the log messages 
+  in the order they were written and the order of the peers 
+  that got to write"
+  [replica-state-gen]
   (gen/bind replica-state-gen
             (fn [state]
               (let [g (gen/return state)] 
@@ -112,12 +132,17 @@
   (checking
     "Checking joins"
     10000
-    [{:keys [replica peer-choices]} 
+    [{:keys [replica log peer-choices]} 
      (apply-entries-gen 
        (gen/return
          {:replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)
                     :messaging (:onyx.messaging/config peer-config)}
           :message-id 0
+          ; TODO: for scheduling we need a way to supply queues for entries written by non peers
+          ; possibly could just check whether they are certain message types 
+          ; in peer-gen (rename to queue-select-gen?)
+          ; eg. queue with :z [{:fn :submit-job]
+          ; if they are in separate queues they could be processed in any order which is what we want
           :entries {:a [{:fn :prepare-join-cluster 
                          :immediate? true
                          :args {:peer-site (extensions/peer-site messaging)
