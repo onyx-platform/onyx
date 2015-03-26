@@ -34,7 +34,8 @@
 
 ;; Messaging interface
 
-(defmulti assign-site-resources (fn [config peer-site peer-sites] (:messaging/impl config)))
+(defmulti assign-site-resources (fn [config peer-site peer-sites] 
+                                  (:messaging/impl config)))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
@@ -52,4 +53,3 @@
                                  (type messenger)))
 
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
-
