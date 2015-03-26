@@ -371,6 +371,8 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
+      (close! (:release-messages-ch component))
+      (close! (:forward-completion-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
       (<!! (:task-lifecycle-ch component))
