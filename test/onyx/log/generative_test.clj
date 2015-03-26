@@ -22,6 +22,8 @@
 
 (def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def messaging 
   (component/start (aeron/aeron {:opts peer-config})))
 
@@ -113,7 +115,8 @@
     [{:keys [replica peer-choices]} 
      (apply-entries-gen 
        (gen/return
-         {:replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)}
+         {:replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)
+                    :messaging (:onyx.messaging/config peer-config)}
           :message-id 0
           :entries {:a [{:fn :prepare-join-cluster 
                          :immediate? true

@@ -15,6 +15,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def n-messages 100)
 
 (def batch-size 20)
@@ -81,3 +83,4 @@
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

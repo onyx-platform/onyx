@@ -16,11 +16,13 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def n-peers 5)
 
 (def batch-size 20)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
 (def catalog
   [{:onyx/name :a
@@ -85,3 +87,4 @@
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

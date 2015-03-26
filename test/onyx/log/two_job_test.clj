@@ -4,6 +4,14 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
+            ; Add for generative testing later
+            ;[onyx.log.generative-test :as log-gen-test]
+            ;[clojure.test.check.generators :as gen]
+            ;[clojure.test :refer :all]
+            ;[com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            ;[onyx.messaging.aeron :as aeron]
+            [com.stuartsierra.component :as component]
+            [clojure.test :refer :all]
             [midje.sweet :refer :all]))
 
 (def onyx-id (java.util.UUID/randomUUID))
@@ -13,15 +21,17 @@
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def peer-config
-  (assoc (:peer-config config)
-    :onyx/id onyx-id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+   (assoc (:peer-config config)
+     :onyx/id onyx-id
+     :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def n-peers 12)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
 (def catalog-1
   [{:onyx/name :a
@@ -116,3 +126,4 @@
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

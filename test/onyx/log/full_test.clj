@@ -19,11 +19,12 @@
 (def messaging 
   (component/start (aeron/aeron {:opts peer-config})))
 
-(def n-peers 3)
+(def n-peers 20)
 
 (facts "peers all join and watch each other"
        (let [env (onyx.api/start-env env-config)
-             v-peers (onyx.api/start-peers n-peers peer-config)] 
+             peer-group (onyx.api/start-peer-group peer-config)
+             v-peers (onyx.api/start-peers n-peers peer-group)] 
          (try 
            (let [ch (chan n-peers)
                  replica (loop [replica (extensions/subscribe-to-log (:log env) ch)]
