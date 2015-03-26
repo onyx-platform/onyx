@@ -3,12 +3,13 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]))
 
-(defrecord AckingDaemon []
+(defrecord AckingDaemon [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Acking Daemon")
-    (assoc component :ack-state (atom {}) :completions-ch (chan 1000)))
+    (let [buffer-size (or (:onyx.messaging/completion-buffer-size opts) 1000)]
+      (assoc component :ack-state (atom {}) :completions-ch (chan buffer-size))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Acking Daemon")
@@ -16,7 +17,7 @@
     (assoc component :ack-state nil :completions-ch nil)))
 
 (defn acking-daemon [config]
-  (map->AckingDaemon {}))
+  (map->AckingDaemon {:opts config}))
 
 (defn ack-message [daemon message-id completion-id ack-val]
   (let [rets
