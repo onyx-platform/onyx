@@ -1,6 +1,7 @@
 (ns onyx.log.one-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
+            [onyx.log.helper :refer [playback-log]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
@@ -70,17 +71,14 @@
 (def log (:log (:env subscription)))
 
 (def replica
-  (loop [replica (:replica subscription)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry log position)
-          new-replica (extensions/apply-log-entry entry replica)
-          counts (map count (mapcat vals (vals (:allocations new-replica))))]
-      (when-not (= (into #{} counts) #{1 2})
-        (recur new-replica)))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
 (onyx.api/shutdown-env (:env subscription))
 
-(fact "peers balanced on 1 jobs" true => true)
+(fact "peers balanced on 1 jobs" 
+      (into #{} (map count (mapcat vals (vals (:allocations replica))))) 
+      =>
+      #{1 2})
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
