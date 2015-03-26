@@ -164,7 +164,7 @@
             entry (extensions/read-log-entry (:log client) position)
             new-replica (extensions/apply-log-entry entry replica)]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica (:messenger client))]
+          (let [diff (extensions/replica-diff entry replica new-replica)]
             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
           (recur new-replica))))
     (component/stop client)
@@ -206,7 +206,10 @@
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped
    by passing it to the shutdown-peer function."
-  [n config]
+  [n {:keys [config] :as peer-group}]
+  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+
   (doall
    (map
     (fn [_]

@@ -114,6 +114,7 @@
 (defn onyx-peer-group
   [config]
   (map->OnyxPeerGroup
-    {:logging-config (logging-config/logging-configuration config)
+    {:config config
+     :logging-config (logging-config/logging-configuration config)
      :messaging-require (messaging-require-ctor config)
      :messaging-group (component/using (messaging-peer-group-ctor config) [:messaging-require :logging-config])}))
