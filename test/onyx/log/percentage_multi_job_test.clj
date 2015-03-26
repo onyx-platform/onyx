@@ -1,8 +1,9 @@
 (ns onyx.log.percentage-multi-job-test
-  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
+  (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.log.helper :refer [playback-log]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -15,10 +16,12 @@
 
 (def peer-config
   (assoc (:peer-config config)
-    :onyx/id onyx-id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/percentage))
+         :onyx/id onyx-id
+         :onyx.peer/job-scheduler :onyx.job-scheduler/percentage))
 
 (def env (onyx.api/start-env env-config))
+
+(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def catalog-1
   [{:onyx/name :a
@@ -88,37 +91,25 @@
 
 (def n-peers 10)
 
-(def v-peers-1 (onyx.api/start-peers n-peers peer-config))
+(def v-peers-1 (onyx.api/start-peers n-peers peer-group))
 
-(def ch (chan n-peers))
+(def ch (chan 10000))
 
-(def replica
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (apply concat (vals (get (:allocations new-replica) j1)))) 7)
-                   (= (count (apply concat (vals (get (:allocations new-replica) j2)))) 3))
-        (recur new-replica)
-        new-replica))))
-
-(fact "70/30% split for percentage job scheduler succeeded" true => true)
-
-(def v-peers-2 (onyx.api/start-peers n-peers peer-config))
-
-(def ch (chan n-peers))
+(defn get-counts [replica]
+  (vector (count (apply concat (vals (get (:allocations replica) j1)))) 
+          (count (apply concat (vals (get (:allocations replica) j2))))))
 
 (def replica
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (apply concat (vals (get (:allocations new-replica) j1)))) 14)
-                   (= (count (apply concat (vals (get (:allocations new-replica) j2)))) 6))
-        (recur new-replica)
-        new-replica))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "70/30% split for percentage job scheduler succeeded after rebalance" true => true)
+(fact "70/30% split for percentage job scheduler succeeded" (get-counts replica) => [7 3])
+
+(def v-peers-2 (onyx.api/start-peers n-peers peer-group))
+
+(def replica-2
+  (playback-log (:log env) replica ch 2000))
+
+(fact "70/30% split for percentage job scheduler succeeded after rebalance" (get-counts replica-2) => [14 6])
 
 (doseq [v-peer v-peers-1]
   (onyx.api/shutdown-peer v-peer))
@@ -128,3 +119,4 @@
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)
