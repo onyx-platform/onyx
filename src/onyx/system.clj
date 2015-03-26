@@ -20,7 +20,7 @@
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]))
 
-(def development-components [:log])
+(def development-components [:logging-config :log])
 
 (def client-components [:log :messaging-require])
 
@@ -93,7 +93,8 @@
 (defn onyx-development-env
   [config]
   (map->OnyxDevelopmentEnv
-   {:log (zookeeper config)}))
+    {:logging-config (logging-config/logging-configuration config)
+     :log (component/using (zookeeper config) [:logging-config])}))
 
 (defn onyx-client
   [config]
