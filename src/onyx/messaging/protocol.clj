@@ -4,9 +4,6 @@
   (:import [java.util UUID]
            [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator]))
 
-;; RAW NIO IMPL
-;; TODO should be able to use unsigneds on size fields etc
-
 ;;;;;;
 ;; helpers
 (defn byte-buffer [size]
@@ -44,8 +41,8 @@
 
 (def completion-payload-length (int (+ completion-msg-length type-header-length)))
 
-(defn build-completion-msg-buf [^ByteBufAllocator allocator id] 
-  (let [buf ^ByteBuf (.ioBuffer allocator completion-payload-length) #_(byte-buffer completion-payload-length)] 
+(defn build-completion-msg-buf [id] 
+  (let [buf ^ByteBuf (byte-buffer completion-payload-length)] 
     (.writeByte buf completion-type-id)
     (write-uuid buf id)
     buf))
@@ -56,8 +53,8 @@
 
 (def ack-payload-length ^int (+ ack-msg-length type-header-length))
 
-(defn build-ack-msg-buf [^ByteBufAllocator allocator id completion-id ack-val] 
-  (let [^ByteBuf buf (.ioBuffer allocator ack-payload-length) #_(byte-buffer ack-payload-length)] 
+(defn build-ack-msg-buf [id completion-id ack-val] 
+  (let [^ByteBuf buf (byte-buffer ack-payload-length)] 
     (.writeByte buf ack-type-id)
     (write-uuid buf id)
     (write-uuid buf completion-id)
@@ -97,7 +94,7 @@
      :ack-val ack-val 
      :message message}))
 
-(defn build-messages-msg-buf [^ByteBufAllocator allocator messages] 
+(defn build-messages-msg-buf [messages] 
   (let [compressed-messages (map (fn [msg]
                                    (update-in msg [:message] compress))
                                  messages)
@@ -108,7 +105,7 @@
                        (apply + (map (fn [m]
                                        (alength ^bytes (:message m)))  
                                      compressed-messages))))
-        buf ^ByteBuf (.ioBuffer allocator buf-size) #_(byte-buffer buf-size)] 
+        buf ^ByteBuf (byte-buffer buf-size)] 
     (.writeByte buf messages-type-id) ; message type header
     (.writeInt buf (int (count compressed-messages))) ; number of messages
     (doseq [msg compressed-messages]
