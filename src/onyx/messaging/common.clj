@@ -25,15 +25,6 @@
 (defmethod messaging-peer-group :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))
 
-(defmethod messaging-require :http-kit-websockets [_]
-  (require 'onyx.messaging.http-kit))
-
-(defmethod messenger :http-kit-websockets [_]
-  (ns-resolve 'onyx.messaging.http-kit 'http-kit-websockets))
-
-(defmethod  messaging-peer-group :http-kit-websockets [_]
-  (ns-resolve 'onyx.messaging.http-kit 'http-kit-peer-group))
-
 (defmethod messenger :netty-tcp [_]
   (require 'onyx.messaging.netty-tcp))
 
