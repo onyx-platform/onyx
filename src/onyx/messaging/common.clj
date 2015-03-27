@@ -10,6 +10,15 @@
   (or (:onyx.messaging/external-addr peer-config)
       (bind-addr peer-config)))
 
+(defn allowable-ports [peer-config]
+  (let [port-range (if-let [port-range (:onyx.messaging/peer-port-range opts)]
+                     (range (first port-range) 
+                            (inc (second port-range)))
+                     [])
+        ports-static (:onyx.messaging/peer-ports opts)]
+    (into (set port-range) 
+          ports-static)))
+
 (defmulti messaging-require :onyx.messaging/impl)
 
 (defmulti messenger :onyx.messaging/impl)

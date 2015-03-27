@@ -4,7 +4,7 @@
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [bind-addr external-addr]]
+              [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
               [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
@@ -100,12 +100,7 @@
     (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
           bind-addr (bind-addr opts)
           external-addr (external-addr opts)
-          port-range (if-let [port-range (:onyx.messaging/peer-port-range opts)]
-                       (set (range (first port-range) 
-                                   (inc (second port-range))))
-                       #{})
-          ports-static (:onyx.messaging/peer-ports opts)
-          ports (into port-range ports-static)]
+          ports (allowable-ports opts)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
