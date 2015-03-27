@@ -64,7 +64,7 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-config))
+(def v-peers (onyx.api/start-peers 3 peer-group))
 
 (onyx.api/submit-job
  peer-config
