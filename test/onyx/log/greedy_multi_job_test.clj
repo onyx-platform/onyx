@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.log.helper :refer [playback-log]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]))
@@ -15,6 +16,8 @@
 (def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
 
 (def env (onyx.api/start-env env-config))
+
+(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def batch-size 20)
 
@@ -84,67 +87,42 @@
 
 (def n-peers 40)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
 (def ch (chan n-peers))
 
+(defn get-count [replica]
+  (let [task-a (first (get-in replica [:tasks j1]))
+        task-b (second (get-in replica [:tasks j1]))
+        task-c (first (get-in replica [:tasks j2]))
+        task-d (second (get-in replica [:tasks j2]))]
+    (vector (count (get-in replica [:allocations j1 task-a]))
+            (count (get-in replica [:allocations j1 task-b]))
+            (count (get-in replica [:allocations j2 task-c]))
+            (count (get-in replica [:allocations j2 task-d])))))
+
 (def replica-1
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)
-          task-a (first (get-in new-replica [:tasks j1]))
-          task-b (second (get-in new-replica [:tasks j1]))
-          task-c (first (get-in new-replica [:tasks j2]))
-          task-d (second (get-in new-replica [:tasks j2]))]
-      (if-not (and (= (count (get-in new-replica [:allocations j1 task-a])) 20)
-                   (= (count (get-in new-replica [:allocations j1 task-b])) 20)
-                   (zero? (apply + (map count (vals (get (:allocations new-replica) j2))))))
-        (recur new-replica)
-        new-replica))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "20 peers were allocated to job 1, task A" true => true)
-
-(fact "20 peers were allocated to job 1, task B" true => true)
-
-(def task-a (first (get-in replica-1 [:tasks j1])))
-
-(def task-b (second (get-in replica-1 [:tasks j1])))
-
-(def task-c (first (get-in replica-1 [:tasks j2])))
-
-(def task-d (second (get-in replica-1 [:tasks j2])))
+(fact "20 peers were allocated to job 1, task A, 20 peers were allocated to job 1, task B" 
+      (get-count replica-1) => [20 20 0 0])
 
 (>!! a-chan :done)
 (close! a-chan)
 
 (def replica-2
-  (loop [replica replica-1]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if (and (= (count (get (get (:allocations new-replica) j2) task-c)) 20)
-               (= (count (get (get (:allocations new-replica) j2) task-d)) 20))
-        new-replica
-        (recur new-replica)))))
+  (playback-log (:log env) replica-1 ch 2000))
 
-(fact "20 peers were reallocated to job 2, task C" true => true)
-
-(fact "20 peers were reallocated to job 2, task D" true => true)
+(fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
+      (get-count replica-2) => [0 0 20 20])
 
 (>!! c-chan :done)
 (close! c-chan)
 
 (def replica-3
-  (loop [replica replica-2]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if (zero? (apply + (map count (vals (get (:allocations new-replica) j2)))))
-        new-replica
-        (recur new-replica)))))
+  (playback-log (:log env) replica-2 ch 2000))
 
-(fact "No peers are executing any tasks" true => true)
+(fact "No peers are executing any tasks" (get-count replica-3) => [0 0 0 0])
 
 (close! b-chan)
 (close! d-chan)
@@ -154,3 +132,4 @@
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

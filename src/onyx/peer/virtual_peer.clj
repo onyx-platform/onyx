@@ -72,34 +72,37 @@
   (start [{:keys [log acking-daemon messenger-buffer messenger] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
+      (try
+        ;; Race to write the job scheduler and messaging to durable storage so that
+        ;; non-peers subscribers can discover which messaging to use.
+        ;; Only one peer will succeed, and only one needs to.
+        (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
+        (extensions/write-chunk log :messaging {:messaging (select-keys opts 
+                                                                        [:onyx.messaging/impl 
+                                                                         :onyx.messaging/peer-port-range
+                                                                         :onyx.messaging/peer-ports])} nil)
 
-      ;; Race to write the job scheduler to durable storage so that
-      ;; non-peers subscribers can discover which job scheduler to use.
-      ;; Only one peer will succeed, and only one needs to.
-      (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
+        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
+              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
+              kill-ch (chan (dropping-buffer 1))
+              restart-ch (chan 1)
+              completion-ch (:completions-ch acking-daemon)
+              peer-site (extensions/peer-site messenger)
+              entry (create-log-entry :prepare-join-cluster
+                                      {:joiner id 
+                                       :peer-site peer-site})
+              origin (extensions/subscribe-to-log log inbox-ch)]
+          (extensions/register-pulse log id)
+          (>!! outbox-ch entry)
 
-      (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
-            outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
-            kill-ch (chan (dropping-buffer 1))
-            restart-ch (chan 1)
-            completion-ch (:completions-ch acking-daemon)
-            send-peer-site (extensions/send-peer-site messenger)
-            acker-peer-site (extensions/acker-peer-site messenger)
-            completion-peer-site (extensions/completion-peer-site messenger)
-            entry (create-log-entry :prepare-join-cluster
-                                    {:joiner id
-                                     :send-site send-peer-site
-                                     :acker-site acker-peer-site
-                                     :completion-site completion-peer-site})
-            origin (extensions/subscribe-to-log log inbox-ch)]
-        (extensions/register-pulse log id)
-        (>!! outbox-ch entry)
-
-        (thread (outbox-loop id log outbox-ch))
-        (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
-        (assoc component :id id :inbox-ch inbox-ch
-               :outbox-ch outbox-ch :kill-ch kill-ch
-               :restart-ch restart-ch))))
+          (thread (outbox-loop id log outbox-ch))
+          (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
+          (assoc component :id id :inbox-ch inbox-ch
+                 :outbox-ch outbox-ch :kill-ch kill-ch
+                 :restart-ch restart-ch))
+        (catch Exception e
+          (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
+          (throw e)))))
 
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))

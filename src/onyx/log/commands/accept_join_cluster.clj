@@ -1,6 +1,7 @@
 (ns onyx.log.commands.accept-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.data :refer [diff]]
+            [taoensso.timbre :refer [info] :as timbre]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
@@ -33,8 +34,9 @@
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
   (if (= (:id state) (:subject diff))
-    (do (doseq [entry (:buffered-outbox state)]
+    (do (extensions/open-peer-site (:messenger state) 
+                                   (get-in new [:peer-sites (:id state)]))
+        (doseq [entry (:buffered-outbox state)]
           (>!! (:outbox-ch state) entry))
         (assoc (dissoc state :buffered-outbox) :stall-output? false))
     state))
-

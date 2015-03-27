@@ -154,7 +154,7 @@
       (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
             leaf-vals (gen-ack-fusion-vals task-map leaves)
             fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
-            link (operation/peer-link event (:acker-id (:root result)) :acker-peer-site)]
+            link (operation/peer-link event (:acker-id (:root result)))]
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
@@ -262,7 +262,7 @@
   (try
     (loop []
       (when-let [{:keys [id peer-id]} (<!! completion-ch)]
-        (let [peer-link (operation/peer-link event peer-id :completion-peer-site)]
+        (let [peer-link (operation/peer-link event peer-id)]
           (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)
           (recur))))
     (catch Exception e
@@ -393,6 +393,8 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
+      (close! (:release-messages-ch component))
+      (close! (:forward-completion-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
       (<!! (:task-lifecycle-ch component))
@@ -401,11 +403,7 @@
       (<!! (:release-messages-ch component))
 
       (let [state @(:onyx.core/state event)]
-        (doseq [[_ link] (get-in state [:links :send-peer-site])]
-          (extensions/close-peer-connection (:onyx.core/messenger event) event link))
-        (doseq [[_ link] (get-in state [:links :acker-peer-site])]
-          (extensions/close-peer-connection (:onyx.core/messenger event) event link))
-        (doseq [[_ link] (get-in state [:links :completion-peer-site])]
+        (doseq [[_ link] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
 
     (assoc component 
@@ -448,4 +446,3 @@
 (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id))))
-

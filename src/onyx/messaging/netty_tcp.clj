@@ -4,7 +4,7 @@
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol :as protocol]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [choose-ip]]
+              [onyx.messaging.common :refer [bind-addr]]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
     (:import [java.net InetSocketAddress]
@@ -281,7 +281,7 @@
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (clojure.core.async/dropping-buffer 1000000))
           daemon (:acking-daemon component)
-          ip (choose-ip opts)
+          ip (bind-addr opts)
           {:keys [port server-shutdown-fn]} (start-netty-server ip 0 buf-recv-ch)
           buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
           app-loop (app daemon parsed-ch inbound-ch release-ch)]
@@ -305,17 +305,17 @@
   (map->NettyTcpSockets {:opts opts}))
 
 ; Not much need for these in aleph
-(defmethod extensions/send-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/send-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
-(defmethod extensions/acker-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/acker-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
-(defmethod extensions/completion-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+; (defmethod extensions/completion-peer-site NettyTcpSockets
+;   [messenger]
+;   [(:ip messenger) (:port messenger)])
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event [host port]]

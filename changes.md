@@ -3,7 +3,6 @@
 - Dropped feature: support for `:sequential` tasks
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
-- New messaging transport: http-kit websockets
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
