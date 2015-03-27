@@ -20,11 +20,12 @@
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
   (start [component]
-    (taoensso.timbre/info "Starting Aeron peer group")
+    (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [media-driver (MediaDriver/launch)]
       (assoc component :media-driver media-driver)))
 
   (stop [{:keys [media-driver] :as component}]
+    (taoensso.timbre/info "Stopping Aeron Peer Group")
     (.close media-driver)
     (assoc component :media-driver nil)))
 
@@ -149,7 +150,6 @@
 
 (defmethod extensions/open-peer-site AeronConnection
   [messenger assigned]
-  (timbre/info "Open peer site " messenger assigned)
   (let [inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
         daemon (:acking-daemon messenger)
@@ -183,7 +183,6 @@
 
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger event {:keys [aeron/external-addr aeron/port]}]
-  (timbre/info "Connect to peer " external-addr port)
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
         channel (aeron-channel external-addr port)
