@@ -2,7 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]]))
 
-(defn apply-fn [f params segment]
+(defn apply-function [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
 
 (defn kw->fn [kw]

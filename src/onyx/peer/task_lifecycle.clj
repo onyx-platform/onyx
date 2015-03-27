@@ -11,7 +11,8 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
-              [onyx.extensions :as extensions]))
+              [onyx.extensions :as extensions])
+    (:import [java.security MessageDigest]))
 
 ;; TODO: Might want to allow a peer to reboot from an
 ;; exception without killing the job, e.g. transient
@@ -34,14 +35,14 @@
   (assoc m :completion-id (:onyx.core/id event)))
 
 (defn sentinel-found? [event]
-  (seq (filter (partial = :done) (map :message (:onyx.core/decompressed event)))))
+  (seq (filter (partial = :done) (map :message (:onyx.core/batch event)))))
 
 (defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event}]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:onyx.core/outbox-ch event) entry)))
 
 (defn sentinel-id [event]
-  (:id (first (filter #(= :done (:message %)) (:onyx.core/decompressed event)))))
+  (:id (first (filter #(= :done (:message %)) (:onyx.core/batch event)))))
 
 (defn drop-nth [n coll]
   (keep-indexed #(if (not= %1 n) %2) coll))
@@ -95,22 +96,53 @@
                  leaves)))
        results)})))
 
-(defn build-new-segments [{:keys [onyx.core/results] :as event}]
-  (merge
-   event
-   {:onyx.core/results
+(defn hash-value [x]
+  (let [md5 (MessageDigest/getInstance "MD5")]
+    (apply str (.digest md5 (.getBytes (pr-str x) "UTF-8")))))
+
+(defn group-message [segment catalog task]
+  (let [t (find-task catalog task)]
+    (if-let [k (:onyx/group-by-key t)]
+      (hash-value (get segment k))
+      (when-let [f (:onyx/group-by-fn t)]
+        (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
+
+(defn group-segments [next-tasks catalog result event]
+  (assoc result
+    :leaves
     (mapv
-     (fn [{:keys [root leaves] :as result}]
-       (assoc result :leaves
-              (mapv
-               (fn [leaf]
-                 (merge leaf
-                        {:id (:id root)
-                         :acker-id (:acker-id root)
-                         :completion-id (:completion-id root)
-                         :ack-vals (repeatedly (count (:flow (:routes leaf))) (fn [] (acker/gen-ack-value)))}))
-               leaves)))
-     results)}))
+     (fn [leaf]
+       (let [msg (if (and (operation/exception? (:message leaf))
+                          (:post-transformation (:routes leaf)))
+                   (operation/apply-function
+                    (operation/kw->fn (:post-transformation (:routes leaf)))
+                    [event] (:message leaf))
+                   (:message leaf))]
+         (assoc leaf
+           :hash-group
+           (reduce (fn [groups t]
+                     (assoc groups t (group-message msg catalog t)))
+                   {} next-tasks)
+           :message (apply dissoc msg (:exclusions (:routes leaf))))))
+     (:leaves result))))
+
+(defn build-new-segments
+  [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
+  (let [next-tasks (keys (:egress-ids serialized-task))
+        results (mapv
+                 (fn [{:keys [root leaves] :as result}]
+                   (assoc result :leaves
+                          (mapv
+                           (fn [leaf]
+                             (merge leaf
+                                    {:id (:id root)
+                                     :acker-id (:acker-id root)
+                                     :completion-id (:completion-id root)
+                                     :ack-vals (repeatedly (count (:flow (:routes leaf)))
+                                                           (fn [] (acker/gen-ack-value)))}))
+                           leaves)))
+                 results)]
+    (merge event {:onyx.core/results (map #(group-segments next-tasks catalog % event) results)})))
 
 (defn gen-ack-fusion-vals [task-map leaves]
   (when-not (= (:onyx/type task-map) :output)
@@ -163,9 +195,6 @@
                  (taoensso.timbre/warn e))))))
   event)
 
-(defn decompress-batch [{:keys [onyx.core/batch] :as event}]
-  (merge event {:onyx.core/decompressed batch}))
-
 (defn try-complete-job [event]
   (when (sentinel-found? event)
     (if (p-ext/drained? event)
@@ -174,19 +203,17 @@
   event)
 
 (defn strip-sentinel
-  [{:keys [onyx.core/batch onyx.core/decompressed onyx.core/message-tree] :as event}]
+  [{:keys [onyx.core/batch onyx.core/message-tree] :as event}]
   (merge
    event
-   (when-let [k (.indexOf (map :message decompressed) :done)]
-     {:onyx.core/decompressed (drop-nth k decompressed)
-      :onyx.core/batch (drop-nth k batch)})))
+   (when-let [k (.indexOf (map :message batch) :done)]
+     {:onyx.core/batch (drop-nth k batch)})))
 
 (defn collect-next-segments [event input]
-  (let [segments (try (p-ext/apply-fn event input) (catch Exception e e))]
+  (let [segments (try (function/apply-fn event input) (catch Exception e e))]
     (if (sequential? segments) segments (vector segments))))
 
-
-(defn apply-fn-single [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn apply-fn-single [{:keys [onyx.core/batch] :as event}]
   ;; PERF: Tight inner loop where a lot of time is spent
   (merge
    event
@@ -197,12 +224,12 @@
              leaves (map (partial apply hash-map) (map vector (repeat :message) segments))]
          (conj coll {:root segment :leaves leaves})))
      []
-     (:onyx.core/decompressed event))}))
+     batch)}))
 
-(defn apply-fn-batch [{:keys [onyx.core/batch onyx.core/decompressed] :as event}]
+(defn apply-fn-batch [{:keys [onyx.core/batch] :as event}]
   ;; Batched functions intentionally ignore their outputs.
-  (let [segments (map :message decompressed)]
-    (p-ext/apply-fn event segments)
+  (let [segments (map :message batch)]
+    (function/apply-fn event segments)
     (merge
      event
      {:onyx.core/results
@@ -211,15 +238,12 @@
          (let [leaves (map (partial apply hash-map) (map vector (repeat :message) segments))]
            (conj coll {:root segment :leaves leaves})))
        []
-       (:onyx.core/decompressed event))})))
+       batch)})))
 
 (defn apply-fn [event]
   (if (:onyx/side-effects-only? (:onyx.core/task-map event))
     (apply-fn-batch event)
     (apply-fn-single event)))
-
-(defn compress-batch [event]
-  (merge event (p-ext/compress-batch event)))
 
 (defn write-batch [event]
   (merge event (p-ext/write-batch event)))
@@ -274,14 +298,12 @@
           (inject-batch-resources)
           (read-batch)
           (tag-messages)
-          (decompress-batch)
           (start-message-timeout-monitors)
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
           (route-output-flow)
           (build-new-segments)
-          (compress-batch)
           (write-batch)
           (ack-messages)
           (close-batch-resources)))
@@ -415,25 +437,15 @@
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
     (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
-(dire/with-post-hook! #'decompress-batch
-  (fn [{:keys [onyx.core/id onyx.core/decompressed onyx.core/batch onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Decompressed %s segments" id lifecycle-id (count decompressed)))))
-
 (dire/with-post-hook! #'apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
 
-(dire/with-post-hook! #'compress-batch
-  (fn [{:keys [onyx.core/id onyx.core/compressed onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Compressed %s segments" id lifecycle-id (count compressed)))))
-
 (dire/with-post-hook! #'write-batch
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/compressed]}]
-    (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count compressed)))))
+  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/results]}]
+    (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
 
 (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id))))
-
-
 

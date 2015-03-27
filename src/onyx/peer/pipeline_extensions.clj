@@ -16,23 +16,6 @@
    - :message - The consumed message"
   type-and-medium-dispatch)
 
-(defmulti ^{:added "0.6.0"} decompress-batch
-  "Decompresses the ingested segments. Must return a map
-   with key :onyx.core/decompressed and value seq representing the
-   decompressed segments."
-  type-and-medium-dispatch)
-
-(defmulti ^{:added "0.6.0"} apply-fn
-  "Applies a function to a decompressed segment. Returns a segment
-   or vector of new segments."
-  (fn [event segment]
-    (type-and-medium-dispatch event)))
-
-(defmulti ^{:added "0.6.0"} compress-batch
-  "Compresses the segments that result from function application. Must return
-   key :onyx.core/compressed and value seq representing the compression of the segments."
-  type-and-medium-dispatch)
-
 (defmulti ^{:added "0.6.0"} write-batch
   "Writes segments to the outgoing data source. Must return a map."
   type-and-medium-dispatch)

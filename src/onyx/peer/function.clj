@@ -9,38 +9,7 @@
               [onyx.extensions :as extensions]
               [taoensso.timbre :as timbre :refer [debug]]
               [dire.core :refer [with-post-hook!]])
-    (:import [java.util UUID]
-             [java.security MessageDigest]))
-
-(defn hash-value [x]
-  (let [md5 (MessageDigest/getInstance "MD5")]
-    (apply str (.digest md5 (.getBytes (pr-str x) "UTF-8")))))
-
-(defn group-message [segment catalog task]
-  (let [t (find-task catalog task)]
-    (if-let [k (:onyx/group-by-key t)]
-      (hash-value (get segment k))
-      (when-let [f (:onyx/group-by-fn t)]
-        (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
-
-(defn compress-segments [next-tasks catalog result event]
-  (assoc result
-    :leaves
-    (mapv
-     (fn [leaf]
-       (let [msg (if (and (operation/exception? (:message leaf))
-                          (:post-transformation (:routes leaf)))
-                   (operation/apply-fn
-                    (operation/kw->fn (:post-transformation (:routes leaf)))
-                    [event] (:message leaf))
-                   (:message leaf))]
-         (assoc leaf
-           :hash-group
-           (reduce (fn [groups t]
-                     (assoc groups t (group-message msg catalog t)))
-                   {} next-tasks)
-           :message (apply dissoc msg (:exclusions (:routes leaf))))))
-     (:leaves result))))
+    (:import [java.util UUID]))
 
 (defmethod l-ext/start-lifecycle? :function
   [_ event]
@@ -54,16 +23,11 @@
   [{:keys [onyx.core/messenger] :as event}]
   {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
 
-(defmethod p-ext/apply-fn :default
+(defn apply-fn
   [{:keys [onyx.core/params] :as event} segment]
-  (operation/apply-fn (:onyx.function/fn event) params segment))
-
-(defmethod p-ext/compress-batch :default
-  [{:keys [onyx.core/results onyx.core/catalog onyx.core/serialized-task]
-    :as event}]
-  (let [next-tasks (keys (:egress-ids serialized-task))
-        compressed-msgs (map #(compress-segments next-tasks catalog % event) results)]
-    (merge event {:onyx.core/compressed compressed-msgs})))
+  (if-let [f (:onyx.function/fn event)]
+    (operation/apply-function f params segment)
+    segment))
 
 (defn filter-by-route [messages task-name]
   (->> messages
@@ -99,8 +63,8 @@
               (count active-peers)))))
 
 (defmethod p-ext/write-batch :default
-  [{:keys [onyx.core/messenger onyx.core/job-id] :as event}]
-  (let [leaves (mapcat :leaves (:onyx.core/compressed event))
+  [{:keys [onyx.core/results onyx.core/messenger onyx.core/job-id] :as event}]
+  (let [leaves (mapcat :leaves results)
         egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
     (when (seq leaves)
       (let [replica @(:onyx.core/replica event)

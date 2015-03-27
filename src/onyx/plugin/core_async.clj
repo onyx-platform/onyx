@@ -27,14 +27,6 @@
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
-(defmethod p-ext/decompress-batch [:input :core.async]
-  [{:keys [onyx.core/batch]}]
-  {:onyx.core/decompressed batch})
-
-(defmethod p-ext/apply-fn [:input :core.async]
-  [event segment]
-  segment)
-
 (defmethod p-ext/ack-message [:input :core.async]
   [{:keys [core.async/pending-messages]} message-id]
   (swap! pending-messages dissoc message-id))
@@ -54,19 +46,10 @@
     (and (= (count (keys x)) 1)
          (= (first (vals x)) :done))))
 
-(defmethod p-ext/apply-fn [:output :core.async]
-  [event segment]
-  segment)
-
-(defmethod p-ext/compress-batch [:output :core.async]
-  [{:keys [onyx.core/results]}]
-  {:onyx.core/compressed results})
-
 (defmethod p-ext/write-batch [:output :core.async]
-  [{:keys [onyx.core/compressed core.async/chan] :as event}]
-  (doseq [msg compressed]
-    (doseq [leaf (:leaves msg)]
-      (>!! chan (:message leaf))))
+  [{:keys [onyx.core/results core.async/chan] :as event}]
+  (doseq [msg (mapcat :leaves results)]
+    (>!! chan (:message msg)))
   {})
 
 (defmethod p-ext/seal-resource [:output :core.async]
