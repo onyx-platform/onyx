@@ -30,7 +30,7 @@
   (try (require sym)
        (catch Exception e
          (fatal e
-                (str "Error loading messenging."
+                (str "Error loading messenging. "
                      "If your peer is AOT compiled you wiil need to manually require " sym))
          (throw e))))
 

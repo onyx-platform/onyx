@@ -13,7 +13,7 @@
              [uk.co.real_logic.agrona CloseHelper]
              [uk.co.real_logic.aeron.driver MediaDriver]
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
-             [uk.co.real_logic.agrona.concurrent BackoffIdleStrategy]
+             [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
@@ -68,25 +68,25 @@
       (onData [buffer offset length header]
         (f buffer offset length header)))))
 
-(defn consumer [limit]
+(defn backoff-strategy [strategy]
+  (case strategy
+    :low-restart-latency (BackoffIdleStrategy. 100 
+                                               10
+                                               (.toNanos TimeUnit/MICROSECONDS 1)
+                                               (.toNanos TimeUnit/MICROSECONDS 100))
+    :high-restart-latency (BackoffIdleStrategy. 100
+                                                10
+                                                (.toNanos TimeUnit/MICROSECONDS 10000)
+                                                (.toNanos TimeUnit/MICROSECONDS 100000))))
+
+(defn consumer [idle-strategy limit]
   (proxy [Consumer] []
     (accept [subscription]
       ;; TODO, evaluate different idle strategies.
-      (let [strategy :high-latency-restart
-            idle-strategy (case strategy 
-                            :high-latency-restart (BackoffIdleStrategy.
-                                                    100
-                                                    10
-                                                    (.toNanos TimeUnit/MICROSECONDS 10000)
-                                                    (.toNanos TimeUnit/MICROSECONDS 100000))
-                            :low-latency-restart (BackoffIdleStrategy.
-                                                   100 
-                                                   10
-                                                   (.toNanos TimeUnit/MICROSECONDS 1)
-                                                   (.toNanos TimeUnit/MICROSECONDS 100)))]
+      (let [strategy ^IdleStrategy (backoff-strategy idle-strategy)]
         (while (not (Thread/interrupted))
           (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
-            (.idle idle-strategy fragments-read)))))))
+            (.idle strategy fragments-read)))))))
 
 (def no-op-error-handler
   (proxy [Consumer] []
@@ -101,11 +101,14 @@
           release-ch (chan (clojure.core.async/dropping-buffer 100000))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
-          ports (allowable-ports config)]
+          ports (allowable-ports config)
+          backpressure-strategy (or (:onyx.messaging/backpressure-strategy config) 
+                                    :high-restart-latency)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
              :ports ports
+             :backpressure-strategy backpressure-strategy
              :resources (atom nil) 
              :release-ch release-ch)))
 
@@ -151,29 +154,28 @@
 (defmethod extensions/open-peer-site AeronConnection
   [messenger assigned]
   (let [inbound-ch (:inbound-ch (:messenger-buffer messenger))
-        release-ch (:release-ch messenger)
-        daemon (:acking-daemon messenger)
-
+        {:keys [release-ch acking-daemon backpressure-strategy bind-addr]} messenger
         ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
-
-        channel (aeron-channel (:bind-addr messenger) (:aeron/port assigned))
+        channel (aeron-channel bind-addr (:aeron/port assigned))
 
         send-handler (data-handler (partial handle-sent-message inbound-ch))
-        acker-handler (data-handler (partial handle-acker-message daemon))
+        acker-handler (data-handler (partial handle-acker-message acking-daemon))
         completion-handler (data-handler (partial handle-completion-message release-ch))
 
         send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
         acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
         completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)
-        accept-send-fut (future (try (.accept ^Consumer (consumer 10) send-subscriber) 
+        send-idle-strategy (backoff-strategy backpressure-strategy)
+        accept-send-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) send-subscriber) 
                                      (catch Exception e (fatal e))))
-        accept-acker-fut (future (try (.accept ^Consumer (consumer 10) acker-subscriber) 
+        accept-acker-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) acker-subscriber) 
                                       (catch Exception e (fatal e))))
-        accept-completion-fut (future (try (.accept ^Consumer (consumer 10) completion-subscriber) 
+        accept-completion-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) completion-subscriber) 
                                            (catch Exception e (fatal e))))]
     (reset! (:resources messenger)
             {:conn aeron
+             :send-idle-strategy send-idle-strategy
              :accept-send-fut accept-send-fut
              :accept-acker-fut accept-acker-fut
              :accept-completion-fut accept-completion-fut
@@ -208,21 +210,24 @@
   (let [[len unsafe-buffer] (protocol/build-messages-msg-buf batch)
         pub ^uk.co.real_logic.aeron.Publication (:send-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
-    (while (not (offer-f)))))
+    (while (not (offer-f))
+      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
   (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
         pub ^uk.co.real_logic.aeron.Publication (:acker-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-    (while (not (offer-f)))))
+    (while (not (offer-f))
+      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-completion-msg-buf id)
         pub ^uk.co.real_logic.aeron.Publication (:completion-pub peer-link) 
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
-    (while (not (offer-f)))))
+    (while (not (offer-f))
+      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
