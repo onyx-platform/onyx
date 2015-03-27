@@ -3,18 +3,18 @@
 (defn my-remote-ip []
   (apply str (butlast (slurp "http://checkip.amazonaws.com"))))
 
-(defn bind-addr [peer-messaging-config]
-  (:peer/bind-addr peer-messaging-config))
+(defn bind-addr [peer-config]
+  (:onyx.messaging/bind-addr peer-config))
 
-(defn external-addr [peer-messaging-config]
-  (or (:peer/external-addr peer-messaging-config)
-      (bind-addr peer-messaging-config)))
+(defn external-addr [peer-config]
+  (or (:onyx.messaging/external-addr peer-config)
+      (bind-addr peer-config)))
 
-(defmulti messaging-require :messaging/impl)
+(defmulti messaging-require :onyx.messaging/impl)
 
-(defmulti messenger :messaging/impl)
+(defmulti messenger :onyx.messaging/impl)
 
-(defmulti messaging-peer-group :messaging/impl)
+(defmulti messaging-peer-group :onyx.messaging/impl)
 
 (defmethod messaging-require :aeron [_]
   (require 'onyx.messaging.aeron))

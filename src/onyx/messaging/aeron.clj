@@ -17,8 +17,6 @@
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
-(def max-port 50000)
-
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
   (start [component]
@@ -35,17 +33,15 @@
 
 (defmethod extensions/assign-site-resources :aeron
   [config peer-site peer-sites]
-  (let [start-port (:aeron/start-port config)
-        existing-ports (->> (vals peer-sites)
-                            (filter 
-                              (fn [s]
-                                (and (= (:aeron/bind-addr peer-site) 
-                                        (:aeron/bind-addr s))
-                                     (= (:aeron/external-addr peer-site) 
-                                        (:aeron/external-addr s)))))
-                            (map :aeron/port)
-                            set)
-        port (first (remove existing-ports (range start-port max-port)))]
+  (let [used-ports (->> (vals peer-sites) 
+                        (filter 
+                          (fn [s]
+                            (= (:aeron/external-addr peer-site) 
+                               (:aeron/external-addr s))))
+                        (map :aeron/port)
+                        set)
+        port (first (remove used-ports
+                            (:aeron/ports peer-site)))]
     (assert port)
     {:aeron/port port}))
 
@@ -95,8 +91,6 @@
   (proxy [Consumer] []
     (accept [_] (taoensso.timbre/warn "Conductor is down."))))
 
-
-
 (defrecord AeronConnection [opts]
   component/Lifecycle
 
@@ -104,12 +98,18 @@
     (taoensso.timbre/info "Starting Aeron")
 
     (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
-          peer-messaging-config (:onyx.messaging/peer-config opts)
-          bind-addr (bind-addr peer-messaging-config)
-          external-addr (external-addr peer-messaging-config)]
+          bind-addr (bind-addr opts)
+          external-addr (external-addr opts)
+          port-range (if-let [port-range (:onyx.messaging/peer-port-range opts)]
+                       (set (range (first port-range) 
+                                   (inc (second port-range))))
+                       #{})
+          ports-static (:onyx.messaging/peer-ports opts)
+          ports (into port-range ports-static)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
+             :ports ports
              :resources (atom nil) 
              :release-ch release-ch)))
 
@@ -142,7 +142,7 @@
 
 (defmethod extensions/peer-site AeronConnection
   [messenger]
-  {:aeron/bind-addr (:bind-addr messenger)
+  {:aeron/ports (:ports messenger)
    :aeron/external-addr (:external-addr messenger)})
 
 (def send-stream-id 1)

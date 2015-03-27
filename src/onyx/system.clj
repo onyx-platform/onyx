@@ -72,20 +72,20 @@
      #(component/stop-system this peer-group-components))))
 
 (defn messenger-ctor [config]
-  (let [rets ((messenger (:onyx.messaging/config config)) config)]
+  (let [rets ((messenger config) config)]
     (when-not rets
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))
     rets))
 
 (defn messaging-require-ctor [config]
   (try
-    (messaging-require (:onyx.messaging/config config))
+    (messaging-require config)
     :loaded
     (catch Exception e
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))))
 
 (defn messaging-peer-group-ctor [config]
-  (let [rets ((messaging-peer-group (:onyx.messaging/config config)) config)]
+  (let [rets ((messaging-peer-group config) config)]
     (when-not rets
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))
     rets))

@@ -35,7 +35,7 @@
 ;; Messaging interface
 
 (defmulti assign-site-resources (fn [config peer-site peer-sites] 
-                                  (:messaging/impl config)))
+                                  (:onyx.messaging/impl config)))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
