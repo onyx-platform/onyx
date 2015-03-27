@@ -31,7 +31,6 @@
 (defmethod messenger :netty-tcp [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))
 
-(defmethod  messaging-peer-group :netty-tcp [_]
+(defmethod messaging-peer-group :netty-tcp [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-peer-group))
-
 
