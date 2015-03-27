@@ -20,7 +20,7 @@
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
   (start [component]
-    (taoensso.timbre/info "Starting Aeron")
+    (taoensso.timbre/info "Starting Aeron peer group")
     (let [media-driver (MediaDriver/launch)]
       (assoc component :media-driver media-driver)))
 
@@ -91,16 +91,16 @@
   (proxy [Consumer] []
     (accept [_] (taoensso.timbre/warn "Conductor is down."))))
 
-(defrecord AeronConnection [opts]
+(defrecord AeronConnection [peer-group]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
-
-    (let [release-ch (chan (clojure.core.async/dropping-buffer 100000))
-          bind-addr (bind-addr opts)
-          external-addr (external-addr opts)
-          ports (allowable-ports opts)]
+    (let [config (:config peer-group)
+          release-ch (chan (clojure.core.async/dropping-buffer 100000))
+          bind-addr (bind-addr config)
+          external-addr (external-addr config)
+          ports (allowable-ports config)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
@@ -132,8 +132,8 @@
 
     (assoc component :bind-addr nil :external-addr nil :site-resources nil :release-ch nil)))
 
-(defn aeron [opts]
-  (map->AeronConnection {:opts opts}))
+(defn aeron [peer-group]
+  (map->AeronConnection {:peer-group peer-group}))
 
 (defmethod extensions/peer-site AeronConnection
   [messenger]

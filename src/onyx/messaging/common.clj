@@ -11,11 +11,11 @@
       (bind-addr peer-config)))
 
 (defn allowable-ports [peer-config]
-  (let [port-range (if-let [port-range (:onyx.messaging/peer-port-range opts)]
+  (let [port-range (if-let [port-range (:onyx.messaging/peer-port-range peer-config)]
                      (range (first port-range) 
                             (inc (second port-range)))
                      [])
-        ports-static (:onyx.messaging/peer-ports opts)]
+        ports-static (:onyx.messaging/peer-ports peer-config)]
     (into (set port-range) 
           ports-static)))
 
@@ -34,12 +34,12 @@
 (defmethod messaging-peer-group :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))
 
-(defmethod messenger :netty-tcp [_]
+(defmethod messaging-require :netty-tcp [_]
   (require 'onyx.messaging.netty-tcp))
 
 (defmethod messenger :netty-tcp [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))
 
 (defmethod messaging-peer-group :netty-tcp [_]
-  (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-peer-group))
+  (ns-resolve 'onyx.messaging.netty-tcp 'netty-peer-group))
 

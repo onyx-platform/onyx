@@ -213,7 +213,7 @@
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer config)
+      (let [v-peer (system/onyx-peer peer-group)
             live (component/start v-peer)
             shutdown-ch (chan 1)
             ack-ch (chan)]

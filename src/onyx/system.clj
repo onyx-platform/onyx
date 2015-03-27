@@ -71,10 +71,10 @@
     (rethrow-component
      #(component/stop-system this peer-group-components))))
 
-(defn messenger-ctor [config]
-  (let [rets ((messenger config) config)]
+(defn messenger-ctor [{:keys [config] :as peer-group}]
+  (let [rets ((messenger config) peer-group)]
     (when-not rets
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))
+      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
     rets))
 
 (defn messaging-require-ctor [config]
@@ -82,12 +82,12 @@
     (messaging-require config)
     :loaded
     (catch Exception e
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))))
+      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))))
 
 (defn messaging-peer-group-ctor [config]
   (let [rets ((messaging-peer-group config) config)]
     (when-not rets
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/config config)})))
+      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
     rets))
 
 (defn onyx-development-env
@@ -103,13 +103,13 @@
      :log (zookeeper config)}))
 
 (defn onyx-peer
-  [config]
+  [{:keys [config] :as peer-group}]
   (map->OnyxPeer
    {:log (zookeeper config)
     :messaging-require (messaging-require-ctor config)
     :acking-daemon (component/using (acking-daemon config) [:log])
     :messenger-buffer (component/using (messenger-buffer config) [:log :acking-daemon])
-    :messenger (component/using (messenger-ctor config) [:messaging-require :acking-daemon :messenger-buffer])
+    :messenger (component/using (messenger-ctor peer-group) [:messaging-require :acking-daemon :messenger-buffer])
     :virtual-peer (component/using (virtual-peer config) [:log :acking-daemon :messenger-buffer :messenger])}))
 
 (defn onyx-peer-group
