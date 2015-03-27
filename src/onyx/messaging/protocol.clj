@@ -1,6 +1,5 @@
 (ns ^:no-doc onyx.messaging.protocol
-  (:require [onyx.compression.nippy :refer [compress decompress]]
-            [taoensso.timbre :as timbre])
+  (:require [taoensso.timbre :as timbre])
   (:import [java.util UUID]
            [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator]))
 
@@ -82,7 +81,7 @@
   (.writeInt buf (alength ^bytes message)) 
   (.writeBytes buf ^bytes message))
 
-(defn read-message-buf [^ByteBuf buf]
+(defn read-message-buf [decompress-f ^ByteBuf buf]
   (let [id (take-uuid buf)
         acker-id (take-uuid buf)
         completion-id (take-uuid buf)
@@ -90,16 +89,16 @@
         message-size (.readInt buf)
         arr (byte-array message-size)
         _ (.readBytes buf arr)
-        message (decompress arr)]
+        message (decompress-f arr)]
     {:id id 
      :acker-id acker-id 
      :completion-id completion-id 
      :ack-val ack-val 
      :message message}))
 
-(defn build-messages-msg-buf [^ByteBufAllocator allocator messages] 
+(defn build-messages-msg-buf [compress-f ^ByteBufAllocator allocator messages] 
   (let [compressed-messages (map (fn [msg]
-                                   (update-in msg [:message] compress))
+                                   (update-in msg [:message] compress-f))
                                  messages)
         buf-size (+ type-header-length
                     (+ 4 ; message count int
@@ -115,10 +114,10 @@
       (write-message-msg buf msg))
     buf))
 
-(defn read-messages-buf [^ByteBuf buf]
+(defn read-messages-buf [decompress-f ^ByteBuf buf]
   {:type messages-type-id 
    :messages (let [message-count (.readInt buf)]
-               (doall (repeatedly message-count #(read-message-buf buf))))})
+               (doall (repeatedly message-count #(read-message-buf decompress-f buf))))})
 
 (defn build-msg-buf [msg]
   (let [t ^byte (:type msg)] 
@@ -127,14 +126,13 @@
       (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
       (= t completion-type-id) (build-completion-msg-buf (:id msg)))))
 
-(defn read-buf [^ByteBuf buf]
+(defn read-buf [decompress-f ^ByteBuf buf]
   (let [msg-type ^byte (.readByte buf)] 
     (cond (= msg-type messages-type-id) 
-          (read-messages-buf buf)
+          (read-messages-buf decompress-f buf)
           (= msg-type ack-type-id) 
           (read-ack-buf buf)
           (= msg-type completion-type-id) 
           (read-completion-buf buf)
           :else (throw (Exception. (str "Invalid message type: " msg-type))))))
-
 

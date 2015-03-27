@@ -1,6 +1,5 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
-  (:require [onyx.compression.nippy :refer [compress decompress]]
-            [taoensso.timbre :as timbre])
+  (:require [taoensso.timbre :as timbre])
   (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
@@ -74,9 +73,9 @@
 (defn meta-message-offsets [start-pos cnt]
   (reductions + start-pos (repeat cnt message-base-length)))
 
-(defn build-messages-msg-buf [messages] 
+(defn build-messages-msg-buf [compress-f messages]
   (let [meta-offsets (meta-message-offsets message-count-size (count messages))
-        message-payloads (compress (map :message messages))
+        message-payloads (compress-f (map :message messages))
         buf-size (+ (last meta-offsets) 
                     (alength message-payloads))
         buf (UnsafeBuffer. (byte-array buf-size))] 
@@ -100,7 +99,7 @@
 ;       [length buf] (build-messages-msg-buf m)]
 ;   (read-messages-buf buf 0 length))
 
-(defn read-messages-buf [^UnsafeBuffer buf offset length]
+(defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
   (let [message-count (.getInt buf offset)
         meta-offsets (meta-message-offsets (+ message-count-size offset) message-count)
         metas (doall (map (partial read-message-meta buf)
@@ -108,7 +107,7 @@
         segments-size  (- (+ offset length) (last meta-offsets))
         message-payload-bytes (byte-array segments-size)
         _ (.getBytes buf (last meta-offsets) message-payload-bytes)
-        message-payloads (decompress message-payload-bytes)]
+        message-payloads (decompress-f message-payload-bytes)]
     (map (fn [m message]
            (assoc m :message message))
          metas

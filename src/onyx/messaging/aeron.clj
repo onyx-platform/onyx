@@ -5,7 +5,6 @@
               [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.common :refer [choose-ip]]
-              [onyx.compression.nippy :refer [decompress compress]]
               [onyx.extensions :as extensions])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
              [uk.co.real_logic.aeron Aeron$Context]
@@ -17,8 +16,9 @@
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
 
-(defn handle-sent-message [inbound-ch ^UnsafeBuffer buffer offset length header]
-  (let [messages (protocol/read-messages-buf buffer offset length)]
+(defn handle-sent-message
+  [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]
+  (let [messages (protocol/read-messages-buf decompress-f buffer offset length)]
     (doseq [message messages]
       (>!! inbound-ch message))))
 
@@ -74,7 +74,11 @@
 
     (let [inbound-ch (:inbound-ch (:messenger-buffer component))
           daemon (:acking-daemon component)
+          decompress-f (:onyx.peer/decompress-fn-impl opts)
+          compress-f (:onyx.peer/compress-fn-impl opts)
           release-ch (chan (clojure.core.async/dropping-buffer 100000))
+
+          _ (prn (:opts component) opts)
 
           ;; TODO, correct port allocation
           port (+ 40000 (rand-int 10000))
@@ -88,7 +92,7 @@
           ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
           aeron (Aeron/connect ctx)
 
-          send-handler (data-handler (partial handle-sent-message inbound-ch))
+          send-handler (data-handler (partial handle-sent-message inbound-ch decompress-f))
           acker-handler (data-handler (partial handle-acker-message daemon))
           completion-handler (data-handler (partial handle-completion-message release-ch))
 
@@ -180,7 +184,8 @@
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
-  (let [[len unsafe-buffer] (protocol/build-messages-msg-buf batch)
+  (let [compress-f (:onyx.peer/compress-fn-impl (:onyx.core/peer-opts event))
+        [len unsafe-buffer] (protocol/build-messages-msg-buf compress-f batch)
         pub ^uk.co.real_logic.aeron.Publication (:pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
     (while (not (offer-f)))))

@@ -2,7 +2,6 @@
     (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
               [onyx.static.planning :refer [find-task]]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.compression.nippy :refer [compress decompress]]
               [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]

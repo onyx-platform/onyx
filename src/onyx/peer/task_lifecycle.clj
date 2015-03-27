@@ -11,7 +11,8 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
-              [onyx.extensions :as extensions])
+              [onyx.extensions :as extensions]
+              [onyx.compression.nippy])
     (:import [java.security MessageDigest]))
 
 ;; TODO: Might want to allow a peer to reboot from an
@@ -321,6 +322,17 @@
      (catch Exception e
        (warn e)))))
 
+(defn resolve-compression-fn-impls [opts]
+  (assoc opts
+    :onyx.peer/decompress-fn-impl
+    (if-let [f (:onyx.peer/decompress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/decompress)
+    :onyx.peer/compress-fn-impl
+    (if-let [f (:onyx.peer/compress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/compress)))
+
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
   component/Lifecycle
 
@@ -351,7 +363,7 @@
                            :onyx.core/messenger messenger
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-response-ch seal-resp-ch
-                           :onyx.core/peer-opts opts
+                           :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/replica replica
                            :onyx.core/state (atom {})}
 

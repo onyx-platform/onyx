@@ -2,7 +2,6 @@
   (:require [clojure.walk :refer [prewalk]]
             [com.stuartsierra.dependency :as dep]
             [onyx.static.planning :as planning]
-            [onyx.compression.nippy :refer [compress decompress]]
             [schema.core :as schema]))
 
 (def base-catalog-entry-validator
@@ -28,13 +27,6 @@
                       (merge base-catalog-entry-validator {:onyx/medium schema/Keyword})
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
-
-(defn serializable? [x]
-  (try
-    (do (compress x)
-        true)
-    (catch Exception e
-      false)))
 
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
