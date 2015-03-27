@@ -1,4 +1,4 @@
-(ns ^:no-doc onyx.messaging.protocol
+(ns ^:no-doc onyx.messaging.protocol-netty
   (:require [onyx.compression.nippy :refer [compress decompress]]
             [taoensso.timbre :as timbre])
   (:import [java.util UUID]
