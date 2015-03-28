@@ -34,11 +34,12 @@
 
 ;; Messaging interface
 
-(defmulti send-peer-site (fn [messenger] (type messenger)))
+(defmulti assign-site-resources (fn [config peer-site peer-sites] 
+                                  (:onyx.messaging/impl config)))
 
-(defmulti acker-peer-site (fn [messenger] (type messenger)))
+(defmulti peer-site (fn [messenger] (type messenger)))
 
-(defmulti completion-peer-site (fn [messenger] (type messenger)))
+(defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
 
@@ -52,4 +53,3 @@
                                  (type messenger)))
 
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
-

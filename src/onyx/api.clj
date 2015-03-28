@@ -206,11 +206,14 @@
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped
    by passing it to the shutdown-peer function."
-  [n config]
+  [n {:keys [config] :as peer-group}]
+  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer config)
+      (let [v-peer (system/onyx-peer peer-group)
             live (component/start v-peer)
             shutdown-ch (chan 1)
             ack-ch (chan)]
@@ -239,3 +242,12 @@
   [env]
   (component/stop env))
 
+(defn ^{:added "0.6.0"} start-peer-group
+  "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
+  [peer-config]
+  (component/start (system/onyx-peer-group peer-config)))
+
+(defn ^{:added "0.6.0"} shutdown-peer-group
+  "Shuts down the given peer-group"
+  [peer-group]
+  (component/stop peer-group))

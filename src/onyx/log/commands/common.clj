@@ -515,4 +515,3 @@
 (defmethod reallocate-from-task? :default
   [scheduler old new job state]
   false)
-

@@ -4,7 +4,7 @@
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol :as protocol]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [choose-ip]]
+              [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
     (:import [java.net InetSocketAddress]
@@ -54,6 +54,10 @@
              [io.netty.bootstrap Bootstrap ServerBootstrap]
              [io.netty.channel.socket.nio NioServerSocketChannel]))
 
+(def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
+(def ^String worker-event-thread-pool-name "onyx-netty-worker-event-pool")
+(def ^String boss-event-thread-pool-name "onyx-netty-boss-event-pool")
+
 (defn leak-detector-level! [level]
   (ResourceLeakDetector/setLevel
     (case level
@@ -62,10 +66,70 @@
       :advanced ResourceLeakDetector$Level/ADVANCED
       :paranoid ResourceLeakDetector$Level/PARANOID)))
 
-;(leak-detector-level! :paranoid)
+(defn event-executor
+  "Creates a new netty execution handler for processing events. 
+  Defaults to 1 thread per core."
+  []
+  (DefaultEventExecutorGroup. (.. Runtime getRuntime availableProcessors)))
 
 (defn epoll? []
   (Epoll/isAvailable))
+
+(defn get-default-event-loop-threads
+  "Determines the default number of threads to use for a Netty EventLoopGroup.
+   This mimics the default used by Netty as of version 4.1."
+  []
+  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
+    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" 
+                                      (* cpu-count 2)))))
+
+(defonce ^DefaultEventExecutorGroup shared-event-executor (event-executor))
+
+(defrecord NettyPeerGroup [opts]
+  component/Lifecycle
+  (start [component]
+    (let [thread-count (long (get-default-event-loop-threads))
+          client-thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)
+          client-group (if (epoll?)
+                         (EpollEventLoopGroup. thread-count client-thread-factory)
+                         (NioEventLoopGroup. thread-count client-thread-factory))
+          boss-thread-factory (DefaultThreadFactory. boss-event-thread-pool-name true)
+          boss-group (if (epoll?)
+                         (EpollEventLoopGroup. thread-count boss-thread-factory)
+                         (NioEventLoopGroup. thread-count boss-thread-factory))
+          worker-thread-factory (DefaultThreadFactory. worker-event-thread-pool-name true)
+          worker-group (if (epoll?)
+                       (EpollEventLoopGroup. thread-count worker-thread-factory)
+                       (NioEventLoopGroup. thread-count worker-thread-factory))]
+
+      (timbre/info "Starting Netty peer group")
+      (assoc component 
+             :shared-event-executor shared-event-executor
+             :client-group client-group 
+             :worker-group worker-group
+             :boss-group boss-group)))
+
+  (stop [component]
+    (assoc component 
+           :shared-event-executor nil :client-group nil 
+           :worker-group nil :boss-group nil)))
+
+(defn netty-peer-group [opts]
+  (map->NettyPeerGroup {:opts opts}))
+
+(defmethod extensions/assign-site-resources :netty-tcp
+  [config peer-site peer-sites]
+  (let [used-ports (->> (vals peer-sites) 
+                        (filter 
+                          (fn [s]
+                            (= (:netty/external-addr peer-site) 
+                               (:netty/external-addr s))))
+                        (map :netty/port)
+                        set)
+        port (first (remove used-ports
+                            (:netty/ports peer-site)))]
+    (assert port)
+    {:netty/port port}))
 
 (defn int32-frame-decoder
   []
@@ -80,26 +144,16 @@
   [^ChannelGroup channel-group handler]
   (proxy [ChannelInboundHandlerAdapter] []
     (channelActive [ctx]
-      (timbre/info "Channel active")
       (.add channel-group (.channel ctx)))
     (channelRead [^ChannelHandlerContext ctx ^Object message]
       (try
         (handler ctx message)
         (catch java.nio.channels.ClosedChannelException e
-          (timbre/warn "channel closed"))))
+          (timbre/warn "Channel closed"))))
     (exceptionCaught [^ChannelHandlerContext ctx ^Throwable cause]
       (timbre/error cause "TCP handler caught")
       (.close (.channel ctx)))
     (isSharable [] true)))
-
-(defn event-executor
-  "Creates a new netty execution handler for processing events. 
-  Defaults to 1 thread per core."
-  []
-  (DefaultEventExecutorGroup. (.. Runtime getRuntime availableProcessors)))
-
-(defonce ^DefaultEventExecutorGroup shared-event-executor
-  (event-executor))
 
 (defn channel-initializer-done [handler]
   (proxy [ChannelInitializer] []
@@ -119,71 +173,29 @@
   core and writes a response back on this channel."
   [buf-recvd-ch] 
   (fn [^ChannelHandlerContext ctx ^Object message]
-    ;(timbre/info "TCP HANDLER MESSAGE " message)
-
-    ; No need for any reply
-    (handle buf-recvd-ch message)
-    #_(when-let [response (handle buf-recvd-ch message)]
-        (.writeAndFlush ctx response))))
-
-(defn get-default-event-loop-threads
-  "Determines the default number of threads to use for a Netty EventLoopGroup.
-   This mimics the default used by Netty as of version 4.1."
-  []
-  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
-    ; TODO: evaluate whether too many threads are used.
-    ; reducing can improve performance
-    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" (* cpu-count 2)))))
-
-(def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
-
-(def client-group
-  (let [thread-count (get-default-event-loop-threads)
-        thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)]
-    (if (epoll?)
-      (EpollEventLoopGroup. (long thread-count) thread-factory)
-      (NioEventLoopGroup. (long thread-count) thread-factory))))
-
-(def ^String server-event-thread-pool-name "onyx-netty-worker-event-pool")
-
-(def worker-group
-  (let [thread-count (get-default-event-loop-threads)
-        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
-    (if (epoll?)
-      (EpollEventLoopGroup. (long thread-count) thread-factory)
-      (NioEventLoopGroup. (long thread-count) thread-factory))))
-
-(def ^String server-event-thread-pool-name "onyx-netty-boss-event-pool")
-
-(def boss-group
-  (let [thread-count (get-default-event-loop-threads)
-        thread-factory (DefaultThreadFactory. server-event-thread-pool-name true)]
-    (if (epoll?)
-      (EpollEventLoopGroup. (long thread-count) thread-factory)
-      (NioEventLoopGroup. (long thread-count) thread-factory))))
+    (handle buf-recvd-ch message)))
 
 
 (defn start-netty-server
-  [host port buf-recvd-ch]
+  [boss-group worker-group host port buf-recvd-ch]
   (let [bootstrap (ServerBootstrap.)
         channel (if (epoll?)
                   EpollServerSocketChannel
                   NioServerSocketChannel)
-
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
                                             (ImmediateEventExecutor/INSTANCE))
-        initializer (channel-initializer-done (gen-tcp-handler channel-group (create-server-handler buf-recvd-ch)))] 
+        initializer (channel-initializer-done 
+                      (gen-tcp-handler channel-group 
+                                       (create-server-handler buf-recvd-ch)))] 
     ; Configure bootstrap
     (doto bootstrap
       (.group boss-group worker-group)
       (.channel channel)
       (.option ChannelOption/SO_REUSEADDR true)
       (.option ChannelOption/TCP_NODELAY true)
-      (.option ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
       (.childOption ChannelOption/SO_REUSEADDR true)
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
-      (.childOption ChannelOption/ALLOCATOR PooledByteBufAllocator/DEFAULT)
       (.childHandler initializer))
     ; Start bootstrap
     (let [ch (->> (InetSocketAddress. host port)
@@ -192,14 +204,10 @@
                   (.channel))
           _ (.add channel-group ch)
           assigned-port (.. ch localAddress getPort)]
-      (timbre/info "TCP server" host assigned-port "online")
-      {:port assigned-port
-       :server-shutdown-fn (fn killer []
-                             (.. channel-group close awaitUninterruptibly)
-                             (timbre/info "TCP server" host port "shut down"))})))
-
-(defn client-handler [msg]
-  (timbre/info "TCP client handler"))
+      (timbre/info "Netty server" host assigned-port "online")
+      (fn killer []
+        (.. channel-group close awaitUninterruptibly)
+        (timbre/info "TCP server" host port "shut down")))))
 
 (defn new-client-handler []
   (proxy [ChannelHandler] []
@@ -223,7 +231,7 @@
            (catch Exception e
              (timbre/fatal e))))))
 
-(defn create-client [host port]
+(defn create-client [client-group host port]
   (let [channel (if (epoll?)
                   EpollSocketChannel
                   NioSocketChannel)]
@@ -257,7 +265,6 @@
                     (throw e)))
              (recur)))
 
-; FIXME; don't want a whole go-loop here, can probably parse above in the handler
 (defn buf-recv-loop [buf-recv-ch parsed-ch]
   (go-loop []
            (let [buf (<!! buf-recv-ch)]
@@ -267,62 +274,80 @@
                  ; undo retain added in server handler
                  (.release ^ByteBuf buf))
                (catch Throwable t
-                 (println t)
-                 (timbre/fatal t (str "exception in go loop." buf " " (.getId (Thread/currentThread))))))
+                 (timbre/fatal t "Exception in recv loop.")))
                  (recur))))
 
-(defrecord NettyTcpSockets [opts]
+(defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Netty TCP Sockets")
-    (let [buf-recv-ch (chan 10000)
-          parsed-ch (chan (clojure.core.async/dropping-buffer 1000000))
-          inbound-ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (clojure.core.async/dropping-buffer 1000000))
-          daemon (:acking-daemon component)
-          ip (choose-ip opts)
-          {:keys [port server-shutdown-fn]} (start-netty-server ip 0 buf-recv-ch)
-          buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
-          app-loop (app daemon parsed-ch inbound-ch release-ch)]
+    (let [{:keys [client-group worker-group boss-group]} (:messaging-group peer-group)
+          config (:config peer-group)
+          release-ch (chan (clojure.core.async/dropping-buffer 100000))
+          bind-addr (bind-addr config)
+          external-addr (external-addr config)
+          ports (allowable-ports config)]
       (assoc component 
-             :app-loop app-loop 
-             :server-shutdown-fn server-shutdown-fn 
-             :buf-loop buf-loop
-             :ip ip 
-             :port port 
+             :bind-addr bind-addr 
+             :external-addr external-addr
+             :boss-group boss-group
+             :client-group client-group
+             :worker-group worker-group
+             :ports ports
+             :resources (atom nil)
              :release-ch release-ch)))
 
-  (stop [component]
-    (taoensso.timbre/info "Stopping Netty TCP Sockets")
-    ((:server-shutdown-fn component))
-    (close! (:app-loop component))
-    (close! (:buf-loop component))
-    (close! (:release-ch component))
-    (assoc component :release-ch nil)))
+  (stop [{:keys [aeron resources release-ch] :as component}]
+    (taoensso.timbre/info "Stopping Aeron")
+    (try 
+      (when-let [rs @resources]
+        (let [{:keys [shutdown-fn app-loop buf-loop]} rs] 
+          (shutdown-fn)
+          (close! app-loop)
+          (close! buf-loop)
+          (close! release-ch))
+        (reset! resources nil)) 
+      (catch Exception e (timbre/fatal e)))
+    (assoc component :bind-addr nil :external-addr nil 
+           :worker-group nil :client-group nil :boss-group nil 
+           :resources nil :release-ch nil)))
 
-(defn netty-tcp-sockets [opts]
-  (map->NettyTcpSockets {:opts opts}))
+(defn netty-tcp-sockets [peer-group]
+  (map->NettyTcpSockets {:peer-group peer-group}))
 
-; Not much need for these in aleph
-(defmethod extensions/send-peer-site NettyTcpSockets
+(defmethod extensions/peer-site NettyTcpSockets
   [messenger]
-  [(:ip messenger) (:port messenger)])
+  {:netty/ports (:ports messenger)
+   :netty/external-addr (:external-addr messenger)})
 
-(defmethod extensions/acker-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
-
-(defmethod extensions/completion-peer-site NettyTcpSockets
-  [messenger]
-  [(:ip messenger) (:port messenger)])
+(defmethod extensions/open-peer-site NettyTcpSockets
+  [messenger assigned]
+  (timbre/info "Open peer site " messenger assigned)
+  (let [buf-recv-ch (chan 10000)
+        parsed-ch (chan (clojure.core.async/dropping-buffer 10000))
+        inbound-ch (:inbound-ch (:messenger-buffer messenger))
+        release-ch (:release-ch messenger)
+        daemon (:acking-daemon messenger)
+        shutdown-fn (start-netty-server (:boss-group messenger)
+                                        (:worker-group messenger)
+                                        (:bind-addr messenger) 
+                                        (:netty/port assigned) 
+                                        buf-recv-ch)
+        buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
+        app-loop (app daemon parsed-ch inbound-ch release-ch)]
+    (reset! (:resources messenger)
+            {:shutdown-fn shutdown-fn 
+             :buf-recv-ch buf-recv-ch
+             :buf-loop buf-loop
+             :app-loop app-loop 
+             :parsed-ch parsed-ch})))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
-  [messenger event [host port]]
-  (timbre/info "Created client " host port)
-  (create-client host port))
+  [messenger event {:keys [netty/external-addr netty/port]}]
+  (timbre/info "Created client " external-addr port)
+  (create-client (:client-group messenger) external-addr port))
 
-; Reused as is from HttpKitWebSockets. Probably something to extract.
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ms (or (:onyx/batch-timeout task-map) 1000)
@@ -335,15 +360,11 @@
           segments)
         segments))))
 
-(defn allocator [^Channel x]
-  (.alloc x))
-
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
   (try
     (.writeAndFlush peer-link 
-                    ^ByteBuf (protocol/build-messages-msg-buf (allocator peer-link) 
-                                                              messages) 
+                    ^ByteBuf (protocol/build-messages-msg-buf messages) 
                     (.voidPromise ^Channel peer-link))
     (catch Exception e 
       (timbre/error e))))
@@ -351,8 +372,7 @@
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-ack-msg-buf (allocator peer-link) 
-                                                       message-id 
+                  ^ByteBuf (protocol/build-ack-msg-buf message-id 
                                                        completion-id 
                                                        ack-val)
                   (.voidPromise ^Channel peer-link)))
@@ -360,7 +380,7 @@
 (defmethod extensions/internal-complete-message NettyTcpSockets
   [messenger event id ^Channel peer-link]
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-completion-msg-buf (allocator peer-link) id)
+                  ^ByteBuf (protocol/build-completion-msg-buf id)
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets

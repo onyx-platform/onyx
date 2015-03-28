@@ -3,10 +3,12 @@
             [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.messaging.dummy-messenger]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
+
 
 (def onyx-id (java.util.UUID/randomUUID))
 
@@ -16,7 +18,8 @@
 
 (def env (onyx.api/start-env env-config))
 
-(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
+(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/round-robin} nil)
+(extensions/write-chunk (:log env) :messaging {:messaging/impl :dummy-messenger} nil)
 
 (def a-id "a")
 
@@ -26,7 +29,8 @@
 
 (def d-id "d")
 
-(def entry (create-log-entry :prepare-join-cluster {:joiner d-id}))
+(def entry (create-log-entry :prepare-join-cluster {:joiner d-id
+                                                    :peer-site {:address 1}}))
 
 (def ch (chan 5))
 
@@ -47,7 +51,8 @@
 (extensions/register-pulse (:log env) c-id)
 (extensions/register-pulse (:log env) d-id)
 
-(def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
+(def old-replica {:messaging {:messaging/impl :dummy-messenger}
+                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
 (def new-replica (f old-replica))
 

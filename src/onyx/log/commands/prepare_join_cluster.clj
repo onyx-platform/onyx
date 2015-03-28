@@ -3,13 +3,18 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.peer.operation :as operation]
+            [taoensso.timbre :refer [info] :as timbre]))
 
-(defn add-peer-sites [replica args]
-  (-> replica
-      (assoc-in [:send-peer-site (:joiner args)] (:send-site args))
-      (assoc-in [:acker-peer-site (:joiner args)] (:acker-site args))
-      (assoc-in [:completion-peer-site (:joiner args)] (:completion-site args))))
+(defn add-site [replica {:keys [joiner peer-site]}]
+  (-> replica 
+      (assoc-in [:peer-sites joiner] 
+                (merge
+                  peer-site
+                  (extensions/assign-site-resources (:messaging replica)
+                                                    peer-site
+                                                    (:peer-sites replica))))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]
@@ -17,24 +22,24 @@
     (if (> n 0)
       (let [joining-peer (:joiner args)
             cluster (:peers replica)
-            all-joined-peers (into #{} (concat (keys (:pairs replica)) cluster))
-            all-prepared-deps (into #{} (keys (:prepared replica)))
-            prep-watches (into #{} (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
-            accepting-deps (into #{} (keys (:accepted replica)))
+            all-joined-peers (set (concat (keys (:pairs replica)) cluster))
+            all-prepared-deps (set (keys (:prepared replica)))
+            prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
+            accepting-deps (set (keys (:accepted replica)))
             candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches)
-            sorted-candidates (sort (filter identity candidates))]
+            sorted-candidates (sort (remove nil? candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
                 watcher (nth sorted-candidates index)]
             (-> replica
                 (update-in [:prepared] merge {watcher joining-peer})
-                (add-peer-sites args)))
+                (add-site args)))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
           (assoc-in [:peer-state (:joiner args)] :idle)
-          (add-peer-sites args)))))
+          (add-site args)))))
 
 (defmethod extensions/replica-diff :prepare-join-cluster
   [entry old new]
@@ -89,8 +94,9 @@
               (close! ch))
           (assoc state :watch-ch ch))
         (= (:id state) (:instant-join diff))
-        (do (doseq [entry (:buffered-outbox state)]
+        (do (extensions/open-peer-site (:messenger state) 
+                                       (get-in new [:peer-sites (:id state)]))
+            (doseq [entry (:buffered-outbox state)]
               (>!! (:outbox-ch state) entry))
             (assoc (dissoc state :buffered-outbox) :stall-output? false))
         :else state))
-
