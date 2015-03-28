@@ -97,7 +97,7 @@ what you will find in this map and what each of its key/value pairs mean. More k
 may be added by the user as the context is associated to throughout the task pipeline.
 
 | key name                     |value type | Meaning       |
-|------------------------------|---------------------------|
+|------------------------------|-----------|---------------|
 |`:onyx.core/id`               |`uuid`     | The unique ID of this peer's lifecycle|
 |`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecyle|
 |`:onyx.core/job-id`           |`uuid`     | The Job ID of the task that this peer is executing|
