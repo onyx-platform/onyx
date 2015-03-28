@@ -1,4 +1,4 @@
-(ns onyx.peer.min-peers-test
+(ns onyx.peer.custom-compression-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -14,12 +14,10 @@
 (def peer-config
   (assoc (:peer-config config)
     :onyx/id id
-    :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
-    :onyx.messaging/compress-fn #(.getBytes (pr-str %))))
+    :onyx.peer/compress-fn pr-str
+    :onyx.peer/decompress-fn read-string))
 
 (def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def n-messages 100)
 
@@ -38,7 +36,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.min-peers-test/my-inc
+    :onyx/fn :onyx.peer.custom-compression-test/my-inc
     :onyx/type :function
     :onyx/batch-size batch-size}
 
@@ -68,7 +66,7 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def v-peers (onyx.api/start-peers 3 peer-config))
 
 (onyx.api/submit-job
  peer-config
@@ -84,8 +82,6 @@
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 

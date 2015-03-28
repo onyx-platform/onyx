@@ -5,8 +5,8 @@
               [onyx.messaging.protocol-aeron :as protocol]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
-              [onyx.compression.nippy :refer [decompress compress]]
-              [onyx.extensions :as extensions])
+              [onyx.extensions :as extensions]
+              [onyx.compression.nippy :refer [compress decompress]])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
@@ -46,8 +46,8 @@
     (assert port)
     {:aeron/port port}))
 
-(defn handle-sent-message [inbound-ch ^UnsafeBuffer buffer offset length header]
-  (let [messages (protocol/read-messages-buf buffer offset length)]
+(defn handle-sent-message [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]
+  (let [messages (protocol/read-messages-buf decompress-f buffer offset length)]
     (doseq [message messages]
       (>!! inbound-ch message))))
 
@@ -103,11 +103,13 @@
           external-addr (external-addr config)
           ports (allowable-ports config)]
       (assoc component 
-             :bind-addr bind-addr 
-             :external-addr external-addr
-             :ports ports
-             :resources (atom nil) 
-             :release-ch release-ch)))
+        :bind-addr bind-addr 
+        :external-addr external-addr
+        :ports ports
+        :resources (atom nil) 
+        :release-ch release-ch
+        :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
+        :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
 
   (stop [{:keys [aeron resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
@@ -159,7 +161,7 @@
 
         channel (aeron-channel (:bind-addr messenger) (:aeron/port assigned))
 
-        send-handler (data-handler (partial handle-sent-message inbound-ch))
+        send-handler (data-handler (partial handle-sent-message inbound-ch (:decompress-f messenger)))
         acker-handler (data-handler (partial handle-acker-message daemon))
         completion-handler (data-handler (partial handle-completion-message release-ch))
 
@@ -205,7 +207,7 @@
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
-  (let [[len unsafe-buffer] (protocol/build-messages-msg-buf batch)
+  (let [[len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) batch)
         pub ^uk.co.real_logic.aeron.Publication (:send-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
     (while (not (offer-f)))))

@@ -3,7 +3,7 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
-              [onyx.extensions :as operation]
+              [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
               [onyx.log.entry :refer [create-log-entry]]))
 
