@@ -9,7 +9,8 @@
   :onyx.messaging/impl :aeron
   :onyx.messaging/peer-port-range [40200 40400]
   :onyx.messaging/peer-ports [40199]
-  :onyx.messaging/bind-addr "localhost"}
+  :onyx.messaging/bind-addr "localhost"
+  :onyx.messaging/backpressure-strategy :high-restart-latency}
 
  :logging {}}
 

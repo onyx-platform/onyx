@@ -2,57 +2,28 @@
     (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
-              [onyx.messaging.protocol :as protocol]
+              [onyx.messaging.protocol-netty :as protocol]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions])
     (:import [java.net InetSocketAddress]
              [java.util.concurrent TimeUnit Executors]
-             [io.netty.channel.epoll 
-              Epoll 
-              EpollEventLoopGroup
-              EpollServerSocketChannel
-              EpollSocketChannel]
-             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator CompositeByteBuf]
-             [java.nio ByteBuffer]
-             [io.netty.channel.socket.nio 
-              NioServerSocketChannel
-              NioSocketChannel]
+             [java.nio]
+             [io.netty.buffer ByteBuf]
              [io.netty.util.internal SystemPropertyUtil]
-             [io.netty.util.concurrent 
-              Future
-              EventExecutorGroup
-              DefaultEventExecutorGroup
-              ImmediateEventExecutor]
-             [io.netty.channel.nio NioEventLoopGroup]
+             [io.netty.util.concurrent Future EventExecutorGroup DefaultThreadFactory 
+              DefaultEventExecutorGroup ImmediateEventExecutor]
+             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer 
+              ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
+             [io.netty.channel.epoll Epoll EpollEventLoopGroup EpollServerSocketChannel EpollSocketChannel]
              [io.netty.channel.socket SocketChannel]
-             [io.netty.channel
-              Channel 
-              ChannelFuture 
-              ChannelOption
-              ChannelPipeline 
-              EventLoopGroup
-              ChannelInitializer
-              ChannelHandler
-              ChannelInboundHandler
-              ChannelOutboundHandler
-              ChannelHandlerContext
-              ChannelFutureListener
-              ChannelInboundHandlerAdapter]
-             [io.netty.handler.codec
-              LengthFieldBasedFrameDecoder
-              LengthFieldPrepender]
-             [io.netty.channel.group 
-              ChannelGroup
-              DefaultChannelGroup]
-             [io.netty.util.concurrent 
-              GenericFutureListener 
-              Future 
-              DefaultThreadFactory]
+             [io.netty.channel.socket.nio NioServerSocketChannel NioSocketChannel]
+             [io.netty.channel.nio NioEventLoopGroup]
+             [io.netty.channel.group ChannelGroup DefaultChannelGroup]
+             [io.netty.handler.codec LengthFieldBasedFrameDecoder LengthFieldPrepender]
              [io.netty.util ResourceLeakDetector ResourceLeakDetector$Level]
-             [io.netty.bootstrap Bootstrap ServerBootstrap]
-             [io.netty.channel.socket.nio NioServerSocketChannel]))
+             [io.netty.bootstrap Bootstrap ServerBootstrap]))
 
 (def ^String client-event-thread-pool-name "onyx-netty-client-event-pool")
 (def ^String worker-event-thread-pool-name "onyx-netty-worker-event-pool")
@@ -362,12 +333,9 @@
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
-  (try
-    (.writeAndFlush peer-link 
-                    ^ByteBuf (protocol/build-messages-msg-buf messages) 
-                    (.voidPromise ^Channel peer-link))
-    (catch Exception e 
-      (timbre/error e))))
+  (.writeAndFlush peer-link 
+                  ^ByteBuf (protocol/build-messages-msg-buf messages) 
+                  (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]

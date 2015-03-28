@@ -1,4 +1,5 @@
-(ns ^:no-doc onyx.messaging.common)
+(ns ^:no-doc onyx.messaging.common
+  (:require [taoensso.timbre :refer [fatal]]))
 
 (defn my-remote-ip []
   (apply str (butlast (slurp "http://checkip.amazonaws.com"))))
@@ -25,8 +26,16 @@
 
 (defmulti messaging-peer-group :onyx.messaging/impl)
 
+(defn safe-require [sym]
+  (try (require sym)
+       (catch Exception e
+         (fatal e
+                (str "Error loading messenging. "
+                     "If your peer is AOT compiled you wiil need to manually require " sym))
+         (throw e))))
+
 (defmethod messaging-require :aeron [_]
-  (require 'onyx.messaging.aeron))
+  (safe-require 'onyx.messaging.aeron))
 
 (defmethod messenger :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron))
@@ -35,7 +44,7 @@
   (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))
 
 (defmethod messaging-require :netty-tcp [_]
-  (require 'onyx.messaging.netty-tcp))
+  (safe-require 'onyx.messaging.netty-tcp))
 
 (defmethod messenger :netty-tcp [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))

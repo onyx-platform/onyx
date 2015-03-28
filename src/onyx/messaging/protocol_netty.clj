@@ -1,7 +1,8 @@
-(ns ^:no-doc onyx.messaging.protocol
-  (:require [taoensso.timbre :as timbre])
-  (:import [java.util UUID]
-           [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator PooledByteBufAllocator ByteBufAllocator]))
+(ns ^:no-doc onyx.messaging.protocol-netty
+    (:require [taoensso.timbre :as timbre])
+    (:import [java.util UUID]
+             [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator
+              PooledByteBufAllocator ByteBufAllocator]))
 
 ;;;;;;
 ;; helpers
