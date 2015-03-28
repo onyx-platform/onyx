@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.log.helper :refer [playback-log]]
+            [onyx.log.helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.extensions :as extensions]
             [onyx.api]))
@@ -107,26 +107,11 @@
 
 (def ch (chan 10000))
 
-(defn get-counts [replica]
-  (let [task-a (nth (get-in replica [:tasks j1]) 0)
-        task-b (nth (get-in replica [:tasks j1]) 1)
-        task-c (nth (get-in replica [:tasks j1]) 2)
-        task-d (nth (get-in replica [:tasks j2]) 0)
-        task-e (nth (get-in replica [:tasks j2]) 1)
-        task-f (nth (get-in replica [:tasks j2]) 2)
-        task-a-count (count (get (get (:allocations replica) j1) task-a))
-        task-b-count (count (get (get (:allocations replica) j1) task-b))
-        task-c-count (count (get (get (:allocations replica) j1) task-c))
-        task-d-count (count (get (get (:allocations replica) j2) task-d))
-        task-e-count (count (get (get (:allocations replica) j2) task-e))
-        task-f-count (count (get (get (:allocations replica) j2) task-f))]
-    [task-a-count task-b-count task-c-count task-d-count task-e-count task-f-count]))
-
 (def replica-1
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
 (fact "Peers balanced after before killed in multi-job test" 
-      (get-counts replica-1) => [6 6 6 6 6 6])
+      (get-counts replica-1 [j1 j2]) => [[6 6 6] [6 6 6]])
 
 (onyx.api/kill-job peer-config j1)
 
@@ -134,7 +119,7 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "Peers balanced after job killed in multi-job test" 
-      (get-counts replica-2) => [0 0 0 12 12 12])
+      (get-counts replica-2) => [[0 0 0] [12 12 12]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

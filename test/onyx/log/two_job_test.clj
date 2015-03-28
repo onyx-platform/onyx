@@ -4,7 +4,7 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
-            [onyx.log.helper :refer [playback-log]]
+            [onyx.log.helper :refer [playback-log get-counts]]
             ; Add for generative testing later
             ;[onyx.log.generative-test :as log-gen-test]
             ;[clojure.test.check.generators :as gen]
@@ -96,27 +96,26 @@
 (defmethod l-ext/inject-lifecycle-resources :f
   [_ _] {:core.async/chan f-chan})
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:a :b] [:b :c]]
-  :catalog catalog-1
-  :task-scheduler :onyx.task-scheduler/round-robin})
+(def j1 
+  (onyx.api/submit-job
+    peer-config
+    {:workflow [[:a :b] [:b :c]]
+     :catalog catalog-1
+     :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:d :e] [:e :f]]
-  :catalog catalog-2
-  :task-scheduler :onyx.task-scheduler/round-robin})
+(def j2 
+  (onyx.api/submit-job
+    peer-config
+    {:workflow [[:d :e] [:e :f]]
+     :catalog catalog-2
+     :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def ch (chan n-peers))
-
-(defn get-counts [replica]
-  (map count (mapcat vals (vals (:allocations replica)))))
 
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "peers balanced on 2 jobs" (get-counts replica) => [2 2 2 2 2 2])
+(fact "peers balanced on 2 jobs" (get-counts replica [j1 j2]) => [[2 2 2] [2 2 2]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

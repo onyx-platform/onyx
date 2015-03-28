@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.log.helper :refer [playback-log]]
+            [onyx.log.helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
@@ -93,27 +93,16 @@
 
 (def ch (chan 10000))
 
-(defn get-counts [replica]
-  (let [task-a (first (get-in replica [:tasks j1]))
-        task-b (second (get-in replica [:tasks j1]))
-        task-c (first (get-in replica [:tasks j2]))
-        task-d (second (get-in replica [:tasks j2]))
-        task-a-count (count (get (get (:allocations replica) j1) task-a))
-        task-b-count (count (get (get (:allocations replica) j1) task-b))
-        task-c-count (count (get (get (:allocations replica) j2) task-c)) 
-        task-d-count (count (get (get (:allocations replica) j2) task-d))]
-    [task-a-count task-b-count task-c-count task-d-count])) 
-
 (def replica-1
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "the peers evenly balance" (get-counts replica-1) => [3 3 3 3])
+(fact "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
 
 (def conn (zk/connect (:zookeeper/address (:env-config config))))
 
-(def task-b (second (get-in replica-1 [:tasks j1])))
+(def task-b (second (get-in replica-1 [:tasks (:job-id j1)])))
 
-(def id (last (get (get (:allocations replica-1) j1) task-b)))
+(def id (last (get (get (:allocations replica-1) (:job-id j1)) task-b)))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" id))
 
@@ -122,7 +111,7 @@
 (def replica-2
   (playback-log (:log env) replica-1 ch 2000))
 
-(fact "the peers rebalance" (get-counts replica-2) => [3 3 3 2])
+(fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 3] [3 2]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

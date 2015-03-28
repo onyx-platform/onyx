@@ -3,7 +3,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.log.helper :refer [playback-log]]
+            [onyx.log.helper :refer [playback-log get-counts]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
@@ -95,21 +95,21 @@
 
 (def ch (chan 10000))
 
-(defn get-counts [replica]
-  (vector (count (apply concat (vals (get (:allocations replica) j1)))) 
-          (count (apply concat (vals (get (:allocations replica) j2))))))
-
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "70/30% split for percentage job scheduler succeeded" (get-counts replica) => [7 3])
+(fact "70/30% split for percentage job scheduler succeeded" 
+      (map (partial apply +) 
+           (get-counts replica [j1 j2])) => [7 3])
 
 (def v-peers-2 (onyx.api/start-peers n-peers peer-group))
 
 (def replica-2
   (playback-log (:log env) replica ch 2000))
 
-(fact "70/30% split for percentage job scheduler succeeded after rebalance" (get-counts replica-2) => [14 6])
+(fact "70/30% split for percentage job scheduler succeeded after rebalance" 
+      (map (partial apply +) 
+           (get-counts replica-2 [j1 j2])) => [14 6])
 
 (doseq [v-peer v-peers-1]
   (onyx.api/shutdown-peer v-peer))
