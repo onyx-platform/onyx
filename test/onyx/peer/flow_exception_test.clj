@@ -15,6 +15,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def batch-size 10)
 
 (def in-chan (chan 100))
@@ -94,7 +96,7 @@
 (defn transform-five [event e]
   {:error? true :value "abc"})
 
-(def v-peers (onyx.api/start-peers 3 peer-config))
+(def v-peers (onyx.api/start-peers 3 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -131,6 +133,8 @@
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 
