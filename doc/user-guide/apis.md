@@ -44,7 +44,7 @@ Starts N virtual peers to execute tasks.
 
 ##### `submit-job`
 
-Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, and `:task-scheduler`.
+Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, and `:task-scheduler`. Returns a map of `:job-id` and `:task-ids`, which map to a UUID and vector of maps respectively.
 
 ##### `await-job-completion`
 
