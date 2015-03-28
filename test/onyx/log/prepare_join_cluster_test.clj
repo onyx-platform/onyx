@@ -1,6 +1,7 @@
 (ns onyx.log.prepare-join-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [com.stuartsierra.component :as component]
             [onyx.messaging.dummy-messenger]
             [onyx.system]
@@ -23,7 +24,7 @@
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :a :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (->DummyMessenger)})]
   (fact (:prepared new-replica) => {:a :d})
   (fact diff => {:observer :a :subject :d})
   (fact reactions => [{:fn :notify-join-cluster
@@ -33,7 +34,7 @@
 (let [old-replica (assoc-in old-replica [:prepared :a] :e)
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :b :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :b :messenger (->DummyMessenger)})]
   (fact (:prepared new-replica) => {:a :e :b :d})
   (fact diff => {:observer :b :subject :d})
   (fact reactions => [{:fn :notify-join-cluster
@@ -46,7 +47,7 @@
                       (assoc-in [:prepared :c] :g))
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]
   (fact (:prepared new-replica) => {:a :e :b :f :c :g})
   (fact diff => nil)
   (fact reactions => [{:fn :abort-join-cluster
@@ -58,7 +59,7 @@
                    :job-scheduler :onyx.job-scheduler/round-robin}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]
   (fact (:peers new-replica) => [:d])
   (fact (:peer-state new-replica) => {:d :idle})
   (fact diff => {:instant-join :d})
@@ -68,7 +69,7 @@
                    :peers [:a]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :a :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (->DummyMessenger)})]
   (fact (:peers new-replica) => [:a])
   (fact (:prepared new-replica) => {:a :d})
   (fact diff => {:observer :a :subject :d})
@@ -84,7 +85,7 @@
                    :job-scheduler :onyx.job-scheduler/round-robin}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]
   (fact new-replica => old-replica)
   (fact diff => nil)
   (fact reactions => [{:fn :abort-join-cluster

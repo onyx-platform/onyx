@@ -5,6 +5,8 @@
   [config peer-site peer-sites]
   {:port 1})
 
-(defmethod extensions/peer-site clojure.lang.Keyword
+(defrecord DummyMessenger [])
+
+(defmethod extensions/peer-site onyx.messaging.dummy_messenger.DummyMessenger
   [messenger]
   {:address 1})

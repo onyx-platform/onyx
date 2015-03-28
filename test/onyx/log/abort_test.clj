@@ -1,11 +1,11 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
+            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(let [peer-state {:id :d :messenger :dummy-messenger}
+(let [peer-state {:id :d :messenger (->DummyMessenger)}
       entry (create-log-entry :abort-join-cluster {:id :d})
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)

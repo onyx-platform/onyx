@@ -1,7 +1,7 @@
 (ns onyx.log.notify-join-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger]
+            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.system]
             [midje.sweet :refer :all]))
 
@@ -16,7 +16,7 @@
                    :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger :dummy-messenger})]
+      reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]
   (fact diff => {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a})
   (fact reactions => [{:fn :accept-join-cluster :args diff :immediate? true}])
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
