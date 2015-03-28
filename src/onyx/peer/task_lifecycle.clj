@@ -172,7 +172,11 @@
     (merge event cycle-params (l-ext/inject-batch-resources* event))))
 
 (defn read-batch [event]
-  (merge event (p-ext/read-batch event)))
+  (let [rets (p-ext/read-batch event)]
+    (when (and (= (count (:onyx.core/batch rets)) 1)
+               (= (:message (first (:onyx.core/batch rets))) :done))
+      (Thread/sleep (:onyx.core/drained-back-off event)))
+    (merge event rets)))
 
 (defn tag-messages [event]
   (merge
