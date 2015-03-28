@@ -16,6 +16,7 @@
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent
 - The last task in a workflow no longer needs to be an `output` task
+- New documentation: Event context map information model
 
 #### 0.5.3
 
