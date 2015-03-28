@@ -118,7 +118,8 @@
 
     (extensions/write-log-entry (:log client) entry)
     (component/stop client)
-    id))
+    {:job-id id
+     :task-ids tasks}))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
