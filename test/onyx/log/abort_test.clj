@@ -11,7 +11,7 @@
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
 
-      old-replica {:messaging {:messaging/impl :dummy-messaging}
+      old-replica {:messaging {:onyx.messaging/impl :dummy-messaging}
                    :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)

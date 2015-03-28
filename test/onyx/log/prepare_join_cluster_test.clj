@@ -16,7 +16,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:messaging {:messaging/impl :dummy-messenger}
+(def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                   :pairs {:a :b :b :c :c :a} :peers [:a :b :c]
                   :peer-sites {}
                   :job-scheduler :onyx.job-scheduler/round-robin})
@@ -53,7 +53,7 @@
                        :args {:id :d}
                        :immediate? true}]))
 
-(let [old-replica {:messaging {:messaging/impl :dummy-messenger}
+(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                    :peers []
                    :job-scheduler :onyx.job-scheduler/round-robin}
       new-replica (f old-replica)
@@ -64,7 +64,7 @@
   (fact diff => {:instant-join :d})
   (fact reactions => nil))
 
-(let [old-replica {:messaging {:messaging/impl :dummy-messenger}
+(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                    :peers [:a]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -76,7 +76,7 @@
                        :args {:observer :d :subject :a}
                        :immediate? true}]))
 
-(let [old-replica {:messaging {:messaging/impl :dummy-messenger}
+(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                    :pairs {:a :b :b :a}
                    :accepted {}
                    :prepared {:a :c}

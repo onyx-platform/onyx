@@ -20,7 +20,7 @@
 (def scheduler :onyx.job-scheduler/round-robin)
 
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-(extensions/write-chunk (:log env) :messaging {:messaging/impl :dummy-messaging} nil)
+(extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
 (facts
  "We can write to the log and read the entries back out"
@@ -34,7 +34,7 @@
 (def env (onyx.api/start-env env-config))
 
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
-(extensions/write-chunk (:log env) :messaging {:messaging/impl :dummy-messaging} nil)
+(extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
 (def entries 10000)
 
