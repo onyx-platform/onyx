@@ -1,31 +1,16 @@
-(ns onyx.log.generative-test
+(ns onyx.log.generators
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [com.stuartsierra.component :as component]
-            [onyx.messaging.aeron :as aeron]
+            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
             [clojure.set :refer [intersection]]
-            [midje.sweet :refer :all]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test :refer :all]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            [zookeeper :as zk]))
+            [clojure.test :refer :all]))
 
-(def onyx-id (java.util.UUID/randomUUID))
-
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
-
-(def env-config (assoc (:env-config config) :onyx/id onyx-id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def messaging 
-  (component/start (aeron/aeron {:opts peer-config})))
+(def messenger (->DummyMessenger))
 
 (defn bump-forward-immediates 
   "If peer hasn't finished joining yet, bump all their 
@@ -36,24 +21,29 @@
     (vec (concat (filter :immediate? entries)
                  (remove :immediate? entries)))))
 
+(defn peerless-entry? [log-entry]
+  (#{:submit-job :kill-job :gc} (:fn log-entry)))
+
 (defn active-peers [replica entry]
   (cond-> (set (concat (:peers replica)
                        ; might not need these with the below entries
                        (vals (or (:prepared replica) {})) 
                        (vals (or (:accepted replica) {}))))
-    (:id (:args entry)) (conj (:id (:args entry)))
-    (:joiner (:args entry)) (conj (:joiner (:args entry)))))
+    (and (not (peerless-entry? entry))
+         (:id (:args entry))) (conj (:id (:args entry)))
+    (and (not (peerless-entry? entry))
+         (:joiner (:args entry))) (conj (:joiner (:args entry)))))
 
 (defn apply-entry [replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry replica)
         diff (extensions/replica-diff entry replica new-replica)
-        peers (active-peers replica entry)
+        peers (active-peers new-replica entry)
         peer-reactions (keep (fn [peer-id] 
                                (if-let [reactions (extensions/reactions entry 
                                                                         replica 
                                                                         new-replica 
                                                                         diff 
-                                                                        {:messenger messaging
+                                                                        {:messenger messenger
                                                                          :id peer-id})]
 
                                  [peer-id reactions]))
@@ -69,6 +59,7 @@
                           entries
                           peer-reactions)]
     (vector new-replica unapplied)))
+
 
 (defn apply-peer-queue-entry 
   "Applies the next log message in the selected peer's queue.
@@ -88,7 +79,7 @@
      :log (conj log message)
      :peer-choices (conj peer-choices next-peer)}))
 
-(defn peer-gen 
+(defn queue-select-gen 
   "Generator to look into all of the peer's write queues
   and pick an entry to get fake written next"
   [replica-state-gen]
@@ -97,13 +88,21 @@
               ; we only play back log messages from peers who have
               ; joined, or whose entry is :prepare-join-cluster 
               ; because non-immediate reactions are buffered til join
-              (let [peers (set (:peers (:replica state)))] 
-                (gen/elements 
-                  (map key 
-                       (filter (fn [[peer [entry]]]
-                                 (or (:immediate? entry)
-                                     (contains? peers peer)))
-                               (:entries state))))))))
+              (let [peerless-queues (->> (:entries state)
+                                         (filter (fn [[queue-id queue]] (peerless-entry? (first queue))))
+                                         (map key))
+                    joined-peers (set (:peers (:replica state)))
+                    selectable-peers (->> (:entries state)
+                                          (filter (fn [[peer [entry]]]
+                                                    (or (:immediate? entry)
+                                                        (contains? joined-peers peer))))
+                                          (map key)
+                                          set)
+                    selectable-queues (into selectable-peers peerless-queues)] 
+                (when (empty? selectable-queues)
+                  (println "No playable log messages. State: " state))
+
+                (gen/elements selectable-queues)))))
 
 (defn apply-entry-gen 
   "Apply an entry from one of the peers log queues
@@ -113,7 +112,7 @@
     (fn [[state peer-id]]
       (apply-peer-queue-entry state peer-id))
     (gen/tuple replica-state-gen
-               (peer-gen replica-state-gen))))
+               (queue-select-gen replica-state-gen))))
 
 (defn apply-entries-gen 
   "Recurse over replica generator until entries
@@ -127,42 +126,3 @@
                 (if (empty? (:entries state))
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))
-
-(deftest joins
-  (checking
-    "Checking joins"
-    10000
-    [{:keys [replica log peer-choices]} 
-     (apply-entries-gen 
-       (gen/return
-         {:replica {:job-scheduler (:onyx.peer/job-scheduler peer-config)
-                    :messaging (:onyx.messaging/config peer-config)}
-          :message-id 0
-          ; TODO: for scheduling we need a way to supply queues for entries written by non peers
-          ; possibly could just check whether they are certain message types 
-          ; in peer-gen (rename to queue-select-gen?)
-          ; eg. queue with :z [{:fn :submit-job]
-          ; if they are in separate queues they could be processed in any order which is what we want
-          :entries {:a [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messaging)
-                                :joiner :a}}]
-                    :b [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messaging)
-                                :joiner :b}}]
-                    :c [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messaging)
-                                :joiner :c}}]
-                    :d [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messaging)
-                                :joiner :d}}]}
-          :log []
-          :peer-choices []}))]
-    (is (= (:prepared replica) {}))
-    (is (= (:accepted replica) {}))
-    (is (= (set (keys (:pairs replica)))
-           (set (vals (:pairs replica)))))
-    (is (= (count (:peers replica)) 4))))

@@ -83,13 +83,8 @@
         exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
     (map :id exempt-tasks)))
 
-(defn ^{:added "0.6.0"} submit-job [config job]
-  (let [id (java.util.UUID/randomUUID)
-        client (component/start (system/onyx-client config))
-        _ (validator/validate-job (assoc job :workflow (:workflow job)))
-        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-        tasks (planning/discover-tasks (:catalog job) (:workflow job))
-        task-ids (map :id tasks)
+(defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
+  (let [task-ids (map :id tasks)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)
@@ -103,8 +98,16 @@
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
               :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
-        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
-        entry (create-log-entry :submit-job args)]
+        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
+    (create-log-entry :submit-job args)))
+
+(defn ^{:added "0.6.0"} submit-job [config job]
+  (let [id (java.util.UUID/randomUUID)
+        _ (validator/validate-job (assoc job :workflow (:workflow job)))
+        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+        tasks (planning/discover-tasks (:catalog job) (:workflow job))
+        entry (create-submit-job-entry id config job tasks)
+        client (component/start (system/onyx-client config))]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
