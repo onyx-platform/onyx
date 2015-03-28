@@ -259,6 +259,13 @@
        (p-ext/ack-message event id)
        (recur)))))
 
+(defn retry-messages! [messenger event]
+  (go
+   (loop []
+     (when-let [id (<! (:retry-ch messenger))]
+       (p-ext/retry-message event id)
+       (recur)))))
+
 (defn forward-completion-calls! [event completion-ch]
   (try
     (loop []
@@ -385,6 +392,7 @@
             (recur @replica)))
 
         (let [release-messages-ch (release-messages! messenger pipeline-data)
+              retry-messages-ch (retry-messages! messenger pipeline-data)
               forward-completion-ch (thread (forward-completion-calls! pipeline-data completion-ch))
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
               listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
@@ -392,6 +400,7 @@
                  :pipeline-data pipeline-data 
                  :seal-ch seal-resp-ch
                  :release-messages-ch release-messages-ch
+                 :retry-messages-ch retry-messages-ch
                  :forward-completion-ch forward-completion-ch 
                  :task-lifecycle-ch task-lifecycle-ch
                  :listen-for-sealer-ch listen-for-sealer-ch)))
@@ -406,6 +415,7 @@
 
       (close! (:seal-ch component))
       (close! (:release-messages-ch component))
+      (close! (:retry-messages-ch component))
       (close! (:forward-completion-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
@@ -413,6 +423,7 @@
       (<!! (:listen-for-sealer-ch component))
       (<!! (:forward-completion-ch component))
       (<!! (:release-messages-ch component))
+      (<!! (:retry-messages-ch component))
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
@@ -422,6 +433,7 @@
            :pipeline-data nil 
            :seal-ch nil
            :release-messages-ch nil
+           :retry-messages-ch nil
            :forward-completion-ch nil 
            :task-lifecycle-ch nil
            :listen-for-sealer-ch nil)))

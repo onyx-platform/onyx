@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
-    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop]]
+    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -146,7 +146,6 @@
   (fn [^ChannelHandlerContext ctx ^Object message]
     (handle buf-recvd-ch message)))
 
-
 (defn start-netty-server
   [boss-group worker-group host port buf-recvd-ch]
   (let [bootstrap (ServerBootstrap.)
@@ -215,7 +214,7 @@
                 (.handler (client-channel-initializer (new-client-handler))))]
         (.channel ^ChannelFuture (.connect b host port))))))
 
-(defn app [daemon parsed-ch inbound-ch release-ch]
+(defn app [daemon parsed-ch inbound-ch release-ch retry-ch]
     (go-loop []
              (try (let [msg (<!! parsed-ch)
                         t ^byte (:type msg)]
@@ -230,7 +229,13 @@
                                              (:ack-val msg))
 
                           (= t protocol/completion-type-id)
-                          (>!! release-ch (:id msg))))
+                          (>!! release-ch (:id msg))
+
+                          (= t protocol/retry-type-id)
+                          (>!! retry-ch (:id msg))
+
+                          :else
+                          (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
                   (catch Exception e
                     (taoensso.timbre/error e)
                     (throw e)))
@@ -255,7 +260,8 @@
     (taoensso.timbre/info "Starting Netty TCP Sockets")
     (let [{:keys [client-group worker-group boss-group]} (:messaging-group peer-group)
           config (:config peer-group)
-          release-ch (chan (clojure.core.async/dropping-buffer 100000))
+          release-ch (chan (dropping-buffer 10000))
+          retry-ch (chan (dropping-buffer 10000))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)]
@@ -269,8 +275,8 @@
              :resources (atom nil)
              :release-ch release-ch)))
 
-  (stop [{:keys [aeron resources release-ch] :as component}]
-    (taoensso.timbre/info "Stopping Aeron")
+  (stop [{:keys [resources release-ch] :as component}]
+    (taoensso.timbre/info "Stopping Netty TCP Sockets")
     (try 
       (when-let [rs @resources]
         (let [{:keys [shutdown-fn app-loop buf-loop]} rs] 
@@ -282,7 +288,7 @@
       (catch Exception e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
            :worker-group nil :client-group nil :boss-group nil 
-           :resources nil :release-ch nil)))
+           :resources nil :release-ch nil :retry-ch nil)))
 
 (defn netty-tcp-sockets [peer-group]
   (map->NettyTcpSockets {:peer-group peer-group}))
@@ -294,11 +300,11 @@
 
 (defmethod extensions/open-peer-site NettyTcpSockets
   [messenger assigned]
-  (timbre/info "Open peer site " messenger assigned)
   (let [buf-recv-ch (chan 10000)
         parsed-ch (chan (clojure.core.async/dropping-buffer 10000))
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
+        retry-ch (:retry-ch messenger)
         daemon (:acking-daemon messenger)
         shutdown-fn (start-netty-server (:boss-group messenger)
                                         (:worker-group messenger)
@@ -306,7 +312,7 @@
                                         (:netty/port assigned) 
                                         buf-recv-ch)
         buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
-        app-loop (app daemon parsed-ch inbound-ch release-ch)]
+        app-loop (app daemon parsed-ch inbound-ch release-ch retry-ch)]
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn 
              :buf-recv-ch buf-recv-ch
@@ -316,7 +322,6 @@
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event {:keys [netty/external-addr netty/port]}]
-  (timbre/info "Created client " external-addr port)
   (create-client (:client-group messenger) external-addr port))
 
 (defmethod extensions/receive-messages NettyTcpSockets
@@ -349,6 +354,12 @@
   [messenger event id ^Channel peer-link]
   (.writeAndFlush peer-link 
                   ^ByteBuf (protocol/build-completion-msg-buf id)
+                  (.voidPromise ^Channel peer-link)))
+
+(defmethod extensions/internal-retry-message NettyTcpSockets
+  [messenger event id ^Channel peer-link]
+  (.writeAndFlush peer-link 
+                  ^ByteBuf (protocol/build-retry-msg-buf id)
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets

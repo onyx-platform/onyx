@@ -7,17 +7,20 @@
 ;;;;;;
 ;; Constants
 
-; id uuid 
+;; id uuid 
 (def completion-msg-length (int 16))
 
-; id uuid, completion-id uuid, ack-val long
+;; id uuid
+(def retry-msg-length (int 16))
+
+;; id uuid, completion-id uuid, ack-val long
 (def ack-msg-length (int 40))
 
-; message length without nippy segments
-; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
+;; message length without nippy segments
+;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
 (def message-base-length (int 56))
 
-; messages with 0 messages in it
+;; messages with 0 messages in it
 (def messages-base-length (int 4))
 
 (defn write-uuid [^MutableDirectBuffer buf offset ^UUID uuid]
@@ -47,8 +50,16 @@
 (defn read-completion [^UnsafeBuffer buf offset]
   (get-uuid buf offset))
 
+(defn read-retry [^UnsafeBuffer buf offset]
+  (get-uuid buf offset))
+
 (defn build-completion-msg-buf [id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
+    (write-uuid buf 0 id)
+    buf))
+
+(defn build-retry-msg-buf [id]
+  (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
     (write-uuid buf 0 id)
     buf))
 
@@ -84,20 +95,6 @@
       (write-message-meta buf offset msg))
     (.putBytes buf (last meta-offsets) message-payloads)
     [buf-size buf]))
-
-; (let [m (vector 
-;           {:id #uuid  "4f127c9f-2fab-4604-9b40-15907b98b126" 
-;            :acker-id #uuid  "07b2090c-5643-4e5a-8d3b-e111eb90376b" 
-;            :completion-id #uuid  "7f4dae49-f621-4169-a64c-989ce7466bc0" 
-;            :ack-val 99999
-;            :message {:a 1}}
-;           {:id #uuid  "4f127c9f-2fab-4604-9b40-15907b98b126" 
-;                  :acker-id #uuid  "07b2090c-5643-4e5a-8d3b-e111eb90376b" 
-;                  :completion-id #uuid  "7f4dae49-f621-4169-a64c-989ce7466bc0" 
-;                  :ack-val 6189462916639123192
-;                  :message {:a 1}})
-;       [length buf] (build-messages-msg-buf m)]
-;   (read-messages-buf buf 0 length))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
   (let [message-count (.getInt buf offset)

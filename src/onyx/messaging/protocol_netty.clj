@@ -23,11 +23,15 @@
 (def messages-type-id ^byte (byte 0))
 (def ack-type-id ^byte (byte 1))
 (def completion-type-id ^byte (byte 2))
+(def retry-type-id ^byte (byte 3))
 
 (def type-header-length (int 1))
 
 ; id uuid 
 (def completion-msg-length (int 16))
+
+; id uuid 
+(def retry-msg-length (int 16))
 
 ; id uuid, completion-id uuid, ack-val long
 (def ack-msg-length (int 40))
@@ -41,14 +45,26 @@
 
 (def completion-payload-length (int (+ completion-msg-length type-header-length)))
 
+(def retry-payload-length (int (+ retry-msg-length type-header-length)))
+
 (defn build-completion-msg-buf [id] 
   (let [buf ^ByteBuf (byte-buffer completion-payload-length)] 
     (.writeByte buf completion-type-id)
     (write-uuid buf id)
     buf))
 
+(defn build-retry-msg-buf [id] 
+  (let [buf ^ByteBuf (byte-buffer retry-payload-length)] 
+    (.writeByte buf retry-type-id)
+    (write-uuid buf id)
+    buf))
+
 (defn read-completion-buf [^ByteBuf buf]
   {:type completion-type-id 
+   :id (take-uuid buf)})
+
+(defn read-retry-buf [^ByteBuf buf]
+  {:type retry-type-id 
    :id (take-uuid buf)})
 
 (def ack-payload-length ^int (+ ack-msg-length type-header-length))
@@ -122,7 +138,8 @@
     (cond 
       (= t messages-type-id) (build-messages-msg-buf (:messages msg))
       (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
-      (= t completion-type-id) (build-completion-msg-buf (:id msg)))))
+      (= t completion-type-id) (build-completion-msg-buf (:id msg))
+      (= t retry-type-id) (build-retry-msg-buf (:id msg)))))
 
 (defn read-buf [decompress-f ^ByteBuf buf]
   (let [msg-type ^byte (.readByte buf)] 
@@ -132,5 +149,7 @@
           (read-ack-buf buf)
           (= msg-type completion-type-id) 
           (read-completion-buf buf)
+          (= msg-type retry-type-id)
+          (read-retry-buf buf)
           :else (throw (Exception. (str "Invalid message type: " msg-type))))))
 
