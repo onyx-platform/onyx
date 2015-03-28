@@ -12,11 +12,12 @@
 - New feature: Flow conditions may post-transform exception values into new segments
 - New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value
 - New feature: Custom compression and decompression functions through Peer configuration
+- New documentation: Event context map information model
 - Added metadata to all public API functions indicating which Onyx version they were added in
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent
 - The last task in a workflow no longer needs to be an `output` task
-- New documentation: Event context map information model
+
 
 #### 0.5.3
 
