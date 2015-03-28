@@ -1,6 +1,8 @@
 (ns onyx.messaging.protocol-test
-  (:require [onyx.messaging.protocol :as protocol]
+  (:require [onyx.messaging.protocol-netty :as protocol]
             [midje.sweet :refer :all]))
+
+;; TODO: fix these tests, implement for Aeron too.
 
 (comment (fact (let [message {:type protocol/completion-type-id
                      :id #uuid "11837bd7-2de5-4b62-888d-171c4c47845c"}] 
