@@ -99,6 +99,37 @@
    (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
    (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
 
+(defn validate-env-config [env-config]
+  (schema/validate
+    {:zookeeper/address schema/Str
+     :onyx/id schema/Uuid
+     (schema/optional-key :zookeeper/server?) schema/Bool
+     (schema/optional-key :zookeeper.server/port) schema/Int}
+    (select-keys env-config 
+                 [:zookeeper/address :onyx/id :zookeeper/server? :zookeeper.server/port])))
+
+(defn validate-peer-config [peer-config]
+  (schema/validate
+    {:zookeeper/address schema/Str
+     :onyx/id schema/Uuid
+     :onyx.peer/job-scheduler schema/Keyword
+     :onyx.messaging/impl (schema/enum :aeron :netty)
+     :onyx.messaging/bind-addr schema/Str
+     (schema/optional-key :onyx.messaging/peer-port-range) [schema/Int]
+     (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
+     (schema/optional-key :onyx.messaging/external-addr) schema/Str
+     (schema/optional-key :onyx.messaging/backpressure-strategy) schema/Keyword}
+    (select-keys peer-config 
+                 [:onyx/id
+                  :zookeeper/address
+                  :onyx.peer/job-scheduler 
+                  :onyx.messaging/impl
+                  :onyx.messaging/peer-port-range
+                  :onyx.messaging/peer-ports
+                  :onyx.messaging/bind-addr
+                  :onyx.messaging/external-addr
+                  :onyx.messaging/backpressure-strategy])))
+
 (defn validate-job
   [job]
   (schema/validate job-validator job)

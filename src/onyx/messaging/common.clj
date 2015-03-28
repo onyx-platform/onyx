@@ -43,12 +43,12 @@
 (defmethod messaging-peer-group :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))
 
-(defmethod messaging-require :netty-tcp [_]
+(defmethod messaging-require :netty [_]
   (safe-require 'onyx.messaging.netty-tcp))
 
-(defmethod messenger :netty-tcp [_]
+(defmethod messenger :netty [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))
 
-(defmethod messaging-peer-group :netty-tcp [_]
+(defmethod messaging-peer-group :netty [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-peer-group))
 

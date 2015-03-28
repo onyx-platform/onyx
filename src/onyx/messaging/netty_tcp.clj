@@ -88,7 +88,7 @@
 (defn netty-peer-group [opts]
   (map->NettyPeerGroup {:opts opts}))
 
-(defmethod extensions/assign-site-resources :netty-tcp
+(defmethod extensions/assign-site-resources :netty
   [config peer-site peer-sites]
   (let [used-ports (->> (vals peer-sites) 
                         (filter 

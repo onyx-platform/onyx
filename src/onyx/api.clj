@@ -86,7 +86,7 @@
 (defn ^{:added "0.6.0"} submit-job [config job]
   (let [id (java.util.UUID/randomUUID)
         client (component/start (system/onyx-client config))
-        _  (validator/validate-job (assoc job :workflow (:workflow job)))
+        _ (validator/validate-job (assoc job :workflow (:workflow job)))
         _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
         task-ids (map :id tasks)
@@ -236,6 +236,7 @@
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
   [env-config]
+  (validator/validate-env-config env-config)
   (component/start (system/onyx-development-env env-config)))
 
 (defn ^{:added "0.6.0"} shutdown-env
@@ -246,6 +247,7 @@
 (defn ^{:added "0.6.0"} start-peer-group
   "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
   [peer-config]
+  (validator/validate-peer-config peer-config)
   (component/start (system/onyx-peer-group peer-config)))
 
 (defn ^{:added "0.6.0"} shutdown-peer-group
