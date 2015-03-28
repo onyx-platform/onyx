@@ -110,6 +110,7 @@
      :catalog catalog-2
      :task-scheduler :onyx.task-scheduler/round-robin}))
 
+
 (def ch (chan n-peers))
 
 (def replica
