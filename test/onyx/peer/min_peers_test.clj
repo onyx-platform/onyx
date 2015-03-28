@@ -11,11 +11,7 @@
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config
-  (assoc (:peer-config config)
-    :onyx/id id
-    :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
-    :onyx.messaging/compress-fn #(.getBytes (pr-str %))))
+(def peer-config (assoc (:peer-config config) :onyx/id id))
 
 (def env (onyx.api/start-env env-config))
 
