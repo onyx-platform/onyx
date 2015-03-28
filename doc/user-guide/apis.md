@@ -23,7 +23,6 @@ Onyx ships with three distinct APIs to accommodate different needs. A descriptio
     - [`read-batch`](#read-batch)
     - [`requeue-sentinel`](#requeue-sentinel)
     - [`ack-batch`](#ack-batch)
-    - [`apply-fn`](#apply-fn)
     - [`write-batch`](#write-batch)
     - [`seal-resource`](#seal-resource)
 
@@ -102,10 +101,6 @@ If applicable for your data source, send the sentinel back to the input source w
 ##### `ack-batch`
 
 Acknowledges the batch of read segments.
-
-##### `apply-fn`
-
-Applies the function for this task to the incoming segments. Takes one segment as input, returns a segment or seq of segments as output.
 
 ##### `write-batch`
 
