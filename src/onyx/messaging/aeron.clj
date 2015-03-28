@@ -161,8 +161,8 @@
         aeron (Aeron/connect ctx)
         channel (aeron-channel bind-addr (:aeron/port assigned))
 
-        send-handler (data-handler (partial handle-sent-message inbound-ch))
-        acker-handler (data-handler (partial handle-acker-message acking-daemon (:decompress-f messenger)))
+        send-handler (data-handler (partial handle-sent-message inbound-ch (:decompress-f messenger)))
+        acker-handler (data-handler (partial handle-acker-message acking-daemon))
         completion-handler (data-handler (partial handle-completion-message release-ch))
 
         send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
