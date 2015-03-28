@@ -21,11 +21,9 @@ Onyx ships with three distinct APIs to accommodate different needs. A descriptio
     - [`close-lifecycle-resources`](#close-lifecycle-resources)
 - [Peer Pipeline API](#peer-pipeline-api)
     - [`read-batch`](#read-batch)
-    - [`decompress-batch`](#decompress-batch)
     - [`requeue-sentinel`](#requeue-sentinel)
     - [`ack-batch`](#ack-batch)
     - [`apply-fn`](#apply-fn)
-    - [`compress-batch`](#compress-batch)
     - [`write-batch`](#write-batch)
     - [`seal-resource`](#seal-resource)
 
@@ -97,10 +95,6 @@ The virtual peer process is extensively pipelined, providing asynchrony between 
 
 Reads multiple segments off the previous element in the workflow.
 
-##### `decompress-batch`
-
-Decompresses the batch that was received. Internally, Onyx uses Fressian for compression.
-
 ##### `requeue-sentinel`
 
 If applicable for your data source, send the sentinel back to the input source when it's found to not block future iterations of the pipeline.
@@ -111,11 +105,7 @@ Acknowledges the batch of read segments.
 
 ##### `apply-fn`
 
-Applies the function for this task to the incoming segments.
-
-##### `compress-batch`
-
-Compresses the batch to send. Internally, Onyx uses Fressian for compression.
+Applies the function for this task to the incoming segments. Takes one segment as input, returns a segment or seq of segments as output.
 
 ##### `write-batch`
 
