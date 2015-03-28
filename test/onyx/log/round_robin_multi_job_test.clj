@@ -119,7 +119,7 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "Peers balanced after job killed in multi-job test" 
-      (get-counts replica-2) => [[0 0 0] [12 12 12]])
+      (get-counts replica-2 [j1 j2]) => [[0 0 0] [12 12 12]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
