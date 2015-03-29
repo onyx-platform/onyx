@@ -25,14 +25,14 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.5.3"]
+[com.mdrogalis/onyx "0.6.0-SNAPSHOT"]
 ```
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
-### User Guide 0.5.3
+### User Guide 0.6.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
@@ -55,13 +55,13 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Examples](doc/user-guide/examples.md)
 - [Frequently Asked Questions](doc/user-guide/faq.md)
 
-### API Docs 0.5.3
+### API Docs 0.6.0
 
 Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.3` goes with `onyx` version `0.5.3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.3.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.6.0` goes with `onyx` version `0.6.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.6.0.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
@@ -80,7 +80,7 @@ You can run a dashboard to monitor Onyx cluster activity, found [here](https://g
 
 ### Release Notes
 
-You can find [the lastest major release notes here](doc/release-notes/0.5.0.md).
+You can find [the lastest major release notes here](doc/release-notes/0.6.0.md).
 
 ### Need help?
 
