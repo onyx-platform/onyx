@@ -3,6 +3,7 @@
 - Dropped feature: support for `:sequential` tasks
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
+- Dropped feature: internal HornetQ messaging plugin
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
@@ -12,6 +13,7 @@
 - New feature: Flow conditions may post-transform exception values into new segments
 - New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value
 - New feature: Custom compression and decompression functions through Peer configuration
+- New feature: Internal core.async plugin
 - New documentation: Event context map information model
 - Added metadata to all public API functions indicating which Onyx version they were added in
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`

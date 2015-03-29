@@ -48,7 +48,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
-- [HornetQ Internal Plugin](doc/user-guide/hornetq-plugin.md)
+- [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
 - [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
@@ -63,11 +63,10 @@ Code level API documentation [can be found here](http://michaeldrogalis.github.i
 
 Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.5.3` goes with `onyx` version `0.5.3`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.5.3.1`).
 
-- [`onyx-hornetq`](doc/user-guide/hornetq-plugin.md)
+- [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
 - [`onyx-sql`](https://github.com/MichaelDrogalis/onyx-sql)
 - [`onyx-kafka`](https://github.com/MichaelDrogalis/onyx-kafka)
-- [`onyx-core-async`](https://github.com/MichaelDrogalis/onyx-core-async)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
