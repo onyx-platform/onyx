@@ -28,48 +28,9 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 #### Workflow
 
-A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It can either by specified via a tree, or a directed, acyclic graph.
-
-In the case of a tree, the workflow is a Clojure map representing a multi-rooted tree of tasks. The outermost keys of the map must name sources of input, and the innermost values of the map must name sources of output. Everything in-between must name a function. Elements of a workflow must be Clojure keywords.
+A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph.
 
 In the case of a directed acyclic graph, the workflow is a Clojure vector of vectors. Each inner vector contains exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge from the first node to the second.
-
-Tree Examples:
-
-```clojure
-;;;    in
-;;;    |
-;;; increment
-;;;    |
-;;;  output
-{:in {:increment :out}}
-```
-
-```clojure
-;;;            input
-;;;             /\
-;;; processing-1 processing-2
-;;;     |             |
-;;;  output-1      output-2
-{:input {:processing-1 :output-1
-         :processing-2 :output-2}}
-```
-
-```clojure
-;;;                       workflow root
-;;;                    /                 \
-;;;            input-1                    input-2
-;;;             /\                          /\
-;;; processing-1 processing-2   processing-2 processing-1
-;;;     |             |              |            |
-;;;  output-1      output-2      output-1      output-2
-{:input-1 {:processing-1 :output-1
-           :processing-2 :output-2}
- :input-2 {:processing-2 :output-1
-           :processing-1 :output-2}
-```
-
-DAG Examples:
 
 ```clojure
 ;;;    in
@@ -114,30 +75,25 @@ Example:
 
 ```clojure
 [{:onyx/name :in
- :onyx/ident :hornetq/read-segments
- :onyx/type :input
- :onyx/medium :hornetq
- :hornetq/queue-name in-queue
- :hornetq/host hornetq-host
- :hornetq/port hornetq-port
- :onyx/batch-size batch-size
- :onyx/doc "A HornetQ input stream"}
+  :onyx/ident :core.async/read-from-chan
+  :onyx/type :input
+  :onyx/medium :core.async
+  :onyx/batch-size batch-size
+  :onyx/max-peers 1
+  :onyx/doc "Reads segments from a core.async channel"}
 
-{:onyx/name :inc
- :onyx/fn :my.namespace/my-function-name
- :onyx/type :function
- :onyx/batch-size batch-size
- :onyx/doc "A function to increment integers"}
+ {:onyx/name :inc
+  :onyx/fn :onyx.peer.min-peers-test/my-inc
+  :onyx/type :function
+  :onyx/batch-size batch-size}
 
-{:onyx/name :out
- :onyx/ident :hornetq/write-segments
- :onyx/type :output
- :onyx/medium :hornetq
- :hornetq/queue-name out-queue
- :hornetq/host hornetq-host
- :hornetq/port hornetq-port
- :onyx/batch-size batch-size
- :onyx/doc "A HornetQ output stream"}]
+ {:onyx/name :out
+  :onyx/ident :core.async/write-to-chan
+  :onyx/type :output
+  :onyx/medium :core.async
+  :onyx/batch-size batch-size
+  :onyx/max-peers 1
+  :onyx/doc "Writes segments to a core.async channel"}]
 ```
 
 #### Flow Conditions
@@ -159,7 +115,7 @@ A segment is the unit of data in Onyx, and it's represented by a Clojure map. Se
 
 #### Function
 
-A function is a construct that receives segments and emits segments for further processing. It literally translates down to a Clojure function.
+A function is a construct that receives segments and emits segments for further processing. It literally is a Clojure function.
 
 #### Plugin
 
@@ -171,9 +127,9 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. A "peer" generally refers to a physical machine.
+A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine.
 
 #### Virtual Peer
 
-A Virtual Peer refers to a single peer process running on a single physical machine. The Coordinator often does not need to know which virtual peers belong to which physical machines, so parallelism can be increased by treating all virtual peers equally. A single Virtual Peer executes at most one task at a time.
+A Virtual Peer refers to a single peer process running on a single physical machine. A single Virtual Peer executes at most one task at a time.
 
