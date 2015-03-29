@@ -45,7 +45,6 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Flow Conditions](doc/user-guide/flow-conditions.md)
 - [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
 - [Event Subscription](doc/user-guide/subscription.md)
-- [Error Handling](doc/user-guide/error-handling.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
 - [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
