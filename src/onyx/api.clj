@@ -113,11 +113,7 @@
     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
 
     (doseq [task tasks]
-      (extensions/write-chunk (:log client) :task task id)
-      (let [task-map (planning/find-task (:catalog job) (:name task))]
-        (when (:onyx/bootstrap? task-map)
-          ;; TODO: reimplment bootstrapping.
-          )))
+      (extensions/write-chunk (:log client) :task task id))
 
     (extensions/write-log-entry (:log client) entry)
     (component/stop client)

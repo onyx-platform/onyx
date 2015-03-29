@@ -7,7 +7,6 @@ Plugins serve as an abstract to compose mechanisms for getting data into and out
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
 - [Interfaces](#interfaces)
-- [Bootstrapping](#bootstrapping)
 - [Templates](#templates)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->

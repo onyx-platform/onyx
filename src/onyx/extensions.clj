@@ -26,7 +26,7 @@
 
 (defmulti write-chunk (fn [log kw chunk id] [(type log) kw]))
 
-(defmulti read-chunk (fn [log kw id] [(type log) kw]))
+(defmulti read-chunk (fn [log kw id & args] [(type log) kw]))
 
 (defmulti update-origin! (fn [log replica message-id] (type log)))
 
