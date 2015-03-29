@@ -1,6 +1,7 @@
 (ns onyx.log.commands.notify-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
+            [taoensso.timbre :refer [info] :as timbre]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
@@ -41,4 +42,3 @@
       (close! (or (:watch-ch state) (chan)))
       (assoc state :watch-ch ch))
     state))
-

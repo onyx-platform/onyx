@@ -112,15 +112,18 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 
 #### Base Configuration
 
-| key name                         | type       | default|
-|----------------------------------|------------|--------|
-|`:onyx.peer/inbox-capacity`       | `int`      | `1000` |
-|`:onyx.peer/outbox-capacity`      | `int`      | `1000` |
-|`:onyx.peer/join-failure-back-off`| `int`      | `250`  |
-|`:onyx.peer/retry-start-interval` | `int`      | `2000` |
-|`:onyx.peer/sequential-back-off`  | `int`      | `2000` |
-|`:onyx.peer/drained-back-off`     | `int`      | `400`  |
-|`:onyx.peer/fn-params`            | `map`      | `{}`   |
+| key name                               | type       | default                            |
+|----------------------------------------|------------|------------------------------------|
+|`:onyx.peer/inbox-capacity`             | `int`      | `1000`                             |
+|`:onyx.peer/outbox-capacity`            | `int`      | `1000`                             |
+|`:onyx.peer/join-failure-back-off`      | `int`      | `250`                              |
+|`:onyx.peer/retry-start-interval`       | `int`      | `2000`                             |
+|`:onyx.peer/sequential-back-off`        | `int`      | `2000`                             |
+|`:onyx.peer/drained-back-off`           | `int`      | `400`                              |
+|`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
+|`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
+|`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
+|`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
 
 ##### `:onyx.peer/inbox-capacity`
 
@@ -151,6 +154,20 @@ underlying `:add` with `(f 42 <segment>)`.
 ##### `onyx.peer/join-failure-back-off`
 
 Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
+
+##### `onyx.messaging/completion-buffer-size`
+
+The number of messages to buffer in the core.async channel for completing messages on an input task.
+
+##### `onyx.messaging/decompress-fn`
+
+The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return
+the decompressed value of the byte array.
+
+##### `onyx.messaging/compress-fn`
+
+The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte
+array representing the segment seq.
 
 ### Peer Full Example
 

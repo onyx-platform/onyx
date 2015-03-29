@@ -2,13 +2,15 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :abort-join-cluster
   [{:keys [args message-id]} replica]
   (-> replica
       (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
-      (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))))
+      (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
+      (update-in [:peer-sites] dissoc (:id args))))
 
 (defmethod extensions/replica-diff :abort-join-cluster
   [entry old new]
@@ -30,6 +32,7 @@
   [{:keys [args]} old new diff peer-args]
   (when (= (:id args) (:id peer-args))
     [{:fn :prepare-join-cluster
-      :args {:joiner (:id peer-args)}
+      :args {:joiner (:id peer-args)
+             :peer-site (extensions/peer-site (:messenger peer-args))}
       :immediate? true}]))
 

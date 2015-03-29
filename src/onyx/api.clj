@@ -83,13 +83,8 @@
         exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
     (map :id exempt-tasks)))
 
-(defn ^{:added "0.6.0"} submit-job [config job]
-  (let [id (java.util.UUID/randomUUID)
-        client (component/start (system/onyx-client config))
-        _  (validator/validate-job (assoc job :workflow (:workflow job)))
-        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-        tasks (planning/discover-tasks (:catalog job) (:workflow job))
-        task-ids (map :id tasks)
+(defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
+  (let [task-ids (map :id tasks)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)
@@ -103,22 +98,27 @@
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
               :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
-        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)
-        entry (create-log-entry :submit-job args)]
+        args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
+    (create-log-entry :submit-job args)))
+
+(defn ^{:added "0.6.0"} submit-job [config job]
+  (let [id (java.util.UUID/randomUUID)
+        _ (validator/validate-job (assoc job :workflow (:workflow job)))
+        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+        tasks (planning/discover-tasks (:catalog job) (:workflow job))
+        entry (create-submit-job-entry id config job tasks)
+        client (component/start (system/onyx-client config))]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
 
     (doseq [task tasks]
-      (extensions/write-chunk (:log client) :task task id)
-      (let [task-map (planning/find-task (:catalog job) (:name task))]
-        (when (:onyx/bootstrap? task-map)
-          ;; TODO: reimplment bootstrapping.
-          )))
+      (extensions/write-chunk (:log client) :task task id))
 
     (extensions/write-log-entry (:log client) entry)
     (component/stop client)
-    id))
+    {:job-id id
+     :task-ids tasks}))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
@@ -206,11 +206,14 @@
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped
    by passing it to the shutdown-peer function."
-  [n config]
+  [n {:keys [config] :as peer-group}]
+  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+
   (doall
    (map
     (fn [_]
-      (let [v-peer (system/onyx-peer config)
+      (let [v-peer (system/onyx-peer peer-group)
             live (component/start v-peer)
             shutdown-ch (chan 1)
             ack-ch (chan)]
@@ -232,6 +235,7 @@
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
   [env-config]
+  (validator/validate-env-config env-config)
   (component/start (system/onyx-development-env env-config)))
 
 (defn ^{:added "0.6.0"} shutdown-env
@@ -239,3 +243,13 @@
   [env]
   (component/stop env))
 
+(defn ^{:added "0.6.0"} start-peer-group
+  "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
+  [peer-config]
+  (validator/validate-peer-config peer-config)
+  (component/start (system/onyx-peer-group peer-config)))
+
+(defn ^{:added "0.6.0"} shutdown-peer-group
+  "Shuts down the given peer-group"
+  [peer-group]
+  (component/stop peer-group))

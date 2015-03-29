@@ -2,6 +2,11 @@ test:
   override:
     - lein with-profile dev,circle-ci midje 'onyx.log.*':
         timeout: 60
+
+machine:
+  java:
+    version: oraclejdk8
+
 notify:
   webhooks:
     # A list of hook hashes, containing the url field

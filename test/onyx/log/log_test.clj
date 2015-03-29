@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
+            [onyx.messaging.dummy-messenger]
             [midje.sweet :refer :all]
             [onyx.api]))
 
@@ -10,13 +11,16 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
-(def peer-config (assoc (:peer-config config) :onyx/id id))
+(def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
 
 (def env (onyx.api/start-env env-config))
 
+(def scheduler :onyx.job-scheduler/round-robin)
+
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
+(extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
 (facts
  "We can write to the log and read the entries back out"
@@ -30,6 +34,7 @@
 (def env (onyx.api/start-env env-config))
 
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
+(extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
 (def entries 10000)
 

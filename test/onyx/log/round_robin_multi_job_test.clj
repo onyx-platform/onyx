@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.log.helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.extensions :as extensions]
             [onyx.api]))
@@ -10,14 +11,16 @@
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def peer-config
   (assoc (:peer-config config)
-    :onyx/id id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+         :onyx/id onyx-id
+         :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
+
+(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def catalog-1
   [{:onyx/name :a
@@ -86,10 +89,10 @@
 
 (def j1
   (onyx.api/submit-job
-   peer-config
-   {:workflow [[:a :b] [:b :c]]
-    :catalog catalog-1
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    peer-config
+    {:workflow [[:a :b] [:b :c]]
+     :catalog catalog-1
+     :task-scheduler :onyx.task-scheduler/round-robin}))
 
 (def j2
   (onyx.api/submit-job
@@ -100,48 +103,27 @@
 
 (def n-peers 36)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
-(def ch (chan n-peers))
+(def ch (chan 10000))
 
 (def replica-1
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)
-          task-a (nth (get-in new-replica [:tasks j1]) 0)
-          task-b (nth (get-in new-replica [:tasks j1]) 1)
-          task-c (nth (get-in new-replica [:tasks j1]) 2)
-          task-d (nth (get-in new-replica [:tasks j2]) 0)
-          task-e (nth (get-in new-replica [:tasks j2]) 1)
-          task-f (nth (get-in new-replica [:tasks j2]) 2)]
-      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 6)
-                   (= (count (get (get (:allocations new-replica) j1) task-b)) 6)
-                   (= (count (get (get (:allocations new-replica) j1) task-c)) 6)
-                   (= (count (get (get (:allocations new-replica) j2) task-d)) 6)
-                   (= (count (get (get (:allocations new-replica) j2) task-e)) 6)
-                   (= (count (get (get (:allocations new-replica) j2) task-f)) 6))
-        (recur new-replica)
-        new-replica))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
+
+(fact "Peers balanced after before killed in multi-job test" 
+      (get-counts replica-1 [j1 j2]) => [[6 6 6] [6 6 6]])
 
 (onyx.api/kill-job peer-config j1)
 
-(def replica-4
-  (loop [replica replica-3]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 0)
-                   (= (count (get (get (:allocations new-replica) j1) task-b)) 0)
-                   (= (count (get (get (:allocations new-replica) j1) task-c)) 0)
-                   (= (count (get (get (:allocations new-replica) j2) task-d)) 12)
-                   (= (count (get (get (:allocations new-replica) j2) task-e)) 12)
-                   (= (count (get (get (:allocations new-replica) j2) task-f)) 12))
-        (recur new-replica)
-        new-replica))))
+(def replica-2
+  (playback-log (:log env) replica-1 ch 2000))
+
+(fact "Peers balanced after job killed in multi-job test" 
+      (get-counts replica-2 [j1 j2]) => [[0 0 0] [12 12 12]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

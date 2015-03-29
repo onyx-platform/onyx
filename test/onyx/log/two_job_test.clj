@@ -4,24 +4,35 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
+            [onyx.log.helper :refer [playback-log get-counts]]
+            ; Add for generative testing later
+            ;[onyx.log.generative-test :as log-gen-test]
+            ;[clojure.test.check.generators :as gen]
+            ;[clojure.test :refer :all]
+            ;[com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            ;[onyx.messaging.aeron :as aeron]
+            [com.stuartsierra.component :as component]
+            [clojure.test :refer :all]
             [midje.sweet :refer :all]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
 (def peer-config
   (assoc (:peer-config config)
-    :onyx/id id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+         :onyx/id onyx-id
+         :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def n-peers 12)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
 (def catalog-1
   [{:onyx/name :a
@@ -85,34 +96,31 @@
 (defmethod l-ext/inject-lifecycle-resources :f
   [_ _] {:core.async/chan f-chan})
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:a :b] [:b :c]]
-  :catalog catalog-1
-  :task-scheduler :onyx.task-scheduler/round-robin})
+(def j1 
+  (onyx.api/submit-job
+    peer-config
+    {:workflow [[:a :b] [:b :c]]
+     :catalog catalog-1
+     :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:d :e] [:e :f]]
-  :catalog catalog-2
-  :task-scheduler :onyx.task-scheduler/round-robin})
+(def j2 
+  (onyx.api/submit-job
+    peer-config
+    {:workflow [[:d :e] [:e :f]]
+     :catalog catalog-2
+     :task-scheduler :onyx.task-scheduler/round-robin}))
+
 
 (def ch (chan n-peers))
 
 (def replica
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)
-          counts (map count (mapcat vals (vals (:allocations new-replica))))]
-      (prn counts)
-      (when-not (= counts [2 2 2 2 2 2])
-        (recur new-replica)))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "peers balanced on 2 jobs" true => true)
+(fact "peers balanced on 2 jobs" (get-counts replica [j1 j2]) => [[2 2 2] [2 2 2]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

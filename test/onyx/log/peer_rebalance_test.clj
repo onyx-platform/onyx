@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.log.helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
@@ -19,6 +20,8 @@
     :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
 
 (def env (onyx.api/start-env env-config))
+
+(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def catalog-1
   [{:onyx/name :a
@@ -86,60 +89,33 @@
 
 (def n-peers 12)
 
-(def v-peers (onyx.api/start-peers n-peers peer-config))
+(def v-peers (onyx.api/start-peers n-peers peer-group))
 
-(def ch (chan n-peers))
+(def ch (chan 10000))
 
 (def replica-1
-  (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)
-          task-a (first (get-in new-replica [:tasks j1]))
-          task-b (second (get-in new-replica [:tasks j1]))
-          task-c (first (get-in new-replica [:tasks j2]))
-          task-d (second (get-in new-replica [:tasks j2]))]
-      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 3)
-                   (= (count (get (get (:allocations new-replica) j1) task-b)) 3)
-                   (= (count (get (get (:allocations new-replica) j2) task-c)) 3)
-                   (= (count (get (get (:allocations new-replica) j2) task-d)) 3))
-        (recur new-replica)
-        new-replica))))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(def task-a (first (get-in replica-1 [:tasks j1])))
-
-(def task-b (second (get-in replica-1 [:tasks j1])))
-
-(def task-c (first (get-in replica-1 [:tasks j2])))
-
-(def task-d (second (get-in replica-1 [:tasks j2])))
-
-(fact "the peers evenly balance" true => true)
+(fact "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
 
 (def conn (zk/connect (:zookeeper/address (:env-config config))))
 
-(def id (last (get (get (:allocations replica-1) j1) task-b)))
+(def task-b (second (get-in replica-1 [:tasks (:job-id j1)])))
+
+(def id (last (get (get (:allocations replica-1) (:job-id j1)) task-b)))
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" id))
 
 (zk/close conn)
 
 (def replica-2
-  (loop [replica replica-1]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
-          new-replica (extensions/apply-log-entry entry replica)]
-      (if-not (and (= (count (get (get (:allocations new-replica) j1) task-a)) 3)
-                   (= (count (get (get (:allocations new-replica) j1) task-b)) 3)
-                   (= (count (get (get (:allocations new-replica) j2) task-c)) 3)
-                   (= (count (get (get (:allocations new-replica) j2) task-d)) 2))
-        (recur new-replica)
-        new-replica))))
+  (playback-log (:log env) replica-1 ch 2000))
 
-(fact "the peers rebalance" true => true)
+(fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 3] [3 2]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
 
+(onyx.api/shutdown-peer-group peer-group)

@@ -3,12 +3,13 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]))
 
-(defrecord AckingDaemon []
+(defrecord AckingDaemon [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Acking Daemon")
-    (assoc component :ack-state (atom {}) :completions-ch (chan 1000)))
+    (let [buffer-size (or (:onyx.messaging/completion-buffer-size opts) 1000)]
+      (assoc component :ack-state (atom {}) :completions-ch (chan buffer-size))))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Acking Daemon")
@@ -16,7 +17,7 @@
     (assoc component :ack-state nil :completions-ch nil)))
 
 (defn acking-daemon [config]
-  (map->AckingDaemon {}))
+  (map->AckingDaemon {:opts config}))
 
 (defn ack-message [daemon message-id completion-id ack-val]
   (let [rets
@@ -40,12 +41,12 @@
 (defn gen-ack-value
   "Generate a 64-bit value to bit-xor against the current ack-value."
   []
-  (.nextLong (java.security.SecureRandom.)))
+  (.nextLong (java.util.concurrent.ThreadLocalRandom/current)))
 
 (defn prefuse-vals
   "Prefuse values on a peer before sending them to the acking
    daemon to decrease packet size."
-  [& vals]
+  [vals]
   (let [vals (filter identity vals)]
     (cond (zero? (count vals)) nil
           (= 1 (count vals)) (first vals)

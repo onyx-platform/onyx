@@ -7,14 +7,13 @@ Plugins serve as an abstract to compose mechanisms for getting data into and out
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
 - [Interfaces](#interfaces)
-- [Bootstrapping](#bootstrapping)
 - [Templates](#templates)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Interfaces
 
-In order to implement a plugin, a number of multimethods need to be extended from the [Pipeline Extensions API](../../src/onyx/peer/pipeline_extensions.clj). Reader plugins will want to implement one or more of `read-batch`, `decompress-batch`, `strip-sentinel`, `requeue-sentinel`,  `ack-batch`, and `apply-fn`. Writer plugins will want to implement one or more of `apply-fn`, `compress-batch`, `write-batch`, and `seal-resource`. See the docstrings for instructions on implementation.
+In order to implement a plugin, a number of multimethods need to be extended from the [Pipeline Extensions API](../../src/onyx/peer/pipeline_extensions.clj). Reader plugins will implement `read-batch`. Writer plugins will implement `write-batch` and `seal-resource`. See the docstrings for instructions on implementation.
 
 ### Bootstrapping
 

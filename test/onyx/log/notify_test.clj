@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.messaging.dummy-messenger]
             [onyx.extensions :as extensions]
             [onyx.api]
             [midje.sweet :refer :all]
@@ -17,6 +18,7 @@
 (def env (onyx.api/start-env env-config))
 
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
+(extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
 (def a-id "a")
 
@@ -31,7 +33,8 @@
 (extensions/register-pulse (:log env) c-id)
 (extensions/register-pulse (:log env) d-id)
 
-(def entry (create-log-entry :prepare-join-cluster {:joiner d-id}))
+(def entry (create-log-entry :prepare-join-cluster {:joiner d-id
+                                                    :peer-site {:address 1}}))
 
 (def ch (chan 5))
 
@@ -49,9 +52,11 @@
 
 (def rep-reactions (partial extensions/reactions read-entry))
 
-(def old-replica {:pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
+(def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
+                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
-(def old-local-state {:log (:log env) :id a-id})
+(def old-local-state {:messenger :dummy-messenger
+                      :log (:log env) :id a-id})
 
 (def new-replica (f old-replica))
 
@@ -118,5 +123,3 @@
 (fact (:args entry) => {:id "d"})
 
 (onyx.api/shutdown-env env)
-
-

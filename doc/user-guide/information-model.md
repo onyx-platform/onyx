@@ -67,10 +67,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### Maps with `:onyx/type` set to `:function` may optionally have these keys
 
-| key name           | type       | choices
-|--------------------|------------|----------
-|`:onyx/group-by-key`| `keyword`  | `any`
-|`:onyx/group-by-fn` | `keyword`  | `any`
+| key name                 | type       | choices | default
+|--------------------------|------------|---------|--------
+|`:onyx/group-by-key`      | `keyword`  | `any`   |
+|`:onyx/group-by-fn`       | `keyword`  | `any`   |
+|`:onyx/side-effects-only?`| `boolean`  |         | `false`
 
 
 ### Flow Conditions
@@ -89,3 +90,35 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:flow/post-transform?`  |`keyword`                     | yes      |`nil`
 |`:flow/action?`          |`keyword`                     | yes      |`nil`
 
+### Event Context
+
+Onyx exposes an "event context" through many of its APIs. This is a description of
+what you will find in this map and what each of its key/value pairs mean. More keys
+may be added by the user as the context is associated to throughout the task pipeline.
+
+| key name                     |value type | Meaning       |
+|------------------------------|-----------|---------------|
+|`:onyx.core/id`               |`uuid`     | The unique ID of this peer's lifecycle|
+|`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecyle|
+|`:onyx.core/job-id`           |`uuid`     | The Job ID of the task that this peer is executing|
+|`:onyx.core/task-id`          |`uuid`     | The Task ID that this peer is executing|
+|`:onyx.core/task`             |`keyword`  | The task name that this peer is executing|
+|`:onyx.core/catalog`          |`vector`   | The full catalog for this job|
+|`:onyx.core/workflow`         |`vector`   | The workflow for this job|
+|`:onyx.core/flow-conditions`  |`vector`   | The flow conditions for this job|
+|`:onyx.core/compiled-norm-fcs`|`vector`   | A sequence of flow conditions with precompiled predicate functions, excluding exception flow conditions|
+|`:onyx.core/compiled-ex-fcs`  |`vector`   | A sequence of flow conditions with precompiled predicate functions, excluding non-exception flow conditions|
+|`:onyx.core/task-map`         |`map`      | The catalog entry for this task|
+|`:onyx.core/serialized-task`  |`map`      | The task that this peer is executing that has been serialized to ZooKeeper|
+|`:onyx.core/params`           |`vector`   | The parameter sequence to be applied to the function that this task uses|
+|`:onyx.core/drained-back-off` |`long`     | The amount of time to back off when the input is drained|
+|`:onyx.core/log`              |`record`   | The Log record Component|
+|`:onyx.core/messenger-buffer` |`channel`  | The messenger buffer core.async channel for this peer|
+|`:onyx.core/messenger`        |`record`   | The Messenger record Component|
+|`:onyx.core/outbox-ch`        |`channel`  | The outbox core.async channel for this peer|
+|`:onyx.core/seal-response-ch` |`channel`  | The core.async channel to deliver seal notifications for this job|
+|`:onyx.core/peer-opts`        |`map`      | The options that this peer was started with|
+|`:onyx.core/replica`          |`atom`     | The replica that this peer has currently accrued|
+|`:onyx.core/state`            |`atom`     | The state that this peer has accrued|
+|`:onyx.core/batch`            |`vector`   | The sequence of segments read by this peer|
+|`:onyx.core/results`          |`map`      | A map of read segment to a vector of segments produced by applying the function of this task|

@@ -1,4 +1,4 @@
-(ns onyx.peer.min-peers-test
+(ns onyx.peer.batch-function-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -15,14 +15,12 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def peer-group (onyx.api/start-peer-group peer-config))
-
 (def n-messages 100)
 
-(def batch-size 20)
+(def batch-size 5)
 
-(defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
+(defn my-inc [segments]
+  :ignored)
 
 (def catalog
   [{:onyx/name :in
@@ -34,8 +32,9 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.min-peers-test/my-inc
+    :onyx/fn :onyx.peer.batch-function-test/my-inc
     :onyx/type :function
+    :onyx/side-effects-only? true
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -62,9 +61,8 @@
   (>!! in-chan {:n n}))
 
 (>!! in-chan :done)
-(close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def v-peers (onyx.api/start-peers 3 peer-config))
 
 (onyx.api/submit-job
  peer-config
@@ -74,14 +72,12 @@
 
 (def results (take-segments! out-chan))
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 
