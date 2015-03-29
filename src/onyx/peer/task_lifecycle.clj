@@ -13,12 +13,13 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy])
-    (:import [java.security MessageDigest]))
+    (:import [java.security MessageDigest]
+             [uk.co.real_logic.aeron.exceptions.DriverTimeoutException]))
 
 ;; TODO: Might want to allow a peer to reboot from an
 ;; exception without killing the job, e.g. transient
 ;; connection failure to ZooKeeper.
-(def restartable-exceptions [])
+(def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
