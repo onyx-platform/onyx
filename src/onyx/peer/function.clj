@@ -49,7 +49,7 @@
           :hash-group (get hash-group route)})
        (:flow routes) ack-vals)))
    []
-   leaves))
+   (remove (fn [leaf] (= :retry (:action (:routes leaf)))) leaves)))
 
 (defn strip-message [segment]
   (select-keys segment [:id :acker-id :completion-id :ack-val :message]))

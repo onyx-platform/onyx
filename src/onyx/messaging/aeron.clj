@@ -213,8 +213,10 @@
         channel (aeron-channel external-addr port)
         send-pub (.addPublication aeron channel send-stream-id)
         acker-pub (.addPublication aeron channel acker-stream-id)
-        completion-pub (.addPublication aeron channel completion-stream-id)]
-    {:conn aeron :send-pub send-pub :acker-pub acker-pub :completion-pub completion-pub}))
+        completion-pub (.addPublication aeron channel completion-stream-id)
+        retry-pub (.addPublication aeron channel retry-stream-id)]
+    {:conn aeron :send-pub send-pub :acker-pub acker-pub
+     :completion-pub completion-pub :retry-pub retry-pub}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -255,7 +257,7 @@
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-retry-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (:retry-pub peer-link) 
+        pub ^uk.co.real_logic.aeron.Publication (:retry-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))

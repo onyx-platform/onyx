@@ -123,6 +123,7 @@
     :flow/to :none
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
+    :flow/action :retry
     :flow/predicate :onyx.peer.colors-flow-test/black?}
 
    {:flow/from :colors-in

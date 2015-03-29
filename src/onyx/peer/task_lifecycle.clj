@@ -68,7 +68,8 @@
          (if (:flow/short-circuit? entry)
            (reduced {:flow (join-output-paths flow (:flow/to entry) downstream)
                      :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))
-                     :post-transformation (:flow/post-transform entry)})
+                     :post-transformation (:flow/post-transform entry)
+                     :action (:flow/action entry)})
            {:flow (join-output-paths flow (:flow/to entry) downstream)
             :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
          all))
@@ -148,7 +149,7 @@
 
 (defn gen-ack-fusion-vals [task-map leaves]
   (when-not (= (:onyx/type task-map) :output)
-    (mapcat :ack-vals leaves)))
+    (mapcat :ack-vals (remove (fn [leaf] (= (:action (:routes leaf)) :retry)) leaves))))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
   (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
@@ -166,6 +167,17 @@
          ;; or'ing by zero covers the case of flow conditions where an
          ;; input task produces a segment that goes nowhere.
          (or fused-vals 0)))))
+  event)
+
+(defn retry-messages [{:keys [onyx.core/results] :as event}]
+  (doseq [result results]
+    (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
+      (let [link (operation/peer-link event (:completion-id (:root result)))]
+        (extensions/internal-retry-message
+         (:onyx.core/messenger event)
+         event
+         (:id (:root result))
+         link))))
   event)
 
 (defn inject-batch-resources [event]
@@ -319,6 +331,7 @@
           (build-new-segments)
           (write-batch)
           (ack-messages)
+          (retry-messages)
           (close-batch-resources)))
     (catch Exception e
       (ex-f e))))
