@@ -239,18 +239,17 @@
 
 (defmethod drop-peers :onyx.task-scheduler/round-robin
   [replica job n]
-  (let [task-seq (cycle (reverse (get-in replica [:tasks job])))]
-    (:rets
-     (reduce
-      (fn [{:keys [rets allocations task-seq] :as vars} _]
-        (-> vars
-            (update-in [:rets] conj (last (get allocations (first task-seq))))
-            (update-in [:allocations (first task-seq)] butlast)
-            (update-in [:task-seq] rest)))
-      {:rets []
-       :allocations (get-in replica [:allocations job])
-       :task-seq task-seq}
-      (range n)))))
+  (first
+    (reduce
+      (fn [[peers-to-drop allocations] _]
+        (let [task-most-peers (->> allocations 
+                                   (sort-by (comp count val))
+                                   reverse
+                                   ffirst)] 
+          [(conj peers-to-drop (last (allocations task-most-peers)))
+           (update-in allocations [task-most-peers] butlast)]))
+      [[] (get-in replica [:allocations job])] 
+      (range n))))
 
 (defmethod drop-peers :onyx.task-scheduler/percentage
   [replica job n]
