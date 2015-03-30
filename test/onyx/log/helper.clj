@@ -11,9 +11,10 @@
       replica)))
 
 (defn job-allocation-counts [replica job-info]
-  (let [allocations (get-in replica [:allocations (:job-id job-info)])
-        tasks (map :id (:task-ids job-info))]
-    (map (comp count allocations) tasks)))
+  (if-let [allocations (get-in replica [:allocations (:job-id job-info)])]
+    (map (comp count allocations :id) 
+         (:task-ids job-info))
+    []))
 
 (defn get-counts [replica job-infos]
   (map (partial job-allocation-counts replica)
