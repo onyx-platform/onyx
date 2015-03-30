@@ -494,7 +494,7 @@
         required (get allocations job)
         actual (count (apply concat (vals (get-in old [:allocations (:job allocation)]))))]
     (when (> actual required)
-      (let [peers-to-drop (drop-peers new job (- actual required))]
+      (let [peers-to-drop (drop-peers new (:job allocation) (- actual required))]
         (some #{(:id state)} (into #{} peers-to-drop))))))
 
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
@@ -505,10 +505,10 @@
             n-peers (count (apply concat (vals (get-in new [:allocations job]))))
             balanced (percentage-balanced-taskload new job candidate-tasks n-peers)
             required (:allocation (get balanced (:task allocation)))
-            actual (count (get-in new [:allocations job (:task allocation)]))]
+            actual (count (get-in new [:allocations (:job allocation) (:task allocation)]))]
         (when (> actual required)
           (let [n (- actual required)
-                peers-to-drop (drop-peers new job n)]
+                peers-to-drop (drop-peers new (:job allocation) n)]
             (when (some #{(:id state)} (into #{} peers-to-drop))
               true)))))))
 
