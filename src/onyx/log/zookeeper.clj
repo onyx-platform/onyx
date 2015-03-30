@@ -257,15 +257,15 @@
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" (:task-id chunk) "/segment-")
+     (let [node (str (bootstrap-path prefix) "/" id "/segment-" (:id chunk))
            bytes (compress chunk)]
-       (zk/create-all conn node :persistent? true :sequential? true :data bytes)))))
+       (zk/create-all conn node :persistent? true :data bytes)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :bootstrapped-index]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" (:task-id chunk) "/index")
+     (let [node (str (bootstrap-path prefix) "/" id "/index")
            bytes (compress chunk)]
        (zk/create-all conn node :persistent? true :data bytes)))))
 
@@ -284,6 +284,15 @@
      (let [node (str (messaging-path prefix) "/messaging")
            bytes (compress chunk)]
        (zk/create conn node :persistent? true :data bytes)))))
+
+(defmethod extensions/force-write-chunk [ZooKeeper :bootstrapped-segment]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (bootstrap-path prefix) "/" id "/segment-" (:id chunk))
+           version (:version (zk/exists conn node))
+           bytes (compress chunk)]
+       (zk/set-data conn node bytes version)))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id _]
