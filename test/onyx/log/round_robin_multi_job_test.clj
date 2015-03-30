@@ -113,13 +113,13 @@
 (fact "Peers balanced after before killed in multi-job test" 
       (get-counts replica-1 [j1 j2]) => [[6 6 6] [6 6 6]])
 
-(onyx.api/kill-job peer-config j1)
+(onyx.api/kill-job peer-config (:job-id j1))
 
 (def replica-2
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "Peers balanced after job killed in multi-job test" 
-      (get-counts replica-2 [j1 j2]) => [[0 0 0] [12 12 12]])
+      (get-counts replica-2 [j1 j2]) => [[] [12 12 12]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

@@ -108,7 +108,7 @@
          {:catalog catalog-2 :workflow workflow
           :task-scheduler :onyx.task-scheduler/round-robin}))
 
-(onyx.api/kill-job peer-config j1)
+(onyx.api/kill-job peer-config (:job-id j1))
 
 (def results (hq-util/consume-queue! hq-config out-queue-2 echo))
 
