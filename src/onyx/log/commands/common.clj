@@ -304,10 +304,11 @@
 
 (defn anticipating-coverage? [old new job-id]
   (let [n-tasks (count (get-in new [:tasks job-id]))
+        n-tasks-covered (count (get-in new [:allocations job-id]))
         n-volunteering (->> (:peers new)
                             (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
                             (count))]
-    (>= n-volunteering n-tasks)))
+    (>= n-volunteering (- n-tasks n-tasks-covered))))
 
 (defn volunteer? [old new state job-id]
   (and (reallocate-from-job? (:job-scheduler old) old new state)
@@ -384,11 +385,21 @@
        (seq (incomplete-jobs new))
        (any-coverable-jobs? new)))
 
+(defn has-peers-allocated? [replica job]
+  (pos? (count (get-in replica [:allocations job]))))
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
-  (when-let [job (first (incomplete-jobs new))]
-    (and (not (job-coverable? old job))
-         (job-coverable? new job))))
+  ; Greedy should preferentially allocate to the jobs that 
+  ; already have peers, otherwise to first incomplete job.
+  ; This ensures stable greedy allocation
+  (let [incomplete (incomplete-jobs new)]
+    (or (->> incomplete
+             (filter (partial has-peers-allocated? new))
+             (filter (partial job-coverable? new))
+             first)
+        (->> incomplete
+             (filter (partial job-coverable? new))
+             first))))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/round-robin
   [old new diff state]
