@@ -126,6 +126,8 @@
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
    for execution."
   [config job-id]
+  (when (nil? job-id)
+    (throw (ex-info {:error "Invalid job id" :job-id job-id})))
   (let [client (component/start (system/onyx-client config))
         entry (create-log-entry :kill-job {:job job-id})]
     (extensions/write-log-entry (:log client) entry)
