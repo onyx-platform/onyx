@@ -16,9 +16,6 @@
 
 (def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
 
-(def messaging 
-  (component/start (aeron/aeron {:opts peer-config})))
-
 (def n-peers 20)
 
 (facts "peers all join and watch each other"
@@ -43,6 +40,7 @@
            (finally
              (doseq [v-peer v-peers]
                (onyx.api/shutdown-peer v-peer)) 
+             (onyx.api/shutdown-peer-group peer-group)
              (onyx.api/shutdown-env env)))))
 
 
