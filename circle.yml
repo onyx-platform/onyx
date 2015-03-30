@@ -1,7 +1,7 @@
 test:
   override:
     - lein with-profile dev,circle-ci midje 'onyx.log.*':
-        timeout: 60
+        timeout: 180
 
 machine:
   java:
