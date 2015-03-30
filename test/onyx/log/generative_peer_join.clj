@@ -16,13 +16,9 @@
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
-
-(def peer-config (assoc (:peer-config config) 
-                        :onyx/id onyx-id
-                        :onyx.messaging/impl :dummy-messenger
-                        ;:onyx.peer/job-scheduler :onyx.job-scheduler/round-robin
-                        ))
+(def peer-config 
+  {:onyx/id onyx-id
+   :onyx.messaging/impl :dummy-messenger})
 
 (def messenger (->DummyMessenger))
 
@@ -72,6 +68,29 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/round-robin})
 
+(def job-3-id #uuid "58d199e8-4ea4-4afd-a112-945e97235924")
+(def job-3
+  {:workflow [[:g :h] [:h :i]]
+   :catalog [{:onyx/name :g
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :h
+              :onyx/fn :onyx.log.round-robin-multi-job-test/my-inc
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :i
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/round-robin})
+
 (defn generate-join-entries [peer-ids]
   (zipmap peer-ids 
           (map (fn [id] [{:fn :prepare-join-cluster 
@@ -80,10 +99,14 @@
                                  :joiner id}}])
                peer-ids)))
 
+(defn generate-peer-ids [n]
+  (map #(keyword (str "p" %))
+       (range 1 (inc n))))
+
 (deftest greedy-allocation
   (checking
     "Checking greedy allocation causes all peers to be allocated to one of two jobs"
-    100
+    1000
     [{:keys [replica log peer-choices]} 
      (log-gen/apply-entries-gen 
        (gen/return
@@ -91,7 +114,7 @@
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries (assoc
-                     (generate-join-entries [:a :b :c :d :e :f :g :h])
+                     (generate-join-entries (generate-peer-ids 8))
                      :job-1 [(api/create-submit-job-entry job-1-id
                                                           peer-config 
                                                           job-1 
@@ -112,14 +135,14 @@
 (deftest greedy-allocation-reallocated
   (checking
     "Checking peers reallocated to other job when killed"
-    100
+    1000
     [{:keys [replica log peer-choices]} 
      (log-gen/apply-entries-gen 
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/greedy
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (generate-join-entries [:a :b :c :d :e :f :g :h])
+          :entries (assoc (generate-join-entries (generate-peer-ids 8))
                           :job-1 [(api/create-submit-job-entry job-1-id
                                                                peer-config 
                                                                job-1 
@@ -134,17 +157,17 @@
     (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
     (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
 
-(deftest round-robin-allocations
+(deftest round-robin-task-balancing
   (checking
-    "Checking round robin allocation causes peers to be evenly split"
-    100000
+    "Checking round robin allocation causes peers to be evenly over tasks"
+    1000
     [{:keys [replica log peer-choices]} 
      (log-gen/apply-entries-gen 
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/round-robin
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
-          :entries (assoc (generate-join-entries [:a :b :c :d :e :f :g :h])
+          :entries (assoc (generate-join-entries (generate-peer-ids 6))
                           :job-1 [(api/create-submit-job-entry job-1-id
                                                                peer-config 
                                                                job-1 
@@ -155,5 +178,35 @@
                                                                (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
           :log []
           :peer-choices []}))]
-    (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 4))
-    (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 4))))
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
+
+(deftest round-robin-allocations
+  (checking
+    "Checking round robin allocation causes peers to be evenly split"
+    1000
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/round-robin
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (generate-join-entries (generate-peer-ids 12))
+                          :job-1 [(api/create-submit-job-entry job-1-id
+                                                               peer-config 
+                                                               job-1 
+                                                               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
+                          :job-2 [(api/create-submit-job-entry job-2-id
+                                                               peer-config 
+                                                               job-2 
+                                                               (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
+                          :job-3 [(api/create-submit-job-entry job-3-id
+                                                               peer-config 
+                                                               job-3 
+                                                               (planning/discover-tasks (:catalog job-3) (:workflow job-3)))
+                                  {:fn :kill-job :args {:job job-3-id}}])
+          :log []
+          :peer-choices []}))]
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))
+    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
