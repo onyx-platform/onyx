@@ -78,7 +78,7 @@ You can run a dashboard to monitor Onyx cluster activity, found [here](https://g
 
 ### Release Notes
 
-You can find [the lastest major release notes here](doc/release-notes/0.6.0.md).
+You can find [the latest major release notes here](doc/release-notes/0.6.0.md).
 
 ### Need help?
 
