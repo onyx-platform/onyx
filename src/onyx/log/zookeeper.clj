@@ -257,11 +257,11 @@
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [id (java.util.UUID/randomUUID)
-           node (str (chunk-path prefix) "/" id "/chunk-" id)
+     (let [unique-id (java.util.UUID/randomUUID)
+           node (str (chunk-path prefix) "/" id "/chunk-" unique-id)
            bytes (compress chunk)]
        (zk/create-all conn node :persistent? true :data bytes)
-       id))))
+       unique-id))))
 
 (defmethod extensions/write-chunk [ZooKeeper :chunk-index]
   [{:keys [conn opts prefix] :as log} kw chunk id]
