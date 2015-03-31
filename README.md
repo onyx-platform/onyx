@@ -28,6 +28,13 @@ Available on Clojars:
 [com.mdrogalis/onyx "0.6.0-SNAPSHOT"]
 ```
 
+### Build Status
+
+Component | Release Branch | Health
+----------|----------------|-------
+onyx core | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x)
+onyx-sql  | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x)
+
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
