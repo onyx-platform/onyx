@@ -162,7 +162,7 @@
   [{:keys [args]} old new diff peer-args]
   (let [scheduler (get-in new [:task-schedulers (:job diff)])]
     (when (and (common/volunteer? old new peer-args (:job peer-args))
-               (common/reallocate-from-task? scheduler old new (:job diff) peer-args))
+               (common/reallocate-from-task? scheduler old new (:job peer-args) peer-args))
       [{:fn :volunteer-for-task :args {:id (:id peer-args)}}])))
 
 (defmethod extensions/fire-side-effects! :volunteer-for-task
