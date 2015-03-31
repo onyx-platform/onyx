@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.api :as api]
             [onyx.static.planning :as planning]
-            [onyx.log.helper :refer [job-allocation-counts]]
+            [onyx.test-helper :refer [job-allocation-counts]]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]

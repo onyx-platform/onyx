@@ -1,7 +1,7 @@
 (ns onyx.log.one-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
-            [onyx.log.helper :refer [playback-log]]
+            [onyx.test-helper :refer [playback-log]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
