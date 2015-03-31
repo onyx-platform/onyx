@@ -18,6 +18,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def batch-size 2)
 
 (def echo 1)
@@ -105,7 +107,7 @@
   [_ event]
   {:onyx.core/params [(atom {})]})
 
-(def v-peers (onyx.api/start-peers! 1 peer-config))
+(def v-peers (onyx.api/start-peers! 1 peer-group))
 
 (onyx.api/submit-job peer-config
                      {:catalog catalog :workflow workflow
@@ -115,6 +117,8 @@
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+    
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 

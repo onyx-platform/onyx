@@ -21,6 +21,9 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group 
+  (onyx.api/start-peer-group peer-config))
+
 (def cluster (atom []))
 
 (def in-queue (str (java.util.UUID/randomUUID)))
@@ -164,7 +167,7 @@
 
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
-  (let [peers (onyx.api/start-peers! 1 peer-config)]
+  (let [peers (onyx.api/start-peers! 1 peer-group)]
     (info (count @cluster) "in the cluster")
     (swap! cluster concat peers)))
 
@@ -196,7 +199,7 @@
 (sim/create-action-log sim-conn sine-cluster-sim)
 
 (doseq [n (range 3)]
-  (swap! cluster concat (onyx.api/start-peers! 1 peer-config)))
+  (swap! cluster concat (onyx.api/start-peers! 1 peer-group)))
 
 (def pruns
   (->> #(sim/run-sim-process sim-uri (:db/id sine-cluster-sim))
@@ -212,6 +215,8 @@
     (onyx.api/shutdown-peer peer)
     (catch Exception e
       (warn e))))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 

@@ -21,6 +21,9 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group 
+  (onyx.api/start-peer-group peer-config))
+
 (def cluster (atom []))
 
 (defn create-peer [executor t k]
@@ -114,7 +117,7 @@
 (defmethod sim/perform-action :action.type/register-sine-peer
   [action process]
   (when (< (count @cluster) 30)
-    (let [peer (first (onyx.api/start-peers 1 peer-config))]
+    (let [peer (first (onyx.api/start-peers 1 peer-group))]
       (swap! cluster conj peer))))
 
 (defmethod sim/perform-action :action.type/unregister-sine-peer
@@ -143,7 +146,7 @@
 (sim/create-action-log sim-conn sine-cluster-sim)
 
 ;; Seed it with 20 peers since sine waves goes negative.
-(doseq [peer (onyx.api/start-peers 20 peer-config)]
+(doseq [peer (onyx.api/start-peers 20 peer-group)]
   (swap! cluster conj peer))
 
 (def pruns
@@ -155,7 +158,7 @@
 
 ;; We should finish with 15 peers. Take it to a global maximum
 ;; to have a reliable seek point in the log for verification.
-(doseq [peer (onyx.api/start-peers 30 peer-config)]
+(doseq [peer (onyx.api/start-peers 30 peer-group)]
   (swap! cluster conj peer))
 
 (def ch (chan 5))
@@ -173,6 +176,8 @@
 
 (doseq [peer @cluster]
   (onyx.api/shutdown-peer peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 
