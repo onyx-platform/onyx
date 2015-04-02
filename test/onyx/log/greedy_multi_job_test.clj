@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.log.helper :refer [playback-log get-counts]]
+            [onyx.test-helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]))

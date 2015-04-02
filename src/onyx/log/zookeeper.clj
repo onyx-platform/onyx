@@ -33,8 +33,8 @@
 (defn sentinel-path [prefix]
   (str (prefix-path prefix) "/sentinel"))
 
-(defn bootstrap-path [prefix]
-  (str (prefix-path prefix) "/bootstrap"))
+(defn chunk-path [prefix]
+  (str (prefix-path prefix) "/chunk"))
 
 (defn origin-path [prefix]
   (str (prefix-path prefix) "/origin"))
@@ -80,7 +80,7 @@
       (zk/create conn (flow-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
-      (zk/create conn (bootstrap-path onyx-id) :persistent? true)
+      (zk/create conn (chunk-path onyx-id) :persistent? true)
       (zk/create conn (origin-path onyx-id) :persistent? true)
       (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
       (zk/create conn (messaging-path onyx-id) :persistent? true)
@@ -253,19 +253,21 @@
            bytes (compress chunk)]
        (zk/create conn node :persistent? true :data bytes)))))
 
-(defmethod extensions/write-chunk [ZooKeeper :bootstrapped-segment]
+(defmethod extensions/write-chunk [ZooKeeper :chunk]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" (:task-id chunk) "/segment-")
+     (let [unique-id (java.util.UUID/randomUUID)
+           node (str (chunk-path prefix) "/" id "/chunk-" unique-id)
            bytes (compress chunk)]
-       (zk/create-all conn node :persistent? true :sequential? true :data bytes)))))
+       (zk/create-all conn node :persistent? true :data bytes)
+       unique-id))))
 
-(defmethod extensions/write-chunk [ZooKeeper :bootstrapped-index]
+(defmethod extensions/write-chunk [ZooKeeper :chunk-index]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" (:task-id chunk) "/index")
+     (let [node (str (chunk-path prefix) "/" id "/index")
            bytes (compress chunk)]
        (zk/create-all conn node :persistent? true :data bytes)))))
 
@@ -285,71 +287,80 @@
            bytes (compress chunk)]
        (zk/create conn node :persistent? true :data bytes)))))
 
+(defmethod extensions/force-write-chunk [ZooKeeper :chunk]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (chunk-path prefix) "/" id "/chunk-" (:id chunk))
+           version (:version (zk/exists conn node))
+           bytes (compress chunk)]
+       (zk/set-data conn node bytes version)))))
+
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (catalog-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (workflow-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :flow-conditions]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (flow-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (task-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :sentinel]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (sentinel-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
-(defmethod extensions/read-chunk [ZooKeeper :bootstrapped-segment]
-  [{:keys [conn opts prefix] :as log} kw id {:keys [task-id]}]
+(defmethod extensions/read-chunk [ZooKeeper :chunk]
+  [{:keys [conn opts prefix] :as log} kw id & {:keys [task-id]}]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" task-id "/segment-" id)]
+     (let [node (str (chunk-path prefix) "/" task-id "/chunk-" id)]
        (decompress (:data (zk/data conn node)))))))
 
-(defmethod extensions/read-chunk [ZooKeeper :bootstrapped-index]
-  [{:keys [conn opts prefix] :as log} kw id {:keys [task-id]}]
+(defmethod extensions/read-chunk [ZooKeeper :chunk-index]
+  [{:keys [conn opts prefix] :as log} kw id & {:keys [task-id]}]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (bootstrap-path prefix) "/" task-id "/index")]
+     (let [node (str (chunk-path prefix) "/" task-id "/index")]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (origin-path prefix) "/origin")]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :job-scheduler]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (job-scheduler-path prefix) "/scheduler")]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :messaging]
-  [{:keys [conn opts prefix] :as log} kw id _]
+  [{:keys [conn opts prefix] :as log} kw id & _]
   (clean-up-broken-connections
    (fn []
      (let [node (str (messaging-path prefix) "/messaging")]

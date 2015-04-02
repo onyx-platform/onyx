@@ -15,6 +15,9 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group 
+  (onyx.api/start-peer-group peer-config))
+
 (def n-messages 15000)
 
 (def batch-size 1320)
@@ -87,7 +90,7 @@
     (map (fn [a] [(keyword (str "in-" a)) :inc])
          (range 1 (inc k-inputs))))))
 
-(def v-peers (onyx.api/start-peers! 6 peer-config))
+(def v-peers (onyx.api/start-peers! 6 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -98,6 +101,8 @@
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 

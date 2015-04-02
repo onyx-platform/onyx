@@ -4,7 +4,7 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
-            [onyx.log.helper :refer [playback-log get-counts]]
+            [onyx.test-helper :refer [playback-log get-counts]]
             ; Add for generative testing later
             ;[onyx.log.generative-test :as log-gen-test]
             ;[clojure.test.check.generators :as gen]

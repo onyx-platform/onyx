@@ -17,6 +17,8 @@
 
 (def env (onyx.api/start-env env-config))
 
+(def peer-group (onyx.api/start-peer-group peer-config))
+
 (def n-messages 15000)
 
 (def batch-size 1320)
@@ -128,7 +130,7 @@
 
 (def workflow [[:in :inc] [:inc :out]])
 
-(def v-peers (onyx.api/start-peers! 1 peer-config))
+(def v-peers (onyx.api/start-peers! 1 peer-group))
 
 (def j1 (onyx.api/submit-job
          peer-config
@@ -154,9 +156,11 @@
         new-replica (extensions/apply-log-entry entry replica)]
     (when-not (= (:killed-jobs new-replica) [j1 j2])
       (recur new-replica))))
-
+    
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)

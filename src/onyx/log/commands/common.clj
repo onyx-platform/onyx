@@ -125,7 +125,8 @@
    (fn [task]
      (let [allocated (get-in replica [:allocations job task])
            n-allocated (if (seq allocated) (count allocated) 0)]
-       (< n-allocated (or (get-in replica [:task-saturation job task]) Double/POSITIVE_INFINITY))))
+       (< n-allocated (or (get-in replica [:task-saturation job task]) 
+                          Double/POSITIVE_INFINITY))))
    tasks))
 
 (defn jobs-with-available-tasks [replica jobs]
@@ -239,18 +240,17 @@
 
 (defmethod drop-peers :onyx.task-scheduler/round-robin
   [replica job n]
-  (let [task-seq (cycle (reverse (get-in replica [:tasks job])))]
-    (:rets
-     (reduce
-      (fn [{:keys [rets allocations task-seq] :as vars} _]
-        (-> vars
-            (update-in [:rets] conj (last (get allocations (first task-seq))))
-            (update-in [:allocations (first task-seq)] butlast)
-            (update-in [:task-seq] rest)))
-      {:rets []
-       :allocations (get-in replica [:allocations job])
-       :task-seq task-seq}
-      (range n)))))
+  (first
+    (reduce
+      (fn [[peers-to-drop allocations] _]
+        (let [task-most-peers (->> allocations 
+                                   (sort-by (comp count val))
+                                   reverse
+                                   ffirst)] 
+          [(conj peers-to-drop (last (allocations task-most-peers)))
+           (update-in allocations [task-most-peers] butlast)]))
+      [[] (get-in replica [:allocations job])] 
+      (range n))))
 
 (defmethod drop-peers :onyx.task-scheduler/percentage
   [replica job n]
@@ -279,15 +279,15 @@
 
 (defmethod reallocate-from-job? :onyx.job-scheduler/round-robin
   [scheduler old new state]
-  (if-let [allocation (peer->allocated-job (:allocations new) (:id state))]
-    (let [peer-counts (balance-jobs new)
-          peers (get (job->peers new) (:job allocation))]
-      (when (> (count peers) (get peer-counts (:job allocation)))
-        (let [n (- (count peers) (get peer-counts (:job allocation)))
-              peers-to-drop (drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
-            true))))
-    true))
+  (boolean
+    (if-let [allocation (peer->allocated-job (:allocations new) (:id state))]
+      (let [peer-counts (balance-jobs new)
+            peers (get (job->peers new) (:job allocation))]
+        (when (> (count peers) (get peer-counts (:job allocation)))
+          (let [n (- (count peers) (get peer-counts (:job allocation)))
+                peers-to-drop (drop-peers new (:job allocation) n)]
+            (some #{(:id state)} peers-to-drop))))
+      true)))
 
 (defmethod reallocate-from-job? :onyx.job-scheduler/percentage
   [scheduler old new state]
@@ -298,16 +298,17 @@
       (when (> (count peers) peer-counts)
         (let [n (- (count peers) peer-counts)
               peers-to-drop (drop-peers new (:job allocation) n)]
-          (when (some #{(:id state)} (into #{} peers-to-drop))
+          (when (some #{(:id state)} peers-to-drop)
             true))))
     true))
 
 (defn anticipating-coverage? [old new job-id]
   (let [n-tasks (count (get-in new [:tasks job-id]))
+        n-tasks-covered (count (get-in new [:allocations job-id]))
         n-volunteering (->> (:peers new)
                             (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
                             (count))]
-    (>= n-volunteering n-tasks)))
+    (>= n-volunteering (- n-tasks n-tasks-covered))))
 
 (defn volunteer? [old new state job-id]
   (and (reallocate-from-job? (:job-scheduler old) old new state)
@@ -384,11 +385,21 @@
        (seq (incomplete-jobs new))
        (any-coverable-jobs? new)))
 
+(defn has-peers-allocated? [replica job]
+  (pos? (count (get-in replica [:allocations job]))))
 (defmethod volunteer-via-accept? :onyx.job-scheduler/greedy
   [old new diff state]
-  (when-let [job (first (incomplete-jobs new))]
-    (and (not (job-coverable? old job))
-         (job-coverable? new job))))
+  ; Greedy should preferentially allocate to the jobs that 
+  ; already have peers, otherwise to first incomplete job.
+  ; This ensures stable greedy allocation
+  (let [incomplete (incomplete-jobs new)]
+    (or (->> incomplete
+             (filter (partial has-peers-allocated? new))
+             (filter (partial job-coverable? new))
+             first)
+        (->> incomplete
+             (filter (partial job-coverable? new))
+             first))))
 
 (defmethod volunteer-via-new-job? :onyx.job-scheduler/round-robin
   [old new diff state]
@@ -494,8 +505,8 @@
         required (get allocations job)
         actual (count (apply concat (vals (get-in old [:allocations (:job allocation)]))))]
     (when (> actual required)
-      (let [peers-to-drop (drop-peers new job (- actual required))]
-        (some #{(:id state)} (into #{} peers-to-drop))))))
+      (let [peers-to-drop (vector (first (drop-peers new (:job allocation) (- actual required))))]
+        (some #{(:id state)} peers-to-drop)))))
 
 (defmethod reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
@@ -505,10 +516,10 @@
             n-peers (count (apply concat (vals (get-in new [:allocations job]))))
             balanced (percentage-balanced-taskload new job candidate-tasks n-peers)
             required (:allocation (get balanced (:task allocation)))
-            actual (count (get-in new [:allocations job (:task allocation)]))]
+            actual (count (get-in new [:allocations (:job allocation) (:task allocation)]))]
         (when (> actual required)
           (let [n (- actual required)
-                peers-to-drop (drop-peers new job n)]
+                peers-to-drop (drop-peers new (:job allocation) n)]
             (when (some #{(:id state)} (into #{} peers-to-drop))
               true)))))))
 

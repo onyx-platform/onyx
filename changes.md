@@ -18,6 +18,7 @@
 - Added metadata to all public API functions indicating which Onyx version they were added in
 - `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
 - `onyx.api/shutdown-peers` is now idempotent
+- Return type of public API function submit-job has changed. It now returns a map containing job-id, and task-ids keys.
 - The last task in a workflow no longer needs to be an `output` task
 
 

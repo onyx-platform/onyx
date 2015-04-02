@@ -101,7 +101,6 @@
                     selectable-queues (into selectable-peers peerless-queues)] 
                 (when (empty? selectable-queues)
                   (println "No playable log messages. State: " state))
-
                 (gen/elements selectable-queues)))))
 
 (defn apply-entry-gen 
@@ -123,6 +122,9 @@
   (gen/bind replica-state-gen
             (fn [state]
               (let [g (gen/return state)] 
+                (when (> (count (:log state))
+                         1000)
+                  (throw (Exception. (str "Log entry generator overflow. Likely issue with uncompletable log\n" state))))
                 (if (empty? (:entries state))
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))

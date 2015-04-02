@@ -28,6 +28,14 @@ Available on Clojars:
 [com.mdrogalis/onyx "0.6.0-SNAPSHOT"]
 ```
 
+### Build Status
+
+Component | Release Branch | Health
+----------|----------------|-------
+onyx core | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x)
+onyx-sql  | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x)
+onyx-datomic  | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x)
+
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
@@ -78,7 +86,7 @@ You can run a dashboard to monitor Onyx cluster activity, found [here](https://g
 
 ### Release Notes
 
-You can find [the lastest major release notes here](doc/release-notes/0.6.0.md).
+You can find [the latest major release notes here](doc/release-notes/0.6.0.md).
 
 ### Need help?
 
@@ -91,6 +99,19 @@ Feel free to use it anywhere. You can find [a few different versions here](https
 ### Running the tests
 
 A simple `lein midje` will run the full suite, which takes about 15-20 minutes on my quad-core MacBook Pro.
+
+N.B.: Leiningen may complain about not being able to find the Aeron jars on Clojars. If this happens, you'll need to clone and install Aeron and Agrona as follows:
+
+```
+git clone https://github.com/real-logic/Agrona.git
+cd Agrona
+./gradlew
+
+cd ..
+git clone https://github.com/real-logic/Aeron.git
+cd Aeron
+./gradlew
+```
 
 ### Contributing
 

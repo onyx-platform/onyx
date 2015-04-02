@@ -3,7 +3,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.log.helper :refer [playback-log get-counts]]
+            [onyx.test-helper :refer [playback-log get-counts]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
