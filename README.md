@@ -32,9 +32,10 @@ Available on Clojars:
 
 Component | Release Branch | Health
 ----------|----------------|-------
-onyx core | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x)
-onyx-sql  | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x)
-onyx-datomic  | `0.6.x`        | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x)
+onyx core | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x)
+onyx-sql  | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x)
+onyx-datomic  | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x)
+onyx-kafka| `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x)
 
 ### Quick Start Guide
 
