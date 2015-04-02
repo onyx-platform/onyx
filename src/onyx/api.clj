@@ -102,6 +102,7 @@
     (create-log-entry :submit-job args)))
 
 (defn ^{:added "0.6.0"} submit-job [config job]
+  (validator/validate-peer-config config)
   (let [id (java.util.UUID/randomUUID)
         _ (validator/validate-job (assoc job :workflow (:workflow job)))
         _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
