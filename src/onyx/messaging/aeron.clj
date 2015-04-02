@@ -266,6 +266,7 @@
   [messenger event peer-link]
   (.close (:send-pub peer-link))
   (.close (:acker-pub peer-link))
+  (.close (:retry-pub peer-link))
   (.close (:completion-pub peer-link))
   (.close (:conn peer-link)) 
   {})
