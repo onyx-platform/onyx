@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.data :refer [diff]]
             [taoensso.timbre :refer [info] :as timbre]
-            [onyx.log.commands.common :as common]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
@@ -28,7 +28,7 @@
 
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff state]
-  (when (common/volunteer-via-accept? old new diff state)
+  (when (cjs/volunteer-via-accept? old new diff state)
     [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
