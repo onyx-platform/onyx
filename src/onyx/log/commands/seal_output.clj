@@ -2,6 +2,7 @@
   (:require [clojure.set :refer [union]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]))
 
 (defn all-outputs-sealed? [replica job]
@@ -44,7 +45,7 @@
 
 (defmethod extensions/reactions :seal-output
   [{:keys [args]} old new diff state]
-  (when (common/volunteer-via-sealed-output? old new diff state)
+  (when (cjs/volunteer-via-sealed-output? old new diff state)
     [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :seal-output

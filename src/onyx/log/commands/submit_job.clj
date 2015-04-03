@@ -3,6 +3,8 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
+            [onyx.scheduling.common-job-scheduler :as cjs]
+            [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.extensions :as extensions]))
 
 (defmulti job-scheduler-replica-update
@@ -55,9 +57,9 @@
 (defmethod extensions/reactions :submit-job
   [{:keys [args] :as entry} old new diff state]
   (let [scheduler (get-in new [:task-schedulers (:job diff)])]
-    (when (and (common/volunteer-via-new-job? old new diff state)
+    (when (and (cjs/volunteer-via-new-job? old new diff state)
                (if (:job state)
-                 (common/reallocate-from-task? scheduler old new (:job diff) state)
+                 (cts/reallocate-from-task? scheduler old new (:job diff) state)
                  true))
       [{:fn :volunteer-for-task :args {:id (:id state)}}])))
 

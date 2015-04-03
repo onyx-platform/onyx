@@ -1,7 +1,8 @@
 (ns onyx.log.commands.kill-job
   (:require [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
-            [onyx.log.commands.common :refer [incomplete-jobs peer->allocated-job] :as common]
+            [onyx.log.commands.common :refer [incomplete-jobs peer->allocated-job]]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]))
 
 (defmethod extensions/apply-log-entry :kill-job
@@ -25,7 +26,7 @@
 (defmethod extensions/reactions :kill-job
   [{:keys [args]} old new diff state]
   (when (and (executing-killed-job? diff old (:job args) (:id state))
-             (common/volunteer-via-killed-job? old new diff state))
+             (cjs/volunteer-via-killed-job? old new diff state))
     [{:fn :volunteer-for-task :args {:id (:id state)}}]))
 
 (defmethod extensions/fire-side-effects! :kill-job
