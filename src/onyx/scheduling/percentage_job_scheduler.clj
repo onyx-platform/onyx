@@ -1,6 +1,41 @@
 (ns onyx.scheduling.percentage-job-scheduler
   (:require [onyx.scheduling.common-job-scheduler :refer [select-job]]))
 
+(defn sort-jobs-by-pct [replica]
+  (let [indexed
+        (map-indexed
+         (fn [k j]
+           {:position k :job j :pct (get-in replica [:percentages j])})
+         (reverse (:jobs replica)))]
+    (reverse (sort-by (juxt :pct :position) indexed))))
+
+(defn min-allocations [jobs n-peers]
+  (mapv
+   (fn [job]
+     (let [n (int (Math/floor (* (* 0.01 (:pct job)) n-peers)))]
+       (assoc job :allocation n)))
+   jobs))
+
+(defn maximum-jobs-to-use [jobs]
+  (reduce
+   (fn [all {:keys [pct] :as job}]
+     (let [sum (apply + (map :pct all))]
+       (if (<= (+ sum pct) 100)
+         (conj all job)
+         (reduced all))))
+   []
+   jobs))
+
+(defn percentage-balanced-workload [replica]
+  (let [n-peers (count (:peers replica))
+        sorted-jobs (sort-jobs-by-pct replica)
+        jobs-to-use (maximum-jobs-to-use sorted-jobs)
+        init-allocations (min-allocations jobs-to-use n-peers)
+        init-usage (apply + (map :allocation init-allocations))
+        left-over-peers (- n-peers init-usage)
+        with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
+    (into {} (map (fn [j] {(:job j) j}) with-leftovers))))
+
 (defmethod select-job :onyx.job-scheduler/percentage
   [{:keys [args]} replica]
   (let [candidates (universally-executable-jobs replica)

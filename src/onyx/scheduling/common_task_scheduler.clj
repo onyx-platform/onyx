@@ -8,6 +8,11 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre]))
 
+(defn active-tasks-only
+  "Filters out tasks that are currently being sealed."
+  [replica tasks]
+  (filter #(nil? (get-in replica [:sealing-task %])) tasks))
+
 (defn incomplete-tasks [replica job tasks]
   (let [tasks (get-in replica [:tasks job])
         completed (get-in replica [:completions job])]

@@ -7,6 +7,18 @@
             [onyx.peer.operation :as operation]
             [taoensso.timbre :refer [info] :as timbre]))
 
+(defn anticipating-coverage? [old new job-id]
+  (let [n-tasks (count (get-in new [:tasks job-id]))
+        n-tasks-covered (count (get-in new [:allocations job-id]))
+        n-volunteering (->> (:peers new)
+                            (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
+                            (count))]
+    (>= n-volunteering (- n-tasks n-tasks-covered))))
+
+(defn volunteer? [old new state job-id]
+  (and (reallocate-from-job? (:job-scheduler old) old new state)
+       (anticipating-coverage? old new job-id)))
+
 (defn add-site [replica {:keys [joiner peer-site]}]
   (-> replica 
       (assoc-in [:peer-sites joiner] 
@@ -70,7 +82,7 @@
         (and (:instant-join diff)
              (= (:id peer-args) (:joiner (:args entry)))
              (seq (:jobs new))
-             (common/volunteer? old new peer-args (:job peer-args)))
+             (volunteer? old new peer-args (:job peer-args)))
         [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster

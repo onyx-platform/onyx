@@ -358,6 +358,9 @@
       (operation/resolve-fn f)
       onyx.compression.nippy/compress)))
 
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
+
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
   component/Lifecycle
 
@@ -404,7 +407,7 @@
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch] :default true))
                      (or (not (common/job-covered? replica-state job-id))
-                         (not (common/any-ackers? replica-state job-id))))
+                         (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))

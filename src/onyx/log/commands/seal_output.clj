@@ -4,6 +4,11 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]))
 
+(defn all-outputs-sealed? [replica job]
+  (let [all (get-in replica [:output-tasks job])
+        sealed (get-in replica [:sealed-outputs job])]
+    (= (into #{} all) (into #{} sealed))))
+
 (defn remove-job-attrs [replica args]
   (-> replica
       (update-in [:exhausted-inputs] dissoc (:job args))
@@ -24,7 +29,7 @@
 (defmethod extensions/apply-log-entry :seal-output
   [{:keys [args]} replica]
   (let [new (update-in replica [:sealed-outputs (:job args)] union #{(:task args)})]
-    (if (common/all-outputs-sealed? new (:job args))
+    (if (all-outputs-sealed? new (:job args))
       (let [tasks (get-in replica [:tasks (:job args)])]
         (-> new
             (remove-job-attrs args)

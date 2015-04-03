@@ -8,6 +8,80 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre]))
 
+(defn balance-workload [replica jobs p]
+  (if (seq jobs)
+    (let [j (count jobs)
+          min-peers (int (/ p j))
+          n (rem p j)
+          max-peers (inc min-peers)]
+      (map-indexed
+       (fn [i job]
+         [job (if (< i n) max-peers min-peers)])
+       jobs))
+    []))
+
+(defn unbounded-jobs [replica balanced]
+  (filter
+   (fn [[job _]]
+     (= (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
+        Double/POSITIVE_INFINITY))
+   balanced))
+
+(defn adjust-with-overflow [replica balanced]
+  (reduce
+   (fn [result [job n]]
+     (let [sat (or (get-in replica [:saturation job]) Double/POSITIVE_INFINITY)
+           extra (- n sat)]
+       (if (pos? extra)
+         (-> result
+             (update-in [:overflow] + extra)
+             (update-in [:jobs] conj [job sat]))
+         (-> result
+             (update-in [:jobs] conj [job n])))))
+   {:overflow 0 :jobs []}
+   balanced))
+
+(defn balance-jobs [replica]
+  (let [balanced (balance-workload replica (:jobs replica) (count (:peers replica)))
+        {:keys [overflow jobs]} (adjust-with-overflow replica balanced)
+        unbounded (unbounded-jobs replica jobs)]
+    (merge-with
+     +
+     (into {} (balance-workload replica (map first unbounded) overflow))
+     (into {} jobs))))
+
+(defn incomplete-jobs [replica]
+  (filter
+   #(< (count (get-in replica [:completions %]))
+       (count (get-in replica [:tasks %])))
+   (:jobs replica)))
+
+(defn jobs-with-available-tasks [replica jobs]
+  (filter
+   (fn [job]
+     (let [tasks (get-in replica [:tasks job])]
+       (seq (active-tasks-only replica tasks))))
+   jobs))
+
+(defn alive-jobs [replica jobs]
+  (let [dead-jobs (into #{} (:killed-jobs replica))]
+    (remove (fn [job] (some #{job} dead-jobs)) jobs)))
+
+(defn job-coverable? [replica job]
+  (let [tasks (get-in replica [:tasks job])]
+    (>= (count (get-in replica [:peers])) (count tasks))))
+
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
 (defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))

@@ -1,6 +1,14 @@
 (ns onyx.scheduling.greedy-job-scheduler
   (:require [onyx.scheduling.common-job-scheduler :refer [select-job]]))
 
+(defn any-coverable-jobs? [replica]
+  (seq
+   (filter
+    (fn [job]
+      (let [tasks (get-in replica [:tasks job])]
+        (>= (count (get-in replica [:peers])) (count tasks))))
+    (incomplete-jobs replica))))
+
 (defmethod select-job :onyx.job-scheduler/greedy
   [{:keys [args]} replica]
   (let [job (first (universally-executable-jobs replica))

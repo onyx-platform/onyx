@@ -6,6 +6,12 @@
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]))
 
+(defn remove-sealing-tasks [replica args]
+  (let [task (get (map-invert (:sealing-tasks replica)) (:id args))]
+    (if task
+      (update-in replica [:sealing-tasks] dissoc task)
+      replica)))
+
 (defmethod extensions/apply-log-entry :leave-cluster
   [{:keys [args]} replica]
   (let [{:keys [id]} args

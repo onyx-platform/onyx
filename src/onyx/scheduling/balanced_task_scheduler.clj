@@ -1,13 +1,22 @@
 (ns onyx.scheduling.balanced-task-scheduler
   (:require [onyx.scheduling.common-task-scheduler :refer [select-task]]))
 
+(defn unsaturated-tasks [replica job tasks]
+  (filter
+   (fn [task]
+     (let [allocated (get-in replica [:allocations job task])
+           n-allocated (if (seq allocated) (count allocated) 0)]
+       (< n-allocated (or (get-in replica [:task-saturation job task]) 
+                          Double/POSITIVE_INFINITY))))
+   tasks))
+
 (defmethod select-task :onyx.task-scheduler/balanced
   [replica job peer-id]
   (let [allocations (get-in replica [:allocations job])]
     (->> (get-in replica [:tasks job])
          (incomplete-tasks replica job)
          (common/active-tasks-only replica)
-         (common/unsaturated-tasks replica job)
+         (unsaturated-tasks replica job)
          (map (fn [t] {:task t :n (count (get allocations t))}))
          (sort-by :n)
          (first)
