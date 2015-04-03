@@ -11,6 +11,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.scheduling.common-job-scheduler :as js]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy])
     (:import [java.security MessageDigest]
@@ -406,7 +407,7 @@
 
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch] :default true))
-                     (or (not (common/job-covered? replica-state job-id))
+                     (or (not (js/job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)

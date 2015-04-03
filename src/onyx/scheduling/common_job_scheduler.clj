@@ -4,8 +4,8 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
-            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.extensions :as extensions]
+            [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre]))
 
 (defn balance-workload [replica jobs p]
@@ -50,17 +50,11 @@
      (into {} (balance-workload replica (map first unbounded) overflow))
      (into {} jobs))))
 
-(defn incomplete-jobs [replica]
-  (filter
-   #(< (count (get-in replica [:completions %]))
-       (count (get-in replica [:tasks %])))
-   (:jobs replica)))
-
 (defn jobs-with-available-tasks [replica jobs]
   (filter
    (fn [job]
      (let [tasks (get-in replica [:tasks job])]
-       (seq (active-tasks-only replica tasks))))
+       (seq (cts/active-tasks-only replica tasks))))
    jobs))
 
 (defn alive-jobs [replica jobs]
@@ -89,8 +83,8 @@
 (defn universally-executable-jobs [replica]
   (->> replica
        (common/incomplete-jobs)
-       (common/alive-jobs replica)
-       (common/jobs-with-available-tasks replica)))
+       (alive-jobs replica)
+       (jobs-with-available-tasks replica)))
 
 (defn exempt-from-acker? [replica job task args]
   (or (some #{task} (get-in replica [:exempt-tasks job]))

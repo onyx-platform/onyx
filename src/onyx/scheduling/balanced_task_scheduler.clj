@@ -1,5 +1,6 @@
 (ns onyx.scheduling.balanced-task-scheduler
-  (:require [onyx.scheduling.common-task-scheduler :refer [select-task]]))
+  (:require [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.log.commands.common :as common]))
 
 (defn unsaturated-tasks [replica job tasks]
   (filter
@@ -10,19 +11,19 @@
                           Double/POSITIVE_INFINITY))))
    tasks))
 
-(defmethod select-task :onyx.task-scheduler/balanced
+(defmethod cts/select-task :onyx.task-scheduler/balanced
   [replica job peer-id]
   (let [allocations (get-in replica [:allocations job])]
     (->> (get-in replica [:tasks job])
-         (incomplete-tasks replica job)
-         (common/active-tasks-only replica)
+         (cts/incomplete-tasks replica job)
+         (cts/active-tasks-only replica)
          (unsaturated-tasks replica job)
          (map (fn [t] {:task t :n (count (get allocations t))}))
          (sort-by :n)
          (first)
          :task)))
 
-(defmethod drop-peers :onyx.task-scheduler/balanced
+(defmethod cts/drop-peers :onyx.task-scheduler/balanced
   [replica job n]
   (first
     (reduce
@@ -36,12 +37,7 @@
       [[] (get-in replica [:allocations job])] 
       (range n))))
 
-(defmethod reallocate-from-task? :onyx.task-scheduler/balanced
+(defmethod cts/reallocate-from-task? :onyx.task-scheduler/balanced
   [scheduler old new job state]
-  (let [allocations (balance-jobs new)
-        allocation (peer->allocated-job (:allocations new) (:id state))
-        required (get allocations job)
-        actual (count (apply concat (vals (get-in old [:allocations (:job allocation)]))))]
-    (when (> actual required)
-      (let [peers-to-drop (vector (first (drop-peers new (:job allocation) (- actual required))))]
-        (some #{(:id state)} peers-to-drop)))))
+  ;;; ??? Cyclic dependency. Needs a rewrite.
+  )

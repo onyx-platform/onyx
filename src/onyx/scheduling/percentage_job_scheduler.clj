@@ -1,5 +1,7 @@
 (ns onyx.scheduling.percentage-job-scheduler
-  (:require [onyx.scheduling.common-job-scheduler :refer [select-job]]))
+  (:require [onyx.scheduling.common-job-scheduler :as cjs]
+            [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.log.commands.common :as common]))
 
 (defn sort-jobs-by-pct [replica]
   (let [indexed
@@ -36,10 +38,10 @@
         with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
     (into {} (map (fn [j] {(:job j) j}) with-leftovers))))
 
-(defmethod select-job :onyx.job-scheduler/percentage
+(defmethod cjs/select-job :onyx.job-scheduler/percentage
   [{:keys [args]} replica]
-  (let [candidates (universally-executable-jobs replica)
-        balanced (common/percentage-balanced-workload replica)
+  (let [candidates (cjs/universally-executable-jobs replica)
+        balanced (percentage-balanced-workload replica)
         allocation (common/peer->allocated-job (:allocations replica) (:id args))
         job
         (reduce
@@ -51,7 +53,7 @@
          nil
          candidates)]
     (if job
-      (if-let [task (select-task replica job (:id args))]
+      (if-let [task (cts/select-task replica job (:id args))]
         (if (or (not= task (:task allocation))
                 (not= job (:job allocation)))
           (-> replica
@@ -59,51 +61,51 @@
               (update-in [:allocations job task] conj (:id args))
               (update-in [:allocations job task] vec)
               (assoc-in [:peer-state (:id args)] :warming-up)
-              (offer-acker job task args))
+              (cjs/offer-acker job task args))
           replica)
         replica)
       replica)))
 
-(defmethod volunteer-via-new-job? :onyx.job-scheduler/percentage
+(defmethod cjs/volunteer-via-new-job? :onyx.job-scheduler/percentage
   [old new diff state]
   (let [allocations (percentage-balanced-workload new)]
     (every?
      (fn [job]
        (let [n-tasks (count (get-in new [:tasks job]))]
          (>= (:allocation (get allocations job)) n-tasks)))
-     (incomplete-jobs new))))
+     (common/incomplete-jobs new))))
 
-(defmethod volunteer-via-leave? :onyx.job-scheduler/percentage
+(defmethod cjs/volunteer-via-leave? :onyx.job-scheduler/percentage
   [old new diff state]
   (let [allocations (percentage-balanced-workload new)
-        allocation (peer->allocated-job (:allocations new) (:id state))]
-    (when (and allocation (seq (incomplete-jobs new)))
+        allocation (common/peer->allocated-job (:allocations new) (:id state))]
+    (when (and allocation (seq (common/incomplete-jobs new)))
       (let [n-required (:allocation (get allocations (:job allocation)))
             n-actual (count (apply concat (vals (get-in new [:allocations (:job allocation)]))))]
         (> n-actual n-required)))))
 
-(defmethod volunteer-via-killed-job? :onyx.job-scheduler/percentage
+(defmethod cjs/volunteer-via-killed-job? :onyx.job-scheduler/percentage
   [old new diff state]
-  (seq (incomplete-jobs new)))
+  (seq (common/incomplete-jobs new)))
 
-(defmethod volunteer-via-sealed-output? :onyx.job-scheduler/percentage
+(defmethod cjs/volunteer-via-sealed-output? :onyx.job-scheduler/percentage
   [old new diff state]
-  (seq (incomplete-jobs new)))
+  (seq (common/incomplete-jobs new)))
 
-(defmethod volunteer-via-accept? :onyx.job-scheduler/percentage
+(defmethod cjs/volunteer-via-accept? :onyx.job-scheduler/percentage
   [old new diff state]
   (and (nil? (:job state))
-       (every? (partial job-coverable? new) (incomplete-jobs new))))
+       (every? (partial cjs/job-coverable? new) (common/incomplete-jobs new))))
 
-(defmethod reallocate-from-job? :onyx.job-scheduler/percentage
+(defmethod cjs/reallocate-from-job? :onyx.job-scheduler/percentage
   [scheduler old new state]
-  (if-let [allocation (peer->allocated-job (:allocations new) (:id state))]
+  (if-let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
     (let [balanced (percentage-balanced-workload new)
           peer-counts (:allocation (get balanced (:job allocation)))
-          peers (get (job->peers new) (:job allocation))]
+          peers (get (common/job->peers new) (:job allocation))]
       (when (> (count peers) peer-counts)
         (let [n (- (count peers) peer-counts)
-              peers-to-drop (drop-peers new (:job allocation) n)]
+              peers-to-drop (cts/drop-peers new (:job allocation) n)]
           (when (some #{(:id state)} peers-to-drop)
             true))))
     true))

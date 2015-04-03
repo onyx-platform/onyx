@@ -36,6 +36,12 @@
    {}
    allocations))
 
+(defn incomplete-jobs [replica]
+  (filter
+   #(< (count (get-in replica [:completions %]))
+       (count (get-in replica [:tasks %])))
+   (:jobs replica)))
+
 (defn remove-peers [replica args]
   (let [prev (get (allocations->peers (:allocations replica)) (:id args))]
     (if (and (:job prev) (:task prev))

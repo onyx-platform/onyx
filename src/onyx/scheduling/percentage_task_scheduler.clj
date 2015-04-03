@@ -1,5 +1,6 @@
 (ns onyx.scheduling.percentage-task-scheduler
-  (:require [onyx.scheduling.common-task-scheduler :refer [select-task]]))
+  (:require [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.log.commands.common :as common]))
 
 (defn highest-pct-task [replica job tasks]
   (->> tasks
@@ -22,6 +23,14 @@
        (assoc task :allocation n)))
    tasks))
 
+(defn percentage-balanced-taskload [replica job candidate-tasks n-peers]
+  (let [sorted-tasks (sort-tasks-by-pct replica job candidate-tasks)
+        init-allocations (min-task-allocations replica job sorted-tasks n-peers)
+        init-usage (apply + (map :allocation init-allocations))
+        left-over-peers (- n-peers init-usage)
+        with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
+    (into {} (map (fn [t] {(:task t) t}) with-leftovers))))
+
 (defn task-needing-pct-peers [replica job tasks peer]
   (let [allocations (get-in replica [:allocations job])
         total-allocated (count (into #{} (conj (apply concat (vals allocations)) peer)))
@@ -38,23 +47,15 @@
      (:task (first sorted-tasks))
      sorted-tasks)))
 
-(defn percentage-balanced-taskload [replica job candidate-tasks n-peers]
-  (let [sorted-tasks (sort-tasks-by-pct replica job candidate-tasks)
-        init-allocations (min-task-allocations replica job sorted-tasks n-peers)
-        init-usage (apply + (map :allocation init-allocations))
-        left-over-peers (- n-peers init-usage)
-        with-leftovers (update-in init-allocations [0 :allocation] + left-over-peers)]
-    (into {} (map (fn [t] {(:task t) t}) with-leftovers))))
-
-(defmethod select-task :onyx.task-scheduler/percentage
+(defmethod cts/select-task :onyx.task-scheduler/percentage
   [replica job peer-id]
   (let [candidates (->> (get-in replica [:tasks job])
-                        (incomplete-tasks replica job)
-                        (common/active-tasks-only replica))]
+                        (cts/incomplete-tasks replica job)
+                        (cts/active-tasks-only replica))]
     (or (task-needing-pct-peers replica job candidates peer-id)
-        (common/highest-pct-task replica job candidates))))
+        (highest-pct-task replica job candidates))))
 
-(defmethod drop-peers :onyx.task-scheduler/percentage
+(defmethod cts/drop-peers :onyx.task-scheduler/percentage
   [replica job n]
   (let [tasks (keys (get-in replica [:allocations job]))
         balanced (percentage-balanced-taskload replica job tasks n)]
@@ -63,9 +64,9 @@
        (drop-last allocation (get-in replica [:allocations job task])))
      balanced)))
 
-(defmethod reallocate-from-task? :onyx.task-scheduler/percentage
+(defmethod cts/reallocate-from-task? :onyx.task-scheduler/percentage
   [scheduler old new job state]
-  (let [allocation (peer->allocated-job (:allocations new) (:id state))]
+  (let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
     (when (= (:job allocation) job)
       (let [candidate-tasks (keys (get-in new [:allocations job]))
             n-peers (count (apply concat (vals (get-in new [:allocations job]))))
@@ -74,7 +75,6 @@
             actual (count (get-in new [:allocations (:job allocation) (:task allocation)]))]
         (when (> actual required)
           (let [n (- actual required)
-                peers-to-drop (drop-peers new (:job allocation) n)]
+                peers-to-drop (cts/drop-peers new (:job allocation) n)]
             (when (some #{(:id state)} (into #{} peers-to-drop))
               true)))))))
-
