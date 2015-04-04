@@ -78,3 +78,40 @@
                 peers-to-drop (cts/drop-peers new (:job allocation) n)]
             (when (some #{(:id state)} (into #{} peers-to-drop))
               true)))))))
+
+(defmethod cts/task-claim-n-peers :onyx.task-scheduler/percentage
+  [replica job n]
+  ;; We can reuse the Balanced task scheduler algorithm as is.
+  (cts/task-claim-n-peers
+   (assoc-in replica [:task-schedulers job] :onyx.task-scheduler/balanced)
+   job n))
+
+(defn reuse-spare-peers [replica job tasks spare-peers]
+  (loop [[head & tail :as task-seq] (get-in replica [:tasks job])
+         results tasks
+         capacity spare-peers]
+    (let [tail (vec tail)]
+      (cond (or (<= capacity 0) (not (seq task-seq)))
+            results
+            (< (get results head) (or (get-in replica [:task-saturation job head] Double/POSITIVE_INFINITY)))
+            (recur (conj tail head) (update-in results [head] inc) (dec capacity))
+            :else
+            (recur tail results capacity)))))
+
+(defmethod cts/task-distribute-peer-count :onyx.task-scheduler/percentage
+  [replica job n]
+  (let [tasks (get-in replica [:tasks job])
+        t (count tasks)
+        min-peers (int (/ n t))
+        r (rem n t)
+        max-peers (inc min-peers)
+        init
+        (reduce
+         (fn [all [task k]]
+           (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                (get-in replica [:task-percentages job task])
+                                (if (< k r) max-peers min-peers))))
+         {}
+         (map vector tasks (range)))
+        spare-peers (- n (apply + (vals init)))]
+    (reuse-spare-peers replica job init spare-peers)))

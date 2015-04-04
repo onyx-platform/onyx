@@ -174,7 +174,37 @@
 
 (def max-utilization-p (claim-spare-peers replica-p job-claims-p spare-peers-p))
 
-(def task-distribution-p (cts/task-distribute-peer-count replica-b :j2 (:j2 max-utilization-p)))
+(def task-distribution-p (cts/task-distribute-peer-count replica-p :j2 (:j2 max-utilization-p)))
+
+
+
+(def replica-pt {:job-scheduler :onyx.job-scheduler/percentage
+                 :jobs [:j1 :j2]
+                 :tasks {:j1 [:t1 :t2 :t3]
+                         :j2 [:t4 :t5 :t6]}
+                 :task-schedulers {:j1 :onyx.task-scheduler/percentage
+                                   :j2 :onyx.task-scheduler/percentage}
+                 :saturation {:j1 0 :j2 Double/POSITIVE_INFINITY}
+                 :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7 :p8 :p9 :p10]
+                 :percentages {:j1 40 :j2 60}
+                 :task-percentages {:j1 {:t1 20 :t2 30 :t3 50}
+                                    :j2 {:t4 50 :t5 20 :t6 30}}})
+
+(def job-offers-pt (job-offer-n-peers replica-pt))
+
+(def job-claims-pt
+  (reduce-kv
+   (fn [all j claim]
+     (assoc all j (cts/task-claim-n-peers replica-pt j claim)))
+   {}
+   job-offers-pt))
+
+(def spare-peers-pt (apply + (vals (merge-with - job-offers-pt job-claims-pt))))
+
+(def max-utilization-pt (claim-spare-peers replica-pt job-claims-pt spare-peers-pt))
+
+(def task-distribution-pt (cts/task-distribute-peer-count replica-pt :j2 (:j2 max-utilization-pt)))
+
 
 
 
