@@ -126,7 +126,7 @@
 
 (def replica-b {:job-scheduler :onyx.job-scheduler/balanced
                 :jobs [:j1 :j2]
-                :tasks {:j1 [:t1 :t2 :t3 :g :h :i :j :k :l :m :n :o :p]
+                :tasks {:j1 [:t1 :t2 :t3 :g :h :i :j :k :l :m :n :o]
                         :j2 [:t4 :t5 :t6]}
                 :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
                 :task-schedulers {:j1 :onyx.task-scheduler/balanced
@@ -155,6 +155,7 @@
                         :j2 [:t4 :t5 :t6]}
                 :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                   :j2 :onyx.task-scheduler/balanced}
+                :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
                 :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7 :p8 :p9 :p10]
                 :percentages {:j1 40 :j2 60}})
 

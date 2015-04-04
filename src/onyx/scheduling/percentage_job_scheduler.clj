@@ -121,3 +121,9 @@
         init-allocations (min-allocations jobs-to-use n-peers)]
     (into {} (map (fn [j] {(:job j) (:capacity j)}) init-allocations))))
 
+(defmethod cjs/claim-spare-peers :onyx.job-scheduler/percentage
+  [replica jobs n]
+  ;; We can get away with using the exact same algorithm as the
+  ;; Balanced job scheduler.
+  (cjs/claim-spare-peers
+   (assoc replica :job-scheduler :onyx.job-scheduler/balanced) jobs n))
