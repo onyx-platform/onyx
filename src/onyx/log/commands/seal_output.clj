@@ -2,6 +2,7 @@
   (:require [clojure.set :refer [union]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
+            [taoensso.timbre :refer [warn fatal info]]
             [onyx.extensions :as extensions]))
 
 (defn remove-job-attrs [replica args]
@@ -48,6 +49,6 @@
     (if (and (:job-completed? diff) (= (:job diff) job))
       (do (when-let [lc (:lifecycle state)]
             (component/stop @lc)
-            (assoc state :lifecycle nil)))
+            (assoc state :lifecycle nil :job nil)))
       state)))
 

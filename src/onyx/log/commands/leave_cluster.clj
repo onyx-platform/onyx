@@ -57,7 +57,7 @@
     (cond (not (common/job-covered? new job))
           (when-let [lifecycle (:lifecycle state)]
             (component/stop @lifecycle)
-            (assoc state :lifecycle nil))
+            (assoc state :lifecycle nil :job nil))
 
           (common/should-seal? new {:job job} state message-id)
           (>!! (:seal-response-ch state) true)

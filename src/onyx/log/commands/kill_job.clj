@@ -32,6 +32,6 @@
   [{:keys [args]} old new diff state]
   (if (executing-killed-job? diff old (:job args) (:id state))
     (do (component/stop @(:lifecycle state))
-        (assoc state :lifecycle nil))
+        (assoc state :lifecycle nil :job nil))
     state))
 
