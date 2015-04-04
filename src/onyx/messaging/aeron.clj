@@ -26,7 +26,7 @@
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (.close media-driver)
+    (when media-driver (.close media-driver))
     (assoc component :media-driver nil)))
 
 (defn aeron-peer-group [opts]
