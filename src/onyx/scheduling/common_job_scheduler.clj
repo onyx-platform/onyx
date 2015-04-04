@@ -174,6 +174,8 @@
 
 (def max-utilization-p (claim-spare-peers replica-p job-claims-p spare-peers-p))
 
+(def task-distribution-p (cts/task-distribute-peer-count replica-b :j2 (:j2 max-utilization-p)))
+
 
 
 
