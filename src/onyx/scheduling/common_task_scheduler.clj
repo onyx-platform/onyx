@@ -51,3 +51,7 @@
 (defmulti task-claim-n-peers
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
+
+(defmulti task-distribute-peer-count
+  (fn [replica job n]
+    (get-in replica [:task-schedulers job])))

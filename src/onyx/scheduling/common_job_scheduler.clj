@@ -94,9 +94,6 @@
 
 (defmulti job-offer-n-peers :job-scheduler)
 
-(defn reclaim-unused-peers [offered-peers claimed-peers]
-  (apply + (vals (merge-with - offered-peers claimed-peers))))
-
 (defmulti claim-spare-peers
   (fn [replica jobs n]
     (:job-scheduler replica)))
@@ -119,7 +116,7 @@
    {}
    job-offers-g))
 
-(def spare-peers-g (reclaim-unused-peers job-offers-g job-claims-g))
+(def spare-peers-g (apply + (vals (merge-with - job-offers-g job-claims-g))))
 
 (def max-utilization-g (claim-spare-peers replica-g job-claims-g spare-peers-g))
 
@@ -131,6 +128,7 @@
                 :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
                 :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                   :j2 :onyx.task-scheduler/balanced}
+                :task-saturation {:j2 {:t4 2}}
                 :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7]})
 
 (def job-offers-b (job-offer-n-peers replica-b))
@@ -142,9 +140,11 @@
    {}
    job-offers-b))
 
-(def spare-peers-b (reclaim-unused-peers job-offers-b job-claims-b))
+(def spare-peers-b (apply + (vals (merge-with - job-offers-b job-claims-b))))
 
 (def max-utilization-b (claim-spare-peers replica-b job-claims-b spare-peers-b))
+
+(cts/task-distribute-peer-count replica-b :j2 (:j2 max-utilization-b))
 
 
 
@@ -168,17 +168,17 @@
    {}
    job-offers-p))
 
-(def spare-peers-p (reclaim-unused-peers job-offers-p job-claims-p))
+(def spare-peers-p (apply + (vals (merge-with - job-offers-p job-claims-p))))
 
 (def max-utilization-p (claim-spare-peers replica-p job-claims-p spare-peers-p))
 
 
 
 
-;; - Function to map job id -> N peers
+;; x - Function to map job id -> N peers
+;; x - Function to take the difference between capacity and usage
+;; x - Function to redisperse extra peers
 ;; - Function to map task id -> N peers
-;; - Function to take the difference between capacity and usage
-;; - Function to redisperse extra peers
 ;; - Function to figure out which peers go to which tasks and jobs
 ;; - Function to update the replica
 ;; - Function per peer to start or not start new task

@@ -47,3 +47,34 @@
     (if (< n (count tasks))
       0
       (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))))
+
+(defn reuse-spare-peers [replica job tasks spare-peers]
+  (loop [[head & tail :as task-seq] (get-in replica [:tasks job])
+         results tasks
+         capacity spare-peers]
+    (let [tail (vec tail)]
+      (cond (or (zero? capacity) (not (seq task-seq)))
+            results
+            (< (get results head) (or (get-in replica [:task-saturation job head] Double/POSITIVE_INFINITY)))
+            (recur (conj tail head) (update-in results [head] inc) (dec capacity))
+            :else
+            (recur tail results capacity)))))
+
+(defmethod cts/task-distribute-peer-count :onyx.task-scheduler/balanced
+  [replica job n]
+  (let [tasks (get-in replica [:tasks job])
+        t (count tasks)
+        p (count (:peers replica))
+        min-peers (int (/ p t))
+        r (rem p t)
+        max-peers (inc min-peers)
+        init
+        (reduce
+         (fn [all [task k]]
+           (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                (if (< k r) max-peers min-peers))))
+         {}
+         (map vector tasks (range)))
+        spare-peers (- n (apply + (vals init)))]
+    (reuse-spare-peers replica job init spare-peers)))
+
