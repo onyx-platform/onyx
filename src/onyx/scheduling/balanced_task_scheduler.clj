@@ -37,18 +37,13 @@
       [[] (get-in replica [:allocations job])] 
       (range n))))
 
-(defmethod cts/reallocate-from-task? :onyx.task-scheduler/balanced
-  [scheduler old new job state])
-
-#_(let [tasks (get-in replica [:tasks job])
-        base (int (/ n (count tasks)))
-        bonus (rem n (count tasks))]
-    (merge (zipmap (take bonus tasks) (repeat (inc base)))
-           (zipmap (drop bonus tasks) (repeat base))))
-
 (defmethod cts/task-claim-n-peers :onyx.task-scheduler/balanced
   [replica job n]
-  (let [task (get-in replica [:tasks job])]
-    (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
-         n)))
-
+  (let [tasks (get-in replica [:tasks job])]
+    ;; If the number of peers is less than the number of tasks,
+    ;; we're not covered - so we claim zero peers. Otherwise we
+    ;; take as much as we're allowed, depending on the saturation
+    ;; of the job.
+    (if (< n (count tasks))
+      0
+      (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))))

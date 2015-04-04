@@ -28,19 +28,6 @@
    {:overflow 0 :jobs []}
    balanced))
 
-(defn balance-jobs [replica]
-  (let [balanced (balance-workload replica (:jobs replica) (count (:peers replica)))
-        {:keys [overflow jobs]} (adjust-with-overflow replica balanced)
-        unbounded (unbounded-jobs replica jobs)]
-    (merge-with
-     +
-     (into {} (balance-workload replica (map first unbounded) overflow))
-     (into {} jobs))))
-
-(defn job-coverable? [replica job]
-  (let [tasks (get-in replica [:tasks job])]
-    (>= (count (get-in replica [:peers])) (count tasks))))
-
 (defn at-least-one-active? [replica peers]
   (->> peers
        (map #(get-in replica [:peer-state %]))
@@ -139,7 +126,7 @@
 
 (def replica-b {:job-scheduler :onyx.job-scheduler/balanced
                 :jobs [:j1 :j2]
-                :tasks {:j1 [:t1 :t2 :t3]
+                :tasks {:j1 [:t1 :t2 :t3 :g :h :i :j :k :l :m :n :o :p]
                         :j2 [:t4 :t5 :t6]}
                 :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
                 :task-schedulers {:j1 :onyx.task-scheduler/balanced
@@ -158,6 +145,32 @@
 (def spare-peers-b (reclaim-unused-peers job-offers-b job-claims-b))
 
 (def max-utilization-b (claim-spare-peers replica-b job-claims-b spare-peers-b))
+
+
+
+
+(def replica-p {:job-scheduler :onyx.job-scheduler/percentage
+                :jobs [:j1 :j2]
+                :tasks {:j1 [:t1 :t2 :t3]
+                        :j2 [:t4 :t5 :t6]}
+                :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                                  :j2 :onyx.task-scheduler/balanced}
+                :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7 :p8 :p9 :p10]
+                :percentages {:j1 40 :j2 60}})
+
+(def job-offers-p (job-offer-n-peers replica-p))
+
+(def job-claims-p
+  (reduce-kv
+   (fn [all j claim]
+     (assoc all j (cts/task-claim-n-peers replica-p j claim)))
+   {}
+   job-offers-p))
+
+(def spare-peers-p (reclaim-unused-peers job-offers-p job-claims-p))
+
+(def max-utilization-p (claim-spare-peers replica-p job-claims-p spare-peers-p))
+
 
 
 

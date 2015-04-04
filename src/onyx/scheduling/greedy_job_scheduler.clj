@@ -3,10 +3,14 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
+(defn job-coverable? [replica job]
+  (let [tasks (get-in replica [:tasks job])]
+    (>= (count (get-in replica [:peers])) (count tasks))))
+
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
   [replica]
   (let [[active & passive] (:jobs replica)
-        coverable? (cjs/job-coverable? replica active)
+        coverable? (job-coverable? replica active)
         n (if coverable? (:peers replica) 0)]
     (merge {active (count n)} (zipmap passive (repeat 0)))))
 
