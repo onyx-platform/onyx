@@ -53,7 +53,7 @@
          results tasks
          capacity spare-peers]
     (let [tail (vec tail)]
-      (cond (or (zero? capacity) (not (seq task-seq)))
+      (cond (or (<= capacity 0) (not (seq task-seq)))
             results
             (< (get results head) (or (get-in replica [:task-saturation job head] Double/POSITIVE_INFINITY)))
             (recur (conj tail head) (update-in results [head] inc) (dec capacity))
@@ -64,9 +64,8 @@
   [replica job n]
   (let [tasks (get-in replica [:tasks job])
         t (count tasks)
-        p (count (:peers replica))
-        min-peers (int (/ p t))
-        r (rem p t)
+        min-peers (int (/ n t))
+        r (rem n t)
         max-peers (inc min-peers)
         init
         (reduce

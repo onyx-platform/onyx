@@ -145,7 +145,7 @@
            results covered-jobs
            capacity n]
       (let [tail (vec tail)]
-        (cond (or (zero? capacity) (not (seq job-seq)))
+        (cond (or (<= capacity 0) (not (seq job-seq)))
               (merge non-covered-jobs results)
               (< (get results head) (get-in replica [:saturation head]))
               (recur (conj tail head) (update-in results [head] inc) (dec capacity))

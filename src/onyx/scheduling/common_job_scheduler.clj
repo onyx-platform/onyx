@@ -120,6 +120,8 @@
 
 (def max-utilization-g (claim-spare-peers replica-g job-claims-g spare-peers-g))
 
+(def task-distribution-g (cts/task-distribute-peer-count replica-g :j1 (:j1 max-utilization-g)))
+
 
 (def replica-b {:job-scheduler :onyx.job-scheduler/balanced
                 :jobs [:j1 :j2]
@@ -144,7 +146,7 @@
 
 (def max-utilization-b (claim-spare-peers replica-b job-claims-b spare-peers-b))
 
-(cts/task-distribute-peer-count replica-b :j2 (:j2 max-utilization-b))
+(def task-distribution-b (cts/task-distribute-peer-count replica-b :j2 (:j2 max-utilization-b)))
 
 
 
