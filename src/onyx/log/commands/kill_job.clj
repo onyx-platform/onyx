@@ -10,6 +10,7 @@
   (let [peers (mapcat identity (vals (get-in replica [:allocations (:job args)])))]
     (if (some #{(:job args)} (into #{} (incomplete-jobs replica)))
       (-> replica
+          ;; Scheduler TODO: move job out of :jobs to :killed-jobs
           (update-in [:killed-jobs] conj (:job args))
           (update-in [:killed-jobs] vec)
           (update-in [:allocations] dissoc (:job args))
@@ -27,7 +28,8 @@
   [{:keys [args]} old new diff state]
   (when (and (executing-killed-job? diff old (:job args) (:id state))
              (cjs/volunteer-via-killed-job? old new diff state))
-    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
+    (do ;; SCHEDULER TODO: << Removed volunteer >>
+      nil)))
 
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]

@@ -38,6 +38,17 @@
       (range n))))
 
 (defmethod cts/reallocate-from-task? :onyx.task-scheduler/balanced
-  [scheduler old new job state]
-  ;;; ??? Cyclic dependency. Needs a rewrite.
-  )
+  [scheduler old new job state])
+
+#_(let [tasks (get-in replica [:tasks job])
+        base (int (/ n (count tasks)))
+        bonus (rem n (count tasks))]
+    (merge (zipmap (take bonus tasks) (repeat (inc base)))
+           (zipmap (drop bonus tasks) (repeat base))))
+
+(defmethod cts/task-claim-n-peers :onyx.task-scheduler/balanced
+  [replica job n]
+  (let [task (get-in replica [:tasks job])]
+    (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
+         n)))
+

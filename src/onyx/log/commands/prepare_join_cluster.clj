@@ -5,18 +5,19 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.peer.operation :as operation]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [taoensso.timbre :refer [info] :as timbre]))
 
 (defn anticipating-coverage? [old new job-id]
   (let [n-tasks (count (get-in new [:tasks job-id]))
         n-tasks-covered (count (get-in new [:allocations job-id]))
         n-volunteering (->> (:peers new)
-                            (filter #(reallocate-from-job? (:job-scheduler old) old new {:id %}))
+                            (filter #(cjs/reallocate-from-job? (:job-scheduler old) old new {:id %}))
                             (count))]
     (>= n-volunteering (- n-tasks n-tasks-covered))))
 
 (defn volunteer? [old new state job-id]
-  (and (reallocate-from-job? (:job-scheduler old) old new state)
+  (and (cjs/reallocate-from-job? (:job-scheduler old) old new state)
        (anticipating-coverage? old new job-id)))
 
 (defn add-site [replica {:keys [joiner peer-site]}]
@@ -83,7 +84,8 @@
              (= (:id peer-args) (:joiner (:args entry)))
              (seq (:jobs new))
              (volunteer? old new peer-args (:job peer-args)))
-        [{:fn :volunteer-for-task :args {:id (:id peer-args)}}]))
+        (do ;; SCHEDULER TODO: << Removed volunteer >>
+          nil)))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]

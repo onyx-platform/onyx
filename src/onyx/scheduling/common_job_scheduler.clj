@@ -8,29 +8,16 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre]))
 
-(defn balance-workload [replica jobs p]
-  (if (seq jobs)
-    (let [j (count jobs)
-          min-peers (int (/ p j))
-          n (rem p j)
-          max-peers (inc min-peers)]
-      (map-indexed
-       (fn [i job]
-         [job (if (< i n) max-peers min-peers)])
-       jobs))
-    []))
-
 (defn unbounded-jobs [replica balanced]
   (filter
    (fn [[job _]]
-     (= (get-in replica [:saturation job] Double/POSITIVE_INFINITY)
-        Double/POSITIVE_INFINITY))
+     (= (get-in replica [:saturation job]) Double/POSITIVE_INFINITY))
    balanced))
 
 (defn adjust-with-overflow [replica balanced]
   (reduce
    (fn [result [job n]]
-     (let [sat (or (get-in replica [:saturation job]) Double/POSITIVE_INFINITY)
+     (let [sat (or (get-in replica [:saturation job]))
            extra (- n sat)]
        (if (pos? extra)
          (-> result
@@ -50,17 +37,6 @@
      (into {} (balance-workload replica (map first unbounded) overflow))
      (into {} jobs))))
 
-(defn jobs-with-available-tasks [replica jobs]
-  (filter
-   (fn [job]
-     (let [tasks (get-in replica [:tasks job])]
-       (seq (cts/active-tasks-only replica tasks))))
-   jobs))
-
-(defn alive-jobs [replica jobs]
-  (let [dead-jobs (into #{} (:killed-jobs replica))]
-    (remove (fn [job] (some #{job} dead-jobs)) jobs)))
-
 (defn job-coverable? [replica job]
   (let [tasks (get-in replica [:tasks job])]
     (>= (count (get-in replica [:peers])) (count tasks))))
@@ -79,12 +55,6 @@
 (defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
-
-(defn universally-executable-jobs [replica]
-  (->> replica
-       (common/incomplete-jobs)
-       (alive-jobs replica)
-       (jobs-with-available-tasks replica)))
 
 (defn exempt-from-acker? [replica job task args]
   (or (some #{task} (get-in replica [:exempt-tasks job]))
@@ -134,3 +104,68 @@
 (defmulti reallocate-from-job?
   (fn [scheduler old new state]
     scheduler))
+
+(defmulti job-offer-n-peers :job-scheduler)
+
+(defn reclaim-unused-peers [offered-peers claimed-peers]
+  (apply + (vals (merge-with - offered-peers claimed-peers))))
+
+(defmulti claim-spare-peers
+  (fn [replica jobs n]
+    (:job-scheduler replica)))
+
+(def replica-g {:job-scheduler :onyx.job-scheduler/greedy
+              :jobs [:j1 :j2]
+              :tasks {:j1 [:t1 :t2 :t3]
+                      :j2 [:t4 :t5]}
+              :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                                :j2 :onyx.task-scheduler/balanced}
+              :saturation {:j1 3}
+              :peers [:p1 :p2 :p3 :p4 :p5]})
+
+(def job-offers-g (job-offer-n-peers replica-g))
+
+(def job-claims-g
+  (reduce-kv
+   (fn [all j claim]
+     (assoc all j (cts/task-claim-n-peers replica-g j claim)))
+   {}
+   job-offers-g))
+
+(def spare-peers-g (reclaim-unused-peers job-offers-g job-claims-g))
+
+(def max-utilization-g (claim-spare-peers replica-g job-claims-g spare-peers-g))
+
+
+(def replica-b {:job-scheduler :onyx.job-scheduler/balanced
+                :jobs [:j1 :j2]
+                :tasks {:j1 [:t1 :t2 :t3]
+                        :j2 [:t4 :t5 :t6]}
+                :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
+                :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                                  :j2 :onyx.task-scheduler/balanced}
+                :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7]})
+
+(def job-offers-b (job-offer-n-peers replica-b))
+
+(def job-claims-b
+  (reduce-kv
+   (fn [all j claim]
+     (assoc all j (cts/task-claim-n-peers replica-b j claim)))
+   {}
+   job-offers-b))
+
+(def spare-peers-b (reclaim-unused-peers job-offers-b job-claims-b))
+
+(def max-utilization-b (claim-spare-peers replica-b job-claims-b spare-peers-b))
+
+
+
+;; - Function to map job id -> N peers
+;; - Function to map task id -> N peers
+;; - Function to take the difference between capacity and usage
+;; - Function to redisperse extra peers
+;; - Function to figure out which peers go to which tasks and jobs
+;; - Function to update the replica
+;; - Function per peer to start or not start new task
+

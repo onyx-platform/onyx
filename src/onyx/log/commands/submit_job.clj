@@ -61,7 +61,8 @@
                (if (:job state)
                  (cts/reallocate-from-task? scheduler old new (:job diff) state)
                  true))
-      [{:fn :volunteer-for-task :args {:id (:id state)}}])))
+      (do ;; SCHEDULER TODO: << Removed volunteer >>
+        nil))))
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]

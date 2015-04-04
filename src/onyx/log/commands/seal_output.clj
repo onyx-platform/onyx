@@ -20,6 +20,7 @@
    (fn [new task]
      (let [peers (get-in new [:allocations (:job args) task])]
        (-> new
+           ;; Scheduler TODO: Move from :jobs to :completed-jobs
            (update-in [:completions (:job args)] conj task)
            (update-in [:completions (:job args)] vec)
            (update-in [:allocations (:job args)] dissoc task)
@@ -46,7 +47,8 @@
 (defmethod extensions/reactions :seal-output
   [{:keys [args]} old new diff state]
   (when (cjs/volunteer-via-sealed-output? old new diff state)
-    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
+    (do ;; SCHEDULER TODO: << Removed volunteer >>
+      nil)))
 
 (defmethod extensions/fire-side-effects! :seal-output
   [{:keys [args]} old new diff state]

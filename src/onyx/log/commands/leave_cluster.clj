@@ -55,7 +55,8 @@
           (and allocation
                (common/volunteer-via-leave? old new diff state)
                (common/reallocate-from-task? scheduler old new (:job allocation) state))
-          [{:fn :volunteer-for-task :args {:id (:id state)}}])))
+          (do ;; SCHEDULER TODO: << Removed volunteer >>
+            nil))))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [message-id args]} old new {:keys [updated-watch]} state]

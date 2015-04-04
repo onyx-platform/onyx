@@ -29,7 +29,8 @@
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff state]
   (when (cjs/volunteer-via-accept? old new diff state)
-    [{:fn :volunteer-for-task :args {:id (:id state)}}]))
+    (do ;; SCHEDULER TODO: << Removed volunteer >>
+      nil)))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
