@@ -1,6 +1,8 @@
 (ns onyx.log.commands.common
-  (:require [clojure.data :refer [diff]]
+  (:require [clojure.core.async :refer [chan]]
+            [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
+            [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info]]))
 
@@ -63,3 +65,11 @@
   (and (all-inputs-exhausted? replica (:job args))
        (executing-output-task? replica (:id state))
        (elected-sealer? replica message-id (:id state))))
+
+(defn start-new-lifecycle [state diff]
+  (when (:lifecycle state)
+    (component/stop @(:lifecycle state)))
+  (let [seal-ch (chan)
+        new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
+        new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
+    (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))

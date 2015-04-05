@@ -5,7 +5,8 @@
             [onyx.log.commands.common :as common]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (defmulti job-scheduler-replica-update
   (fn [replica entry]
@@ -48,7 +49,8 @@
       (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
       (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
       (job-scheduler-replica-update entry)
-      (task-scheduler-replica-update entry)))
+      (task-scheduler-replica-update entry)
+      (reconfigure-cluster-workload)))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]
@@ -56,15 +58,12 @@
 
 (defmethod extensions/reactions :submit-job
   [{:keys [args] :as entry} old new diff state]
-  (let [scheduler (get-in new [:task-schedulers (:job diff)])]
-    (when (and (cjs/volunteer-via-new-job? old new diff state)
-               (if (:job state)
-                 (cts/reallocate-from-task? scheduler old new (:job diff) state)
-                 true))
-      (do ;; SCHEDULER TODO: << Removed volunteer >>
-        nil))))
+  [])
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
-  state)
-
+  (let [old-allocation (common/peer->allocated-job (:allocations old) (:id state))
+        new-allocation (common/peer->allocated-job (:allocations new) (:id state))]
+    (if-not (not old-allocation new-allocation)
+      (common/start-new-lifecycle state diff)
+      state)))

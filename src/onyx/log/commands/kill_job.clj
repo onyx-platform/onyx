@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :refer [incomplete-jobs peer->allocated-job]]
             [onyx.scheduling.common-job-scheduler :as cjs]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (defmethod extensions/apply-log-entry :kill-job
   [{:keys [args]} replica]
@@ -14,7 +15,8 @@
           (update-in [:killed-jobs] conj (:job args))
           (update-in [:killed-jobs] vec)
           (update-in [:allocations] dissoc (:job args))
-          (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))}))
+          (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))})
+          (reconfigure-cluster-workload))
       replica)))
 
 (defmethod extensions/replica-diff :kill-job
