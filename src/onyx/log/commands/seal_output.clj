@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.scheduling.common-job-scheduler :as cjs]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (defn all-outputs-sealed? [replica job]
   (let [all (get-in replica [:output-tasks job])
@@ -24,7 +25,8 @@
            (update-in [:completions (:job args)] conj task)
            (update-in [:completions (:job args)] vec)
            (update-in [:allocations (:job args)] dissoc task)
-           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers))))))
+           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
+           (reconfigure-cluster-workload))))
    replica
    tasks))
 
@@ -46,16 +48,8 @@
 
 (defmethod extensions/reactions :seal-output
   [{:keys [args]} old new diff state]
-  (when (cjs/volunteer-via-sealed-output? old new diff state)
-    (do ;; SCHEDULER TODO: << Removed volunteer >>
-      nil)))
+  [])
 
 (defmethod extensions/fire-side-effects! :seal-output
   [{:keys [args]} old new diff state]
-  (let [{:keys [job]} (common/peer->allocated-job (:allocations old) (:id state))]
-    (if (and (:job-completed? diff) (= (:job diff) job))
-      (do (when-let [lc (:lifecycle state)]
-            (component/stop @lc)
-            (assoc state :lifecycle nil)))
-      state)))
-
+  (common/start-new-lifecycle state diff))

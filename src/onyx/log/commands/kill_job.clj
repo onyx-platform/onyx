@@ -28,10 +28,7 @@
 
 (defmethod extensions/reactions :kill-job
   [{:keys [args]} old new diff state]
-  (when (and (executing-killed-job? diff old (:job args) (:id state))
-             (cjs/volunteer-via-killed-job? old new diff state))
-    (do ;; SCHEDULER TODO: << Removed volunteer >>
-      nil)))
+  [])
 
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]
