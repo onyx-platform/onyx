@@ -66,10 +66,14 @@
        (executing-output-task? replica (:id state))
        (elected-sealer? replica message-id (:id state))))
 
-(defn start-new-lifecycle [state diff]
-  (when (:lifecycle state)
-    (component/stop @(:lifecycle state)))
-  (let [seal-ch (chan)
-        new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
-        new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
-    (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
+(defn start-new-lifecycle [old new diff state]
+  (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
+        new-allocation (peer->allocated-job (:allocations new) (:id state))]
+    (if-not (not old-allocation new-allocation)
+      (do (when (:lifecycle state)
+            (component/stop @(:lifecycle state)))
+          (let [seal-ch (chan)
+                new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
+                new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
+            (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
+      state)))

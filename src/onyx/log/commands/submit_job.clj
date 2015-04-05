@@ -62,8 +62,4 @@
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
-  (let [old-allocation (common/peer->allocated-job (:allocations old) (:id state))
-        new-allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (if-not (not old-allocation new-allocation)
-      (common/start-new-lifecycle state diff)
-      state)))
+  (common/start-new-lifecycle old new diff state))

@@ -59,6 +59,7 @@
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (common/start-new-lifecycle
+     old new diff
      (cond (common/should-seal? new {:job job} state message-id)
            (>!! (:seal-response-ch state) true)
 
@@ -75,5 +76,4 @@
              (close! (or (:watch-ch state) (chan)))
              (assoc state :watch-ch ch))
 
-           :else state)
-     diff)))
+           :else state))))

@@ -43,9 +43,4 @@
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
-  (let [next-state (unbuffer-messages state diff new)
-        old-allocation (common/peer->allocated-job (:allocations old) (:id next-state))
-        new-allocation (common/peer->allocated-job (:allocations new) (:id next-state))]
-    (if-not (not old-allocation new-allocation)
-      (common/start-new-lifecycle next-state diff)
-      next-state)))
+  (common/start-new-lifecycle old new diff state))

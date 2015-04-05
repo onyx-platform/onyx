@@ -74,6 +74,7 @@
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle
+   old new diff
    (cond (= (:id state) (:observer diff))
          (let [ch (chan 1)]
            (extensions/on-delete (:log state) (:subject diff) ch)
@@ -98,5 +99,4 @@
              (doseq [entry (:buffered-outbox state)]
                (>!! (:outbox-ch state) entry))
              (assoc (dissoc state :buffered-outbox) :stall-output? false))
-         :else state)
-   diff))
+         :else state)))

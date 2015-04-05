@@ -1,7 +1,7 @@
 (ns onyx.log.commands.kill-job
   (:require [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
-            [onyx.log.commands.common :refer [peer->allocated-job]]
+            [onyx.log.commands.common :refer [peer->allocated-job] :as common]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
@@ -32,8 +32,5 @@
 
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]
-  (if (executing-killed-job? diff old (:job args) (:id state))
-    (do (component/stop @(:lifecycle state))
-        (assoc state :lifecycle nil))
-    state))
+  (common/start-new-lifecycle old new diff state))
 
