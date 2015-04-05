@@ -39,6 +39,57 @@
         active? (partial at-least-one-active? replica)]
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
+(defn current-job-allocations [replica]
+  (into {}
+        (map (fn [j]
+               {j (apply + (map count (vals (get-in replica [:allocations j]))))})
+             (:jobs replica))))
+
+(defn current-task-allocations [replica]
+  (into
+   {}
+   (map (fn [j]
+          {j (into {} (map (fn [[t a]] {t (count a)}) (get-in replica [:allocations j])))})
+        (:jobs replica))))
+
+(defn job->task-claims [replica job-offers]
+  (reduce-kv
+   (fn [all j claim]
+     (assoc all j (cts/task-claim-n-peers replica j claim)))
+   {}
+   job-offers))
+
+(defn reallocate-peers [origin-replica displaced-peers max-utilization]
+  (loop [peer-pool displaced-peers
+         replica origin-replica]
+    (let [candidate-jobs (filter identity
+                                 (mapcat
+                                  (fn [job]
+                                    (let [current (get (current-task-allocations replica) job)
+                                          desired (cts/task-distribute-peer-count replica job (get max-utilization job))
+                                          tasks (get-in replica [:tasks job])]
+                                      (map
+                                       (fn [t]
+                                         (when (< (get current t) (get desired t))
+                                           [job t]))
+                                       tasks)))
+                                  (:jobs replica)))]
+      (if (and (seq peer-pool) (seq candidate-jobs))
+        (recur (rest peer-pool)
+               (update-in replica [:allocations
+                                   (ffirst candidate-jobs)
+                                   (second (first candidate-jobs))]
+                          conj (first peer-pool)))
+        replica))))
+
+(defn find-displaced-peers [replica max-util]
+  (mapcat
+   (fn [job]
+     (let [overflow (- (get current-allocations-c job) (get max-util job))]
+       (when (pos? overflow)
+         (cts/drop-peers replica job overflow))))
+   (:jobs replica)))
+
 (defmulti select-job
   (fn [{:keys [args]} replica]
     (:job-scheduler replica)))
@@ -206,14 +257,33 @@
 (def task-distribution-pt (cts/task-distribute-peer-count replica-pt :j2 (:j2 max-utilization-pt)))
 
 
+(def replica-c {:job-scheduler :onyx.job-scheduler/percentage
+                :jobs [:j1 :j2]
+                :tasks {:j1 [:t1 :t2 :t3]
+                        :j2 [:t4 :t5 :t6]}
+                :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                                  :j2 :onyx.task-scheduler/balanced}
+                :saturation {:j1 3 :j2 Double/POSITIVE_INFINITY}
+                :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7 :p8 :p9 :p10]
+                :percentages {:j1 40 :j2 60}
+                :allocations {:j1 {:t1 [] :t2 [] :t3 []}
+                              :j2 {:t4 [:p1 :p2 :p3 :p4]
+                                   :t5 [:p5 :p6 :p7]
+                                   :t6 [:p8 :p9 :p10]}}})
 
+(def job-offers-c (job-offer-n-peers replica-c))
 
+(def job-claims-c (job->task-claims replica-c job-offers-c))
 
-;; x - Function to map job id -> N peers
-;; x - Function to take the difference between capacity and usage
-;; x - Function to redisperse extra peers
-;; x - Function to map task id -> N peers
-;; - Function to figure out which peers go to which tasks and jobs
-;; - Function to update the replica
-;; - Function per peer to start or not start new task
+(def spare-peers-c (apply + (vals (merge-with - job-offers-c job-claims-c))))
+
+(def max-utilization-c (claim-spare-peers replica-c job-claims-c spare-peers-c))
+
+(def task-distribution-c (cts/task-distribute-peer-count replica-c :j2 (:j2 max-utilization-c)))
+
+(def current-job-allocations-c (current-job-allocations replica-c))
+
+(def current-task-allocations-c (current-task-allocations replica-c))
+
+(def peers-to-displace (find-displaced-peers replica-c max-utilization-c))
 
