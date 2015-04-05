@@ -73,7 +73,7 @@
       (do (when (:lifecycle state)
             (component/stop @(:lifecycle state)))
           (let [seal-ch (chan)
-                new-state (assoc state :job (:job diff) :task (:task diff) :seal-ch seal-ch)
-                new-lifecycle (future (component/start ((:task-lifecycle-fn state) diff new-state)))]
-            (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch)))
+                new-state (assoc state :job (:job new-allocation) :task (:task new-allocation) :seal-ch seal-ch)
+                new-lifecycle (future (component/start ((:task-lifecycle-fn state) (select-keys new-allocation [:job :task]) new-state)))]
+            (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch :job (:job new-allocation) :task (:task new-allocation))))
       state)))

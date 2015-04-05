@@ -6,7 +6,7 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-task-scheduler :as cts]
-            [taoensso.timbre]))
+            [taoensso.timbre :refer [info]]))
 
 (defmulti job-offer-n-peers
   (fn [replica]
@@ -15,17 +15,6 @@
 (defmulti claim-spare-peers
   (fn [replica jobs n]
     (:job-scheduler replica)))
-
-(defn at-least-one-active? [replica peers]
-  (->> peers
-       (map #(get-in replica [:peer-state %]))
-       (filter (partial = :active))
-       (seq)))
-
-(defn job-covered? [replica job]
-  (let [tasks (get-in replica [:tasks job])
-        active? (partial at-least-one-active? replica)]
-    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
 (defn current-job-allocations [replica]
   (into {}
@@ -58,7 +47,7 @@
                                           tasks (get-in replica [:tasks job])]
                                       (map
                                        (fn [t]
-                                         (when (< (get current t) (get desired t))
+                                         (when (< (or (get current t) 0) (get desired t))
                                            [job t]))
                                        tasks)))
                                   (:jobs replica)))]
@@ -70,20 +59,26 @@
                           conj (first peer-pool)))
         replica))))
 
+(defn find-unused-peers [replica]
+  (let [used-peers (apply concat (mapcat vals (vals (get-in replica [:allocations]))))]
+    (clojure.set/difference (set (:peers replica)) (set used-peers))))
+
 (defn find-displaced-peers [replica current-allocations max-util]
-  (mapcat
-   (fn [job]
-     (let [overflow (- (get current-allocations job) (get max-util job))]
-       (when (pos? overflow)
-         (cts/drop-peers replica job overflow))))
-   (:jobs replica)))
+  (clojure.set/union
+   (find-unused-peers replica)
+   (mapcat
+    (fn [job]
+      (let [overflow (- (get current-allocations job) (get max-util job))]
+        (when (pos? overflow)
+          (cts/drop-peers replica job overflow))))
+    (:jobs replica))))
 
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
         job-claims (job->task-claims replica job-offers)
         spare-peers (apply + (vals (merge-with - job-offers job-claims)))
         max-utilization (claim-spare-peers replica job-claims spare-peers)
-        current-allocations (current-task-allocations replica)
+        current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)]
     (reallocate-peers replica peers-to-displace max-utilization)))
 

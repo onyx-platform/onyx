@@ -11,7 +11,6 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
-              [onyx.scheduling.common-job-scheduler :as js]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy])
     (:import [java.security MessageDigest]
@@ -21,6 +20,17 @@
 ;; exception without killing the job, e.g. transient
 ;; connection failure to ZooKeeper.
 (def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
+
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
@@ -407,7 +417,7 @@
 
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch] :default true))
-                     (or (not (js/job-covered? replica-state job-id))
+                     (or (not (job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)

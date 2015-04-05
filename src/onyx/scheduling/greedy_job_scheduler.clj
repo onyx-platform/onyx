@@ -12,8 +12,8 @@
   (if (seq (:jobs replica))
     (let [[active & passive] (:jobs replica)
           coverable? (job-coverable? replica active)
-          n (if coverable? (:peers replica) 0)]
-      (merge {active (count n)} (zipmap passive (repeat 0))))
+          n (if coverable? (count (:peers replica)) 0)]
+      (merge {active n} (zipmap passive (repeat 0))))
     {}))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/greedy
