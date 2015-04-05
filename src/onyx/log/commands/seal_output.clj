@@ -11,33 +11,20 @@
         sealed (get-in replica [:sealed-outputs job])]
     (= (into #{} all) (into #{} sealed))))
 
-(defn remove-job-attrs [replica args]
-  (-> replica
-      (update-in [:exhausted-inputs] dissoc (:job args))
-      (update-in [:sealed-outputs] dissoc (:job args))))
-
-(defn complete-tasks [replica args tasks]
-  (reduce
-   (fn [new task]
-     (let [peers (get-in new [:allocations (:job args) task])]
-       (-> new
-           ;; Scheduler TODO: Move from :jobs to :completed-jobs
-           (update-in [:completions (:job args)] conj task)
-           (update-in [:completions (:job args)] vec)
-           (update-in [:allocations (:job args)] dissoc task)
-           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
-           (reconfigure-cluster-workload))))
-   replica
-   tasks))
-
 (defmethod extensions/apply-log-entry :seal-output
   [{:keys [args]} replica]
   (let [new (update-in replica [:sealed-outputs (:job args)] union #{(:task args)})]
     (if (all-outputs-sealed? new (:job args))
-      (let [tasks (get-in replica [:tasks (:job args)])]
+      (let [peers (apply concat (vals (get-in replica [:allocations (:job args)])))]
         (-> new
-            (remove-job-attrs args)
-            (complete-tasks args tasks)))
+            (update-in [:exhausted-inputs] dissoc (:job args))
+            (update-in [:sealed-outputs] dissoc (:job args))
+            (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
+            (update-in [:jobs vec])
+            (update-in [:completed-jobs] conj (:job args))
+            (update-in [:allocations (:job args)] dissoc)
+            (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
+            (reconfigure-cluster-workload)))
       new)))
 
 (defmethod extensions/replica-diff :seal-output

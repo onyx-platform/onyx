@@ -8,6 +8,14 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre]))
 
+(defmulti job-offer-n-peers
+  (fn [replica]
+    (:job-scheduler replica)))
+
+(defmulti claim-spare-peers
+  (fn [replica jobs n]
+    (:job-scheduler replica)))
+
 (defn at-least-one-active? [replica peers]
   (->> peers
        (map #(get-in replica [:peer-state %]))
@@ -62,10 +70,10 @@
                           conj (first peer-pool)))
         replica))))
 
-(defn find-displaced-peers [replica max-util]
+(defn find-displaced-peers [replica current-allocations max-util]
   (mapcat
    (fn [job]
-     (let [overflow (- (get current-allocations-c job) (get max-util job))]
+     (let [overflow (- (get current-allocations job) (get max-util job))]
        (when (pos? overflow)
          (cts/drop-peers replica job overflow))))
    (:jobs replica)))
@@ -75,7 +83,8 @@
         job-claims (job->task-claims replica job-offers)
         spare-peers (apply + (vals (merge-with - job-offers job-claims)))
         max-utilization (claim-spare-peers replica job-claims spare-peers)
-        peers-to-displace (find-displaced-peers replica max-utilization)]
+        current-allocations (current-task-allocations replica)
+        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)]
     (reallocate-peers replica peers-to-displace max-utilization)))
 
 (defn exempt-from-acker? [replica job task args]
@@ -95,11 +104,3 @@
           (update-in [:ackers job] conj (:id args))
           (update-in [:ackers job] vec))
       replica)))
-
-(defmulti job-offer-n-peers
-  (fn [replica]
-    (:job-scheduler replica)))
-
-(defmulti claim-spare-peers
-  (fn [replica jobs n]
-    (:job-scheduler replica)))
