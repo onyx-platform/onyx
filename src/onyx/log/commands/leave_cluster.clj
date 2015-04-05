@@ -33,7 +33,7 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (common/remove-sealing-tasks args)
+        (remove-sealing-tasks args)
         (common/remove-peers args)
         (reconfigure-cluster-workload))))
 
@@ -59,12 +59,7 @@
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (common/start-new-lifecycle
-     (cond (not (common/job-covered? new job))
-           (when-let [lifecycle (:lifecycle state)]
-             (component/stop @lifecycle)
-             (assoc state :lifecycle nil))
-
-           (common/should-seal? new {:job job} state message-id)
+     (cond (common/should-seal? new {:job job} state message-id)
            (>!! (:seal-response-ch state) true)
 
            (and (= (:id state) (:observer updated-watch))

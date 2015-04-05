@@ -34,21 +34,6 @@
        (drop-last allocation (get-in replica [:allocations job task])))
      balanced)))
 
-(defmethod cts/reallocate-from-task? :onyx.task-scheduler/percentage
-  [scheduler old new job state]
-  (let [allocation (common/peer->allocated-job (:allocations new) (:id state))]
-    (when (= (:job allocation) job)
-      (let [candidate-tasks (keys (get-in new [:allocations job]))
-            n-peers (count (apply concat (vals (get-in new [:allocations job]))))
-            balanced (percentage-balanced-taskload new job candidate-tasks n-peers)
-            required (:allocation (get balanced (:task allocation)))
-            actual (count (get-in new [:allocations (:job allocation) (:task allocation)]))]
-        (when (> actual required)
-          (let [n (- actual required)
-                peers-to-drop (cts/drop-peers new (:job allocation) n)]
-            (when (some #{(:id state)} (into #{} peers-to-drop))
-              true)))))))
-
 (defmethod cts/task-claim-n-peers :onyx.task-scheduler/percentage
   [replica job n]
   ;; We can reuse the Balanced task scheduler algorithm as is.
