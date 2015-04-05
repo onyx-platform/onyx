@@ -17,17 +17,6 @@
         completed (get-in replica [:completions job])]
     (filter identity (second (diff completed tasks)))))
 
-(defmulti select-task
-  (fn [replica job peer-id]
-    (get-in replica [:task-schedulers job])))
-
-(defmethod select-task :default
-  [replica job peer-id]
-  (throw (ex-info 
-           (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead."
-                   (get-in replica [:task-schedulers job]))
-           {:replica replica})))
-
 (defmulti drop-peers
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
@@ -39,14 +28,6 @@
              (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead." 
                      scheduler)
              {:replica replica}))))
-
-(defmulti reallocate-from-task?
-  (fn [scheduler old new job state]
-    scheduler))
-
-(defmethod reallocate-from-task? :default
-  [scheduler old new job state]
-  false)
 
 (defmulti task-claim-n-peers
   (fn [replica job n]
