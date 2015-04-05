@@ -2,8 +2,9 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.data :refer [diff]]
             [taoensso.timbre :refer [info] :as timbre]
-            [onyx.scheduling.common-job-scheduler :as cjs]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.log.commands.common :as common]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (defmethod extensions/apply-log-entry :accept-join-cluster
   [{:keys [args]} replica]
@@ -16,7 +17,8 @@
         (update-in [:accepted] dissoc accepted-observer)
         (update-in [:peers] vec)
         (update-in [:peers] conj accepted-joiner)
-        (assoc-in [:peer-state accepted-joiner] :idle))))
+        (assoc-in [:peer-state accepted-joiner] :idle)
+        (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
@@ -28,12 +30,9 @@
 
 (defmethod extensions/reactions :accept-join-cluster
   [entry old new diff state]
-  (when (cjs/volunteer-via-accept? old new diff state)
-    (do ;; SCHEDULER TODO: << Removed volunteer >>
-      nil)))
+  [])
 
-(defmethod extensions/fire-side-effects! :accept-join-cluster
-  [entry old new diff state]
+(defn unbuffer-messages [state diff new]
   (if (= (:id state) (:subject diff))
     (do (extensions/open-peer-site (:messenger state) 
                                    (get-in new [:peer-sites (:id state)]))
@@ -41,3 +40,12 @@
           (>!! (:outbox-ch state) entry))
         (assoc (dissoc state :buffered-outbox) :stall-output? false))
     state))
+
+(defmethod extensions/fire-side-effects! :accept-join-cluster
+  [entry old new diff state]
+  (let [next-state (unbuffer-messages state diff new)
+        old-allocation (common/peer->allocated-job (:allocations old) (:id next-state))
+        new-allocation (common/peer->allocated-job (:allocations new) (:id next-state))]
+    (if-not (not old-allocation new-allocation)
+      (common/start-new-lifecycle next-state diff)
+      next-state)))
