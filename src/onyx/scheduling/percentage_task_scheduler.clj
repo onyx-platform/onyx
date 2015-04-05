@@ -101,16 +101,11 @@
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/percentage
   [replica job n]
   (let [tasks (get-in replica [:tasks job])
-        t (count tasks)
-        min-peers (int (/ n t))
-        r (rem n t)
-        max-peers (inc min-peers)
         init
         (reduce
          (fn [all [task k]]
            (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
-                                (get-in replica [:task-percentages job task])
-                                (if (< k r) max-peers min-peers))))
+                                (int (* n (get-in replica [:task-percentages job task]) 0.01)))))
          {}
          (map vector tasks (range)))
         spare-peers (- n (apply + (vals init)))]

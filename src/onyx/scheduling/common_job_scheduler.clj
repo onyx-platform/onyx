@@ -212,7 +212,7 @@
 ;; x - Function to map job id -> N peers
 ;; x - Function to take the difference between capacity and usage
 ;; x - Function to redisperse extra peers
-;; - Function to map task id -> N peers
+;; x - Function to map task id -> N peers
 ;; - Function to figure out which peers go to which tasks and jobs
 ;; - Function to update the replica
 ;; - Function per peer to start or not start new task
