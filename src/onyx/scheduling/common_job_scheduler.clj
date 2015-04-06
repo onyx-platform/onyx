@@ -83,7 +83,7 @@
 (defn choose-acker-candidates [replica peers]
   (remove
    (fn [p]
-     (let [{:keys [job task]} (common/peer->allocated-job replica p)]
+     (let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) p)]
        (exempt-from-acker? replica job task)))
    peers))
 
@@ -93,7 +93,7 @@
    (fn [result job]
      (let [peers (apply concat (vals (get-in result [:allocations job])))
            pct (get-in result [:acker-percentage job])
-           n (int (Math/ceil (* (* 0.01 pct) peers)))
+           n (int (Math/ceil (* (* 0.01 pct) (count peers))))
            candidates (choose-acker-candidates result peers)]
        (assoc-in result [:ackers job] (take n candidates))))
    replica
