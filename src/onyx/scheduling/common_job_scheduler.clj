@@ -73,6 +73,32 @@
           (cts/drop-peers replica job overflow))))
     (:jobs replica))))
 
+(defn exempt-from-acker? [replica job task]
+  (or (some #{task} (get-in replica [:exempt-tasks job]))
+      (and (get-in replica [:acker-exclude-inputs job])
+           (some #{task} (get-in replica [:input-tasks job])))
+      (and (get-in replica [:acker-exclude-outputs job])
+           (some #{task} (get-in replica [:output-tasks job])))))
+
+(defn choose-acker-candidates [replica peers]
+  (remove
+   (fn [p]
+     (let [{:keys [job task]} (common/peer->allocated-job replica p)]
+       (exempt-from-acker? replica job task)))
+   peers))
+
+(defn choose-ackers [replica]
+  ;; TODO: ensure this behaves consistently with respect to ordering
+  (reduce
+   (fn [result job]
+     (let [peers (apply concat (vals (get-in result [:allocations job])))
+           pct (get-in result [:acker-percentage job])
+           n (int (Math/ceil (* (* 0.01 pct) peers)))
+           candidates (choose-acker-candidates result peers)]
+       (assoc-in result [:ackers job] (take n candidates))))
+   replica
+   (:jobs replica)))
+
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
         job-claims (job->task-claims replica job-offers)
@@ -80,22 +106,4 @@
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)]
-    (reallocate-peers replica peers-to-displace max-utilization)))
-
-(defn exempt-from-acker? [replica job task args]
-  (or (some #{task} (get-in replica [:exempt-tasks job]))
-      (and (get-in replica [:acker-exclude-inputs job])
-           (some #{task} (get-in replica [:input-tasks job])))
-      (and (get-in replica [:acker-exclude-outputs job])
-           (some #{task} (get-in replica [:output-tasks job])))))
-
-(defn offer-acker [replica job task args]
-  (let [peers (count (apply concat (vals (get-in replica [:allocations job]))))
-        ackers (count (get-in replica [:ackers job]))
-        pct (get-in replica [:acker-percentage job])
-        current-pct (int (Math/ceil (* 10 (double (/ ackers peers)))))]
-    (if (and (< current-pct pct) (not (exempt-from-acker? replica job task args)))
-      (-> replica
-          (update-in [:ackers job] conj (:id args))
-          (update-in [:ackers job] vec))
-      replica)))
+    (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))))
