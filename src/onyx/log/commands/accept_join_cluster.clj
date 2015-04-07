@@ -43,4 +43,5 @@
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
   [entry old new diff state]
-  (common/start-new-lifecycle old new diff state))
+  (let [next-state (unbuffer-messages state diff new)]
+    (common/start-new-lifecycle old new diff next-state)))
