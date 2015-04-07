@@ -16,8 +16,7 @@
         (update-in [:killed-jobs] vec)
         (update-in [:allocations] dissoc (:job args))
         (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))})
-        (reconfigure-cluster-workload))
-    replica))
+        (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :kill-job
   [entry old new]
