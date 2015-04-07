@@ -162,7 +162,7 @@
 
 (deftest balanced-task-balancing
   (checking
-   "Checking round robin allocation causes peers to be evenly over tasks"
+   "Checking Balanced allocation causes peers to be evenly over tasks"
    1000
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
@@ -186,7 +186,7 @@
 
 (deftest balanced-allocations
   (checking
-   "Checking round robin allocation causes peers to be evenly split"
+   "Checking balanced allocation causes peers to be evenly split"
    1000
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
@@ -210,6 +210,6 @@
                           {:fn :kill-job :args {:job job-3-id}}])
        :log []
        :peer-choices []}))]
-   (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
-   (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))
+   (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
+   (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
