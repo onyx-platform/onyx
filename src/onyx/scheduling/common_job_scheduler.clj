@@ -53,10 +53,11 @@
                                   (:jobs replica)))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
-               (let [removed (common/remove-peers replica (first peer-pool))]
-                 (update-in removed [:allocations
-                                     (ffirst candidate-jobs)
-                                     (second (first candidate-jobs))]
+               (let [removed (common/remove-peers replica (first peer-pool))
+                     reset-state (assoc-in replica [:peer-state (first peer-pool)] :idle)]
+                 (update-in reset-state [:allocations
+                                         (ffirst candidate-jobs)
+                                         (second (first candidate-jobs))]
                             conj (first peer-pool))))
         replica))))
 
