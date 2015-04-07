@@ -55,10 +55,15 @@
         (recur (rest peer-pool)
                (let [removed (common/remove-peers replica (first peer-pool))
                      reset-state (assoc-in replica [:peer-state (first peer-pool)] :idle)]
-                 (update-in reset-state [:allocations
-                                         (ffirst candidate-jobs)
-                                         (second (first candidate-jobs))]
-                            conj (first peer-pool))))
+                 (-> reset-state
+                     (update-in [:allocations
+                                 (ffirst candidate-jobs)
+                                 (second (first candidate-jobs))]
+                                conj (first peer-pool))
+                     (update-in [:allocations
+                                 (ffirst candidate-jobs)
+                                 (second (first candidate-jobs))]
+                                vec))))
         replica))))
 
 (defn find-unused-peers [replica]
@@ -97,7 +102,7 @@
            pct (get-in result [:acker-percentage job])
            n (int (Math/ceil (* (* 0.01 pct) (count peers))))
            candidates (choose-acker-candidates result peers)]
-       (assoc-in result [:ackers job] (take n candidates))))
+       (assoc-in result [:ackers job] (vec (take n candidates)))))
    replica
    (:jobs replica)))
 
