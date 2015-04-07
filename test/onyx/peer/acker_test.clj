@@ -81,7 +81,7 @@
     peer-config
     {:catalog catalog
      :workflow workflow
-     :task-scheduler :onyx.task-scheduler/round-robin
+     :task-scheduler :onyx.task-scheduler/balanced
      :acker/percentage 5
      :acker/exempt-input-tasks? true
      :acker/exempt-output-tasks? true

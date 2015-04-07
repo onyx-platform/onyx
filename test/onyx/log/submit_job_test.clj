@@ -40,7 +40,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+(def old-replica {:job-scheduler :onyx.job-scheduler/balanced
                   :peers [:p1 :p2]})
 
 (let [new-replica (f old-replica)
@@ -57,7 +57,7 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/round-robin
+(def old-replica {:job-scheduler :onyx.job-scheduler/balanced
                   :peers [:p1 :p2 :p3]})
 
 (let [new-replica (f old-replica)

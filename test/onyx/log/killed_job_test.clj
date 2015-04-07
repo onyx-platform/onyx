@@ -16,7 +16,7 @@
                   :jobs [:j1]
                   :tasks {:j1 [:t1 :t2]}
                   :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
-                  :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
+                  :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                   :peer-state {:a :active :b :active :c :active}
                   :peers [:a :b :c]})
 

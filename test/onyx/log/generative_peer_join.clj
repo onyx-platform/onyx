@@ -44,7 +44,7 @@
               :onyx/medium :core.async
               :onyx/batch-size 20
               :onyx/doc "Writes segments to a core.async channel"}]
-   :task-scheduler :onyx.task-scheduler/round-robin})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
 
@@ -68,7 +68,7 @@
               :onyx/medium :core.async
               :onyx/batch-size 20
               :onyx/doc "Writes segments to a core.async channel"}]
-   :task-scheduler :onyx.task-scheduler/round-robin})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-3-id #uuid "58d199e8-4ea4-4afd-a112-945e97235924")
 
@@ -92,7 +92,7 @@
               :onyx/medium :core.async
               :onyx/batch-size 20
               :onyx/doc "Writes segments to a core.async channel"}]
-   :task-scheduler :onyx.task-scheduler/round-robin})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (defn generate-join-entries [peer-ids]
   (zipmap peer-ids 
@@ -160,14 +160,14 @@
    (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
    (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
 
-(deftest round-robin-task-balancing
+(deftest balanced-task-balancing
   (checking
-   "Checking round robin allocation causes peers to be evenly over tasks"
+   "Checking Balanced allocation causes peers to be evenly over tasks"
    1000
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/round-robin
+      {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
        :entries (assoc (generate-join-entries (generate-peer-ids 6))
@@ -184,14 +184,14 @@
    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
 
-(deftest round-robin-allocations
+(deftest balanced-allocations
   (checking
-   "Checking round robin allocation causes peers to be evenly split"
+   "Checking balanced allocation causes peers to be evenly split"
    1000
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/round-robin
+      {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
        :entries (assoc (generate-join-entries (generate-peer-ids 12))
@@ -210,6 +210,6 @@
                           {:fn :kill-job :args {:job job-3-id}}])
        :log []
        :peer-choices []}))]
-   (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
-   (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))
+   (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
+   (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))

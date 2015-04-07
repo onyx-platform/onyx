@@ -16,9 +16,13 @@
             [onyx.log.commands.signal-ready]
             [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
-            [onyx.log.commands.volunteer-for-task]
             [onyx.log.commands.kill-job]
-            [onyx.log.commands.gc]))
+            [onyx.log.commands.gc]
+            [onyx.scheduling.greedy-job-scheduler]
+            [onyx.scheduling.balanced-job-scheduler]
+            [onyx.scheduling.percentage-job-scheduler]
+            [onyx.scheduling.balanced-task-scheduler]
+            [onyx.scheduling.percentage-task-scheduler]))
 
 (def development-components [:logging-config :log])
 

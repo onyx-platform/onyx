@@ -21,6 +21,17 @@
 ;; connection failure to ZooKeeper.
 (def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
 
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
@@ -358,6 +369,9 @@
       (operation/resolve-fn f)
       onyx.compression.nippy/compress)))
 
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
+
 (defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
   component/Lifecycle
 
@@ -403,8 +417,8 @@
 
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch] :default true))
-                     (or (not (common/job-covered? replica-state job-id))
-                         (not (common/any-ackers? replica-state job-id))))
+                     (or (not (job-covered? replica-state job-id))
+                         (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))

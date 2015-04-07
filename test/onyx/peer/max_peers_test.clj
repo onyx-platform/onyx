@@ -69,7 +69,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :task-scheduler :onyx.task-scheduler/round-robin})
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 
 ;;;;;;;;;;;;;;;;;;;; TODO: Very only 3 peers were actually used ;;;;;;;;;;;;;;;;;;;;;;;;;;;;

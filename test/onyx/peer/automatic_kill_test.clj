@@ -135,17 +135,17 @@
 (def j1 (onyx.api/submit-job
          peer-config
          {:catalog catalog-1 :workflow workflow
-          :task-scheduler :onyx.task-scheduler/round-robin}))
+          :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2 (onyx.api/submit-job
          peer-config
          {:catalog catalog-2 :workflow workflow
-          :task-scheduler :onyx.task-scheduler/round-robin}))
+          :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j3 (onyx.api/submit-job
          peer-config
          {:catalog catalog-3 :workflow workflow
-          :task-scheduler :onyx.task-scheduler/round-robin}))
+          :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def ch (chan 100))
 

@@ -17,7 +17,7 @@
 (def peer-config
   (assoc (:peer-config config)
     :onyx/id onyx-id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 
@@ -78,14 +78,14 @@
    peer-config
    {:workflow [[:a :b]]
     :catalog catalog-1
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2
   (onyx.api/submit-job
    peer-config
    {:workflow [[:c :d]]
     :catalog catalog-2
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def n-peers 12)
 

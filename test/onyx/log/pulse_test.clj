@@ -18,7 +18,7 @@
 
 (def env (onyx.api/start-env env-config))
 
-(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/round-robin} nil)
+(extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/balanced} nil)
 (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messenger} nil)
 
 (def a-id "a")

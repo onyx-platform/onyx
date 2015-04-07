@@ -16,7 +16,6 @@
                    :accepted {:a :d}
                    :peers [:a :b :c]
                    :job-scheduler :onyx.job-scheduler/greedy}
-
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :a]) => :d)
@@ -24,7 +23,7 @@
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :a :subject :d})
-  (fact (rep-reactions old-replica new-replica diff {}) => nil))
+  (fact (rep-reactions old-replica new-replica diff {}) => []))
 
 (let [entry (create-log-entry :accept-join-cluster
                               {:observer :d
@@ -45,5 +44,5 @@
   (fact (get-in new-replica [:accepted]) => {})
   (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :a :subject :d})
-  (fact (rep-reactions old-replica new-replica diff {}) => nil))
+  (fact (rep-reactions old-replica new-replica diff {}) => []))
 

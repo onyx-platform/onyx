@@ -352,16 +352,6 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
 
 -------------------------------------------------
-[`volunteer-for-task`](https://github.com/MichaelDrogalis/onyx/blob/0.6.x/src/onyx/log/commands/volunteer_for_task.clj)
-
-- Submitter: peer (P) that wants to execute a new task
-- Purpose: P is possibly available to execute a new task because a new job was submitted, or the cluster size changed - depending on the job and task schedulers
-- Arguments: peer ID of P
-- Replica update: Updates `:allocations` with peer ID under the chosen job and task, if any. Switches `:peer-state` for this peer to `:warming-up` if a task is chosen.
-- Side effects: Stop the current task lifecycle, if one is running. Starts a new task lifecycle for the chosen task
-- Reactions: None
-
--------------------------------------------------
 [`seal-task`](https://github.com/MichaelDrogalis/onyx/blob/0.6.x/src/onyx/log/commands/seal_task.clj)
 
 - Submitter: peer (P), who has seen the leader sentinel

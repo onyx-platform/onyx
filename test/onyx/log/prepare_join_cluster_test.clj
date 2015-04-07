@@ -20,7 +20,7 @@
 (def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                   :pairs {:a :b :b :c :c :a} :peers [:a :b :c]
                   :peer-sites {}
-                  :job-scheduler :onyx.job-scheduler/round-robin})
+                  :job-scheduler :onyx.job-scheduler/balanced})
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -56,7 +56,7 @@
 
 (let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
                    :peers []
-                   :job-scheduler :onyx.job-scheduler/round-robin}
+                   :job-scheduler :onyx.job-scheduler/balanced}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]
@@ -82,7 +82,7 @@
                    :accepted {}
                    :prepared {:a :c}
                    :peers [:a :b]
-                   :job-scheduler :onyx.job-scheduler/round-robin}
+                   :job-scheduler :onyx.job-scheduler/balanced}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (->DummyMessenger)})]

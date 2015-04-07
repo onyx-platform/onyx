@@ -1,4 +1,4 @@
-(ns onyx.log.round-robin-multi-job-test
+(ns onyx.log.balanced-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -15,8 +15,8 @@
 
 (def peer-config
   (assoc (:peer-config config)
-         :onyx/id onyx-id
-         :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+    :onyx/id onyx-id
+    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 
@@ -32,7 +32,7 @@
       :onyx/doc "Reads segments from a core.async channel"}
 
      {:onyx/name :b
-      :onyx/fn :onyx.log.round-robin-multi-job-test/my-inc
+      :onyx/fn :onyx.log.balanced-multi-job-test/my-inc
       :onyx/type :function
       :onyx/batch-size 20}
 
@@ -52,7 +52,7 @@
       :onyx/doc "Reads segments from a core.async channel"}
 
      {:onyx/name :e
-      :onyx/fn :onyx.log.round-robin-multi-job-test/my-inc
+      :onyx/fn :onyx.log.balanced-multi-job-test/my-inc
       :onyx/type :function
       :onyx/batch-size 20}
 
@@ -93,14 +93,14 @@
       peer-config
       {:workflow [[:a :b] [:b :c]]
        :catalog catalog-1
-       :task-scheduler :onyx.task-scheduler/round-robin}))
+       :task-scheduler :onyx.task-scheduler/balanced}))
 
   (def j2
     (onyx.api/submit-job
       peer-config
       {:workflow [[:d :e] [:e :f]]
        :catalog catalog-2
-       :task-scheduler :onyx.task-scheduler/round-robin}))
+       :task-scheduler :onyx.task-scheduler/balanced}))
 
   (def n-peers 36)
 

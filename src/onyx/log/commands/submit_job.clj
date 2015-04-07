@@ -3,7 +3,10 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
-            [onyx.extensions :as extensions]))
+            [onyx.scheduling.common-job-scheduler :as cjs]
+            [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.extensions :as extensions]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (defmulti job-scheduler-replica-update
   (fn [replica entry]
@@ -46,7 +49,8 @@
       (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
       (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
       (job-scheduler-replica-update entry)
-      (task-scheduler-replica-update entry)))
+      (task-scheduler-replica-update entry)
+      (reconfigure-cluster-workload)))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]
@@ -54,14 +58,8 @@
 
 (defmethod extensions/reactions :submit-job
   [{:keys [args] :as entry} old new diff state]
-  (let [scheduler (get-in new [:task-schedulers (:job diff)])]
-    (when (and (common/volunteer-via-new-job? old new diff state)
-               (if (:job state)
-                 (common/reallocate-from-task? scheduler old new (:job diff) state)
-                 true))
-      [{:fn :volunteer-for-task :args {:id (:id state)}}])))
+  [])
 
 (defmethod extensions/fire-side-effects! :submit-job
   [entry old new diff state]
-  state)
-
+  (common/start-new-lifecycle old new diff state))

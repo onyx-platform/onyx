@@ -41,8 +41,7 @@
                                (:aeron/external-addr s))))
                         (map :aeron/port)
                         set)
-        port (first (remove used-ports
-                            (:aeron/ports peer-site)))]
+        port (first (sort (remove used-ports (:aeron/ports peer-site))))]
     (assert port)
     {:aeron/port port}))
 

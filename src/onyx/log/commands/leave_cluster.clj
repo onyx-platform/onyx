@@ -4,7 +4,14 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
-            [onyx.log.commands.common :as common]))
+            [onyx.log.commands.common :as common]
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
+
+(defn remove-sealing-tasks [replica args]
+  (let [task (get (map-invert (:sealing-tasks replica)) (:id args))]
+    (if task
+      (update-in replica [:sealing-tasks] dissoc task)
+      replica)))
 
 (defmethod extensions/apply-log-entry :leave-cluster
   [{:keys [args]} replica]
@@ -26,8 +33,9 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (common/remove-sealing-tasks args)
-        (common/remove-peers args))))
+        (remove-sealing-tasks (:id args))
+        (common/remove-peers args)
+        (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :leave-cluster
   [{:keys [args]} old new]
@@ -41,39 +49,31 @@
   [{:keys [args]} old new diff state]
   (let [allocation (common/peer->allocated-job (:allocations old) (:id state))
         scheduler (get-in new [:task-schedulers (:job allocation)])]
-    (cond (or (= (:id state) (get (:prepared old) (:id args)))
+    (when (or (= (:id state) (get (:prepared old) (:id args)))
               (= (:id state) (get (:accepted old) (:id args))))
-          [{:fn :abort-join-cluster
-            :args {:id (:id state)}
-            :immediate? true}]
-          (and allocation
-               (common/volunteer-via-leave? old new diff state)
-               (common/reallocate-from-task? scheduler old new (:job allocation) state))
-          [{:fn :volunteer-for-task :args {:id (:id state)}}])))
+      [{:fn :abort-join-cluster
+        :args {:id (:id state)}
+        :immediate? true}])))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
-  [{:keys [message-id args]} old new {:keys [updated-watch]} state]
+  [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-    (cond (not (common/job-covered? new job))
-          (when-let [lifecycle (:lifecycle state)]
-            (component/stop @lifecycle)
-            (assoc state :lifecycle nil :job nil))
+    (common/start-new-lifecycle
+     old new diff
+     (cond (common/should-seal? new {:job job} state message-id)
+           (>!! (:seal-response-ch state) true)
 
-          (common/should-seal? new {:job job} state message-id)
-          (>!! (:seal-response-ch state) true)
+           (and (= (:id state) (:observer updated-watch))
+                (not= (:observer updated-watch) (:subject updated-watch)))
 
-          (and (= (:id state) (:observer updated-watch))
-               (not= (:observer updated-watch) (:subject updated-watch)))
+           (let [ch (chan 1)]
+             (extensions/on-delete (:log state) (:subject updated-watch) ch)
+             (go (when (<! ch)
+                   (extensions/write-log-entry
+                    (:log state)
+                    {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
+                 (close! ch))
+             (close! (or (:watch-ch state) (chan)))
+             (assoc state :watch-ch ch))
 
-          (let [ch (chan 1)]
-            (extensions/on-delete (:log state) (:subject updated-watch) ch)
-            (go (when (<! ch)
-                  (extensions/write-log-entry
-                   (:log state)
-                   {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
-                (close! ch))
-            (close! (or (:watch-ch state) (chan)))
-            (assoc state :watch-ch ch))
-
-          :else state)))
-
+           :else state))))
