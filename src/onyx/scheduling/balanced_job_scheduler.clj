@@ -23,16 +23,18 @@
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/balanced
   [{:keys [jobs peers] :as replica}]
-  (let [j (count jobs)
-        p (count peers)
-        min-peers (int (/ p j))
-        n (rem p j)
-        max-peers (inc min-peers)]
-    (reduce
-     (fn [all [job k]]
-       (assoc all job (if (< k n) max-peers min-peers)))
-     {}
-     (map vector jobs (range)))))
+  (if (seq jobs)
+    (let [j (count jobs)
+          p (count peers)
+          min-peers (int (/ p j))
+          n (rem p j)
+          max-peers (inc min-peers)]
+      (reduce
+       (fn [all [job k]]
+         (assoc all job (if (< k n) max-peers min-peers)))
+       {}
+       (map vector jobs (range))))
+    {}))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
