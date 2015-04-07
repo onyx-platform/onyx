@@ -33,7 +33,7 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (remove-sealing-tasks args)
+        (remove-sealing-tasks (:id args))
         (common/remove-peers args)
         (reconfigure-cluster-workload))))
 

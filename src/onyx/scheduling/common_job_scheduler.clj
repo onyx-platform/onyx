@@ -53,10 +53,11 @@
                                   (:jobs replica)))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
-               (update-in replica [:allocations
-                                   (ffirst candidate-jobs)
-                                   (second (first candidate-jobs))]
-                          conj (first peer-pool)))
+               (let [removed (common/remove-peers replica (first peer-pool))]
+                 (update-in removed [:allocations
+                                     (ffirst candidate-jobs)
+                                     (second (first candidate-jobs))]
+                            conj (first peer-pool))))
         replica))))
 
 (defn find-unused-peers [replica]

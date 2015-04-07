@@ -38,10 +38,10 @@
    {}
    allocations))
 
-(defn remove-peers [replica args]
-  (let [prev (get (allocations->peers (:allocations replica)) (:id args))]
+(defn remove-peers [replica id]
+  (let [prev (get (allocations->peers (:allocations replica)) id)]
     (if (and (:job prev) (:task prev))
-      (let [remove-f #(vec (remove (partial = (:id args)) %))]
+      (let [remove-f #(vec (remove (partial = id) %))]
         (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
       replica)))
 
