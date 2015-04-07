@@ -77,10 +77,7 @@
         ;; non-peers subscribers can discover which messaging to use.
         ;; Only one peer will succeed, and only one needs to.
         (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
-        (extensions/write-chunk log :messaging {:messaging (select-keys opts 
-                                                                        [:onyx.messaging/impl 
-                                                                         :onyx.messaging/peer-port-range
-                                                                         :onyx.messaging/peer-ports])} nil)
+        (extensions/write-chunk log :messaging {:messaging (select-keys opts [:onyx.messaging/impl])} nil)
 
         (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
               outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))

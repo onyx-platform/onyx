@@ -32,4 +32,3 @@
 (defmethod extensions/fire-side-effects! :kill-job
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle old new diff state))
-

@@ -4,7 +4,8 @@
             [onyx.log.commands.common :as common]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]
-            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [taoensso.timbre :refer [warn fatal info]]))
 
 (defn all-outputs-sealed? [replica job]
   (let [all (get-in replica [:output-tasks job])
