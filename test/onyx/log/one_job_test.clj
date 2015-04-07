@@ -62,7 +62,7 @@
  peer-config
  {:workflow [[:a :b] [:b :c]]
   :catalog catalog
-  :task-scheduler :onyx.task-scheduler/round-robin})
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def ch (chan n-peers))
 

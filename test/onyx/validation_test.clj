@@ -13,7 +13,7 @@
 (def peer-config
   (assoc (:peer-config config)
     :onyx/id id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 
@@ -64,28 +64,28 @@
     :onyx/batch-size 2}])
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-input-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-output-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-function-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-grouper-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-aggregator-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin}) => (throws Exception))
+                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (def workflow-tests-catalog
   [{:onyx/name :in
@@ -117,22 +117,22 @@
 
 (fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
                                         :workflow illegal-incoming-inputs-workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin})
+                                        :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
                                         :workflow illegal-outgoing-outputs-workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin})
+                                        :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
                                         :workflow illegal-edge-nodes-count-workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin})
+                                        :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
                                         :workflow illegal-intermediate-nodes-workflow
-                                        :task-scheduler :onyx.task-scheduler/round-robin})
+                                        :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
 
 (onyx.api/shutdown-env env)

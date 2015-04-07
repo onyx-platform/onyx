@@ -9,9 +9,9 @@
   (let [completed (:completed-jobs replica)
         killed (:killed-jobs replica)
         jobs (concat completed killed)]
-    (as-> jobs x
-          (assoc-in x [:killed-jobs] [])
-          (assoc-in x [:completed-jobs] [])
+    (as-> replica x
+          (assoc x :killed-jobs [])
+          (assoc x :completed-jobs [])
           (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
@@ -23,8 +23,8 @@
 
 (defmethod extensions/replica-diff :gc
   [entry old new]
-  {:jobs (first (diff (into #{} (:jobs old)) (into #{} (:jobs new))))
-   :killed-jobs (first (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new))))
+  {:killed-jobs (first (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new))))
+   :completed-jobs (first (diff (into #{} (:completed-jobs old)) (into #{} (:completed-jobs new))))
    :tasks (first (diff (:tasks old) (:tasks new)))
    :allocations (first (diff (:allocations old) (:allocations new)))})
 

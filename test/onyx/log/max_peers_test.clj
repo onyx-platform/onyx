@@ -11,9 +11,9 @@
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
    :saturation {:j1 Double/POSITIVE_INFINITY :j2 Double/POSITIVE_INFINITY}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 4 :j2 4})
 
 (fact
@@ -22,9 +22,9 @@
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
    :saturation {:j1 2 :j2 Double/POSITIVE_INFINITY}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 2 :j2 6})
 
 (fact
@@ -33,9 +33,9 @@
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
    :saturation {:j1 4 :j2 4}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 4 :j2 4})
 
 (fact
@@ -44,9 +44,9 @@
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
    :saturation {:j1 2 :j2 3}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 2 :j2 3})
 
 (fact
@@ -55,9 +55,9 @@
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
    :saturation {:j1 5 :j2 5}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 2 :j2 1})
 
 (fact
@@ -65,8 +65,8 @@
   {:peers [:a :b :c :d :e :f :g :h]
    :jobs [:j1 :j2]
    :tasks {:j1 [:t1 :t2] :j2 [:t3 :t4]}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin}
-   :job-scheduler :onyx.job-scheduler/round-robin})
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced}
+   :job-scheduler :onyx.job-scheduler/balanced})
  => {:j1 4 :j2 4})
 

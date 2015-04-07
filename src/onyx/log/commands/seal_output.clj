@@ -20,7 +20,7 @@
             (update-in [:exhausted-inputs] dissoc (:job args))
             (update-in [:sealed-outputs] dissoc (:job args))
             (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
-            (update-in [:jobs vec])
+            (update-in [:jobs] vec)
             (update-in [:completed-jobs] conj (:job args))
             (update-in [:allocations (:job args)] dissoc)
             (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
@@ -39,4 +39,4 @@
 
 (defmethod extensions/fire-side-effects! :seal-output
   [{:keys [args]} old new diff state]
-  (common/start-new-lifecycle state diff))
+  (common/start-new-lifecycle old new diff state))

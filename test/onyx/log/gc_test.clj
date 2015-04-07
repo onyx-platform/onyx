@@ -13,15 +13,15 @@
 (def rep-reactions (partial extensions/reactions entry))
 
 (def old-replica
-  {:jobs [:j1 :j2 :j3]
+  {:jobs [:j2]
    :tasks {:j1 [:t1 :t2]
            :j2 [:t3 :t4]
            :j3 [:t5 :t6]}
-   :task-schedulers {:j1 :onyx.task-scheduler/round-robin
-                     :j2 :onyx.task-scheduler/round-robin
-                     :j3 :onyx.task-scheduler/round-robin}
+   :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                     :j2 :onyx.task-scheduler/balanced
+                     :j3 :onyx.task-scheduler/balanced}
    :killed-jobs [:j1]
-   :completions {:j3 [:t5 :t6]}
+   :completed-jobs [:j3]
    :allocations {:j1 {:t2 []}
                  :j2 {:t3 [:p1]}}})
 
@@ -31,9 +31,9 @@
   (fact new-replica =>
         {:jobs [:j2]
          :tasks {:j2 [:t3 :t4]}
-         :task-schedulers {:j2 :onyx.task-scheduler/round-robin}
+         :task-schedulers {:j2 :onyx.task-scheduler/balanced}
          :killed-jobs []
-         :completions {}
+         :completed-jobs []
          :allocations {:j2 {:t3 [:p1]}}
          :percentages nil
          :saturation nil
@@ -41,9 +41,8 @@
          :input-tasks nil
          :output-tasks nil})
   (fact reactions => [])
-  (fact diff => {:jobs #{:j1 :j3}
-                 :killed-jobs #{:j1}
-                 :completions {:j3 [:t5 :t6]}
+  (fact diff => {:killed-jobs #{:j1}
+                 :completed-jobs #{:j3}
                  :tasks {:j1 [:t1 :t2] :j3 [:t5 :t6]}
                  :allocations {:j1 {:t2 []}}}))
 

@@ -18,7 +18,7 @@
                    :allocations {:j1 {:t1 [:y]}}
                    :ackers {:j1 [:x]}
                    :acker-percentage {:j1 5}
-                   :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
+                   :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                    :peers [:x :y]}
       new-replica (f old-replica)]
   (fact new-replica =>
@@ -29,7 +29,7 @@
 
          :ackers {:j1 [:x]}
          :acker-percentage {:j1 5}
-         :task-schedulers {:j1 :onyx.task-scheduler/round-robin}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :peer-state {:x :warming-up}
          :peers [:x :y]})
   (extensions/replica-diff entry old-replica new-replica))

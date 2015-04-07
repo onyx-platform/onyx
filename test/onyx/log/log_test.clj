@@ -17,7 +17,7 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def scheduler :onyx.job-scheduler/round-robin)
+(def scheduler :onyx.job-scheduler/balanced)
 
 (try 
   (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)

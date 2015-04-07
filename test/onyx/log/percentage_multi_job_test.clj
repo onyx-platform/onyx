@@ -79,7 +79,7 @@
    {:workflow [[:a :b]]
     :catalog catalog-1
     :percentage 70
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2
   (onyx.api/submit-job
@@ -87,7 +87,7 @@
    {:workflow [[:c :d]]
     :catalog catalog-2
     :percentage 30
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def n-peers 10)
 
