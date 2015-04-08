@@ -32,6 +32,6 @@
 
   (fact diff => #{:j1})
 
-  (fact a-reactions => [{:fn :volunteer-for-task :args {:id :a}}])
-  (fact d-reactions => nil))
+  (fact a-reactions => [])
+  (fact d-reactions => []))
 
