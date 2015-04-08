@@ -34,7 +34,7 @@
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (remove-sealing-tasks (:id args))
-        (common/remove-peers args)
+        (common/remove-peers (:id args))
         (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :leave-cluster

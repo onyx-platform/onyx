@@ -8,7 +8,8 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]}
+      old-replica {:pairs {:a :b :b :c :c :a} :peers [:a :b :c]
+                   :job-scheduler :onyx.job-scheduler/greedy}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :a]) => :b)
@@ -21,7 +22,8 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:pairs {:a :b :b :a} :peers [:a :b]}
+      old-replica {:pairs {:a :b :b :a} :peers [:a :b]
+                   :job-scheduler :onyx.job-scheduler/greedy}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :a]) => nil)
@@ -65,8 +67,7 @@
       diff (rep-diff old-replica new-replica)]
   (fact (:allocations (f old-replica)) => {:j1 {:t1 [:a :b]} :j2 {:t2 []}})
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :b})
-        => [{:fn :volunteer-for-task :args {:id :b}}])
+  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
 
   (let [old-replica2 {:job-scheduler :onyx.job-scheduler/balanced
                       :pairs {:a :b :b :c :c :a} 
