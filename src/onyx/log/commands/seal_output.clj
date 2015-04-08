@@ -23,7 +23,7 @@
             (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
             (update-in [:jobs] vec)
             (update-in [:completed-jobs] conj (:job args))
-            (update-in [:allocations (:job args)] dissoc)
+            (update-in [:allocations] dissoc (:job args))
             (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
             (reconfigure-cluster-workload)))
       new)))
