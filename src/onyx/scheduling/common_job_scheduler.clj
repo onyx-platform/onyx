@@ -54,7 +54,7 @@
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
                (let [removed (common/remove-peers replica (first peer-pool))
-                     reset-state (assoc-in replica [:peer-state (first peer-pool)] :warming-up)]
+                     reset-state (assoc-in removed [:peer-state (first peer-pool)] :warming-up)]
                  (-> reset-state
                      (update-in [:allocations
                                  (ffirst candidate-jobs)
