@@ -122,10 +122,10 @@
   (fact "Peers balanced after job killed in multi-job test" 
         (get-counts replica-2 [j1 j2]) => [[] [12 12 12]])
 
-  (finally 
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
+  (finally
+   (onyx.api/shutdown-peer-group peer-group)
 
-    (onyx.api/shutdown-env env)
+   (doseq [v-peer v-peers]
+     (onyx.api/shutdown-peer v-peer))
 
-    (onyx.api/shutdown-peer-group peer-group)))
+   (onyx.api/shutdown-env env)))
