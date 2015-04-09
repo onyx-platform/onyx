@@ -13,7 +13,6 @@
     (let [[active & passive] (:jobs replica)
           coverable? (job-coverable? replica active)
           n (if coverable? (count (:peers replica)) 0)]
-      (taoensso.timbre/info (str active "::" passive))
       (merge {active n} (zipmap passive (repeat 0))))
     {}))
 
