@@ -31,13 +31,11 @@
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/batch-timeout 2000
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :b
     :onyx/fn :onyx.log.one-job-test/my-inc
     :onyx/type :function
-    :onyx/batch-timeout 2000
     :onyx/batch-size batch-size}
 
    {:onyx/name :c
@@ -45,7 +43,6 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/batch-timeout 2000
     :onyx/doc "Writes segments to a core.async channel"}])
 
 (def in-chan (chan 100))
@@ -76,8 +73,6 @@
       (into #{} (map count (mapcat vals (vals (:allocations replica))))) 
       =>
       #{1 2})
-
-(onyx.api/shutdown-env (:env subscription))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
