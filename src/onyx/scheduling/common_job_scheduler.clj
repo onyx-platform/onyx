@@ -99,7 +99,7 @@
   (reduce
    (fn [result job]
      (let [peers (apply concat (vals (get-in result [:allocations job])))
-           pct (get-in result [:acker-percentage job] 10)
+           pct (or (get-in result [:acker-percentage job]) 10)
            n (int (Math/ceil (* (* 0.01 pct) (count peers))))
            candidates (choose-acker-candidates result peers)]
        (assoc-in result [:ackers job] (vec (take n candidates)))))

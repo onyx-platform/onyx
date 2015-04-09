@@ -4,7 +4,9 @@
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(def entry (create-log-entry :submit-job {:id :a :tasks [:t1]}))
+(def entry (create-log-entry :submit-job {:id :a :tasks [:t1]
+                                          :task-scheduler :onyx.task-scheduler/balanced
+                                          :saturation 42}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
 
@@ -19,19 +21,19 @@
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:jobs new-replica) => [:a])
-  (fact diff => {:job :a})
-  (fact reactions => [{:fn :volunteer-for-task :args {:id :x}}]))
+  (fact diff => {:job :a}))
 
 (let [old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
+                   :task-schedulers {:b :onyx.task-scheduler/balanced}
                    :tasks {:b [:t1 :t2]}}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
   (fact (:jobs new-replica) => [:b :a])
-  (fact diff => {:job :a})
-  (fact reactions => nil))
+  (fact diff => {:job :a}))
 
 (def entry (create-log-entry :submit-job {:id :j1
+                                          :task-scheduler :onyx.task-scheduler/balanced
                                           :tasks [:t1 :t2 :t3]}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
@@ -45,24 +47,6 @@
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (rep-reactions old-replica new-replica diff {:id :p1}) => nil?)
-  (fact (rep-reactions old-replica new-replica diff {:id :p2}) => nil?))
-
-(def entry (create-log-entry :submit-job {:id :j1
-                                          :tasks [:t1 :t2 :t3]}))
-
-(def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
-
-(def rep-diff (partial extensions/replica-diff entry))
-
-(def rep-reactions (partial extensions/reactions entry))
-
-(def old-replica {:job-scheduler :onyx.job-scheduler/balanced
-                  :peers [:p1 :p2 :p3]})
-
-(let [new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)]
-  (fact (rep-reactions old-replica new-replica diff {:id :p1}) =not=> nil?)
-  (fact (rep-reactions old-replica new-replica diff {:id :p2}) =not=> nil?)
-  (fact (rep-reactions old-replica new-replica diff {:id :p3}) =not=> nil?))
+  (fact (rep-reactions old-replica new-replica diff {:id :p1}) => [])
+  (fact (rep-reactions old-replica new-replica diff {:id :p2}) => []))
 
