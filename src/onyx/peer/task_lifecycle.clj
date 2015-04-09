@@ -280,29 +280,29 @@
 (defn close-batch-resources [event]
   (merge event (l-ext/close-batch-resources* event)))
 
-(defn release-messages! [messenger event cleanup-ch]
+(defn release-messages! [messenger event]
   (go
    (loop []
-     (when-let [id (first (alts!! [(:release-ch messenger) cleanup-ch]))]
+     (when-let [id (<! (:release-ch messenger))]
        (p-ext/ack-message event id)
        (recur)))))
 
-(defn retry-messages! [messenger event cleanup-ch]
+(defn retry-messages! [messenger event]
   (go
    (loop []
-     (when-let [id (first (alts!! [(:retry-ch messenger) cleanup-ch]))]
+     (when-let [id (<! (:retry-ch messenger))]
        (p-ext/retry-message event id)
        (recur)))))
 
-(defn forward-completion-calls! [event completion-ch cleanup-ch]
-  (go 
+(defn forward-completion-calls! [event completion-ch]
+  (try
     (loop []
-      (when-let [{:keys [id peer-id]} (first (alts!! [completion-ch cleanup-ch]))]
-        (try
-          (let [peer-link (operation/peer-link event peer-id)]
-            (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link))
-          (catch Exception e (timbre/fatal e)))
-        (recur)))))
+      (when-let [{:keys [id peer-id]} (<!! completion-ch)]
+        (let [peer-link (operation/peer-link event peer-id)]
+          (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)
+          (recur))))
+    (catch Exception e
+      (timbre/fatal e))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
@@ -423,14 +423,12 @@
             (Thread/sleep 500)
             (recur @replica)))
 
-        (let [cleanup-ch (chan 1)
-              release-messages-ch (release-messages! messenger pipeline-data cleanup-ch)
-              retry-messages-ch (retry-messages! messenger pipeline-data cleanup-ch)
-              forward-completion-ch (forward-completion-calls! pipeline-data completion-ch cleanup-ch)
+        (let [release-messages-ch (release-messages! messenger pipeline-data)
+              retry-messages-ch (retry-messages! messenger pipeline-data)
+              forward-completion-ch (thread (forward-completion-calls! pipeline-data completion-ch))
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
               listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
           (assoc component 
-                 :cleanup-ch cleanup-ch
                  :pipeline-data pipeline-data 
                  :seal-ch seal-resp-ch
                  :release-messages-ch release-messages-ch
@@ -448,11 +446,14 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
-      (close! (:cleanup-ch component))
+      (close! (:release-messages-ch component))
+      (close! (:retry-messages-ch component))
+      (close! (:forward-completion-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
       (<!! (:task-lifecycle-ch component))
       (<!! (:listen-for-sealer-ch component))
+      (<!! (:forward-completion-ch component))
       (<!! (:release-messages-ch component))
       (<!! (:retry-messages-ch component))
 
