@@ -66,6 +66,7 @@
   (fact reactions => nil))
 
 (let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
+                   :job-scheduler :onyx.job-scheduler/greedy
                    :peers [:a]}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
