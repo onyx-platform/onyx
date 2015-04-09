@@ -9,7 +9,6 @@
             [midje.sweet :refer :all]
             [zookeeper :as zk]))
 
-
 (def onyx-id (java.util.UUID/randomUUID))
 
 (def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
@@ -52,6 +51,7 @@
 (extensions/register-pulse (:log env) d-id)
 
 (def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
+                  :job-scheduler :onyx.job-scheduler/greedy
                   :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
 
 (def new-replica (f old-replica))
