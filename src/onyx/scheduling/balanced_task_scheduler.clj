@@ -9,7 +9,6 @@
       (fn [[peers-to-drop allocations] _]
         (let [task-most-peers (->> allocations 
                                    (sort-by (comp count val))
-                                   reverse
                                    ffirst)] 
           [(conj peers-to-drop (last (allocations task-most-peers)))
            (update-in allocations [task-most-peers] butlast)]))
