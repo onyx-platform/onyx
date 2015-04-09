@@ -42,7 +42,7 @@
                         (map :aeron/port)
                         set)
         port (first (sort (remove used-ports (:aeron/ports peer-site))))]
-    (assert port)
+    (assert port "Couldn't assign port - ran out of available ports.")
     {:aeron/port port}))
 
 (defn handle-sent-message [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]
