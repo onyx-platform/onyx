@@ -5,15 +5,19 @@
 (defmethod cts/drop-peers :onyx.task-scheduler/balanced
   [replica job n]
   (first
-    (reduce
-      (fn [[peers-to-drop allocations] _]
-        (let [task-most-peers (->> allocations 
-                                   (sort-by (comp count val))
-                                   ffirst)] 
-          [(conj peers-to-drop (last (allocations task-most-peers)))
-           (update-in allocations [task-most-peers] butlast)]))
-      [[] (get-in replica [:allocations job])] 
-      (range n))))
+   (reduce
+    (fn [[peers-to-drop allocations] _]
+      (let [max-peers (->> allocations
+                           (sort-by (comp count val))
+                           reverse
+                           first
+                           second
+                           count)
+            task-most-peers (ffirst (filter (fn [x] (= max-peers (count (second x)))) allocations))]
+        [(conj peers-to-drop (last (allocations task-most-peers)))
+         (update-in allocations [task-most-peers] butlast)]))
+    [[] (get-in replica [:allocations job])]
+    (range n))))
 
 (defmethod cts/task-claim-n-peers :onyx.task-scheduler/balanced
   [replica job n]

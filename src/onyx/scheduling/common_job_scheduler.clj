@@ -19,14 +19,17 @@
 (defn current-job-allocations [replica]
   (into {}
         (map (fn [j]
-               {j (apply + (map count (vals (get-in replica [:allocations j]))))})
+               {j (count (remove nil? (apply concat (vals (get-in replica [:allocations j])))))})
              (:jobs replica))))
 
 (defn current-task-allocations [replica]
   (into
    {}
    (map (fn [j]
-          {j (into {} (map (fn [[t a]] {t (count a)}) (get-in replica [:allocations j])))})
+          {j (into {}
+                   (map (fn [t]
+                          {t (count (filter identity (get-in replica [:allocations j t])))})
+                        (get-in replica [:tasks j])))})
         (:jobs replica))))
 
 (defn job->task-claims [replica job-offers]
@@ -45,11 +48,10 @@
                                     (let [current (get (current-task-allocations replica) job)
                                           desired (cts/task-distribute-peer-count replica job (get max-utilization job))
                                           tasks (get-in replica [:tasks job])]
-                                      (map
-                                       (fn [t]
-                                         (when (< (or (get current t) 0) (get desired t))
-                                           [job t]))
-                                       tasks)))
+                                      (map (fn [t]
+                                             (when (< (or (get current t) 0) (get desired t))
+                                               [job t]))
+                                           tasks)))
                                   (:jobs replica)))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
@@ -73,12 +75,14 @@
 (defn find-displaced-peers [replica current-allocations max-util]
   (clojure.set/union
    (find-unused-peers replica)
-   (mapcat
-    (fn [job]
-      (let [overflow (- (get current-allocations job) (get max-util job))]
-        (when (pos? overflow)
-          (cts/drop-peers replica job overflow))))
-    (:jobs replica))))
+   (remove
+    nil?
+    (mapcat
+     (fn [job]
+       (let [overflow (- (get current-allocations job) (get max-util job))]
+         (when (pos? overflow)
+           (cts/drop-peers replica job overflow))))
+     (:jobs replica)))))
 
 (defn exempt-from-acker? [replica job task]
   (or (some #{task} (get-in replica [:exempt-tasks job]))

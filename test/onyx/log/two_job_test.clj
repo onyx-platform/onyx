@@ -110,7 +110,6 @@
      :catalog catalog-2
      :task-scheduler :onyx.task-scheduler/balanced}))
 
-
 (def ch (chan n-peers))
 
 (def replica
