@@ -7,12 +7,6 @@
             [onyx.log.commands.common :as common]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
-(defn remove-sealing-tasks [replica args]
-  (let [task (get (map-invert (:sealing-tasks replica)) (:id args))]
-    (if task
-      (update-in replica [:sealing-tasks] dissoc task)
-      replica)))
-
 (defmethod extensions/apply-log-entry :leave-cluster
   [{:keys [args]} replica]
   (let [{:keys [id]} args
@@ -33,7 +27,6 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (remove-sealing-tasks (:id args))
         (common/remove-peers (:id args))
         (reconfigure-cluster-workload))))
 

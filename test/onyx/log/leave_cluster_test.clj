@@ -67,16 +67,4 @@
       diff (rep-diff old-replica new-replica)]
   (fact (:allocations (f old-replica)) => {:j1 {:t1 [:a]} :j2 {:t2 [:b]}})
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
-
-  (let [old-replica2 {:job-scheduler :onyx.job-scheduler/balanced
-                      :pairs {:a :b :b :c :c :a} 
-                      :peers [:a :b :c]
-                      :jobs [:j1 :j2]
-                      :task-schedulers {:j1 :onyx.task-scheduler/balanced
-                                        :j2 :onyx.task-scheduler/balanced} 
-                      :tasks {:j1 [:t1] :j2 [:t2]}
-                      :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}
-                      :sealing-tasks {:t2 :c}}
-        new-replica2 (f old-replica2)]
-    (fact (:sealing-tasks new-replica2) => {})))
+  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil))
