@@ -38,7 +38,8 @@
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
-  (let [ordered-jobs (sort-by #(count (get-in replica [:tasks %]))
+  (let [ordered-jobs (sort-by (juxt #(.indexOf (:jobs replica) %)
+                                    #(count (get-in replica [:tasks %])))
                               (:jobs replica))]
     (loop [[head & tail :as job-seq] ordered-jobs
            results jobs

@@ -182,9 +182,10 @@
    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
 
+(deftest balanced-allocations-uneven)
 (checking
- "Checking Balanced allocation causes peers to be evenly over tasks"
- 10
+ "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
+ 1000
  [{:keys [replica log peer-choices]}
   (log-gen/apply-entries-gen
    (gen/return
@@ -204,8 +205,9 @@
      :peer-choices []}))]
  (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
        j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
-   (is (= (map count j1-allocations) [2 1 1]))
-   (is (= (map count j2-allocations) [1 1 1]))))
+   ;; Since job IDs are reused, we can't know which order they'll be in.
+   (is (= (set [(map count j1-allocations) (map count j2-allocations)])
+          #{[2 1 1] [1 1 1]}))))
 
 (deftest balanced-allocations
   (checking
