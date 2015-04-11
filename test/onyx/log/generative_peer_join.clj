@@ -1,6 +1,5 @@
 (ns onyx.log.generative-peer-join
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+  (:require [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
@@ -11,8 +10,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            [zookeeper :as zk]))
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
