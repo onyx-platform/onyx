@@ -34,6 +34,7 @@
 
 (def entry (create-log-entry :submit-job {:id :j1
                                           :task-scheduler :onyx.task-scheduler/balanced
+                                          :saturation 42
                                           :tasks [:t1 :t2 :t3]}))
 
 (def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
