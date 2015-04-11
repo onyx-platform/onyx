@@ -11,7 +11,7 @@
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
-             [uk.co.real_logic.aeron.driver MediaDriver]
+             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context]
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
              [java.util.function Consumer]
@@ -21,7 +21,9 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [media-driver (MediaDriver/launch)]
+    (let [ctx (MediaDriver$Context.)
+          _ (.dirsDeleteOnExit ctx true)
+          media-driver (MediaDriver/launch ctx)]
       (assoc component :media-driver media-driver)))
 
   (stop [{:keys [media-driver] :as component}]
