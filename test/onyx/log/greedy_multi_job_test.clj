@@ -76,14 +76,14 @@
    peer-config
    {:workflow [[:a :b]]
     :catalog catalog-1
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2
   (onyx.api/submit-job
    peer-config
    {:workflow [[:c :d]]
     :catalog catalog-2
-    :task-scheduler :onyx.task-scheduler/round-robin}))
+    :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def n-peers 40)
 
@@ -104,7 +104,7 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => [[0 0] [20 20]])
+      (get-counts replica-2 [j1 j2]) => [[] [20 20]])
 
 (>!! c-chan :done)
 (close! c-chan)
@@ -112,14 +112,15 @@
 (def replica-3
   (playback-log (:log env) replica-2 ch 2000))
 
-(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[0 0] [0 0]])
+(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[] []])
 
 (close! b-chan)
 (close! d-chan)
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-env env)
 
-(onyx.api/shutdown-peer-group peer-group)

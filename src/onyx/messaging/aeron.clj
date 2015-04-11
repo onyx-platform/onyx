@@ -11,7 +11,7 @@
              [uk.co.real_logic.aeron Aeron$Context]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
-             [uk.co.real_logic.aeron.driver MediaDriver]
+             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context]
              [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
              [java.util.function Consumer]
@@ -21,12 +21,14 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [media-driver (MediaDriver/launch)]
+    (let [ctx (MediaDriver$Context.)
+          _ (.dirsDeleteOnExit ctx true)
+          media-driver (MediaDriver/launch ctx)]
       (assoc component :media-driver media-driver)))
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (.close media-driver)
+    (when media-driver (.close media-driver))
     (assoc component :media-driver nil)))
 
 (defn aeron-peer-group [opts]
@@ -41,9 +43,8 @@
                                (:aeron/external-addr s))))
                         (map :aeron/port)
                         set)
-        port (first (remove used-ports
-                            (:aeron/ports peer-site)))]
-    (assert port)
+        port (first (sort (remove used-ports (:aeron/ports peer-site))))]
+    (assert port "Couldn't assign port - ran out of available ports.")
     {:aeron/port port}))
 
 (defn handle-sent-message [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]

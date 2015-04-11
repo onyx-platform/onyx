@@ -6,17 +6,14 @@
 
 (defmethod extensions/apply-log-entry :gc
   [{:keys [args message-id]} replica]
-  (let [completed (difference (into #{} (:jobs replica))
-                              (into #{} (common/incomplete-jobs replica)))
+  (let [completed (:completed-jobs replica)
         killed (:killed-jobs replica)
-        jobs (concat completed killed)
-        remove-f #(vec (remove (fn [j] (some #{j} jobs)) %))]
-    (as-> jobs x
-          (reduce (fn [new job] (update-in new [:jobs] remove-f)) replica x)
-          (reduce (fn [new job] (update-in new [:killed-jobs] remove-f)) x jobs)
+        jobs (concat completed killed)]
+    (as-> replica x
+          (assoc x :killed-jobs [])
+          (assoc x :completed-jobs [])
           (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:completions] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
           (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs)
@@ -26,10 +23,9 @@
 
 (defmethod extensions/replica-diff :gc
   [entry old new]
-  {:jobs (first (diff (into #{} (:jobs old)) (into #{} (:jobs new))))
-   :killed-jobs (first (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new))))
+  {:killed-jobs (first (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new))))
+   :completed-jobs (first (diff (into #{} (:completed-jobs old)) (into #{} (:completed-jobs new))))
    :tasks (first (diff (:tasks old) (:tasks new)))
-   :completions (first (diff (:completions old) (:completions new)))
    :allocations (first (diff (:allocations old) (:allocations new)))})
 
 (defmethod extensions/reactions :gc

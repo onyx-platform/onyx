@@ -23,8 +23,8 @@
 
 (def peer-config
   (assoc (:peer-config config)
-         :onyx/id onyx-id
-         :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin))
+    :onyx/id onyx-id
+    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 
@@ -101,15 +101,14 @@
     peer-config
     {:workflow [[:a :b] [:b :c]]
      :catalog catalog-1
-     :task-scheduler :onyx.task-scheduler/round-robin}))
+     :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2 
   (onyx.api/submit-job
     peer-config
     {:workflow [[:d :e] [:e :f]]
      :catalog catalog-2
-     :task-scheduler :onyx.task-scheduler/round-robin}))
-
+     :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def ch (chan n-peers))
 
@@ -121,6 +120,6 @@
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
-
 (onyx.api/shutdown-peer-group peer-group)
+
+(onyx.api/shutdown-env env)

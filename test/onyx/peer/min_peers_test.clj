@@ -70,7 +70,7 @@
  peer-config
  {:catalog catalog
   :workflow workflow
-  :task-scheduler :onyx.task-scheduler/round-robin})
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))
 

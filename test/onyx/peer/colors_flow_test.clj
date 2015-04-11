@@ -199,7 +199,7 @@
  peer-config
  {:catalog catalog :workflow workflow
   :flow-conditions flow-conditions
-  :task-scheduler :onyx.task-scheduler/round-robin})
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def red (take-segments! red-out-chan))
 

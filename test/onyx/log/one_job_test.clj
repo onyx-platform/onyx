@@ -62,20 +62,14 @@
  peer-config
  {:workflow [[:a :b] [:b :c]]
   :catalog catalog
-  :task-scheduler :onyx.task-scheduler/round-robin})
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def ch (chan n-peers))
-
-(def subscription (onyx.api/subscribe-to-log peer-config ch))
-
-(def log (:log (:env subscription)))
 
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(onyx.api/shutdown-env (:env subscription))
-
-(fact "peers balanced on 1 jobs" 
+(fact "peers balanced on 1 job"
       (into #{} (map count (mapcat vals (vals (:allocations replica))))) 
       =>
       #{1 2})

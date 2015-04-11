@@ -104,12 +104,12 @@
   (def j1 (onyx.api/submit-job
             peer-config
             {:catalog catalog-1 :workflow workflow
-             :task-scheduler :onyx.task-scheduler/round-robin}))
+             :task-scheduler :onyx.task-scheduler/balanced}))
 
   (def j2 (onyx.api/submit-job
             peer-config
             {:catalog catalog-2 :workflow workflow
-             :task-scheduler :onyx.task-scheduler/round-robin}))
+             :task-scheduler :onyx.task-scheduler/balanced}))
 
   (onyx.api/kill-job peer-config (:job-id j1))
 

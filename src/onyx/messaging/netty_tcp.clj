@@ -31,11 +31,11 @@
 
 (defn leak-detector-level! [level]
   (ResourceLeakDetector/setLevel
-    (case level
-      :disabled ResourceLeakDetector$Level/DISABLED
-      :simple ResourceLeakDetector$Level/SIMPLE
-      :advanced ResourceLeakDetector$Level/ADVANCED
-      :paranoid ResourceLeakDetector$Level/PARANOID)))
+   (case level
+     :disabled ResourceLeakDetector$Level/DISABLED
+     :simple ResourceLeakDetector$Level/SIMPLE
+     :advanced ResourceLeakDetector$Level/ADVANCED
+     :paranoid ResourceLeakDetector$Level/PARANOID)))
 
 (defn event-executor
   "Creates a new netty execution handler for processing events. 
@@ -66,24 +66,24 @@
                          (NioEventLoopGroup. thread-count client-thread-factory))
           boss-thread-factory (DefaultThreadFactory. boss-event-thread-pool-name true)
           boss-group (if (epoll?)
-                         (EpollEventLoopGroup. thread-count boss-thread-factory)
-                         (NioEventLoopGroup. thread-count boss-thread-factory))
+                       (EpollEventLoopGroup. thread-count boss-thread-factory)
+                       (NioEventLoopGroup. thread-count boss-thread-factory))
           worker-thread-factory (DefaultThreadFactory. worker-event-thread-pool-name true)
           worker-group (if (epoll?)
-                       (EpollEventLoopGroup. thread-count worker-thread-factory)
-                       (NioEventLoopGroup. thread-count worker-thread-factory))]
+                         (EpollEventLoopGroup. thread-count worker-thread-factory)
+                         (NioEventLoopGroup. thread-count worker-thread-factory))]
 
       (timbre/info "Starting Netty peer group")
-      (assoc component 
-             :shared-event-executor shared-event-executor
-             :client-group client-group 
-             :worker-group worker-group
-             :boss-group boss-group)))
+      (assoc component
+        :shared-event-executor shared-event-executor
+        :client-group client-group
+        :worker-group worker-group
+        :boss-group boss-group)))
 
   (stop [component]
     (assoc component 
-           :shared-event-executor nil :client-group nil 
-           :worker-group nil :boss-group nil)))
+      :shared-event-executor nil :client-group nil
+      :worker-group nil :boss-group nil)))
 
 (defn netty-peer-group [opts]
   (map->NettyPeerGroup {:opts opts}))
@@ -92,9 +92,9 @@
   [config peer-site peer-sites]
   (let [used-ports (->> (vals peer-sites) 
                         (filter 
-                          (fn [s]
-                            (= (:netty/external-addr peer-site) 
-                               (:netty/external-addr s))))
+                         (fn [s]
+                           (= (:netty/external-addr peer-site) 
+                              (:netty/external-addr s))))
                         (map :netty/port)
                         set)
         port (first (remove used-ports
@@ -104,7 +104,7 @@
 
 (defn int32-frame-decoder
   []
-  ; Offset 0, 4 byte header, skip those 4 bytes.
+                                        ; Offset 0, 4 byte header, skip those 4 bytes.
   (LengthFieldBasedFrameDecoder. Integer/MAX_VALUE, 0, 4, 0, 4))
 
 (defn int32-frame-encoder
@@ -153,11 +153,11 @@
                   EpollServerSocketChannel
                   NioServerSocketChannel)
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
-                                            (ImmediateEventExecutor/INSTANCE))
+                        (ImmediateEventExecutor/INSTANCE))
         initializer (channel-initializer-done 
-                      (gen-tcp-handler channel-group 
-                                       (create-server-handler buf-recvd-ch)))] 
-    ; Configure bootstrap
+                     (gen-tcp-handler channel-group 
+                                      (create-server-handler buf-recvd-ch)))] 
+                                        ; Configure bootstrap
     (doto bootstrap
       (.group boss-group worker-group)
       (.channel channel)
@@ -167,7 +167,7 @@
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
       (.childHandler initializer))
-    ; Start bootstrap
+                                        ; Start bootstrap
     (let [ch (->> (InetSocketAddress. host port)
                   (.bind bootstrap)
                   (.sync)
@@ -184,7 +184,7 @@
     (handlerAdded [ctx]
       (timbre/info "Handler added"))
     (handlerRemoved [ctx]
-       (timbre/info "Handler removed"))
+      (timbre/info "Handler removed"))
     (exceptionCaught [context cause]
       (.printStackTrace cause)
       (.close context))))
@@ -215,43 +215,43 @@
         (.channel ^ChannelFuture (.connect b host port))))))
 
 (defn app [daemon parsed-ch inbound-ch release-ch retry-ch]
-    (go-loop []
-             (try (let [msg (<!! parsed-ch)
-                        t ^byte (:type msg)]
-                    (cond (= t protocol/messages-type-id) 
-                          (doseq [message (:messages msg)]
-                            (>!! inbound-ch message))
+  (go-loop []
+           (try (let [msg (<!! parsed-ch)
+                      t ^byte (:type msg)]
+                  (cond (= t protocol/messages-type-id) 
+                        (doseq [message (:messages msg)]
+                          (>!! inbound-ch message))
 
-                          (= t protocol/ack-type-id)
-                          (acker/ack-message daemon
-                                             (:id msg)
-                                             (:completion-id msg)
-                                             (:ack-val msg))
+                        (= t protocol/ack-type-id)
+                        (acker/ack-message daemon
+                                           (:id msg)
+                                           (:completion-id msg)
+                                           (:ack-val msg))
 
-                          (= t protocol/completion-type-id)
-                          (>!! release-ch (:id msg))
+                        (= t protocol/completion-type-id)
+                        (>!! release-ch (:id msg))
 
-                          (= t protocol/retry-type-id)
-                          (>!! retry-ch (:id msg))
+                        (= t protocol/retry-type-id)
+                        (>!! retry-ch (:id msg))
 
-                          :else
-                          (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
-                  (catch Exception e
-                    (taoensso.timbre/error e)
-                    (throw e)))
-             (recur)))
+                        :else
+                        (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
+                (catch Exception e
+                  (taoensso.timbre/error e)
+                  (throw e)))
+           (recur)))
 
-(defn buf-recv-loop [buf-recv-ch parsed-ch]
+(defn buf-recv-loop [messenger buf-recv-ch parsed-ch]
   (go-loop []
            (let [buf (<!! buf-recv-ch)]
              (try 
-               (let [decompressed (protocol/read-buf buf)]
+               (let [decompressed (protocol/read-buf (:decompress-f messenger) buf)]
                  (>!! parsed-ch decompressed)
-                 ; undo retain added in server handler
+                 ;; undo retain added in server handler
                  (.release ^ByteBuf buf))
                (catch Throwable t
                  (timbre/fatal t "Exception in recv loop.")))
-                 (recur))))
+             (recur))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -265,15 +265,17 @@
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)]
-      (assoc component 
-             :bind-addr bind-addr 
-             :external-addr external-addr
-             :boss-group boss-group
-             :client-group client-group
-             :worker-group worker-group
-             :ports ports
-             :resources (atom nil)
-             :release-ch release-ch)))
+      (assoc component
+        :bind-addr bind-addr 
+        :external-addr external-addr
+        :boss-group boss-group
+        :client-group client-group
+        :worker-group worker-group
+        :ports ports
+        :resources (atom nil)
+        :release-ch release-ch
+        :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
+        :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
 
   (stop [{:keys [resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
@@ -311,7 +313,7 @@
                                         (:bind-addr messenger) 
                                         (:netty/port assigned) 
                                         buf-recv-ch)
-        buf-loop (buf-recv-loop buf-recv-ch parsed-ch)
+        buf-loop (buf-recv-loop messenger buf-recv-ch parsed-ch)
         app-loop (app daemon parsed-ch inbound-ch release-ch retry-ch)]
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn 
@@ -339,7 +341,7 @@
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-messages-msg-buf messages) 
+                  ^ByteBuf (protocol/build-messages-msg-buf (:compress-f messenger) messages) 
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets

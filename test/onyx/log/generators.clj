@@ -45,8 +45,8 @@
                                                                         diff 
                                                                         {:messenger messenger
                                                                          :id peer-id})]
-
-                                 [peer-id reactions]))
+                                 (when (seq reactions)
+                                   [peer-id reactions])))
                              peers)
         ; it does not matter that multiple reactions are processed
         ; together because they may be processed interleaved depending on 

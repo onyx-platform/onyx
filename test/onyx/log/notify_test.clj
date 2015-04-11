@@ -53,7 +53,8 @@
 (def rep-reactions (partial extensions/reactions read-entry))
 
 (def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
+                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]
+                  :job-scheduler :onyx.job-scheduler/greedy})
 
 (def old-local-state {:messenger :dummy-messenger
                       :log (:log env) :id a-id})
