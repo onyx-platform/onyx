@@ -23,8 +23,8 @@
 
 (def peer-config
   (assoc (:peer-config config)
-         :onyx/id onyx-id
-         :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
+    :onyx/id onyx-id
+    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 
@@ -120,6 +120,6 @@
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
-
 (onyx.api/shutdown-peer-group peer-group)
+
+(onyx.api/shutdown-env env)
