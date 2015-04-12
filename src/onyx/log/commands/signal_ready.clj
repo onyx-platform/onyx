@@ -23,6 +23,6 @@
   [{:keys [args message-id]} old new diff state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (when (common/should-seal? new {:job job} state message-id)
-      (>!! (:seal-response-ch state) true)))
+      (>!! (:seal-ch state) true)))
   state)
 

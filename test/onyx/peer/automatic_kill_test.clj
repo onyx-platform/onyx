@@ -26,16 +26,19 @@
 
 (def in-chan-1 (chan (inc n-messages)))
 (def in-chan-2 (chan (inc n-messages)))
-(def in-chan-3 (chan (inc n-messages)))
 
 (def out-chan-1 (chan (sliding-buffer (inc n-messages))))
 (def out-chan-2 (chan (sliding-buffer (inc n-messages))))
-(def out-chan-3 (chan (sliding-buffer (inc n-messages))))
 
 (doseq [n (range n-messages)]
   (>!! in-chan-1 {:n n})
-  (>!! in-chan-2 {:n n})
-  (>!! in-chan-3 {:n n}))
+  (>!! in-chan-2 {:n n}))
+
+(>!! in-chan-1 :done)
+(>!! in-chan-2 :done)
+
+(close! in-chan-1)
+(close! in-chan-2)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -84,28 +87,6 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def catalog-3
-  [{:onyx/name :in-3
-    :onyx/ident :core.async/read-from-chan
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :inc
-    :onyx/fn :onyx.peer.automatic-kill-test/my-inc
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :out-3
-    :onyx/ident :core.async/write-to-chan
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
-
 (defmethod l-ext/inject-lifecycle-resources :in-1
   [_ _] {:core.async/chan in-chan-1})
 
@@ -113,22 +94,14 @@
   [_ _] {:core.async/chan out-chan-1})
 
 (defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-1})
+  [_ _] {:core.async/chan in-chan-2})
 
 (defmethod l-ext/inject-lifecycle-resources :out-2
-  [_ _] {:core.async/chan out-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-3
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :out-3
-  [_ _] {:core.async/chan out-chan-1})
+  [_ _] {:core.async/chan out-chan-2})
 
 (def workflow-1 [[:in-1 :inc] [:inc :out-1]])
 
 (def workflow-2 [[:in-2 :inc] [:inc :out-2]])
-
-(def workflow-3 [[:in-3 :inc] [:inc :out-3]])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 

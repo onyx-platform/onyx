@@ -372,7 +372,9 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
-(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
+(defrecord TaskLifeCycle
+    [id log messenger-buffer messenger job-id task-id replica restart-ch
+     kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
   component/Lifecycle
 
   (start [component]
@@ -401,7 +403,7 @@
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/outbox-ch outbox-ch
-                           :onyx.core/seal-response-ch seal-resp-ch
+                           :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/replica replica
                            :onyx.core/state (atom {})}
@@ -409,14 +411,14 @@
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
-        (while (and (first (alts!! [kill-ch] :default true))
+        (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
-          (when (and (first (alts!! [kill-ch] :default true))
+          (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
@@ -471,12 +473,12 @@
       :listen-for-sealer-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
-                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts]}]
+                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job :task-id task :restart-ch restart-ch
                        :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
-                       :opts opts}))
+                       :opts opts :task-kill-ch task-kill-ch}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
