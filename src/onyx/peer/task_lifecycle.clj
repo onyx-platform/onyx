@@ -429,20 +429,20 @@
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
               listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
           (assoc component 
-                 :pipeline-data pipeline-data 
-                 :seal-ch seal-resp-ch
-                 :release-messages-ch release-messages-ch
-                 :retry-messages-ch retry-messages-ch
-                 :forward-completion-ch forward-completion-ch 
-                 :task-lifecycle-ch task-lifecycle-ch
-                 :listen-for-sealer-ch listen-for-sealer-ch)))
+            :pipeline-data pipeline-data
+            :seal-ch seal-resp-ch
+            :release-messages-ch release-messages-ch
+            :retry-messages-ch retry-messages-ch
+            :forward-completion-ch forward-completion-ch
+            :task-lifecycle-ch task-lifecycle-ch
+            :listen-for-sealer-ch listen-for-sealer-ch)))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
-    (let [event (:pipeline-data component)]
+    (when-let [event (:pipeline-data component)]
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
@@ -461,14 +461,14 @@
         (doseq [[_ link] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
 
-    (assoc component 
-           :pipeline-data nil 
-           :seal-ch nil
-           :release-messages-ch nil
-           :retry-messages-ch nil
-           :forward-completion-ch nil 
-           :task-lifecycle-ch nil
-           :listen-for-sealer-ch nil)))
+    (assoc component
+      :pipeline-data nil
+      :seal-ch nil
+      :release-messages-ch nil
+      :retry-messages-ch nil
+      :forward-completion-ch nil
+      :task-lifecycle-ch nil
+      :listen-for-sealer-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts]}]
