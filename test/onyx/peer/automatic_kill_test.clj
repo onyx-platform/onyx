@@ -132,7 +132,7 @@
 
 (def results (take-segments! out-chan-2))
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n (+ x 50001)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
