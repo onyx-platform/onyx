@@ -61,6 +61,7 @@
 
 (defn handle-completion-message [release-ch buffer offset length header]
   (let [completion-id (protocol/read-completion buffer offset)]
+    (prn "Completed: " completion-id)
     (>!! release-ch completion-id)))
 
 (defn handle-retry-message [retry-ch buffer offset length header]

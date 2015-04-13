@@ -18,11 +18,9 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 15000)
+(def n-messages 20)
 
-(def batch-size 1320)
-
-(def echo 1000)
+(def batch-size 2)
 
 (def in-chan-1 (chan (inc n-messages)))
 (def in-chan-2 (chan (inc n-messages)))
@@ -32,13 +30,10 @@
 
 (doseq [n (range n-messages)]
   (>!! in-chan-1 {:n n})
-  (>!! in-chan-2 {:n n}))
+  (>!! in-chan-2 {:n (+ n 50000)}))
 
 (>!! in-chan-1 :done)
 (>!! in-chan-2 :done)
-
-(close! in-chan-1)
-(close! in-chan-2)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
@@ -53,7 +48,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.automatic-kill-test/my-invalid-fn-name
+    :onyx/fn :onyx.peer.automatic-kill-test/my-inc
     :onyx/type :function
     :onyx/batch-size batch-size}
 
@@ -111,36 +106,36 @@
             {:catalog catalog-1 :workflow workflow-1
              :task-scheduler :onyx.task-scheduler/balanced})))
 
+(def results (take-segments! out-chan-1))
+
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
+
+(prn "Go")
+
 (def j2
   (:job-id (onyx.api/submit-job
             peer-config
             {:catalog catalog-2 :workflow workflow-2
              :task-scheduler :onyx.task-scheduler/balanced})))
 
-(def j3
-  (:job-id (onyx.api/submit-job
-            peer-config
-            {:catalog catalog-3 :workflow workflow-3
-             :task-scheduler :onyx.task-scheduler/balanced})))
+(def ch (chan n-messages))
 
-(def ch (chan 100))
-
-;; Make sure we find the first two killed jobs in the replica, then bail
-(loop [replica (extensions/subscribe-to-log (:log env) ch)]
+;; Make sure we find the killed job in the replica, then bail
+#_(loop [replica (extensions/subscribe-to-log (:log env) ch)]
   (let [position (<!! ch)
         entry (extensions/read-log-entry (:log env) position)
         new-replica (extensions/apply-log-entry entry replica)]
-    (when-not (= (:killed-jobs new-replica) [j1 j2])
+    (when-not (= (:killed-jobs new-replica) [j1])
       (recur new-replica))))
+
+(def results (take-segments! out-chan-2))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
-    
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
+(close! in-chan-1)
+(close! in-chan-2)
 

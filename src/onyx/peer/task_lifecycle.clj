@@ -169,6 +169,7 @@
             leaf-vals (gen-ack-fusion-vals task-map leaves)
             fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
             link (operation/peer-link event (:acker-id (:root result)))]
+        (prn "Sending ack " (:id (:root result)) " from " (:onyx.core/task event) " with " fused-vals " " (:completion-id (:root result)))
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
@@ -218,6 +219,7 @@
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
     (doseq [m (:onyx.core/batch event)]
       (go (try (<! (timeout (or (:onyx/pending-timeout (:onyx.core/task-map event)) 60000)))
+               (taoensso.timbre/info (str "Message " (:id m) " timed out, replaying it from it's initial task."))
                (when (p-ext/pending? event (:id m))
                  (p-ext/retry-message event (:id m)))
                (catch Exception e

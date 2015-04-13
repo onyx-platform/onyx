@@ -24,6 +24,7 @@
                                 :message (first (alts!! [retry-ch chan timeout-ch] :priority true))}))
                    (remove (comp nil? :message)))]
     (doseq [m batch]
+      (prn "Read: " (:id m) "::" (:message m))
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
@@ -41,7 +42,8 @@
   (get @pending-messages message-id))
 
 (defmethod p-ext/drained? [:input :core.async]
-  [{:keys [core.async/pending-messages]}]
+  [{:keys [core.async/pending-messages] :as event}]
+  (taoensso.timbre/info (str "Aaaand: " (count @pending-messages)))
   (let [x @pending-messages]
     (and (= (count (keys x)) 1)
          (= (first (vals x)) :done))))
