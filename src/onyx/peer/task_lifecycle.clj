@@ -458,8 +458,6 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
-      (close! (:aux-ch component))
-      (close! (:replay-messages-ch component))
       (close! (:task-lifecycle-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
