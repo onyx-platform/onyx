@@ -297,7 +297,6 @@
              ch (second (alts!! [timeout-ch task-kill-ch]))]
          (when (= ch timeout-ch)
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
-             (prn tail)
              (doseq [m tail]
                (when (p-ext/pending? event (:id m))
                  (taoensso.timbre/info (str "Message " (:id m) " timed out, replaying it from it's initial task."))
