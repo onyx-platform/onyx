@@ -280,8 +280,10 @@
   (go
    (loop []
      (when-let [[v ch] (alts!! [task-kill-ch
-                                (:retry-ch messenger)
-                                (:release-ch messenger)]
+                                completion-ch
+                                seal-ch
+                                (:release-ch messenger)
+                                (:retry-ch messenger)]
                                :priority true)]
        (when-not (= ch task-kill-ch)
          (cond (= ch (:release-ch messenger))
