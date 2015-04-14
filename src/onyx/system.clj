@@ -22,7 +22,8 @@
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
-            [onyx.scheduling.percentage-task-scheduler]))
+            [onyx.scheduling.percentage-task-scheduler]
+            [onyx.plugin.core-async]))
 
 (def development-components [:logging-config :log])
 

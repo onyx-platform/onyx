@@ -289,7 +289,7 @@
                                   (:release-ch messenger)
                                   (:retry-ch messenger)]
                                  :priority true)]
-         (when-not (= ch task-kill-ch)
+         (when (and (not= ch task-kill-ch) v)
            (cond (= ch (:release-ch messenger))
                  (p-ext/ack-message event v)
 
