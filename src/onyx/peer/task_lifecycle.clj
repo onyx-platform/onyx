@@ -277,7 +277,7 @@
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
-  (go
+  (thread
    (loop []
      (when-let [[v ch] (alts!! [task-kill-ch
                                 completion-ch
