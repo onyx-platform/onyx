@@ -118,10 +118,10 @@
 (close! b-chan)
 (close! d-chan)
 
-(onyx.api/shutdown-peer-group peer-group)
-
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 
