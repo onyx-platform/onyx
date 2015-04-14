@@ -275,19 +275,33 @@
 (defn close-batch-resources [event]
   (merge event (l-ext/close-batch-resources* event)))
 
-(defn release-messages! [messenger event task-kill-ch]
+(defn launch-aux-threads!
+  [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
   (go
    (loop []
-     (when-let [id (first (alts!! [(:release-ch messenger) task-kill-ch]))]
-       (p-ext/ack-message event id)
-       (recur)))))
+     (when-let [[v ch] (alts!! [task-kill-ch
+                                (:retry-ch messenger)
+                                (:release-ch messenger)]
+                               :priority true)]
+       (when-not (= ch task-kill-ch)
+         (cond (= ch (:release-ch messenger))
+               (p-ext/ack-message event v)
 
-(defn retry-messages! [messenger event task-kill-ch]
-  (go
-   (loop []
-     (when-let [id (first (alts!! [(:retry-ch messenger) task-kill-ch]))]
-       (p-ext/retry-message event id)
-       (recur)))))
+               (= ch (:retry-ch messenger))
+               (p-ext/retry-message event v)
+
+               (= ch completion-ch)
+               (let [{:keys [id peer-id]} v]
+                 (let [peer-link (operation/peer-link event peer-id)]
+                   (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)))
+
+               (= ch seal-ch)
+               (do
+                 (p-ext/seal-resource event)
+                 (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                   :task (:onyx.core/task-id event)})]
+                   (>!! outbox-ch entry))))
+         (recur))))))
 
 (defn replay-messages! [messenger event replay-interval task-kill-ch]
   (go
@@ -303,16 +317,6 @@
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
              (recur))))))))
-
-(defn forward-completion-calls! [event completion-ch task-kill-ch]
-  (thread 
-    (loop []
-      (when-let [{:keys [id peer-id]} (first (alts!! [completion-ch task-kill-ch]))]
-        (try
-          (let [peer-link (operation/peer-link event peer-id)]
-            (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link))
-          (catch Exception e (timbre/fatal e)))
-        (recur)))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
@@ -356,17 +360,6 @@
           (close-batch-resources)))
     (catch Exception e
       (ex-f e))))
-
-(defn listen-for-sealer [job task init-event seal-ch outbox-ch]
-  ;; TODO: only launch for output tasks
-  (go
-   (try
-     (when (<! seal-ch)
-       (p-ext/seal-resource init-event)
-       (let [entry (entry/create-log-entry :seal-output {:job job :task task})]
-         (>!! outbox-ch entry)))
-     (catch Exception e
-       (warn e)))))
 
 (defn resolve-compression-fn-impls [opts]
   (assoc opts
@@ -441,20 +434,15 @@
             (Thread/sleep 500)
             (recur @replica)))
 
-        (let [release-messages-ch (release-messages! messenger pipeline-data task-kill-ch)
-              retry-messages-ch (retry-messages! messenger pipeline-data task-kill-ch)
-              replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
-              forward-completion-ch (forward-completion-calls! pipeline-data completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
-              listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
+        (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
+              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component 
             :pipeline-data pipeline-data
             :seal-ch seal-resp-ch
-            :release-messages-ch release-messages-ch
-            :retry-messages-ch retry-messages-ch
-            :forward-completion-ch forward-completion-ch
             :task-lifecycle-ch task-lifecycle-ch
-            :listen-for-sealer-ch listen-for-sealer-ch)))
+            :replay-messages-ch replay-messages-ch
+            :aux-ch aux-ch)))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
@@ -465,16 +453,15 @@
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
-      (close! (:release-messages-ch component))
-      (close! (:retry-messages-ch component))
-      (close! (:forward-completion-ch component))
+      (close! (:aux-ch component))
+      (close! (:replay-messages-ch component))
+      (close! (:task-lifecycle-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
       (<!! (:task-lifecycle-ch component))
-      (<!! (:listen-for-sealer-ch component))
-      (<!! (:forward-completion-ch component))
-      (<!! (:release-messages-ch component))
-      (<!! (:retry-messages-ch component))
+      (<!! (:replay-messages-ch component))
+      (<!! (:aux-ch component))
+      (<!! (:seal-ch component))
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
@@ -483,11 +470,10 @@
     (assoc component
       :pipeline-data nil
       :seal-ch nil
-      :release-messages-ch nil
-      :retry-messages-ch nil
-      :forward-completion-ch nil
+      :aux-ch nil
+      :replay-messages-ch nil
       :task-lifecycle-ch nil
-      :listen-for-sealer-ch nil)))
+      :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
