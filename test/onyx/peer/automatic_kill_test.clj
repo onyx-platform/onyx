@@ -29,8 +29,9 @@
 (def out-chan-2 (chan (sliding-buffer (inc n-messages))))
 
 (doseq [n (range n-messages)]
-  (>!! in-chan-1 {:n n})
-  (>!! in-chan-2 {:n (+ n 50000)}))
+  ;; Using + 50,000 on the first job to make sure messages don't cross jobs.
+  (>!! in-chan-1 {:n (+ n 50000)})
+  (>!! in-chan-2 {:n n}))
 
 (>!! in-chan-1 :done)
 (>!! in-chan-2 :done)
@@ -48,7 +49,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.automatic-kill-test/my-inc
+    :onyx/fn :onyx.peer.automatic-kill-test/my-invalid-fn
     :onyx/type :function
     :onyx/batch-size batch-size}
 
@@ -105,15 +106,6 @@
             peer-config
             {:catalog catalog-1 :workflow workflow-1
              :task-scheduler :onyx.task-scheduler/balanced})))
-
-(def results (take-segments! out-chan-1))
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
-
-(prn "Go")
-
 (def j2
   (:job-id (onyx.api/submit-job
             peer-config
@@ -123,7 +115,7 @@
 (def ch (chan n-messages))
 
 ;; Make sure we find the killed job in the replica, then bail
-#_(loop [replica (extensions/subscribe-to-log (:log env) ch)]
+(loop [replica (extensions/subscribe-to-log (:log env) ch)]
   (let [position (<!! ch)
         entry (extensions/read-log-entry (:log env) position)
         new-replica (extensions/apply-log-entry entry replica)]
@@ -132,10 +124,16 @@
 
 (def results (take-segments! out-chan-2))
 
-(let [expected (set (map (fn [x] {:n (+ x 50001)}) (range n-messages)))]
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
 (close! in-chan-1)
 (close! in-chan-2)
 
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
+
+(onyx.api/shutdown-env env)

@@ -169,7 +169,6 @@
             leaf-vals (gen-ack-fusion-vals task-map leaves)
             fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
             link (operation/peer-link event (:acker-id (:root result)))]
-        (prn "Sending ack " (:id (:root result)) " from " (:onyx.core/task event) " with " fused-vals " " (:completion-id (:root result)))
         (extensions/internal-ack-message
          (:onyx.core/messenger event)
          event
@@ -485,7 +484,7 @@
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
     (when-not start-lifecycle?
-      (timbre/info (format "[%s / %s] Sequential task currently has queue consumers. Backing off and retrying..." id lifecycle-id)))))
+      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..." id lifecycle-id)))))
 
 (dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
