@@ -57,6 +57,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 | key name              | type     | default
 |-----------------------|----------|--------
 |`:onyx/pending-timeout`|`integer` | `60000`
+|`:onyx/replay-interval`|`integer` | `1000`
 |`:onyx/max-pending`    |`integer` | `10000`
 
 #### Maps with `:onyx/type` set to `:function` must have these keys

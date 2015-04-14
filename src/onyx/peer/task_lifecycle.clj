@@ -214,15 +214,9 @@
                    (partial add-acker-id event))
              batch))))))
 
-(defn start-message-timeout-monitors [event]
+(defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (doseq [m (:onyx.core/batch event)]
-      (go (try (<! (timeout (or (:onyx/pending-timeout (:onyx.core/task-map event)) 60000)))
-               (taoensso.timbre/info (str "Message " (:id m) " timed out, replaying it from it's initial task."))
-               (when (p-ext/pending? event (:id m))
-                 (p-ext/retry-message event (:id m)))
-               (catch Exception e
-                 (taoensso.timbre/warn e))))))
+    (swap! state update-in [:timeout-pool 0] concat (map :id (:onyx.core/batch event))))
   event)
 
 (defn try-complete-job [event]
@@ -293,7 +287,23 @@
    (loop []
      (when-let [id (first (alts!! [(:retry-ch messenger) task-kill-ch]))]
        (p-ext/retry-message event id)
-       (recur))) ))
+       (recur)))))
+
+(defn replay-messages! [messenger event replay-interval task-kill-ch]
+  (go
+   (when (= :input (:onyx/type (:onyx.core/task-map event)))
+     (loop []
+       (let [timeout-ch (timeout replay-interval)
+             ch (second (alts!! [timeout-ch task-kill-ch]))]
+         (when (= ch timeout-ch)
+           (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
+             (prn tail)
+             (doseq [m tail]
+               (when (p-ext/pending? event (:id m))
+                 (taoensso.timbre/info (str "Message " (:id m) " timed out, replaying it from it's initial task."))
+                 (p-ext/retry-message event (:id m))))
+             (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
+             (recur))))))))
 
 (defn forward-completion-calls! [event completion-ch task-kill-ch]
   (thread 
@@ -335,7 +345,7 @@
           (inject-batch-resources)
           (read-batch)
           (tag-messages)
-          (start-message-timeout-monitors)
+          (add-messages-to-timeout-pool)
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
@@ -384,6 +394,11 @@
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             catalog-entry (find-task catalog (:name task))
+            ;; Number of buckets in the timeout pool is covered over a 60 second
+            ;; interval, moving each bucket back 60 seconds / N buckets
+            replay-interval (or (:onyx/replay-interval opts) 1000)
+            n-buckets (int (Math/ceil (/ 60000 replay-interval)))
+            buckets (vec (repeat n-buckets []))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -407,7 +422,7 @@
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/replica replica
-                           :onyx.core/state (atom {})}
+                           :onyx.core/state (atom {:timeout-pool buckets})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
@@ -428,6 +443,7 @@
 
         (let [release-messages-ch (release-messages! messenger pipeline-data task-kill-ch)
               retry-messages-ch (retry-messages! messenger pipeline-data task-kill-ch)
+              replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
               forward-completion-ch (forward-completion-calls! pipeline-data completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
               listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]

@@ -20,7 +20,6 @@
   (map->AckingDaemon {:opts config}))
 
 (defn ack-message [daemon message-id completion-id ack-val]
-  (prn "Incoming: " message-id "::" ack-val "::" completion-id)
   (let [rets
         (swap!
          (:ack-state daemon)
@@ -30,7 +29,6 @@
              (let [current-val (second (get-in state [message-id]))]
                (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
     (when-let [x (get rets message-id)]
-      (prn "Acked: " message-id "::" (second x))
       (when (zero? (second x))
         (swap! (:ack-state daemon) dissoc message-id)
         (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})))))
