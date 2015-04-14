@@ -85,7 +85,7 @@
     :catalog catalog-2
     :task-scheduler :onyx.task-scheduler/balanced}))
 
-(def n-peers 40)
+(def n-peers 20)
 
 (def v-peers (onyx.api/start-peers n-peers peer-group))
 
@@ -95,7 +95,7 @@
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
 (fact "20 peers were allocated to job 1, task A, 20 peers were allocated to job 1, task B" 
-      (get-counts replica-1 [j1 j2]) => [[20 20] [0 0]])
+      (get-counts replica-1 [j1 j2]) => [[10 10] [0 0]])
 
 (>!! a-chan :done)
 (close! a-chan)
@@ -104,7 +104,7 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => [[] [20 20]])
+      (get-counts replica-2 [j1 j2]) => [[] [10 10]])
 
 (>!! c-chan :done)
 (close! c-chan)
