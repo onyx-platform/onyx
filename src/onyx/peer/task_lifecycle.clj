@@ -40,9 +40,12 @@
   (l-ext/start-lifecycle?* event))
 
 (defn add-acker-id [event m]
-  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
-        n (mod (hash (:message m)) (count peers))]
-    (assoc m :acker-id (nth peers n))))
+  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
+    (if-not (seq peers)
+      (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
+          (throw (ex-info "Not enough acker peers" {:peers peers})))
+      (let [n (mod (hash (:message m)) (count peers))]
+        (assoc m :acker-id (nth peers n))))))
 
 (defn add-completion-id [event m]
   (assoc m :completion-id (:onyx.core/id event)))

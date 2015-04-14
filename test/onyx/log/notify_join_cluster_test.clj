@@ -2,11 +2,12 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.system]
             [midje.sweet :refer :all]))
 
 (def peer-config 
-  (:peer-config (read-string (slurp (clojure.java.io/resource "test-config.edn")))))
+  (:peer-config (load-config)))
 
 (let [entry (create-log-entry :notify-join-cluster {:observer :d :subject :a})
       f (partial extensions/apply-log-entry entry)

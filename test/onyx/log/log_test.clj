@@ -4,12 +4,13 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.messaging.dummy-messenger]
+            [onyx.test-helper :refer [load-config]]
             [midje.sweet :refer :all]
             [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
