@@ -2,7 +2,7 @@
     (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
-              [taoensso.timbre :refer [info warn trace] :as timbre]
+              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.static.planning :refer [find-task build-pred-fn]]
@@ -278,32 +278,35 @@
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
-   (loop []
-     (when-let [[v ch] (alts!! [task-kill-ch
-                                completion-ch
-                                seal-ch
-                                (:release-ch messenger)
-                                (:retry-ch messenger)]
-                               :priority true)]
-       (when-not (= ch task-kill-ch)
-         (cond (= ch (:release-ch messenger))
-               (p-ext/ack-message event v)
+   (try
+     (loop []
+       (when-let [[v ch] (alts!! [task-kill-ch
+                                  completion-ch
+                                  seal-ch
+                                  (:release-ch messenger)
+                                  (:retry-ch messenger)]
+                                 :priority true)]
+         (when-not (= ch task-kill-ch)
+           (cond (= ch (:release-ch messenger))
+                 (p-ext/ack-message event v)
 
-               (= ch (:retry-ch messenger))
-               (p-ext/retry-message event v)
+                 (= ch (:retry-ch messenger))
+                 (p-ext/retry-message event v)
 
-               (= ch completion-ch)
-               (let [{:keys [id peer-id]} v]
-                 (let [peer-link (operation/peer-link event peer-id)]
-                   (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)))
+                 (= ch completion-ch)
+                 (let [{:keys [id peer-id]} v]
+                   (let [peer-link (operation/peer-link event peer-id)]
+                     (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)))
 
-               (= ch seal-ch)
-               (do
-                 (p-ext/seal-resource event)
-                 (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
-                                                                   :task (:onyx.core/task-id event)})]
-                   (>!! outbox-ch entry))))
-         (recur))))))
+                 (= ch seal-ch)
+                 (do
+                   (p-ext/seal-resource event)
+                   (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                     :task (:onyx.core/task-id event)})]
+                     (>!! outbox-ch entry))))
+           (recur))))
+     (catch Exception e
+       (fatal e)))))
 
 (defn replay-messages! [messenger event replay-interval task-kill-ch]
   (go
