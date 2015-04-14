@@ -30,7 +30,6 @@
       (extensions/write-log-entry (:log env) {:n n}))
 
     (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
-
   (finally
     (onyx.api/shutdown-env env)))
 
@@ -59,7 +58,6 @@
     (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
                       (range entries)))
           => entries))
-
   (finally 
     (onyx.api/shutdown-env env)))
 

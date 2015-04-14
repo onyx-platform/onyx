@@ -105,7 +105,7 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => [[] [5 5]])
+      (get-counts replica-2 [j1 j2]) => [[0 0] [5 5]])
 
 (>!! c-chan :done)
 (close! c-chan)
@@ -113,7 +113,7 @@
 (def replica-3
   (playback-log (:log env) replica-2 ch 2000))
 
-(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[] []])
+(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[0 0] [0 0]])
 
 (close! b-chan)
 (close! d-chan)
