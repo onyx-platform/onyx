@@ -298,9 +298,9 @@
          (when (= ch timeout-ch)
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
-               (when (p-ext/pending? event (:id m))
-                 (taoensso.timbre/info (str "Message " (:id m) " timed out, replaying it from it's initial task."))
-                 (p-ext/retry-message event (:id m))))
+               (when (p-ext/pending? event m)
+                 (taoensso.timbre/info (str "Message " m " timed out, replaying it from it's initial task."))
+                 (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
              (recur))))))))
 
@@ -395,8 +395,9 @@
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
-            replay-interval (or (:onyx/replay-interval opts) 1000)
-            n-buckets (int (Math/ceil (/ 60000 replay-interval)))
+            replay-interval (or (:onyx/replay-interval catalog-entry) 1000)
+            pending-timeout (or (:onyx/pending-timeout catalog-entry) 60000)
+            n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
             buckets (vec (repeat n-buckets []))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
