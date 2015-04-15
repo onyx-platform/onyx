@@ -57,6 +57,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 | key name              | type     | default
 |-----------------------|----------|--------
 |`:onyx/pending-timeout`|`integer` | `60000`
+|`:onyx/replay-interval`|`integer` | `1000`
 |`:onyx/max-pending`    |`integer` | `10000`
 
 #### Maps with `:onyx/type` set to `:function` must have these keys
@@ -116,7 +117,7 @@ may be added by the user as the context is associated to throughout the task pip
 |`:onyx.core/messenger-buffer` |`channel`  | The messenger buffer core.async channel for this peer|
 |`:onyx.core/messenger`        |`record`   | The Messenger record Component|
 |`:onyx.core/outbox-ch`        |`channel`  | The outbox core.async channel for this peer|
-|`:onyx.core/seal-response-ch` |`channel`  | The core.async channel to deliver seal notifications for this job|
+|`:onyx.core/seal-ch`          |`channel`  | The core.async channel to deliver seal notifications for this job|
 |`:onyx.core/peer-opts`        |`map`      | The options that this peer was started with|
 |`:onyx.core/replica`          |`atom`     | The replica that this peer has currently accrued|
 |`:onyx.core/state`            |`atom`     | The state that this peer has accrued|

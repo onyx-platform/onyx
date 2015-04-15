@@ -2,12 +2,12 @@
   (:require [com.stuartsierra.component :as component]
             [onyx.system :refer [onyx-development-env]]
             [midje.sweet :refer :all]
-            [onyx.queue.hornetq-utils :as hq-util]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 

@@ -3,13 +3,13 @@
             [com.stuartsierra.component :as component]
             [midje.sweet :refer :all]
             [onyx.system :refer [onyx-development-env]]
-            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.extensions :as extensions]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 

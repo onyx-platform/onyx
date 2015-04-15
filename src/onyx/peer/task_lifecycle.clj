@@ -2,7 +2,7 @@
     (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
-              [taoensso.timbre :refer [info warn trace] :as timbre]
+              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.static.planning :refer [find-task build-pred-fn]]
@@ -40,9 +40,12 @@
   (l-ext/start-lifecycle?* event))
 
 (defn add-acker-id [event m]
-  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])
-        n (mod (hash (:message m)) (count peers))]
-    (assoc m :acker-id (nth peers n))))
+  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
+    (if-not (seq peers)
+      (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
+          (throw (ex-info "Not enough acker peers" {:peers peers})))
+      (let [n (mod (hash (:message m)) (count peers))]
+        (assoc m :acker-id (nth peers n))))))
 
 (defn add-completion-id [event m]
   (assoc m :completion-id (:onyx.core/id event)))
@@ -214,14 +217,9 @@
                    (partial add-acker-id event))
              batch))))))
 
-(defn start-message-timeout-monitors [event]
+(defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (doseq [m (:onyx.core/batch event)]
-      (go (try (<! (timeout (or (:onyx/pending-timeout (:onyx.core/task-map event)) 60000)))
-               (when (p-ext/pending? event (:id m))
-                 (p-ext/retry-message event (:id m)))
-               (catch Exception e
-                 (taoensso.timbre/warn e))))))
+    (swap! state update-in [:timeout-pool 0] concat (map :id (:onyx.core/batch event))))
   event)
 
 (defn try-complete-job [event]
@@ -280,29 +278,53 @@
 (defn close-batch-resources [event]
   (merge event (l-ext/close-batch-resources* event)))
 
-(defn release-messages! [messenger event]
-  (go
-   (loop []
-     (when-let [id (<! (:release-ch messenger))]
-       (p-ext/ack-message event id)
-       (recur)))))
+(defn launch-aux-threads!
+  [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
+  (thread
+   (try
+     (loop []
+       (when-let [[v ch] (alts!! [task-kill-ch
+                                  completion-ch
+                                  seal-ch
+                                  (:release-ch messenger)
+                                  (:retry-ch messenger)]
+                                 :priority true)]
+         (when (and (not= ch task-kill-ch) v)
+           (cond (= ch (:release-ch messenger))
+                 (p-ext/ack-message event v)
 
-(defn retry-messages! [messenger event]
-  (go
-   (loop []
-     (when-let [id (<! (:retry-ch messenger))]
-       (p-ext/retry-message event id)
-       (recur)))))
+                 (= ch (:retry-ch messenger))
+                 (p-ext/retry-message event v)
 
-(defn forward-completion-calls! [event completion-ch]
-  (try
-    (loop []
-      (when-let [{:keys [id peer-id]} (<!! completion-ch)]
-        (let [peer-link (operation/peer-link event peer-id)]
-          (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)
-          (recur))))
-    (catch Exception e
-      (timbre/fatal e))))
+                 (= ch completion-ch)
+                 (let [{:keys [id peer-id]} v]
+                   (let [peer-link (operation/peer-link event peer-id)]
+                     (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)))
+
+                 (= ch seal-ch)
+                 (do
+                   (p-ext/seal-resource event)
+                   (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                     :task (:onyx.core/task-id event)})]
+                     (>!! outbox-ch entry))))
+           (recur))))
+     (catch Exception e
+       (fatal e)))))
+
+(defn replay-messages! [messenger event replay-interval task-kill-ch]
+  (go
+   (when (= :input (:onyx/type (:onyx.core/task-map event)))
+     (loop []
+       (let [timeout-ch (timeout replay-interval)
+             ch (second (alts!! [timeout-ch task-kill-ch]))]
+         (when (= ch timeout-ch)
+           (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
+             (doseq [m tail]
+               (when (p-ext/pending? event m)
+                 (taoensso.timbre/info (str "Message " m " timed out, replaying it from it's initial task."))
+                 (p-ext/retry-message event m)))
+             (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
+             (recur))))))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
   (warn e)
@@ -334,7 +356,7 @@
           (inject-batch-resources)
           (read-batch)
           (tag-messages)
-          (start-message-timeout-monitors)
+          (add-messages-to-timeout-pool)
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
@@ -346,17 +368,6 @@
           (close-batch-resources)))
     (catch Exception e
       (ex-f e))))
-
-(defn listen-for-sealer [job task init-event seal-ch outbox-ch]
-  ;; TODO: only launch for output tasks
-  (go
-   (try
-     (when (<! seal-ch)
-       (p-ext/seal-resource init-event)
-       (let [entry (entry/create-log-entry :seal-output {:job job :task task})]
-         (>!! outbox-ch entry)))
-     (catch Exception e
-       (warn e)))))
 
 (defn resolve-compression-fn-impls [opts]
   (assoc opts
@@ -372,7 +383,9 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
-(defrecord TaskLifeCycle [id log messenger-buffer messenger job-id task-id replica restart-ch kill-ch outbox-ch seal-resp-ch completion-ch opts]
+(defrecord TaskLifeCycle
+    [id log messenger-buffer messenger job-id task-id replica restart-ch
+     kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
   component/Lifecycle
 
   (start [component]
@@ -381,6 +394,12 @@
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             catalog-entry (find-task catalog (:name task))
+            ;; Number of buckets in the timeout pool is covered over a 60 second
+            ;; interval, moving each bucket back 60 seconds / N buckets
+            replay-interval (or (:onyx/replay-interval catalog-entry) 1000)
+            pending-timeout (or (:onyx/pending-timeout catalog-entry) 60000)
+            n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
+            buckets (vec (repeat n-buckets []))
 
             _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -401,87 +420,79 @@
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/outbox-ch outbox-ch
-                           :onyx.core/seal-response-ch seal-resp-ch
+                           :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/replica replica
-                           :onyx.core/state (atom {})}
+                           :onyx.core/state (atom {:timeout-pool buckets})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
 
-        (while (and (first (alts!! [kill-ch] :default true))
+        (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
-          (when (and (first (alts!! [kill-ch] :default true))
+          (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))
 
-        (let [release-messages-ch (release-messages! messenger pipeline-data)
-              retry-messages-ch (retry-messages! messenger pipeline-data)
-              forward-completion-ch (thread (forward-completion-calls! pipeline-data completion-ch))
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
-              listen-for-sealer-ch (listen-for-sealer job-id task-id pipeline-data seal-resp-ch outbox-ch)]
+        (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
+              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component 
-                 :pipeline-data pipeline-data 
-                 :seal-ch seal-resp-ch
-                 :release-messages-ch release-messages-ch
-                 :retry-messages-ch retry-messages-ch
-                 :forward-completion-ch forward-completion-ch 
-                 :task-lifecycle-ch task-lifecycle-ch
-                 :listen-for-sealer-ch listen-for-sealer-ch)))
+            :pipeline-data pipeline-data
+            :seal-ch seal-resp-ch
+            :task-lifecycle-ch task-lifecycle-ch
+            :replay-messages-ch replay-messages-ch
+            :aux-ch aux-ch)))
       (catch Exception e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
-    (let [event (:pipeline-data component)]
+    (when-let [event (:pipeline-data component)]
       (l-ext/close-lifecycle-resources* event)
 
       (close! (:seal-ch component))
-      (close! (:release-messages-ch component))
-      (close! (:retry-messages-ch component))
-      (close! (:forward-completion-ch component))
+      (close! (:task-lifecycle-ch component))
       
       ;; Ensure task operations are finished before closing peer connections
       (<!! (:task-lifecycle-ch component))
-      (<!! (:listen-for-sealer-ch component))
-      (<!! (:forward-completion-ch component))
-      (<!! (:release-messages-ch component))
-      (<!! (:retry-messages-ch component))
+      (<!! (:replay-messages-ch component))
+      (<!! (:aux-ch component))
+      (<!! (:seal-ch component))
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
 
-    (assoc component 
-           :pipeline-data nil 
-           :seal-ch nil
-           :release-messages-ch nil
-           :retry-messages-ch nil
-           :forward-completion-ch nil 
-           :task-lifecycle-ch nil
-           :listen-for-sealer-ch nil)))
+    (assoc component
+      :pipeline-data nil
+      :seal-ch nil
+      :aux-ch nil
+      :replay-messages-ch nil
+      :task-lifecycle-ch nil
+      :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
-                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts]}]
+                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job :task-id task :restart-ch restart-ch
                        :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
-                       :opts opts}))
+                       :opts opts :task-kill-ch task-kill-ch}))
 
 (dire/with-post-hook! #'munge-start-lifecycle
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
     (when-not start-lifecycle?
-      (timbre/info (format "[%s / %s] Sequential task currently has queue consumers. Backing off and retrying..." id lifecycle-id)))))
+      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..." id lifecycle-id)))))
 
 (dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]

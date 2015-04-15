@@ -4,12 +4,13 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.messaging.dummy-messenger]
+            [onyx.test-helper :refer [load-config]]
             [midje.sweet :refer :all]
             [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
@@ -29,7 +30,6 @@
       (extensions/write-log-entry (:log env) {:n n}))
 
     (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
-
   (finally
     (onyx.api/shutdown-env env)))
 
@@ -58,7 +58,6 @@
     (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
                       (range entries)))
           => entries))
-
   (finally 
     (onyx.api/shutdown-env env)))
 

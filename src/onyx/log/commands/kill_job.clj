@@ -8,15 +8,18 @@
 
 (defmethod extensions/apply-log-entry :kill-job
   [{:keys [args]} replica]
-  (let [peers (mapcat identity (vals (get-in replica [:allocations (:job args)])))]
-    (-> replica
-        (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
-        (update-in [:jobs] vec)
-        (update-in [:killed-jobs] conj (:job args))
-        (update-in [:killed-jobs] vec)
-        (update-in [:allocations] dissoc (:job args))
-        (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))})
-        (reconfigure-cluster-workload))))
+  (if-not (some #{(:job args)} (:killed-jobs replica))
+    (let [peers (mapcat identity (vals (get-in replica [:allocations (:job args)])))]
+      (-> replica
+          (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
+          (update-in [:jobs] vec)
+          (update-in [:killed-jobs] conj (:job args))
+          (update-in [:killed-jobs] vec)
+          (update-in [:allocations] dissoc (:job args))
+          (update-in [:ackers] dissoc (:job args))
+          (merge {:peer-state (into {} (map (fn [p] {p :idle}) peers))})
+          (reconfigure-cluster-workload)))
+    replica))
 
 (defmethod extensions/replica-diff :kill-job
   [entry old new]

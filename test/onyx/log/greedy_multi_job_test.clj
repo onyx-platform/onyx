@@ -4,12 +4,13 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.test-helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
             [midje.sweet :refer :all]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
@@ -85,7 +86,7 @@
     :catalog catalog-2
     :task-scheduler :onyx.task-scheduler/balanced}))
 
-(def n-peers 40)
+(def n-peers 10)
 
 (def v-peers (onyx.api/start-peers n-peers peer-group))
 
@@ -94,8 +95,10 @@
 (def replica-1
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "20 peers were allocated to job 1, task A, 20 peers were allocated to job 1, task B" 
-      (get-counts replica-1 [j1 j2]) => [[20 20] [0 0]])
+(let [])
+(fact "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B" 
+      (get-counts replica-1 [j1 j2]) => (fn [x] (or (= x [[5 5] [0 0]])
+                                                   (= x [[5 5] []]))))
 
 (>!! a-chan :done)
 (close! a-chan)
@@ -103,8 +106,9 @@
 (def replica-2
   (playback-log (:log env) replica-1 ch 2000))
 
-(fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => [[] [20 20]])
+(fact "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D" 
+      (get-counts replica-2 [j1 j2]) => (fn [x] (or (= x [[0 0] [5 5]])
+                                                   (= x [[] [5 5]]))))
 
 (>!! c-chan :done)
 (close! c-chan)
@@ -112,15 +116,17 @@
 (def replica-3
   (playback-log (:log env) replica-2 ch 2000))
 
-(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[] []])
+(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2])
+      => (fn [x] (or (= x [[0 0] [0 0]])
+                    (= x [[] []]))))
 
 (close! b-chan)
 (close! d-chan)
 
-(onyx.api/shutdown-peer-group peer-group)
-
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
 

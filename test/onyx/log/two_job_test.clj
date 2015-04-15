@@ -4,7 +4,7 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
-            [onyx.test-helper :refer [playback-log get-counts]]
+            [onyx.test-helper :refer [playback-log get-counts load-config]]
             ; Add for generative testing later
             ;[onyx.log.generative-test :as log-gen-test]
             ;[clojure.test.check.generators :as gen]
@@ -17,7 +17,7 @@
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
