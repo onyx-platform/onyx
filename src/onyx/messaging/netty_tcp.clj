@@ -215,45 +215,37 @@
                 (.handler (client-channel-initializer (new-client-handler))))]
         (.channel ^ChannelFuture (.connect b host port))))))
 
-(defn app [daemon parsed-ch inbound-ch release-ch retry-ch shutdown-ch]
+(defn app [daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch]
   (go-loop []
-           (when-let [msg (first (alts!! [parsed-ch shutdown-ch]))]
-             (try 
-               (let [t ^byte (:type msg)]
-                 (cond (= t protocol/messages-type-id) 
-                       (doseq [message (:messages msg)]
-                         (>!! inbound-ch message))
+          (let [[buf ch] (alts!! [buf-recv-ch shutdown-ch])]
+            (when buf 
+              (try 
+                (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
+                  ;; undo retain added in server handler
+                  (.release ^ByteBuf buf)
+                  (let [t ^byte (:type msg)]
+                    (cond (= t protocol/messages-type-id) 
+                          (doseq [message (:messages msg)]
+                            (>!! inbound-ch message))
 
-                       (= t protocol/ack-type-id)
-                       (acker/ack-message daemon
-                                          (:id msg)
-                                          (:completion-id msg)
-                                          (:ack-val msg))
+                          (= t protocol/ack-type-id)
+                          (acker/ack-message daemon
+                                             (:id msg)
+                                             (:completion-id msg)
+                                             (:ack-val msg))
 
-                       (= t protocol/completion-type-id)
-                       (>!! release-ch (:id msg))
+                          (= t protocol/completion-type-id)
+                          (>!! release-ch (:id msg))
 
-                       (= t protocol/retry-type-id)
-                       (>!! retry-ch (:id msg))
+                          (= t protocol/retry-type-id)
+                          (>!! retry-ch (:id msg))
 
-                       :else
-                       (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
-             (catch Exception e
-               (taoensso.timbre/error e)
-               (throw e))))
-           (recur)))
-
-(defn buf-recv-loop [messenger buf-recv-ch parsed-ch shutdown-ch]
-  (go-loop []
-           (when-let [buf (first (alts!! [buf-recv-ch shutdown-ch]))]
-             (try 
-               (let [decompressed (protocol/read-buf (:decompress-f messenger) buf)]
-                 (>!! parsed-ch decompressed)
-                 ;; undo retain added in server handler
-                 (.release ^ByteBuf buf))
-               (catch Throwable t
-                 (timbre/fatal t "Exception in recv loop.")))
-             (recur))))
+                          :else
+                          (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
+                (catch Exception e
+                  (taoensso.timbre/error e)
+                  (throw e)))
+              (recur)))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -284,10 +276,9 @@
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
     (try 
       (when-let [rs @resources]
-        (let [{:keys [shutdown-fn shutdown-ch parsed-ch]} rs] 
-          (shutdown-fn)
-          (close! parsed-ch)
-          (close! shutdown-ch))
+        (let [{:keys [shutdown-fn shutdown-ch]} rs] 
+          (close! shutdown-ch)
+          (shutdown-fn))
         (reset! resources nil)) 
       (catch Exception e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
@@ -305,7 +296,6 @@
 (defmethod extensions/open-peer-site NettyTcpSockets
   [messenger assigned]
   (let [buf-recv-ch (chan 10000)
-        parsed-ch (chan (clojure.core.async/dropping-buffer 10000))
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
         retry-ch (:retry-ch messenger)
@@ -316,15 +306,12 @@
                                         (:netty/port assigned) 
                                         buf-recv-ch)
         shutdown-ch (chan 1)
-        buf-loop (buf-recv-loop messenger buf-recv-ch parsed-ch shutdown-ch)
-        app-loop (app daemon parsed-ch inbound-ch release-ch retry-ch shutdown-ch)]
+        app-loop (app daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch)]
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn 
              :shutdown-ch shutdown-ch
              :buf-recv-ch buf-recv-ch
-             :buf-loop buf-loop
-             :app-loop app-loop 
-             :parsed-ch parsed-ch})))
+             :app-loop app-loop})))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event {:keys [netty/external-addr netty/port]}]
