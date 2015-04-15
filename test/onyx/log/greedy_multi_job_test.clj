@@ -95,8 +95,10 @@
 (def replica-1
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "20 peers were allocated to job 1, task A, 20 peers were allocated to job 1, task B" 
-      (get-counts replica-1 [j1 j2]) => [[5 5] [0 0]])
+(let [])
+(fact "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B" 
+      (get-counts replica-1 [j1 j2]) => (fn [x] (or (= x [[5 5] [0 0]])
+                                                   (= x [[5 5] []]))))
 
 (>!! a-chan :done)
 (close! a-chan)
@@ -104,8 +106,9 @@
 (def replica-2
   (playback-log (:log env) replica-1 ch 2000))
 
-(fact "20 peers were reallocated to job 2, task C, 20 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => [[0 0] [5 5]])
+(fact "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D" 
+      (get-counts replica-2 [j1 j2]) => (fn [x] (or (= x [[0 0] [5 5]])
+                                                   (= x [[] [5 5]]))))
 
 (>!! c-chan :done)
 (close! c-chan)
@@ -113,7 +116,9 @@
 (def replica-3
   (playback-log (:log env) replica-2 ch 2000))
 
-(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2]) => [[0 0] [0 0]])
+(fact "No peers are executing any tasks" (get-counts replica-3 [j1 j2])
+      => (fn [x] (or (= x [[0 0] [0 0]])
+                    (= x [[] []]))))
 
 (close! b-chan)
 (close! d-chan)
