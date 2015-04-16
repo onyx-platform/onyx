@@ -166,7 +166,7 @@
     (mapcat :ack-vals (remove (fn [leaf] (= (:action (:routes leaf)) :retry)) leaves))))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
-  (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
+  (when (not (:onyx/bulk? (:onyx.core/task-map event)))
     (doseq [result results]
       (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
             leaf-vals (gen-ack-fusion-vals task-map leaves)
@@ -268,7 +268,7 @@
        batch)})))
 
 (defn apply-fn [event]
-  (if (:onyx/side-effects-only? (:onyx.core/task-map event))
+  (if (:onyx/bulk? (:onyx.core/task-map event))
     (apply-fn-batch event)
     (apply-fn-single event)))
 
