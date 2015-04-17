@@ -1,4 +1,4 @@
-(ns onyx.peer.batch-function-test
+(ns onyx.peer.bulk-function-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
