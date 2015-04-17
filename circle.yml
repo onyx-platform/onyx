@@ -9,7 +9,7 @@ machine:
 
 dependencies:
   pre:
-    bash ./install-aeron.sh
+    - bash ./install-aeron.sh
   cache_directories:
     - Aeron
 
