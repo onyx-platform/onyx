@@ -9,12 +9,7 @@ machine:
 
 dependencies:
   pre:
-    - "cd .."
-    - "git clone https://github.com/real-logic/Aeron.git"
-    - "cd Aeron"
-    - "git checkout cb3588760f88aac614ec5bbae9e05d1c7a675968"
-    - "./gradlew"
-    - "gradle install"
+    - cd .. && git clone https://github.com/real-logic/Aeron.git && cd Aeron && git checkout cb3588760f88aac614ec5bbae9e05d1c7a675968 && ./gradlew && gradle install
   cache_directories:
     - "~/Aeron"
 
