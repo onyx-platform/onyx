@@ -1,4 +1,4 @@
-(ns onyx.messaging.protocol-test
+(ns onyx.messaging.protocol-netty-test
   (:require [onyx.messaging.protocol-netty :as protocol]
             [onyx.compression.nippy :refer [compress decompress]]
             [midje.sweet :refer :all]))
