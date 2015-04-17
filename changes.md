@@ -21,6 +21,7 @@
 - Return type of public API function submit-job has changed. It now returns a map containing job-id, and task-ids keys.
 - The last task in a workflow no longer needs to be an `output` task
 - Renamed "Round Robin" schedulers to "Balanced"
+- Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
 
 #### 0.5.3
 
