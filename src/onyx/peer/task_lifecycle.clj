@@ -441,7 +441,7 @@
 
         (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch task-kill-ch ex-f))]
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component 
             :pipeline-data pipeline-data
             :seal-ch seal-resp-ch
