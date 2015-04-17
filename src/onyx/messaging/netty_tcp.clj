@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
-    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop dropping-buffer]]
+    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! thread go-loop dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -102,7 +102,7 @@
                         set)
         port (first (remove used-ports
                             (:netty/ports peer-site)))]
-    (assert port)
+    (assert port "Couldn't assign port - ran out of available ports.")
     {:netty/port port}))
 
 (defn int32-frame-decoder
@@ -170,7 +170,6 @@
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
       (.childHandler initializer))
-                                        ; Start bootstrap
     (let [ch (->> (InetSocketAddress. host port)
                   (.bind bootstrap)
                   (.sync)
@@ -187,7 +186,7 @@
     (handlerAdded [ctx])
     (handlerRemoved [ctx])
     (exceptionCaught [context cause]
-      (.printStackTrace cause)
+      (timbre/error cause "TCP client exception.")
       (.close context))))
 
 (defn client-channel-initializer [handler]
@@ -216,11 +215,13 @@
         (.channel ^ChannelFuture (.connect b host port))))))
 
 (defn app [daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch]
-  (go-loop []
+  (thread
+    (loop []
           (let [[buf ch] (alts!! [buf-recv-ch shutdown-ch])]
             (when buf 
               (try 
                 (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
+                  ;(taoensso.timbre/info "Message buf: " buf msg)
                   ;; undo retain added in server handler
                   (.release ^ByteBuf buf)
                   (let [t ^byte (:type msg)]
@@ -245,7 +246,7 @@
                 (catch Exception e
                   (taoensso.timbre/error e)
                   (throw e)))
-              (recur)))))
+              (recur))))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -276,9 +277,10 @@
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
     (try 
       (when-let [rs @resources]
-        (let [{:keys [shutdown-fn shutdown-ch]} rs] 
+        (let [{:keys [shutdown-fn shutdown-ch app-loop]} rs] 
+          (shutdown-fn)
           (close! shutdown-ch)
-          (shutdown-fn))
+          (<!! app-loop))
         (reset! resources nil)) 
       (catch Exception e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
@@ -331,12 +333,14 @@
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
+  ;(taoensso.timbre/info "SENDING messages " messages)
   (.writeAndFlush peer-link 
                   ^ByteBuf (protocol/build-messages-msg-buf (:compress-f messenger) messages) 
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]
+  ;(taoensso.timbre/info "SENDING ACK: " message-id ack-val)
   (.writeAndFlush peer-link 
                   ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)
                   (.voidPromise ^Channel peer-link)))
