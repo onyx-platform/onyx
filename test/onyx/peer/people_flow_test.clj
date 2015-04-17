@@ -55,25 +55,21 @@
    {:onyx/name :process-children
     :onyx/fn :onyx.peer.people-flow-test/process-children
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-adults
     :onyx/fn :onyx.peer.people-flow-test/process-adults
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-athletes-in-washington
     :onyx/fn :onyx.peer.people-flow-test/process-athletes-in-washington
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-everyone
     :onyx/fn :onyx.peer.people-flow-test/process-everyone
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :children-out

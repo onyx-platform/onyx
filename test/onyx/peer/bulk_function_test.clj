@@ -1,4 +1,4 @@
-(ns onyx.peer.batch-function-test
+(ns onyx.peer.bulk-function-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
@@ -35,9 +35,9 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.peer.batch-function-test/my-inc
+    :onyx/fn :onyx.peer.bulk-function-test/my-inc
     :onyx/type :function
-    :onyx/side-effects-only? true
+    :onyx/bulk? true
     :onyx/batch-size batch-size}
 
    {:onyx/name :out

@@ -6,10 +6,16 @@
 
 (defmethod l-ext/inject-lifecycle-resources :core.async/read-from-chan
   [_ event]
+  (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
   {:core.async/pending-messages (atom {})
    :core.async/retry-ch (chan 1000)})
 
-(defmethod p-ext/read-batch [:input :core.async]
+(defmethod l-ext/inject-lifecycle-resources :core.async/write-to-chan
+  [_ event]
+  (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
+  {})
+
+(defmethod p-ext/read-batch :core.async/read-from-chan
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
            core.async/pending-messages] :as event}]
   (let [pending (count (keys @pending-messages))
@@ -27,32 +33,32 @@
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
-(defmethod p-ext/ack-message [:input :core.async]
+(defmethod p-ext/ack-message :core.async/read-from-chan
   [{:keys [core.async/pending-messages]} message-id]
   (swap! pending-messages dissoc message-id))
 
-(defmethod p-ext/retry-message [:input :core.async]
+(defmethod p-ext/retry-message :core.async/read-from-chan
   [{:keys [core.async/pending-messages core.async/retry-ch]} message-id]
   (>!! retry-ch (get @pending-messages message-id))
   (swap! pending-messages dissoc message-id))
 
-(defmethod p-ext/pending? [:input :core.async]
+(defmethod p-ext/pending? :core.async/read-from-chan
   [{:keys [core.async/pending-messages]} message-id]
   (get @pending-messages message-id))
 
-(defmethod p-ext/drained? [:input :core.async]
+(defmethod p-ext/drained? :core.async/read-from-chan
   [{:keys [core.async/pending-messages] :as event}]
   (let [x @pending-messages]
     (and (= (count (keys x)) 1)
          (= (first (vals x)) :done))))
 
-(defmethod p-ext/write-batch [:output :core.async]
+(defmethod p-ext/write-batch :core.async/write-to-chan
   [{:keys [onyx.core/results core.async/chan] :as event}]
   (doseq [msg (mapcat :leaves results)]
     (>!! chan (:message msg)))
   {})
 
-(defmethod p-ext/seal-resource [:output :core.async]
+(defmethod p-ext/seal-resource :core.async/write-to-chan
   [{:keys [core.async/chan]}]
   (>!! chan :done))
 
@@ -66,4 +72,3 @@
         (if-not (= segment :done)
           (recur stack)
           stack)))))
-

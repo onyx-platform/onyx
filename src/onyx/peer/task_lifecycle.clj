@@ -16,9 +16,6 @@
     (:import [java.security MessageDigest]
              [uk.co.real_logic.aeron.exceptions.DriverTimeoutException]))
 
-;; TODO: Might want to allow a peer to reboot from an
-;; exception without killing the job, e.g. transient
-;; connection failure to ZooKeeper.
 (def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
 
 (defn at-least-one-active? [replica peers]
@@ -166,21 +163,20 @@
     (mapcat :ack-vals (remove (fn [leaf] (= (:action (:routes leaf)) :retry)) leaves))))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
-  (when (not (:onyx/side-effects-only? (:onyx.core/task-map event)))
-    (doseq [result results]
-      (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
-            leaf-vals (gen-ack-fusion-vals task-map leaves)
-            fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
-            link (operation/peer-link event (:acker-id (:root result)))]
-        (extensions/internal-ack-message
-         (:onyx.core/messenger event)
-         event
-         link
-         (:id (:root result))
-         (:completion-id (:root result))
-         ;; or'ing by zero covers the case of flow conditions where an
-         ;; input task produces a segment that goes nowhere.
-         (or fused-vals 0)))))
+  (doseq [result results]
+    (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
+          leaf-vals (gen-ack-fusion-vals task-map leaves)
+          fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
+          link (operation/peer-link event (:acker-id (:root result)))]
+      (extensions/internal-ack-message
+       (:onyx.core/messenger event)
+       event
+       link
+       (:id (:root result))
+       (:completion-id (:root result))
+       ;; or'ing by zero covers the case of flow conditions where an
+       ;; input task produces a segment that goes nowhere.
+       (or fused-vals 0))))
   event)
 
 (defn retry-messages [{:keys [onyx.core/results] :as event}]
@@ -253,8 +249,8 @@
      []
      batch)}))
 
-(defn apply-fn-batch [{:keys [onyx.core/batch] :as event}]
-  ;; Batched functions intentionally ignore their outputs.
+(defn apply-fn-bulk [{:keys [onyx.core/batch] :as event}]
+  ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
     (function/apply-fn event segments)
     (merge
@@ -268,8 +264,8 @@
        batch)})))
 
 (defn apply-fn [event]
-  (if (:onyx/side-effects-only? (:onyx.core/task-map event))
-    (apply-fn-batch event)
+  (if (:onyx/bulk? (:onyx.core/task-map event))
+    (apply-fn-bulk event)
     (apply-fn-single event)))
 
 (defn write-batch [event]
@@ -321,7 +317,6 @@
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
                (when (p-ext/pending? event m)
-                 (taoensso.timbre/info (str "Message " m " timed out, replaying it from it's initial task."))
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
              (recur))))))))

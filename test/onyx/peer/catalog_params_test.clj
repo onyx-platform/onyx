@@ -21,7 +21,7 @@
 
 (def n-messages 1000)
 
-(def batch-size 100)
+(def batch-size 20)
 
 (defn my-adder [factor {:keys [n] :as segment}]
   (assoc segment :n (+ n factor)))

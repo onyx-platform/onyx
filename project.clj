@@ -23,9 +23,6 @@
                                   [org.clojure/test.check "0.7.0"]
                                   [com.gfredericks/test.chuck "0.1.16"]
                                   [org.clojure/data.generators "0.1.2"]
-                                  [com.datomic/datomic-free "0.9.4755"
-                                   :exclusions [com.fasterxml.jackson.core/jackson-core io.netty/netty]]
-                                  [com.datomic/simulant "0.1.6"]
                                   [org.clojure/tools.nrepl "0.2.3"]]
                    :plugins [[lein-midje "3.1.1"]
                              [codox "0.8.8"]]}
