@@ -344,7 +344,9 @@
 (defn compile-fc-exs [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
-(defn run-task-lifecycle [init-event seal-ch kill-ch ex-f]
+(defn run-task-lifecycle 
+  "The main task run loop, read batch, ack messages, etc."
+  [init-event seal-ch kill-ch ex-f]
   (try
     (while (first (alts!! [seal-ch kill-ch] :default true))
       (-> init-event
