@@ -9,9 +9,9 @@ machine:
 
 dependencies:
   pre:
-    - "[ ! -d /home/ubuntu/Aeron ] && cd .. && git clone https://github.com/real-logic/Aeron.git && cd Aeron && git checkout cb3588760f88aac614ec5bbae9e05d1c7a675968 && ./gradlew && gradle install"
+    bash ./install-aeron.sh
   cache_directories:
-    - "~/Aeron"
+    - Aeron
 
 notify:
   webhooks:
