@@ -205,14 +205,13 @@
   (let [channel (if (epoll?)
                   EpollSocketChannel
                   NioSocketChannel)]
-    (try
-      (let [b (doto (Bootstrap.)
-                (.option ChannelOption/SO_REUSEADDR true)
-                (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
-                (.group client-group)
-                (.channel channel)
-                (.handler (client-channel-initializer (new-client-handler))))]
-        (.channel ^ChannelFuture (.connect b host port))))))
+    (let [b (doto (Bootstrap.)
+              (.option ChannelOption/SO_REUSEADDR true)
+              (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
+              (.group client-group)
+              (.channel channel)
+              (.handler (client-channel-initializer (new-client-handler))))]
+      (.channel ^ChannelFuture (.awaitUninterruptibly (.connect b host port))))))
 
 (defn app [daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch]
   (thread
@@ -359,4 +358,4 @@
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
   [messenger event ^Channel peer-link]
-  (.close peer-link))
+  (-> peer-link .close .sync))
