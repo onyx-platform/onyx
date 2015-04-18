@@ -121,14 +121,14 @@
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/white?}
 
-   {:flow/from :colors-in
+   #_{:flow/from :colors-in
     :flow/to :none
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/action :retry
     :flow/predicate :onyx.peer.colors-flow-test/black?}
 
-   {:flow/from :colors-in
+   #_{:flow/from :colors-in
     :flow/to [:process-red]
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
@@ -140,13 +140,13 @@
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/blue?}
 
-   {:flow/from :colors-in
+   #_{:flow/from :colors-in
     :flow/to [:process-green]
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/green?}
 
-   {:flow/from :colors-in
+   #_{:flow/from :colors-in
     :flow/to [:process-red]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}
@@ -156,7 +156,7 @@
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}
 
-   {:flow/from :colors-in
+   #_{:flow/from :colors-in
     :flow/to [:process-green]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}])
