@@ -47,9 +47,6 @@
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
-    (catch clojure.lang.ExceptionInfo e
-      ;; ZooKeeper connection dropped, close out cleanly.
-      )
     (catch Exception e
       (taoensso.timbre/info e))
     (finally
