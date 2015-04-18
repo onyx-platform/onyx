@@ -1,9 +1,8 @@
 (ns onyx.peer.join-test
-  (:require [com.stuartsierra.component :as component]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.queue.hornetq-utils :as hq-util]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
@@ -23,23 +22,6 @@
 
 (def batch-size 2)
 
-(def echo 1)
-
-(def name-queue (str (java.util.UUID/randomUUID)))
-
-(def age-queue (str (java.util.UUID/randomUUID)))
-
-(def out-queue (str (java.util.UUID/randomUUID)))
-
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
-
-(hq-util/create-queue! hq-config name-queue)
-
-(hq-util/create-queue! hq-config age-queue)
-
-(hq-util/create-queue! hq-config out-queue)
-
 (def people
   [{:id 1 :name "Mike" :age 23}
    {:id 2 :name "Dorrene" :age 24}
@@ -52,9 +34,20 @@
 
 (def ages (map #(select-keys % [:id :age]) people))
 
-(hq-util/write-and-cap! hq-config name-queue names 1)
+(def name-chan (chan (inc names)))
 
-(hq-util/write-and-cap! hq-config age-queue ages 1)
+(def age-chan (chan (inc ages)))
+
+(def out-chan (chan (sliding-buffer (inc n-messages))))
+
+(doseq [name names]
+  (>!! name-chan name))
+
+(doseq [age ages]
+  (>!! age-chan age))
+
+(>!! name-chan :done)
+(>!! age-chan :done)
 
 (defn join-person [local-state segment]
   (let [state @local-state]
@@ -67,22 +60,20 @@
 
 (def catalog
   [{:onyx/name :names
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :hornetq/queue-name name-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :ages
-    :onyx/ident :hornetq/read-segments
+    :onyx/ident :core.async/read-from-chan
     :onyx/type :input
-    :onyx/medium :hornetq
-    :hornetq/queue-name age-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :join-person
     :onyx/fn :onyx.peer.join-test/join-person
@@ -91,13 +82,12 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
-    :onyx/ident :hornetq/write-segments
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :hornetq
-    :hornetq/queue-name out-queue
-    :hornetq/host (:host (:non-clustered (:hornetq config)))
-    :hornetq/port (:port (:non-clustered (:hornetq config)))
-    :onyx/batch-size batch-size}])
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
 
 (def workflow
   [[:names :join-person]
@@ -108,13 +98,16 @@
   [_ event]
   {:onyx.core/params [(atom {})]})
 
-(def v-peers (onyx.api/start-peers! 1 peer-group))
+(def v-peers (onyx.api/start-peers 4 peer-group))
 
-(onyx.api/submit-job peer-config
-                     {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/balanced})
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (hq-util/consume-queue! hq-config out-queue echo))
+(def results (take-segments! out-chan))
+
+(fact (into #{} (butlast results)) => (into #{} people))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
@@ -122,6 +115,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-
-(fact (into #{} (butlast results)) => (into #{} people))
-

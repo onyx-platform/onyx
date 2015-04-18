@@ -151,7 +151,7 @@
 (let [catalog
       [{:onyx/name :a
         :onyx/type :input
-        :onyx/medium :hornetq}
+        :onyx/medium :core.async}
 
        {:onyx/name :b
         :onyx/type :input}
@@ -170,7 +170,7 @@
 
        {:onyx/name :g
         :onyx/type :output
-        :onyx/medium :hornetq}]
+        :onyx/medium :core.async}]
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
       tasks (onyx.static.planning/discover-tasks catalog workflow)
 

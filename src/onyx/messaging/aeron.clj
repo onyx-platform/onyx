@@ -95,7 +95,7 @@
 
 (def no-op-error-handler
   (proxy [Consumer] []
-    (accept [_] (taoensso.timbre/warn "Conductor is down."))))
+    (accept [x] (taoensso.timbre/warn x))))
 
 (defrecord AeronConnection [peer-group]
   component/Lifecycle
