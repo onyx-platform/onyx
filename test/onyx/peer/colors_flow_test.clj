@@ -112,10 +112,11 @@
 
    [:process-red :red-out]
    [:process-blue :blue-out]
-   [:process-green :green-out]])
+   [:process-green :green-out]
+   ])
 
 (def flow-conditions
-  [{:flow/from :colors-in
+  [#_{:flow/from :colors-in
     :flow/to :all
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
