@@ -115,7 +115,7 @@
    [:process-green :green-out]
    ])
 
-(def flow-conditions
+#_(def flow-conditions
   [#_{:flow/from :colors-in
     :flow/to :all
     :flow/short-circuit? true
@@ -201,7 +201,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :flow-conditions flow-conditions
+;;  :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def red (take-segments! red-out-chan))
