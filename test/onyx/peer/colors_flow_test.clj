@@ -112,8 +112,7 @@
 
    [:process-red :red-out]
    [:process-blue :blue-out]
-   [:process-green :green-out]
-   ])
+   [:process-green :green-out]])
 
 #_(def flow-conditions
   [#_{:flow/from :colors-in
@@ -182,14 +181,6 @@
 
 (def constantly-true (constantly true))
 
-(def process-children identity)
-
-(def process-adults identity)
-
-(def process-athletes-in-washington identity)
-
-(def process-everyone identity)
-
 (def process-red identity)
 
 (def process-blue identity)
@@ -241,4 +232,3 @@
   (onyx.api/shutdown-peer-group peer-group)
 
   (onyx.api/shutdown-env env))
-

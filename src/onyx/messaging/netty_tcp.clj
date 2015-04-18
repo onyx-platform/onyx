@@ -198,7 +198,7 @@
                (.addLast "int32-frame-decoder" (int32-frame-decoder))
                (.addLast "int32-frame-encoder" (int32-frame-encoder))
                (.addLast "handler" handler)))
-           (catch Exception e
+           (catch Throwable e
              (timbre/fatal e))))))
 
 (defn create-client [client-group host port]
@@ -236,7 +236,7 @@
 
                         :else
                         (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
-                (catch Exception e
+                (catch Throwable e
                   (taoensso.timbre/error e)
                   (throw e)))
            (recur)))
@@ -287,7 +287,7 @@
           (close! buf-loop)
           (close! release-ch))
         (reset! resources nil)) 
-      (catch Exception e (timbre/fatal e)))
+      (catch Throwable e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
            :worker-group nil :client-group nil :boss-group nil 
            :resources nil :release-ch nil :retry-ch nil)))

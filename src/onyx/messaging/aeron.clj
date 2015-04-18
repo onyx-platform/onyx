@@ -146,7 +146,7 @@
         (reset! resources nil))
       (close! (:release-ch component))
       (close! (:retry-ch component))
-      (catch Exception e (fatal e)))
+      (catch Throwable e (fatal e)))
 
     (assoc component
       :bind-addr nil :external-addr nil
@@ -188,13 +188,13 @@
         retry-subscriber (.addSubscription aeron channel retry-stream-id retry-handler)
 
         accept-send-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) send-subscriber) 
-                                     (catch Exception e (fatal e))))
+                                     (catch Throwable e (fatal e))))
         accept-acker-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) acker-subscriber) 
-                                      (catch Exception e (fatal e))))
+                                      (catch Throwable e (fatal e))))
         accept-completion-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) completion-subscriber) 
-                                           (catch Exception e (fatal e))))
+                                           (catch Throwable e (fatal e))))
         accept-retry-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) retry-subscriber)
-                                      (catch Exception e (fatal e))))]
+                                      (catch Throwable e (fatal e))))]
     (reset! (:resources messenger)
             {:conn aeron
              :send-idle-strategy send-idle-strategy

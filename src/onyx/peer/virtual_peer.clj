@@ -47,7 +47,7 @@
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
-    (catch Exception e
+    (catch Throwable e
       (taoensso.timbre/info e))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
@@ -58,7 +58,7 @@
       (when-let [entry (<!! outbox-ch)]
         (extensions/write-log-entry log entry)
         (recur)))
-    (catch Exception e
+    (catch Throwable e
       (taoensso.timbre/info e))
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
@@ -94,7 +94,7 @@
           (assoc component :id id :inbox-ch inbox-ch
                  :outbox-ch outbox-ch :kill-ch kill-ch
                  :restart-ch restart-ch))
-        (catch Exception e
+        (catch Throwable e
           (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
           (throw e)))))
 
