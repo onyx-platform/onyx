@@ -398,7 +398,7 @@
             n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
             buckets (vec (repeat n-buckets []))
 
-            _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
+            _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -435,9 +435,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))
+
+        (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
         (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)

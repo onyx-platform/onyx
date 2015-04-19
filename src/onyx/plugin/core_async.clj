@@ -22,14 +22,16 @@
         max-pending (or (:onyx/max-pending task-map) 10000)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
-        ms (or (:onyx/batch-timeout task-map) 50)
-        timeout-ch (timeout ms)
+        ms (or (:onyx/batch-timeout task-map) 1000)
+        step-ms (/ ms (:onyx/batch-size task-map))
         batch (if (zero? max-segments)
-                (<!! timeout-ch)
+                (<!! (timeout ms))
                 (->> (range max-segments)
-                     (map (fn [_] {:id (java.util.UUID/randomUUID)
-                                   :input :core.async
-                                   :message (first (alts!! [retry-ch chan timeout-ch] :priority true))}))
+                     (map (fn [_]
+                            (let [t-ch (timeout step-ms)]
+                              {:id (java.util.UUID/randomUUID)
+                               :input :core.async
+                               :message (first (alts!! [retry-ch chan t-ch] :priority true))})))
                      (remove (comp nil? :message))))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
