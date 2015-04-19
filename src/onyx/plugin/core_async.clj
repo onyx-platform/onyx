@@ -52,7 +52,7 @@
 (defmethod p-ext/drained? :core.async/read-from-chan
   [{:keys [core.async/pending-messages] :as event}]
   (let [x @pending-messages]
-    (and (= (count (keys x)) 1)
+    (and (= (count x) 1)
          (= (first (vals x)) :done))))
 
 (defmethod p-ext/write-batch :core.async/write-to-chan
