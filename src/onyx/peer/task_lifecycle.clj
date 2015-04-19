@@ -60,11 +60,6 @@
 (defn drop-nth [n coll]
   (keep-indexed #(if (not= %1 n) %2) coll))
 
-(defn fuse-ack-vals [task parent-ack child-ack]
-  (if (= (:onyx/type task) :output)
-    parent-ack
-    (acker/prefuse-vals (vector parent-ack child-ack))))
-
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
