@@ -28,16 +28,15 @@
 
 (def green-out-chan (chan (sliding-buffer 100)))
 
-(doseq [x [;;{:color "red" :extra-key "Some extra context for the predicates"}
-           ;;{:color "blue" :extra-key "Some extra context for the predicates"}
+(doseq [x [{:color "red" :extra-key "Some extra context for the predicates"}
+           {:color "blue" :extra-key "Some extra context for the predicates"}
            {:color "white" :extra-key "Some extra context for the predicates"}
-           ;;{:color "green" :extra-key "Some extra context for the predicates"}
-           ;;{:color "orange" :extra-key "Some extra context for the predicates"}
-           ;;{:color "black" :extra-key "Some extra context for the predicates"}
-           ;;{:color "purple" :extra-key "Some extra context for the predicates"}
-           ;;{:color "cyan" :extra-key "Some extra context for the predicates"}
-           ;;{:color "yellow" :extra-key "Some extra context for the predicates"}
-           ]]
+           {:color "green" :extra-key "Some extra context for the predicates"}
+           {:color "orange" :extra-key "Some extra context for the predicates"}
+           {:color "black" :extra-key "Some extra context for the predicates"}
+           {:color "purple" :extra-key "Some extra context for the predicates"}
+           {:color "cyan" :extra-key "Some extra context for the predicates"}
+           {:color "yellow" :extra-key "Some extra context for the predicates"}]]
   (>!! colors-in-chan x))
 
 (>!! colors-in-chan :done)
@@ -114,49 +113,49 @@
    [:process-blue :blue-out]
    [:process-green :green-out]])
 
-#_(def flow-conditions
-  [#_{:flow/from :colors-in
+(def flow-conditions
+  [{:flow/from :colors-in
     :flow/to :all
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/white?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to :none
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/action :retry
     :flow/predicate :onyx.peer.colors-flow-test/black?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-red]
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/red?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-blue]
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/blue?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-green]
     :flow/short-circuit? true
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/green?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-red]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-blue]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}
 
-   #_{:flow/from :colors-in
+   {:flow/from :colors-in
     :flow/to [:process-green]
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}])

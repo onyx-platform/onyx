@@ -9,10 +9,10 @@
               [onyx.compression.nippy :refer [compress decompress]])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
              [uk.co.real_logic.aeron Aeron$Context]
+             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
-             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context]
-             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
@@ -21,7 +21,7 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [ctx (MediaDriver$Context.)
+    (let [ctx (doto (MediaDriver$Context.) (.threadingMode ThreadingMode/SHARED))
           _ (.dirsDeleteOnExit ctx true)
           media-driver (MediaDriver/launch ctx)]
       (assoc component :media-driver media-driver)))
