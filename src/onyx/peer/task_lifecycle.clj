@@ -344,7 +344,9 @@
 (defn compile-fc-exs [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
-(defn run-task-lifecycle [init-event seal-ch kill-ch ex-f]
+(defn run-task-lifecycle 
+  "The main task run loop, read batch, ack messages, etc."
+  [init-event seal-ch kill-ch ex-f]
   (try
     (while (first (alts!! [seal-ch kill-ch] :default true))
       (-> init-event
@@ -443,6 +445,7 @@
           (assoc component 
             :pipeline-data pipeline-data
             :seal-ch seal-resp-ch
+            :task-kill-ch task-kill-ch
             :task-lifecycle-ch task-lifecycle-ch
             :replay-messages-ch replay-messages-ch
             :aux-ch aux-ch)))
@@ -455,15 +458,14 @@
     (when-let [event (:pipeline-data component)]
       (l-ext/close-lifecycle-resources* event)
 
-      (close! (:seal-ch component))
-      (close! (:task-lifecycle-ch component))
-      
       ;; Ensure task operations are finished before closing peer connections
+      (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
+
+      (close! (:task-kill-ch component))
       (<!! (:replay-messages-ch component))
       (<!! (:aux-ch component))
-      (<!! (:seal-ch component))
-
+      
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))

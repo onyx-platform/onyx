@@ -18,17 +18,19 @@
 (defmethod p-ext/read-batch :core.async/read-from-chan
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
            core.async/pending-messages] :as event}]
-  (let [pending (count (keys @pending-messages))
+  (let [pending (count @pending-messages)
         max-pending (or (:onyx/max-pending task-map) 10000)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
         ms (or (:onyx/batch-timeout task-map) 50)
         timeout-ch (timeout ms)
-        batch (->> (range max-segments)
-                   (map (fn [_] {:id (java.util.UUID/randomUUID)
-                                :input :core.async
-                                :message (first (alts!! [retry-ch chan timeout-ch] :priority true))}))
-                   (remove (comp nil? :message)))]
+        batch (if (zero? max-segments)
+                (<!! timeout-ch)
+                (->> (range max-segments)
+                     (map (fn [_] {:id (java.util.UUID/randomUUID)
+                                   :input :core.async
+                                   :message (first (alts!! [retry-ch chan timeout-ch] :priority true))}))
+                     (remove (comp nil? :message))))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
@@ -39,8 +41,9 @@
 
 (defmethod p-ext/retry-message :core.async/read-from-chan
   [{:keys [core.async/pending-messages core.async/retry-ch]} message-id]
-  (>!! retry-ch (get @pending-messages message-id))
-  (swap! pending-messages dissoc message-id))
+  (when-let [msg (get @pending-messages message-id)]
+    (>!! retry-ch msg)
+    (swap! pending-messages dissoc message-id)))
 
 (defmethod p-ext/pending? :core.async/read-from-chan
   [{:keys [core.async/pending-messages]} message-id]
