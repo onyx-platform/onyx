@@ -1,7 +1,8 @@
 (ns onyx.peer.multi-input-test
-  (:require [com.stuartsierra.component :as component]
-            [onyx.system :refer [onyx-development-env]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
@@ -15,89 +16,122 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def peer-group 
-  (onyx.api/start-peer-group peer-config))
+(def peer-group (onyx.api/start-peer-group peer-config))
 
 (def n-messages 15000)
 
-(def batch-size 1320)
+(def batch-size 20)
 
-(def k-inputs 4)
+(def in-chan-1 (chan (inc n-messages)))
 
-(def echo 1000)
+(def in-chan-2 (chan (inc n-messages)))
 
-(def in-queues (map (fn [_] (str (java.util.UUID/randomUUID))) (range k-inputs)))
+(def in-chan-3 (chan (inc n-messages)))
 
-(def out-queue (str (java.util.UUID/randomUUID)))
+(def in-chan-4 (chan (inc n-messages)))
 
-(def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                "port" (:port (:non-clustered (:hornetq config)))})
+(def out-chan (chan (sliding-buffer (inc n-messages))))
 
-(doseq [in-queue in-queues]
-  (hq-util/create-queue! hq-config in-queue))
+(defmethod l-ext/inject-lifecycle-resources :in-1
+  [_ _] {:core.async/chan in-chan-1})
 
-(hq-util/create-queue! hq-config out-queue)
+(defmethod l-ext/inject-lifecycle-resources :in-2
+  [_ _] {:core.async/chan in-chan-2})
+
+(defmethod l-ext/inject-lifecycle-resources :in-3
+  [_ _] {:core.async/chan in-chan-3})
+
+(defmethod l-ext/inject-lifecycle-resources :in-4
+  [_ _] {:core.async/chan in-chan-4})
+
+(defmethod l-ext/inject-lifecycle-resources :out
+  [_ _] {:core.async/chan out-chan})
 
 (def messages
-  (->> k-inputs
+  (->> 4
        (inc)
        (range)
-       (map (fn [k] (* k (/ n-messages k-inputs))))
+       (map (fn [k] (* k (/ n-messages 4))))
        (partition 2 1)
        (map (partial apply range))
        (map (fn [r] (map (fn [x] {:n x}) r)))))
 
-(doseq [[q b] (map (fn [q b] [q b]) in-queues messages)]
-  (hq-util/write-and-cap! hq-config q b echo))
+(doseq [[q b] (map (fn [q b] [q b]) [in-chan-1 in-chan-2 in-chan-3 in-chan-4] messages)]
+  (>!! q b))
+
+(>!! in-chan-1 :done)
+(>!! in-chan-2 :done)
+(>!! in-chan-3 :done)
+(>!! in-chan-4 :done)
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(def input-entries
-  (map
-   (fn [k]
-     {:onyx/name (keyword (str "in-" k))
-      :onyx/ident :hornetq/read-segments
-      :onyx/type :input
-      :onyx/medium :hornetq
-      :hornetq/queue-name (nth in-queues (dec k))
-      :hornetq/host (:host (:non-clustered (:hornetq config)))
-      :hornetq/port (:port (:non-clustered (:hornetq config)))
-      :onyx/batch-size batch-size})
-   (range 1 (inc k-inputs))))
-
 (def catalog
-  (concat
-   input-entries
-   [{:onyx/name :inc
-     :onyx/fn :onyx.peer.multi-input-test/my-inc
-     :onyx/type :function
-     :onyx/batch-size batch-size}
+  [{:onyx/name :in-1
+    :onyx/ident :core.async/read-from-chan
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
 
-    {:onyx/name :out
-     :onyx/ident :hornetq/write-segments
-     :onyx/type :output
-     :onyx/medium :hornetq
-     :hornetq/queue-name out-queue
-     :hornetq/host (:host (:non-clustered (:hornetq config)))
-     :hornetq/port (:port (:non-clustered (:hornetq config)))
-     :onyx/batch-size batch-size}]))
+   {:onyx/name :in-2
+    :onyx/ident :core.async/read-from-chan
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
+
+   {:onyx/name :in-3
+    :onyx/ident :core.async/read-from-chan
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
+
+   {:onyx/name :in-4
+    :onyx/ident :core.async/read-from-chan
+    :onyx/type :input
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Reads segments from a core.async channel"}
+
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.multi-input-test/my-inc
+    :onyx/type :function
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :out
+    :onyx/ident :core.async/write-to-chan
+    :onyx/type :output
+    :onyx/medium :core.async
+    :onyx/batch-size batch-size
+    :onyx/max-peers 1
+    :onyx/doc "Writes segments to a core.async channel"}])
 
 (def workflow
-  (vec
-   (concat
-    [[:inc :out]]
-    (map (fn [a] [(keyword (str "in-" a)) :inc])
-         (range 1 (inc k-inputs))))))
+  [[:in-1 :inc]
+   [:in-2 :inc]
+   [:in-3 :inc]
+   [:in-4 :inc]
+   [:inc :out]])
 
-(def v-peers (onyx.api/start-peers! 6 peer-group))
+(def v-peers (onyx.api/start-peers 6 peer-group))
 
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (hq-util/consume-queue! hq-config out-queue echo))
+(def results (take-segments! out-chan))
+
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
@@ -105,8 +139,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
-

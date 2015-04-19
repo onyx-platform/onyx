@@ -9,10 +9,10 @@
               [onyx.compression.nippy :refer [compress decompress]])
     (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
              [uk.co.real_logic.aeron Aeron$Context]
+             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
              [uk.co.real_logic.agrona CloseHelper]
-             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context]
-             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
              [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
              [java.util.function Consumer]
              [java.util.concurrent TimeUnit]))
@@ -21,7 +21,7 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [ctx (MediaDriver$Context.)
+    (let [ctx (doto (MediaDriver$Context.) (.threadingMode ThreadingMode/SHARED))
           _ (.dirsDeleteOnExit ctx true)
           media-driver (MediaDriver/launch ctx)]
       (assoc component :media-driver media-driver)))
@@ -95,7 +95,7 @@
 
 (def no-op-error-handler
   (proxy [Consumer] []
-    (accept [_] (taoensso.timbre/warn "Conductor is down."))))
+    (accept [x] (taoensso.timbre/warn x))))
 
 (defrecord AeronConnection [peer-group]
   component/Lifecycle
@@ -146,7 +146,7 @@
         (reset! resources nil))
       (close! (:release-ch component))
       (close! (:retry-ch component))
-      (catch Exception e (fatal e)))
+      (catch Throwable e (fatal e)))
 
     (assoc component
       :bind-addr nil :external-addr nil
@@ -188,13 +188,13 @@
         retry-subscriber (.addSubscription aeron channel retry-stream-id retry-handler)
 
         accept-send-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) send-subscriber) 
-                                     (catch Exception e (fatal e))))
+                                     (catch Throwable e (fatal e))))
         accept-acker-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) acker-subscriber) 
-                                      (catch Exception e (fatal e))))
+                                      (catch Throwable e (fatal e))))
         accept-completion-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) completion-subscriber) 
-                                           (catch Exception e (fatal e))))
+                                           (catch Throwable e (fatal e))))
         accept-retry-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) retry-subscriber)
-                                      (catch Exception e (fatal e))))]
+                                      (catch Throwable e (fatal e))))]
     (reset! (:resources messenger)
             {:conn aeron
              :send-idle-strategy send-idle-strategy

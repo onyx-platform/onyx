@@ -233,7 +233,7 @@
      {:onyx.core/batch (drop-nth k batch)})))
 
 (defn collect-next-segments [event input]
-  (let [segments (try (function/apply-fn event input) (catch Exception e e))]
+  (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
     (if (sequential? segments) segments (vector segments))))
 
 (defn apply-fn-single [{:keys [onyx.core/batch] :as event}]
@@ -304,7 +304,7 @@
                                                                      :task (:onyx.core/task-id event)})]
                      (>!! outbox-ch entry))))
            (recur))))
-     (catch Exception e
+     (catch Throwable e
        (fatal e)))))
 
 (defn replay-messages! [messenger event replay-interval task-kill-ch]
@@ -363,7 +363,7 @@
           (ack-messages)
           (retry-messages)
           (close-batch-resources)))
-    (catch Exception e
+    (catch Throwable e
       (ex-f e))))
 
 (defn resolve-compression-fn-impls [opts]
@@ -449,7 +449,7 @@
             :task-lifecycle-ch task-lifecycle-ch
             :replay-messages-ch replay-messages-ch
             :aux-ch aux-ch)))
-      (catch Exception e
+      (catch Throwable e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
 

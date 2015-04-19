@@ -1,15 +1,18 @@
 (ns onyx.peer.killed-job-test
-  (:require [clojure.core.async :refer [chan <!!]]
-            [com.stuartsierra.component :as component]
+  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.system :refer [onyx-development-env]]
-            [onyx.extensions :as extensions]
+            [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
 (def config (load-config))
+
+(def n-messages 15000)
+
+(def batch-size 1320)
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
@@ -19,101 +22,99 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(try 
-  (def n-messages 15000)
+(def in-chan-1 (chan (inc n-messages)))
 
-  (def batch-size 1320)
+(def out-chan-1 (chan (sliding-buffer (inc n-messages))))
 
-  (def echo 1000)
+(def in-chan-2 (chan (inc n-messages)))
 
-  (def in-queue-1 (str (java.util.UUID/randomUUID)))
+(def out-chan-2 (chan (sliding-buffer (inc n-messages))))
 
-  (def out-queue-1 (str (java.util.UUID/randomUUID)))
+(defmethod l-ext/inject-lifecycle-resources :in-1
+  [_ _] {:core.async/chan in-chan-1})
 
-  (def in-queue-2 (str (java.util.UUID/randomUUID)))
+(defmethod l-ext/inject-lifecycle-resources :out-1
+  [_ _] {:core.async/chan out-chan-1})
 
-  (def out-queue-2 (str (java.util.UUID/randomUUID)))
+(defmethod l-ext/inject-lifecycle-resources :in-2
+  [_ _] {:core.async/chan in-chan-2})
 
-  (def hq-config {"host" (:host (:non-clustered (:hornetq config)))
-                  "port" (:port (:non-clustered (:hornetq config)))})
+(defmethod l-ext/inject-lifecycle-resources :out-2
+  [_ _] {:core.async/chan out-chan-2})
 
-  (hq-util/create-queue! hq-config in-queue-1)
-  (hq-util/create-queue! hq-config out-queue-1)
-
-  (hq-util/create-queue! hq-config in-queue-2)
-  (hq-util/create-queue! hq-config out-queue-2)
-
+(try
   ;;; Don't write any segments to j1 so that the job will stay alive until we kill it.
-  (hq-util/write-and-cap! hq-config in-queue-2 (map (fn [x] {:n x}) (range n-messages)) echo)
+  (doseq [n (range n-messages)]
+    (>!! in-chan-2 {:n n}))
+
+  (>!! in-chan-2 :done)
 
   (defn my-inc [{:keys [n] :as segment}]
     (assoc segment :n (inc n)))
 
   (def catalog-1
-    [{:onyx/name :in
-      :onyx/ident :hornetq/read-segments
+    [{:onyx/name :in-1
+      :onyx/ident :core.async/read-from-chan
       :onyx/type :input
-      :onyx/medium :hornetq
-      :hornetq/queue-name in-queue-1
-      :hornetq/host (:host (:non-clustered (:hornetq config)))
-      :hornetq/port (:port (:non-clustered (:hornetq config)))
-      :onyx/batch-size batch-size}
+      :onyx/medium :core.async
+      :onyx/batch-size batch-size
+      :onyx/max-peers 1
+      :onyx/doc "Reads segments from a core.async channel"}
 
      {:onyx/name :inc
       :onyx/fn :onyx.peer.killed-job-test/my-inc
       :onyx/type :function
       :onyx/batch-size batch-size}
 
-     {:onyx/name :out
-      :onyx/ident :hornetq/write-segments
+     {:onyx/name :out-2
+      :onyx/ident :core.async/write-to-chan
       :onyx/type :output
-      :onyx/medium :hornetq
-      :hornetq/queue-name out-queue-1
-      :hornetq/host (:host (:non-clustered (:hornetq config)))
-      :hornetq/port (:port (:non-clustered (:hornetq config)))
-      :onyx/batch-size batch-size}])
+      :onyx/medium :core.async
+      :onyx/batch-size batch-size
+      :onyx/max-peers 1
+      :onyx/doc "Writes segments to a core.async channel"}])
 
   (def catalog-2
-    [{:onyx/name :in
-      :onyx/ident :hornetq/read-segments
+    [{:onyx/name :in-2
+      :onyx/ident :core.async/read-from-chan
       :onyx/type :input
-      :onyx/medium :hornetq
-      :hornetq/queue-name in-queue-2
-      :hornetq/host (:host (:non-clustered (:hornetq config)))
-      :hornetq/port (:port (:non-clustered (:hornetq config)))
-      :onyx/batch-size batch-size}
+      :onyx/medium :core.async
+      :onyx/batch-size batch-size
+      :onyx/max-peers 1
+      :onyx/doc "Reads segments from a core.async channel"}
 
      {:onyx/name :inc
       :onyx/fn :onyx.peer.killed-job-test/my-inc
       :onyx/type :function
       :onyx/batch-size batch-size}
 
-     {:onyx/name :out
-      :onyx/ident :hornetq/write-segments
+     {:onyx/name :out-2
+      :onyx/ident :core.async/write-to-chan
       :onyx/type :output
-      :onyx/medium :hornetq
-      :hornetq/queue-name out-queue-2
-      :hornetq/host (:host (:non-clustered (:hornetq config)))
-      :hornetq/port (:port (:non-clustered (:hornetq config)))
-      :onyx/batch-size batch-size}])
+      :onyx/medium :core.async
+      :onyx/batch-size batch-size
+      :onyx/max-peers 1
+      :onyx/doc "Writes segments to a core.async channel"}])
 
-  (def workflow [[:in :inc] [:inc :out]])
+  (def workflow-1 [[:in-1 :inc] [:inc :out-1]])
+
+  (def workflow-2 [[:in-2 :inc] [:inc :out-2]])
 
   (def v-peers (onyx.api/start-peers! 1 peer-group))
 
   (def j1 (onyx.api/submit-job
             peer-config
-            {:catalog catalog-1 :workflow workflow
+            {:catalog catalog-1 :workflow workflow-1
              :task-scheduler :onyx.task-scheduler/balanced}))
 
   (def j2 (onyx.api/submit-job
             peer-config
-            {:catalog catalog-2 :workflow workflow
+            {:catalog catalog-2 :workflow workflow-2
              :task-scheduler :onyx.task-scheduler/balanced}))
 
   (onyx.api/kill-job peer-config (:job-id j1))
 
-  (def results (hq-util/consume-queue! hq-config out-queue-2 echo))
+  (def results (take-segments! out-chan-2))
 
   (def ch (chan 100))
 
@@ -124,14 +125,14 @@
           new-replica (extensions/apply-log-entry entry replica)]
       (when-not (= (first (:killed-jobs new-replica)) j1)
         (recur new-replica))))
+
+  (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+    (fact (set (butlast results)) => expected)
+    (fact (last results) => :done))
   (finally 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))
 
-    (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (fact (set (butlast results)) => expected)
-      (fact (last results) => :done))
-
     (onyx.api/shutdown-peer-group peer-group)
+    
     (onyx.api/shutdown-env env)))
-

@@ -202,7 +202,7 @@
                   (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
                   (recur (component/start live)))
               :else (throw (ex-info "Read from a channel with no response implementation" {})))))
-    (catch Exception e
+    (catch Throwable e
       (fatal "Peer lifecycle threw an exception")
       (fatal e))))
 

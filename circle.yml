@@ -2,6 +2,8 @@ test:
   override:
     - export TEST_TRANSPORT_IMPL=aeron; lein with-profile dev,circle-ci midje 'onyx.log.*':
         timeout: 180
+    - export TEST_TRANSPORT_IMPL=aeron; lein with-profile dev,circle-ci midje 'onyx.log.*':
+        timeout: 180
 
 machine:
   java:
