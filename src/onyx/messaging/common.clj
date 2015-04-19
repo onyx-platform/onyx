@@ -28,7 +28,7 @@
 
 (defn safe-require [sym]
   (try (require sym)
-       (catch Exception e
+       (catch Throwable e
          (fatal e
                 (str "Error loading messenging. "
                      "If your peer is AOT compiled you wiil need to manually require " sym))

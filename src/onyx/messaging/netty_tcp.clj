@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
-    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! go-loop dropping-buffer]]
+    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! thread go-loop dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -80,7 +80,10 @@
         :worker-group worker-group
         :boss-group boss-group)))
 
-  (stop [component]
+  (stop [{:keys [client-group worker-group boss-group] :as component}]
+    (.shutdownGracefully client-group)
+    (.shutdownGracefully boss-group)
+    (.shutdownGracefully worker-group)
     (assoc component 
       :shared-event-executor nil :client-group nil
       :worker-group nil :boss-group nil)))
@@ -99,12 +102,12 @@
                         set)
         port (first (remove used-ports
                             (:netty/ports peer-site)))]
-    (assert port)
+    (assert port "Couldn't assign port - ran out of available ports.")
     {:netty/port port}))
 
 (defn int32-frame-decoder
   []
-                                        ; Offset 0, 4 byte header, skip those 4 bytes.
+  ; Offset 0, 4 byte header, skip those 4 bytes.
   (LengthFieldBasedFrameDecoder. Integer/MAX_VALUE, 0, 4, 0, 4))
 
 (defn int32-frame-encoder
@@ -167,7 +170,6 @@
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
       (.childHandler initializer))
-                                        ; Start bootstrap
     (let [ch (->> (InetSocketAddress. host port)
                   (.bind bootstrap)
                   (.sync)
@@ -181,12 +183,10 @@
 
 (defn new-client-handler []
   (proxy [ChannelHandler] []
-    (handlerAdded [ctx]
-      (timbre/info "Handler added"))
-    (handlerRemoved [ctx]
-      (timbre/info "Handler removed"))
+    (handlerAdded [ctx])
+    (handlerRemoved [ctx])
     (exceptionCaught [context cause]
-      (.printStackTrace cause)
+      (timbre/error cause "TCP client exception.")
       (.close context))))
 
 (defn client-channel-initializer [handler]
@@ -198,60 +198,54 @@
                (.addLast "int32-frame-decoder" (int32-frame-decoder))
                (.addLast "int32-frame-encoder" (int32-frame-encoder))
                (.addLast "handler" handler)))
-           (catch Exception e
+           (catch Throwable e
              (timbre/fatal e))))))
 
 (defn create-client [client-group host port]
   (let [channel (if (epoll?)
                   EpollSocketChannel
                   NioSocketChannel)]
-    (try
-      (let [b (doto (Bootstrap.)
-                (.option ChannelOption/SO_REUSEADDR true)
-                (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
-                (.group client-group)
-                (.channel channel)
-                (.handler (client-channel-initializer (new-client-handler))))]
-        (.channel ^ChannelFuture (.connect b host port))))))
+    (let [b (doto (Bootstrap.)
+              (.option ChannelOption/SO_REUSEADDR true)
+              (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
+              (.group client-group)
+              (.channel channel)
+              (.handler (client-channel-initializer (new-client-handler))))]
+      (.channel ^ChannelFuture (.awaitUninterruptibly (.connect b host port))))))
 
-(defn app [daemon parsed-ch inbound-ch release-ch retry-ch]
-  (go-loop []
-           (try (let [msg (<!! parsed-ch)
-                      t ^byte (:type msg)]
-                  (cond (= t protocol/messages-type-id) 
-                        (doseq [message (:messages msg)]
-                          (>!! inbound-ch message))
+(defn app [daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch]
+  (thread
+    (loop []
+          (let [[buf ch] (alts!! [buf-recv-ch shutdown-ch])]
+            (when buf 
+              (try 
+                (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
+                  ;(taoensso.timbre/info "Message buf: " buf msg)
+                  ;; undo retain added in server handler
+                  (.release ^ByteBuf buf)
+                  (let [t ^byte (:type msg)]
+                    (cond (= t protocol/messages-type-id) 
+                          (doseq [message (:messages msg)]
+                            (>!! inbound-ch message))
 
-                        (= t protocol/ack-type-id)
-                        (acker/ack-message daemon
-                                           (:id msg)
-                                           (:completion-id msg)
-                                           (:ack-val msg))
+                          (= t protocol/ack-type-id)
+                          (acker/ack-message daemon
+                                             (:id msg)
+                                             (:completion-id msg)
+                                             (:ack-val msg))
 
-                        (= t protocol/completion-type-id)
-                        (>!! release-ch (:id msg))
+                          (= t protocol/completion-type-id)
+                          (>!! release-ch (:id msg))
 
-                        (= t protocol/retry-type-id)
-                        (>!! retry-ch (:id msg))
+                          (= t protocol/retry-type-id)
+                          (>!! retry-ch (:id msg))
 
-                        :else
-                        (throw (ex-info "Unexpected message received from Netty" {:message msg}))))
-                (catch Exception e
+                          :else
+                          (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
+                (catch Throwable e
                   (taoensso.timbre/error e)
                   (throw e)))
-           (recur)))
-
-(defn buf-recv-loop [messenger buf-recv-ch parsed-ch]
-  (go-loop []
-           (let [buf (<!! buf-recv-ch)]
-             (try 
-               (let [decompressed (protocol/read-buf (:decompress-f messenger) buf)]
-                 (>!! parsed-ch decompressed)
-                 ;; undo retain added in server handler
-                 (.release ^ByteBuf buf))
-               (catch Throwable t
-                 (timbre/fatal t "Exception in recv loop.")))
-             (recur))))
+              (recur))))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -266,28 +260,28 @@
           external-addr (external-addr config)
           ports (allowable-ports config)]
       (assoc component
-        :bind-addr bind-addr 
-        :external-addr external-addr
-        :boss-group boss-group
-        :client-group client-group
-        :worker-group worker-group
-        :ports ports
-        :resources (atom nil)
-        :release-ch release-ch
-        :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
-        :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
+             :bind-addr bind-addr 
+             :external-addr external-addr
+             :boss-group boss-group
+             :client-group client-group
+             :worker-group worker-group
+             :ports ports
+             :resources (atom nil)
+             :release-ch release-ch
+             :retry-ch retry-ch
+             :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
+             :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
 
   (stop [{:keys [resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
     (try 
       (when-let [rs @resources]
-        (let [{:keys [shutdown-fn app-loop buf-loop]} rs] 
+        (let [{:keys [shutdown-fn shutdown-ch app-loop]} rs] 
           (shutdown-fn)
-          (close! app-loop)
-          (close! buf-loop)
-          (close! release-ch))
+          (close! shutdown-ch)
+          (<!! app-loop))
         (reset! resources nil)) 
-      (catch Exception e (timbre/fatal e)))
+      (catch Throwable e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
            :worker-group nil :client-group nil :boss-group nil 
            :resources nil :release-ch nil :retry-ch nil)))
@@ -303,7 +297,6 @@
 (defmethod extensions/open-peer-site NettyTcpSockets
   [messenger assigned]
   (let [buf-recv-ch (chan 10000)
-        parsed-ch (chan (clojure.core.async/dropping-buffer 10000))
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
         retry-ch (:retry-ch messenger)
@@ -313,14 +306,13 @@
                                         (:bind-addr messenger) 
                                         (:netty/port assigned) 
                                         buf-recv-ch)
-        buf-loop (buf-recv-loop messenger buf-recv-ch parsed-ch)
-        app-loop (app daemon parsed-ch inbound-ch release-ch retry-ch)]
+        shutdown-ch (chan 1)
+        app-loop (app daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch)]
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn 
+             :shutdown-ch shutdown-ch
              :buf-recv-ch buf-recv-ch
-             :buf-loop buf-loop
-             :app-loop app-loop 
-             :parsed-ch parsed-ch})))
+             :app-loop app-loop})))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event {:keys [netty/external-addr netty/port]}]
@@ -340,16 +332,16 @@
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event ^Channel peer-link messages]
+  ;(taoensso.timbre/info "SENDING messages " messages)
   (.writeAndFlush peer-link 
                   ^ByteBuf (protocol/build-messages-msg-buf (:compress-f messenger) messages) 
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event ^Channel peer-link message-id completion-id ack-val]
+  ;(taoensso.timbre/info "SENDING ACK: " message-id ack-val)
   (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-ack-msg-buf message-id 
-                                                       completion-id 
-                                                       ack-val)
+                  ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)
                   (.voidPromise ^Channel peer-link)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
@@ -366,4 +358,4 @@
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
   [messenger event ^Channel peer-link]
-  (.close peer-link))
+  (-> peer-link .close .sync))

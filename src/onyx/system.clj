@@ -36,7 +36,7 @@
 (defn rethrow-component [f]
   (try
     (f)
-    (catch Exception e
+    (catch Throwable e
       (fatal e)
       (throw (.getCause e)))))
 
@@ -86,7 +86,7 @@
   (try
     (messaging-require config)
     :loaded
-    (catch Exception e
+    (catch Throwable e
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))))
 
 (defn messaging-peer-group-ctor [config]

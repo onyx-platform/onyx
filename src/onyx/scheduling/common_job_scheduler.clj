@@ -16,6 +16,16 @@
   (fn [replica jobs n]
     (:job-scheduler replica)))
 
+(defmethod job-offer-n-peers :default
+  [replica]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:job-scheduler (:job-scheduler replica)})))
+
+(defmethod claim-spare-peers :default
+  [replica]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:job-scheduler (:job-scheduler replica)})))
+
 (defn current-job-allocations [replica]
   (into {}
         (map (fn [j]

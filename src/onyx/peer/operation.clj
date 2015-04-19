@@ -10,7 +10,7 @@
     (let [user-ns (symbol (name (namespace kw)))
           user-fn (symbol (name kw))]
       (or (ns-resolve user-ns user-fn) (throw (Exception.))))
-    (catch Exception e
+    (catch Throwable e
       (throw (ex-info "Could not resolve function" {:fn kw})))))
 
 (defn resolve-fn [task-map]
@@ -18,7 +18,7 @@
 
 (defn exception? [e]
   (let [classes (supers (class e))]
-    (boolean (some #{java.lang.Exception} classes))))
+    (boolean (some #{java.lang.Throwable} classes))))
 
 (defn start-lifecycle?
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]

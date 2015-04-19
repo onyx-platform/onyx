@@ -60,11 +60,6 @@
 (defn drop-nth [n coll]
   (keep-indexed #(if (not= %1 n) %2) coll))
 
-(defn fuse-ack-vals [task parent-ack child-ack]
-  (if (= (:onyx/type task) :output)
-    parent-ack
-    (acker/prefuse-vals (vector parent-ack child-ack))))
-
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (into #{} downstream)
         (= to-add :none) #{}
@@ -233,7 +228,7 @@
      {:onyx.core/batch (drop-nth k batch)})))
 
 (defn collect-next-segments [event input]
-  (let [segments (try (function/apply-fn event input) (catch Exception e e))]
+  (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
     (if (sequential? segments) segments (vector segments))))
 
 (defn apply-fn-single [{:keys [onyx.core/batch] :as event}]
@@ -304,7 +299,7 @@
                                                                      :task (:onyx.core/task-id event)})]
                      (>!! outbox-ch entry))))
            (recur))))
-     (catch Exception e
+     (catch Throwable e
        (fatal e)))))
 
 (defn replay-messages! [messenger event replay-interval task-kill-ch]
@@ -344,7 +339,9 @@
 (defn compile-fc-exs [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
-(defn run-task-lifecycle [init-event seal-ch kill-ch ex-f]
+(defn run-task-lifecycle 
+  "The main task run loop, read batch, ack messages, etc."
+  [init-event seal-ch kill-ch ex-f]
   (try
     (while (first (alts!! [seal-ch kill-ch] :default true))
       (-> init-event
@@ -361,7 +358,7 @@
           (ack-messages)
           (retry-messages)
           (close-batch-resources)))
-    (catch Exception e
+    (catch Throwable e
       (ex-f e))))
 
 (defn resolve-compression-fn-impls [opts]
@@ -396,7 +393,7 @@
             n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
             buckets (vec (repeat n-buckets []))
 
-            _ (taoensso.timbre/info (format "[%s] Starting Task LifeCycle for job %s, task %s" id job-id (:name task)))
+            _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -433,9 +430,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (job-covered? replica-state job-id))
                          (not (any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the job yet, backing off and trying again..." id))
+            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))
+
+        (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
         (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
@@ -443,10 +442,11 @@
           (assoc component 
             :pipeline-data pipeline-data
             :seal-ch seal-resp-ch
+            :task-kill-ch task-kill-ch
             :task-lifecycle-ch task-lifecycle-ch
             :replay-messages-ch replay-messages-ch
             :aux-ch aux-ch)))
-      (catch Exception e
+      (catch Throwable e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
 
@@ -455,15 +455,14 @@
     (when-let [event (:pipeline-data component)]
       (l-ext/close-lifecycle-resources* event)
 
-      (close! (:seal-ch component))
-      (close! (:task-lifecycle-ch component))
-      
       ;; Ensure task operations are finished before closing peer connections
+      (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
+
+      (close! (:task-kill-ch component))
       (<!! (:replay-messages-ch component))
       (<!! (:aux-ch component))
-      (<!! (:seal-ch component))
-
+      
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
@@ -495,7 +494,7 @@
 
 (dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
+    (taoensso.timbre/trace (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
 (dire/with-post-hook! #'apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
@@ -503,7 +502,7 @@
 
 (dire/with-post-hook! #'write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/results]}]
-    (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
+    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
 
 (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]

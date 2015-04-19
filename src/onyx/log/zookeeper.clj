@@ -142,7 +142,7 @@
     (try
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
         (>!! ch true))
-      (catch Exception e
+      (catch Throwable e
         ;; Node doesn't exist.
         (>!! ch true)))))
 
@@ -151,7 +151,7 @@
     (if-let [chunk
              (try
                (extensions/read-chunk log :job-scheduler nil)
-               (catch Exception e
+               (catch Throwable e
                  (warn e)
                  (warn "Job scheduler couldn't be discovered. Backing off 500ms and trying again...")
                  nil))]
@@ -164,7 +164,7 @@
     (if-let [chunk
              (try
                (extensions/read-chunk log :messaging nil)
-               (catch Exception e
+               (catch Throwable e
                  (warn e)
                  (warn "Messaging couldn't be discovered. Backing off 500ms and trying again...")
                  nil))]
@@ -209,7 +209,7 @@
          (close! ch))
        (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
          (close! ch))
-       (catch Exception e
+       (catch Throwable e
          (fatal e))))
     (<!! rets)))
 

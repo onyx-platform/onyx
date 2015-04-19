@@ -8,7 +8,7 @@
 - New messaging transport: Aeron
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
-- New feature: Functions can take an entire batch of segments as their input with catalog key `:onyx/batch?` true
+- New feature: Functions can take an entire batch of segments as their input with catalog key `:onyx/bulk?` true
 - New feature: Flow conditions handle exceptions as predicates
 - New feature: Flow conditions may post-transform exception values into new segments
 - New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value

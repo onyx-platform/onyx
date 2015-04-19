@@ -133,14 +133,6 @@
    :messages (let [message-count (.readInt buf)]
                (doall (repeatedly message-count #(read-message-buf decompress-f buf))))})
 
-(defn build-msg-buf [msg]
-  (let [t ^byte (:type msg)] 
-    (cond 
-      (= t messages-type-id) (build-messages-msg-buf (:messages msg))
-      (= t ack-type-id) (build-ack-msg-buf (:id msg) (:completion-id msg) (:ack-val msg))
-      (= t completion-type-id) (build-completion-msg-buf (:id msg))
-      (= t retry-type-id) (build-retry-msg-buf (:id msg)))))
-
 (defn read-buf [decompress-f ^ByteBuf buf]
   (let [msg-type ^byte (.readByte buf)] 
     (cond (= msg-type messages-type-id) 

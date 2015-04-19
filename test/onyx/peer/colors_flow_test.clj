@@ -180,14 +180,6 @@
 
 (def constantly-true (constantly true))
 
-(def process-children identity)
-
-(def process-adults identity)
-
-(def process-athletes-in-washington identity)
-
-(def process-everyone identity)
-
 (def process-red identity)
 
 (def process-blue identity)
@@ -199,7 +191,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :flow-conditions flow-conditions
+;;  :flow-conditions flow-conditions
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def red (take-segments! red-out-chan))
@@ -232,10 +224,10 @@
 
 (close! colors-in-chan)
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(do
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
+  (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
-
+  (onyx.api/shutdown-env env))
