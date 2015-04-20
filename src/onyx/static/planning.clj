@@ -1,6 +1,7 @@
 (ns onyx.static.planning
   (:require [com.stuartsierra.dependency :as dep]
-            [onyx.peer.operation :refer [kw->fn]])
+            [onyx.peer.operation :refer [kw->fn]]
+            [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
 (defmulti create-io-task
