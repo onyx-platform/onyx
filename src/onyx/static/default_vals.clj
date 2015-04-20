@@ -10,4 +10,7 @@
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
    :onyx.peer/sequential-back-off 2000
-   :onyx.peer/job-not-ready-back-off 500})
+   :onyx.peer/job-not-ready-back-off 500
+
+   :onyx.messaging/release-ch-buffer-size 10000
+   :onyx.messaging/retry-ch-buffer-size 10000})
