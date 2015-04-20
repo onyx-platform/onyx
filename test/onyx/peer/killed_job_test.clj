@@ -4,6 +4,7 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
+            [onyx.extensions :as extensions]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -30,18 +31,6 @@
 
 (def out-chan-2 (chan (sliding-buffer (inc n-messages))))
 
-(defmethod l-ext/inject-lifecycle-resources :in-1
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :out-1
-  [_ _] {:core.async/chan out-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-2})
-
-(defmethod l-ext/inject-lifecycle-resources :out-2
-  [_ _] {:core.async/chan out-chan-2})
-
 (try
   ;;; Don't write any segments to j1 so that the job will stay alive until we kill it.
   (doseq [n (range n-messages)]
@@ -66,7 +55,7 @@
       :onyx/type :function
       :onyx/batch-size batch-size}
 
-     {:onyx/name :out-2
+     {:onyx/name :out-1
       :onyx/ident :core.async/write-to-chan
       :onyx/type :output
       :onyx/medium :core.async
@@ -96,23 +85,37 @@
       :onyx/max-peers 1
       :onyx/doc "Writes segments to a core.async channel"}])
 
+(defmethod l-ext/inject-lifecycle-resources :in-1
+  [_ _] {:core.async/chan in-chan-1})
+
+(defmethod l-ext/inject-lifecycle-resources :out-1
+  [_ _] {:core.async/chan out-chan-1})
+
+(defmethod l-ext/inject-lifecycle-resources :in-2
+  [_ _] {:core.async/chan in-chan-2})
+
+(defmethod l-ext/inject-lifecycle-resources :out-2
+  [_ _] {:core.async/chan out-chan-2})
+
+
+
   (def workflow-1 [[:in-1 :inc] [:inc :out-1]])
 
   (def workflow-2 [[:in-2 :inc] [:inc :out-2]])
 
-  (def v-peers (onyx.api/start-peers! 1 peer-group))
+  (def v-peers (onyx.api/start-peers 3 peer-group))
 
-  (def j1 (onyx.api/submit-job
+  (def j1 (:job-id (onyx.api/submit-job
             peer-config
             {:catalog catalog-1 :workflow workflow-1
-             :task-scheduler :onyx.task-scheduler/balanced}))
+             :task-scheduler :onyx.task-scheduler/balanced})))
 
-  (def j2 (onyx.api/submit-job
-            peer-config
-            {:catalog catalog-2 :workflow workflow-2
-             :task-scheduler :onyx.task-scheduler/balanced}))
+  (def j2 (:job-id (onyx.api/submit-job
+                     peer-config
+                     {:catalog catalog-2 :workflow workflow-2
+                      :task-scheduler :onyx.task-scheduler/balanced})))
 
-  (onyx.api/kill-job peer-config (:job-id j1))
+  (onyx.api/kill-job peer-config j1)
 
   (def results (take-segments! out-chan-2))
 
