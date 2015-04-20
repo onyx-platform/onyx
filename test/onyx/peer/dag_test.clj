@@ -29,11 +29,11 @@
 
 (def c-chan (chan (inc n-messages)))
 
-(def j-chan (chan (sliding-buffer (inc n-messages))))
+(def j-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
-(def k-chan (chan (sliding-buffer (inc n-messages))))
+(def k-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
-(def l-chan (chan (sliding-buffer (inc n-messages))))
+(def l-chan (chan 500000 #_(sliding-buffer (* 3 (inc n-messages)))))
 
 (defmethod l-ext/inject-lifecycle-resources :A
   [_ _] {:core.async/chan a-chan})
