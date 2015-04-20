@@ -36,7 +36,7 @@
 (defn build-segments-to-send [leaves]
   (reduce
    (fn [all {:keys [routes ack-vals hash-group message] :as leaf}]
-     (concat
+     (into
       all
       (map
        (fn [route ack-val]
