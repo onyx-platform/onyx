@@ -320,7 +320,7 @@
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 1000)
+  (let [ms (or (:onyx/batch-timeout task-map) 50)
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]

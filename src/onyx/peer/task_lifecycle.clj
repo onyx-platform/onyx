@@ -148,7 +148,7 @@
                                      :acker-id (:acker-id root)
                                      :completion-id (:completion-id root)
                                      :ack-vals (repeatedly (count (:flow (:routes leaf)))
-                                                           (fn [] (acker/gen-ack-value)))}))
+                                                           acker/gen-ack-value)}))
                            leaves)))
                  results)]
     (merge event {:onyx.core/results (map #(group-segments next-tasks catalog % event) results)})))

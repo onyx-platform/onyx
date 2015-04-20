@@ -79,8 +79,8 @@
                                                10
                                                (.toNanos TimeUnit/MICROSECONDS 1)
                                                (.toNanos TimeUnit/MICROSECONDS 100))
-    :high-restart-latency (BackoffIdleStrategy. 100
-                                                10
+    :high-restart-latency (BackoffIdleStrategy. 10
+                                                100
                                                 (.toNanos TimeUnit/MICROSECONDS 10000)
                                                 (.toNanos TimeUnit/MICROSECONDS 100000))))
 
@@ -221,7 +221,7 @@
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 1000)
+  (let [ms (or (:onyx/batch-timeout task-map) 50)
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]

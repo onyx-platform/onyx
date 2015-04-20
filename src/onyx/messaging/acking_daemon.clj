@@ -24,14 +24,16 @@
         (swap!
          (:ack-state daemon)
          (fn [state]
-           (if-not (get-in state [message-id])
-             (assoc state message-id [completion-id ack-val])
-             (let [current-val (second (get-in state [message-id]))]
-               (assoc state message-id [completion-id (bit-xor current-val ack-val)])))))]
+           (if-let [current-ack-val (get-in state [message-id :ack-val])]
+             (assoc-in state [message-id :ack-val] (bit-xor current-ack-val ack-val))
+             (assoc state message-id {:completion-id completion-id
+                                      :ack-val ack-val}))))]
+
     (when-let [x (get rets message-id)]
-      (when (zero? (second x))
+      (when (zero? (:ack-val x))
         (swap! (:ack-state daemon) dissoc message-id)
-        (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id})))))
+        (>!! (:completions-ch daemon) {:id message-id
+                                       :peer-id completion-id})))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
