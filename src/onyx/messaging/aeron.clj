@@ -79,8 +79,8 @@
                                                10
                                                (.toNanos TimeUnit/MICROSECONDS 1)
                                                (.toNanos TimeUnit/MICROSECONDS 100))
-    :high-restart-latency (BackoffIdleStrategy. 100
-                                                10
+    :high-restart-latency (BackoffIdleStrategy. 10
+                                                100
                                                 (.toNanos TimeUnit/MICROSECONDS 10000)
                                                 (.toNanos TimeUnit/MICROSECONDS 100000))))
 
