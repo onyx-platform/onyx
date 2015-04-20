@@ -38,16 +38,9 @@
         children (map (partial find-task catalog) children-names)
         element-name (:onyx/name element)
         task-id (task-ids element-name)]
-    (if (= (count parents) 1)
-      [{:id task-id
-        :name element-name
-        :egress-ids (egress-ids-from-children task-ids children)}]
-      (concat
-        [{:id task-id
-          :name element-name
-          :egress-ids (egress-ids-from-children task-ids children)}]
-        (map #(assoc-in % [:egress-ids (:onyx/name element)] task-id)
-             (rest parents))))))
+    {:id task-id
+     :name element-name
+     :egress-ids (egress-ids-from-children task-ids children)}))
 
 (defmethod create-task :function
   [task-ids catalog task-name parents children-names]
@@ -63,15 +56,15 @@
 
 (defmethod create-io-task :input
   [task-ids element parent children]
-  [{:id (task-ids (:onyx/name element))
+  {:id (task-ids (:onyx/name element))
     :name (:onyx/name element)
-    :egress-ids (egress-ids-from-children task-ids children)}])
+    :egress-ids (egress-ids-from-children task-ids children)})
 
 (defmethod create-io-task :output
   [task-ids element parents children]
   (let [task-name (:onyx/name element)]
-    [{:id (task-ids task-name) 
-      :name task-name}]))
+    {:id (task-ids task-name) 
+     :name task-name}))
 
 (defn to-dependency-graph [workflow]
   (reduce (fn [g edge]
@@ -96,7 +89,7 @@
         (let [parents (dep/immediate-dependencies dag element)
               children (dep/immediate-dependents dag element)
               parent-entries (filter #(some #{(:name %)} parents) tasks)]
-          (concat tasks (create-task task-ids catalog element parent-entries children))))
+          (conj tasks (create-task task-ids catalog element parent-entries children))))
       []
       sorted-dag))))
 
