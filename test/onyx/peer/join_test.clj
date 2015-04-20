@@ -14,8 +14,6 @@
 
 (def peer-config (assoc (:peer-config config) :onyx/id id))
 
-(def dev (onyx-development-env env-config))
-
 (def env (onyx.api/start-env env-config))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
