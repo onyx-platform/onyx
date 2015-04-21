@@ -10,6 +10,6 @@
               ;(.threadingMode ThreadingMode/DEDICATED)
               (.dirsDeleteOnExit true))
         media-driver (MediaDriver/launch ctx)]
-    media-driver)
-  (<!! (chan)))
+    (println "Launched the Media Driver. Blocking forever...")
+    (<!! (chan))))
 
