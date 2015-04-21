@@ -21,10 +21,14 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [ctx (doto (MediaDriver$Context.) (.threadingMode ThreadingMode/SHARED))
-          _ (.dirsDeleteOnExit ctx true)
-          media-driver (MediaDriver/launch ctx)]
-      (assoc component :media-driver media-driver)))
+    (if (and (contains? opts :onyx.messaging.aeron/embedded-driver)
+             (false? (opts :onyx.messaging.aeron/embedded-driver)))
+      component
+      (let [ctx (doto (MediaDriver$Context.) 
+                  (.threadingMode ThreadingMode/SHARED)
+                  (.dirsDeleteOnExit true))
+            media-driver (MediaDriver/launch ctx)]
+        (assoc component :media-driver media-driver))))
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
@@ -108,7 +112,7 @@
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)
-          backpressure-strategy (or (:onyx.messaging/backpressure-strategy config) 
+          backpressure-strategy (or (:onyx.messaging.aeron/backpressure-strategy config) 
                                     :high-restart-latency)]
       (assoc component 
         :bind-addr bind-addr 
