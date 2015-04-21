@@ -1,4 +1,5 @@
 (ns onyx.messaging.aeron-media-driver
+  (:require [clojure.core.async :refer [chan <!!]])
   (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
            [uk.co.real_logic.aeron Aeron$Context]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
@@ -10,6 +11,5 @@
               (.dirsDeleteOnExit true))
         media-driver (MediaDriver/launch ctx)]
     media-driver)
-  (while true
-    (Thread/sleep 1000000)))
+  (<!! (chan)))
 
