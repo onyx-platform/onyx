@@ -1,8 +1,5 @@
 test:
   override:
-    - ./circle-runner.sh aeron:
-        timeout: 360 
-        parallel: true
     - ./circle-runner.sh netty:
         timeout: 360
         parallel: true
