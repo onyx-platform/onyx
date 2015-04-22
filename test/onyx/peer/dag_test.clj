@@ -19,7 +19,7 @@
 (def peer-group 
   (onyx.api/start-peer-group peer-config))
 
-(def n-messages 15000)
+(def n-messages 500)
 
 (def batch-size 40)
 
