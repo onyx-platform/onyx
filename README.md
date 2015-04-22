@@ -25,7 +25,7 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.6.0-SNAPSHOT"]
+[com.mdrogalis/onyx "0.6.0-alpha1"]
 ```
 
 ### Build Status
@@ -95,7 +95,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.5.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.6.x/resources/logo).
 
 ### Running the tests
 
