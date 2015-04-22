@@ -15,7 +15,7 @@
                  [uk.co.real-logic/aeron-client "0.1-SNAPSHOT"]
                  [uk.co.real-logic/aeron-driver "0.1-SNAPSHOT"]
                  [uk.co.real-logic/aeron-common "0.1-SNAPSHOT"]
-                 [prismatic/schema "0.3.1"]
+                 [prismatic/schema "0.4.0"]
                  [zookeeper-clj "0.9.1" :exclusions [io.netty/netty]]
                  [io.netty/netty-all "4.0.26.Final"]
                  [dire "0.5.1"]]
