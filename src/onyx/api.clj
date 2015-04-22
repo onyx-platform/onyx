@@ -181,10 +181,8 @@
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
       (let [position (<!! ch)
             entry (extensions/read-log-entry (:log client) position)
-            new-replica (extensions/apply-log-entry entry replica)
-            tasks (get (:tasks new-replica) job-id)
-            complete-tasks (get (:completions new-replica) job-id)]
-        (if (or (nil? tasks) (not= (into #{} tasks) (into #{} complete-tasks)))
+            new-replica (extensions/apply-log-entry entry replica)]
+        (if-not (some #{job-id} (:completed-jobs new-replica))
           (recur new-replica)
           (do (component/stop client)
               true))))))
@@ -202,7 +200,7 @@
                   (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
                   (recur (component/start live)))
               :else (throw (ex-info "Read from a channel with no response implementation" {})))))
-    (catch Exception e
+    (catch Throwable e
       (fatal "Peer lifecycle threw an exception")
       (fatal e))))
 

@@ -1,5 +1,5 @@
 (ns onyx.log.commands.common
-  (:require [clojure.core.async :refer [chan]]
+  (:require [clojure.core.async :refer [chan close!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [com.stuartsierra.component :as component]
@@ -69,12 +69,17 @@
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
-    (if (and (not= old-allocation new-allocation)
-             (not (nil? new-allocation)))
+    (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
+            (close! (:task-kill-ch state))
             (component/stop @(:lifecycle state)))
-          (let [seal-ch (chan)
-                new-state (assoc state :job (:job new-allocation) :task (:task new-allocation) :seal-ch seal-ch)
-                new-lifecycle (future (component/start ((:task-lifecycle-fn state) (select-keys new-allocation [:job :task]) new-state)))]
-            (assoc new-state :lifecycle new-lifecycle :seal-response-ch seal-ch :job (:job new-allocation) :task (:task new-allocation))))
+          (if (not (nil? new-allocation))
+            (let [seal-ch (chan)
+                  task-kill-ch (chan)
+                  new-state (assoc state :job (:job new-allocation) :task (:task new-allocation)
+                                   :seal-ch seal-ch :task-kill-ch task-kill-ch)
+                  new-lifecycle (future (component/start ((:task-lifecycle-fn state)
+                                                          (select-keys new-allocation [:job :task]) new-state)))]
+              (assoc new-state :lifecycle new-lifecycle))
+            (assoc state :lifecycle nil :seal-ch nil :task-kill-ch nil :job nil :task nil)))
       state)))

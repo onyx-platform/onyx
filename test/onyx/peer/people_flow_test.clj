@@ -3,11 +3,12 @@
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
@@ -54,25 +55,21 @@
    {:onyx/name :process-children
     :onyx/fn :onyx.peer.people-flow-test/process-children
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-adults
     :onyx/fn :onyx.peer.people-flow-test/process-adults
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-athletes-in-washington
     :onyx/fn :onyx.peer.people-flow-test/process-athletes-in-washington
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :process-everyone
     :onyx/fn :onyx.peer.people-flow-test/process-everyone
     :onyx/type :function
-    :onyx/consumption :concurrent
     :onyx/batch-size batch-size}
 
    {:onyx/name :children-out

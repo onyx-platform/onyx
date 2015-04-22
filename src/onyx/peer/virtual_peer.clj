@@ -36,7 +36,7 @@
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
-              position (first (alts!! [kill-ch inbox-ch] :priority? true))]
+              position (first (alts!! [kill-ch inbox-ch] :priority true))]
           (if position
             (let [entry (extensions/read-log-entry log position)
                   new-replica (extensions/apply-log-entry entry replica)
@@ -47,10 +47,7 @@
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
-    (catch clojure.lang.ExceptionInfo e
-      ;; ZooKeeper connection dropped, close out cleanly.
-      )
-    (catch Exception e
+    (catch Throwable e
       (taoensso.timbre/info e))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
@@ -61,7 +58,7 @@
       (when-let [entry (<!! outbox-ch)]
         (extensions/write-log-entry log entry)
         (recur)))
-    (catch Exception e
+    (catch Throwable e
       (taoensso.timbre/info e))
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
@@ -97,7 +94,7 @@
           (assoc component :id id :inbox-ch inbox-ch
                  :outbox-ch outbox-ch :kill-ch kill-ch
                  :restart-ch restart-ch))
-        (catch Exception e
+        (catch Throwable e
           (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
           (throw e)))))
 

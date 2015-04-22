@@ -1,12 +1,13 @@
 (ns onyx.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.test-helper :refer [load-config]]
             [midje.sweet :refer :all]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
@@ -150,7 +151,7 @@
 (let [catalog
       [{:onyx/name :a
         :onyx/type :input
-        :onyx/medium :hornetq}
+        :onyx/medium :core.async}
 
        {:onyx/name :b
         :onyx/type :input}
@@ -169,7 +170,7 @@
 
        {:onyx/name :g
         :onyx/type :output
-        :onyx/medium :hornetq}]
+        :onyx/medium :core.async}]
       workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
       tasks (onyx.static.planning/discover-tasks catalog workflow)
 

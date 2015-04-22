@@ -44,3 +44,12 @@
 (defn get-counts [replica job-infos]
   (map (partial job-allocation-counts replica)
        job-infos))
+
+(defn load-config []
+  (let [cfg (read-string (slurp (clojure.java.io/resource "test-config.edn")))]
+    (let [impl (System/getenv "TEST_TRANSPORT_IMPL")]
+      (cond (= impl "aeron")
+            (assoc-in cfg [:peer-config :onyx.messaging/impl] :aeron)
+            (= impl "netty")
+            (assoc-in cfg [:peer-config :onyx.messaging/impl] :netty)
+            :else cfg))))

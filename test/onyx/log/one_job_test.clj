@@ -3,13 +3,14 @@
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log]]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
+            [onyx.test-helper :refer [load-config]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 

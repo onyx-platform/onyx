@@ -3,11 +3,12 @@
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
@@ -28,11 +29,11 @@
 
 (def c-chan (chan (inc n-messages)))
 
-(def j-chan (chan (sliding-buffer (inc n-messages))))
+(def j-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
-(def k-chan (chan (sliding-buffer (inc n-messages))))
+(def k-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
-(def l-chan (chan (sliding-buffer (inc n-messages))))
+(def l-chan (chan 500000 #_(sliding-buffer (* 3 (inc n-messages)))))
 
 (defmethod l-ext/inject-lifecycle-resources :A
   [_ _] {:core.async/chan a-chan})
@@ -210,14 +211,14 @@
 
 (fact (last l-results) => :done)
 
-(fact (into #{} (concat a-segments b-segments))
-      => (into #{} (butlast j-results)))
+(fact (into #{} (butlast j-results))
+      => (into #{} (concat a-segments b-segments)))
 
-(fact (into #{} (concat a-segments b-segments))
-      => (into #{} (butlast k-results)))
+(fact (into #{} (butlast k-results))
+      => (into #{} (concat a-segments b-segments)))
 
-(fact (into #{} (concat a-segments b-segments c-segments))
-      => (into #{} (butlast l-results)))
+(fact (into #{} (butlast l-results))
+      => (into #{} (concat a-segments b-segments c-segments)))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

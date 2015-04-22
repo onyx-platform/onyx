@@ -6,7 +6,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
-              [taoensso.timbre :as timbre :refer [debug]]
+              [taoensso.timbre :as timbre :refer [debug info]]
               [dire.core :refer [with-post-hook!]])
     (:import [java.util UUID]))
 
@@ -36,7 +36,7 @@
 (defn build-segments-to-send [leaves]
   (reduce
    (fn [all {:keys [routes ack-vals hash-group message] :as leaf}]
-     (concat
+     (into
       all
       (map
        (fn [route ack-val]
@@ -55,11 +55,12 @@
   (select-keys segment [:id :acker-id :completion-id :ack-val :message]))
 
 (defn pick-peer [active-peers hash-group]
-  (if (nil? hash-group)
-    (rand-nth active-peers)
-    (nth active-peers
-         (mod (hash hash-group)
-              (count active-peers)))))
+  (when (seq active-peers)
+    (if (nil? hash-group)
+      (rand-nth active-peers)
+      (nth active-peers
+           (mod (hash hash-group)
+                (count active-peers))))))
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/results onyx.core/messenger onyx.core/job-id] :as event}]
@@ -72,8 +73,8 @@
         (doseq [[{:keys [route hash-group]} segs] groups]
           (let [peers (get-in replica [:allocations job-id (get egress-tasks route)])
                 active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-                target (pick-peer active-peers hash-group)
-                link (operation/peer-link event target)]
-            (onyx.extensions/send-messages messenger event link (map strip-message segs))))
+                target (pick-peer active-peers hash-group)]
+            (when target
+              (let [link (operation/peer-link event target)]
+                (onyx.extensions/send-messages messenger event link (map strip-message segs))))))
         {}))))
-

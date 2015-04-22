@@ -7,9 +7,10 @@
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))

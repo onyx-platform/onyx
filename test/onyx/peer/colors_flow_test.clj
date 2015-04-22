@@ -3,11 +3,12 @@
             [midje.sweet :refer :all]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
 
-(def config (read-string (slurp (clojure.java.io/resource "test-config.edn"))))
+(def config (load-config))
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
@@ -179,14 +180,6 @@
 
 (def constantly-true (constantly true))
 
-(def process-children identity)
-
-(def process-adults identity)
-
-(def process-athletes-in-washington identity)
-
-(def process-everyone identity)
-
 (def process-red identity)
 
 (def process-blue identity)
@@ -231,10 +224,10 @@
 
 (close! colors-in-chan)
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(do
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
+  (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
-
+  (onyx.api/shutdown-env env))

@@ -10,7 +10,7 @@
             [zookeeper :as zk]))
 
 (facts "peers all join and watch each other"
-       (let [config (load-config "test-config.edn")
+       (let [config (load-config)
              onyx-id (java.util.UUID/randomUUID)
              env-config (assoc (:env-config config) :onyx/id onyx-id)
              peer-config (assoc (:peer-config config) :onyx/id onyx-id)

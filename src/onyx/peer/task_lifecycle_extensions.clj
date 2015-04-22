@@ -8,11 +8,14 @@
 (defn ident-dispatch [{:keys [onyx.core/task-map]}]
   (:onyx/ident task-map))
 
+(defn task-type [task-map]
+  (:onyx/type task-map))
+
 (defn type-and-medium-dispatch [{:keys [onyx.core/task-map]}]
-  [(p-ext/task-type task-map) (:onyx/medium task-map)])
+  [(task-type task-map) (:onyx/medium task-map)])
 
 (defn type-dispatch [{:keys [onyx.core/task-map]}]
-  (p-ext/task-type task-map))
+  (task-type task-map))
 
 (defn merge-api-levels [f event]
   (reduce
