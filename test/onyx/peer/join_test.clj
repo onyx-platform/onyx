@@ -4,7 +4,8 @@
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
-            [onyx.api]))
+            [onyx.api]
+            [taoensso.timbre :refer [info warn trace fatal] :as timbre]))
 
 (def id (java.util.UUID/randomUUID))
 
@@ -14,12 +15,9 @@
 
 (def peer-config (assoc (:peer-config config) :onyx/id id))
 
-(def dev (onyx-development-env env-config))
-
 (def env (onyx.api/start-env env-config))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
-
 (def batch-size 2)
 
 (def people
@@ -34,11 +32,11 @@
 
 (def ages (map #(select-keys % [:id :age]) people))
 
-(def name-chan (chan (inc names)))
+(def name-chan (chan (inc (count names))))
 
-(def age-chan (chan (inc ages)))
+(def age-chan (chan (inc (count ages))))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (chan 10000 #_(sliding-buffer (inc n-messages))))
 
 (doseq [name names]
   (>!! name-chan name))
@@ -98,6 +96,15 @@
   [_ event]
   {:onyx.core/params [(atom {})]})
 
+(defmethod l-ext/inject-lifecycle-resources :names
+  [_ _] {:core.async/chan name-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :ages
+  [_ _] {:core.async/chan age-chan})
+
+(defmethod l-ext/inject-lifecycle-resources :out
+  [_ _] {:core.async/chan out-chan})
+
 (def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
@@ -107,7 +114,7 @@
 
 (def results (take-segments! out-chan))
 
-(fact (into #{} (butlast results)) => (into #{} people))
+(fact (set (butlast results)) => (set people))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

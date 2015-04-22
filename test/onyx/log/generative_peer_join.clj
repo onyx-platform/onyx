@@ -182,32 +182,32 @@
    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
 
-(deftest balanced-allocations-uneven)
-(checking
- "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
- 1000
- [{:keys [replica log peer-choices]}
-  (log-gen/apply-entries-gen
-   (gen/return
-    {:replica {:job-scheduler :onyx.job-scheduler/balanced
-               :messaging {:onyx.messaging/impl :dummy-messenger}}
-     :message-id 0
-     :entries (assoc (generate-join-entries (generate-peer-ids 7))
-                :job-1 [(api/create-submit-job-entry job-1-id
-                                                     peer-config
-                                                     job-1
-                                                     (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                :job-2 [(api/create-submit-job-entry job-2-id
-                                                     peer-config
-                                                     job-2
-                                                     (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
-     :log []
-     :peer-choices []}))]
- (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
-       j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
-   ;; Since job IDs are reused, we can't know which order they'll be in.
-   (is (= (set [(map count j1-allocations) (map count j2-allocations)])
-          #{[2 1 1] [1 1 1]}))))
+(deftest balanced-allocations-uneven
+  (checking
+   "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
+   1000
+   [{:keys [replica log peer-choices]}
+    (log-gen/apply-entries-gen
+     (gen/return
+      {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                 :messaging {:onyx.messaging/impl :dummy-messenger}}
+       :message-id 0
+       :entries (assoc (generate-join-entries (generate-peer-ids 7))
+                  :job-1 [(api/create-submit-job-entry job-1-id
+                                                       peer-config
+                                                       job-1
+                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
+                  :job-2 [(api/create-submit-job-entry job-2-id
+                                                       peer-config
+                                                       job-2
+                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
+       :log []
+       :peer-choices []}))]
+   (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
+         j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
+     ;; Since job IDs are reused, we can't know which order they'll be in.
+     (is (= (set [(map count j1-allocations) (map count j2-allocations)])
+            #{[2 1 1] [1 1 1]})))))
 
 (deftest balanced-allocations
   (checking

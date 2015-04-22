@@ -8,13 +8,17 @@
 ;; Constants
 
 ;; id uuid 
-(def completion-msg-length (int 16))
+(def completion-msg-length (int 17))
 
 ;; id uuid
-(def retry-msg-length (int 16))
+(def retry-msg-length (int 17))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ack-msg-length (int 40))
+(def ack-msg-length (int 41))
+
+(def completion-msg-id (byte 0))
+(def retry-msg-id (byte 1))
+(def ack-msg-id (byte 2))
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
@@ -34,10 +38,14 @@
 
 (defn build-acker-message [^UUID id ^UUID completion-id ^long ack-val]
   (let [buf (UnsafeBuffer. (byte-array ack-msg-length))]
-    (write-uuid buf 0 id)
-    (write-uuid buf 16 completion-id)
-    (.putLong buf 32 ack-val)
+    (.putByte buf 0 ack-msg-id)
+    (write-uuid buf 1 id)
+    (write-uuid buf 17 completion-id)
+    (.putLong buf 33 ack-val)
     buf))
+
+(defn read-message-type [buf offset]
+  (.getByte buf offset))
 
 (defn read-acker-message [^UnsafeBuffer buf offset]
   (let [id (get-uuid buf offset)
@@ -55,12 +63,14 @@
 
 (defn build-completion-msg-buf [id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
-    (write-uuid buf 0 id)
+    (.putByte buf 0 completion-msg-id)
+    (write-uuid buf 1 id)
     buf))
 
 (defn build-retry-msg-buf [id]
   (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
-    (write-uuid buf 0 id)
+    (.putByte buf 0 retry-msg-id)
+    (write-uuid buf 1 id)
     buf))
 
 (defn write-message-meta [^MutableDirectBuffer buf offset {:keys [id acker-id completion-id ack-val]}]

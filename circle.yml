@@ -1,9 +1,11 @@
 test:
   override:
-    - export TEST_TRANSPORT_IMPL=aeron; lein with-profile dev,circle-ci midje 'onyx.log.*':
-        timeout: 180
-    - export TEST_TRANSPORT_IMPL=aeron; lein with-profile dev,circle-ci midje 'onyx.log.*':
-        timeout: 180
+    - ./circle-runner.sh aeron:
+        timeout: 360 
+        parallel: true
+    - ./circle-runner.sh netty:
+        timeout: 360
+        parallel: true
 
 machine:
   java:
@@ -14,6 +16,7 @@ dependencies:
     - bash ./install-aeron.sh
   cache_directories:
     - Aeron
+    - Agrona
 
 notify:
   webhooks:
