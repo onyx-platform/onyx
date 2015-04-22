@@ -9,8 +9,11 @@
             [taoensso.timbre :refer [info] :as timbre]))
 
 (defn add-site [replica {:keys [joiner peer-site]}]
+  (prn peer-site " :: " (extensions/assign-site-resources (:messaging replica)
+                                                    peer-site
+                                                    (:peer-sites replica)))
   (-> replica 
-      (assoc-in [:peer-sites joiner] 
+      (assoc-in [:peer-sites joiner]
                 (merge
                   peer-site
                   (extensions/assign-site-resources (:messaging replica)

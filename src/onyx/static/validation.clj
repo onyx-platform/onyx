@@ -113,7 +113,7 @@
     {:zookeeper/address schema/Str
      :onyx/id schema/Uuid
      :onyx.peer/job-scheduler schema/Keyword
-     :onyx.messaging/impl (schema/enum :aeron :netty :dummy-messenger)
+     :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
      :onyx.messaging/bind-addr schema/Str
      (schema/optional-key :onyx.messaging/peer-port-range) [schema/Int]
      (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]

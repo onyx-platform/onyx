@@ -12,7 +12,8 @@
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config (assoc (:peer-config config) :onyx/id id))
+(def peer-config (assoc (:peer-config config) :onyx/id id
+                        :onyx.messaging/impl :core.async))
 
 (def env (onyx.api/start-env env-config))
 
@@ -47,7 +48,7 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def workflow [[:in :inc] [:inc :out]])
+(def workflow [[:in :inc][:inc :out]])
 
 (def in-chan (chan (inc n-messages)))
 
@@ -79,9 +80,11 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(do
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
+  (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
+  (onyx.api/shutdown-env env))
+
