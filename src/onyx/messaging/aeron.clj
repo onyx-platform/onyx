@@ -257,8 +257,10 @@
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
   (when-let [pub (get-in peer-link [:send-pub :pub])] 
-    (when @pub (.close @pub)))
+    (when @pub (.close @pub))
+    (reset! pub nil))
   (when-let [pub (get-in peer-link [:send-pub :aux-pub])]
-    (when @pub (.close @pub)))
+    (when @pub (.close @pub))
+    (reset! pub nil))
   (.close (:conn peer-link)) 
   {})
