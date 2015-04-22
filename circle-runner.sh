@@ -1,4 +1,4 @@
-#!/usr/bin/zsh
+#!/bin/bash
 
 set -x
 set -e
@@ -16,7 +16,7 @@ do
   then
     files+=" $file"
   fi
-  i=$i+1
+  ((++i))
 done
 
 export TEST_TRANSPORT_IMPL=$1 
