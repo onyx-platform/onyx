@@ -16,6 +16,7 @@ dependencies:
     - bash ./install-aeron.sh
   cache_directories:
     - Aeron
+    - Agrona
 
 notify:
   webhooks:

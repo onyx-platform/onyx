@@ -5,7 +5,7 @@ set -e
 
 if [ ! -e Agrona ]; then
   git clone https://github.com/real-logic/Agrona.git
-  cd Aeron
+  cd Agrona
   git checkout 31d85ecfcbe1e3de38a0b5a095239d2ba973234b
   ./gradlew
 fi
