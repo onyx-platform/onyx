@@ -25,7 +25,7 @@
              (false? (opts :onyx.messaging.aeron/embedded-driver)))
       component
       (let [ctx (doto (MediaDriver$Context.) 
-                  (.threadingMode ThreadingMode/SHARED)
+                  (.threadingMode ThreadingMode/DEDICATED)
                   (.dirsDeleteOnExit true))
             media-driver (MediaDriver/launch ctx)]
         (assoc component :media-driver media-driver))))
