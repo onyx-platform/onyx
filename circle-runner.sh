@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -e
 
 i=0
