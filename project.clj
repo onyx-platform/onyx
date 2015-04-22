@@ -1,4 +1,4 @@
-(defproject com.mdrogalis/onyx "0.6.0-SNAPSHOT"
+(defproject com.mdrogalis/onyx "0.6.0-alpha1"
   :description "Distributed, masterless, fault tolerant data processing for Clojure"
   :url "https://github.com/MichaelDrogalis/onyx"
   :license {:name "Eclipse Public License"
@@ -28,4 +28,3 @@
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx3g"]}}
   :codox {:output-dir "doc/api"})
-
