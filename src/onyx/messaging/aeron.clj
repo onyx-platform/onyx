@@ -160,10 +160,7 @@
    :aeron/external-addr (:external-addr messenger)})
 
 (def send-stream-id 1)
-(def acker-stream-id 2)
-(def completion-stream-id 3)
-(def retry-stream-id 4)
-(def aux-stream-id 5)
+(def aux-stream-id 2)
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -200,11 +197,13 @@
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
         channel (aeron-channel external-addr port)
-        send-pub (.addPublication aeron channel send-stream-id)
-        aux-pub (.addPublication aeron channel aux-stream-id)]
+        f-send-pub #(.addPublication aeron channel send-stream-id)
+        f-aux-pub #(.addPublication aeron channel aux-stream-id)]
     {:conn aeron 
-     :send-pub send-pub 
-     :aux-pub aux-pub}))
+     :send-pub {:f-create f-send-pub
+                :pub (atom nil)} 
+     :aux-pub {:f-create f-aux-pub
+               :pub (atom nil)}}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -218,10 +217,15 @@
           segments)
         segments))))
 
+(defn get-peer-link-pub [peer-link k]
+  (if-let [pub @(get-in peer-link [k :pub])]
+    pub
+    (reset! (get-in peer-link [k :pub]) ((get-in peer-link [k :f-create])))))
+
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
   (let [[len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) batch)
-        pub ^uk.co.real_logic.aeron.Publication (:send-pub peer-link)
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :send-pub)
         offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -229,7 +233,7 @@
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
   (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
-        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link)
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -237,7 +241,7 @@
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-completion-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link) 
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -245,14 +249,16 @@
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-retry-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link)
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
-  (.close (:send-pub peer-link))
-  (.close (:aux-pub peer-link))
+  (when-let [pub @(get-in peer-link [:send-pub :pub])] 
+    (.close pub))
+  (when-let [pub @(get-in peer-link [:send-pub :aux-pub])] 
+    (.close pub))
   (.close (:conn peer-link)) 
   {})
