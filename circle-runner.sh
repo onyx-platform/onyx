@@ -6,6 +6,8 @@ set -e
 i=0
 files=()
 
+echo $CIRCLE_NODE_INDEX " of " $CIRCLE_NODE_TOTAL
+
 TEST_NSES=$(find test -name "*.clj" |sed s/test\\///|sed s/\\//\\./g|sed s/".clj$"//|sed s/"_"/"-"/g|sort)
 
 for file in $TEST_NSES
@@ -17,4 +19,5 @@ do
   ((i++))
 done
 
-TEST_TRANSPORT_IMPL=$1 lein with-profile dev,circle-ci midje ${files[@]} 
+export TEST_TRANSPORT_IMPL=$1 
+lein with-profile dev,circle-ci midje ${files[@]} 
