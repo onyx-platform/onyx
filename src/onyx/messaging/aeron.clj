@@ -56,20 +56,23 @@
     (doseq [message messages]
       (>!! inbound-ch message))))
 
-(defn handle-acker-message [daemon buffer offset length header]
-  (let [thawed (protocol/read-acker-message buffer offset)]
-    (acker/ack-message daemon
-                       (:id thawed)
-                       (:completion-id thawed)
-                       (:ack-val thawed))))
+(defn handle-aux-message [daemon release-ch retry-ch buffer offset length header]
+  (let [msg-type (protocol/read-message-type buffer offset)
+        offset-rest (inc offset)] 
+    (cond (= msg-type protocol/ack-msg-id)
+          (let [thawed (protocol/read-acker-message buffer offset-rest)]
+            (acker/ack-message daemon
+                               (:id thawed)
+                               (:completion-id thawed)
+                               (:ack-val thawed)))
 
-(defn handle-completion-message [release-ch buffer offset length header]
-  (let [completion-id (protocol/read-completion buffer offset)]
-    (>!! release-ch completion-id)))
+          (= msg-type protocol/completion-msg-id)
+          (let [completion-id (protocol/read-completion buffer offset-rest)]
+            (>!! release-ch completion-id))
 
-(defn handle-retry-message [retry-ch buffer offset length header]
-  (let [retry-id (protocol/read-retry buffer offset)]
-    (>!! retry-ch retry-id)))
+          (= msg-type protocol/retry-msg-id)
+          (let [retry-id (protocol/read-retry buffer offset)]
+            (>!! retry-ch retry-id)))))
 
 (defn data-handler [f]
   (FragmentAssemblyAdapter. 
@@ -131,21 +134,13 @@
       (when-let [rs @resources]
         (let [{:keys [conn
                       send-subscriber 
-                      acker-subscriber 
-                      completion-subscriber
-                      retry-subscriber
+                      aux-subscriber 
                       accept-send-fut 
-                      accept-acker-fut
-                      accept-completion-fut
-                      accept-retry-fut]} rs] 
+                      accept-aux-fut]} rs] 
           (future-cancel accept-send-fut)
-          (future-cancel accept-acker-fut)
-          (future-cancel accept-completion-fut)
-          (future-cancel accept-retry-fut)
+          (future-cancel accept-aux-fut)
          (when send-subscriber (.close send-subscriber))
-         (when acker-subscriber (.close acker-subscriber))
-         (when completion-subscriber (.close completion-subscriber))
-         (when retry-subscriber (.close retry-subscriber))
+         (when aux-subscriber (.close aux-subscriber))
          (when conn (.close conn)))
         (reset! resources nil))
       (close! (:release-ch component))
@@ -168,6 +163,7 @@
 (def acker-stream-id 2)
 (def completion-stream-id 3)
 (def retry-stream-id 4)
+(def aux-stream-id 5)
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -182,34 +178,22 @@
         send-idle-strategy (backoff-strategy backpressure-strategy)
 
         send-handler (data-handler (partial handle-sent-message inbound-ch (:decompress-f messenger)))
-        acker-handler (data-handler (partial handle-acker-message acking-daemon))
-        completion-handler (data-handler (partial handle-completion-message release-ch))
-        retry-handler (data-handler (partial handle-retry-message retry-ch))
+        aux-handler (data-handler (partial handle-aux-message acking-daemon release-ch retry-ch))
 
         send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
-        acker-subscriber (.addSubscription aeron channel acker-stream-id acker-handler)
-        completion-subscriber (.addSubscription aeron channel completion-stream-id completion-handler)
-        retry-subscriber (.addSubscription aeron channel retry-stream-id retry-handler)
+        aux-subscriber (.addSubscription aeron channel aux-stream-id aux-handler)
 
         accept-send-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) send-subscriber) 
                                      (catch Throwable e (fatal e))))
-        accept-acker-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) acker-subscriber) 
-                                      (catch Throwable e (fatal e))))
-        accept-completion-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) completion-subscriber) 
-                                           (catch Throwable e (fatal e))))
-        accept-retry-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) retry-subscriber)
+        accept-aux-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) aux-subscriber) 
                                       (catch Throwable e (fatal e))))]
     (reset! (:resources messenger)
             {:conn aeron
              :send-idle-strategy send-idle-strategy
              :accept-send-fut accept-send-fut
-             :accept-acker-fut accept-acker-fut
-             :accept-completion-fut accept-completion-fut
-             :accept-retry-fut accept-retry-fut
+             :accept-aux-fut accept-aux-fut
              :send-subscriber send-subscriber
-             :acker-subscriber acker-subscriber
-             :completion-subscriber completion-subscriber
-             :retry-subscriber retry-subscriber})))
+             :aux-subscriber aux-subscriber})))
 
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger event {:keys [aeron/external-addr aeron/port]}]
@@ -217,11 +201,10 @@
         aeron (Aeron/connect ctx)
         channel (aeron-channel external-addr port)
         send-pub (.addPublication aeron channel send-stream-id)
-        acker-pub (.addPublication aeron channel acker-stream-id)
-        completion-pub (.addPublication aeron channel completion-stream-id)
-        retry-pub (.addPublication aeron channel retry-stream-id)]
-    {:conn aeron :send-pub send-pub :acker-pub acker-pub
-     :completion-pub completion-pub :retry-pub retry-pub}))
+        aux-pub (.addPublication aeron channel aux-stream-id)]
+    {:conn aeron 
+     :send-pub send-pub 
+     :aux-pub aux-pub}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -246,7 +229,7 @@
 (defmethod extensions/internal-ack-message AeronConnection
   [messenger event peer-link message-id completion-id ack-val]
   (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
-        pub ^uk.co.real_logic.aeron.Publication (:acker-pub peer-link)
+        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -254,7 +237,7 @@
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-completion-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (:completion-pub peer-link) 
+        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link) 
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -262,7 +245,7 @@
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event id peer-link]
   (let [unsafe-buffer (protocol/build-retry-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (:retry-pub peer-link)
+        pub ^uk.co.real_logic.aeron.Publication (:aux-pub peer-link)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
@@ -270,8 +253,6 @@
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
   (.close (:send-pub peer-link))
-  (.close (:acker-pub peer-link))
-  (.close (:retry-pub peer-link))
-  (.close (:completion-pub peer-link))
+  (.close (:aux-pub peer-link))
   (.close (:conn peer-link)) 
   {})
