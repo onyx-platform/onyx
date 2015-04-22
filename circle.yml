@@ -1,9 +1,9 @@
 test:
   override:
-    - export TEST_TRANSPORT_IMPL=aeron; lein with-profile dev,circle-ci midje:
-        timeout: 180
-    - export TEST_TRANSPORT_IMPL=netty; lein with-profile dev,circle-ci midje:
-        timeout: 180
+    - ./circle-runner.sh aeron:
+        timeout: 360 
+    - ./circle-runner.sh netty:
+        timeout: 360
 
 machine:
   java:
