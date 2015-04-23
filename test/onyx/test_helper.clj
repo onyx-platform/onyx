@@ -52,6 +52,6 @@
             (assoc-in cfg [:peer-config :onyx.messaging/impl] :aeron)
             (= impl "netty")
             (assoc-in cfg [:peer-config :onyx.messaging/impl] :netty)
-            (= impl "core-async")
+            (= impl "core.async")
             (assoc-in cfg [:peer-config :onyx.messaging/impl] :core.async)
             :else cfg))))
