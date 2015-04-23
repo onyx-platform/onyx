@@ -12,7 +12,8 @@
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
-              [onyx.compression.nippy])
+              [onyx.compression.nippy]
+              [onyx.static.default-vals :refer [defaults]])
     (:import [java.security MessageDigest]
              [uk.co.real_logic.aeron.exceptions.DriverTimeoutException]))
 
@@ -389,8 +390,10 @@
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
-            replay-interval (or (:onyx/replay-interval catalog-entry) 1000)
-            pending-timeout (or (:onyx/pending-timeout catalog-entry) 60000)
+            replay-interval (or (:onyx/replay-interval catalog-entry) 
+                                (:onyx/replay-interval defaults))
+            pending-timeout (or (:onyx/pending-timeout catalog-entry) 
+                                (:onyx/pending-timeout defaults))
             n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
             buckets (vec (repeat n-buckets []))
 
