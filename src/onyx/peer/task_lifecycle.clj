@@ -494,7 +494,7 @@
 
 (dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
-    (taoensso.timbre/info (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
+    (taoensso.timbre/trace (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
 
 (dire/with-post-hook! #'apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
@@ -502,7 +502,7 @@
 
 (dire/with-post-hook! #'write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/results]}]
-    (taoensso.timbre/info (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
+    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
 
 (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
