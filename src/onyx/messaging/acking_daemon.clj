@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.messaging.acking-daemon
     (:require [clojure.core.async :refer [chan >!! close! sliding-buffer]]
               [com.stuartsierra.component :as component]
+              [onyx.static.default-vals :refer [defaults]]
               [taoensso.timbre :as timbre]))
 
 (defrecord AckingDaemon [opts]
@@ -8,7 +9,8 @@
 
   (start [component]
     (taoensso.timbre/info "Starting Acking Daemon")
-    (let [buffer-size (or (:onyx.messaging/completion-buffer-size opts) 50000)]
+    (let [buffer-size (or (:onyx.messaging/completion-buffer-size opts) 
+                          (:onyx.messaging/completion-buffer-size defaults))]
       (assoc component :ack-state (atom {}) :completions-ch (chan (sliding-buffer buffer-size)))))
 
   (stop [component]

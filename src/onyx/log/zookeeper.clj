@@ -46,7 +46,7 @@
   (str (prefix-path prefix) "/messaging"))
 
 (defn throw-subscriber-closed []
-  (throw (ex-info "Log subscriber closed from disconnecting to ZooKeeper" {})))
+  (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
 (defn clean-up-broken-connections [f]
   (try
@@ -67,7 +67,7 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting ZooKeeper")
+    (taoensso.timbre/info "Starting ZooKeeper:" (if (:zookeeper/server? config) "server" "client"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
           conn (zk/connect (:zookeeper/address config))]
@@ -89,11 +89,11 @@
       (assoc component :server server :conn conn :prefix onyx-id)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping ZooKeeper")
+    (taoensso.timbre/info "Stopping ZooKeeper:" (if (:zookeeper/server? config) "server" "client"))
     (zk/close (:conn component))
 
     (when (:server component)
-      (.stop (:server component)))
+      (.close (:server component)))
 
     component))
 

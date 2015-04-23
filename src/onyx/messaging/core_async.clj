@@ -3,6 +3,7 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.static.default-vals :refer [defaults]]
               [onyx.extensions :as extensions]))
 
 (defrecord CoreAsyncPeerGroup []
@@ -29,8 +30,8 @@
 
   (start [component]
     (taoensso.timbre/info "Starting core.async Messaging Channel")
-    (let [release-ch (chan (dropping-buffer 10000))
-          retry-ch (chan (dropping-buffer 10000))]
+    (let [release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))]
       (assoc component :release-ch release-ch :retry-ch retry-ch)))
 
   (stop [component]
@@ -88,7 +89,7 @@
 
 (defmethod extensions/receive-messages CoreAsync
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 50)
+  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
