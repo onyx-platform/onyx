@@ -178,11 +178,12 @@
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [link (operation/peer-link event (:completion-id (:root result)))]
+        (taoensso.timbre/info (format "Sending retry message: " (:id (:root result))))
         (extensions/internal-retry-message
-         (:onyx.core/messenger event)
-         event
-         (:id (:root result))
-         link))))
+          (:onyx.core/messenger event)
+          event
+          (:id (:root result))
+          link))))
   event)
 
 (defn inject-batch-resources [event]
