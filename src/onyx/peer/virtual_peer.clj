@@ -5,7 +5,8 @@
               [onyx.extensions :as extensions]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
-              [onyx.log.entry :refer [create-log-entry]]))
+              [onyx.log.entry :refer [create-log-entry]]
+              [onyx.static.default-vals :refer [defaults]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (if (:stall-output? state)
@@ -76,8 +77,10 @@
         (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
         (extensions/write-chunk log :messaging {:messaging (select-keys opts [:onyx.messaging/impl])} nil)
 
-        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
-              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
+        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 
+                                 (:onyx.peer/inbox-capacity defaults)))
+              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 
+                                  (:onyx.peer/outbox-capacity defaults)))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
               completion-ch (:completions-ch acking-daemon)
