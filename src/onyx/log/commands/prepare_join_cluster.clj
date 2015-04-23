@@ -10,7 +10,7 @@
 
 (defn add-site [replica {:keys [joiner peer-site]}]
   (-> replica 
-      (assoc-in [:peer-sites joiner] 
+      (assoc-in [:peer-sites joiner]
                 (merge
                   peer-site
                   (extensions/assign-site-resources (:messaging replica)

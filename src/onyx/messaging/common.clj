@@ -52,3 +52,11 @@
 (defmethod messaging-peer-group :netty [_]
   (ns-resolve 'onyx.messaging.netty-tcp 'netty-peer-group))
 
+(defmethod messaging-require :core.async [_]
+  (safe-require 'onyx.messaging.core-async))
+
+(defmethod messenger :core.async [_]
+  (ns-resolve 'onyx.messaging.core-async 'core-async))
+
+(defmethod messaging-peer-group :core.async [_]
+  (ns-resolve 'onyx.messaging.core-async 'core-async-peer-group))

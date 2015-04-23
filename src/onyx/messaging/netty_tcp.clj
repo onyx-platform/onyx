@@ -73,7 +73,7 @@
                          (EpollEventLoopGroup. thread-count worker-thread-factory)
                          (NioEventLoopGroup. thread-count worker-thread-factory))]
 
-      (timbre/info "Starting Netty peer group")
+      (timbre/info "Starting Netty Peer Group")
       (assoc component
         :shared-event-executor shared-event-executor
         :client-group client-group
@@ -81,6 +81,7 @@
         :boss-group boss-group)))
 
   (stop [{:keys [client-group worker-group boss-group] :as component}]
+    (timbre/info "Stopping Netty Peer Group")
     (.shutdownGracefully client-group)
     (.shutdownGracefully boss-group)
     (.shutdownGracefully worker-group)
