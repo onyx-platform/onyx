@@ -1,21 +1,22 @@
 (ns ^:no-doc onyx.messaging.aeron
-    (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! dropping-buffer]]
-              [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [fatal] :as timbre]
-              [onyx.messaging.protocol-aeron :as protocol]
-              [onyx.messaging.acking-daemon :as acker]
-              [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
-              [onyx.extensions :as extensions]
-              [onyx.compression.nippy :refer [compress decompress]])
-    (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
-             [uk.co.real_logic.aeron Aeron$Context]
-             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-             [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
-             [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
-             [uk.co.real_logic.agrona CloseHelper]
-             [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
-             [java.util.function Consumer]
-             [java.util.concurrent TimeUnit]))
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! dropping-buffer]]
+            [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [fatal] :as timbre]
+            [onyx.messaging.protocol-aeron :as protocol]
+            [onyx.messaging.acking-daemon :as acker]
+            [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
+            [onyx.extensions :as extensions]
+            [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.static.default-vals :refer [defaults]])
+  (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
+           [uk.co.real_logic.aeron Aeron$Context]
+           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+           [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
+           [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
+           [uk.co.real_logic.agrona CloseHelper]
+           [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
+           [java.util.function Consumer]
+           [java.util.concurrent TimeUnit]))
 
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
@@ -110,8 +111,8 @@
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)
-          release-ch (chan (dropping-buffer 10000))
-          retry-ch (chan (dropping-buffer 10000))
+          release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)
@@ -207,7 +208,7 @@
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 50)
+  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]

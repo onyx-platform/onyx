@@ -6,7 +6,8 @@
               [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
               [onyx.compression.nippy :refer [compress decompress]]
-              [onyx.extensions :as extensions])
+              [onyx.extensions :as extensions]
+              [onyx.static.default-vals :refer [defaults]])
     (:import [java.net InetSocketAddress]
              [java.util.concurrent TimeUnit Executors]
              [java.nio]
@@ -255,8 +256,8 @@
     (taoensso.timbre/info "Starting Netty TCP Sockets")
     (let [{:keys [client-group worker-group boss-group]} (:messaging-group peer-group)
           config (:config peer-group)
-          release-ch (chan (dropping-buffer 10000))
-          retry-ch (chan (dropping-buffer 10000))
+          release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)]
@@ -321,7 +322,7 @@
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 50)
+  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
