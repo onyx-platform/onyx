@@ -67,7 +67,7 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting ZooKeeper: " (if (:zookeeper/server? config) "server" "client"))
+    (taoensso.timbre/info "Starting ZooKeeper:" (if (:zookeeper/server? config) "server" "client"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
           conn (zk/connect (:zookeeper/address config))]
@@ -89,7 +89,7 @@
       (assoc component :server server :conn conn :prefix onyx-id)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping ZooKeeper: " (if (:zookeeper/server? config) "server" "client"))
+    (taoensso.timbre/info "Stopping ZooKeeper:" (if (:zookeeper/server? config) "server" "client"))
     (zk/close (:conn component))
 
     (when (:server component)
