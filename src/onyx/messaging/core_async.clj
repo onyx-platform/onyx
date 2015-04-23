@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.core-async
     (:require [clojure.core.async :refer [chan >!! <!! alts!! dropping-buffer timeout close!]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :as timbre]
+              [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.extensions :as extensions]))
 
@@ -13,6 +13,8 @@
 
   (stop [component]
     (timbre/info "Stopping core.async Peer Group")
+    (doseq [ch (vals @(:channels component))]
+      (close! ch))
     (assoc component :channels nil)))
 
 (defn core-async-peer-group [opts]
@@ -20,7 +22,7 @@
 
 (defmethod extensions/assign-site-resources :core.async
   [config peer-site peer-sites]
-  {:site (inc (or (last (sort (map :site (vals peer-sites)))) 0))})
+  peer-site)
 
 (defrecord CoreAsync [peer-group]
   component/Lifecycle
@@ -44,8 +46,32 @@
   [messenger]
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         id (java.util.UUID/randomUUID)
-        inbound-ch (:inbound-ch (:messenger-buffer messenger))]
-    (swap! chs assoc id (chan (dropping-buffer 10000)))
+        inbound-ch (:inbound-ch (:messenger-buffer messenger))
+        ch (chan (dropping-buffer 10000))]
+    (future
+      (try
+        (loop []
+          (when-let [x (<!! ch)]
+            (cond (= (:type x) :send)
+                  (doseq [m (:messages x)]
+                    (>!! inbound-ch m))
+
+                  (= (:type x) :ack)
+                  (acker/ack-message (:acking-daemon messenger)
+                                     (:id x) (:completion-id x) (:ack-val x))
+
+                  (= (:type x) :complete)
+                  (>!! (:release-ch messenger) (:id x))
+
+                  (= (:type x) :retry)
+                  (>!! (:retry-ch messenger) (:id x))
+
+                  :else
+                  (throw (ex-info "Don't recognize message type" {:msg x})))
+            (recur)))
+        (catch Throwable e
+          (fatal e))))
+    (swap! chs assoc id ch)
     {:site id}))
 
 (defmethod extensions/open-peer-site CoreAsync
@@ -55,8 +81,6 @@
 
 (defmethod extensions/connect-to-peer CoreAsync
   [messenger event peer-site]
-  (prn peer-site)
-  (clojure.pprint/pprint @(:channels (:messaging-group (:peer-group messenger))))
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         ch (get @chs (:site peer-site))]
     (assert ch)
@@ -76,19 +100,19 @@
 
 (defmethod extensions/send-messages CoreAsync
   [messenger event peer-link messages]
-  (>!! peer-link {:msgs messages}))
+  (>!! peer-link {:type :send :messages messages}))
 
 (defmethod extensions/internal-ack-message CoreAsync
   [messenger event peer-link message-id completion-id ack-val]
-  (>!! peer-link {:ack {:message-id message-id :completion-id completion-id :ack-val ack-val}}))
+  (>!! peer-link {:type :ack :id message-id :completion-id completion-id :ack-val ack-val}))
 
 (defmethod extensions/internal-complete-message CoreAsync
   [messenger event id peer-link]
-  (>!! peer-link {:complete id}))
+  (>!! peer-link {:type :complete :id id}))
 
 (defmethod extensions/internal-retry-message CoreAsync
   [messenger event id peer-link]
-  (>!! peer-link {:retry id}))
+  (>!! peer-link {:type :retry :id id}))
 
 (defmethod extensions/close-peer-connection CoreAsync
   [messenger event peer-link]
