@@ -189,9 +189,6 @@
     (let [env-t (component/start (map->TestEnv config))] 
       (try
         (add-peers env-t 10)         
-        ;; TODO look into why this has issues
-        ; Not sure why this would affect anything
-        (Thread/sleep 10000)
         (is (= {:out [{:n 2} :done]
                 :inc_out [{:n 2} :done]}
                @(run-job env-t (add-debug-output-tasks 
