@@ -6,6 +6,7 @@
 - Dropped feature: internal HornetQ messaging plugin
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
+- New messaging transport: core.async
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
 - New feature: Functions can take an entire batch of segments as their input with catalog key `:onyx/bulk?` true
