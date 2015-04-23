@@ -237,9 +237,7 @@
   "Starts a development environment using an in-memory implementation ZooKeeper."
   [env-config]
   (validator/validate-env-config env-config)
-  (let [env (component/start (system/onyx-development-env env-config))]
-    (Thread/sleep 2000)
-    env))
+  (component/start (system/onyx-development-env env-config)))
 
 (defn ^{:added "0.6.0"} shutdown-env
   "Shuts down the given development environment."
