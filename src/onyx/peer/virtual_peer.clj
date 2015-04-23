@@ -89,11 +89,14 @@
           (extensions/register-pulse log id)
           (>!! outbox-ch entry)
 
-          (thread (outbox-loop id log outbox-ch))
-          (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
-          (assoc component :id id :inbox-ch inbox-ch
-                 :outbox-ch outbox-ch :kill-ch kill-ch
-                 :restart-ch restart-ch))
+          (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
+                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))]
+            (assoc component 
+                   :outbox-loop-ch outbox-loop-ch
+                   :processing-loop-ch processing-loop-ch
+                   :id id :inbox-ch inbox-ch
+                   :outbox-ch outbox-ch :kill-ch kill-ch
+                   :restart-ch restart-ch)))
         (catch Throwable e
           (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
           (throw e)))))
@@ -105,6 +108,8 @@
     (close! (:outbox-ch component))
     (close! (:kill-ch component))
     (close! (:restart-ch component))
+    (<!! (:outbox-loop-ch component))
+    (<!! (:processing-loop-ch component))
 
     component))
 
