@@ -1,9 +1,9 @@
 test:
   override:
-    - ./circle-runner.sh netty:
+    - ./circle-runner.sh core.async:
         timeout: 360
         parallel: true
-    - ./circle-runner.sh core.async:
+    - ./circle-runner.sh netty:
         timeout: 360
         parallel: true
 
