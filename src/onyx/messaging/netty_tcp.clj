@@ -298,6 +298,8 @@
 
 (defmethod extensions/open-peer-site NettyTcpSockets
   [messenger assigned]
+  ;; TODO: get rid of buf-recv-ch and do the handling inside 
+  ;; the netty handler
   (let [buf-recv-ch (chan 10000)
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
