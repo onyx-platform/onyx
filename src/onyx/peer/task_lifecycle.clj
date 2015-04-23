@@ -178,7 +178,6 @@
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [link (operation/peer-link event (:completion-id (:root result)))]
-        (taoensso.timbre/info (format "Sending retry message: " (:id (:root result))))
         (extensions/internal-retry-message
           (:onyx.core/messenger event)
           event
@@ -313,6 +312,7 @@
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
                (when (p-ext/pending? event m)
+                 (taoensso.timbre/info (format "Replay message %s" m))
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
              (recur))))))))
