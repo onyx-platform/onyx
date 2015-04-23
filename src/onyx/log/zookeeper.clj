@@ -46,7 +46,7 @@
   (str (prefix-path prefix) "/messaging"))
 
 (defn throw-subscriber-closed []
-  (throw (ex-info "Log subscriber closed from disconnecting to ZooKeeper" {})))
+  (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
 (defn clean-up-broken-connections [f]
   (try
@@ -93,7 +93,7 @@
     (zk/close (:conn component))
 
     (when (:server component)
-      (.stop (:server component)))
+      (.close (:server component)))
 
     component))
 

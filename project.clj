@@ -6,7 +6,7 @@
   :jvm-opts ["-Xmx4g"]
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [org.apache.curator/curator-test "2.6.0"]
+                 [org.apache.curator/curator-test "2.7.1"]
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
