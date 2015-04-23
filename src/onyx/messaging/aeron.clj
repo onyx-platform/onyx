@@ -21,8 +21,8 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (if (and (contains? opts :onyx.messaging.aeron/embedded-driver)
-             (false? (opts :onyx.messaging.aeron/embedded-driver)))
+    (if (and (contains? opts :onyx.messaging.aeron/embedded-driver?)
+             (false? (opts :onyx.messaging.aeron/embedded-driver?)))
       component
       (let [ctx (doto (MediaDriver$Context.) 
                   (.threadingMode ThreadingMode/DEDICATED)
