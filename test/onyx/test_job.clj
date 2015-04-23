@@ -188,7 +188,7 @@
   (testing "Test env runs job with debug tasks"
     (let [env-t (component/start (map->TestEnv config))] 
       (try
-        (add-peers env-t 10)         
+        (add-peers env-t 4)         
         (is (= {:out [{:n 2} :done]
                 :inc_out [{:n 2} :done]}
                @(run-job env-t (add-debug-output-tasks 
