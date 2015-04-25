@@ -189,16 +189,19 @@
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
-    (loop [live started-peer]
+    (loop [live @started-peer]
       (let [restart-ch (:restart-ch (:virtual-peer live))
             [v ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
         (cond (= ch shutdown-ch)
               (do (component/stop live)
+                  (reset! started-peer nil)
                   (>!! ack-ch true))
               (= ch restart-ch)
               (do (component/stop live)
                   (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                  (recur (component/start live)))
+                  (let [live (component/start live)]
+                    (reset! started-peer live)
+                    (recur live)))
               :else (throw (ex-info "Read from a channel with no response implementation" {})))))
     (catch Throwable e
       (fatal "Peer lifecycle threw an exception")
@@ -217,8 +220,10 @@
       (let [v-peer (system/onyx-peer peer-group)
             live (component/start v-peer)
             shutdown-ch (chan 1)
-            ack-ch (chan)]
-        {:peer (future (peer-lifecycle live config shutdown-ch ack-ch))
+            ack-ch (chan)
+            started-peer (atom live)]
+        {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
+         :started-peer started-peer
          :shutdown-ch shutdown-ch
          :ack-ch ack-ch}))
     (range n))))
