@@ -23,7 +23,8 @@
     (swap! (:v-peers component) into (onyx.api/start-peers n-peers (:peer-group component))))
 
   (lookup-peer [component peer-id]
-    (first (filter #(= peer-id @(:peer-id %))
+    (first (filter #(= peer-id 
+                       (:id (:virtual-peer @(:started-peer %))))
                    @(:v-peers component))))
 
   (remove-peer [component v-peer]
