@@ -11,7 +11,7 @@
           user-fn (symbol (name kw))]
       (or (ns-resolve user-ns user-fn) (throw (Exception.))))
     (catch Throwable e
-      (throw (ex-info "Could not resolve function" {:fn kw})))))
+      (throw (ex-info "Could not resolve function on the classpath, did you require the file that contains this function?" {:fn kw})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))
