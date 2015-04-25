@@ -243,4 +243,3 @@
   (validate-none-position flow-conditions-schema)
   (validate-short-circuit flow-conditions-schema)
   (validate-auto-short-circuit flow-conditions-schema))
-

@@ -3,6 +3,7 @@
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace fatal] :as timbre]
+              [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.static.planning :refer [find-task build-pred-fn]]
@@ -14,10 +15,10 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.static.default-vals :refer [defaults]])
-    (:import [java.security MessageDigest]
-             [uk.co.real_logic.aeron.exceptions.DriverTimeoutException]))
+    (:import [java.security MessageDigest]))
 
-(def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
+;; TODO: Are there any exceptions that a peer should autoreboot itself?
+(def restartable-exceptions [])
 
 (defn at-least-one-active? [replica peers]
   (->> peers
@@ -212,7 +213,8 @@
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (swap! state update-in [:timeout-pool 0] concat (map :id (:onyx.core/batch event))))
+    (swap! state update-in [:timeout-pool 0] rsc/add-to-head
+           (map :id (:onyx.core/batch event))))
   event)
 
 (defn try-complete-job [event]
@@ -317,7 +319,7 @@
                (when (p-ext/pending? event m)
                  (taoensso.timbre/info (format "Replay message %s" m))
                  (p-ext/retry-message event m)))
-             (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
+             (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
              (recur))))))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
@@ -417,8 +419,7 @@
                                 (:onyx/replay-interval defaults))
             pending-timeout (or (:onyx/pending-timeout catalog-entry) 
                                 (:onyx/pending-timeout defaults))
-            n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
-            buckets (vec (repeat n-buckets []))
+            r-seq (rsc/create-r-seq pending-timeout replay-interval)
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -446,7 +447,7 @@
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/replica replica
-                           :onyx.core/state (atom {:timeout-pool buckets})}
+                           :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             injection-results (l-ext/inject-lifecycle-resources* pipeline-data)
