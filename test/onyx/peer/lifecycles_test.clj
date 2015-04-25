@@ -12,7 +12,7 @@
 
 (def env-config (assoc (:env-config config) :onyx/id id))
 
-(def peer-config (assoc (:peer-config config) :onyx/id id))
+(def peer-config (assoc (:peer-config config) :onyx/id id :onyx.messaging/impl :core.async))
 
 (def env (onyx.api/start-env env-config))
 
@@ -56,7 +56,7 @@
     :lifecycle/post-batch :onyx.peer.lifecycles-test/post-batch
     :lifecycle/post :onyx.peer.lifecycles-test/stop-lifecycle}])
 
-(defn counter (atom 0))
+(def counter (atom 0))
 
 (defn start-lifecycle [event lifecycle]
   (swap! counter inc)
@@ -96,6 +96,7 @@
  peer-config
  {:catalog catalog
   :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))
@@ -103,6 +104,11 @@
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
+
+;; Counter is inc'ed 13 times. 5 for each start/stop of a batch, 2 more times
+;; for starting and stopping the lifecycle, and 1 more post-batch for
+;; shutting down the task
+(fact @counter => 13)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

@@ -187,9 +187,9 @@
   event)
 
 (defn inject-batch-resources [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params ((:onyx.core/compiled-pre-batch-fn event)
-                               (l-ext/inject-batch-resources* event)))))
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
+        results (l-ext/inject-batch-resources* event)]
+    (merge event cycle-params results ((:onyx.core/compiled-pre-batch-fn event) results))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -269,8 +269,8 @@
   (merge event (p-ext/write-batch event)))
 
 (defn close-batch-resources [event]
-  (merge event ((:onyx.core/compiled-post-batch-fn event)
-                (l-ext/close-batch-resources* event))))
+  (let [results (l-ext/close-batch-resources* event)]
+    (merge event results ((:onyx.core/compiled-post-batch-fn event) results))))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -449,9 +449,11 @@
                            :onyx.core/state (atom {:timeout-pool buckets})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
+            injection-results (l-ext/inject-lifecycle-resources* pipeline-data)
             pipeline-data (merge pipeline-data
+                                 injection-results
                                  ((:onyx.core/compiled-pre-fn pipeline-data)
-                                  (l-ext/inject-lifecycle-resources* pipeline-data)))]
+                                  injection-results))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))

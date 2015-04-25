@@ -94,6 +94,7 @@
    :task-scheduler schema/Keyword
    (schema/optional-key :percentage) schema/Int
    (schema/optional-key :flow-conditions) schema/Any
+   (schema/optional-key :lifecycles) schema/Any
    (schema/optional-key :acker/percentage) schema/Int
    (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
    (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
