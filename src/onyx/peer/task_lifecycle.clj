@@ -494,7 +494,7 @@
 
 (dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
+    (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id))))
 
 (dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
