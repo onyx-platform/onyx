@@ -377,6 +377,26 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
+(defn compile-lifecycle-functions [lifecycles task-name kw]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
+    (reduce
+     (fn [f lifecycle]
+       (comp (operation/kw->fn (get lifecycle kw)) f))
+     identity
+     matched)))
+
+(defn compile-pre-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre))
+
+(defn compile-post-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre-batch))
+
+(defn compile-post-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/post-batch))
+
+(defn compile-post-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/post))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -387,6 +407,7 @@
       (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
+            lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
