@@ -388,7 +388,7 @@
 (defn compile-pre-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/pre))
 
-(defn compile-post-batch-task-functions [lifecycles task-name]
+(defn compile-pre-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/pre-batch))
 
 (defn compile-post-batch-task-functions [lifecycles task-name]
@@ -427,6 +427,10 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/compiled-pre-fn (compile-pre-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-pre-batch-fn (compile-pre-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-post-batch-fn (compile-post-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-post-fn (compile-post-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
