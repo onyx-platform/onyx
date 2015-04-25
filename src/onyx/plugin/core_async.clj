@@ -9,6 +9,7 @@
   [_ event]
   (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
   {:core.async/pending-messages (atom {})
+   :core.async/drained? (atom false)
    :core.async/retry-ch (chan 1000)})
 
 (defmethod l-ext/inject-lifecycle-resources :core.async/write-to-chan
@@ -17,8 +18,8 @@
   {})
 
 (defmethod p-ext/read-batch :core.async/read-from-chan
-  [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
-           core.async/pending-messages] :as event}]
+  [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch 
+           core.async/pending-messages core.async/drained?] :as event}]
   (let [pending (count @pending-messages)
         max-pending (or (:onyx/max-pending task-map) (:onyx/max-pending defaults))
         batch-size (:onyx/batch-size task-map)
@@ -28,14 +29,22 @@
         timeout-ch (timeout ms)
         batch (if (zero? max-segments)
                 (<!! timeout-ch)
-                (->> (range max-segments)
-                     (map (fn [_]
-                            {:id (java.util.UUID/randomUUID)
-                             :input :core.async
-                             :message (first (alts!! [retry-ch chan timeout-ch] :priority true))}))
-                     (remove (comp nil? :message))))]
+                (loop [segments [] cnt 0]
+                  (if (= cnt batch-size)
+                    segments
+                    (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))] 
+                      (recur (conj segments 
+                                   {:id (java.util.UUID/randomUUID)
+                                    :input :core.async
+                                    :message message})
+                             (inc cnt))
+                      segments))))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
+    (when (and (= 1 (count @pending-messages))
+               (= (count batch) 1)
+               (= (:message (first batch)) :done))
+      (reset! drained? true))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/ack-message :core.async/read-from-chan
@@ -53,10 +62,8 @@
   (get @pending-messages message-id))
 
 (defmethod p-ext/drained? :core.async/read-from-chan
-  [{:keys [core.async/pending-messages] :as event}]
-  (let [x @pending-messages]
-    (and (= (count x) 1)
-         (= (first (vals x)) :done))))
+  [{:keys [core.async/drained? core.async/pending-messages] :as event}]
+  @drained?)
 
 (defmethod p-ext/write-batch :core.async/write-to-chan
   [{:keys [onyx.core/results core.async/chan] :as event}]
