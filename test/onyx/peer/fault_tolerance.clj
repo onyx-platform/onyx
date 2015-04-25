@@ -26,7 +26,12 @@
     :onyx/batch-size batch-size
     :onyx/doc "Reads segments from a core.async channel"}
 
-   {:onyx/name :inc
+   {:onyx/name :intermediate-1
+    :onyx/fn :onyx.peer.fault-tolerance/process-middle
+    :onyx/type :function
+    :onyx/batch-size batch-size}
+
+   {:onyx/name :intermediate-2
     :onyx/fn :onyx.peer.fault-tolerance/process-middle
     :onyx/type :function
     :onyx/batch-size batch-size}
@@ -38,7 +43,9 @@
     :onyx/batch-size batch-size
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def workflow [[:in :inc] [:inc :out]])
+(def workflow [[:in :intermediate-1] 
+               [:intermediate-1 :intermediate-2] 
+               [:intermediate-2 :out]])
 
 (def chan-size 10000)
 
@@ -85,7 +92,7 @@
                       (map (juxt :name :id))
                       (into {}))
 
-        non-input-task-ids (set (vals (dissoc task-ids :in :out)))
+        non-input-task-ids (set (vals (dissoc task-ids :in)))
 
         remove-completed-ch (go-loop []
                                      (let [v (<!! out-chan)]
@@ -125,6 +132,7 @@
       (fact after-done => #{}))
 
     (close! kill-ch)
+    (<!! mess-with-peers-ch)
     (helper-env/remove-n-peers test-env 9))
 
     (finally 
