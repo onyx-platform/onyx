@@ -187,8 +187,9 @@
   event)
 
 (defn inject-batch-resources [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params (l-ext/inject-batch-resources* event))))
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
+        results (l-ext/inject-batch-resources* event)]
+    (merge event cycle-params results ((:onyx.core/compiled-pre-batch-fn event) results))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -268,7 +269,8 @@
   (merge event (p-ext/write-batch event)))
 
 (defn close-batch-resources [event]
-  (merge event (l-ext/close-batch-resources* event)))
+  (let [results (l-ext/close-batch-resources* event)]
+    (merge event results ((:onyx.core/compiled-post-batch-fn event) results))))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -377,6 +379,26 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
+(defn compile-lifecycle-functions [lifecycles task-name kw]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
+    (reduce
+     (fn [f lifecycle]
+       (comp (fn [x] ((operation/kw->fn (get lifecycle kw)) x lifecycle)) f))
+     identity
+     matched)))
+
+(defn compile-pre-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre))
+
+(defn compile-pre-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre-batch))
+
+(defn compile-post-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/post-batch))
+
+(defn compile-post-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/post))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -387,6 +409,7 @@
       (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
+            lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
@@ -406,6 +429,10 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/compiled-pre-fn (compile-pre-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-pre-batch-fn (compile-pre-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-post-batch-fn (compile-post-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-post-fn (compile-post-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
@@ -422,7 +449,11 @@
                            :onyx.core/state (atom {:timeout-pool buckets})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
+            injection-results (l-ext/inject-lifecycle-resources* pipeline-data)
+            pipeline-data (merge pipeline-data
+                                 injection-results
+                                 ((:onyx.core/compiled-pre-fn pipeline-data)
+                                  injection-results))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
@@ -457,7 +488,7 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      (l-ext/close-lifecycle-resources* event)
+      ((:onyx.core/compiled-post-fn event) (l-ext/close-lifecycle-resources* event))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
@@ -494,7 +525,7 @@
 
 (dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
+    (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id))))
 
 (dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
