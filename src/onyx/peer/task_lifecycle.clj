@@ -188,7 +188,8 @@
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params (l-ext/inject-batch-resources* event))))
+    (merge event cycle-params ((:onyx.core/compiled-pre-batch-fn event)
+                               (l-ext/inject-batch-resources* event)))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -268,7 +269,8 @@
   (merge event (p-ext/write-batch event)))
 
 (defn close-batch-resources [event]
-  (merge event (l-ext/close-batch-resources* event)))
+  (merge event ((:onyx.core/compiled-post-batch-fn event)
+                (l-ext/close-batch-resources* event))))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -381,7 +383,7 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (comp (operation/kw->fn (get lifecycle kw)) f))
+       (comp (fn [x] ((operation/kw->fn (get lifecycle kw)) x lifecycle)) f))
      identity
      matched)))
 
@@ -447,7 +449,9 @@
                            :onyx.core/state (atom {:timeout-pool buckets})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
+            pipeline-data (merge pipeline-data
+                                 ((:onyx.core/compiled-pre-fn pipeline-data)
+                                  (l-ext/inject-lifecycle-resources* pipeline-data)))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
@@ -482,7 +486,7 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      (l-ext/close-lifecycle-resources* event)
+      ((:onyx.core/compiled-post-fn event) (l-ext/close-lifecycle-resources* event))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
