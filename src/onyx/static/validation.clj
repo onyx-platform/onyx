@@ -99,6 +99,26 @@
    (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
    (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
 
+(defn validate-lifecycles [lifecycles catalog]
+  (doseq [lifecycle lifecycles]
+    (assert (or (= (:lifecycle/task lifecycle) :all)
+                (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
+            (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle)))
+    (schema/validate
+     {:lifecycle/task schema/Keyword
+      (schema/optional-key :lifecycle/pre) schema/Keyword
+      (schema/optional-key :lifecycle/pre-batch) schema/Keyword
+      (schema/optional-key :lifecycle/post-batch) schema/Keyword
+      (schema/optional-key :lifecycle/post) schema/Keyword
+      (schema/optional-key :lifecycle/doc) String}
+     (select-keys lifecycle
+                  [:lifecycle/task
+                   :lifecycle/pre
+                   :lifecycle/pre-batch
+                   :lifecycle/post-batch
+                   :lifecycle/post
+                   :lifecycle/doc]))))
+
 (defn validate-env-config [env-config]
   (schema/validate
     {:zookeeper/address schema/Str
