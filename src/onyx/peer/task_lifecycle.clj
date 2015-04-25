@@ -385,7 +385,7 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (comp (fn [x] ((operation/kw->fn (get lifecycle kw)) x lifecycle)) f))
+       (comp (fn [x] ((operation/kw->fn (get lifecycle kw :clojure.core/identity)) x lifecycle)) f))
      identity
      matched)))
 
