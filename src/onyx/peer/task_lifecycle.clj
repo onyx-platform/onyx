@@ -386,7 +386,7 @@
     (reduce
      (fn [f lifecycle]
        (if-let [g (get lifecycle kw)]
-         (comp (fn [x] ((operation/kw->fn g) x lifecycle)) f)
+         (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
          f))
      identity
      matched)))
