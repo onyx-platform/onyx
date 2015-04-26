@@ -100,7 +100,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |-------------------------|------------------------------|----------|--------
 |`:lifecycle/name`        |`keyword`                     | no       |
 |`:lifecycle/calls`       |`keyword`                     | no       |
-|`:lifecycle/doc`         |`string`                      | yes       |
+|`:lifecycle/doc`         |`string`                      | yes      |
 
 ### Event Context
 
