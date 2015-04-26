@@ -184,7 +184,8 @@
         (fatal e "Could not stop environment")))
     (assoc component :env nil :peer-group nil :replica nil :v-peers nil)))
 
-(deftest test-test-env 
+(comment
+  (deftest test-test-env 
   (testing "Test env runs job with debug tasks"
     (let [env-t (component/start (map->TestEnv config))] 
       (try
@@ -215,4 +216,4 @@
                                   :workflow [[:in :inc] [:inc :out]]
                                   :task-scheduler :onyx.task-scheduler/balanced})
                          {:in [{:n 1}]})))
-        (finally (component/stop env-t))))))
+        (finally (component/stop env-t)))))))
