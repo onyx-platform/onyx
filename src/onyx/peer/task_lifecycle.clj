@@ -385,23 +385,24 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (if-let [g (get lifecycle kw)]
-         (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
-         f))
+       (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+         (if-let [g (get calls-map kw)]
+           (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
+           f)))
      identity
      matched)))
 
 (defn compile-pre-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
 
 (defn compile-pre-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/pre-batch))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
 
 (defn compile-post-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/post-batch))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
 (defn compile-post-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/post))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
