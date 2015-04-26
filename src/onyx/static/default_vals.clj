@@ -1,17 +1,22 @@
 (ns onyx.static.default-vals)
 
 (def defaults
-  {:onyx/input-retry-timeout 1000
+  {; input task defaults
+   :onyx/input-retry-timeout 1000
    :onyx/pending-timeout 60000
-   :onyx/batch-timeout 1000
    :onyx/max-pending 10000
 
+   ; task defaults
+   :onyx/batch-timeout 1000
+
+   ; peer defaults
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
    :onyx.peer/sequential-back-off 2000
    :onyx.peer/job-not-ready-back-off 500
 
+   ; messaging defaults
    :onyx.messaging.aeron/embedded-driver? true
    :onyx.messaging.netty/thread-pool-sizes 1
    :onyx.messaging/completion-buffer-size 50000
