@@ -14,7 +14,11 @@
                                           (:peer-config config))))
 (def batch-size 5)
 
-(def process-middle identity)
+(defn int-1 [segment]
+  (assoc segment :a 1))
+
+(defn int-2 [segment]
+  (assoc segment :b 1))
 
 (def batch-timeout 500)
 
@@ -29,13 +33,13 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :intermediate-1
-    :onyx/fn :onyx.peer.fault-tolerance/process-middle
+    :onyx/fn :onyx.peer.fault-tolerance/int-1
     :onyx/batch-timeout batch-timeout
     :onyx/type :function
     :onyx/batch-size batch-size}
 
    {:onyx/name :intermediate-2
-    :onyx/fn :onyx.peer.fault-tolerance/process-middle
+    :onyx/fn :onyx.peer.fault-tolerance/int-2
     :onyx/type :function
     :onyx/batch-timeout batch-timeout
     :onyx/batch-size batch-size}
@@ -67,6 +71,9 @@
 (def incomplete 
   (atom #{}))
 
+(def bad-values
+  (atom #{}))
+
 (def n-messages-total 100000)
 
 (try
@@ -74,7 +81,7 @@
   (let [load-data-ch (thread 
                        (loop [ls (repeatedly n-messages-total (fn [] {:id (java.util.UUID/randomUUID)}))]
                          (when-let [segment (first ls)]
-                           (swap! incomplete conj segment)
+                           (swap! incomplete conj (int-2 (int-1 segment)))
                            (>!! in-chan segment)
                            (recur (rest ls))))
                        (>!! in-chan :done)
@@ -103,13 +110,15 @@
                                      (let [v (<!! out-chan)]
                                        (when (and v (not= v :done)) 
                                          (swap! incomplete disj v)
+                                         (when (or (nil? (:a v))
+                                                   (nil? (:b v)))
+                                           (swap! bad-values conj v))
                                          (recur))))
         kill-ch (chan 1)
-        ; it can take 3 * batch-timeout to make it through a full circuit, however
-        ; there will be circumstances where the peers left alone, so lets try 2* for now
-        chaos-kill-ms (* 2 batch-timeout)
         mess-with-peers-ch (go-loop []
-                                    (let [[v ch] (alts!! [(timeout chaos-kill-ms) kill-ch])]
+                                    (let [; average the the full circuit worth of timeouts
+                                          chaos-kill-ms (rand-int (* 3 batch-timeout 2))
+                                          [v ch] (alts!! [(timeout chaos-kill-ms) kill-ch])]
                                       (when-not (= ch kill-ch) 
                                         (try 
                                           (when-let [non-input-peers (->> (get (:allocations @(:replica test-env)) job-id)
@@ -134,11 +143,9 @@
                          (if v 
                            (recur (conj after-done v))
                            after-done)))]
-      (fact after-done => #{}))
-
+      (fact after-done => #{})
+      (fact @bad-values => #{}))
     (close! kill-ch)
-    (<!! mess-with-peers-ch)
-    (helper-env/remove-n-peers test-env 9))
-
+    #_(<!! mess-with-peers-ch))
   (finally 
     (component/stop test-env)))
