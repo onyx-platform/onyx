@@ -71,3 +71,5 @@ Finally, create a lifecycle data structure and pass it to your `onyx.api/submit-
   ...
   }
 ```
+
+You can supply as many sets of lifecycles as you want. They are invoked in the order that they are supplied in the vector, giving you a predictable sequence of calls. Be sure that all the keyword symbols and functions are required onto the classpath for the peer that will be executing them.
