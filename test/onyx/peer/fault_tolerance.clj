@@ -143,8 +143,8 @@
                          (if v 
                            (recur (conj after-done v))
                            after-done)))]
-      (fact after-done => #{})
-      (fact @bad-values => #{}))
+      (fact after-done => #{}))
+      (fact @bad-values => #{})
     (close! kill-ch)
     #_(<!! mess-with-peers-ch))
   (finally 
