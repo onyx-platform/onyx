@@ -36,7 +36,8 @@
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
-  (l-ext/start-lifecycle?* event))
+  (and ((:onyx.core/compiled-start-task-fn event) event)
+       (l-ext/start-lifecycle?* event)))
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
@@ -381,6 +382,22 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
+(defn compile-start-task-functions [lifecycles task-name]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
+        fs
+        (remove
+         nil?
+         (map
+          (fn [lifecycle]
+            (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+              (when-let [g (:lifecycle/start-task? calls-map)]
+                (fn [x] ((operation/kw->fn g) x lifecycle)))))
+          matched))]
+    (fn [event]
+      (if (seq fs)
+        (every? true? ((apply juxt fs) event))
+        true))))
+
 (defn compile-lifecycle-functions [lifecycles task-name kw]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
@@ -391,9 +408,6 @@
            f)))
      identity
      matched)))
-
-(defn compile-start-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/start-task?))
 
 (defn compile-before-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
