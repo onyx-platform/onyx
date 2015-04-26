@@ -4,6 +4,7 @@
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
 - Dropped feature: internal HornetQ messaging plugin
+- Dropped feature: multimethod lifecycles
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New messaging transport: core.async
