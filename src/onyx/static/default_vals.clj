@@ -12,6 +12,8 @@
    :onyx.peer/sequential-back-off 2000
    :onyx.peer/job-not-ready-back-off 500
 
+   :onyx.messaging.aeron/embedded-driver? true
+   :onyx.messaging.netty/thread-pool-sizes 1
    :onyx.messaging/completion-buffer-size 50000
    :onyx.messaging/release-ch-buffer-size 10000
    :onyx.messaging/retry-ch-buffer-size 10000})

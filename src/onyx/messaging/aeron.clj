@@ -22,14 +22,16 @@
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (if (and (contains? opts :onyx.messaging.aeron/embedded-driver?)
-             (false? (opts :onyx.messaging.aeron/embedded-driver?)))
-      component
-      (let [ctx (doto (MediaDriver$Context.) 
-                  (.threadingMode ThreadingMode/DEDICATED)
-                  (.dirsDeleteOnExit true))
-            media-driver (MediaDriver/launch ctx)]
-        (assoc component :media-driver media-driver))))
+    (let [embedded-driver? (if-not (nil? (:onyx.messaging.aeron/embedded-driver? opts))
+                             (:onyx.messaging.aeron/embedded-driver? opts)
+                             (:onyx.messaging.aeron/embedded-driver? defaults))]
+      (if embedded-driver?
+        (let [ctx (doto (MediaDriver$Context.) 
+                    (.threadingMode ThreadingMode/DEDICATED)
+                    (.dirsDeleteOnExit true))
+              media-driver (MediaDriver/launch ctx)]
+          (assoc component :media-driver media-driver)) 
+        component)))
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")

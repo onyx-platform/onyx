@@ -47,20 +47,14 @@
 (defn epoll? []
   (Epoll/isAvailable))
 
-(defn get-default-event-loop-threads
-  "Determines the default number of threads to use for a Netty EventLoopGroup.
-   This mimics the default used by Netty as of version 4.1."
-  []
-  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
-    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" 
-                                      (* cpu-count 2)))))
-
 (defonce ^DefaultEventExecutorGroup shared-event-executor (event-executor))
 
 (defrecord NettyPeerGroup [opts]
   component/Lifecycle
   (start [component]
-    (let [thread-count (long (get-default-event-loop-threads))
+    (let [thread-count (or (:onyx.messaging.netty/thread-pool-sizes opts)
+                           (:onyx.messaging.netty/thread-pool-sizes defaults))
+
           client-thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)
           client-group (if (epoll?)
                          (EpollEventLoopGroup. thread-count client-thread-factory)
