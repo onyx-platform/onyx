@@ -1,7 +1,7 @@
 (ns onyx.static.default-vals)
 
 (def defaults
-  {:onyx/replay-interval 1000
+  {:onyx/input-retry-timeout 1000
    :onyx/pending-timeout 60000
    :onyx/batch-timeout 1000
    :onyx/max-pending 10000
