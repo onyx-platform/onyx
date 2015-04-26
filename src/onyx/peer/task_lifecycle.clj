@@ -385,7 +385,7 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (let [calls-map (var-get (resolve (symbol (name (:lifecycle/calls lifecycle)))))]
+       (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
          (if-let [g (get calls-map kw)]
            (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
            f)))
