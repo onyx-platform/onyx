@@ -40,7 +40,7 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
   {})
 ```
 
-Notice that all lifecycle functions return maps exception `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned.
+Notice that all lifecycle functions return maps exception `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task`.
 
 Next, define a map that wires all these functions together:
 
@@ -71,3 +71,5 @@ Finally, create a lifecycle data structure and pass it to your `onyx.api/submit-
   ...
   }
 ```
+
+You can supply as many sets of lifecycles as you want. They are invoked in the order that they are supplied in the vector, giving you a predictable sequence of calls. Be sure that all the keyword symbols and functions are required onto the classpath for the peer that will be executing them.
