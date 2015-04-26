@@ -27,6 +27,10 @@
 
 (def counter (atom 0))
 
+(defn start-task? [event lifecycle]
+  (swap! counter inc)
+  true)
+
 (defn before-task [event lifecycle]
   (swap! counter inc)
   {})
@@ -44,7 +48,8 @@
   {})
 
 (def calls
-  {:lifecycle/before-task :onyx.peer.lifecycles-test/before-task
+  {:lifecycle/start-task? :onyx.peer.lifecycles-test/start-task?
+   :lifecycle/before-task :onyx.peer.lifecycles-test/before-task
    :lifecycle/before-batch :onyx.peer.lifecycles-test/before-batch
    :lifecycle/after-batch :onyx.peer.lifecycles-test/after-batch
    :lifecycle/after-task :onyx.peer.lifecycles-test/after-task})
@@ -109,10 +114,11 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-;; Counter is inc'ed 13 times. 5 for each start/stop of a batch, 2 more times
+;; Counter is inc'ed 14 times. 1 time on start up,
+;; 5 for each start/stop of a batch, 2 more times
 ;; for starting and stopping the lifecycle, and 1 more post-batch for
-;; shutting down the task
-(fact @counter => 13)
+;; shutting down the task.
+(fact @counter => 14)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
