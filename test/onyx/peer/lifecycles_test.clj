@@ -25,6 +25,30 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
+(def counter (atom 0))
+
+(defn before-task [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn after-task [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn before-batch [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn after-batch [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(def calls
+  {:lifecycle/before-task :onyx.peer.lifecycles-test/before-task
+   :lifecycle/before-batch :onyx.peer.lifecycles-test/before-batch
+   :lifecycle/after-batch :onyx.peer.lifecycles-test/after-batch
+   :lifecycle/after-task :onyx.peer.lifecycles-test/after-task})
+
 (def catalog
   [{:onyx/name :in
     :onyx/ident :core.async/read-from-chan
@@ -51,28 +75,8 @@
 
 (def lifecycles
   [{:lifecycle/task :inc
-    :lifecycle/pre :onyx.peer.lifecycles-test/start-lifecycle
-    :lifecycle/pre-batch :onyx.peer.lifecycles-test/pre-batch
-    :lifecycle/post-batch :onyx.peer.lifecycles-test/post-batch
-    :lifecycle/post :onyx.peer.lifecycles-test/stop-lifecycle}])
-
-(def counter (atom 0))
-
-(defn start-lifecycle [event lifecycle]
-  (swap! counter inc)
-  {})
-
-(defn stop-lifecycle [event lifecycle]
-  (swap! counter inc)
-  {})
-
-(defn pre-batch [event lifecycle]
-  (swap! counter inc)
-  {})
-
-(defn post-batch [event lifecycle]
-  (swap! counter inc)
-  {})
+    :lifecycle/calls :onyx.peer.lifecycles-test/calls
+    :lifecycle/doc "Test lifecycles that increment a counter in an atom"}])
 
 (def in-chan (chan (inc n-messages)))
 
