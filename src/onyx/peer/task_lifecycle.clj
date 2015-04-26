@@ -190,7 +190,7 @@
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
         results (l-ext/inject-batch-resources* event)]
-    (merge event cycle-params results ((:onyx.core/compiled-pre-batch-fn event) results))))
+    (merge event cycle-params results ((:onyx.core/compiled-before-batch-fn event) results))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -272,7 +272,7 @@
 
 (defn close-batch-resources [event]
   (let [results (l-ext/close-batch-resources* event)]
-    (merge event results ((:onyx.core/compiled-post-batch-fn event) results))))
+    (merge event results ((:onyx.core/compiled-after-batch-fn event) results))))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -392,16 +392,19 @@
      identity
      matched)))
 
-(defn compile-pre-task-functions [lifecycles task-name]
+(defn compile-start-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/start-task?))
+
+(defn compile-before-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
 
-(defn compile-pre-batch-task-functions [lifecycles task-name]
+(defn compile-before-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
 
-(defn compile-post-batch-task-functions [lifecycles task-name]
+(defn compile-after-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
-(defn compile-post-task-functions [lifecycles task-name]
+(defn compile-after-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
 
 (defrecord TaskLifeCycle
@@ -433,10 +436,11 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/compiled-pre-fn (compile-pre-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-pre-batch-fn (compile-pre-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-post-batch-fn (compile-post-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-post-fn (compile-post-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-start-task-fn (compile-start-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-task-fn (compile-before-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
@@ -456,7 +460,7 @@
             injection-results (l-ext/inject-lifecycle-resources* pipeline-data)
             pipeline-data (merge pipeline-data
                                  injection-results
-                                 ((:onyx.core/compiled-pre-fn pipeline-data)
+                                 ((:onyx.core/compiled-before-task-fn pipeline-data)
                                   injection-results))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
@@ -492,7 +496,7 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      ((:onyx.core/compiled-post-fn event) (l-ext/close-lifecycle-resources* event))
+      ((:onyx.core/compiled-after-task-fn event) (l-ext/close-lifecycle-resources* event))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
