@@ -57,6 +57,28 @@
 
   (def out-chan (chan (sliding-buffer (inc n-messages))))
 
+  (defn inject-in-ch [event lifecycle]
+    {:core.async/chan in-chan})
+
+  (defn inject-out-ch [event lifecycle]
+    {:core.async/chan out-chan})
+
+  (def in-calls
+    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-ch})
+
+  (def out-calls
+    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+
+  (def lifecycles
+    [{:lifecycle/task :in
+      :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
+     {:lifecycle/task :in
+      :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+     {:lifecycle/task :out
+      :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+     {:lifecycle/task :out
+      :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
   (doseq [n (range n-messages)]
     (>!! in-chan {:n n}))
 
@@ -66,11 +88,11 @@
   (def v-peers (onyx.api/start-peers 3 peer-group))
 
   (onyx.api/submit-job
-    peer-config
-    {:catalog catalog
-     :workflow workflow
-     :lifecycles lifecycles
-     :task-scheduler :onyx.task-scheduler/balanced})
+   peer-config
+   {:catalog catalog
+    :workflow workflow
+    :lifecycles lifecycles
+    :task-scheduler :onyx.task-scheduler/balanced})
 
   (def results (take-segments! out-chan))
 
@@ -79,9 +101,9 @@
     (fact (last results) => :done))
 
   (finally 
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
+   (doseq [v-peer v-peers]
+     (onyx.api/shutdown-peer v-peer))
 
-    (onyx.api/shutdown-peer-group peer-group)
+   (onyx.api/shutdown-peer-group peer-group)
 
-    (onyx.api/shutdown-env env)))
+   (onyx.api/shutdown-env env)))

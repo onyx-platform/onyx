@@ -62,6 +62,28 @@
   [[:in :inc]
    [:inc :out]])
 
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-ch})
+
+(def out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (def flow-conditions
   [{:flow/from :inc
     :flow/to [:out]
