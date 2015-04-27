@@ -2,7 +2,6 @@
     (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
               [onyx.static.planning :refer [find-task]]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
@@ -10,21 +9,13 @@
               [dire.core :refer [with-post-hook!]])
     (:import [java.util UUID]))
 
-(defmethod l-ext/start-lifecycle? :function
-  [_ event]
-  {:onyx.core/start-lifecycle? (operation/start-lifecycle? event)})
-
-(defmethod l-ext/inject-lifecycle-resources :function
-  [_ {:keys [onyx.core/task-map]}]
-  {:onyx.function/fn (operation/resolve-fn task-map)})
-
 (defmethod p-ext/read-batch :default
   [{:keys [onyx.core/messenger] :as event}]
   {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
 
 (defn apply-fn
   [{:keys [onyx.core/params] :as event} segment]
-  (if-let [f (:onyx.function/fn event)]
+  (if-let [f (:onyx.core/fn event)]
     (operation/apply-function f params segment)
     segment))
 
