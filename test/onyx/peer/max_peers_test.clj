@@ -1,7 +1,6 @@
 (ns onyx.peer.max-peers-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -53,12 +52,6 @@
 (def in-chan (chan (inc n-messages)))
 
 (def out-chan (chan (sliding-buffer (inc n-messages))))
-
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))

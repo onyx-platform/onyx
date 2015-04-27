@@ -1,7 +1,6 @@
 (ns onyx.peer.dag-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -34,24 +33,6 @@
 (def k-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
 (def l-chan (chan 500000 #_(sliding-buffer (* 3 (inc n-messages)))))
-
-(defmethod l-ext/inject-lifecycle-resources :A
-  [_ _] {:core.async/chan a-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :B
-  [_ _] {:core.async/chan b-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :C
-  [_ _] {:core.async/chan c-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :J
-  [_ _] {:core.async/chan j-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :K
-  [_ _] {:core.async/chan k-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :L
-  [_ _] {:core.async/chan l-chan})
 
 (def a-segments
   (map (fn [n] {:n n})

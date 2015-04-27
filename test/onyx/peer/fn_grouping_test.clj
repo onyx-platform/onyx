@@ -1,7 +1,6 @@
 (ns onyx.peer.fn-grouping-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -26,12 +25,6 @@
 (def in-chan (chan 1000000))
 
 (def out-chan (chan (sliding-buffer 1000000)))
-
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
 
 (defmethod l-ext/inject-lifecycle-resources
   :onyx.peer.fn-grouping-test/sum-balance

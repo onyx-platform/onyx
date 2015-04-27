@@ -1,7 +1,6 @@
 (ns onyx.peer.colors-flow-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -91,18 +90,6 @@
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
-
-(defmethod l-ext/inject-lifecycle-resources :colors-in
-  [_ _] {:core.async/chan colors-in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :red-out
-  [_ _] {:core.async/chan red-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :blue-out
-  [_ _] {:core.async/chan blue-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :green-out
-  [_ _] {:core.async/chan green-out-chan})
 
 (def workflow
   [[:colors-in :process-red]

@@ -1,7 +1,6 @@
 (ns onyx.peer.killed-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.extensions :as extensions]
@@ -84,20 +83,6 @@
       :onyx/batch-size batch-size
       :onyx/max-peers 1
       :onyx/doc "Writes segments to a core.async channel"}])
-
-(defmethod l-ext/inject-lifecycle-resources :in-1
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :out-1
-  [_ _] {:core.async/chan out-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-2})
-
-(defmethod l-ext/inject-lifecycle-resources :out-2
-  [_ _] {:core.async/chan out-chan-2})
-
-
 
   (def workflow-1 [[:in-1 :inc] [:inc :out-1]])
 

@@ -1,7 +1,6 @@
 (ns onyx.peer.join-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]
@@ -95,15 +94,6 @@
 (defmethod l-ext/inject-lifecycle-resources :join-person
   [_ event]
   {:onyx.core/params [(atom {})]})
-
-(defmethod l-ext/inject-lifecycle-resources :names
-  [_ _] {:core.async/chan name-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :ages
-  [_ _] {:core.async/chan age-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
 
 (def v-peers (onyx.api/start-peers 4 peer-group))
 

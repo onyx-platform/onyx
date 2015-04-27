@@ -1,7 +1,6 @@
 (ns onyx.peer.people-flow-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -103,21 +102,6 @@
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
-
-(defmethod l-ext/inject-lifecycle-resources :people-in
-  [_ _] {:core.async/chan people-in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :children-out
-  [_ _] {:core.async/chan children-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :adults-out
-  [_ _] {:core.async/chan adults-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :athletes-wa-out
-  [_ _] {:core.async/chan athletes-wa-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :everyone-out
-  [_ _] {:core.async/chan everyone-out-chan})
 
 (def workflow
   [[:people-in :process-children]

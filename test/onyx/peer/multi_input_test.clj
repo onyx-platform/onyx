@@ -1,7 +1,6 @@
 (ns onyx.peer.multi-input-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -31,21 +30,6 @@
 (def in-chan-4 (chan (inc n-messages)))
 
 (def out-chan (chan (sliding-buffer (inc n-messages))))
-
-(defmethod l-ext/inject-lifecycle-resources :in-1
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-2})
-
-(defmethod l-ext/inject-lifecycle-resources :in-3
-  [_ _] {:core.async/chan in-chan-3})
-
-(defmethod l-ext/inject-lifecycle-resources :in-4
-  [_ _] {:core.async/chan in-chan-4})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
 
 (def messages
   (->> 4
