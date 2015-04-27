@@ -132,6 +132,58 @@
     :flow/to [:process-everyone]
     :flow/predicate :onyx.peer.people-flow-test/constantly-true}])
 
+(defn inject-people-in-ch [event lifecycle]
+  {:core.async/chan people-in-chan})
+
+(defn inject-children-out-ch [event lifecycle]
+  {:core.async/chan children-out-chan})
+
+(defn inject-adults-out-ch [event lifecycle]
+  {:core.async/chan adults-out-chan})
+
+(defn inject-athletes-wa-out-ch [event lifecycle]
+  {:core.async/chan athletes-wa-out-chan})
+
+(defn inject-everyone-out-ch [event lifecycle]
+  {:core.async/chan everyone-out-chan})
+
+(def people-in-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-people-in-ch})
+
+(def children-out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-children-out-ch})
+
+(def adults-out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-adults-out-ch})
+
+(def athletes-wa-out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-athletes-wa-out-ch})
+
+(def everyone-out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-everyone-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :people-in
+    :lifecycle/calls :onyx.peer.min-peers-test/people-in-calls}
+   {:lifecycle/task :people-in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :children-out
+    :lifecycle/calls :onyx.peer.min-peers-test/children-out-calls}
+   {:lifecycle/task :children-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :adults-out
+    :lifecycle/calls :onyx.peer.min-peers-test/adults-out-calls}
+   {:lifecycle/task :adults-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :athletes-wa-out
+    :lifecycle/calls :onyx.peer.min-peers-test/athletes-wa-out-calls}
+   {:lifecycle/task :athletes-wa-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :everyone-out
+    :lifecycle/calls :onyx.peer.min-peers-test/everyone-out-calls}
+   {:lifecycle/task :everyone-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (defn child? [event old {:keys [age]} all-new max-child-age]
   (<= age max-child-age))
 
