@@ -191,7 +191,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :flow-conditions flow-conditions
+  :flow-conditions flow-conditions :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def red (take-segments! red-out-chan))

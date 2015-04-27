@@ -1,7 +1,6 @@
 (ns onyx.peer.automatic-kill-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.extensions :as extensions]
@@ -84,21 +83,53 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(defmethod l-ext/inject-lifecycle-resources :in-1
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :out-1
-  [_ _] {:core.async/chan out-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-2})
-
-(defmethod l-ext/inject-lifecycle-resources :out-2
-  [_ _] {:core.async/chan out-chan-2})
-
 (def workflow-1 [[:in-1 :inc] [:inc :out-1]])
 
 (def workflow-2 [[:in-2 :inc] [:inc :out-2]])
+
+(defn inject-in-ch-1 [event lifecycle]
+  {:core.async/chan in-chan-1})
+
+(defn inject-out-ch-1 [event lifecycle]
+  {:core.async/chan out-chan-1})
+
+(defn inject-in-ch-2 [event lifecycle]
+  {:core.async/chan in-chan-2})
+
+(defn inject-out-ch-2 [event lifecycle]
+  {:core.async/chan out-chan-2})
+
+(def in-calls-1
+  {:lifecycle/before-task :onyx.peer.automatic-kill-test/inject-in-ch-1})
+
+(def out-calls-1
+  {:lifecycle/before-task :onyx.peer.automatic-kill-test/inject-out-ch-1})
+
+(def in-calls-2
+  {:lifecycle/before-task :onyx.peer.automatic-kill-test/inject-in-ch-2})
+
+(def out-calls-2
+  {:lifecycle/before-task :onyx.peer.automatic-kill-test/inject-out-ch-2})
+
+(def lifecycles-1
+  [{:lifecycle/task :in-1
+    :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-1}
+   {:lifecycle/task :in-1
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out-1
+    :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-1}
+   {:lifecycle/task :out-1
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
+(def lifecycles-2
+  [{:lifecycle/task :in-2
+    :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-2}
+   {:lifecycle/task :in-2
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out-2
+    :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}
+   {:lifecycle/task :out-2
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
@@ -106,11 +137,13 @@
   (:job-id (onyx.api/submit-job
             peer-config
             {:catalog catalog-1 :workflow workflow-1
+             :lifecycles lifecycles-1
              :task-scheduler :onyx.task-scheduler/balanced})))
 (def j2
   (:job-id (onyx.api/submit-job
             peer-config
             {:catalog catalog-2 :workflow workflow-2
+             :lifecycles lifecycles-2
              :task-scheduler :onyx.task-scheduler/balanced})))
 
 (def ch (chan n-messages))

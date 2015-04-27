@@ -70,6 +70,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))

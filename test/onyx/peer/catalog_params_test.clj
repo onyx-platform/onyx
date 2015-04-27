@@ -73,6 +73,7 @@
  peer-config
  {:catalog catalog
   :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))

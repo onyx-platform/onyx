@@ -106,14 +106,16 @@
   (def v-peers (onyx.api/start-peers 3 peer-group))
 
   (def j1 (:job-id (onyx.api/submit-job
-            peer-config
-            {:catalog catalog-1 :workflow workflow-1
-             :task-scheduler :onyx.task-scheduler/balanced})))
+                    peer-config
+                    {:catalog catalog-1 :workflow workflow-1
+                     :lifecycles lifecycles
+                     :task-scheduler :onyx.task-scheduler/balanced})))
 
   (def j2 (:job-id (onyx.api/submit-job
-                     peer-config
-                     {:catalog catalog-2 :workflow workflow-2
-                      :task-scheduler :onyx.task-scheduler/balanced})))
+                    peer-config
+                    {:catalog catalog-2 :workflow workflow-2
+                     :lifecycles lifecycles
+                     :task-scheduler :onyx.task-scheduler/balanced})))
 
   (onyx.api/kill-job peer-config j1)
 

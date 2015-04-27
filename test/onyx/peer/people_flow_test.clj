@@ -182,6 +182,7 @@
  peer-config
  {:catalog catalog :workflow workflow
   :flow-conditions flow-conditions
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def children (take-segments! children-out-chan))
