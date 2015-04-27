@@ -1,7 +1,6 @@
 (ns onyx.log.percentage-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [onyx.api :as api]
@@ -61,23 +60,56 @@
 
 (def d-chan (chan (sliding-buffer 100)))
 
-(defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/chan a-chan})
+(defn inject-a-ch [event lifecycle]
+  {:core.async/chan a-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :b
-  [_ _] {:core.async/chan b-chan})
+(defn inject-b-ch [event lifecycle]
+  {:core.async/chan b-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/chan c-chan})
+(defn inject-c-ch [event lifecycle]
+  {:core.async/chan c-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :d
-  [_ _] {:core.async/chan d-chan})
+(defn inject-d-ch [event lifecycle]
+  {:core.async/chan d-chan})
+
+(def a-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-a-ch})
+
+(def b-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-b-ch})
+
+(def c-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-c-ch})
+
+(def d-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-d-ch})
+
+(def lifecycles-1
+  [{:lifecycle/task :a
+    :lifecycle/calls :onyx.peer.min-peers-test/a-calls}
+   {:lifecycle/task :a
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :b
+    :lifecycle/calls :onyx.peer.min-peers-test/b-calls}
+   {:lifecycle/task :b
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
+(def lifecycles-2
+  [{:lifecycle/task :c
+    :lifecycle/calls :onyx.peer.min-peers-test/c-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :d
+    :lifecycle/calls :onyx.peer.min-peers-test/d-calls}
+   {:lifecycle/task :d
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def j1
   (onyx.api/submit-job
    peer-config
    {:workflow [[:a :b]]
     :catalog catalog-1
+    :lifecycles lifecycles-1
     :percentage 70
     :task-scheduler :onyx.task-scheduler/balanced}))
 
@@ -86,6 +118,7 @@
    peer-config
    {:workflow [[:c :d]]
     :catalog catalog-2
+    :lifecycles lifecycles-2
     :percentage 30
     :task-scheduler :onyx.task-scheduler/balanced}))
 

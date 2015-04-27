@@ -104,6 +104,58 @@
    [:in-4 :inc]
    [:inc :out]])
 
+(defn inject-in-1-ch [event lifecycle]
+  {:core.async/chan in-1-chan})
+
+(defn inject-in-2-ch [event lifecycle]
+  {:core.async/chan in-2-chan})
+
+(defn inject-in-3-ch [event lifecycle]
+  {:core.async/chan in-3-chan})
+
+(defn inject-in-4-ch [event lifecycle]
+  {:core.async/chan in-4-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-1-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-1-ch})
+
+(def in-2-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-2-ch})
+
+(def in-3-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-3-ch})
+
+(def in-4-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-4-ch})
+
+(def out-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in-1
+    :lifecycle/calls :onyx.peer.min-peers-test/in-1-calls}
+   {:lifecycle/task :in-1
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-2
+    :lifecycle/calls :onyx.peer.min-peers-test/in-2-calls}
+   {:lifecycle/task :in-2
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-3
+    :lifecycle/calls :onyx.peer.min-peers-test/in-3-calls}
+   {:lifecycle/task :in-3
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-4
+    :lifecycle/calls :onyx.peer.min-peers-test/in-4-calls}
+   {:lifecycle/task :in-4
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (def v-peers (onyx.api/start-peers 6 peer-group))
 
 (onyx.api/submit-job

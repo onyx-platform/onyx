@@ -173,6 +173,68 @@
    [:I :L]
    [:D :G]])
 
+(defn inject-a-ch [event lifecycle]
+  {:core.async/chan a-chan})
+
+(defn inject-b-ch [event lifecycle]
+  {:core.async/chan b-chan})
+
+(defn inject-c-ch [event lifecycle]
+  {:core.async/chan c-chan})
+
+(defn inject-j-ch [event lifecycle]
+  {:core.async/chan j-chan})
+
+(defn inject-k-ch [event lifecycle]
+  {:core.async/chan k-chan})
+
+(defn inject-l-ch [event lifecycle]
+  {:core.async/chan l-chan})
+
+(def a-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-a-ch})
+
+(def b-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-b-ch})
+
+(def c-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-c-ch})
+
+(def j-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-j-ch})
+
+(def k-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-k-ch})
+
+(def l-calls
+  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-l-ch})
+
+(def lifecycles
+  [{:lifecycle/task :a
+    :lifecycle/calls :onyx.peer.min-peers-test/a-calls}
+   {:lifecycle/task :a
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :b
+    :lifecycle/calls :onyx.peer.min-peers-test/b-calls}
+   {:lifecycle/task :b
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.peer.min-peers-test/c-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :j
+    :lifecycle/calls :onyx.peer.min-peers-test/j-calls}
+   {:lifecycle/task :j
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :k
+    :lifecycle/calls :onyx.peer.min-peers-test/k-calls}
+   {:lifecycle/task :k
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :l
+    :lifecycle/calls :onyx.peer.min-peers-test/l-calls}
+   {:lifecycle/task :l
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (def v-peers (onyx.api/start-peers 12 peer-group))
 
 (onyx.api/submit-job
