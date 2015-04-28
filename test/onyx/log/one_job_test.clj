@@ -7,9 +7,9 @@
             [onyx.api :as api]
             [midje.sweet :refer :all]))
 
-(def onyx-id (java.util.UUID/randomUUID))
-
 (def config (load-config))
+
+(def onyx-id (java.util.UUID/randomUUID))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
@@ -62,13 +62,13 @@
   {:lifecycle/before-task :onyx.peer.one-job-test/inject-out-ch})
 
 (def lifecycles
-  [{:lifecycle/task :in
+  [{:lifecycle/task :a
     :lifecycle/calls :onyx.peer.one-job-test/in-calls}
-   {:lifecycle/task :in
+   {:lifecycle/task :a
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :out
+   {:lifecycle/task :c
     :lifecycle/calls :onyx.peer.one-job-test/out-calls}
-   {:lifecycle/task :out
+   {:lifecycle/task :c
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (defn my-inc [segment]
