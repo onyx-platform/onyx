@@ -160,32 +160,32 @@
   {:core.async/chan green-out-chan})
 
 (def colors-in-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-colors-in-ch})
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-colors-in-ch})
 
 (def red-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-red-out-ch})
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-red-out-ch})
 
 (def blue-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-blue-out-ch})
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-blue-out-ch})
 
 (def green-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-green-out-ch})
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-green-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :colors-in
-    :lifecycle/calls :onyx.peer.min-peers-test/colors-in-calls}
+    :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
    {:lifecycle/task :colors-in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :red-out
-    :lifecycle/calls :onyx.peer.min-peers-test/red-out-calls}
+    :lifecycle/calls :onyx.peer.colors-flow-test/red-out-calls}
    {:lifecycle/task :red-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :blue-out
-    :lifecycle/calls :onyx.peer.min-peers-test/blue-out-calls}
+    :lifecycle/calls :onyx.peer.colors-flow-test/blue-out-calls}
    {:lifecycle/task :blue-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :green-out
-    :lifecycle/calls :onyx.peer.min-peers-test/green-out-calls}
+    :lifecycle/calls :onyx.peer.colors-flow-test/green-out-calls}
    {:lifecycle/task :green-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

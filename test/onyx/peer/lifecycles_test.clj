@@ -88,10 +88,10 @@
    :lifecycle/after-task :onyx.peer.lifecycles-test/after-task})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-ch})
+  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in

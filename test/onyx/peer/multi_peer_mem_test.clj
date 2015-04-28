@@ -60,18 +60,18 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-ch})
+  {:lifecycle/before-task :onyx.peer.multi-peer-mem-test/inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.multi-peer-mem-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
+    :lifecycle/calls :onyx.peer.multi-peer-mem-test/in-calls}
    {:lifecycle/task :in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+    :lifecycle/calls :onyx.peer.multi-peer-mem-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

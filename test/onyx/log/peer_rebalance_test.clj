@@ -73,34 +73,34 @@
   {:core.async/chan d-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-a-ch})
+  {:lifecycle/before-task :onyx.peer.peer-rebalance-test/inject-a-ch})
 
 (def b-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-b-ch})
+  {:lifecycle/before-task :onyx.peer.peer-rebalance-test/inject-b-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-c-ch})
+  {:lifecycle/before-task :onyx.peer.peer-rebalance-test/inject-c-ch})
 
 (def d-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-d-ch})
+  {:lifecycle/before-task :onyx.peer.peer-rebalance-test/inject-d-ch})
 
 (def lifecycles-1
   [{:lifecycle/task :a
-    :lifecycle/calls :onyx.peer.min-peers-test/a-calls}
+    :lifecycle/calls :onyx.peer.peer-rebalance-test/a-calls}
    {:lifecycle/task :a
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :b
-    :lifecycle/calls :onyx.peer.min-peers-test/b-calls}
+    :lifecycle/calls :onyx.peer.peer-rebalance-test/b-calls}
    {:lifecycle/task :b
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def lifecycles-2
   [{:lifecycle/task :c
-    :lifecycle/calls :onyx.peer.min-peers-test/c-calls}
+    :lifecycle/calls :onyx.peer.peer-rebalance-test/c-calls}
    {:lifecycle/task :c
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :d
-    :lifecycle/calls :onyx.peer.min-peers-test/d-calls}
+    :lifecycle/calls :onyx.peer.peer-rebalance-test/d-calls}
    {:lifecycle/task :d
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

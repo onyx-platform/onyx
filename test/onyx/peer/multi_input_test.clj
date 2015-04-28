@@ -120,39 +120,39 @@
   {:core.async/chan out-chan})
 
 (def in-1-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-1-ch})
+  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-1-ch})
 
 (def in-2-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-2-ch})
+  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-2-ch})
 
 (def in-3-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-3-ch})
+  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-3-ch})
 
 (def in-4-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-4-ch})
+  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-4-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in-1
-    :lifecycle/calls :onyx.peer.min-peers-test/in-1-calls}
+    :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
    {:lifecycle/task :in-1
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :in-2
-    :lifecycle/calls :onyx.peer.min-peers-test/in-2-calls}
+    :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
    {:lifecycle/task :in-2
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :in-3
-    :lifecycle/calls :onyx.peer.min-peers-test/in-3-calls}
+    :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
    {:lifecycle/task :in-3
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :in-4
-    :lifecycle/calls :onyx.peer.min-peers-test/in-4-calls}
+    :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
    {:lifecycle/task :in-4
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+    :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

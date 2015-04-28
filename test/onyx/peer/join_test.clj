@@ -104,32 +104,32 @@
   {:onyx.core/params [(atom {})]})
 
 (def names-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-names-ch})
+  {:lifecycle/before-task :onyx.peer.join-test/inject-names-ch})
 
 (def ages-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-ages-ch})
+  {:lifecycle/before-task :onyx.peer.join-test/inject-ages-ch})
 
 (def join-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-join-state})
+  {:lifecycle/before-task :onyx.peer.join-test/inject-join-state})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.join-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :names
-    :lifecycle/calls :onyx.peer.min-peers-test/names-calls}
+    :lifecycle/calls :onyx.peer.join-test/names-calls}
    {:lifecycle/task :names
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :ages
-    :lifecycle/calls :onyx.peer.min-peers-test/ages-calls}
+    :lifecycle/calls :onyx.peer.join-test/ages-calls}
    {:lifecycle/task :ages
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+    :lifecycle/calls :onyx.peer.join-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :join-person
-    :lifecycle/calls :onyx.peer.min-peers-test/join-calls}])
+    :lifecycle/calls :onyx.peer.join-test/join-calls}])
 
 (def v-peers (onyx.api/start-peers 4 peer-group))
 

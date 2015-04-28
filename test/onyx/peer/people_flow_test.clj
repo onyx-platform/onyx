@@ -148,39 +148,39 @@
   {:core.async/chan everyone-out-chan})
 
 (def people-in-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-people-in-ch})
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-people-in-ch})
 
 (def children-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-children-out-ch})
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-children-out-ch})
 
 (def adults-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-adults-out-ch})
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-adults-out-ch})
 
 (def athletes-wa-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-athletes-wa-out-ch})
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-athletes-wa-out-ch})
 
 (def everyone-out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-everyone-out-ch})
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-everyone-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :people-in
-    :lifecycle/calls :onyx.peer.min-peers-test/people-in-calls}
+    :lifecycle/calls :onyx.peer.people-flow-test/people-in-calls}
    {:lifecycle/task :people-in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :children-out
-    :lifecycle/calls :onyx.peer.min-peers-test/children-out-calls}
+    :lifecycle/calls :onyx.peer.people-flow-test/children-out-calls}
    {:lifecycle/task :children-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :adults-out
-    :lifecycle/calls :onyx.peer.min-peers-test/adults-out-calls}
+    :lifecycle/calls :onyx.peer.people-flow-test/adults-out-calls}
    {:lifecycle/task :adults-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :athletes-wa-out
-    :lifecycle/calls :onyx.peer.min-peers-test/athletes-wa-out-calls}
+    :lifecycle/calls :onyx.peer.people-flow-test/athletes-wa-out-calls}
    {:lifecycle/task :athletes-wa-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :everyone-out
-    :lifecycle/calls :onyx.peer.min-peers-test/everyone-out-calls}
+    :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}
    {:lifecycle/task :everyone-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

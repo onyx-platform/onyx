@@ -74,24 +74,24 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-ch})
+  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-in-ch})
 
 (def sum-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-sum-state
-   :lifecycle/after-task :onyx.peer.min-peers-test/flush-sum-state})
+  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-sum-state
+   :lifecycle/after-task :onyx.peer.kw-grouping-test/flush-sum-state})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
+    :lifecycle/calls :onyx.peer.kw-grouping-test/in-calls}
    {:lifecycle/task :in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :sum-balance
     :lifecycle/calls :onyx.peer.kw-grouping-test/sum-calls}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+    :lifecycle/calls :onyx.peer.kw-grouping-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

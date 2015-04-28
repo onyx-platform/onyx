@@ -101,32 +101,32 @@
     {:core.async/chan out-2-chan})
 
   (def in-1-calls
-    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-1-ch})
+    {:lifecycle/before-task :onyx.peer.killed-job-test/inject-in-1-ch})
 
   (def in-2-calls
-    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-in-2-ch})
+    {:lifecycle/before-task :onyx.peer.killed-job-test/inject-in-2-ch})
 
   (def out-1-calls
-    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-1-ch})
+    {:lifecycle/before-task :onyx.peer.killed-job-test/inject-out-1-ch})
 
   (def out-2-calls
-    {:lifecycle/before-task :onyx.peer.min-peers-test/inject-out-2-ch})
+    {:lifecycle/before-task :onyx.peer.killed-job-test/inject-out-2-ch})
 
   (def lifecycles
     [{:lifecycle/task :in-1
-      :lifecycle/calls :onyx.peer.min-peers-test/in-1-calls}
+      :lifecycle/calls :onyx.peer.killed-job-test/in-1-calls}
      {:lifecycle/task :in-1
       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
      {:lifecycle/task :in-2
-      :lifecycle/calls :onyx.peer.min-peers-test/in-2-calls}
+      :lifecycle/calls :onyx.peer.killed-job-test/in-2-calls}
      {:lifecycle/task :in-2
       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
      {:lifecycle/task :out-1
-      :lifecycle/calls :onyx.peer.min-peers-test/out-1-calls}
+      :lifecycle/calls :onyx.peer.killed-job-test/out-1-calls}
      {:lifecycle/task :out-1
       :lifecycle/calls :onyx.plugin.core-async/writer-calls}
      {:lifecycle/task :out-2
-      :lifecycle/calls :onyx.peer.min-peers-test/out-2-calls}
+      :lifecycle/calls :onyx.peer.killed-job-test/out-2-calls}
      {:lifecycle/task :out-2
       :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

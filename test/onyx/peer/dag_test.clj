@@ -192,46 +192,46 @@
   {:core.async/chan l-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-a-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-a-ch})
 
 (def b-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-b-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-b-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-c-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-c-ch})
 
 (def j-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-j-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-j-ch})
 
 (def k-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-k-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-k-ch})
 
 (def l-calls
-  {:lifecycle/before-task :onyx.peer.min-peers-test/inject-l-ch})
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-l-ch})
 
 (def lifecycles
   [{:lifecycle/task :a
-    :lifecycle/calls :onyx.peer.min-peers-test/a-calls}
+    :lifecycle/calls :onyx.peer.dag-test/a-calls}
    {:lifecycle/task :a
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :b
-    :lifecycle/calls :onyx.peer.min-peers-test/b-calls}
+    :lifecycle/calls :onyx.peer.dag-test/b-calls}
    {:lifecycle/task :b
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :c
-    :lifecycle/calls :onyx.peer.min-peers-test/c-calls}
+    :lifecycle/calls :onyx.peer.dag-test/c-calls}
    {:lifecycle/task :c
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :j
-    :lifecycle/calls :onyx.peer.min-peers-test/j-calls}
+    :lifecycle/calls :onyx.peer.dag-test/j-calls}
    {:lifecycle/task :j
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :k
-    :lifecycle/calls :onyx.peer.min-peers-test/k-calls}
+    :lifecycle/calls :onyx.peer.dag-test/k-calls}
    {:lifecycle/task :k
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
    {:lifecycle/task :l
-    :lifecycle/calls :onyx.peer.min-peers-test/l-calls}
+    :lifecycle/calls :onyx.peer.dag-test/l-calls}
    {:lifecycle/task :l
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
