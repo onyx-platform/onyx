@@ -96,11 +96,15 @@
 (def lifecycles
   [{:lifecycle/task :in
     :lifecycle/calls :onyx.peer.lifecycles-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :inc
     :lifecycle/calls :onyx.peer.lifecycles-test/calls
     :lifecycle/doc "Test lifecycles that increment a counter in an atom"}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}])
+    :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
