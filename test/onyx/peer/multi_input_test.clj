@@ -105,16 +105,16 @@
    [:inc :out]])
 
 (defn inject-in-1-ch [event lifecycle]
-  {:core.async/chan in-1-chan})
+  {:core.async/chan in-chan-1})
 
 (defn inject-in-2-ch [event lifecycle]
-  {:core.async/chan in-2-chan})
+  {:core.async/chan in-chan-2})
 
 (defn inject-in-3-ch [event lifecycle]
-  {:core.async/chan in-3-chan})
+  {:core.async/chan in-chan-3})
 
 (defn inject-in-4-ch [event lifecycle]
-  {:core.async/chan in-4-chan})
+  {:core.async/chan in-chan-4})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan out-chan})
