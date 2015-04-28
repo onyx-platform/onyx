@@ -92,15 +92,15 @@
    [:join-person :out]])
 
 (defn inject-names-ch [event lifecycle]
-  {:core.async/chan names-chan})
+  {:core.async/chan name-chan})
 
 (defn inject-ages-ch [event lifecycle]
-  {:core.async/chan ages-chan})
+  {:core.async/chan age-chan})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan out-chan})
 
-(defn inject-join-state [event]
+(defn inject-join-state [event lifecycle]
   {:onyx.core/params [(atom {})]})
 
 (def names-calls

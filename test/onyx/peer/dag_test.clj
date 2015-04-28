@@ -210,29 +210,29 @@
   {:lifecycle/before-task :onyx.peer.dag-test/inject-l-ch})
 
 (def lifecycles
-  [{:lifecycle/task :a
+  [{:lifecycle/task :A
     :lifecycle/calls :onyx.peer.dag-test/a-calls}
-   {:lifecycle/task :a
+   {:lifecycle/task :A
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :b
+   {:lifecycle/task :B
     :lifecycle/calls :onyx.peer.dag-test/b-calls}
-   {:lifecycle/task :b
+   {:lifecycle/task :B
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :c
+   {:lifecycle/task :C
     :lifecycle/calls :onyx.peer.dag-test/c-calls}
-   {:lifecycle/task :c
+   {:lifecycle/task :C
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :j
+   {:lifecycle/task :J
     :lifecycle/calls :onyx.peer.dag-test/j-calls}
-   {:lifecycle/task :j
+   {:lifecycle/task :J
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-   {:lifecycle/task :k
+   {:lifecycle/task :K
     :lifecycle/calls :onyx.peer.dag-test/k-calls}
-   {:lifecycle/task :k
+   {:lifecycle/task :K
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-   {:lifecycle/task :l
+   {:lifecycle/task :L
     :lifecycle/calls :onyx.peer.dag-test/l-calls}
-   {:lifecycle/task :l
+   {:lifecycle/task :L
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def v-peers (onyx.api/start-peers 12 peer-group))

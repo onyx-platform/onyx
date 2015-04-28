@@ -92,7 +92,7 @@
    {:lifecycle/task :in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :sum-balance
-    :lifecycle/calls :onyx.peer.kw-grouping-test/sum-calls}
+    :lifecycle/calls :onyx.peer.fn-grouping-test/sum-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}
    {:lifecycle/task :out
