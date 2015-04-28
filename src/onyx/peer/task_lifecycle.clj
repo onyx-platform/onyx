@@ -175,7 +175,7 @@
        (or fused-vals 0))))
   event)
 
-(defn retry-messages [{:keys [onyx.core/results] :as event}]
+(defn flow-retry-messages [{:keys [onyx.core/results] :as event}]
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [link (operation/peer-link event (:completion-id (:root result)))]
@@ -304,11 +304,11 @@
      (catch Throwable e
        (fatal e)))))
 
-(defn replay-messages! [messenger event replay-interval task-kill-ch]
+(defn input-retry-messages! [messenger event input-retry-timeout task-kill-ch]
   (go
    (when (= :input (:onyx/type (:onyx.core/task-map event)))
      (loop []
-       (let [timeout-ch (timeout replay-interval)
+       (let [timeout-ch (timeout input-retry-timeout)
              ch (second (alts!! [timeout-ch task-kill-ch]))]
          (when (= ch timeout-ch)
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
@@ -359,7 +359,7 @@
           (build-new-segments)
           (write-batch)
           (ack-messages)
-          (retry-messages)
+          (flow-retry-messages)
           (close-batch-resources)))
     (catch Throwable e
       (ex-f e))))
@@ -435,11 +435,11 @@
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
-            replay-interval (or (:onyx/replay-interval catalog-entry) 
-                                (:onyx/replay-interval defaults))
+            input-retry-timeout (or (:onyx/input-retry-timeout catalog-entry) 
+                                    (:onyx/input-retry-timeout defaults))
             pending-timeout (or (:onyx/pending-timeout catalog-entry) 
                                 (:onyx/pending-timeout defaults))
-            r-seq (rsc/create-r-seq pending-timeout replay-interval)
+            r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -490,7 +490,7 @@
 
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
-        (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
+        (let [input-retry-messages-ch (input-retry-messages! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component 
@@ -498,7 +498,7 @@
             :seal-ch seal-resp-ch
             :task-kill-ch task-kill-ch
             :task-lifecycle-ch task-lifecycle-ch
-            :replay-messages-ch replay-messages-ch
+            :input-retry-messages-ch input-retry-messages-ch
             :aux-ch aux-ch)))
       (catch Throwable e
         (handle-exception e restart-ch outbox-ch job-id)
@@ -514,7 +514,7 @@
       (<!! (:task-lifecycle-ch component))
 
       (close! (:task-kill-ch component))
-      (<!! (:replay-messages-ch component))
+      (<!! (:input-retry-messages-ch component))
       (<!! (:aux-ch component))
       
       (let [state @(:onyx.core/state event)]
@@ -525,7 +525,7 @@
       :pipeline-data nil
       :seal-ch nil
       :aux-ch nil
-      :replay-messages-ch nil
+      :input-retry-messages-ch nil
       :task-lifecycle-ch nil
       :task-lifecycle-ch nil)))
 

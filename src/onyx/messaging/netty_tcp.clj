@@ -47,20 +47,14 @@
 (defn epoll? []
   (Epoll/isAvailable))
 
-(defn get-default-event-loop-threads
-  "Determines the default number of threads to use for a Netty EventLoopGroup.
-   This mimics the default used by Netty as of version 4.1."
-  []
-  (let [cpu-count (->> (Runtime/getRuntime) (.availableProcessors))]
-    (max 1 (SystemPropertyUtil/getInt "io.netty.eventLoopThreads" 
-                                      (* cpu-count 2)))))
-
 (defonce ^DefaultEventExecutorGroup shared-event-executor (event-executor))
 
 (defrecord NettyPeerGroup [opts]
   component/Lifecycle
   (start [component]
-    (let [thread-count (long (get-default-event-loop-threads))
+    (let [thread-count (or (:onyx.messaging.netty/thread-pool-sizes opts)
+                           (:onyx.messaging.netty/thread-pool-sizes defaults))
+
           client-thread-factory (DefaultThreadFactory. client-event-thread-pool-name true)
           client-group (if (epoll?)
                          (EpollEventLoopGroup. thread-count client-thread-factory)
@@ -140,19 +134,38 @@
           (.addLast "int32-frame-encoder" (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
-(defn handle [buf-recvd-ch msg]
-  (.retain ^ByteBuf msg)
-  (>!! buf-recvd-ch msg))
-
 (defn create-server-handler
   "Given a core, a channel, and a message, applies the message to 
   core and writes a response back on this channel."
-  [buf-recvd-ch] 
-  (fn [^ChannelHandlerContext ctx ^Object message]
-    (handle buf-recvd-ch message)))
+  [messenger inbound-ch release-ch retry-ch] 
+  (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
+    (try 
+      (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
+        (let [t ^byte (:type msg)]
+          (cond (= t protocol/messages-type-id) 
+                (doseq [message (:messages msg)]
+                  (>!! inbound-ch message))
+
+                (= t protocol/ack-type-id)
+                (acker/ack-message (:acking-daemon messenger)
+                                   (:id msg)
+                                   (:completion-id msg)
+                                   (:ack-val msg))
+
+                (= t protocol/completion-type-id)
+                (>!! release-ch (:id msg))
+
+                (= t protocol/retry-type-id)
+                (>!! retry-ch (:id msg))
+
+                :else
+                (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
+      (catch Throwable e
+        (taoensso.timbre/error e)
+        (throw e)))))
 
 (defn start-netty-server
-  [boss-group worker-group host port buf-recvd-ch]
+  [boss-group worker-group host port messenger inbound-ch release-ch retry-ch]
   (let [bootstrap (ServerBootstrap.)
         channel (if (epoll?)
                   EpollServerSocketChannel
@@ -161,8 +174,10 @@
                         (ImmediateEventExecutor/INSTANCE))
         initializer (channel-initializer-done 
                      (gen-tcp-handler channel-group 
-                                      (create-server-handler buf-recvd-ch)))] 
-                                        ; Configure bootstrap
+                                      (create-server-handler messenger 
+                                                             inbound-ch 
+                                                             release-ch 
+                                                             retry-ch)))] 
     (doto bootstrap
       (.group boss-group worker-group)
       (.channel channel)
@@ -215,40 +230,6 @@
               (.handler (client-channel-initializer (new-client-handler))))]
       (.channel ^ChannelFuture (.awaitUninterruptibly (.connect b host port))))))
 
-(defn app [daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch]
-  (thread
-    (loop []
-          (let [[buf ch] (alts!! [buf-recv-ch shutdown-ch])]
-            (when buf 
-              (try 
-                (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
-                  ;(taoensso.timbre/info "Message buf: " buf msg)
-                  ;; undo retain added in server handler
-                  (.release ^ByteBuf buf)
-                  (let [t ^byte (:type msg)]
-                    (cond (= t protocol/messages-type-id) 
-                          (doseq [message (:messages msg)]
-                            (>!! inbound-ch message))
-
-                          (= t protocol/ack-type-id)
-                          (acker/ack-message daemon
-                                             (:id msg)
-                                             (:completion-id msg)
-                                             (:ack-val msg))
-
-                          (= t protocol/completion-type-id)
-                          (>!! release-ch (:id msg))
-
-                          (= t protocol/retry-type-id)
-                          (>!! retry-ch (:id msg))
-
-                          :else
-                          (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
-                (catch Throwable e
-                  (taoensso.timbre/error e)
-                  (throw e)))
-              (recur))))))
-
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
 
@@ -278,10 +259,8 @@
     (taoensso.timbre/info "Stopping Netty TCP Sockets")
     (try 
       (when-let [rs @resources]
-        (let [{:keys [shutdown-fn shutdown-ch app-loop]} rs] 
-          (shutdown-fn)
-          (close! shutdown-ch)
-          (<!! app-loop))
+        (let [{:keys [shutdown-fn]} rs] 
+          (shutdown-fn))
         (reset! resources nil)) 
       (catch Throwable e (timbre/fatal e)))
     (assoc component :bind-addr nil :external-addr nil 
@@ -298,25 +277,19 @@
 
 (defmethod extensions/open-peer-site NettyTcpSockets
   [messenger assigned]
-  ;; TODO: get rid of buf-recv-ch and do the handling inside 
-  ;; the netty handler
-  (let [buf-recv-ch (chan 10000)
-        inbound-ch (:inbound-ch (:messenger-buffer messenger))
+  (let [inbound-ch (:inbound-ch (:messenger-buffer messenger))
         release-ch (:release-ch messenger)
         retry-ch (:retry-ch messenger)
-        daemon (:acking-daemon messenger)
         shutdown-fn (start-netty-server (:boss-group messenger)
                                         (:worker-group messenger)
                                         (:bind-addr messenger) 
                                         (:netty/port assigned) 
-                                        buf-recv-ch)
-        shutdown-ch (chan 1)
-        app-loop (app daemon messenger buf-recv-ch inbound-ch release-ch retry-ch shutdown-ch)]
+                                        messenger 
+                                        inbound-ch 
+                                        release-ch 
+                                        retry-ch)]
     (reset! (:resources messenger)
-            {:shutdown-fn shutdown-fn 
-             :shutdown-ch shutdown-ch
-             :buf-recv-ch buf-recv-ch
-             :app-loop app-loop})))
+            {:shutdown-fn shutdown-fn})))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event {:keys [netty/external-addr netty/port]}]
