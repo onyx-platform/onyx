@@ -1,7 +1,6 @@
 (ns onyx.peer.fn-grouping-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -27,22 +26,12 @@
 
 (def out-chan (chan (sliding-buffer 1000000)))
 
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources
-  :onyx.peer.fn-grouping-test/sum-balance
-  [_ event]
+(defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
     {:onyx.core/params [balance]
      :test/balance balance}))
 
-(defmethod l-ext/close-lifecycle-resources
-  :onyx.peer.fn-grouping-test/sum-balance
-  [_ {:keys [test/balance]}]
+(defn flush-sum-state [{:keys [test/balance] :as event} lifecycle]
   (swap! output conj @balance)
   {})
 
@@ -80,6 +69,34 @@
     :onyx/batch-size 40
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls
+  {:lifecycle/before-task :onyx.peer.fn-grouping-test/inject-in-ch})
+
+(def sum-calls
+  {:lifecycle/before-task :onyx.peer.fn-grouping-test/inject-sum-state
+   :lifecycle/after-task :onyx.peer.fn-grouping-test/flush-sum-state})
+
+(def out-calls
+  {:lifecycle/before-task :onyx.peer.fn-grouping-test/inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls :onyx.peer.fn-grouping-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :sum-balance
+    :lifecycle/calls :onyx.peer.fn-grouping-test/sum-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def size 3000)
 
@@ -142,6 +159,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))
@@ -162,4 +180,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-

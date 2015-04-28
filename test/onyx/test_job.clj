@@ -2,7 +2,6 @@
   (:require [onyx.test-helper]
             [clojure.test :refer :all]
             [clojure.core.async :refer [chan >!! <!! close! sliding-buffer go-loop]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [taoensso.timbre :refer [fatal] :as timbre]
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
@@ -45,13 +44,13 @@
         extra-dag-edges (map (juxt identity out-task-name) inner-task-names)]
     (-> job
         (update-in [:catalog] into (map (fn [task]
-                                           {:onyx/name (out-task-name task)
-                                            :onyx/ident :core.async/write-to-chan
-                                            :onyx/type :output
-                                            :onyx/medium :core.async
-                                            :onyx/batch-size 20
-                                            :onyx/max-peers 1})
-                                         inner-task-names))
+                                          {:onyx/name (out-task-name task)
+                                           :onyx/ident :core.async/write-to-chan
+                                           :onyx/type :output
+                                           :onyx/medium :core.async
+                                           :onyx/batch-size 20
+                                           :onyx/max-peers 1})
+                                        inner-task-names))
         (update-in [:workflow] into extra-dag-edges))))
 
 (defprotocol Manager
@@ -78,8 +77,8 @@
                                    n-peers-required 
                                    n-peers)))))
 
-    ; Convert all input and output tasks to core.async input and output tasks
-    ; This code should be made into a helper function like add-debug-output-tasks
+                                        ; Convert all input and output tasks to core.async input and output tasks
+                                        ; This code should be made into a helper function like add-debug-output-tasks
     (let [in-names (set (input-names catalog)) 
           out-names (set (output-names catalog))
           alt-name->name (into {} 
@@ -105,6 +104,10 @@
                               :onyx/batch-size 20
                               :onyx/max-peers 1}) 
                            out-names-alt)
+          lifecycles (map (fn [n]
+                            {:lifecycle/name n
+                             :lifecycle/calls (keyword (str "onyx.test-job/" n "-calls"))})
+                          (concat in-names-alt out-names-alt))
           workflow-alt (mapv (fn [edge]
                                (mapv (fn [task] 
                                        (if (or (in-names task) (out-names task))
@@ -114,23 +117,27 @@
                              workflow)
 
           _ (doall 
-              (map (fn [[k c]]
-                     (defmethod l-ext/inject-lifecycle-resources k
-                       [_ _] {:core.async/chan c}))
-                   (merge in-chans out-chans)))
+             (map (fn [[k c]]
+                    (let [f-sym (symbol (str "inject-" (name k)))]
+                      (intern *ns* f-sym (eval `(fn ~k ~[] {:core.async/chan c})))
+                      (intern *ns* (symbol (str (name k) "-calls"))
+                              {:lifecycle/before-task
+                               (str :onyx.test-job (str "/inject-" (name k)))})))
+                  (merge in-chans out-chans)))
 
           job (onyx.api/submit-job (:peer-config component) 
                                    {:workflow workflow-alt
                                     :catalog (concat catalog in-entries out-entries)
+                                    :lifecycles lifecycles
                                     :task-scheduler task-scheduler})
 
           _ (doall 
-              (map (fn [[k in-ch]]
-                     (doseq [v (inputs (alt-name->name k))]
-                       (>!! in-ch v))
-                     (>!! in-ch :done)
-                     (close! in-ch))
-                   in-chans))]
+             (map (fn [[k in-ch]]
+                    (doseq [v (inputs (alt-name->name k))]
+                      (>!! in-ch v))
+                    (>!! in-ch :done)
+                    (close! in-ch))
+                  in-chans))]
       (future
         (let [results (into {} 
                             (map (fn [[k out-ch]]
@@ -157,13 +164,13 @@
                            (reset! !replica new-replica)
                            (recur new-replica)))] 
           (assoc component 
-                 :env-config env-config
-                 :peer-config peer-config
-                 :env env 
-                 :peer-group peer-group
-                 :replica !replica
-                 :v-peers (atom [])
-                 :log-ch ch))
+            :env-config env-config
+            :peer-config peer-config
+            :env env 
+            :peer-group peer-group
+            :replica !replica
+            :v-peers (atom [])
+            :log-ch ch))
         (catch Exception e
           (fatal e "Could not start peer group")
           (onyx.api/shutdown-env env)))))
@@ -192,27 +199,27 @@
         (is (= {:out [{:n 2} :done]
                 :inc_out [{:n 2} :done]}
                @(run-job env-t (add-debug-output-tasks 
-                                 {:catalog [{:onyx/name :in
-                                             :onyx/ident :core.async/read-from-chan
-                                             :onyx/type :input
-                                             :onyx/medium :core.async
-                                             :onyx/batch-size 20
-                                             :onyx/max-peers 1
-                                             :onyx/doc "Reads segments from a core.async channel"}
+                                {:catalog [{:onyx/name :in
+                                            :onyx/ident :core.async/read-from-chan
+                                            :onyx/type :input
+                                            :onyx/medium :core.async
+                                            :onyx/batch-size 20
+                                            :onyx/max-peers 1
+                                            :onyx/doc "Reads segments from a core.async channel"}
 
-                                            {:onyx/name :inc
-                                             :onyx/fn :onyx.test-job/my-inc
-                                             :onyx/type :function
-                                             :onyx/batch-size 20}
+                                           {:onyx/name :inc
+                                            :onyx/fn :onyx.test-job/my-inc
+                                            :onyx/type :function
+                                            :onyx/batch-size 20}
 
-                                            {:onyx/name :out
-                                             :onyx/ident :core.async/write-to-chan
-                                             :onyx/type :output
-                                             :onyx/medium :core.async
-                                             :onyx/batch-size 20
-                                             :onyx/max-peers 1
-                                             :onyx/doc "Writes segments to a core.async channel"}]
-                                  :workflow [[:in :inc] [:inc :out]]
-                                  :task-scheduler :onyx.task-scheduler/balanced})
+                                           {:onyx/name :out
+                                            :onyx/ident :core.async/write-to-chan
+                                            :onyx/type :output
+                                            :onyx/medium :core.async
+                                            :onyx/batch-size 20
+                                            :onyx/max-peers 1
+                                            :onyx/doc "Writes segments to a core.async channel"}]
+                                 :workflow [[:in :inc] [:inc :out]]
+                                 :task-scheduler :onyx.task-scheduler/balanced})
                          {:in [{:n 1}]})))
         (finally (component/stop env-t))))))

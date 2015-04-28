@@ -1,20 +1,25 @@
 (ns onyx.plugin.core-async
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <!]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
             [taoensso.timbre :refer [debug] :as timbre]))
 
-(defmethod l-ext/inject-lifecycle-resources :core.async/read-from-chan
-  [_ event]
+(defn inject-reader
+  [event lifecycle]
   (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
   {:core.async/pending-messages (atom {})
    :core.async/retry-ch (chan 1000)})
 
-(defmethod l-ext/inject-lifecycle-resources :core.async/write-to-chan
-  [_ event]
+(defn inject-writer
+  [event lifecycle]
   (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
   {})
+
+(def reader-calls
+  {:lifecycle/before-task :onyx.plugin.core-async/inject-reader})
+
+(def writer-calls
+  {:lifecycle/before-task :onyx.plugin.core-async/inject-writer})
 
 (defmethod p-ext/read-batch :core.async/read-from-chan
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch
