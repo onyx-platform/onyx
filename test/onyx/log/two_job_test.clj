@@ -90,34 +90,34 @@
   {:core.async/chan f-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.peer.two-job-test/inject-a-ch})
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-a-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.peer.two-job-test/inject-c-ch})
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-c-ch})
 
 (def d-calls
-  {:lifecycle/before-task :onyx.peer.two-job-test/inject-d-ch})
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-d-ch})
 
 (def f-calls
-  {:lifecycle/before-task :onyx.peer.two-job-test/inject-f-ch})
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-f-ch})
 
 (def lifecycles-1
   [{:lifecycle/task :a
-    :lifecycle/calls :onyx.peer.two-job-test/a-calls}
+    :lifecycle/calls :onyx.log.two-job-test/a-calls}
    {:lifecycle/task :a
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :c
-    :lifecycle/calls :onyx.peer.two-job-test/c-calls}
+    :lifecycle/calls :onyx.log.two-job-test/c-calls}
    {:lifecycle/task :c
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def lifecycles-2
   [{:lifecycle/task :d
-    :lifecycle/calls :onyx.peer.two-job-test/d-calls}
+    :lifecycle/calls :onyx.log.two-job-test/d-calls}
    {:lifecycle/task :d
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :f
-    :lifecycle/calls :onyx.peer.two-job-test/f-calls}
+    :lifecycle/calls :onyx.log.two-job-test/f-calls}
    {:lifecycle/task :f
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 

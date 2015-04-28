@@ -56,18 +56,18 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.one-job-test/inject-in-ch})
+  {:lifecycle/before-task :onyx.log.one-job-test/inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.one-job-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.log.one-job-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :a
-    :lifecycle/calls :onyx.peer.one-job-test/in-calls}
+    :lifecycle/calls :onyx.log.one-job-test/in-calls}
    {:lifecycle/task :a
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :c
-    :lifecycle/calls :onyx.peer.one-job-test/out-calls}
+    :lifecycle/calls :onyx.log.one-job-test/out-calls}
    {:lifecycle/task :c
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
