@@ -81,17 +81,17 @@
   {:core.async/chan out-chan})
 
 (def calls
-  {:lifecycle/start-task? :onyx.peer.lifecycles-test/start-task?
-   :lifecycle/before-task :onyx.peer.lifecycles-test/before-task
-   :lifecycle/before-batch :onyx.peer.lifecycles-test/before-batch
-   :lifecycle/after-batch :onyx.peer.lifecycles-test/after-batch
-   :lifecycle/after-task :onyx.peer.lifecycles-test/after-task})
+  {:lifecycle/start-task? start-task?
+   :lifecycle/before-task before-task
+   :lifecycle/before-batch before-batch
+   :lifecycle/after-batch after-batch
+   :lifecycle/after-task after-task})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-in-ch})
+  {:lifecycle/before-task inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-out-ch})
+  {:lifecycle/before-task inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in

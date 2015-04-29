@@ -64,20 +64,20 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 
 Notice that all lifecycle functions return maps exception `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task`.
 
-Next, define a map that wires all these functions together:
+Next, define a map that wires all these functions together by mapping predefined keywords to the functions:
 
 ```clojure
 (def calls
-  {:lifecycle/start-task? :my.ns/start-task?
-   :lifecycle/before-task :my.ns/before-task
-   :lifecycle/before-batch :my.ns/before-batch
-   :lifecycle/after-batch :my.ns/after-batch
-   :lifecycle/after-task :my.ns/after-task})
+  {:lifecycle/start-task? start-task?
+   :lifecycle/before-task before-task
+   :lifecycle/before-batch before-batch
+   :lifecycle/after-batch after-batch
+   :lifecycle/after-task after-task})
 ```
 
-Each of these 5 keys maps to a fully qualified function as a keyword. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
+Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
 
-Finally, create a lifecycle data structure and pass it to your `onyx.api/submit-job` call:
+Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to a fully namespaced keyword pointing to the calls map that we just definef. Pass it to your `onyx.api/submit-job` call:
 
 ```clojure
 (def lifecycles

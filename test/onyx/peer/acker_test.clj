@@ -71,10 +71,10 @@
     {:core.async/chan out-chan})
 
   (def in-calls
-    {:lifecycle/before-task :onyx.peer.acker-test/inject-in-ch})
+    {:lifecycle/before-task inject-in-ch})
 
   (def out-calls
-    {:lifecycle/before-task :onyx.peer.acker-test/inject-out-ch})
+    {:lifecycle/before-task inject-out-ch})
 
   (def lifecycles
     [{:lifecycle/task :in

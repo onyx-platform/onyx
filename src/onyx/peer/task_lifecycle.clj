@@ -387,7 +387,7 @@
           (fn [lifecycle]
             (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
               (when-let [g (:lifecycle/start-task? calls-map)]
-                (fn [x] ((operation/kw->fn g) x lifecycle)))))
+                (fn [x] (g x lifecycle)))))
           matched))]
     (fn [event]
       (if (seq fs)
@@ -400,7 +400,7 @@
      (fn [f lifecycle]
        (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
          (if-let [g (get calls-map kw)]
-           (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
+           (comp (fn [x] (merge x (g x lifecycle))) f)
            f)))
      identity
      matched)))

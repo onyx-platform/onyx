@@ -104,16 +104,16 @@
   {:onyx.core/params [(atom {})]})
 
 (def names-calls
-  {:lifecycle/before-task :onyx.peer.join-test/inject-names-ch})
+  {:lifecycle/before-task inject-names-ch})
 
 (def ages-calls
-  {:lifecycle/before-task :onyx.peer.join-test/inject-ages-ch})
+  {:lifecycle/before-task inject-ages-ch})
 
 (def join-calls
-  {:lifecycle/before-task :onyx.peer.join-test/inject-join-state})
+  {:lifecycle/before-task inject-join-state})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.join-test/inject-out-ch})
+  {:lifecycle/before-task inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :names
