@@ -1,16 +1,9 @@
 (ns onyx.log.two-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
-            ; Add for generative testing later
-            ;[onyx.log.generative-test :as log-gen-test]
-            ;[clojure.test.check.generators :as gen]
-            ;[clojure.test :refer :all]
-            ;[com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            ;[onyx.messaging.aeron :as aeron]
             [com.stuartsierra.component :as component]
             [clojure.test :refer :all]
             [midje.sweet :refer :all]))
@@ -84,23 +77,56 @@
 
 (def f-chan (chan (sliding-buffer 100)))
 
-(defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/chan a-chan})
+(defn inject-a-ch [event lifecycle]
+  {:core.async/chan a-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/chan c-chan})
+(defn inject-c-ch [event lifecycle]
+  {:core.async/chan c-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :d
-  [_ _] {:core.async/chan d-chan})
+(defn inject-d-ch [event lifecycle]
+  {:core.async/chan d-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :f
-  [_ _] {:core.async/chan f-chan})
+(defn inject-f-ch [event lifecycle]
+  {:core.async/chan f-chan})
+
+(def a-calls
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-a-ch})
+
+(def c-calls
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-c-ch})
+
+(def d-calls
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-d-ch})
+
+(def f-calls
+  {:lifecycle/before-task :onyx.log.two-job-test/inject-f-ch})
+
+(def lifecycles-1
+  [{:lifecycle/task :a
+    :lifecycle/calls :onyx.log.two-job-test/a-calls}
+   {:lifecycle/task :a
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.log.two-job-test/c-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
+(def lifecycles-2
+  [{:lifecycle/task :d
+    :lifecycle/calls :onyx.log.two-job-test/d-calls}
+   {:lifecycle/task :d
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :f
+    :lifecycle/calls :onyx.log.two-job-test/f-calls}
+   {:lifecycle/task :f
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def j1 
   (onyx.api/submit-job
     peer-config
     {:workflow [[:a :b] [:b :c]]
      :catalog catalog-1
+     :lifecycles lifecycles-1
      :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def j2 
@@ -108,6 +134,7 @@
     peer-config
     {:workflow [[:d :e] [:e :f]]
      :catalog catalog-2
+     :lifecycles lifecycles-2
      :task-scheduler :onyx.task-scheduler/balanced}))
 
 (def ch (chan n-peers))

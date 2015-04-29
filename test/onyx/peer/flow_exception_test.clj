@@ -1,7 +1,6 @@
 (ns onyx.peer.flow-exception-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -59,15 +58,31 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
-
 (def workflow
   [[:in :inc]
    [:inc :out]])
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls
+  {:lifecycle/before-task :onyx.peer.flow-exception-test/inject-in-ch})
+
+(def out-calls
+  {:lifecycle/before-task :onyx.peer.flow-exception-test/inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls :onyx.peer.flow-exception-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def flow-conditions
   [{:flow/from :inc
@@ -101,7 +116,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :flow-conditions flow-conditions
+  :flow-conditions flow-conditions :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))

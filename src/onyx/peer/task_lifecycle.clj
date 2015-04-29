@@ -8,7 +8,6 @@
               [onyx.log.entry :as entry]
               [onyx.static.planning :refer [find-task build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
@@ -36,8 +35,7 @@
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
-  (and ((:onyx.core/compiled-start-task-fn event) event)
-       (l-ext/start-lifecycle?* event)))
+  ((:onyx.core/compiled-start-task-fn event) event))
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
@@ -189,9 +187,8 @@
   event)
 
 (defn inject-batch-resources [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}
-        results (l-ext/inject-batch-resources* event)]
-    (merge event cycle-params results ((:onyx.core/compiled-before-batch-fn event) results))))
+  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
+    (merge cycle-params event ((:onyx.core/compiled-before-batch-fn event) event))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -272,8 +269,7 @@
   (merge event (p-ext/write-batch event)))
 
 (defn close-batch-resources [event]
-  (let [results (l-ext/close-batch-resources* event)]
-    (merge event results ((:onyx.core/compiled-after-batch-fn event) results))))
+  (merge event ((:onyx.core/compiled-after-batch-fn event) event)))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -421,6 +417,10 @@
 (defn compile-after-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
 
+(defn resolve-task-fn [entry]
+  (when (= (:onyx/type entry) :function)
+    (operation/kw->fn (:onyx/fn entry))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -467,18 +467,15 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
+                           :onyx.core/fn (resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            injection-results (l-ext/inject-lifecycle-resources* pipeline-data)
-            pipeline-data (merge pipeline-data
-                                 injection-results
-                                 ((:onyx.core/compiled-before-task-fn pipeline-data)
-                                  injection-results))]
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                    (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
+                    (not (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -510,7 +507,7 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      ((:onyx.core/compiled-after-task-fn event) (l-ext/close-lifecycle-resources* event))
+      ((:onyx.core/compiled-after-task-fn event) event)
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))

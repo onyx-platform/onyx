@@ -1,6 +1,5 @@
 (ns onyx.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.test-helper :refer [load-config]]
             [midje.sweet :refer :all]
             [onyx.api]))

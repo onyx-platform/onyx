@@ -1,7 +1,6 @@
 (ns onyx.peer.people-flow-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -104,21 +103,6 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(defmethod l-ext/inject-lifecycle-resources :people-in
-  [_ _] {:core.async/chan people-in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :children-out
-  [_ _] {:core.async/chan children-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :adults-out
-  [_ _] {:core.async/chan adults-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :athletes-wa-out
-  [_ _] {:core.async/chan athletes-wa-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :everyone-out
-  [_ _] {:core.async/chan everyone-out-chan})
-
 (def workflow
   [[:people-in :process-children]
    [:people-in :process-adults]
@@ -147,6 +131,58 @@
    {:flow/from :people-in
     :flow/to [:process-everyone]
     :flow/predicate :onyx.peer.people-flow-test/constantly-true}])
+
+(defn inject-people-in-ch [event lifecycle]
+  {:core.async/chan people-in-chan})
+
+(defn inject-children-out-ch [event lifecycle]
+  {:core.async/chan children-out-chan})
+
+(defn inject-adults-out-ch [event lifecycle]
+  {:core.async/chan adults-out-chan})
+
+(defn inject-athletes-wa-out-ch [event lifecycle]
+  {:core.async/chan athletes-wa-out-chan})
+
+(defn inject-everyone-out-ch [event lifecycle]
+  {:core.async/chan everyone-out-chan})
+
+(def people-in-calls
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-people-in-ch})
+
+(def children-out-calls
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-children-out-ch})
+
+(def adults-out-calls
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-adults-out-ch})
+
+(def athletes-wa-out-calls
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-athletes-wa-out-ch})
+
+(def everyone-out-calls
+  {:lifecycle/before-task :onyx.peer.people-flow-test/inject-everyone-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :people-in
+    :lifecycle/calls :onyx.peer.people-flow-test/people-in-calls}
+   {:lifecycle/task :people-in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :children-out
+    :lifecycle/calls :onyx.peer.people-flow-test/children-out-calls}
+   {:lifecycle/task :children-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :adults-out
+    :lifecycle/calls :onyx.peer.people-flow-test/adults-out-calls}
+   {:lifecycle/task :adults-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :athletes-wa-out
+    :lifecycle/calls :onyx.peer.people-flow-test/athletes-wa-out-calls}
+   {:lifecycle/task :athletes-wa-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :everyone-out
+    :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}
+   {:lifecycle/task :everyone-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (defn child? [event old {:keys [age]} all-new max-child-age]
   (<= age max-child-age))
@@ -182,6 +218,7 @@
  peer-config
  {:catalog catalog :workflow workflow
   :flow-conditions flow-conditions
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def children (take-segments! children-out-chan))
