@@ -227,6 +227,7 @@
             (.channel channel)
             (.handler (client-channel-initializer (new-client-handler))))
         ch-fut ^ChannelFuture (.awaitUninterruptibly (.connect b host port) 
+                                                     ;; TODO, add connection timeout
                                                      ;(:onyx.messaging.netty/connect-timeout-millis defaults)
                                                      ;TimeUnit/MILLISECONDS
                                                      )
