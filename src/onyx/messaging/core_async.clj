@@ -80,16 +80,12 @@
   ;; Pass, channel and future already running to process messages.
   )
 
-(defmethod extensions/initialize-peer-link CoreAsync
-  [messenger _ site]
-  {})
-
 (defmethod extensions/connect-to-peer CoreAsync
-  [messenger _ link peer-site]
+  [messenger event peer-site]
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         ch (get @chs (:site peer-site))]
     (assert ch)
-    (reset! link {:ch ch})))
+    ch))
 
 (defmethod extensions/receive-messages CoreAsync
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -105,19 +101,19 @@
 
 (defmethod extensions/send-messages CoreAsync
   [messenger event peer-link messages]
-  (>!! (:ch @peer-link) {:type :send :messages messages}))
+  (>!! peer-link {:type :send :messages messages}))
 
 (defmethod extensions/internal-ack-message CoreAsync
   [messenger event peer-link message-id completion-id ack-val]
-  (>!! (:ch @peer-link) {:type :ack :id message-id :completion-id completion-id :ack-val ack-val}))
+  (>!! peer-link {:type :ack :id message-id :completion-id completion-id :ack-val ack-val}))
 
 (defmethod extensions/internal-complete-message CoreAsync
   [messenger event id peer-link]
-  (>!! (:ch @peer-link) {:type :complete :id id}))
+  (>!! peer-link {:type :complete :id id}))
 
 (defmethod extensions/internal-retry-message CoreAsync
   [messenger event id peer-link]
-  (>!! (:ch @peer-link) {:type :retry :id id}))
+  (>!! peer-link {:type :retry :id id}))
 
 (defmethod extensions/close-peer-connection CoreAsync
   [messenger event peer-link]

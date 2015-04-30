@@ -33,7 +33,7 @@
                    (swap! update-in 
                           [:links peer-id] 
                           (fn [link]
-                            (or link (atom (extensions/initialize-peer-link messenger event site)))))
-                   (get-in [:links peer-id]))
-          _ (extensions/connect-to-peer messenger event link site)]
+                            (or link 
+                                (extensions/connect-to-peer messenger event link site))))
+                   (get-in [:links peer-id]))]
       link)))

@@ -195,22 +195,18 @@
              :send-subscriber send-subscriber
              :aux-subscriber aux-subscriber})))
 
-(defmethod extensions/initialize-peer-link AeronConnection
-  [messenger _ site]
-  {})
-
 (defmethod extensions/connect-to-peer AeronConnection
-  [messenger _ link {:keys [aeron/external-addr aeron/port]}]
+  [messenger event {:keys [aeron/external-addr aeron/port]}]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
         channel (aeron-channel external-addr port)
         f-send-pub #(.addPublication aeron channel send-stream-id)
         f-aux-pub #(.addPublication aeron channel aux-stream-id)]
-    (reset! link {:conn aeron 
-                  :send-pub {:f-create f-send-pub
-                             :pub (atom nil)} 
-                  :aux-pub {:f-create f-aux-pub
-                            :pub (atom nil)}})))
+    {:conn aeron 
+     :send-pub {:f-create f-send-pub
+                :pub (atom nil)} 
+     :aux-pub {:f-create f-aux-pub
+               :pub (atom nil)}}))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -225,10 +221,9 @@
         segments))))
 
 (defn get-peer-link-pub [peer-link k]
-  (if-let [pub @(get-in @peer-link [k :pub])]
+  (if-let [pub @(get-in peer-link [k :pub])]
     pub
-    (let [pub ((get-in @peer-link [k :f-create]))] 
-      (reset! (get-in @peer-link [k :pub]) pub))))
+    (reset! (get-in peer-link [k :pub]) ((get-in peer-link [k :f-create])))))
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
@@ -264,11 +259,11 @@
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
-  (when-let [pub (get-in @peer-link [:send-pub :pub])] 
+  (when-let [pub (get-in peer-link [:send-pub :pub])] 
     (when @pub (.close @pub))
     (reset! pub nil))
-  (when-let [pub (get-in @peer-link [:send-pub :aux-pub])]
+  (when-let [pub (get-in peer-link [:send-pub :aux-pub])]
     (when @pub (.close @pub))
     (reset! pub nil))
-  (.close (:conn @peer-link)) 
+  (.close (:conn peer-link)) 
   {})
