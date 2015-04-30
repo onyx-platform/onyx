@@ -1,7 +1,6 @@
 (ns onyx.peer.dag-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -34,24 +33,6 @@
 (def k-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
 
 (def l-chan (chan 500000 #_(sliding-buffer (* 3 (inc n-messages)))))
-
-(defmethod l-ext/inject-lifecycle-resources :A
-  [_ _] {:core.async/chan a-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :B
-  [_ _] {:core.async/chan b-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :C
-  [_ _] {:core.async/chan c-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :J
-  [_ _] {:core.async/chan j-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :K
-  [_ _] {:core.async/chan k-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :L
-  [_ _] {:core.async/chan l-chan})
 
 (def a-segments
   (map (fn [n] {:n n})
@@ -192,11 +173,74 @@
    [:I :L]
    [:D :G]])
 
+(defn inject-a-ch [event lifecycle]
+  {:core.async/chan a-chan})
+
+(defn inject-b-ch [event lifecycle]
+  {:core.async/chan b-chan})
+
+(defn inject-c-ch [event lifecycle]
+  {:core.async/chan c-chan})
+
+(defn inject-j-ch [event lifecycle]
+  {:core.async/chan j-chan})
+
+(defn inject-k-ch [event lifecycle]
+  {:core.async/chan k-chan})
+
+(defn inject-l-ch [event lifecycle]
+  {:core.async/chan l-chan})
+
+(def a-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-a-ch})
+
+(def b-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-b-ch})
+
+(def c-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-c-ch})
+
+(def j-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-j-ch})
+
+(def k-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-k-ch})
+
+(def l-calls
+  {:lifecycle/before-task :onyx.peer.dag-test/inject-l-ch})
+
+(def lifecycles
+  [{:lifecycle/task :A
+    :lifecycle/calls :onyx.peer.dag-test/a-calls}
+   {:lifecycle/task :A
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :B
+    :lifecycle/calls :onyx.peer.dag-test/b-calls}
+   {:lifecycle/task :B
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :C
+    :lifecycle/calls :onyx.peer.dag-test/c-calls}
+   {:lifecycle/task :C
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :J
+    :lifecycle/calls :onyx.peer.dag-test/j-calls}
+   {:lifecycle/task :J
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :K
+    :lifecycle/calls :onyx.peer.dag-test/k-calls}
+   {:lifecycle/task :K
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :L
+    :lifecycle/calls :onyx.peer.dag-test/l-calls}
+   {:lifecycle/task :L
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (def v-peers (onyx.api/start-peers 12 peer-group))
 
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def j-results (take-segments! j-chan))

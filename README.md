@@ -30,12 +30,12 @@ Available on Clojars:
 
 ### Build Status
 
-Component | Release Branch | Health
-----------|----------------|-------
-onyx core | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x)
-onyx-sql  | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x)
-onyx-datomic  | `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x)
-onyx-kafka| `0.6.x` | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x)
+Component | `0.6.x`| `master`
+----------|--------|--------
+onyx core | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/master)
+onyx-sql  | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/master)
+onyx-datomic  | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/master)
+onyx-kafka| [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/master)
 
 ### Quick Start Guide
 
@@ -52,6 +52,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
 - [Flow Conditions](doc/user-guide/flow-conditions.md)
+- [Lifecycles](doc/user-guide/lifecycles.md)
 - [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Plugins](doc/user-guide/plugins.md)

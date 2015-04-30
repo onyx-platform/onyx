@@ -3,21 +3,21 @@
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace fatal] :as timbre]
+              [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.static.planning :refer [find-task build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.task-lifecycle-extensions :as l-ext]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.static.default-vals :refer [defaults]])
-    (:import [java.security MessageDigest]
-             [uk.co.real_logic.aeron.exceptions.DriverTimeoutException]))
+    (:import [java.security MessageDigest]))
 
-(def restartable-exceptions [uk.co.real_logic.aeron.exceptions.DriverTimeoutException])
+;; TODO: Are there any exceptions that a peer should autoreboot itself?
+(def restartable-exceptions [])
 
 (defn at-least-one-active? [replica peers]
   (->> peers
@@ -35,7 +35,7 @@
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
-  (l-ext/start-lifecycle?* event))
+  ((:onyx.core/compiled-start-task-fn event) event))
 
 (defn add-acker-id [event m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
@@ -175,7 +175,7 @@
        (or fused-vals 0))))
   event)
 
-(defn retry-messages [{:keys [onyx.core/results] :as event}]
+(defn flow-retry-messages [{:keys [onyx.core/results] :as event}]
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [link (operation/peer-link event (:completion-id (:root result)))]
@@ -188,7 +188,7 @@
 
 (defn inject-batch-resources [event]
   (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge event cycle-params (l-ext/inject-batch-resources* event))))
+    (merge cycle-params event ((:onyx.core/compiled-before-batch-fn event) event))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -211,7 +211,8 @@
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (swap! state update-in [:timeout-pool 0] concat (map :id (:onyx.core/batch event))))
+    (swap! state update-in [:timeout-pool 0] rsc/add-to-head
+           (map :id (:onyx.core/batch event))))
   event)
 
 (defn try-complete-job [event]
@@ -268,7 +269,7 @@
   (merge event (p-ext/write-batch event)))
 
 (defn close-batch-resources [event]
-  (merge event (l-ext/close-batch-resources* event)))
+  (merge event ((:onyx.core/compiled-after-batch-fn event) event)))
 
 (defn launch-aux-threads!
   [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -303,11 +304,11 @@
      (catch Throwable e
        (fatal e)))))
 
-(defn replay-messages! [messenger event replay-interval task-kill-ch]
+(defn input-retry-messages! [messenger event input-retry-timeout task-kill-ch]
   (go
    (when (= :input (:onyx/type (:onyx.core/task-map event)))
      (loop []
-       (let [timeout-ch (timeout replay-interval)
+       (let [timeout-ch (timeout input-retry-timeout)
              ch (second (alts!! [timeout-ch task-kill-ch]))]
          (when (= ch timeout-ch)
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
@@ -315,7 +316,7 @@
                (when (p-ext/pending? event m)
                  (taoensso.timbre/info (format "Replay message %s" m))
                  (p-ext/retry-message event m)))
-             (swap! (:onyx.core/state event) update-in [:timeout-pool] (comp vec #(conj % []) butlast))
+             (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
              (recur))))))))
 
 (defn handle-exception [e restart-ch outbox-ch job-id]
@@ -358,7 +359,7 @@
           (build-new-segments)
           (write-batch)
           (ack-messages)
-          (retry-messages)
+          (flow-retry-messages)
           (close-batch-resources)))
     (catch Throwable e
       (ex-f e))))
@@ -377,6 +378,49 @@
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
+(defn compile-start-task-functions [lifecycles task-name]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
+        fs
+        (remove
+         nil?
+         (map
+          (fn [lifecycle]
+            (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+              (when-let [g (:lifecycle/start-task? calls-map)]
+                (fn [x] ((operation/kw->fn g) x lifecycle)))))
+          matched))]
+    (fn [event]
+      (if (seq fs)
+        (every? true? ((apply juxt fs) event))
+        true))))
+
+(defn compile-lifecycle-functions [lifecycles task-name kw]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
+    (reduce
+     (fn [f lifecycle]
+       (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+         (if-let [g (get calls-map kw)]
+           (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
+           f)))
+     identity
+     matched)))
+
+(defn compile-before-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
+
+(defn compile-before-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
+
+(defn compile-after-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
+
+(defn compile-after-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
+
+(defn resolve-task-fn [entry]
+  (when (= (:onyx/type entry) :function)
+    (operation/kw->fn (:onyx/fn entry))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -387,15 +431,15 @@
       (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
+            lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
-            replay-interval (or (:onyx/replay-interval catalog-entry) 
-                                (:onyx/replay-interval defaults))
+            input-retry-timeout (or (:onyx/input-retry-timeout catalog-entry) 
+                                    (:onyx/input-retry-timeout defaults))
             pending-timeout (or (:onyx/pending-timeout catalog-entry) 
                                 (:onyx/pending-timeout defaults))
-            n-buckets (int (Math/ceil (/ pending-timeout replay-interval)))
-            buckets (vec (repeat n-buckets []))
+            r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -406,6 +450,11 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/compiled-start-task-fn (compile-start-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-task-fn (compile-before-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task-map catalog-entry
@@ -418,14 +467,15 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
+                           :onyx.core/fn (resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
-                           :onyx.core/state (atom {:timeout-pool buckets})}
+                           :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (merge pipeline-data (l-ext/inject-lifecycle-resources* pipeline-data))]
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                    (not (:onyx.core/start-lifecycle? (munge-start-lifecycle pipeline-data))))
+                    (not (munge-start-lifecycle pipeline-data)))
           (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -440,7 +490,7 @@
 
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
-        (let [replay-messages-ch (replay-messages! messenger pipeline-data replay-interval task-kill-ch)
+        (let [input-retry-messages-ch (input-retry-messages! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component 
@@ -448,7 +498,7 @@
             :seal-ch seal-resp-ch
             :task-kill-ch task-kill-ch
             :task-lifecycle-ch task-lifecycle-ch
-            :replay-messages-ch replay-messages-ch
+            :input-retry-messages-ch input-retry-messages-ch
             :aux-ch aux-ch)))
       (catch Throwable e
         (handle-exception e restart-ch outbox-ch job-id)
@@ -457,14 +507,14 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      (l-ext/close-lifecycle-resources* event)
+      ((:onyx.core/compiled-after-task-fn event) event)
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
 
       (close! (:task-kill-ch component))
-      (<!! (:replay-messages-ch component))
+      (<!! (:input-retry-messages-ch component))
       (<!! (:aux-ch component))
       
       (let [state @(:onyx.core/state event)]
@@ -475,7 +525,7 @@
       :pipeline-data nil
       :seal-ch nil
       :aux-ch nil
-      :replay-messages-ch nil
+      :input-retry-messages-ch nil
       :task-lifecycle-ch nil
       :task-lifecycle-ch nil)))
 
@@ -494,7 +544,7 @@
 
 (dire/with-post-hook! #'inject-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Created new tx session" id lifecycle-id))))
+    (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id))))
 
 (dire/with-post-hook! #'read-batch
   (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]

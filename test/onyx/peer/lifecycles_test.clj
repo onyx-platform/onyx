@@ -1,4 +1,4 @@
-(ns onyx.peer.catalog-params-test
+(ns onyx.peer.lifecycles-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -15,17 +15,36 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def peer-group 
-  (onyx.api/start-peer-group peer-config))
+(def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 1000)
+(def n-messages 100)
 
 (def batch-size 20)
 
-(defn my-adder [factor {:keys [n] :as segment}]
-  (assoc segment :n (+ n factor)))
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
 
-(def workflow [[:in :add] [:add :out]])
+(def counter (atom 0))
+
+(defn start-task? [event lifecycle]
+  (swap! counter inc)
+  true)
+
+(defn before-task [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn after-task [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn before-batch [event lifecycle]
+  (swap! counter inc)
+  {})
+
+(defn after-batch [event lifecycle]
+  (swap! counter inc)
+  {})
 
 (def catalog
   [{:onyx/name :in
@@ -36,11 +55,9 @@
     :onyx/max-peers 1
     :onyx/doc "Reads segments from a core.async channel"}
 
-   {:onyx/name :add
-    :onyx/fn :onyx.peer.catalog-params-test/my-adder
+   {:onyx/name :inc
+    :onyx/fn :onyx.peer.lifecycles-test/my-inc
     :onyx/type :function
-    :onyx/factor 42
-    :onyx/params [:onyx/factor]
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -50,6 +67,8 @@
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
+
+(def workflow [[:in :inc] [:inc :out]])
 
 (def in-chan (chan (inc n-messages)))
 
@@ -61,19 +80,29 @@
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan out-chan})
 
+(def calls
+  {:lifecycle/start-task? :onyx.peer.lifecycles-test/start-task?
+   :lifecycle/before-task :onyx.peer.lifecycles-test/before-task
+   :lifecycle/before-batch :onyx.peer.lifecycles-test/before-batch
+   :lifecycle/after-batch :onyx.peer.lifecycles-test/after-batch
+   :lifecycle/after-task :onyx.peer.lifecycles-test/after-task})
+
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.catalog-params-test/inject-in-ch})
+  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.catalog-params-test/inject-out-ch})
+  {:lifecycle/before-task :onyx.peer.lifecycles-test/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls :onyx.peer.catalog-params-test/in-calls}
+    :lifecycle/calls :onyx.peer.lifecycles-test/in-calls}
    {:lifecycle/task :in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :inc
+    :lifecycle/calls :onyx.peer.lifecycles-test/calls
+    :lifecycle/doc "Test lifecycles that increment a counter in an atom"}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.catalog-params-test/out-calls}
+    :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
@@ -81,6 +110,7 @@
   (>!! in-chan {:n n}))
 
 (>!! in-chan :done)
+(close! in-chan)
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
@@ -93,7 +123,15 @@
 
 (def results (take-segments! out-chan))
 
-(fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
+(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
+
+;; Counter is inc'ed 14 times. 1 time on start up,
+;; 5 for each start/stop of a batch, 2 more times
+;; for starting and stopping the lifecycle, and 1 more post-batch for
+;; shutting down the task.
+(fact @counter => 14)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
@@ -101,4 +139,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-

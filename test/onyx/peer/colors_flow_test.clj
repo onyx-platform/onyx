@@ -1,7 +1,6 @@
 (ns onyx.peer.colors-flow-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -92,18 +91,6 @@
     :onyx/max-peers 1
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(defmethod l-ext/inject-lifecycle-resources :colors-in
-  [_ _] {:core.async/chan colors-in-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :red-out
-  [_ _] {:core.async/chan red-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :blue-out
-  [_ _] {:core.async/chan blue-out-chan})
-
-(defmethod l-ext/inject-lifecycle-resources :green-out
-  [_ _] {:core.async/chan green-out-chan})
-
 (def workflow
   [[:colors-in :process-red]
    [:colors-in :process-blue]
@@ -160,6 +147,48 @@
     :flow/exclude-keys [:extra-key]
     :flow/predicate :onyx.peer.colors-flow-test/orange?}])
 
+(defn inject-colors-in-ch [event lifecycle]
+  {:core.async/chan colors-in-chan})
+
+(defn inject-red-out-ch [event lifecycle]
+  {:core.async/chan red-out-chan})
+
+(defn inject-blue-out-ch [event lifecycle]
+  {:core.async/chan blue-out-chan})
+
+(defn inject-green-out-ch [event lifecycle]
+  {:core.async/chan green-out-chan})
+
+(def colors-in-calls
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-colors-in-ch})
+
+(def red-out-calls
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-red-out-ch})
+
+(def blue-out-calls
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-blue-out-ch})
+
+(def green-out-calls
+  {:lifecycle/before-task :onyx.peer.colors-flow-test/inject-green-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :colors-in
+    :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
+   {:lifecycle/task :colors-in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :red-out
+    :lifecycle/calls :onyx.peer.colors-flow-test/red-out-calls}
+   {:lifecycle/task :red-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :blue-out
+    :lifecycle/calls :onyx.peer.colors-flow-test/blue-out-calls}
+   {:lifecycle/task :blue-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :green-out
+    :lifecycle/calls :onyx.peer.colors-flow-test/green-out-calls}
+   {:lifecycle/task :green-out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (defn black? [event old {:keys [color]} all-new]
   (= color "black"))
 
@@ -191,7 +220,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
-  :flow-conditions flow-conditions
+  :flow-conditions flow-conditions :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def red (take-segments! red-out-chan))
@@ -224,10 +253,9 @@
 
 (close! colors-in-chan)
 
-(do
-  (doseq [v-peer v-peers]
-    (onyx.api/shutdown-peer v-peer))
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
 
-  (onyx.api/shutdown-peer-group peer-group)
+(onyx.api/shutdown-peer-group peer-group)
 
-  (onyx.api/shutdown-env env))
+(onyx.api/shutdown-env env)

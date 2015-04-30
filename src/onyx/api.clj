@@ -106,12 +106,14 @@
   (let [id (java.util.UUID/randomUUID)
         _ (validator/validate-job (assoc job :workflow (:workflow job)))
         _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+        _ (validator/validate-lifecycles (:lifecycles job) (:catalog job))
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
         entry (create-submit-job-entry id config job tasks)
         client (component/start (system/onyx-client config))]
     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
+    (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
 
     (doseq [task tasks]
       (extensions/write-chunk (:log client) :task task id))

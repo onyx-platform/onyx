@@ -4,6 +4,7 @@
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
 - Dropped feature: internal HornetQ messaging plugin
+- Dropped feature: multimethod lifecycles
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
 - New messaging transport: core.async
@@ -14,6 +15,7 @@
 - New feature: Flow conditions may post-transform exception values into new segments
 - New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value
 - New feature: Custom compression and decompression functions through Peer configuration
+- New feature: Data driven lifecycles
 - New feature: Internal core.async plugin
 - New documentation: Event context map information model
 - Added metadata to all public API functions indicating which Onyx version they were added in
@@ -23,6 +25,7 @@
 - The last task in a workflow no longer needs to be an `output` task
 - Renamed "Round Robin" schedulers to "Balanced"
 - Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
+- Peers now launch inside of a "peer group" to share network resources.
 
 #### 0.5.3
 
