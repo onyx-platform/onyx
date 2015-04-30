@@ -211,7 +211,7 @@
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (swap! state update-in [:timeout-pool 0] rsc/add-to-head
+    (swap! state update-in [:timeout-pool] rsc/add-to-head
            (map :id (:onyx.core/batch event))))
   event)
 
@@ -314,7 +314,7 @@
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
                (when (p-ext/pending? event m)
-                 (taoensso.timbre/info (format "Replay message %s" m))
+                 (taoensso.timbre/info (format "Input retry message %s" m))
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
              (recur))))))))
