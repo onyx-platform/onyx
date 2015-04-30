@@ -34,6 +34,6 @@
                           [:links peer-id] 
                           (fn [link]
                             (or link 
-                                (extensions/connect-to-peer messenger event link site))))
+                                (extensions/connect-to-peer messenger event site))))
                    (get-in [:links peer-id]))]
       link)))

@@ -392,7 +392,7 @@
                             :pending-ch (make-pending-chan messenger)}))))))))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
-  [messenger _ link site]
+  [messenger event site]
   (doto 
     (->Connection messenger 
                   site 
