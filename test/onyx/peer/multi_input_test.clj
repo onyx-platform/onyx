@@ -120,19 +120,19 @@
   {:core.async/chan out-chan})
 
 (def in-1-calls
-  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-1-ch})
+  {:lifecycle/before-task inject-in-1-ch})
 
 (def in-2-calls
-  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-2-ch})
+  {:lifecycle/before-task inject-in-2-ch})
 
 (def in-3-calls
-  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-3-ch})
+  {:lifecycle/before-task inject-in-3-ch})
 
 (def in-4-calls
-  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-in-4-ch})
+  {:lifecycle/before-task inject-in-4-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.multi-input-test/inject-out-ch})
+  {:lifecycle/before-task inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in-1

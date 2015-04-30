@@ -211,7 +211,7 @@
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (swap! state update-in [:timeout-pool 0] rsc/add-to-head
+    (swap! state update-in [:timeout-pool] rsc/add-to-head
            (map :id (:onyx.core/batch event))))
   event)
 
@@ -314,7 +314,7 @@
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
                (when (p-ext/pending? event m)
-                 (taoensso.timbre/info (format "Replay message %s" m))
+                 (taoensso.timbre/info (format "Input retry message %s" m))
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
              (recur))))))))
@@ -387,7 +387,7 @@
           (fn [lifecycle]
             (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
               (when-let [g (:lifecycle/start-task? calls-map)]
-                (fn [x] ((operation/kw->fn g) x lifecycle)))))
+                (fn [x] (g x lifecycle)))))
           matched))]
     (fn [event]
       (if (seq fs)
@@ -400,7 +400,7 @@
      (fn [f lifecycle]
        (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
          (if-let [g (get calls-map kw)]
-           (comp (fn [x] (merge x ((operation/kw->fn g) x lifecycle))) f)
+           (comp (fn [x] (merge x (g x lifecycle))) f)
            f)))
      identity
      matched)))

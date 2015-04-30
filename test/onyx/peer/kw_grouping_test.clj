@@ -74,14 +74,14 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-in-ch})
+  {:lifecycle/before-task inject-in-ch})
 
 (def sum-calls
-  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-sum-state
-   :lifecycle/after-task :onyx.peer.kw-grouping-test/flush-sum-state})
+  {:lifecycle/before-task inject-sum-state
+   :lifecycle/after-task flush-sum-state})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.kw-grouping-test/inject-out-ch})
+  {:lifecycle/before-task inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in

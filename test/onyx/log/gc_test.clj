@@ -45,4 +45,3 @@
                  :completed-jobs #{:j3}
                  :tasks {:j1 [:t1 :t2] :j3 [:t5 :t6]}
                  :allocations {:j1 {:t2 []}}}))
-

@@ -17,10 +17,10 @@
   {})
 
 (def reader-calls
-  {:lifecycle/before-task :onyx.plugin.core-async/inject-reader})
+  {:lifecycle/before-task inject-reader})
 
 (def writer-calls
-  {:lifecycle/before-task :onyx.plugin.core-async/inject-writer})
+  {:lifecycle/before-task inject-writer})
 
 (defmethod p-ext/read-batch :core.async/read-from-chan
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch 

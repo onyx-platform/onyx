@@ -73,16 +73,16 @@
   {:core.async/chan d-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.log.peer-rebalance-test/inject-a-ch})
+  {:lifecycle/before-task inject-a-ch})
 
 (def b-calls
-  {:lifecycle/before-task :onyx.log.peer-rebalance-test/inject-b-ch})
+  {:lifecycle/before-task inject-b-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.log.peer-rebalance-test/inject-c-ch})
+  {:lifecycle/before-task inject-c-ch})
 
 (def d-calls
-  {:lifecycle/before-task :onyx.log.peer-rebalance-test/inject-d-ch})
+  {:lifecycle/before-task inject-d-ch})
 
 (def lifecycles-1
   [{:lifecycle/task :a

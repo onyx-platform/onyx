@@ -192,22 +192,22 @@
   {:core.async/chan l-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-a-ch})
+  {:lifecycle/before-task inject-a-ch})
 
 (def b-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-b-ch})
+  {:lifecycle/before-task inject-b-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-c-ch})
+  {:lifecycle/before-task inject-c-ch})
 
 (def j-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-j-ch})
+  {:lifecycle/before-task inject-j-ch})
 
 (def k-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-k-ch})
+  {:lifecycle/before-task inject-k-ch})
 
 (def l-calls
-  {:lifecycle/before-task :onyx.peer.dag-test/inject-l-ch})
+  {:lifecycle/before-task inject-l-ch})
 
 (def lifecycles
   [{:lifecycle/task :A

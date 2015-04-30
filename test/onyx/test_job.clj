@@ -121,8 +121,7 @@
                     (let [f-sym (symbol (str "inject-" (name k)))]
                       (intern *ns* f-sym (eval `(fn ~k ~[] {:core.async/chan c})))
                       (intern *ns* (symbol (str (name k) "-calls"))
-                              {:lifecycle/before-task
-                               (str :onyx.test-job (str "/inject-" (name k)))})))
+                              {:lifecycle/before-task f-sym})))
                   (merge in-chans out-chans)))
 
           job (onyx.api/submit-job (:peer-config component) 

@@ -90,16 +90,16 @@
   {:core.async/chan f-chan})
 
 (def a-calls
-  {:lifecycle/before-task :onyx.log.two-job-test/inject-a-ch})
+  {:lifecycle/before-task inject-a-ch})
 
 (def c-calls
-  {:lifecycle/before-task :onyx.log.two-job-test/inject-c-ch})
+  {:lifecycle/before-task inject-c-ch})
 
 (def d-calls
-  {:lifecycle/before-task :onyx.log.two-job-test/inject-d-ch})
+  {:lifecycle/before-task inject-d-ch})
 
 (def f-calls
-  {:lifecycle/before-task :onyx.log.two-job-test/inject-f-ch})
+  {:lifecycle/before-task inject-f-ch})
 
 (def lifecycles-1
   [{:lifecycle/task :a
