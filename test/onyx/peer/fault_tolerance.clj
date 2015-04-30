@@ -9,8 +9,7 @@
             [onyx.api]))
 
 (def config (load-config))
-(def test-env (component/start (->TestEnv (:env-config config) 
-                                          (:peer-config config))))
+
 (def batch-size 5)
 
 (defn int-1 [segment]
@@ -92,6 +91,10 @@
 (def n-messages-total 100000)
 
 (when false
+  (def test-env (component/start (->TestEnv (:env-config config) 
+                                            (:peer-config config))))
+
+
   (try
     (helper-env/add-peers test-env 9)
     (let [load-data-ch (thread 
