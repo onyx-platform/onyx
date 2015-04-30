@@ -1,6 +1,5 @@
 (ns onyx.helper-env
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer go-loop]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [taoensso.timbre :refer [fatal] :as timbre]
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
@@ -36,7 +35,7 @@
       (doseq [v-peer v-peers] 
         (remove-peer component v-peer))))
 
-  (run-job [component {:keys [workflow catalog task-scheduler] :as job}]
+  (run-job [component {:keys [workflow catalog lifecycles task-scheduler] :as job}]
     (let [n-peers-required (count (distinct (flatten workflow)))
           n-peers (count @(:v-peers component))] 
       (when (< n-peers n-peers-required)
@@ -46,6 +45,7 @@
     (onyx.api/submit-job (:peer-config component) 
                          {:workflow workflow
                           :catalog catalog
+                          :lifecycles lifecycles
                           :task-scheduler task-scheduler}))
 
   component/Lifecycle
