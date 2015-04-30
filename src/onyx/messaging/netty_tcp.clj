@@ -233,7 +233,6 @@
         ch (.channel ch-fut)]
     (if (and (.isSuccess ch-fut) 
              (established? ch))
-      ;; should set to connected now and then flush pending messages
       ch
       (do (.close ch)
           nil))))
@@ -312,92 +311,106 @@
       (recur)))
   (.flush channel))
 
-(defprotocol ConnectionManager
+(defprotocol IConnectionManager
   (connect [_])
   (write [connection buf])
-  (reset-connection [_ previous-link-val])
+  (reset-connection [_])
   (enqueue-pending [_ buf])
   (close [_]))
+
+(defprotocol IConnectionState 
+  (initializing [this])
+  (reset [this])
+  (connecting [this])
+  (failed [this])
+  (connected [this]))
 
 (defn add-failed-check 
   "Check if the future failed. link-val is used as a staleness check
   for the connection as it should not be reset if it has already been reset."
-  [f connection link-val buf]
+  [f connection buf]
   (.addListener f (reify GenericFutureListener
                     (operationComplete [_ _]
                       (when-not (.isSuccess f)
                         (timbre/error "Message failed to send: " (.cause f))
-                        (reset-connection connection link-val))))))
+                        (reset-connection connection))))))
+
 
 (defn make-pending-chan [messenger]
   (chan (sliding-buffer (:pending-buffer-size messenger))))
 
-(defrecord Connection [messenger site link]
-  ConnectionManager
-  (reset-connection [connection previous-link-val]
-    (when (compare-and-set! link 
-                            previous-link-val 
-                            {:state :reset
-                             :pending-ch (make-pending-chan messenger)})
+(defrecord ConnectionState [state]
+  IConnectionState
+  (initializing [_]
+    (compare-and-set! state :initializing :connecting))
+  (reset [_] 
+    (compare-and-set! state :connected :reset))
+  (connecting [_]
+    (or (compare-and-set! state :reset :connecting)
+        (compare-and-set! state :initializing :connecting)
+        (compare-and-set! state :failed :connecting)))
+  (failed [_]
+    (compare-and-set! state :connecting :failed))
+  (connected [_]
+    (compare-and-set! state :connecting :connected)))
+
+(defrecord ConnectionManager [messenger site state pending-ch channel]
+  IConnectionManager
+  (reset-connection [connection]
+    (when (reset state)
+      (reset! pending-ch (make-pending-chan messenger))
+      (reset! channel nil)
       (connect connection)))
 
   (enqueue-pending [connection buf]
-    (let [link-val @link
-          channel ^Channel (:channel link-val)] 
-      (case (:state link-val)
-        :initializing (>!! (:pending-ch link-val) buf)
-        :connecting (>!! (:pending-ch link-val) buf)
-        :reset (connect connection)
-        :failed (connect connection)
-        ;; may have finished connecting in the time between
-        ;; so we should check if it's established now before trying to reconnect
-        :connected (if (established? channel)
-                     (.writeAndFlush channel buf (.voidPromise channel))
-                     (reset-connection connection link-val)))))
+    (case @(:state state)
+      :initializing (>!! @pending-ch buf)
+      :connecting (>!! @pending-ch buf)
+      :reset (connect connection)
+      :failed (connect connection)
+      ;; may have finished connecting in the time between
+      ;; so we should check if it's established now before trying to reconnect
+      :connected (let [channel-val @channel] 
+                   (if (established? channel-val)
+                     (.writeAndFlush channel-val buf (.voidPromise channel-val))
+                     (reset-connection connection)))))
 
   (write [connection buf]
-    (let [link-val @link
-          channel ^Channel (:channel link-val)] 
-      (if (and channel (.isActive channel))
-        (let [fut (.writeAndFlush channel ^ByteBuf buf)] 
-          (add-failed-check fut connection link-val ^ByteBuf buf)) 
+    (let [channel-val ^Channel @channel] 
+      (if (and channel-val (.isActive channel-val))
+        (let [fut (.writeAndFlush channel-val ^ByteBuf buf)] 
+          (add-failed-check fut connection ^ByteBuf buf)) 
         (enqueue-pending connection buf))))
 
   (close [_] 
-    (some-> @link :channel .close)
-    (some-> @link :pending-ch close!))
+    (some-> @channel .close)
+    (some-> @pending-ch close!))
 
   (connect [_]
-    ; Ensures only a single thread will connect by only allowing the connection that performed
-    ; the CAS to go ahead and connect.
-    ; The spawned future will be the one to set the channel in the peer-link. 
-    ; All sending threads will continue on adding to the pending-ch until the 
-    ; connection has been established
-    (let [link-val @link
-          state (:state link-val)
-          connecting-link-val (assoc link-val :state :connecting)]
-      (when (#{:initializing :reset :failed} state)
-        (when (compare-and-set! link link-val connecting-link-val)
-          (future
-            (if-let [channel (create-client (:client-group messenger) (:netty/external-addr site) (:netty/port site))] 
-              (let [pending-ch (:pending-ch connecting-link-val)
-                    connected-link-val (assoc connecting-link-val 
-                                              :channel channel 
-                                              :state :connected
-                                              :pending-ch nil)
-                    was-set? (compare-and-set! link connecting-link-val connected-link-val)] 
-                (assert was-set?)
-                (flush-pending channel pending-ch))
-              (reset! link {:state :failed
-                            :pending-ch (make-pending-chan messenger)}))))))))
+    ; The state machine decides who gets to connect to ensure only one thread
+    ; will connect, and the remaining will write out to the pending channel
+    (when (connecting state)
+      (future
+        (if-let [opened-channel (create-client (:client-group messenger) 
+                                               (:netty/external-addr site) 
+                                               (:netty/port site))] 
+          (let [connected? (connected state)] 
+            (assert connected?)
+            (flush-pending opened-channel @pending-ch)
+            (reset! channel opened-channel))
+          (do
+            (failed state)
+            (reset! channel nil)
+            (reset! pending-ch (make-pending-chan messenger))))))))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
   [messenger event site]
   (doto 
-    (->Connection messenger 
-                  site 
-                  (atom {:state :initializing
-                         :pending-ch (make-pending-chan messenger)}))
+    (->ConnectionManager messenger 
+                         site
+                         (->ConnectionState (atom :initializing)) 
+                         (atom (make-pending-chan messenger))
+                         (atom nil))
     connect))
 
 (defmethod extensions/receive-messages NettyTcpSockets
@@ -411,13 +424,6 @@
           (recur (conj segments v) (inc i))
           segments)
         segments))))
-
-; (defn reset-connection-enqueue [messenger event peer-link buf]
-;   (let [site (:site link-val)
-;         peer-link-new (extensions/initialize-peer-link messenger event site)
-;         link-val (reset! peer-link peer-link-new)] 
-;     (>!! (:pending-ch link-val) buf)
-;     (extensions/connect-to-peer messenger event peer-link site)))
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event peer-link messages]
