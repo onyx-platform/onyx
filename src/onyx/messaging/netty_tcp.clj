@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
-    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! thread go-loop dropping-buffer]]
+    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! 
+                                          thread go-loop sliding-buffer dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -66,14 +67,10 @@
           worker-thread-factory (DefaultThreadFactory. worker-event-thread-pool-name true)
           worker-group (if (epoll?)
                          (EpollEventLoopGroup. thread-count worker-thread-factory)
-                         (NioEventLoopGroup. thread-count worker-thread-factory))
-
-          pending-buffer-size (or (:onyx.messaging.netty/pending-buffer-size opts) 
-                                  (:onyx.messaging.netty/pending-buffer-size defaults))]
+                         (NioEventLoopGroup. thread-count worker-thread-factory))]
       (timbre/info "Starting Netty Peer Group")
       (assoc component
              :shared-event-executor shared-event-executor
-             :pending-buffer-size pending-buffer-size
              :client-group client-group
              :worker-group worker-group
              :boss-group boss-group)))
@@ -170,17 +167,12 @@
 (defn start-netty-server
   [boss-group worker-group host port messenger inbound-ch release-ch retry-ch]
   (let [bootstrap (ServerBootstrap.)
-        channel (if (epoll?)
-                  EpollServerSocketChannel
-                  NioServerSocketChannel)
+        channel (if (epoll?) EpollServerSocketChannel NioServerSocketChannel)
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
-                        (ImmediateEventExecutor/INSTANCE))
-        initializer (channel-initializer-done 
-                     (gen-tcp-handler channel-group 
-                                      (create-server-handler messenger 
-                                                             inbound-ch 
-                                                             release-ch 
-                                                             retry-ch)))] 
+                                            (ImmediateEventExecutor/INSTANCE))
+        initializer (->> (create-server-handler messenger inbound-ch release-ch retry-ch)
+                         (gen-tcp-handler channel-group)   
+                         (channel-initializer-done))] 
     (doto bootstrap
       (.group boss-group worker-group)
       (.channel channel)
@@ -198,7 +190,7 @@
           assigned-port (.. ch localAddress getPort)]
       (timbre/info "Netty server" host assigned-port "online")
       (fn killer []
-        (.. channel-group close awaitUninterruptibly)
+        (.close channel-group)
         (timbre/info "TCP server" host port "shut down")))))
 
 (defn new-client-handler []
@@ -222,8 +214,7 @@
              (timbre/fatal e))))))
 
 (defn established? [channel]
-  (and (not (nil? channel))
-       (.isActive channel)))
+  (and channel (.isActive channel)))
 
 (defn create-client [client-group host port]
   (let [channel (if (epoll?)
@@ -258,13 +249,16 @@
           retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
-          ports (allowable-ports config)]
+          ports (allowable-ports config)
+          pending-buffer-size (or (:onyx.messaging.netty/pending-buffer-size config) 
+                                  (:onyx.messaging.netty/pending-buffer-size defaults))]
       (assoc component
              :bind-addr bind-addr 
              :external-addr external-addr
              :boss-group boss-group
              :client-group client-group
              :worker-group worker-group
+             :pending-buffer-size pending-buffer-size
              :ports ports
              :resources (atom nil)
              :release-ch release-ch
@@ -308,14 +302,8 @@
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn})))
 
-(defmethod extensions/initialize-peer-link NettyTcpSockets
-  [messenger _ site]
-  {:state :initializing
-   :site site 
-   :pending-ch (chan (:pending-buffer-size messenger))})
-
 (defn flush-pending 
-  "Flush all pending bufs. Useful when the channel is established"
+  "Flush all pending bufs. Run after when the channel is established."
   [^Channel channel pending-ch]
   (close! pending-ch)
   (loop []
@@ -324,24 +312,93 @@
       (recur)))
   (.flush channel))
 
+(defprotocol ConnectionManager
+  (connect [_])
+  (write [connection buf])
+  (reset-connection [_ previous-link-val])
+  (enqueue-pending [_ buf])
+  (close [_]))
+
+(defn add-failed-check 
+  "Check if the future failed. link-val is used as a staleness check
+  for the connection as it should not be reset if it has already been reset."
+  [f connection link-val buf]
+  (.addListener f (reify GenericFutureListener
+                    (operationComplete [_ _]
+                      (when-not (.isSuccess f)
+                        (timbre/error "Message failed to send: " (.cause f))
+                        (reset-connection connection link-val))))))
+
+(defn make-pending-chan [messenger]
+  (chan (sliding-buffer (:pending-buffer-size messenger))))
+
+(defrecord Connection [messenger site link]
+  ConnectionManager
+  (reset-connection [connection previous-link-val]
+    (when (compare-and-set! link 
+                            previous-link-val 
+                            {:state :reset
+                             :pending-ch (make-pending-chan messenger)})
+      (connect connection)))
+
+  (enqueue-pending [connection buf]
+    (let [link-val @link
+          channel ^Channel (:channel link-val)] 
+      (case (:state link-val)
+        :initializing (>!! (:pending-ch link-val) buf)
+        :connecting (>!! (:pending-ch link-val) buf)
+        :reset (connect connection)
+        :failed (connect connection)
+        ;; may have finished connecting in the time between
+        ;; so we should check if it's established now before trying to reconnect
+        :connected (if (established? channel)
+                     (.writeAndFlush channel buf (.voidPromise channel))
+                     (reset-connection connection link-val)))))
+
+  (write [connection buf]
+    (let [link-val @link
+          channel ^Channel (:channel link-val)] 
+      (if (and channel (.isActive channel))
+        (let [fut (.writeAndFlush channel ^ByteBuf buf)] 
+          (add-failed-check fut connection link-val ^ByteBuf buf)) 
+        (enqueue-pending connection buf))))
+
+  (close [_] 
+    (some-> @link :channel .close)
+    (some-> @link :pending-ch close!))
+
+  (connect [_]
+    ; Ensures only a single thread will connect by only allowing the connection that performed
+    ; the CAS to go ahead and connect.
+    ; The spawned future will be the one to set the channel in the peer-link. 
+    ; All sending threads will continue on adding to the pending-ch until the 
+    ; connection has been established
+    (let [link-val @link
+          state (:state link-val)
+          connecting-link-val (assoc link-val :state :connecting)]
+      (when (#{:initializing :reset :failed} state)
+        (when (compare-and-set! link link-val connecting-link-val)
+          (future
+            (if-let [channel (create-client (:client-group messenger) (:netty/external-addr site) (:netty/port site))] 
+              (let [pending-ch (:pending-ch connecting-link-val)
+                    connected-link-val (assoc connecting-link-val 
+                                              :channel channel 
+                                              :state :connected
+                                              :pending-ch nil)
+                    was-set? (compare-and-set! link connecting-link-val connected-link-val)] 
+                (assert was-set?)
+                (flush-pending channel pending-ch))
+              (reset! link {:state :failed
+                            :pending-ch (make-pending-chan messenger)}))))))))
+
 (defmethod extensions/connect-to-peer NettyTcpSockets
-  ; Ensures only a single thread will connect by CAS.
-  ; The spawned future will be the one to set the channel in the peer-link. 
-  ; All sending threads will continue on adding to the pending-ch until the 
-  ; connection has been established
-  [messenger _ link {:keys [netty/external-addr netty/port]}]
-  (let [link-val @link
-        pending-ch (:pending-ch link-val)
-        new-link-val (assoc link-val :state :connecting)
-        state (:state link-val)
-        connect-here? (and (#{:initializing :failed} state)
-                           (compare-and-set! link link-val new-link-val))] 
-    (when connect-here?
-      (future
-        (if-let [channel (create-client (:client-group messenger) external-addr port)] 
-          (do (reset! link (assoc new-link-val :channel channel :state :connected))
-              (flush-pending channel pending-ch))
-          (reset! link {:site (:site link-val)}))))))
+  [messenger _ link site]
+  (doto 
+    (->Connection messenger 
+                  site 
+                  (atom {:state :initializing
+                         :pending-ch (make-pending-chan messenger)}))
+    connect))
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -355,53 +412,29 @@
           segments)
         segments))))
 
-(defn enqueue-pending [messenger event peer-link buf]
-  (let [link-val @peer-link
-        channel ^Channel (:channel link-val)] 
-    (case (:state link-val)
-      :initializing (>!! (:pending-ch link-val) buf)
-      :connecting (>!! (:pending-ch link-val) buf)
-      ;; may have finished connecting in the time between
-      ;; so we should check if it's established now before trying to reconnect
-      :connected (if (established? channel)
-                   (.writeAndFlush channel buf (.voidPromise channel))
-                   (let [site (:site link-val)
-                         peer-link-new (extensions/initialize-peer-link messenger event site)
-                         link-val (reset! peer-link peer-link-new)] 
-                     (>!! (:pending-ch link-val) buf)
-                     (extensions/connect-to-peer messenger event peer-link site))))))
-
-(defn add-failed-check [f messenger event peer-link buf]
-  (.addListener f (reify GenericFutureListener
-                    (operationComplete [_ _]
-                      (when-not (.isSuccess f)
-                        (timbre/error "Message failed to send: " (.cause f))
-                        ; Not sure if re-queing here is a great idea
-                        (enqueue-pending messenger event peer-link buf))))))
-              
-(defn write [messenger event peer-link ^ByteBuf buf]
-  (let [channel ^Channel (:channel @peer-link)] 
-    (if (established? channel)
-      (let [fut (.writeAndFlush channel buf)] 
-        (add-failed-check fut messenger event peer-link buf)) 
-      (enqueue-pending messenger event peer-link buf))))
+; (defn reset-connection-enqueue [messenger event peer-link buf]
+;   (let [site (:site link-val)
+;         peer-link-new (extensions/initialize-peer-link messenger event site)
+;         link-val (reset! peer-link peer-link-new)] 
+;     (>!! (:pending-ch link-val) buf)
+;     (extensions/connect-to-peer messenger event peer-link site)))
 
 (defmethod extensions/send-messages NettyTcpSockets
   [messenger event peer-link messages]
-  (write messenger event peer-link (protocol/build-messages-msg-buf (:compress-f messenger) messages)))
+  (write peer-link (protocol/build-messages-msg-buf (:compress-f messenger) messages)))
 
 (defmethod extensions/internal-ack-message NettyTcpSockets
   [messenger event peer-link message-id completion-id ack-val]
-  (write messenger event peer-link (protocol/build-ack-msg-buf message-id completion-id ack-val)))
+  (write peer-link (protocol/build-ack-msg-buf message-id completion-id ack-val)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
   [messenger event id peer-link]
-  (write messenger event peer-link (protocol/build-completion-msg-buf id)))
+  (write peer-link (protocol/build-completion-msg-buf id)))
 
 (defmethod extensions/internal-retry-message NettyTcpSockets
-  [messenger event id ^Channel peer-link]
-  (write messenger event peer-link (protocol/build-retry-msg-buf id)))
+  [messenger event id peer-link]
+  (write peer-link (protocol/build-retry-msg-buf id)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
-  [messenger event ^Channel peer-link]
-  (some-> @peer-link :channel .close))
+  [messenger event peer-link]
+  (close peer-link))
