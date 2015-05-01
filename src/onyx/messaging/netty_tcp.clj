@@ -147,10 +147,11 @@
                   (>!! inbound-ch message))
 
                 (= t protocol/ack-type-id)
-                (acker/ack-message (:acking-daemon messenger)
-                                   (:id msg)
-                                   (:completion-id msg)
-                                   (:ack-val msg))
+                (doseq [ack (:acks msg)]
+                  (acker/ack-message (:acking-daemon messenger)
+                                     (:id ack)
+                                     (:completion-id ack)
+                                     (:ack-val ack)))
 
                 (= t protocol/completion-type-id)
                 (>!! release-ch (:id msg))
@@ -430,9 +431,9 @@
   [messenger event peer-link messages]
   (write peer-link (protocol/build-messages-msg-buf (:compress-f messenger) messages)))
 
-(defmethod extensions/internal-ack-message NettyTcpSockets
-  [messenger event peer-link message-id completion-id ack-val]
-  (write peer-link (protocol/build-ack-msg-buf message-id completion-id ack-val)))
+(defmethod extensions/internal-ack-messages NettyTcpSockets
+  [messenger event peer-link acks]
+  (write peer-link (protocol/build-acks-msg-buf acks)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
   [messenger event id peer-link]

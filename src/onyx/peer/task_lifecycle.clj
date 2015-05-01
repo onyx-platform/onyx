@@ -94,17 +94,16 @@
 (defn route-output-flow
   [{:keys [onyx.core/serialized-task onyx.core/results] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))]
-    (merge
-     event
-     {:onyx.core/results
-      (mapv
-       (fn [{:keys [root leaves] :as result}]
-         (assoc result :leaves
-                (mapv
-                 (fn [leaf]
-                   (assoc leaf :routes (add-route-data event result leaf downstream)))
-                 leaves)))
-       results)})))
+    (assoc event 
+           :onyx.core/results
+           (mapv
+             (fn [{:keys [root leaves] :as result}]
+               (assoc result :leaves
+                      (mapv
+                        (fn [leaf]
+                          (assoc leaf :routes (add-route-data event result leaf downstream)))
+                        leaves)))
+             results))))
 
 (defn hash-value [x]
   (let [md5 (MessageDigest/getInstance "MD5")]
@@ -159,20 +158,18 @@
     (mapcat :ack-vals (remove (fn [leaf] (= (:action (:routes leaf)) :retry)) leaves))))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
-  (doseq [result results]
-    (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
-          leaf-vals (gen-ack-fusion-vals task-map leaves)
-          fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))
-          link (operation/peer-link event (:acker-id (:root result)))]
-      (extensions/internal-ack-message
-       (:onyx.core/messenger event)
-       event
-       link
-       (:id (:root result))
-       (:completion-id (:root result))
-       ;; or'ing by zero covers the case of flow conditions where an
-       ;; input task produces a segment that goes nowhere.
-       (or fused-vals 0))))
+  (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
+    (let [link (operation/peer-link event acker-id)
+          acks (map (fn [result] (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
+                                       leaf-vals (gen-ack-fusion-vals task-map leaves)
+                                       fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))]
+                                   {:id (:id (:root result))
+                                    :completion-id (:completion-id (:root result))
+                                    ;; or'ing by zero covers the case of flow conditions where an
+                                    ;; input task produces a segment that goes nowhere.
+                                    :ack-val (or fused-vals 0)}))
+                    results-by-acker)] 
+      (extensions/internal-ack-messages (:onyx.core/messenger event) event link acks)))
   event)
 
 (defn flow-retry-messages [{:keys [onyx.core/results] :as event}]

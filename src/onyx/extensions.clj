@@ -51,8 +51,8 @@
 
 (defmulti close-peer-connection (fn [messenger event link] (type messenger)))
 
-(defmulti internal-ack-message (fn [messenger event peer-link message-id completion-id ack-val]
-                                 (type messenger)))
+(defmulti internal-ack-messages (fn [messenger event peer-link acks]
+                                  (type messenger)))
 
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 

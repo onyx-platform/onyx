@@ -233,13 +233,15 @@
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
-(defmethod extensions/internal-ack-message AeronConnection
-  [messenger event peer-link message-id completion-id ack-val]
-  (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
-        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-    (while (not (offer-f))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+(defmethod extensions/internal-ack-messages AeronConnection
+  [messenger event peer-link acks]
+  ; TODO: Might want to batch in a single buffer as in netty
+  (let [pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)] 
+    (doseq [{:keys [id completion-id ack-val]} acks] 
+      (let [unsafe-buffer (protocol/build-acker-message id completion-id ack-val)
+            offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
+        (while (not (offer-f))
+          (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]

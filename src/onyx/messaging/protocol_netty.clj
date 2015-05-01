@@ -33,8 +33,9 @@
 ; id uuid 
 (def retry-msg-length (int 16))
 
+(def acks-base-length (int 4))
 ; id uuid, completion-id uuid, ack-val long
-(def ack-msg-length (int 40))
+(def ack-base-length (int 40))
 
 ; message length without nippy segments
 ; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long), nippy-byte-count (int)
@@ -67,24 +68,30 @@
   {:type retry-type-id 
    :id (take-uuid buf)})
 
-(def ack-payload-length ^int (+ ack-msg-length type-header-length))
-
-(defn build-ack-msg-buf [id completion-id ack-val] 
-  (let [^ByteBuf buf (byte-buffer ack-payload-length)] 
+(defn build-acks-msg-buf [acks] 
+  (let [^ByteBuf buf (byte-buffer (+ acks-base-length 
+                                     type-header-length 
+                                     (* (count acks) ack-base-length)))] 
     (.writeByte buf ack-type-id)
-    (write-uuid buf id)
-    (write-uuid buf completion-id)
-    (.writeLong buf ack-val)
+    (.writeInt buf (int (count acks)))
+    (doseq [ack acks]
+      (write-uuid buf (:id ack))
+      (write-uuid buf (:completion-id ack))
+      (.writeLong buf (:ack-val ack)))
     buf))
 
-(defn read-ack-buf [^ByteBuf buf]
-  (let [id (take-uuid buf)
-        completion-id (take-uuid buf)
-        ack-val (.readLong buf)]
+(defn read-acks-buf [^ByteBuf buf]
+  (let [cnt (.readInt buf)] 
     {:type ack-type-id
-     :id id 
-     :completion-id completion-id
-     :ack-val ack-val}))
+     :acks (doall 
+             (repeatedly cnt 
+                         (fn [] 
+                           (let [id (take-uuid buf)
+                                 completion-id (take-uuid buf)
+                                 ack-val (.readLong buf)]
+                             {:id id 
+                              :completion-id completion-id
+                              :ack-val ack-val}))))}))
 
 (defn write-message-msg [^ByteBuf buf {:keys [id acker-id completion-id ack-val message]}]
   (write-uuid buf id)
@@ -138,7 +145,7 @@
     (cond (= msg-type messages-type-id) 
           (read-messages-buf decompress-f buf)
           (= msg-type ack-type-id) 
-          (read-ack-buf buf)
+          (read-acks-buf buf)
           (= msg-type completion-type-id) 
           (read-completion-buf buf)
           (= msg-type retry-type-id)
