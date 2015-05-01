@@ -78,9 +78,9 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
 
-### Offical Dashboard
+### Offical Dashboard and Metrics
 
-You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard).
+You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/MichaelDrogalis/onyx-metrics).
 
 ### lib-onyx
 
