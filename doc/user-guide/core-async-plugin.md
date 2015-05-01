@@ -2,7 +2,7 @@
 
 Onyx plugin providing read and write facilities for Clojure core.async.
 
-#### Installation
+### Installation
 
 This plugin is included with Onyx. You do not need to add it as a separate dependency.
 
@@ -12,9 +12,11 @@ In your peer boot-up namespace:
 (:require [onyx.plugin.core-async])
 ```
 
-#### Catalog entries
+### Functions
 
-##### read-from-chan
+#### read-from-chan
+
+##### Catalog entry
 
 ```clojure
 {:onyx/name :in
@@ -26,27 +28,7 @@ In your peer boot-up namespace:
  :onyx/doc "Reads segments from a core.async channel"}
 ```
 
-##### write-to-chan
-
-```clojure
-{:onyx/name :out
- :onyx/ident :core.async/write-to-chan
- :onyx/type :output
- :onyx/medium :core.async
- :onyx/batch-size batch-size
- :onyx/max-peers 1
- :onyx/doc "Writes segments to a core.async channel"}
-```
-
-#### Attributes
-
-This plugin does not use any attributes.
-
-#### Lifecycle Arguments
-
-References to core.async channels must be injected for both the input and output tasks.
-
-##### `read-from-chan`
+##### Lifecycle entries
 
 ```clojure
 [{:lifecycle/task :your-task-name
@@ -68,7 +50,21 @@ Make sure that `my.ns/in-calls` is a map that references a function to inject th
   {:lifecycle/before-task inject-in-ch})
 ```
 
-##### `write-to-chan`
+#### write-to-chan
+
+##### Catalog entry
+
+```clojure
+{:onyx/name :out
+ :onyx/ident :core.async/write-to-chan
+ :onyx/type :output
+ :onyx/medium :core.async
+ :onyx/batch-size batch-size
+ :onyx/max-peers 1
+ :onyx/doc "Writes segments to a core.async channel"}
+```
+
+##### Lifecycle entries
 
 ```clojure
 [{:lifecycle/task :your-task-name
@@ -89,7 +85,7 @@ Again, as with `read-from-chan`, there's a little extra to do since core.async h
   {:lifecycle/before-task inject-out-ch})
 ```
 
-#### Functions
+#### Utility Functions
 
 ##### `take-segments!`
 
