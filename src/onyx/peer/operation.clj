@@ -17,8 +17,7 @@
   (kw->fn (:onyx/fn task-map)))
 
 (defn exception? [e]
-  (let [classes (supers (class e))]
-    (boolean (some #{java.lang.Throwable} classes))))
+  (instance? java.lang.Throwable e))
 
 (defn start-lifecycle?
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
