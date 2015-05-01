@@ -2,7 +2,7 @@
 
 Onyx plugin providing read and write facilities for Clojure core.async.
 
-### Installation
+#### Installation
 
 This plugin is included with Onyx. You do not need to add it as a separate dependency.
 
@@ -12,11 +12,11 @@ In your peer boot-up namespace:
 (:require [onyx.plugin.core-async])
 ```
 
-### Functions
+#### Functions
 
-#### read-from-chan
+##### read-from-chan
 
-##### Catalog entry
+Catalog entry:
 
 ```clojure
 {:onyx/name :in
@@ -28,7 +28,7 @@ In your peer boot-up namespace:
  :onyx/doc "Reads segments from a core.async channel"}
 ```
 
-##### Lifecycle entries
+Lifecycle entries:
 
 ```clojure
 [{:lifecycle/task :your-task-name
@@ -50,9 +50,9 @@ Make sure that `my.ns/in-calls` is a map that references a function to inject th
   {:lifecycle/before-task inject-in-ch})
 ```
 
-#### write-to-chan
+##### write-to-chan
 
-##### Catalog entry
+Catalog entry:
 
 ```clojure
 {:onyx/name :out
@@ -64,7 +64,7 @@ Make sure that `my.ns/in-calls` is a map that references a function to inject th
  :onyx/doc "Writes segments to a core.async channel"}
 ```
 
-##### Lifecycle entries
+Lifecycle entries:
 
 ```clojure
 [{:lifecycle/task :your-task-name
