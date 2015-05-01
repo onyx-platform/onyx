@@ -114,7 +114,7 @@
   [^ChannelGroup channel-group handler]
   (proxy [ChannelInboundHandlerAdapter] []
     (channelActive [ctx]
-      (.add channel-group (.channel ctx)))
+      (.add channel-group (.channel ^ChannelHandlerContext ctx)))
     (channelRead [^ChannelHandlerContext ctx ^Object message]
       (try
         (handler ctx message)
@@ -213,7 +213,7 @@
            (catch Throwable e
              (timbre/fatal e))))))
 
-(defn established? [channel]
+(defn established? [^Channel channel]
   (and channel (.isActive channel)))
 
 (defn create-client [client-group host port]
@@ -232,7 +232,7 @@
                                                      ;TimeUnit/MILLISECONDS
                                                      )
         ch (.channel ch-fut)]
-    (if (and (.isSuccess ch-fut) 
+    (if (and (.isSuccess ^ChannelFuture ch-fut) 
              (established? ch))
       ch
       (do (.close ch)
@@ -328,7 +328,7 @@
 
 (defn add-failed-check 
   "Check if the message failed to send"
-  [f connection buf]
+  [^ChannelFuture f connection buf]
   (.addListener f (reify GenericFutureListener
                     (operationComplete [_ _]
                       (when-not (.isSuccess f)
@@ -371,7 +371,7 @@
       :failed (connect connection)
       ;; may have finished connecting in the time between
       ;; so we should check if it's established now before trying to reconnect
-      :connected (let [channel-val @channel] 
+      :connected (let [channel-val ^Channel @channel] 
                    (if (established? channel-val)
                      (.writeAndFlush channel-val buf (.voidPromise channel-val))
                      (reset-connection connection)))))
