@@ -16,8 +16,8 @@
              [io.netty.util.internal SystemPropertyUtil]
              [io.netty.util.concurrent Future EventExecutorGroup DefaultThreadFactory 
               DefaultEventExecutorGroup ImmediateEventExecutor GenericFutureListener]
-             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer 
-              ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
+             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer ChannelPipeline
+              MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
              [io.netty.channel.epoll Epoll EpollEventLoopGroup EpollServerSocketChannel EpollSocketChannel]
              [io.netty.channel.socket SocketChannel]
              [io.netty.channel.socket.nio NioServerSocketChannel NioSocketChannel]
@@ -77,9 +77,9 @@
 
   (stop [{:keys [client-group worker-group boss-group] :as component}]
     (timbre/info "Stopping Netty Peer Group")
-    (.shutdownGracefully client-group)
-    (.shutdownGracefully boss-group)
-    (.shutdownGracefully worker-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup client-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup boss-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup worker-group)
     (assoc component 
       :shared-event-executor nil :client-group nil
       :worker-group nil :boss-group nil)))
@@ -128,10 +128,10 @@
 (defn channel-initializer-done [handler]
   (proxy [ChannelInitializer] []
     (initChannel [ch]
-      (let [pipeline (.pipeline ^Channel ch)]
+      (let [pipeline ^ChannelPipeline (.pipeline ^Channel ch)]
         (doto pipeline 
-          (.addLast "int32-frame-decoder" (int32-frame-decoder))
-          (.addLast "int32-frame-encoder" (int32-frame-encoder))
+          (.addLast "int32-frame-decoder" ^LengthFieldBasedFrameDecoder (int32-frame-decoder))
+          (.addLast "int32-frame-encoder" ^LengthFieldPrepender (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
 (defn create-server-handler
@@ -183,13 +183,12 @@
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
       (.childHandler initializer))
-    (let [ch (->> (InetSocketAddress. host port)
+    (let [ch (->> (InetSocketAddress. ^String host ^Integer port)
                   (.bind bootstrap)
                   (.sync)
                   (.channel))
-          _ (.add channel-group ch)
-          assigned-port (.. ch localAddress getPort)]
-      (timbre/info "Netty server" host assigned-port "online")
+          _ (.add channel-group ch)]
+      (timbre/info "Netty server" host port "online")
       (fn killer []
         (.close channel-group)
         (timbre/info "TCP server" host port "shut down")))))
@@ -198,7 +197,7 @@
   (proxy [ChannelHandler] []
     (handlerAdded [ctx])
     (handlerRemoved [ctx])
-    (exceptionCaught [context cause]
+    (exceptionCaught [^ChannelHandlerContext context cause]
       (timbre/error cause "TCP client exception.")
       (.close context))))
 
@@ -206,11 +205,11 @@
   (proxy [ChannelInitializer] []
     (initChannel [ch]
       (timbre/info "Initializing client channel")
-      (try (let [pipeline (.pipeline ^Channel ch)]
-             (doto pipeline 
-               (.addLast "int32-frame-decoder" (int32-frame-decoder))
-               (.addLast "int32-frame-encoder" (int32-frame-encoder))
-               (.addLast "handler" handler)))
+      (try (let [pipeline ^ChannelPipeline (.pipeline ^Channel ch)]
+             (doto ^ChannelPipeline pipeline 
+               (.addLast "int32-frame-decoder" ^LengthFieldBasedFrameDecoder (int32-frame-decoder))
+               (.addLast "int32-frame-encoder" ^LengthFieldPrepender (int32-frame-encoder))
+               (.addLast "handler" ^ChannelHandler handler)))
            (catch Throwable e
              (timbre/fatal e))))))
 
@@ -227,7 +226,7 @@
             (.group client-group)
             (.channel channel)
             (.handler (client-channel-initializer (new-client-handler))))
-        ch-fut ^ChannelFuture (.awaitUninterruptibly (.connect b host port) 
+        ch-fut ^ChannelFuture (.awaitUninterruptibly ^ChannelFuture (.connect ^Bootstrap b ^String host ^Integer port) 
                                                      ;; TODO, add connection timeout
                                                      ;(:onyx.messaging.netty/connect-timeout-millis defaults)
                                                      ;TimeUnit/MILLISECONDS
@@ -385,7 +384,7 @@
         (enqueue-pending connection buf))))
 
   (close [_] 
-    (some-> @channel .close)
+    (let [cval @channel] (if cval (.close ^Channel cval)))
     (some-> @pending-ch close!))
 
   (connect [_]

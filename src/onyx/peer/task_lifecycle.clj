@@ -223,7 +223,7 @@
   [{:keys [onyx.core/batch onyx.core/message-tree] :as event}]
   (merge
    event
-   (when-let [k (.indexOf (map :message batch) :done)]
+   (when-let [k (.indexOf ^clojure.lang.PersistentVector (mapv :message batch) :done)]
      {:onyx.core/batch (drop-nth k batch)})))
 
 (defn collect-next-segments [event input]
