@@ -327,8 +327,7 @@
   (connected [this]))
 
 (defn add-failed-check 
-  "Check if the future failed. link-val is used as a staleness check
-  for the connection as it should not be reset if it has already been reset."
+  "Check if the message failed to send"
   [f connection buf]
   (.addListener f (reify GenericFutureListener
                     (operationComplete [_ _]
@@ -336,35 +335,36 @@
                         (timbre/error "Message failed to send: " (.cause f))
                         (reset-connection connection))))))
 
-
 (defn make-pending-chan [messenger]
   (chan (sliding-buffer (:pending-buffer-size messenger))))
 
-(defrecord ConnectionState [state]
-  IConnectionState
-  (initializing [_]
-    (compare-and-set! state :initializing :connecting))
-  (reset [_] 
+(defn state->connecting [state]
+  (compare-and-set! state :initializing :connecting))
+
+(defn state->reset [state] 
     (compare-and-set! state :connected :reset))
-  (connecting [_]
-    (or (compare-and-set! state :reset :connecting)
-        (compare-and-set! state :initializing :connecting)
-        (compare-and-set! state :failed :connecting)))
-  (failed [_]
-    (compare-and-set! state :connecting :failed))
-  (connected [_]
-    (compare-and-set! state :connecting :connected)))
+
+(defn state->connecting [state]
+  (or (compare-and-set! state :reset :connecting)
+      (compare-and-set! state :initializing :connecting)
+      (compare-and-set! state :failed :connecting)))
+
+(defn state->failed [state]
+  (compare-and-set! state :connecting :failed))
+
+(defn state->connected [state]
+  (compare-and-set! state :connecting :connected))
 
 (defrecord ConnectionManager [messenger site state pending-ch channel]
   IConnectionManager
   (reset-connection [connection]
-    (when (reset state)
+    (when (state->reset state)
       (reset! pending-ch (make-pending-chan messenger))
       (reset! channel nil)
       (connect connection)))
 
   (enqueue-pending [connection buf]
-    (case @(:state state)
+    (case @state
       :initializing (>!! @pending-ch buf)
       :connecting (>!! @pending-ch buf)
       :reset (connect connection)
@@ -390,17 +390,17 @@
   (connect [_]
     ; The state machine decides who gets to connect to ensure only one thread
     ; will connect, and the remaining will write out to the pending channel
-    (when (connecting state)
+    (when (state->connecting state)
       (future
         (if-let [opened-channel (create-client (:client-group messenger) 
                                                (:netty/external-addr site) 
                                                (:netty/port site))] 
-          (let [connected? (connected state)] 
+          (let [connected? (state->connected state)] 
             (assert connected?)
             (flush-pending opened-channel @pending-ch)
             (reset! channel opened-channel))
           (do
-            (failed state)
+            (state->failed state)
             (reset! channel nil)
             (reset! pending-ch (make-pending-chan messenger))))))))
 
@@ -409,7 +409,7 @@
   (doto 
     (->ConnectionManager messenger 
                          site
-                         (->ConnectionState (atom :initializing)) 
+                         (atom :initializing) 
                          (atom (make-pending-chan messenger))
                          (atom nil))
     connect))
