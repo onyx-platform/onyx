@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
-  (:require [taoensso.timbre :as timbre])
+  (:require [taoensso.timbre :as timbre]
+            [onyx.peer.task-lifecycle :refer [->Leaf]])
   (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
@@ -51,9 +52,7 @@
   (let [id (get-uuid buf offset)
         completion-id (get-uuid buf (+ offset 16))
         ack-val (.getLong buf (+ offset 32))]
-    {:id id
-     :completion-id completion-id
-     :ack-val ack-val}))
+    [id completion-id ack-val]))
 
 (defn read-completion [^UnsafeBuffer buf offset]
   (get-uuid buf offset))
@@ -84,10 +83,7 @@
         acker-id (get-uuid buf (+ offset 16))
         completion-id (get-uuid buf (+ offset 32))
         ack-val (.getLong buf (+ offset 48))]
-    {:id id 
-     :acker-id acker-id 
-     :completion-id completion-id 
-     :ack-val ack-val}))
+    (->Leaf nil id acker-id completion-id ack-val nil nil nil)))
 
 (def message-count-size 4)
 

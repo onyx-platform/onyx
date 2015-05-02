@@ -63,11 +63,8 @@
   (let [msg-type (protocol/read-message-type buffer offset)
         offset-rest (inc offset)] 
     (cond (= msg-type protocol/ack-msg-id)
-          (let [thawed (protocol/read-acker-message buffer offset-rest)]
-            (acker/ack-message daemon
-                               (:id thawed)
-                               (:completion-id thawed)
-                               (:ack-val thawed)))
+          (let [[id completion-id ack-val] (protocol/read-acker-message buffer offset-rest)]
+            (acker/ack-message daemon id completion-id ack-val))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset-rest)]
