@@ -92,21 +92,21 @@
     (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
-(defn route-output-flow
+ (defn route-output-flow
   [{:keys [onyx.core/serialized-task] :as event}]
-  (let [downstream (keys (:egress-ids serialized-task))]
-    (update-in event 
-               [:onyx.core/results]
-               (fn [results] 
-                 (map
-                   (fn [result]
-                     (update-in result 
-                                [:leaves]
-                                (fn [leaves] 
-                                  (map (fn [leaf]
-                                         (assoc leaf :routes (add-route-data event result leaf downstream)))
-                                       leaves))))
-                   results)))))
+   (let [downstream (keys (:egress-ids serialized-task))]
+     (update-in event 
+                [:onyx.core/results]
+                (fn [results] 
+                  (map
+                    (fn [result]
+                      (update-in result 
+                                 [:leaves]
+                                 (fn [leaves] 
+                                   (map (fn [leaf]
+                                          (assoc leaf :routes (add-route-data event result leaf downstream)))
+                                        leaves))))
+                    results)))))
 
 (defn hash-value [x]
   (let [md5 (MessageDigest/getInstance "MD5")]
@@ -134,21 +134,28 @@
                    {} next-tasks)
            :message (apply dissoc msg (:exclusions (:routes leaf))))))
 
+(defn add-ack-vals [leaf]
+  (assoc leaf 
+         :ack-vals 
+         (repeatedly (count (:flow (:routes leaf)))
+                     acker/gen-ack-value)))
+
 (defn build-new-segments
   [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
-  (let [next-tasks (keys (:egress-ids serialized-task))
+  (let [downstream (keys (:egress-ids serialized-task))
         results (map (fn [{:keys [root leaves] :as result}]
-                       (assoc result 
-                              :leaves 
-                              (map (fn [leaf]
-                                     (-> leaf 
-                                         (assoc :id (:id root)
-                                                :acker-id (:acker-id root)
-                                                :completion-id (:completion-id root)
-                                                :ack-vals (repeatedly (count (:flow (:routes leaf)))
-                                                                      acker/gen-ack-value))
-                                         (group-segments next-tasks catalog event)))
-                                   leaves)))
+                       (let [{:keys [id acker-id completion-id]} root] 
+                         (assoc result 
+                                :leaves 
+                                (map (fn [leaf]
+                                       (-> leaf 
+                                           (assoc :routes (add-route-data event result leaf downstream)
+                                                  :id id 
+                                                  :acker-id acker-id 
+                                                  :completion-id completion-id)
+                                           (group-segments downstream catalog event)
+                                           (add-ack-vals)))
+                                     leaves))))
                      results)]
     (assoc event :onyx.core/results results)))
 
@@ -247,7 +254,7 @@
   (assoc
    event
    :onyx.core/results
-    (mapv
+    (map
       (fn [segment]
         (let [segments (collect-next-segments event (:message segment))
               leaves (map leaf segments)]
@@ -261,7 +268,7 @@
     (assoc
       event
       :onyx.core/results
-      (mapv
+      (map
         (fn [segment]
           (let [leaves (map leaf segments)]
             {:root segment :leaves leaves}))
@@ -362,7 +369,6 @@
           (try-complete-job)
           (strip-sentinel)
           (apply-fn)
-          (route-output-flow)
           (build-new-segments)
           (write-batch)
           (ack-messages)
