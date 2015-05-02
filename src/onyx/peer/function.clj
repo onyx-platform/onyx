@@ -24,6 +24,18 @@
        (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
        (map #(dissoc % :routes :hash-group))))
 
+(defn into-transient [coll vs]
+  (loop [rs vs updated-coll coll]
+    (if (empty? rs)
+      updated-coll
+      (recur (rest rs) (conj! updated-coll (first rs))))))
+
+(defn fast-concat [vvs]
+  (loop [vs vvs coll (transient [])]
+    (if (empty? vs)
+      (persistent! coll)
+      (recur (rest vs) (into-transient coll (first vs))))))
+
 (defn build-segments-to-send [leaves]
   (->> leaves
        (map (fn [{:keys [routes ack-vals hash-group message] :as leaf}]
@@ -38,7 +50,7 @@
                         :route route
                         :hash-group (get hash-group route)})
                      (:flow routes) ack-vals))))
-       (reduce into [])))
+       fast-concat))
 
 (defn pick-peer [active-peers hash-group]
   (when-not (empty? active-peers)
@@ -50,7 +62,7 @@
 
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/results onyx.core/messenger onyx.core/job-id] :as event}]
-  (let [leaves (reduce into [] (map :leaves results))
+  (let [leaves (fast-concat (map :leaves results))
         egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
     (when-not (empty? leaves)
       (let [replica @(:onyx.core/replica event)
