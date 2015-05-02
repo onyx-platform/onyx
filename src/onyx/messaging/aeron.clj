@@ -35,7 +35,7 @@
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (when media-driver (.close media-driver))
+    (when media-driver (.close ^MediaDriver media-driver))
     (assoc component :media-driver nil)))
 
 (defn aeron-peer-group [opts]
@@ -142,9 +142,9 @@
                       accept-aux-fut]} rs] 
           (future-cancel accept-send-fut)
           (future-cancel accept-aux-fut)
-         (when send-subscriber (.close send-subscriber))
-         (when aux-subscriber (.close aux-subscriber))
-         (when conn (.close conn)))
+         (when send-subscriber (.close ^uk.co.real_logic.aeron.Subscription send-subscriber))
+         (when aux-subscriber (.close ^uk.co.real_logic.aeron.Subscription aux-subscriber))
+         (when conn (.close ^uk.co.real_logic.aeron.Aeron conn)))
         (reset! resources nil))
       (close! (:release-ch component))
       (close! (:retry-ch component))
@@ -262,10 +262,10 @@
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
   (when-let [pub (get-in peer-link [:send-pub :pub])] 
-    (when @pub (.close @pub))
+    (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
   (when-let [pub (get-in peer-link [:send-pub :aux-pub])]
-    (when @pub (.close @pub))
+    (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
-  (.close (:conn peer-link)) 
+  (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
   {})

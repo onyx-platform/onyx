@@ -45,7 +45,7 @@
     buf))
 
 (defn read-message-type [buf offset]
-  (.getByte buf offset))
+  (.getByte ^UnsafeBuffer buf ^int offset))
 
 (defn read-acker-message [^UnsafeBuffer buf offset]
   (let [id (get-uuid buf offset)
@@ -98,7 +98,7 @@
   (let [meta-offsets (meta-message-offsets message-count-size (count messages))
         message-payloads (compress-f (map :message messages))
         buf-size (+ (last meta-offsets) 
-                    (alength message-payloads))
+                    (count message-payloads))
         buf (UnsafeBuffer. (byte-array buf-size))] 
     (.putInt buf 0 (int (count messages))) ; number of messages
     (doseq [[msg offset] (map vector messages meta-offsets)]
