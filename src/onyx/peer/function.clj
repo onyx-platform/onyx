@@ -6,6 +6,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [taoensso.timbre :as timbre :refer [debug info]]
+              [onyx.types :refer [->Leaf]]
               [dire.core :refer [with-post-hook!]])
     (:import [java.util UUID]))
 
@@ -42,13 +43,15 @@
               (if (= :retry (:action routes))
                 []
                 (map (fn [route ack-val]
-                       {:id (:id leaf)
-                        :acker-id (:acker-id leaf)
-                        :completion-id (:completion-id leaf)
-                        :message (:message leaf)
-                        :ack-val ack-val
-                        :route route
-                        :hash-group (get hash-group route)})
+                       (->Leaf (:message leaf)
+                               (:id leaf)
+                               (:acker-id leaf)
+                               (:completion-id leaf)
+                               ack-val
+                               nil
+                               route
+                               nil
+                               (get hash-group route)))
                      (:flow routes) ack-vals))))
        fast-concat))
 

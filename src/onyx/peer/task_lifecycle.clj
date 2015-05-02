@@ -13,16 +13,9 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
+              [onyx.types :refer [->Leaf leaf ->Route ->Ack]]
               [onyx.static.default-vals :refer [defaults]])
     (:import [java.security MessageDigest]))
-
-
-(defrecord Leaf [message id acker-id completion-id ack-val ack-vals routes hash-group])
-(defn leaf 
-  ([message] 
-   (->Leaf message nil nil nil nil nil nil nil)))
-(defrecord Route [flow exclusions post-transformation action])
-(defrecord Ack [id completion-id ack-val])
 
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
 (def restartable-exceptions [])

@@ -2,6 +2,7 @@
     (:require [clojure.core.async :refer [chan >!! close! sliding-buffer]]
               [com.stuartsierra.component :as component]
               [onyx.static.default-vals :refer [defaults]]
+              [onyx.types :refer [->Ack]]
               [taoensso.timbre :as timbre]))
 
 (defrecord AckingDaemon [opts]
@@ -21,8 +22,6 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {:opts config}))
 
-(defrecord Ack [completions-id ack-val])
-
 ;; TODO, performance
 ;; Should ack multiple messages at a time so only a single swap! 
 ;; is required
@@ -34,7 +33,7 @@
             (let [updated-ack-val (if-let [current-ack-val (get-in state [message-id :ack-val])] 
                                     (bit-xor current-ack-val ack-val))]
               (cond (nil? updated-ack-val)
-                    (assoc state message-id (->Ack completion-id ack-val))
+                    (assoc state message-id (->Ack nil completion-id ack-val))
                     (zero? updated-ack-val)
                     (dissoc state message-id) 
                     :else 
