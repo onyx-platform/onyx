@@ -119,42 +119,38 @@
       (when-let [f (:onyx/group-by-fn t)]
         (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
-(defn group-segments [next-tasks catalog result event]
-  (assoc result
-    :leaves
-    (map
-     (fn [leaf]
-       (let [msg (if (and (operation/exception? (:message leaf))
-                          (:post-transformation (:routes leaf)))
-                   (operation/apply-function
-                    (operation/kw->fn (:post-transformation (:routes leaf)))
-                    [event] (:message leaf))
-                   (:message leaf))]
-         (assoc leaf
+(defn group-segments [leaf next-tasks catalog event]
+  (let [post-transformation (:post-transformation (:routes leaf))
+        message (:message leaf)
+        msg (if (and (operation/exception? message) post-transformation)
+              (operation/apply-function (operation/kw->fn post-transformation)
+                                        [event] 
+                                        message)
+              message)]
+    (assoc leaf
            :hash-group
            (reduce (fn [groups t]
                      (assoc groups t (group-message msg catalog t)))
                    {} next-tasks)
            :message (apply dissoc msg (:exclusions (:routes leaf))))))
-     (:leaves result))))
 
 (defn build-new-segments
   [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
   (let [next-tasks (keys (:egress-ids serialized-task))
-        results (map
-                  (fn [{:keys [root leaves] :as result}]
-                    (assoc result :leaves
-                           (map
-                             (fn [leaf]
-                               (assoc leaf
-                                      :id (:id root)
-                                      :acker-id (:acker-id root)
-                                      :completion-id (:completion-id root)
-                                      :ack-vals (repeatedly (count (:flow (:routes leaf)))
-                                                            acker/gen-ack-value)))
-                             leaves)))
-                 results)]
-    (assoc event :onyx.core/results (map #(group-segments next-tasks catalog % event) results))))
+        results (map (fn [{:keys [root leaves] :as result}]
+                       (assoc result 
+                              :leaves 
+                              (map (fn [leaf]
+                                     (-> leaf 
+                                         (assoc :id (:id root)
+                                                :acker-id (:acker-id root)
+                                                :completion-id (:completion-id root)
+                                                :ack-vals (repeatedly (count (:flow (:routes leaf)))
+                                                                      acker/gen-ack-value))
+                                         (group-segments next-tasks catalog event)))
+                                   leaves)))
+                     results)]
+    (assoc event :onyx.core/results results)))
 
 (defn ack-routes? [routes]
   (and (not-empty (:flow routes))
@@ -170,7 +166,6 @@
             0
             leaves)
     0))
-
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
@@ -200,8 +195,9 @@
   event)
 
 (defn inject-batch-resources [event]
-  (let [cycle-params {:onyx.core/lifecycle-id (java.util.UUID/randomUUID)}]
-    (merge cycle-params event ((:onyx.core/compiled-before-batch-fn event) event))))
+  (-> event 
+      (merge ((:onyx.core/compiled-before-batch-fn event) event))
+      (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID))))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -251,27 +247,25 @@
   (assoc
    event
    :onyx.core/results
-    (reduce
-     (fn [coll segment]
-       (let [segments (collect-next-segments event (:message segment))
-             leaves (map leaf segments)]
-         (conj coll {:root segment :leaves leaves})))
-     []
-     batch)))
+    (mapv
+      (fn [segment]
+        (let [segments (collect-next-segments event (:message segment))
+              leaves (map leaf segments)]
+          {:root segment :leaves leaves}))
+      batch)))
 
 (defn apply-fn-bulk [{:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
     (function/apply-fn event segments)
-    (merge
-     event
-     {:onyx.core/results
-      (reduce
-       (fn [coll segment]
-         (let [leaves (map leaf segments)]
-           (conj coll {:root segment :leaves leaves})))
-       []
-       batch)})))
+    (assoc
+      event
+      :onyx.core/results
+      (mapv
+        (fn [segment]
+          (let [leaves (map leaf segments)]
+            {:root segment :leaves leaves}))
+        batch))))
 
 (defn apply-fn [event]
   (if (:onyx/bulk? (:onyx.core/task-map event))
