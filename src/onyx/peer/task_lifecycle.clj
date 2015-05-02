@@ -62,9 +62,9 @@
   (keep-indexed #(if (not= %1 n) %2) coll))
 
 (defn join-output-paths [all to-add downstream]
-  (cond (= to-add :all) (into #{} downstream)
+  (cond (= to-add :all) (set downstream)
         (= to-add :none) #{}
-        :else (clojure.set/union (into #{} all) (into #{} to-add))))
+        :else (into (set all) to-add)))
 
 (defn choose-output-paths
   [event compiled-flow-conditions result leaf serialized-task downstream]
@@ -74,11 +74,11 @@
        (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
          (if (:flow/short-circuit? entry)
            (reduced {:flow (join-output-paths flow (:flow/to entry) downstream)
-                     :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))
+                     :exclusions (into (set exclusions) (:flow/exclude-keys entry))
                      :post-transformation (:flow/post-transform entry)
                      :action (:flow/action entry)})
            {:flow (join-output-paths flow (:flow/to entry) downstream)
-            :exclusions (clojure.set/union (into #{} exclusions) (into #{} (:flow/exclude-keys entry)))})
+            :exclusions (into (set exclusions) (:flow/exclude-keys entry))})
          all))
      {:flow #{} :exclusions #{}}
      compiled-flow-conditions)
@@ -92,18 +92,21 @@
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
 (defn route-output-flow
-  [{:keys [onyx.core/serialized-task onyx.core/results] :as event}]
+  [{:keys [onyx.core/serialized-task] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))]
-    (assoc event 
-           :onyx.core/results
-           (mapv
-             (fn [{:keys [root leaves] :as result}]
-               (assoc result :leaves
-                      (mapv
-                        (fn [leaf]
-                          (assoc leaf :routes (add-route-data event result leaf downstream)))
-                        leaves)))
-             results))))
+    (update-in event 
+               [:onyx.core/results]
+               (fn [results] 
+                 (mapv
+                   (fn [result]
+                     (update-in result 
+                                [:leaves]
+                                (fn [leaves] 
+                                  (mapv
+                                    (fn [leaf]
+                                      (assoc leaf :routes (add-route-data event result leaf downstream)))
+                                    leaves))))
+                   results)))))
 
 (defn hash-value [x]
   (let [md5 (MessageDigest/getInstance "MD5")]
@@ -153,16 +156,35 @@
                  results)]
     (merge event {:onyx.core/results (map #(group-segments next-tasks catalog % event) results)})))
 
+(defn ack-routes? [routes]
+  (and (not-empty (:flow routes))
+       (not= (:action routes) 
+             :retry)))
+
+;; This could probably be cleaned up with transducers
 (defn gen-ack-fusion-vals [task-map leaves]
-  (when-not (= (:onyx/type task-map) :output)
-    (mapcat :ack-vals (remove (fn [leaf] (= (:action (:routes leaf)) :retry)) leaves))))
+  (if-not (= (:onyx/type task-map) :output)
+    (reduce (fn [fused-ack leaf]
+              (let [routes (:routes leaf)] 
+                (if (ack-routes? routes)
+                  (reduce (fn [fused ack-val]
+                            (if ack-val 
+                              (bit-xor fused ack-val)
+                              fused))
+                          fused-ack
+                          (:ack-vals leaf))
+                  fused-ack))) 
+            0
+            leaves)
+    0))
 
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
     (let [link (operation/peer-link event acker-id)
-          acks (map (fn [result] (let [leaves (filter (fn [leaf] (seq (:flow (:routes leaf)))) (:leaves result))
-                                       leaf-vals (gen-ack-fusion-vals task-map leaves)
-                                       fused-vals (acker/prefuse-vals (conj leaf-vals (:ack-val (:root result))))]
+          acks (map (fn [result] (let [fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
+                                       fused-vals (if-let [ack-val (:ack-val (:root result))] 
+                                                    (bit-xor fused-leaf-vals ack-val)
+                                                    fused-leaf-vals)]
                                    {:id (:id (:root result))
                                     :completion-id (:completion-id (:root result))
                                     ;; or'ing by zero covers the case of flow conditions where an
@@ -269,27 +291,27 @@
   (merge event ((:onyx.core/compiled-after-batch-fn event) event)))
 
 (defn launch-aux-threads!
-  [messenger event outbox-ch seal-ch completion-ch task-kill-ch]
+  [{:keys [release-ch retry-ch] :as messenger} event outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
    (try
      (loop []
        (when-let [[v ch] (alts!! [task-kill-ch
                                   completion-ch
                                   seal-ch
-                                  (:release-ch messenger)
-                                  (:retry-ch messenger)]
+                                  release-ch
+                                  retry-ch]
                                  :priority true)]
-         (when (and (not= ch task-kill-ch) v)
-           (cond (= ch (:release-ch messenger))
+         (when v
+           (cond (= ch release-ch)
                  (p-ext/ack-message event v)
 
-                 (= ch (:retry-ch messenger))
+                 (= ch retry-ch)
                  (p-ext/retry-message event v)
 
                  (= ch completion-ch)
-                 (let [{:keys [id peer-id]} v]
-                   (let [peer-link (operation/peer-link event peer-id)]
-                     (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link)))
+                 (let [{:keys [id peer-id]} v
+                       peer-link (operation/peer-link event peer-id)]
+                   (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link))
 
                  (= ch seal-ch)
                  (do

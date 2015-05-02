@@ -21,15 +21,20 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {:opts config}))
 
+;; TODO, performance
+;; Should ack multiple messages at a time so only a single swap! 
+;; is required
 (defn ack-message [daemon message-id completion-id ack-val]
   (let [rets
         (swap!
-         (:ack-state daemon)
-         (fn [state]
-           (if-let [current-ack-val (get-in state [message-id :ack-val])]
-             (assoc-in state [message-id :ack-val] (bit-xor current-ack-val ack-val))
-             (assoc state message-id {:completion-id completion-id
-                                      :ack-val ack-val}))))]
+          (:ack-state daemon)
+          (fn [state]
+            (update-in state 
+                       [message-id]
+                       (fn [ack]
+                         (if-let [current-ack-val (:ack-val ack)]
+                           (assoc ack :ack-val (bit-xor current-ack-val ack-val))
+                           {:completions-id completion-id :ack-val ack-val})))))]
 
     (when-let [x (get rets message-id)]
       (when (zero? (:ack-val x))
@@ -47,12 +52,13 @@
   []
   (.nextLong (java.util.concurrent.ThreadLocalRandom/current)))
 
-(defn prefuse-vals
-  "Prefuse values on a peer before sending them to the acking
-   daemon to decrease packet size."
-  [vals]
-  (let [vals (filter identity vals)]
-    (cond (zero? (count vals)) nil
-          (= 1 (count vals)) (first vals)
-          :else (apply bit-xor vals))))
-
+; (defn prefuse-vals
+;   "Prefuse values on a peer before sending them to the acking
+;   daemon to decrease packet size."
+;   [vals]
+;   (reduce (fn [running v]
+;             (if v 
+;               (bit-xor running v)
+;               running))
+;           (or (first vals) 0)
+;           (rest vals)))

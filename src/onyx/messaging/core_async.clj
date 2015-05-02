@@ -99,9 +99,12 @@
           segments)
         segments))))
 
+(defn strip-message [segment]
+  (select-keys segment [:id :acker-id :completion-id :ack-val :message]))
+
 (defmethod extensions/send-messages CoreAsync
   [messenger event peer-link messages]
-  (>!! peer-link {:type :send :messages messages}))
+  (>!! peer-link {:type :send :messages (map strip-message messages)}))
 
 (defmethod extensions/internal-ack-messages CoreAsync
   [messenger event peer-link acks]
