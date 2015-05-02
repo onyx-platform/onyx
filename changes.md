@@ -60,23 +60,23 @@
 
 #### 0.4.1
 
-- Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
-- Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
+- Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/onyx-platform/onyx/issues/33)
+- Adds log rotation to default Onyx logging configuration. [#35](https://github.com/onyx-platform/onyx/issues/35)
 - Peer options available in pipeline event map under key `:onyx.core/peer-opts`
 
 #### 0.4.0
 
-- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/MichaelDrogalis/onyx/issues/20)
-- Support for directed, acylic graphs as workflows. [#26](https://github.com/MichaelDrogalis/onyx/issues/26)
-- Fix for peer live lock on task completion. [#23](https://github.com/MichaelDrogalis/onyx/issues/23)
-- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
-- `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/MichaelDrogalis/onyx/issues/3)
+- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/onyx-platform/onyx/issues/20)
+- Support for directed, acylic graphs as workflows. [#26](https://github.com/onyx-platform/onyx/issues/26)
+- Fix for peer live lock on task completion. [#23](https://github.com/onyx-platform/onyx/issues/23)
+- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/onyx-platform/onyx/issues/24)
+- `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/onyx-platform/onyx/issues/3)
 - Fix HornetQ ipv6 multicast socket bind issue when running on hosts with ipv6 interfaces.
-- Adds `:onyx/batch-timeout` option to all catalog entries. [#29](https://github.com/MichaelDrogalis/onyx/issues/29)
+- Adds `:onyx/batch-timeout` option to all catalog entries. [#29](https://github.com/onyx-platform/onyx/issues/29)
 
 #### 0.3.3
 
-- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/MichaelDrogalis/onyx/issues/18)
+- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/onyx-platform/onyx/issues/18)
 
 #### 0.3.2
 

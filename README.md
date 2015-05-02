@@ -32,14 +32,14 @@ Available on Clojars:
 
 Component | `0.6.x`| `master`
 ----------|--------|--------
-onyx core | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx/tree/master)
-onyx-sql  | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-sql/tree/master)
-onyx-datomic  | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-datomic/tree/master)
-onyx-kafka| [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/MichaelDrogalis/onyx-kafka/tree/master)
+onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master)
+onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
+onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
+onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/MichaelDrogalis/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
 
 ### User Guide 0.6.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
@@ -72,19 +72,19 @@ Code level API documentation [can be found here](http://michaeldrogalis.github.i
 Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.6.0` goes with `onyx` version `0.6.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.6.0.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
-- [`onyx-datomic`](https://github.com/MichaelDrogalis/onyx-datomic)
-- [`onyx-sql`](https://github.com/MichaelDrogalis/onyx-sql)
-- [`onyx-kafka`](https://github.com/MichaelDrogalis/onyx-kafka)
+- [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
+- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
+- [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 
-Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin).
+Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 
 ### Offical Dashboard and Metrics
 
-You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/MichaelDrogalis/onyx-metrics).
+You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/onyx-platform/onyx-metrics).
 
 ### lib-onyx
 
-[lib-onyx](https://github.com/MichaelDrogalis/lib-onyx) is a library created to support extra functionality in Onyx. It provides pluggable functionality such as in-memory streaming joins, automatic message retry, and interval-based actions.
+[lib-onyx](https://github.com/onyx-platform/lib-onyx) is a library created to support extra functionality in Onyx. It provides pluggable functionality such as in-memory streaming joins, automatic message retry, and interval-based actions.
 
 ### Release Notes
 
@@ -96,7 +96,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/MichaelDrogalis/onyx/tree/0.6.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.6.x/resources/logo).
 
 ### Running the tests
 
@@ -155,7 +155,7 @@ Distributed under the Eclipse Public License, the same as Clojure.
 
 ### Profiler
 
-![YourKit](https://raw.githubusercontent.com/MichaelDrogalis/onyx/master/resources/logo/yourkit.png)
+![YourKit](https://raw.githubusercontent.com/onyx-platform/onyx/master/resources/logo/yourkit.png)
 
 YourKit supports open source projects with its full-featured Java Profiler.
 YourKit, LLC is the creator of <a href="https://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a>

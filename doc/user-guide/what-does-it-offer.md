@@ -42,7 +42,7 @@ In general, your design is in trouble when you've reached for `with-redefs` or s
 
 #### Easy Parameterization of Workflows
 
-It's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peers to spin up their own parameters at boot-up time. See [the tests](https://github.com/MichaelDrogalis/onyx/blob/0.4.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
+It's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peers to spin up their own parameters at boot-up time. See [the tests](https://github.com/onyx-platform/onyx/blob/0.4.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
 
 #### Transparent Code Reuse for Batch and Streaming
 
@@ -50,7 +50,7 @@ Onyx uses the notion of a *sentinel value* to transparently switch between strea
 
 #### Aspect Orientation
 
-Clojure functions again serve as a huge win. [Dire](https://github.com/MichaelDrogalis/dire) is a library that supports aspects, meaning you can keep your application logic water-tight away from logging, preconditions, and error handling.
+Clojure functions again serve as a huge win. [Dire](https://github.com/onyx-platform/dire) is a library that supports aspects, meaning you can keep your application logic water-tight away from logging, preconditions, and error handling.
 
 #### AOT Nothing
 
