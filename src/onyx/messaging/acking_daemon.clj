@@ -21,6 +21,8 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {:opts config}))
 
+(defrecord Ack [completions-id ack-val])
+
 ;; TODO, performance
 ;; Should ack multiple messages at a time so only a single swap! 
 ;; is required
@@ -29,18 +31,16 @@
         (swap!
           (:ack-state daemon)
           (fn [state]
-            (update-in state 
-                       [message-id]
-                       (fn [ack]
-                         (if-let [current-ack-val (:ack-val ack)]
-                           (assoc ack :ack-val (bit-xor current-ack-val ack-val))
-                           {:completions-id completion-id :ack-val ack-val})))))]
-
-    (when-let [x (get rets message-id)]
-      (when (zero? (:ack-val x))
-        (swap! (:ack-state daemon) dissoc message-id)
-        (>!! (:completions-ch daemon) {:id message-id
-                                       :peer-id completion-id})))))
+            (let [updated-ack-val (if-let [current-ack-val (get-in state [message-id :ack-val])] 
+                                    (bit-xor current-ack-val ack-val))]
+              (cond (nil? updated-ack-val)
+                    (assoc state message-id (->Ack completion-id ack-val))
+                    (zero? updated-ack-val)
+                    (dissoc state message-id) 
+                    :else 
+                    (assoc-in state [message-id :ack-val] updated-ack-val)))))]
+    (when-not (get rets message-id)
+      (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id}))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
