@@ -6,7 +6,7 @@
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
-              [onyx.static.planning :refer [find-task build-pred-fn]]
+              [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -97,7 +97,7 @@
     (apply str (.digest md5 (.getBytes (pr-str x) "UTF-8")))))
 
 (defn group-message [segment catalog task]
-  (let [t (find-task catalog task)]
+  (let [t (find-task-fast catalog task)]
     (if-let [k (:onyx/group-by-key t)]
       (hash-value (get segment k))
       (when-let [f (:onyx/group-by-fn t)]
