@@ -24,15 +24,17 @@
   true)
 
 (defn peer-link
-  [{:keys [onyx.core/messenger onyx.core/state onyx.core/replica] :as event} peer-id]
-  (if-let [link (get-in @state [:links peer-id])]
+  [{:keys [onyx.core/state] :as event} peer-id]
+  (if-let [link (get (:links @state) peer-id)]
     link
-    (let [site (get-in @replica [:peer-sites peer-id])
-          link (-> state 
-                   (swap! update-in 
-                          [:links peer-id] 
-                          (fn [link]
-                            (or link 
-                                (extensions/connect-to-peer messenger event site))))
-                   (get-in [:links peer-id]))]
-      link)))
+    (let [site (-> @(:onyx.core/replica event)
+                   :peer-sites
+                   (get peer-id))]
+      (-> state 
+          (swap! update-in 
+                 [:links peer-id] 
+                 (fn [link]
+                   (or link 
+                       (extensions/connect-to-peer (:onyx.core/messenger event) event site))))
+          :links
+          (get peer-id)))))
