@@ -21,12 +21,12 @@
 
 (defmethod cts/task-claim-n-peers :onyx.task-scheduler/balanced
   [replica job n]
-  (let [tasks (get-in replica [:tasks job])]
-    ;; If the number of peers is less than the number of tasks,
-    ;; we're not covered - so we claim zero peers. Otherwise we
-    ;; take as much as we're allowed, depending on the saturation
-    ;; of the job.
-    (if (< n (count tasks))
+  (let [min-required (apply + (vals (get-in replica [:min-required-peers job])))]
+    ;; If the number of peers is less than the mininum number of
+    ;; required peers, we're not covered - so we claim zero peers.
+    ;; Otherwise we take as much as we're allowed, depending on the
+    ;; saturation of the job.
+    (if (< n min-required)
       0
       (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))))
 
