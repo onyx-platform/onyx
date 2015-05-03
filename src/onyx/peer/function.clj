@@ -26,16 +26,18 @@
        (map #(dissoc % :routes :hash-group))))
 
 (defn into-transient [coll vs]
-  (loop [rs vs updated-coll coll]
-    (if (empty? rs)
-      updated-coll
-      (recur (rest rs) (conj! updated-coll (first rs))))))
+  (loop [rs (seq vs) updated-coll coll]
+    (if rs 
+      (recur (next rs) 
+             (conj! updated-coll (first rs)))
+      updated-coll)))
 
 (defn fast-concat [vvs]
-  (loop [vs vvs coll (transient [])]
-    (if (empty? vs)
-      (persistent! coll)
-      (recur (rest vs) (into-transient coll (first vs))))))
+  (loop [vs (seq vvs) coll (transient [])]
+    (if vs
+      (recur (next vs) 
+             (into-transient coll (first vs)))
+      (persistent! coll))))
 
 (defn build-segments-to-send [leaves]
   (->> leaves
