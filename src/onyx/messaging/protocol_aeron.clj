@@ -90,6 +90,7 @@
 (defn meta-message-offsets [start-pos cnt]
   (reductions + start-pos (repeat cnt message-base-length)))
 
+;; TODO: optimize, currently pretty slow relative to everything else
 (defn build-messages-msg-buf [compress-f messages]
   (let [meta-offsets (meta-message-offsets message-count-size (count messages))
         message-payloads (compress-f (map :message messages))

@@ -115,7 +115,8 @@
            :hash-group
            (reduce (fn [groups t]
                      (assoc groups t (group-message msg catalog t)))
-                   {} next-tasks)
+                   {} 
+                   next-tasks)
            :message (apply dissoc msg (:exclusions (:routes leaf))))))
 
 
