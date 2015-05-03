@@ -79,7 +79,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 | key name                 | type       | choices             |
 |--------------------------|------------|---------------------|
 |`:onyx/min-peers`         | `integer`  | `any`               |
-|`:onyx/flux-policy`       | `keyword`  | `:stop`, `:continue`|
+|`:onyx/flux-policy`       | `keyword`  | `:kill`, `:continue`|
 
 ### Flow Conditions
 
