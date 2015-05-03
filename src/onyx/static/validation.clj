@@ -10,10 +10,6 @@
    :onyx/batch-size (schema/pred pos? 'pos?)
    schema/Keyword schema/Any})
 
-(def group-validator
-  {:onyx/min-peers schema/Int
-   :onyx/flux-policy (schema/enum :continue :kill)})
-
 (defn edge-two-nodes? [edge]
   (= (count edge) 2))
 
@@ -33,10 +29,10 @@
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
 (def group-entry-validator
-  (schema/conditional #(and (= (:onyx/type %) :function)
-                            (or (not (nil? (:onyx/group-by-key %)))
-                                (not (nil? (:onyx/group-by-fn %)))))
-                      group-validator))
+  {(schema/optional-key :onyx/group-by-key) schema/Keyword
+   (schema/optional-key :onyx/group-by-fn) schema/Keyword
+   :onyx/min-peers schema/Int
+   :onyx/flux-policy (schema/enum :continue :kill)})
 
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
@@ -52,7 +48,12 @@
   [catalog]
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
-    (schema/validate group-entry-validator)
+    (when (and (= (:onyx/type entry) :function)
+               (or (not (nil? (:onyx/group-by-key entry)))
+                   (not (nil? (:onyx/group-by-fn entry)))))
+      (let [kws (select-keys entry [:onyx/group-by-fn :onyx/group-by-key
+                                    :onyx/min-peers :onyx/flux-policy])]
+        (schema/validate group-entry-validator kws)))
     (name-and-type-not-equal entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
