@@ -54,7 +54,7 @@
          (fn [all [task k]]
            (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
                                 (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
-                                (if (< k r) max-peers min-peers))))
+                                (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task]))))))
          {}
          (map vector tasks (range)))
         spare-peers (- n (apply + (vals init)))]

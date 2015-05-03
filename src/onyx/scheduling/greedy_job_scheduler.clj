@@ -4,8 +4,8 @@
             [onyx.log.commands.common :as common]))
 
 (defn job-coverable? [replica job]
-  (let [tasks (get-in replica [:tasks job])]
-    (>= (count (get-in replica [:peers])) (count tasks))))
+  (let [min-req (apply + (vals (get-in replica [:min-required-peers job])))]
+    (>= (count (get-in replica [:peers])) min-req)))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
   [replica]
