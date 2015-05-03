@@ -76,10 +76,10 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys
 
-| key name                 | type       | choices           |
-|--------------------------|------------|-------------------|
-|`:onyx/min-peers`         | `integer`  | `any`             |
-|`:onyx/flux-policy`       | `keyword`  | `stop`, `continue`|
+| key name                 | type       | choices             |
+|--------------------------|------------|---------------------|
+|`:onyx/min-peers`         | `integer`  | `any`               |
+|`:onyx/flux-policy`       | `keyword`  | `:stop`, `:continue`|
 
 ### Flow Conditions
 
