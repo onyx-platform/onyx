@@ -13,7 +13,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Leaf leaf ->Route ->Ack]]
+              [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
               [onyx.static.default-vals :refer [defaults]])
     (:import [java.security MessageDigest]))
 
@@ -91,22 +91,6 @@
   (if (operation/exception? (:message leaf))
     (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
-
- (defn route-output-flow
-  [{:keys [onyx.core/serialized-task] :as event}]
-   (let [downstream (keys (:egress-ids serialized-task))]
-     (update-in event 
-                [:onyx.core/results]
-                (fn [results] 
-                  (map
-                    (fn [result]
-                      (update-in result 
-                                 [:leaves]
-                                 (fn [leaves] 
-                                   (map (fn [leaf]
-                                          (assoc leaf :routes (add-route-data event result leaf downstream)))
-                                        leaves))))
-                    results)))))
 
 (defn hash-value [x]
   (let [md5 (MessageDigest/getInstance "MD5")]
@@ -258,7 +242,7 @@
       (fn [segment]
         (let [segments (collect-next-segments event (:message segment))
               leaves (map leaf segments)]
-          {:root segment :leaves leaves}))
+          (->Result segment leaves)))
       batch)))
 
 (defn apply-fn-bulk [{:keys [onyx.core/batch] :as event}]
@@ -271,7 +255,7 @@
       (map
         (fn [segment]
           (let [leaves (map leaf segments)]
-            {:root segment :leaves leaves}))
+            (->Result segment leaves)))
         batch))))
 
 (defn apply-fn [event]

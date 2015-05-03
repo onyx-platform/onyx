@@ -6,5 +6,6 @@
    (->Leaf message nil nil nil nil nil nil nil nil)))
 (defrecord Route [flow exclusions post-transformation action])
 (defrecord Ack [id completion-id ack-val])
+(defrecord Result [root leaves])
 
 
