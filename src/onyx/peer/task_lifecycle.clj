@@ -118,11 +118,12 @@
                    {} next-tasks)
            :message (apply dissoc msg (:exclusions (:routes leaf))))))
 
+
+
 (defn add-ack-vals [leaf]
   (assoc leaf 
          :ack-vals 
-         (repeatedly (count (:flow (:routes leaf)))
-                     acker/gen-ack-value)))
+         (acker/generate-acks (count (:flow (:routes leaf))))))
 
 (defn build-new-segments
   [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
@@ -148,7 +149,9 @@
        (not= (:action routes) 
              :retry)))
 
-(defn gen-ack-fusion-vals [task-map leaves]
+(defn gen-ack-fusion-vals 
+  "Prefuses acks to reduce packet size"
+  [task-map leaves]
   (if-not (= (:onyx/type task-map) :output)
     (reduce (fn [fused-ack leaf]
               (if (ack-routes? (:routes leaf))

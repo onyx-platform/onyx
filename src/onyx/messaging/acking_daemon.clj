@@ -61,3 +61,12 @@
 ;               running))
 ;           (or (first vals) 0)
 ;           (rest vals)))
+(defn generate-acks 
+  "Batch generates acks."
+  [cnt] 
+  (let [rng (java.util.concurrent.ThreadLocalRandom/current)] 
+    (loop [n 0 coll (transient [])]
+      (if (= n cnt)
+        (persistent! coll)
+        (recur (inc n) 
+               (conj! coll (.nextLong rng)))))))
