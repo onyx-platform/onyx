@@ -49,16 +49,6 @@
   []
   (.nextLong (java.util.concurrent.ThreadLocalRandom/current)))
 
-; (defn prefuse-vals
-;   "Prefuse values on a peer before sending them to the acking
-;   daemon to decrease packet size."
-;   [vals]
-;   (reduce (fn [running v]
-;             (if v 
-;               (bit-xor running v)
-;               running))
-;           (or (first vals) 0)
-;           (rest vals)))
 (defn generate-acks 
   "Batch generates acks."
   [cnt] 
