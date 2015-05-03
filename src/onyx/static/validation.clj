@@ -10,6 +10,10 @@
    :onyx/batch-size (schema/pred pos? 'pos?)
    schema/Keyword schema/Any})
 
+(def group-validator
+  {:onyx/min-peers schema/Int
+   :onyx/flux-policy (schema/enum :continue :kill)})
+
 (defn edge-two-nodes? [edge]
   (= (count edge) 2))
 
@@ -28,6 +32,12 @@
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
+(def group-entry-validator
+  (schema/conditional #(and (= (:onyx/type %) :function)
+                            (or (not (nil? (:onyx/group-by-key %)))
+                                (not (nil? (:onyx/group-by-fn %)))))
+                      group-validator))
+
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
            (:onyx/type task))
@@ -42,6 +52,7 @@
   [catalog]
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
+    (schema/validate group-entry-validator)
     (name-and-type-not-equal entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
