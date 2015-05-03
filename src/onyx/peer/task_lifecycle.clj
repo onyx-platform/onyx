@@ -2,7 +2,7 @@
     (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
-              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
+              [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
@@ -538,27 +538,29 @@
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
                        :opts opts :task-kill-ch task-kill-ch}))
 
-(dire/with-post-hook! #'munge-start-lifecycle
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
-    (when-not start-lifecycle?
-      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..." id lifecycle-id)))))
+(when (or (nil? level-compile-time) (= level-compile-time :info) (= level-compile-time :trace))
+  (dire/with-post-hook! #'munge-start-lifecycle
+    (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
+      (when-not start-lifecycle?
+        (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..." id lifecycle-id))))))
 
-(dire/with-post-hook! #'inject-batch-resources
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id))))
+(when (or (nil? level-compile-time) (= level-compile-time :trace))
+  (dire/with-post-hook! #'inject-batch-resources
+    (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
+      (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id)))))
 
-(dire/with-post-hook! #'read-batch
-  (fn [{:keys [onyx.core/id onyx.core/batch onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Read %s segments" id lifecycle-id (count batch)))))
-
-(dire/with-post-hook! #'apply-fn
+(when (or (nil? level-compile-time) (= level-compile-time :trace))
+  (dire/with-post-hook! #'apply-fn
   (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results)))))
+    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results))))))
 
-(dire/with-post-hook! #'write-batch
+(when (or (nil? level-compile-time) (= level-compile-time :trace))
+  (= level-compile-time :trace)
+  (dire/with-post-hook! #'write-batch
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/results]}]
-    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results)))))
+    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results))))))
 
-(dire/with-post-hook! #'close-batch-resources
+(when (or (nil? level-compile-time) (= level-compile-time :trace))
+  (dire/with-post-hook! #'close-batch-resources
   (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id))))
+    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id)))))
