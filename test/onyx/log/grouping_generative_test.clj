@@ -71,3 +71,6 @@
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
+
+;; TODO: Peers in a grouping task are never reallocated.
+
