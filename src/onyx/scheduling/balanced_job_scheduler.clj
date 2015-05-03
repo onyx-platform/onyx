@@ -4,8 +4,7 @@
             [onyx.log.commands.common :as common]))
 
 (defn job-coverable? [replica job n]
-  (let [tasks (get-in replica [:tasks job])]
-    (>= n (count tasks))))
+  (>= n (apply + (vals (get-in replica [:min-required-peers job])))))
 
 (defn allocate-peers [{:keys [jobs peers] :as replica}]
   (loop [results {}]
@@ -39,13 +38,14 @@
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
   (let [ordered-jobs (sort-by (juxt #(.indexOf (:jobs replica) %)
-                                    #(count (get-in replica [:tasks %])))
+                                    #(apply + (vals (get-in replica [:min-required-peers %]))))
                               (:jobs replica))]
     (loop [[head & tail :as job-seq] ordered-jobs
            results jobs
            capacity n]
       (let [tail (vec tail)
-            to-cover (- (count (get-in replica [:tasks head])) (get results head 0))]
+            min-peers (apply + (vals (get-in replica [:min-required-peers head])))
+            to-cover (- min-peers (get results head 0))]
         (cond (or (<= capacity 0) (not (seq job-seq)))
               results
               (and (>= capacity to-cover) (pos? to-cover))

@@ -45,7 +45,7 @@
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/balanced
   [replica job n]
   (let [tasks (get-in replica [:tasks job])
-        t (count tasks)
+        t (apply + (vals (get-in replica [:min-required-peers job])))
         min-peers (int (/ n t))
         r (rem n t)
         max-peers (inc min-peers)
@@ -53,6 +53,7 @@
         (reduce
          (fn [all [task k]]
            (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
                                 (if (< k r) max-peers min-peers))))
          {}
          (map vector tasks (range)))
