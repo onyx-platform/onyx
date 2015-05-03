@@ -27,17 +27,17 @@
         (swap!
           (:ack-state daemon)
           (fn [state]
-            (let [ack (get state message-id)
-                  updated-ack-val (if-let [current-ack-val (:ack-val ack)] 
-                                    (bit-xor current-ack-val ack-val))]
-              (cond (nil? updated-ack-val)
-                    (assoc state message-id (->Ack nil completion-id ack-val))
-                    (zero? updated-ack-val)
-                    (dissoc state message-id) 
-                    :else 
-                    (assoc state message-id (assoc ack :ack-val updated-ack-val))))))]
-    (when-not (get rets message-id)
-      (>!! (:completions-ch daemon) {:id message-id :peer-id completion-id}))))
+            (if-let [ack (get state message-id)]
+              (let [updated-ack-val (bit-xor (:ack-val ack) ack-val)]
+                (if (zero? updated-ack-val)
+                  (dissoc state message-id) 
+                  (assoc state message-id (assoc ack :ack-val updated-ack-val))))
+              (if (zero? ack-val) 
+                state
+                (assoc state message-id (->Ack nil completion-id ack-val))))))]
+    (when (get rets message-id)
+      (>!! (:completions-ch daemon) {:id message-id
+                                     :peer-id completion-id}))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
@@ -58,3 +58,5 @@
         (persistent! coll)
         (recur (inc n) 
                (conj! coll (.nextLong rng)))))))
+
+
