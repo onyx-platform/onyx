@@ -52,7 +52,8 @@
                                route
                                nil
                                (get hash-group route)))
-                     (:flow routes) ack-vals))))
+                     (:flow routes) 
+                     ack-vals))))
        fast-concat))
 
 (defn pick-peer [active-peers hash-group]
