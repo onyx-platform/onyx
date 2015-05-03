@@ -128,3 +128,15 @@
                 (if (empty? (:entries state))
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))
+
+(defn generate-join-entries [peer-ids]
+  (zipmap peer-ids
+          (map (fn [id] [{:fn :prepare-join-cluster
+                         :immediate? true
+                         :args {:peer-site (extensions/peer-site messenger)
+                                :joiner id}}])
+               peer-ids)))
+
+(defn generate-peer-ids [n]
+  (map #(keyword (str "p" %))
+       (range 1 (inc n))))

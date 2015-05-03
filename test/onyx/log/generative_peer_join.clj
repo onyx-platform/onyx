@@ -92,18 +92,6 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(defn generate-join-entries [peer-ids]
-  (zipmap peer-ids 
-          (map (fn [id] [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messenger)
-                                :joiner id}}])
-               peer-ids)))
-
-(defn generate-peer-ids [n]
-  (map #(keyword (str "p" %))
-       (range 1 (inc n))))
-
 (deftest greedy-allocation
   (checking
    "Checking greedy allocation causes all peers to be allocated to one of two jobs"
@@ -115,7 +103,7 @@
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
        :entries (assoc
-                    (generate-join-entries (generate-peer-ids 8))
+                    (log-gen/generate-join-entries (log-gen/generate-peer-ids 8))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -143,7 +131,7 @@
       {:replica {:job-scheduler :onyx.job-scheduler/greedy
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 8))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 8))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -168,7 +156,7 @@
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 6))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 6))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -192,7 +180,7 @@
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 7))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 7))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config
                                                        job-1
@@ -219,7 +207,7 @@
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 12))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 12))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
