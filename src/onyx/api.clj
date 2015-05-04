@@ -38,6 +38,17 @@
        (or (:onyx/min-peers (planning/find-task catalog (:name task))) 1)})
     tasks)))
 
+(defn ^{:no-doc true} flux-policies [catalog tasks]
+  (into
+   {}
+   (remove
+    second
+    (map
+     (fn [task]
+       {(:id task)
+        (:onyx/flux-policy (planning/find-task catalog (:name task)))})
+     tasks))))
+
 (defn ^{:added "0.6.0"} map-set-workflow->workflow
   "Converts a workflow in format:
    {:a #{:b :c}
@@ -98,13 +109,19 @@
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)
         min-reqs (min-required-peers (:catalog job) tasks)
+        task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
         exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
-        args {:id id :tasks task-ids :task-scheduler scheduler
-              :saturation sat :task-saturation task-saturation
+        args {:id id
+              :tasks task-ids
+              :task-scheduler scheduler
+              :saturation sat
+              :task-saturation task-saturation
               :min-required-peers min-reqs
-              :inputs input-task-ids :outputs output-task-ids
+              :flux-policies task-flux-policies
+              :inputs input-task-ids
+              :outputs output-task-ids
               :exempt-tasks exempt-task-ids
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)

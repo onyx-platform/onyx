@@ -2,6 +2,7 @@
   (:require [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
+            [onyx.system]
             [onyx.api :as api]
             [onyx.static.planning :as planning]
             [onyx.test-helper :refer [job-allocation-counts]]
