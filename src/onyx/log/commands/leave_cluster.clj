@@ -5,7 +5,14 @@
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
+            [onyx.log.commands.kill-job :refer [apply-kill-job]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
+
+(defn enforce-flux-policy [replica id]
+  (let [allocation (common/peer->allocated-job (:allocations replica) id)]
+    (if (= (get replica [:flux-policies (:job allocation) (:task allocation)]) :kill)
+      (apply-kill-job replica)
+      replica)))
 
 (defmethod extensions/apply-log-entry :leave-cluster
   [{:keys [args]} replica]
@@ -28,6 +35,7 @@
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (common/remove-peers (:id args))
+        (enforce-flux-policy id)
         (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :leave-cluster
