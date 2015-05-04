@@ -72,5 +72,56 @@
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
 
+(def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
+
+(def job-2
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 10
+              :onyx/flux-policy :kill
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest min-peers-flux-kill
+  (let [rets (api/create-submit-job-entry
+              job-2-id
+              peer-config
+              job-2
+              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
+    (checking
+     "Checking no peers are ever allocated to this job since this job needs at least
+      12 peers to run."
+     1000
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 6)) :job-2 [rets])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args rets))]
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
+
 ;; TODO: Peers in a grouping task are never reallocated.
 

@@ -45,17 +45,19 @@
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/balanced
   [replica job n]
   (let [tasks (get-in replica [:tasks job])
-        t (apply + (vals (get-in replica [:min-required-peers job])))
-        min-peers (int (/ n t))
-        r (rem n t)
-        max-peers (inc min-peers)
-        init
-        (reduce
-         (fn [all [task k]]
-           (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
-                                (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
-                                (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task]))))))
-         {}
-         (map vector tasks (range)))
-        spare-peers (- n (apply + (vals init)))]
-    (reuse-spare-peers replica job init spare-peers)))
+        t (apply + (vals (get-in replica [:min-required-peers job])))]
+    (if (< n t)
+      (zipmap tasks (repeat 0))
+      (let [min-peers (int (/ n t))
+            r (rem n t)
+            max-peers (inc min-peers)
+            init
+            (reduce
+             (fn [all [task k]]
+               (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                    (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
+                                    (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task]))))))
+             {}
+             (map vector tasks (range)))
+            spare-peers (- n (apply + (vals init)))]
+        (reuse-spare-peers replica job init spare-peers)))))

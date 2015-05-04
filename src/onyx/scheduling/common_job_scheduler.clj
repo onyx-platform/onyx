@@ -52,17 +52,18 @@
 (defn reallocate-peers [origin-replica displaced-peers max-utilization]
   (loop [peer-pool displaced-peers
          replica origin-replica]
-    (let [candidate-jobs (filter identity
-                                 (mapcat
-                                  (fn [job]
-                                    (let [current (get (current-task-allocations replica) job)
-                                          desired (cts/task-distribute-peer-count replica job (get max-utilization job))
-                                          tasks (get-in replica [:tasks job])]
-                                      (map (fn [t]
-                                             (when (< (or (get current t) 0) (get desired t))
-                                               [job t]))
-                                           tasks)))
-                                  (:jobs replica)))]
+    (let [candidate-jobs (remove
+                          nil?
+                          (mapcat
+                           (fn [job]
+                             (let [current (get (current-task-allocations replica) job)
+                                   desired (cts/task-distribute-peer-count replica job (get max-utilization job))
+                                   tasks (get-in replica [:tasks job])]
+                               (map (fn [t]
+                                      (when (< (or (get current t) 0) (get desired t))
+                                        [job t]))
+                                    tasks)))
+                           (:jobs replica)))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
                (let [removed (common/remove-peers replica (first peer-pool))
