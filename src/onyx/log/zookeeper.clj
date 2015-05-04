@@ -27,6 +27,9 @@
 (defn flow-path [prefix]
   (str (prefix-path prefix) "/flow"))
 
+(defn lifecycles-path [prefix]
+  (str (prefix-path prefix) "/lifecycles"))
+
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
@@ -46,7 +49,7 @@
   (str (prefix-path prefix) "/messaging"))
 
 (defn throw-subscriber-closed []
-  (throw (ex-info "Log subscriber closed from disconnecting to ZooKeeper" {})))
+  (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
 (defn clean-up-broken-connections [f]
   (try
@@ -67,7 +70,7 @@
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting ZooKeeper")
+    (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (:zookeeper.server/port config)))
           conn (zk/connect (:zookeeper/address config))]
@@ -78,6 +81,7 @@
       (zk/create conn (catalog-path onyx-id) :persistent? true)
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
+      (zk/create conn (lifecycles-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
@@ -89,11 +93,11 @@
       (assoc component :server server :conn conn :prefix onyx-id)))
 
   (stop [component]
-    (taoensso.timbre/info "Stopping ZooKeeper")
+    (taoensso.timbre/info "Stopping ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (zk/close (:conn component))
 
     (when (:server component)
-      (.stop (:server component)))
+      (.close (:server component)))
 
     component))
 
@@ -237,6 +241,14 @@
            bytes (compress chunk)]
        (zk/create conn node :persistent? true :data bytes)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :lifecycles]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (lifecycles-path prefix) "/" id)
+           bytes (compress chunk)]
+       (zk/create conn node :persistent? true :data bytes)))))
+
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
@@ -315,6 +327,13 @@
   (clean-up-broken-connections
    (fn []
      (let [node (str (flow-path prefix) "/" id)]
+       (decompress (:data (zk/data conn node)))))))
+
+(defmethod extensions/read-chunk [ZooKeeper :lifecycles]
+  [{:keys [conn opts prefix] :as log} kw id & _]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (lifecycles-path prefix) "/" id)]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]

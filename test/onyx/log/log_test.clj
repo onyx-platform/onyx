@@ -41,17 +41,18 @@
 
     (extensions/subscribe-to-log (:log env) ch)
 
-    (future
-      (try
-        (doseq [n (range entries)]
-          (extensions/write-log-entry (:log env) {:n n}))
-        (catch Exception e
-          (.printStackTrace e))))
+    (let [write-fut (future
+                      (try
+                        (doseq [n (range entries)]
+                          (extensions/write-log-entry (:log env) {:n n}))
+                        (catch Exception e
+                          (.printStackTrace e))))]
+      (facts
+        "We can asynchronously write log entries and read them back in order"
+        (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
+                          (range entries)))
+              => entries))
 
-    (facts
-      "We can asynchronously write log entries and read them back in order"
-      (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
-                        (range entries)))
-            => entries))
+      (deref write-fut))
     (finally 
       (onyx.api/shutdown-env env))))

@@ -54,11 +54,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 #### Maps with `:onyx/type` set to `:input` may optionally have these keys
 
-| key name              | type     | default
-|-----------------------|----------|--------
-|`:onyx/pending-timeout`|`integer` | `60000`
-|`:onyx/replay-interval`|`integer` | `1000`
-|`:onyx/max-pending`    |`integer` | `10000`
+| key name                   | type     | default
+|----------------------------|----------|--------
+|`:onyx/pending-timeout`     |`integer` | `60000`
+|`:onyx/input-retry-timeout `|`integer` | `1000`
+|`:onyx/max-pending`         |`integer` | `10000`
 
 #### Maps with `:onyx/type` set to `:function` must have these keys
 
@@ -90,6 +90,17 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:flow/thrown-exception?`|`boolean`                     | yes      |`false`
 |`:flow/post-transform?`  |`keyword`                     | yes      |`nil`
 |`:flow/action?`          |`keyword`                     | yes      |`nil`
+
+### Lifecycles
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+
+| key name                |type                          | optional?| default
+|-------------------------|------------------------------|----------|--------
+|`:lifecycle/name`        |`keyword`                     | no       |
+|`:lifecycle/calls`       |`keyword`                     | no       |
+|`:lifecycle/doc`         |`string`                      | yes      |
 
 ### Event Context
 

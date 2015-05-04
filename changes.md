@@ -4,8 +4,10 @@
 - Dropped feature: support for `onyx.task-scheduler/greedy`
 - Dropped feature: support for HornetQ messaging
 - Dropped feature: internal HornetQ messaging plugin
+- Dropped feature: multimethod lifecycles
 - New messaging transport: Netty TCP
 - New messaging transport: Aeron
+- New messaging transport: core.async
 - New feature: Percentage-based, elastically scalable acknowledgement configuration
 - New feature: Input, output, and specific task name exemption from acting as an acker node
 - New feature: Functions can take an entire batch of segments as their input with catalog key `:onyx/bulk?` true
@@ -13,6 +15,7 @@
 - New feature: Flow conditions may post-transform exception values into new segments
 - New feature: Flow conditions support a new `:action` key with `:retry` to reprocess a segment from its root value
 - New feature: Custom compression and decompression functions through Peer configuration
+- New feature: Data driven lifecycles
 - New feature: Internal core.async plugin
 - New documentation: Event context map information model
 - Added metadata to all public API functions indicating which Onyx version they were added in
@@ -22,6 +25,7 @@
 - The last task in a workflow no longer needs to be an `output` task
 - Renamed "Round Robin" schedulers to "Balanced"
 - Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
+- Peers now launch inside of a "peer group" to share network resources.
 
 #### 0.5.3
 
@@ -56,23 +60,23 @@
 
 #### 0.4.1
 
-- Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/MichaelDrogalis/onyx/issues/33)
-- Adds log rotation to default Onyx logging configuration. [#35](https://github.com/MichaelDrogalis/onyx/issues/35)
+- Fixes aggregate ignoring `:onyx/batch-timeout`. [#33](https://github.com/onyx-platform/onyx/issues/33)
+- Adds log rotation to default Onyx logging configuration. [#35](https://github.com/onyx-platform/onyx/issues/35)
 - Peer options available in pipeline event map under key `:onyx.core/peer-opts`
 
 #### 0.4.0
 
-- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/MichaelDrogalis/onyx/issues/20)
-- Support for directed, acylic graphs as workflows. [#26](https://github.com/MichaelDrogalis/onyx/issues/26)
-- Fix for peer live lock on task completion. [#23](https://github.com/MichaelDrogalis/onyx/issues/23)
-- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/MichaelDrogalis/onyx/issues/24)
-- `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/MichaelDrogalis/onyx/issues/3)
+- Grouper and Aggregate functions removed, replaced by catalog-level grouping and implicit aggregation. [#20](https://github.com/onyx-platform/onyx/issues/20)
+- Support for directed, acylic graphs as workflows. [#26](https://github.com/onyx-platform/onyx/issues/26)
+- Fix for peer live lock on task completion. [#23](https://github.com/onyx-platform/onyx/issues/23)
+- Fixed bug where job submission silently fails due to malformed workflow [#24](https://github.com/onyx-platform/onyx/issues/24)
+- `submit-job` throws exceptions on a malformed catalog submission. [#3](https://github.com/onyx-platform/onyx/issues/3)
 - Fix HornetQ ipv6 multicast socket bind issue when running on hosts with ipv6 interfaces.
-- Adds `:onyx/batch-timeout` option to all catalog entries. [#29](https://github.com/MichaelDrogalis/onyx/issues/29)
+- Adds `:onyx/batch-timeout` option to all catalog entries. [#29](https://github.com/onyx-platform/onyx/issues/29)
 
 #### 0.3.3
 
-- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/MichaelDrogalis/onyx/issues/18)
+- Fixes a scenario where a virtual peer can deadlock on task completion. [#18](https://github.com/onyx-platform/onyx/issues/18)
 
 #### 0.3.2
 

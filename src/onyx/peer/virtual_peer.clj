@@ -5,7 +5,8 @@
               [onyx.extensions :as extensions]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
-              [onyx.log.entry :refer [create-log-entry]]))
+              [onyx.log.entry :refer [create-log-entry]]
+              [onyx.static.default-vals :refer [defaults]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (if (:stall-output? state)
@@ -76,8 +77,10 @@
         (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
         (extensions/write-chunk log :messaging {:messaging (select-keys opts [:onyx.messaging/impl])} nil)
 
-        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 1000))
-              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 1000))
+        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 
+                                 (:onyx.peer/inbox-capacity defaults)))
+              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 
+                                  (:onyx.peer/outbox-capacity defaults)))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
               completion-ch (:completions-ch acking-daemon)
@@ -89,11 +92,14 @@
           (extensions/register-pulse log id)
           (>!! outbox-ch entry)
 
-          (thread (outbox-loop id log outbox-ch))
-          (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
-          (assoc component :id id :inbox-ch inbox-ch
-                 :outbox-ch outbox-ch :kill-ch kill-ch
-                 :restart-ch restart-ch))
+          (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
+                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))]
+            (assoc component 
+                   :outbox-loop-ch outbox-loop-ch
+                   :processing-loop-ch processing-loop-ch
+                   :id id :inbox-ch inbox-ch
+                   :outbox-ch outbox-ch :kill-ch kill-ch
+                   :restart-ch restart-ch)))
         (catch Throwable e
           (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
           (throw e)))))
@@ -105,6 +111,8 @@
     (close! (:outbox-ch component))
     (close! (:kill-ch component))
     (close! (:restart-ch component))
+    (<!! (:outbox-loop-ch component))
+    (<!! (:processing-loop-ch component))
 
     component))
 

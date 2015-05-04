@@ -23,4 +23,4 @@ This sort of dynamic behavior is accomplished via bootstrapping. By setting `:on
 
 ### Templates
 
-To help move past the boilerplate of creating new plugins, use Leiningen with [`onyx-plugin`](https://github.com/MichaelDrogalis/onyx-plugin) to generate a template.
+To help move past the boilerplate of creating new plugins, use Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin) to generate a template.

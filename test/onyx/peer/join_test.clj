@@ -1,7 +1,6 @@
 (ns onyx.peer.join-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]
@@ -92,24 +91,52 @@
    [:ages :join-person]
    [:join-person :out]])
 
-(defmethod l-ext/inject-lifecycle-resources :join-person
-  [_ event]
+(defn inject-names-ch [event lifecycle]
+  {:core.async/chan name-chan})
+
+(defn inject-ages-ch [event lifecycle]
+  {:core.async/chan age-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(defn inject-join-state [event lifecycle]
   {:onyx.core/params [(atom {})]})
 
-(defmethod l-ext/inject-lifecycle-resources :names
-  [_ _] {:core.async/chan name-chan})
+(def names-calls
+  {:lifecycle/before-task inject-names-ch})
 
-(defmethod l-ext/inject-lifecycle-resources :ages
-  [_ _] {:core.async/chan age-chan})
+(def ages-calls
+  {:lifecycle/before-task inject-ages-ch})
 
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
+(def join-calls
+  {:lifecycle/before-task inject-join-state})
+
+(def out-calls
+  {:lifecycle/before-task inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :names
+    :lifecycle/calls :onyx.peer.join-test/names-calls}
+   {:lifecycle/task :names
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :ages
+    :lifecycle/calls :onyx.peer.join-test/ages-calls}
+   {:lifecycle/task :ages
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.join-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+   {:lifecycle/task :join-person
+    :lifecycle/calls :onyx.peer.join-test/join-calls}])
 
 (def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))

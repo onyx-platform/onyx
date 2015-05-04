@@ -2,15 +2,14 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.test-helper :refer [load-config]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]))
 
-(def onyx-id (java.util.UUID/randomUUID))
-
 (def config (load-config))
+
+(def onyx-id (java.util.UUID/randomUUID))
 
 (def env-config (assoc (:env-config config) :onyx/id onyx-id))
 
@@ -50,11 +49,27 @@
 
 (def out-chan (chan (sliding-buffer 100)))
 
-(defmethod l-ext/inject-lifecycle-resources :a
-  [_ _] {:core.async/chan in-chan})
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :c
-  [_ _] {:core.async/chan out-chan})
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls
+  {:lifecycle/before-task inject-in-ch})
+
+(def out-calls
+  {:lifecycle/before-task inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :a
+    :lifecycle/calls :onyx.log.one-job-test/in-calls}
+   {:lifecycle/task :a
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.log.one-job-test/out-calls}
+   {:lifecycle/task :c
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (defn my-inc [segment]
   {:n (inc (:n segment))})
@@ -63,6 +78,7 @@
  peer-config
  {:workflow [[:a :b] [:b :c]]
   :catalog catalog
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def ch (chan n-peers))

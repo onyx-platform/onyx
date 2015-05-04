@@ -12,9 +12,11 @@ In your peer boot-up namespace:
 (:require [onyx.plugin.core-async])
 ```
 
-#### Catalog entries
+#### Functions
 
 ##### read-from-chan
+
+Catalog entry:
 
 ```clojure
 {:onyx/name :in
@@ -26,7 +28,31 @@ In your peer boot-up namespace:
  :onyx/doc "Reads segments from a core.async channel"}
 ```
 
+Lifecycle entries:
+
+```clojure
+[{:lifecycle/task :your-task-name
+  :lifecycle/calls :my.ns/in-calls}
+ {:lifecycle/task :your-task-name
+  :lifecycle/calls :onyx.plugin.core-async/reader-calls}]
+```
+
+There's a little extra baggage with core.async because you need a reference to the channel.
+Make sure that `my.ns/in-calls` is a map that references a function to inject the channel in:
+
+```clojure
+(def in-chan (chan capacity))
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(def in-calls
+  {:lifecycle/before-task inject-in-ch})
+```
+
 ##### write-to-chan
+
+Catalog entry:
 
 ```clojure
 {:onyx/name :out
@@ -38,29 +64,28 @@ In your peer boot-up namespace:
  :onyx/doc "Writes segments to a core.async channel"}
 ```
 
-#### Attributes
-
-This plugin does not use any attributes.
-
-#### Lifecycle Arguments
-
-References to core.async channels must be injected for both the input and output tasks.
-
-##### `read-from-chan`
+Lifecycle entries:
 
 ```clojure
-(defmethod l-ext/inject-lifecycle-resources :my.input.task.identity-or-name
-  [_ _] {:core.async/chan (chan capacity)})
+[{:lifecycle/task :your-task-name
+  :lifecycle/calls :my.ns/out-calls}
+ {:lifecycle/task :your-task-name
+  :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 ```
 
-##### `write-to-chan`
+Again, as with `read-from-chan`, there's a little extra to do since core.async has some exceptional behavior compared to other plugins:
 
 ```clojure
-(defmethod l-ext/inject-lifecycle-resources :my.output.task.identity-or-name
-  [_ _] {:core.async/chan (chan capacity)})
+(def out-chan (chan capacity))
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def out-calls
+  {:lifecycle/before-task inject-out-ch})
 ```
 
-#### Functions
+#### Utility Functions
 
 ##### `take-segments!`
 

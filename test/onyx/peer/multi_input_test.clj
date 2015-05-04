@@ -1,7 +1,6 @@
 (ns onyx.peer.multi-input-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
@@ -31,21 +30,6 @@
 (def in-chan-4 (chan (inc n-messages)))
 
 (def out-chan (chan (sliding-buffer (inc n-messages))))
-
-(defmethod l-ext/inject-lifecycle-resources :in-1
-  [_ _] {:core.async/chan in-chan-1})
-
-(defmethod l-ext/inject-lifecycle-resources :in-2
-  [_ _] {:core.async/chan in-chan-2})
-
-(defmethod l-ext/inject-lifecycle-resources :in-3
-  [_ _] {:core.async/chan in-chan-3})
-
-(defmethod l-ext/inject-lifecycle-resources :in-4
-  [_ _] {:core.async/chan in-chan-4})
-
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
 
 (def messages
   (->> 4
@@ -120,11 +104,64 @@
    [:in-4 :inc]
    [:inc :out]])
 
+(defn inject-in-1-ch [event lifecycle]
+  {:core.async/chan in-chan-1})
+
+(defn inject-in-2-ch [event lifecycle]
+  {:core.async/chan in-chan-2})
+
+(defn inject-in-3-ch [event lifecycle]
+  {:core.async/chan in-chan-3})
+
+(defn inject-in-4-ch [event lifecycle]
+  {:core.async/chan in-chan-4})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-1-calls
+  {:lifecycle/before-task inject-in-1-ch})
+
+(def in-2-calls
+  {:lifecycle/before-task inject-in-2-ch})
+
+(def in-3-calls
+  {:lifecycle/before-task inject-in-3-ch})
+
+(def in-4-calls
+  {:lifecycle/before-task inject-in-4-ch})
+
+(def out-calls
+  {:lifecycle/before-task inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in-1
+    :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
+   {:lifecycle/task :in-1
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-2
+    :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
+   {:lifecycle/task :in-2
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-3
+    :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
+   {:lifecycle/task :in-3
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :in-4
+    :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
+   {:lifecycle/task :in-4
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+
 (def v-peers (onyx.api/start-peers 6 peer-group))
 
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))

@@ -94,10 +94,31 @@
    :task-scheduler schema/Keyword
    (schema/optional-key :percentage) schema/Int
    (schema/optional-key :flow-conditions) schema/Any
+   (schema/optional-key :lifecycles) schema/Any
    (schema/optional-key :acker/percentage) schema/Int
    (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
    (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
    (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
+
+(defn validate-lifecycles [lifecycles catalog]
+  (doseq [lifecycle lifecycles]
+    (assert (or (= (:lifecycle/task lifecycle) :all)
+                (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
+            (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle)))
+    (schema/validate
+     {:lifecycle/task schema/Keyword
+      (schema/optional-key :lifecycle/pre) schema/Keyword
+      (schema/optional-key :lifecycle/pre-batch) schema/Keyword
+      (schema/optional-key :lifecycle/post-batch) schema/Keyword
+      (schema/optional-key :lifecycle/post) schema/Keyword
+      (schema/optional-key :lifecycle/doc) String}
+     (select-keys lifecycle
+                  [:lifecycle/task
+                   :lifecycle/pre
+                   :lifecycle/pre-batch
+                   :lifecycle/post-batch
+                   :lifecycle/post
+                   :lifecycle/doc]))))
 
 (defn validate-env-config [env-config]
   (schema/validate
@@ -113,7 +134,7 @@
     {:zookeeper/address schema/Str
      :onyx/id schema/Uuid
      :onyx.peer/job-scheduler schema/Keyword
-     :onyx.messaging/impl (schema/enum :netty :dummy-messenger)
+     :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
      :onyx.messaging/bind-addr schema/Str
      (schema/optional-key :onyx.messaging/peer-port-range) [schema/Int]
      (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
@@ -222,4 +243,3 @@
   (validate-none-position flow-conditions-schema)
   (validate-short-circuit flow-conditions-schema)
   (validate-auto-short-circuit flow-conditions-schema))
-

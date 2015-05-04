@@ -1,7 +1,6 @@
 (ns onyx.peer.multi-peer-mem-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.test-helper :refer [load-config]]
             [onyx.plugin.core-async]
             [onyx.api]))
@@ -54,11 +53,27 @@
 
 (def out-chan (chan (sliding-buffer (inc n-messages))))
 
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
 
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls
+  {:lifecycle/before-task inject-in-ch})
+
+(def out-calls
+  {:lifecycle/before-task inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls :onyx.peer.multi-peer-mem-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.peer.multi-peer-mem-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
@@ -70,6 +85,7 @@
 (onyx.api/submit-job
  peer-config
  {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))

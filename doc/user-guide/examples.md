@@ -10,4 +10,4 @@
 
 ### Examples Project
 
-See the [Examples Project](https://github.com/MichaelDrogalis/onyx-examples) for a set of self-contained demonstrations of specific Onyx functionality.
+See the [Examples Project](https://github.com/onyx-platform/onyx-examples) for a set of self-contained demonstrations of specific Onyx functionality.
