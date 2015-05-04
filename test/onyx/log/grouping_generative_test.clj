@@ -99,7 +99,7 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(deftest min-peers-flux-kill
+(deftest min-peers-on-grouping
   (let [rets (api/create-submit-job-entry
               job-2-id
               peer-config
@@ -119,6 +119,41 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
+
+(deftest combined-jobs
+  (let [job-1-rets (api/create-submit-job-entry
+                    job-1-id
+                    peer-config
+                    job-1
+                    (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
+        job-2-rets (api/create-submit-job-entry
+                    job-2-id
+                    peer-config
+                    job-2
+                    (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
+    (checking
+     "Checking peers are allocated to job 1 even though job 2 is submitted and can't start."
+     1000
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 10))
+                    :job-1 [job-1-rets]
+                    :job-2 [job-2-rets])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args job-1-rets))
+           [t4 t5 t6] (:tasks (:args job-2-rets))]
+       (is (= 3 (count (get (get (:allocations replica) job-1-id) t1))))
+       (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
+       (is (= 3 (count (get (get (:allocations replica) job-1-id) t3))))
+
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
