@@ -2,12 +2,21 @@
   (:require [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
+(defn filter-grouped-tasks [replica job allocations]
+  (into
+   {}
+   (remove
+    (fn [[k v]]
+      (not (nil? (get-in replica [:flux-policies replica job k]))))
+    allocations)))
+
 (defmethod cts/drop-peers :onyx.task-scheduler/balanced
   [replica job n]
   (first
    (reduce
     (fn [[peers-to-drop allocations] _]
       (let [max-peers (->> allocations
+                           (filter-grouped-tasks replica job)
                            (sort-by (comp count val))
                            reverse
                            first

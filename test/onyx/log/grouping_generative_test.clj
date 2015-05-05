@@ -215,5 +215,3 @@
        ;; before the peer boots up, making it irrelevant.
        (is (or (= [0 0 0] [c1 c2 c3])
                (= [1 2 1] [c1 c2 c3])))))))
-
-;; TODO: Peers in a grouping task are never reallocated.
