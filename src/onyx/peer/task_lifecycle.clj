@@ -111,13 +111,12 @@
                                         [event] 
                                         message)
               message)]
-    (assoc leaf
-           :hash-group
-           (reduce (fn [groups t]
-                     (assoc groups t (group-message msg catalog t)))
-                   {} 
-                   next-tasks)
-           :message (apply dissoc msg (:exclusions (:routes leaf))))))
+    (-> leaf 
+        (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
+        (assoc :hash-group (reduce (fn [groups t]
+                                     (assoc groups t (group-message msg catalog t)))
+                                   {} 
+                                   next-tasks)))))
 
 
 
@@ -135,10 +134,10 @@
                                 :leaves 
                                 (map (fn [leaf]
                                        (-> leaf 
-                                           (assoc :routes (add-route-data event result leaf downstream)
-                                                  :id id 
-                                                  :acker-id acker-id 
-                                                  :completion-id completion-id)
+                                           (assoc :routes (add-route-data event result leaf downstream))
+                                           (assoc :id id)
+                                           (assoc :acker-id acker-id)
+                                           (assoc :completion-id completion-id)
                                            (group-segments downstream catalog event)
                                            (add-ack-vals)))
                                      leaves))))
