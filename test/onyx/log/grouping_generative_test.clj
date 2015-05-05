@@ -194,7 +194,7 @@
               job-3
               (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
     (checking "The job is killed after a peer drops out of the grouping task."
-     100
+     1000
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
