@@ -39,6 +39,10 @@
       0
       (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))))
 
+(defn preallocated-grouped-task? [replica job task]
+  (and (not (nil? (get-in replica [:flux-policies job task])))
+       (> (count (get-in replica [:allocations job task])) 0)))
+
 (defn reuse-spare-peers [replica job tasks spare-peers]
   (loop [[head & tail :as task-seq] (get-in replica [:tasks job])
          results tasks
@@ -46,7 +50,8 @@
     (let [tail (vec tail)]
       (cond (or (<= capacity 0) (not (seq task-seq)))
             results
-            (< (get results head) (or (get-in replica [:task-saturation job head] Double/POSITIVE_INFINITY)))
+            (and (< (get results head) (or (get-in replica [:task-saturation job head] Double/POSITIVE_INFINITY)))
+                 (not (preallocated-grouped-task? replica job head)))
             (recur (conj tail head) (update-in results [head] inc) (dec capacity))
             :else
             (recur tail results capacity)))))
@@ -63,9 +68,13 @@
             init
             (reduce
              (fn [all [task k]]
-               (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
-                                    (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
-                                    (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task]))))))
+               ;; If it's a grouped task that has already been allocated,
+               ;; we can't add more peers since that would break the hashing algorithm.
+               (if (preallocated-grouped-task? replica job task)
+                 all
+                 (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                      (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
+                                      (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task])))))))
              {}
              (map vector tasks (range)))
             spare-peers (- n (apply + (vals init)))]
