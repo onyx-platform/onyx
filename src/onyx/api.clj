@@ -41,13 +41,15 @@
 (defn ^{:no-doc true} flux-policies [catalog tasks]
   (into
    {}
-   (remove
+   (filter
     second
-    (map
-     (fn [task]
-       {(:id task)
-        (:onyx/flux-policy (planning/find-task catalog (:name task)))})
-     tasks))))
+    (into
+     {}
+     (map
+      (fn [task]
+        {(:id task)
+         (:onyx/flux-policy (planning/find-task catalog (:name task)))})
+      tasks)))))
 
 (defn ^{:added "0.6.0"} map-set-workflow->workflow
   "Converts a workflow in format:

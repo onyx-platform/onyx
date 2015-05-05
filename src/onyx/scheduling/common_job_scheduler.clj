@@ -121,11 +121,25 @@
    replica
    (:jobs replica)))
 
+(defn deallocate-starved-jobs
+  "Strips out allocations from jobs that no longer meet the minimum number
+   of peers. This can happen if a peer leaves from a running job."
+  [replica]
+  (reduce
+   (fn [result job]
+     (if (< (apply + (map count (vals (get-in result [:allocations job]))))
+            (apply + (vals (get-in result [:min-required-peers job]))))
+       (update-in result [:allocations] dissoc job)
+       result))
+   replica
+   (:jobs replica)))
+
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
         job-claims (job->task-claims replica job-offers)
         spare-peers (apply + (vals (merge-with - job-offers job-claims)))
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
-        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)]
-    (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))))
+        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
+        deallocated (deallocate-starved-jobs replica)]
+    (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))

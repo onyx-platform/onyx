@@ -17,7 +17,8 @@
 
 (def peer-config 
   {:onyx/id onyx-id
-   :onyx.messaging/impl :dummy-messenger})
+   :onyx.messaging/impl :dummy-messenger
+   :onyx.peer/try-join-once? true})
 
 (def messenger (->DummyMessenger))
 
@@ -49,7 +50,61 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(deftest min-peers-flux-kill
+(def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
+
+(def job-2
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 10
+              :onyx/flux-policy :continue
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(def job-3-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
+
+(def job-3
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 2
+              :onyx/flux-policy :kill
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest min-peers-one-job
   (let [rets (api/create-submit-job-entry
               job-1-id
               peer-config 
@@ -73,34 +128,7 @@
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
 
-(def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
-
-(def job-2
-  {:workflow [[:a :b] [:b :c]]
-   :catalog [{:onyx/name :a
-              :onyx/ident :core.async/read-from-chan
-              :onyx/type :input
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Reads segments from a core.async channel"}
-
-             {:onyx/name :b
-              :onyx/fn :mock/fn
-              :onyx/type :function
-              :onyx/group-by-kw :mock-key
-              :onyx/min-peers 10
-              :onyx/flux-policy :kill
-              :onyx/batch-size 20}
-
-             {:onyx/name :c
-              :onyx/ident :core.async/write-to-chan
-              :onyx/type :output
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Writes segments to a core.async channel"}]
-   :task-scheduler :onyx.task-scheduler/balanced})
-
-(deftest min-peers-on-grouping
+(deftest min-peers-not-enough-peers
   (let [rets (api/create-submit-job-entry
               job-2-id
               peer-config
@@ -159,5 +187,33 @@
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
 
-;; TODO: Peers in a grouping task are never reallocated.
+(deftest kill-flux-policy
+  (let [rets (api/create-submit-job-entry
+              job-3-id
+              peer-config
+              job-3
+              (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
+    (checking "The job is killed after a peer drops out of the grouping task."
+     100
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 4))
+                    :job-3 [rets
+                            {:fn :leave-cluster :args {:id :p1} :immediate? true}])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args rets))
+           c1 (count (get (get (:allocations replica) job-3-id) t1))
+           c2 (count (get (get (:allocations replica) job-3-id) t2))
+           c3 (count (get (get (:allocations replica) job-3-id) t3))]
+       ;; Either no peers are allocated or they all are. The option
+       ;; is because of the timing of the kill signal. It may pop up
+       ;; before the peer boots up, making it irrelevant.
+       (is (or (= [0 0 0] [c1 c2 c3])
+               (= [1 2 1] [c1 c2 c3])))))))
 
+;; TODO: Peers in a grouping task are never reallocated.

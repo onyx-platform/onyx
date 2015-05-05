@@ -44,7 +44,8 @@
                                                                         new-replica 
                                                                         diff 
                                                                         {:messenger messenger
-                                                                         :id peer-id})]
+                                                                         :id peer-id
+                                                                         :opts {:onyx.peer/try-join-once? true}})]
                                  (when (seq reactions)
                                    [peer-id reactions])))
                              peers)
@@ -98,7 +99,7 @@
                                                         (contains? joined-peers peer))))
                                           (map key)
                                           set)
-                    selectable-queues (into selectable-peers peerless-queues)] 
+                    selectable-queues (into selectable-peers peerless-queues)]
                 (when (empty? selectable-queues)
                   (println "No playable log messages. State: " state))
                 (gen/elements selectable-queues)))))
