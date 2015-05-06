@@ -92,7 +92,9 @@
 
 (def results (take-segments! out-chan))
 
-(fact results => (conj (vec (map (fn [x] {:n (+ x 42)}) (range n-messages))) :done))
+(let [expected (set (map (fn [x] {:n (+ x 42)}) (range n-messages)))]
+  (fact (set (butlast results)) => expected)
+  (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

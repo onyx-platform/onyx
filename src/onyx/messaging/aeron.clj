@@ -35,7 +35,7 @@
 
   (stop [{:keys [media-driver] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (when media-driver (.close media-driver))
+    (when media-driver (.close ^MediaDriver media-driver))
     (assoc component :media-driver nil)))
 
 (defn aeron-peer-group [opts]
@@ -63,11 +63,8 @@
   (let [msg-type (protocol/read-message-type buffer offset)
         offset-rest (inc offset)] 
     (cond (= msg-type protocol/ack-msg-id)
-          (let [thawed (protocol/read-acker-message buffer offset-rest)]
-            (acker/ack-message daemon
-                               (:id thawed)
-                               (:completion-id thawed)
-                               (:ack-val thawed)))
+          (let [[id completion-id ack-val] (protocol/read-acker-message buffer offset-rest)]
+            (acker/ack-message daemon id completion-id ack-val))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset-rest)]
@@ -142,9 +139,9 @@
                       accept-aux-fut]} rs] 
           (future-cancel accept-send-fut)
           (future-cancel accept-aux-fut)
-         (when send-subscriber (.close send-subscriber))
-         (when aux-subscriber (.close aux-subscriber))
-         (when conn (.close conn)))
+         (when send-subscriber (.close ^uk.co.real_logic.aeron.Subscription send-subscriber))
+         (when aux-subscriber (.close ^uk.co.real_logic.aeron.Subscription aux-subscriber))
+         (when conn (.close ^uk.co.real_logic.aeron.Aeron conn)))
         (reset! resources nil))
       (close! (:release-ch component))
       (close! (:retry-ch component))
@@ -233,13 +230,15 @@
     (while (not (offer-f))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
-(defmethod extensions/internal-ack-message AeronConnection
-  [messenger event peer-link message-id completion-id ack-val]
-  (let [unsafe-buffer (protocol/build-acker-message message-id completion-id ack-val)
-        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-    (while (not (offer-f))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+(defmethod extensions/internal-ack-messages AeronConnection
+  [messenger event peer-link acks]
+  ; TODO: Might want to batch in a single buffer as in netty
+  (let [pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)] 
+    (doseq [{:keys [id completion-id ack-val]} acks] 
+      (let [unsafe-buffer (protocol/build-acker-message id completion-id ack-val)
+            offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
+        (while (not (offer-f))
+          (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
@@ -260,10 +259,10 @@
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
   (when-let [pub (get-in peer-link [:send-pub :pub])] 
-    (when @pub (.close @pub))
+    (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
   (when-let [pub (get-in peer-link [:send-pub :aux-pub])]
-    (when @pub (.close @pub))
+    (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
-  (.close (:conn peer-link)) 
+  (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
   {})
