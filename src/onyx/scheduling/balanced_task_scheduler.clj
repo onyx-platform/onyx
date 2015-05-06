@@ -28,17 +28,6 @@
     [[] (get-in replica [:allocations job])]
     (range n))))
 
-(defmethod cts/task-claim-n-peers :onyx.task-scheduler/balanced
-  [replica job n]
-  (let [min-required (apply + (vals (get-in replica [:min-required-peers job])))]
-    ;; If the number of peers is less than the mininum number of
-    ;; required peers, we're not covered - so we claim zero peers.
-    ;; Otherwise we take as much as we're allowed, depending on the
-    ;; saturation of the job.
-    (if (< n min-required)
-      0
-      (min (get-in replica [:saturation job] Double/POSITIVE_INFINITY) n))))
-
 (defn preallocated-grouped-task? [replica job task]
   (and (not (nil? (get-in replica [:flux-policies job task])))
        (> (count (get-in replica [:allocations job task])) 0)))

@@ -29,19 +29,9 @@
                      scheduler)
              {:replica replica}))))
 
-(defmulti task-claim-n-peers
-  (fn [replica job n]
-    (get-in replica [:task-schedulers job])))
-
 (defmulti task-distribute-peer-count
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
-
-(defmethod task-claim-n-peers :default
-  [replica job n]
-  (throw (ex-info (format "Task scheduler %s not recognized" (get-in replica [:task-schedulers job]))
-                  {:task-scheduler (get-in replica [:task-schedulers job])
-                   :job job})))
 
 (defmethod task-distribute-peer-count :default
   [replica job n]

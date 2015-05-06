@@ -8,6 +8,47 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre :refer [info]]))
 
+(defn job-upper-bound [replica job]
+  ;; We need to handle a special case here when figuring out the upper saturation limit.
+  ;; If this is a job with a grouped task that has already been allocated,
+  ;; we can't allocate to the grouped task anymore, even if it's saturation
+  ;; level is Infinity.
+  (let [tasks (get-in replica [:tasks job])
+        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+    (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
+      (apply + (map (fn [task]
+                      (if (some #{task} grouped-tasks)
+                        ;; Cannot allocate anymore, you have what you have.
+                        (count (get-in replica [:allocations job task]))
+                        ;; Allocate as much the original task saturation allows since it hasn't
+                        ;; been allocated yet.
+                        (get-in replica [:task-saturation job task])))))
+      (get-in replica [:saturation job] Double/POSITIVE_INFINITY))))
+
+(defn job-lower-bound [replica job]
+  ;; Again, we handle the special case of a grouped task that has already
+  ;; begun.
+  (let [tasks (get-in replica [:tasks job])
+        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+    (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
+      (apply + (map (fn [task]
+                      (if (some #{task} grouped-tasks)
+                        ;; Cannot allocate anymore, you have what you have.
+                        (count (get-in replica [:allocations job task]))
+                        ;; Grab the absolute minimum for this task, no constraints.
+                        (get-in replica [:min-required-peers job task])))))
+      (apply + (vals (get-in replica [:min-required-peers job]))))))
+
+(defn job-coverable? [replica job n]
+  (>= n (job-lower-bound replica job)))
+
+(defn job-bounds [replica jobs]
+  (map
+   (fn [job]
+     {:lower (min-peers-for-job replica job)
+      :upper (job-upper-bound replica job)})
+   jobs))
+
 (defmulti job-offer-n-peers
   (fn [replica]
     (:job-scheduler replica)))
@@ -42,10 +83,14 @@
                         (get-in replica [:tasks j])))})
         (:jobs replica))))
 
-(defn job->task-claims [replica job-offers]
+(defn job-claim-peers [replica job-offers]
   (reduce-kv
-   (fn [all j claim]
-     (assoc all j (cts/task-claim-n-peers replica j claim)))
+   (fn [all j n]
+     (if (job-coverable? replica j n)
+       (let [sat (job-upper-bound replica j)]
+         (assert (>= n sat) "Saturation value was less than offer value. There's a bug in the scheduler. Aborting!")
+         (assoc all j (min sat n)))
+       (assoc all j 0)))
    {}
    job-offers))
 
@@ -136,10 +181,32 @@
 
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
-        job-claims (job->task-claims replica job-offers)
+        job-claims (job-claim-peers replica job-offers)
         spare-peers (apply + (vals (merge-with - job-offers job-claims)))
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
         deallocated (deallocate-starved-jobs replica)]
+    (prn (map count (vals (first (vals (:allocations (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))))))
     (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))
+
+;; xx  Offer: Should be the "essence" of the scheduler. Doesn't know about minimum requirements, saturation, etc.
+;;          - Greedy: gets all peers. Balanced: does an even spread. Pct: does a staggered spread
+;; xx Claims: Here's a task, and N peers for the job - how many do you want? Should be common. Knows about saturation, min requirements.
+;; xx Spare: Computes the difference between what was offered and what was taken.
+
+;; Max utilization: You claimed X, and I have Y more to give. How do you want to disperse them? Scheduler specific, but must respect bounds. This might be a good spot to update the replica to only allow job updates to peers without limit constraints.
+;; We can look at each job and compute its upper bound for peers and pass that in as a parameter to the scheduler specific blocks.
+
+;; Displaced: Find peers that aren't being used and peers that are on jobs that need to give up some peers. This is common, and we need to make sure that peers from grouped tasks never get displaced.
+;; Reallocate: Takes the displaced peers and disperses them over the tasks. Scheduler specific, but must respect lower and upper bounds - which all schedulers have in common.
+
+
+
+;; Invariants for grouped tasks:
+;; - Grouped tasks must be allocated a minimum number of peers, no less.
+;; - Once a task has been allocated to, it never receives more peers in a future allocation
+;; - Once a task has been allocated to, none of its peers may ever be reallocated to another task
+;; - If a task loses a peer and its Flux Policy is kill, the job gets completely deallocated
+;; - If a task loses a peer and its Flux Policy is continue, the task remains exactly as is
+
