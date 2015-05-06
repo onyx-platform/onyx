@@ -9,24 +9,24 @@
 ;; Constants
 
 ;; id uuid 
-(def completion-msg-length (int 17))
+(def ^:const completion-msg-length (int 17))
 
 ;; id uuid
-(def retry-msg-length (int 17))
+(def ^:const retry-msg-length (int 17))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ack-msg-length (int 41))
+(def ^:const ack-msg-length (int 41))
 
-(def completion-msg-id (byte 0))
-(def retry-msg-id (byte 1))
-(def ack-msg-id (byte 2))
+(def ^:const completion-msg-id (byte 0))
+(def ^:const retry-msg-id (byte 1))
+(def ^:const ack-msg-id (byte 2))
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
-(def message-base-length (int 56))
+(def ^:const message-base-length (int 56))
 
 ;; messages with 0 messages in it
-(def messages-base-length (int 4))
+(def ^:const messages-base-length (int 4))
 
 (defn write-uuid [^MutableDirectBuffer buf offset ^UUID uuid]
   (.putLong buf offset (.getMostSignificantBits uuid))
