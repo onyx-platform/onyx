@@ -78,41 +78,62 @@
   (write-uuid buf (+ offset 32) completion-id)
   (.putLong buf (+ offset 48) ack-val))
 
-(defn read-message-meta [^UnsafeBuffer buf offset]
+(defn read-message [^UnsafeBuffer buf offset message]
   (let [id (get-uuid buf offset)
         acker-id (get-uuid buf (+ offset 16))
         completion-id (get-uuid buf (+ offset 32))
         ack-val (.getLong buf (+ offset 48))]
-    (->Leaf nil id acker-id completion-id ack-val nil nil nil nil)))
+    (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
 
-(def message-count-size 4)
+(def ^:const message-count-size 4)
+(def ^:const payload-size-size 4)
 
 (defn meta-message-offsets [start-pos cnt]
   (reductions + start-pos (repeat cnt message-base-length)))
 
-;; TODO: optimize, currently pretty slow relative to everything else
 (defn build-messages-msg-buf [compress-f messages]
-  (let [meta-offsets (meta-message-offsets message-count-size (count messages))
-        message-payloads (compress-f (map :message messages))
-        buf-size (+ (last meta-offsets) 
-                    (count message-payloads))
+  ;; Performance consideration:
+  ;; We would rather write to one contiguous byte array or a byteoutputstream
+  ;; that returns a byte array. This would require changes to nippy
+  (let [message-count (count messages)
+        message-payloads ^bytes (compress-f (map :message messages))
+        payload-size (alength message-payloads)
+        buf-size (+ message-count-size
+                    payload-size-size
+                    payload-size 
+                    (* message-count message-base-length))
         buf (UnsafeBuffer. (byte-array buf-size))] 
     (.putInt buf 0 (int (count messages))) ; number of messages
-    (doseq [[msg offset] (map vector messages meta-offsets)]
-      (write-message-meta buf offset msg))
-    (.putBytes buf (last meta-offsets) message-payloads)
-    [buf-size buf]))
+    (.putInt buf message-count-size payload-size)
+    (.putBytes buf 
+               (+ message-count-size
+                  payload-size-size) 
+               message-payloads)
+    (let [offset (+ message-count-size payload-size-size payload-size)
+          buf-size (reduce (fn [offset msg]
+                             (write-message-meta buf offset msg) 
+                             (+ message-base-length offset))
+                           offset
+                           messages)]
+      [buf-size buf])))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
   (let [message-count (.getInt buf offset)
-        meta-offsets (meta-message-offsets (+ message-count-size offset) message-count)
-        metas (doall (map (partial read-message-meta buf)
-                          (butlast meta-offsets)))
-        segments-size  (- (+ offset length) (last meta-offsets))
-        message-payload-bytes (byte-array segments-size)
-        _ (.getBytes buf (last meta-offsets) message-payload-bytes)
-        message-payloads (decompress-f message-payload-bytes)]
-    (map (fn [m message]
-           (assoc m :message message))
-         metas
-         message-payloads)))
+        offset (+ offset message-count-size)
+        payload-size (.getInt buf offset)
+        offset (+ offset payload-size-size)
+        ;; Performance consideration:
+        ;; We would rather that we didn't need to allocate an additional
+        ;; byte array here and have nippy directly read from the buf bytes
+        message-payload-bytes (byte-array payload-size)
+        _ (.getBytes buf offset message-payload-bytes)
+        message-payloads (decompress-f message-payload-bytes)
+        offset (+ offset payload-size)]
+    (loop [messages (transient []) 
+           payloads (seq message-payloads) 
+           offset offset]
+      (if-let [v (first payloads)] 
+        (recur (conj! messages (read-message buf offset v))
+               (next payloads)
+               (+ offset message-base-length))
+        (persistent! messages)))))
