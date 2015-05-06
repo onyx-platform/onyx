@@ -39,6 +39,7 @@
              (into-transient coll (first vs)))
       (persistent! coll))))
 
+;; needs a performance boost
 (defn build-segments-to-send [leaves]
   (->> leaves
        (map (fn [{:keys [routes ack-vals hash-group message] :as leaf}]
@@ -66,6 +67,7 @@
                 (count active-peers)))
       (rand-nth active-peers))))
 
+;; Needs a performance boost
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/results onyx.core/messenger onyx.core/job-id] :as event}]
   (let [leaves (fast-concat (map :leaves results))
@@ -73,9 +75,10 @@
     (when-not (empty? leaves)
       (let [replica @(:onyx.core/replica event)
             segments (build-segments-to-send leaves)
-            groups (group-by (juxt :route :hash-group) segments)]
+            groups (group-by (juxt :route :hash-group) segments)
+            allocations (get (:allocations replica) job-id)]
         (doseq [[[route hash-group] segs] groups]
-          (let [peers (get-in replica [:allocations job-id (get egress-tasks route)])
+          (let [peers (get allocations (get egress-tasks route))
                 active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
                 target (pick-peer active-peers hash-group)]
             (when target
