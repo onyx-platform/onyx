@@ -2,7 +2,6 @@
     (:require [clojure.core.async :refer [chan >!! close! sliding-buffer]]
               [com.stuartsierra.component :as component]
               [onyx.static.default-vals :refer [defaults]]
-              [onyx.types :refer [->Ack]]
               [taoensso.timbre :as timbre]))
 
 (defrecord AckingDaemon [opts]
@@ -25,19 +24,18 @@
 (defn ack-message [daemon message-id completion-id ack-val]
   (let [rets
         (swap!
-          (:ack-state daemon)
-          (fn [state]
-            (if-let [ack (get state message-id)]
-              (let [updated-ack-val (bit-xor (:ack-val ack) ack-val)]
-                (if (zero? updated-ack-val)
-                  (dissoc state message-id) 
-                  (assoc state message-id (assoc ack :ack-val updated-ack-val))))
-              (if (zero? ack-val) 
-                state
-                (assoc state message-id (->Ack nil completion-id ack-val))))))]
-    (when (get rets message-id)
-      (>!! (:completions-ch daemon) {:id message-id
-                                     :peer-id completion-id}))))
+         (:ack-state daemon)
+         (fn [state]
+           (if-let [current-ack-val (get-in state [message-id :ack-val])]
+             (assoc-in state [message-id :ack-val] (bit-xor current-ack-val ack-val))
+             (assoc state message-id {:completion-id completion-id
+                                      :ack-val ack-val}))))]
+
+    (when-let [x (get rets message-id)]
+      (when (zero? (:ack-val x))
+        (swap! (:ack-state daemon) dissoc message-id)
+        (>!! (:completions-ch daemon) {:id message-id
+                                       :peer-id completion-id})))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
@@ -58,5 +56,3 @@
         (persistent! coll)
         (recur (inc n) 
                (conj! coll (.nextLong rng)))))))
-
-
