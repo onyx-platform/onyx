@@ -395,10 +395,10 @@
         (if-let [opened-channel (create-client (:client-group messenger) 
                                                (:netty/external-addr site) 
                                                (:netty/port site))] 
-          (let [connected? (state->connected state)] 
+          (let [_ (reset! channel opened-channel)
+                connected? (state->connected state)] 
             (assert connected?)
-            (flush-pending opened-channel @pending-ch)
-            (reset! channel opened-channel))
+            (flush-pending opened-channel @pending-ch))
           (do
             (state->failed state)
             (reset! channel nil)
