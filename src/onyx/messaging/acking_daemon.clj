@@ -35,7 +35,7 @@
               (if (zero? ack-val) 
                 state
                 (assoc state message-id (->Ack nil completion-id ack-val))))))]
-    (when (get rets message-id)
+    (when-not (get rets message-id)
       (>!! (:completions-ch daemon) {:id message-id
                                      :peer-id completion-id}))))
 
