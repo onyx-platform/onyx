@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
-  (:require [taoensso.timbre :as timbre])
+  (:require [taoensso.timbre :as timbre]
+            [onyx.types :refer [->Leaf]])
   (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
@@ -8,24 +9,24 @@
 ;; Constants
 
 ;; id uuid 
-(def completion-msg-length (int 17))
+(def ^:const completion-msg-length (int 17))
 
 ;; id uuid
-(def retry-msg-length (int 17))
+(def ^:const retry-msg-length (int 17))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ack-msg-length (int 41))
+(def ^:const ack-msg-length (int 41))
 
-(def completion-msg-id (byte 0))
-(def retry-msg-id (byte 1))
-(def ack-msg-id (byte 2))
+(def ^:const completion-msg-id (byte 0))
+(def ^:const retry-msg-id (byte 1))
+(def ^:const ack-msg-id (byte 2))
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
-(def message-base-length (int 56))
+(def ^:const message-base-length (int 56))
 
 ;; messages with 0 messages in it
-(def messages-base-length (int 4))
+(def ^:const messages-base-length (int 4))
 
 (defn write-uuid [^MutableDirectBuffer buf offset ^UUID uuid]
   (.putLong buf offset (.getMostSignificantBits uuid))
@@ -45,15 +46,13 @@
     buf))
 
 (defn read-message-type [buf offset]
-  (.getByte buf offset))
+  (.getByte ^UnsafeBuffer buf ^int offset))
 
 (defn read-acker-message [^UnsafeBuffer buf offset]
   (let [id (get-uuid buf offset)
         completion-id (get-uuid buf (+ offset 16))
         ack-val (.getLong buf (+ offset 32))]
-    {:id id
-     :completion-id completion-id
-     :ack-val ack-val}))
+    [id completion-id ack-val]))
 
 (defn read-completion [^UnsafeBuffer buf offset]
   (get-uuid buf offset))
@@ -79,43 +78,62 @@
   (write-uuid buf (+ offset 32) completion-id)
   (.putLong buf (+ offset 48) ack-val))
 
-(defn read-message-meta [^UnsafeBuffer buf offset]
+(defn read-message [^UnsafeBuffer buf offset message]
   (let [id (get-uuid buf offset)
         acker-id (get-uuid buf (+ offset 16))
         completion-id (get-uuid buf (+ offset 32))
         ack-val (.getLong buf (+ offset 48))]
-    {:id id 
-     :acker-id acker-id 
-     :completion-id completion-id 
-     :ack-val ack-val}))
+    (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
 
-(def message-count-size 4)
+(def ^:const message-count-size 4)
+(def ^:const payload-size-size 4)
 
 (defn meta-message-offsets [start-pos cnt]
   (reductions + start-pos (repeat cnt message-base-length)))
 
 (defn build-messages-msg-buf [compress-f messages]
-  (let [meta-offsets (meta-message-offsets message-count-size (count messages))
-        message-payloads (compress-f (map :message messages))
-        buf-size (+ (last meta-offsets) 
-                    (alength message-payloads))
+  ;; Performance consideration:
+  ;; We would rather write to one contiguous byte array or a byteoutputstream
+  ;; that returns a byte array. This would require changes to nippy
+  (let [message-count (count messages)
+        message-payloads ^bytes (compress-f (map :message messages))
+        payload-size (alength message-payloads)
+        buf-size (+ message-count-size
+                    payload-size-size
+                    payload-size 
+                    (* message-count message-base-length))
         buf (UnsafeBuffer. (byte-array buf-size))] 
     (.putInt buf 0 (int (count messages))) ; number of messages
-    (doseq [[msg offset] (map vector messages meta-offsets)]
-      (write-message-meta buf offset msg))
-    (.putBytes buf (last meta-offsets) message-payloads)
-    [buf-size buf]))
+    (.putInt buf message-count-size payload-size)
+    (.putBytes buf 
+               (+ message-count-size
+                  payload-size-size) 
+               message-payloads)
+    (let [offset (+ message-count-size payload-size-size payload-size)
+          buf-size (reduce (fn [offset msg]
+                             (write-message-meta buf offset msg) 
+                             (+ message-base-length offset))
+                           offset
+                           messages)]
+      [buf-size buf])))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
   (let [message-count (.getInt buf offset)
-        meta-offsets (meta-message-offsets (+ message-count-size offset) message-count)
-        metas (doall (map (partial read-message-meta buf)
-                          (butlast meta-offsets)))
-        segments-size  (- (+ offset length) (last meta-offsets))
-        message-payload-bytes (byte-array segments-size)
-        _ (.getBytes buf (last meta-offsets) message-payload-bytes)
-        message-payloads (decompress-f message-payload-bytes)]
-    (map (fn [m message]
-           (assoc m :message message))
-         metas
-         message-payloads)))
+        offset (+ offset message-count-size)
+        payload-size (.getInt buf offset)
+        offset (+ offset payload-size-size)
+        ;; Performance consideration:
+        ;; We would rather that we didn't need to allocate an additional
+        ;; byte array here and have nippy directly read from the buf bytes
+        message-payload-bytes (byte-array payload-size)
+        _ (.getBytes buf offset message-payload-bytes)
+        message-payloads (decompress-f message-payload-bytes)
+        offset (+ offset payload-size)]
+    (loop [messages (transient []) 
+           payloads (seq message-payloads) 
+           offset offset]
+      (if-let [v (first payloads)] 
+        (recur (conj! messages (read-message buf offset v))
+               (next payloads)
+               (+ offset message-base-length))
+        (persistent! messages)))))
