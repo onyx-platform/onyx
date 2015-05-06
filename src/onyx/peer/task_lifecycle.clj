@@ -277,12 +277,7 @@
   (thread
    (try
      (loop []
-       (when-let [[v ch] (alts!! [task-kill-ch
-                                  completion-ch
-                                  seal-ch
-                                  release-ch
-                                  retry-ch]
-                                 :priority true)]
+       (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
          (when v
            (cond (= ch release-ch)
                  (p-ext/ack-message event v)
