@@ -22,7 +22,8 @@
                         (count (get-in replica [:allocations job task]))
                         ;; Allocate as much the original task saturation allows since it hasn't
                         ;; been allocated yet.
-                        (get-in replica [:task-saturation job task])))))
+                        (get-in replica [:task-saturation job task])))
+                    tasks))
       (get-in replica [:saturation job] Double/POSITIVE_INFINITY))))
 
 (defn job-lower-bound [replica job]
@@ -36,18 +37,12 @@
                         ;; Cannot allocate anymore, you have what you have.
                         (count (get-in replica [:allocations job task]))
                         ;; Grab the absolute minimum for this task, no constraints.
-                        (get-in replica [:min-required-peers job task])))))
+                        (get-in replica [:min-required-peers job task])))
+                    tasks))
       (apply + (vals (get-in replica [:min-required-peers job]))))))
 
 (defn job-coverable? [replica job n]
   (>= n (job-lower-bound replica job)))
-
-(defn job-bounds [replica jobs]
-  (map
-   (fn [job]
-     {:lower (min-peers-for-job replica job)
-      :upper (job-upper-bound replica job)})
-   jobs))
 
 (defmulti job-offer-n-peers
   (fn [replica]
@@ -88,7 +83,6 @@
    (fn [all j n]
      (if (job-coverable? replica j n)
        (let [sat (job-upper-bound replica j)]
-         (assert (>= n sat) "Saturation value was less than offer value. There's a bug in the scheduler. Aborting!")
          (assoc all j (min sat n)))
        (assoc all j 0)))
    {}
@@ -102,8 +96,12 @@
                           (mapcat
                            (fn [job]
                              (let [current (get (current-task-allocations replica) job)
-                                   desired (cts/task-distribute-peer-count replica job (get max-utilization job))
+                                   desired (cts/task-distribute-peer-count original-replica job (get max-utilization job))
                                    tasks (get-in replica [:tasks job])]
+                               (prn "==")
+                               (clojure.pprint/pprint current)
+                               (clojure.pprint/pprint desired)
+                               (prn "==")
                                (map (fn [t]
                                       (when (< (or (get current t) 0) (get desired t))
                                         [job t]))
@@ -187,8 +185,65 @@
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
         deallocated (deallocate-starved-jobs replica)]
-    (prn (map count (vals (first (vals (:allocations (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))))))
     (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))
+
+(clojure.pprint/pprint (:allocations (reconfigure-cluster-workload replica)))
+
+(def replica
+  {:exempt-tasks {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" []},
+   :peer-sites
+   {:p6 {:port 1, :address 1},
+    :p1 {:port 1, :address 1},
+    :p5 {:port 1, :address 1},
+    :p3 {:port 1, :address 1},
+    :p4 {:port 1, :address 1},
+    :p2 {:port 1, :address 1}},
+   :output-tasks
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    [#uuid "18b6336f-56d9-49af-a884-b2d7b5d46842"]},
+   :job-scheduler :onyx.job-scheduler/greedy,
+   :ackers {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" []},
+   :saturation {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" 42},
+   :peers [:p2 :p4 :p3 :p5 :p1 :p6],
+   :acker-exclude-outputs
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" false},
+   :min-required-peers
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    {#uuid "9ce690ba-c167-4bc1-bf31-7b3ccd2f9513" 1,
+     #uuid "15e89200-c2d9-45e1-8c95-b5028bb4c9e0" 4,
+     #uuid "18b6336f-56d9-49af-a884-b2d7b5d46842" 1}},
+   :accepted {},
+   :jobs [#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"],
+   :tasks
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    [#uuid "9ce690ba-c167-4bc1-bf31-7b3ccd2f9513"
+
+     #uuid "15e89200-c2d9-45e1-8c95-b5028bb4c9e0"
+     #uuid "18b6336f-56d9-49af-a884-b2d7b5d46842"]},
+   :pairs {:p6 :p5, :p1 :p4, :p5 :p1, :p3 :p6, :p4 :p2, :p2 :p3},
+   :flux-policies
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    {#uuid "15e89200-c2d9-45e1-8c95-b5028bb4c9e0" :kill}},
+   :messaging {:onyx.messaging/impl :dummy-messenger},
+   :allocations {},
+   :prepared {},
+   :input-tasks
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    [#uuid "9ce690ba-c167-4bc1-bf31-7b3ccd2f9513"]},
+   :acker-percentage {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" 1},
+   :peer-state
+   {:p6 :idle, :p1 :idle, :p5 :idle, :p3 :idle, :p4 :idle, :p2 :idle},
+   :acker-exclude-inputs
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608" false},
+   :task-schedulers
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    :onyx.task-scheduler/balanced},
+   :task-saturation
+   {#uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"
+    {#uuid "9ce690ba-c167-4bc1-bf31-7b3ccd2f9513" 42,
+     #uuid "15e89200-c2d9-45e1-8c95-b5028bb4c9e0" 4,
+     #uuid "18b6336f-56d9-49af-a884-b2d7b5d46842"
+     42}}})
 
 ;; xx  Offer: Should be the "essence" of the scheduler. Doesn't know about minimum requirements, saturation, etc.
 ;;          - Greedy: gets all peers. Balanced: does an even spread. Pct: does a staggered spread
@@ -204,8 +259,8 @@
 
 
 ;; Invariants for grouped tasks:
-;; - Grouped tasks must be allocated a minimum number of peers, no less.
-;; - Once a task has been allocated to, it never receives more peers in a future allocation
+;; - Grouped tasks must be allocated a minimum number of peers, no less. [done]
+;; - Once a task has been allocated to, it never receives more peers in a future allocation [done]
 ;; - Once a task has been allocated to, none of its peers may ever be reallocated to another task
 ;; - If a task loses a peer and its Flux Policy is kill, the job gets completely deallocated
 ;; - If a task loses a peer and its Flux Policy is continue, the task remains exactly as is

@@ -113,7 +113,7 @@
     (checking
      "Checking that exactly 4 peers are assigned to task B, and if that drops
       below 4, the job is killed due to the flux policy."
-     1000
+     1
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return

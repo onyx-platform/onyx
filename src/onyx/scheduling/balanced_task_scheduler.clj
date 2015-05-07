@@ -1,5 +1,6 @@
 (ns onyx.scheduling.balanced-task-scheduler
   (:require [onyx.scheduling.common-task-scheduler :as cts]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]))
 
 (defn filter-grouped-tasks [replica job allocations]
@@ -48,7 +49,8 @@
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/balanced
   [replica job n]
   (let [tasks (get-in replica [:tasks job])
-        t (apply + (vals (get-in replica [:min-required-peers job])))]
+        t (cjs/job-lower-bound replica job)]
+    (prn "t:" t)
     (if (< n t)
       (zipmap tasks (repeat 0))
       (let [min-peers (int (/ n t))
@@ -60,7 +62,7 @@
                ;; If it's a grouped task that has already been allocated,
                ;; we can't add more peers since that would break the hashing algorithm.
                (if (preallocated-grouped-task? replica job task)
-                 all
+                 (assoc all task (count (get-in replica [:allocations job task])))
                  (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
                                       (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)
                                       (if (< k r) max-peers (max min-peers (get-in replica [:min-required-peers job task])))))))
