@@ -1,4 +1,4 @@
-(ns onyx.log.grouping-generative-task
+(ns onyx.log.grouping-generative-test
   (:require [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
