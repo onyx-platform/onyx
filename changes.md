@@ -18,14 +18,14 @@
 - New feature: Data driven lifecycles
 - New feature: Internal core.async plugin
 - New documentation: Event context map information model
-- Added metadata to all public API functions indicating which Onyx version they were added in
-- `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
-- `onyx.api/shutdown-peers` is now idempotent
-- Return type of public API function submit-job has changed. It now returns a map containing job-id, and task-ids keys.
-- The last task in a workflow no longer needs to be an `output` task
-- Renamed "Round Robin" schedulers to "Balanced"
-- Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
-- Peers now launch inside of a "peer group" to share network resources.
+- API: Added metadata to all public API functions indicating which Onyx version they were added in
+- API: `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
+- API: `onyx.api/shutdown-peers` is now idempotent
+- API: Return type of public API function submit-job has changed. It now returns a map containing job-id, and task-ids keys.
+- API: Renamed "Round Robin" schedulers to "Balanced"
+- API: The last task in a workflow no longer needs to be an `output` task
+- API: Plugin lifecycle extensions now dispatch off of identity, rather than type and name.
+- API: Peers now launch inside of a "peer group" to share network resources.
 
 #### 0.5.3
 
