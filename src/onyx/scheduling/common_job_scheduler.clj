@@ -200,5 +200,5 @@
 ;; - Grouped tasks must be allocated a minimum number of peers, no less. [done]
 ;; - Once a task has been allocated to, it never receives more peers in a future allocation [done]
 ;; - Once a task has been allocated to, none of its peers may ever be reallocated to another task
-;; - If a task loses a peer and its Flux Policy is kill, the job gets completely deallocated
-;; - If a task loses a peer and its Flux Policy is continue, the task remains exactly as is
+;; - If a task loses a peer and its Flux Policy is kill, the job gets completely deallocated [done]
+;; - If a task loses a peer and its Flux Policy is continue, the task remains exactly as is [done]
