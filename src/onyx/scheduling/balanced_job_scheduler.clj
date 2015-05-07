@@ -34,9 +34,9 @@
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
-  (let [ordered-jobs (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica) %))
-                                    #(cjs/job-lower-bound replica %)
-                                    (:jobs replica)))]
+  (let [ordered-jobs (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %)
+                                    #(cjs/job-lower-bound replica %))
+                              (:jobs replica))]
         (loop [[head & tail :as job-seq] ordered-jobs
                results jobs
                capacity n]

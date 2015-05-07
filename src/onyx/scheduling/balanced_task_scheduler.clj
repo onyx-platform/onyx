@@ -40,7 +40,7 @@
     (let [least-allocated-task (first (sort-by
                                        (juxt 
                                         #(get results %)
-                                        #(.indexOf (get-in replica [:tasks job]) %))
+                                        #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) %))
                                        task-seq))]
       (cond
        ;; If there are no more peers to give out, or no more tasks

@@ -161,8 +161,8 @@
               job-4
               (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
-     "Checking that exactly at least 4 tasks are assigned to B."
-     1
+     "Checking at least 4 tasks are assigned to B."
+     1000
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
@@ -173,9 +173,14 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (is (= 5 (count (get (get (:allocations replica) job-4-id) t1))))
-       (is (= 5 (count (get (get (:allocations replica) job-4-id) t2))))
-       (is (= 4 (count (get (get (:allocations replica) job-4-id) t3))))))))
+       ;; If the job is submitted first, the second case occurs. Otherwise the first
+       ;; case pins task B to 4 peers.
+       (or (is (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+                    (= 4 (count (get (get (:allocations replica) job-4-id) t2)))
+                    (= 5 (count (get (get (:allocations replica) job-4-id) t3)))))
+           (is (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+                    (= 5 (count (get (get (:allocations replica) job-4-id) t2)))
+                    (= 4 (count (get (get (:allocations replica) job-4-id) t3))))))))))
 
 (deftest min-peers-not-enough-peers
   (let [rets (api/create-submit-job-entry
