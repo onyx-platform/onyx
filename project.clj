@@ -1,4 +1,4 @@
-(defproject com.mdrogalis/onyx "0.6.0-alpha2"
+(defproject com.mdrogalis/onyx "0.6.0-SNAPSHOT"
   :description "Distributed, masterless, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
