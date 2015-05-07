@@ -100,9 +100,9 @@
                                           (map key)
                                           set)
                     selectable-queues (into selectable-peers peerless-queues)]
-                (when (empty? selectable-queues)
-                  (println "No playable log messages. State: " state))
-                (gen/elements selectable-queues)))))
+                (if (empty? selectable-queues)
+                  (throw (Exception. (str "No playable log messages. State: " state)))
+                  (gen/elements selectable-queues))))))
 
 (defn apply-entry-gen 
   "Apply an entry from one of the peers log queues
