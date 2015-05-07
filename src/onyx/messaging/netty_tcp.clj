@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
-    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! thread go-loop dropping-buffer]]
+    (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! 
+                                          thread go-loop sliding-buffer dropping-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -14,9 +15,9 @@
              [io.netty.buffer ByteBuf]
              [io.netty.util.internal SystemPropertyUtil]
              [io.netty.util.concurrent Future EventExecutorGroup DefaultThreadFactory 
-              DefaultEventExecutorGroup ImmediateEventExecutor]
-             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer 
-              ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
+              DefaultEventExecutorGroup ImmediateEventExecutor GenericFutureListener]
+             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer ChannelPipeline
+              MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
              [io.netty.channel.epoll Epoll EpollEventLoopGroup EpollServerSocketChannel EpollSocketChannel]
              [io.netty.channel.socket SocketChannel]
              [io.netty.channel.socket.nio NioServerSocketChannel NioSocketChannel]
@@ -67,19 +68,18 @@
           worker-group (if (epoll?)
                          (EpollEventLoopGroup. thread-count worker-thread-factory)
                          (NioEventLoopGroup. thread-count worker-thread-factory))]
-
       (timbre/info "Starting Netty Peer Group")
       (assoc component
-        :shared-event-executor shared-event-executor
-        :client-group client-group
-        :worker-group worker-group
-        :boss-group boss-group)))
+             :shared-event-executor shared-event-executor
+             :client-group client-group
+             :worker-group worker-group
+             :boss-group boss-group)))
 
   (stop [{:keys [client-group worker-group boss-group] :as component}]
     (timbre/info "Stopping Netty Peer Group")
-    (.shutdownGracefully client-group)
-    (.shutdownGracefully boss-group)
-    (.shutdownGracefully worker-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup client-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup boss-group)
+    (.shutdownGracefully ^MultithreadEventLoopGroup worker-group)
     (assoc component 
       :shared-event-executor nil :client-group nil
       :worker-group nil :boss-group nil)))
@@ -114,7 +114,7 @@
   [^ChannelGroup channel-group handler]
   (proxy [ChannelInboundHandlerAdapter] []
     (channelActive [ctx]
-      (.add channel-group (.channel ctx)))
+      (.add channel-group (.channel ^ChannelHandlerContext ctx)))
     (channelRead [^ChannelHandlerContext ctx ^Object message]
       (try
         (handler ctx message)
@@ -128,10 +128,10 @@
 (defn channel-initializer-done [handler]
   (proxy [ChannelInitializer] []
     (initChannel [ch]
-      (let [pipeline (.pipeline ^Channel ch)]
+      (let [pipeline ^ChannelPipeline (.pipeline ^Channel ch)]
         (doto pipeline 
-          (.addLast "int32-frame-decoder" (int32-frame-decoder))
-          (.addLast "int32-frame-encoder" (int32-frame-encoder))
+          (.addLast "int32-frame-decoder" ^LengthFieldBasedFrameDecoder (int32-frame-decoder))
+          (.addLast "int32-frame-encoder" ^LengthFieldPrepender (int32-frame-encoder))
           (.addLast shared-event-executor "handler" handler))))))
 
 (defn create-server-handler
@@ -147,10 +147,11 @@
                   (>!! inbound-ch message))
 
                 (= t protocol/ack-type-id)
-                (acker/ack-message (:acking-daemon messenger)
-                                   (:id msg)
-                                   (:completion-id msg)
-                                   (:ack-val msg))
+                (doseq [ack (:acks msg)]
+                  (acker/ack-message (:acking-daemon messenger)
+                                     (:id ack)
+                                     (:completion-id ack)
+                                     (:ack-val ack)))
 
                 (= t protocol/completion-type-id)
                 (>!! release-ch (:id msg))
@@ -167,17 +168,12 @@
 (defn start-netty-server
   [boss-group worker-group host port messenger inbound-ch release-ch retry-ch]
   (let [bootstrap (ServerBootstrap.)
-        channel (if (epoll?)
-                  EpollServerSocketChannel
-                  NioServerSocketChannel)
+        channel (if (epoll?) EpollServerSocketChannel NioServerSocketChannel)
         channel-group (DefaultChannelGroup. (str "tcp-server " host ":" port)
-                        (ImmediateEventExecutor/INSTANCE))
-        initializer (channel-initializer-done 
-                     (gen-tcp-handler channel-group 
-                                      (create-server-handler messenger 
-                                                             inbound-ch 
-                                                             release-ch 
-                                                             retry-ch)))] 
+                                            (ImmediateEventExecutor/INSTANCE))
+        initializer (->> (create-server-handler messenger inbound-ch release-ch retry-ch)
+                         (gen-tcp-handler channel-group)   
+                         (channel-initializer-done))] 
     (doto bootstrap
       (.group boss-group worker-group)
       (.channel channel)
@@ -187,22 +183,21 @@
       (.childOption ChannelOption/TCP_NODELAY true)
       (.childOption ChannelOption/SO_KEEPALIVE true)
       (.childHandler initializer))
-    (let [ch (->> (InetSocketAddress. host port)
+    (let [ch (->> (InetSocketAddress. ^String host ^Integer port)
                   (.bind bootstrap)
                   (.sync)
                   (.channel))
-          _ (.add channel-group ch)
-          assigned-port (.. ch localAddress getPort)]
-      (timbre/info "Netty server" host assigned-port "online")
+          _ (.add channel-group ch)]
+      (timbre/info "Netty server" host port "online")
       (fn killer []
-        (.. channel-group close awaitUninterruptibly)
+        (.close channel-group)
         (timbre/info "TCP server" host port "shut down")))))
 
 (defn new-client-handler []
   (proxy [ChannelHandler] []
     (handlerAdded [ctx])
     (handlerRemoved [ctx])
-    (exceptionCaught [context cause]
+    (exceptionCaught [^ChannelHandlerContext context cause]
       (timbre/error cause "TCP client exception.")
       (.close context))))
 
@@ -210,25 +205,38 @@
   (proxy [ChannelInitializer] []
     (initChannel [ch]
       (timbre/info "Initializing client channel")
-      (try (let [pipeline (.pipeline ^Channel ch)]
-             (doto pipeline 
-               (.addLast "int32-frame-decoder" (int32-frame-decoder))
-               (.addLast "int32-frame-encoder" (int32-frame-encoder))
-               (.addLast "handler" handler)))
+      (try (let [pipeline ^ChannelPipeline (.pipeline ^Channel ch)]
+             (doto ^ChannelPipeline pipeline 
+               (.addLast "int32-frame-decoder" ^LengthFieldBasedFrameDecoder (int32-frame-decoder))
+               (.addLast "int32-frame-encoder" ^LengthFieldPrepender (int32-frame-encoder))
+               (.addLast "handler" ^ChannelHandler handler)))
            (catch Throwable e
              (timbre/fatal e))))))
+
+(defn established? [^Channel channel]
+  (and channel (.isActive channel)))
 
 (defn create-client [client-group host port]
   (let [channel (if (epoll?)
                   EpollSocketChannel
-                  NioSocketChannel)]
-    (let [b (doto (Bootstrap.)
-              (.option ChannelOption/SO_REUSEADDR true)
-              (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
-              (.group client-group)
-              (.channel channel)
-              (.handler (client-channel-initializer (new-client-handler))))]
-      (.channel ^ChannelFuture (.awaitUninterruptibly (.connect b host port))))))
+                  NioSocketChannel)
+        b (doto (Bootstrap.)
+            (.option ChannelOption/SO_REUSEADDR true)
+            (.option ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
+            (.group client-group)
+            (.channel channel)
+            (.handler (client-channel-initializer (new-client-handler))))
+        ch-fut ^ChannelFuture (.awaitUninterruptibly ^ChannelFuture (.connect ^Bootstrap b ^String host ^Integer port) 
+                                                     ;; TODO, add connection timeout
+                                                     ;(:onyx.messaging.netty/connect-timeout-millis defaults)
+                                                     ;TimeUnit/MILLISECONDS
+                                                     )
+        ch (.channel ch-fut)]
+    (if (and (.isSuccess ^ChannelFuture ch-fut) 
+             (established? ch))
+      ch
+      (do (.close ch)
+          nil))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -241,13 +249,16 @@
           retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
-          ports (allowable-ports config)]
+          ports (allowable-ports config)
+          pending-buffer-size (or (:onyx.messaging.netty/pending-buffer-size config) 
+                                  (:onyx.messaging.netty/pending-buffer-size defaults))]
       (assoc component
              :bind-addr bind-addr 
              :external-addr external-addr
              :boss-group boss-group
              :client-group client-group
              :worker-group worker-group
+             :pending-buffer-size pending-buffer-size
              :ports ports
              :resources (atom nil)
              :release-ch release-ch
@@ -291,9 +302,117 @@
     (reset! (:resources messenger)
             {:shutdown-fn shutdown-fn})))
 
+(defn flush-pending 
+  "Flush all pending bufs. Run after when the channel is established."
+  [^Channel channel pending-ch]
+  (close! pending-ch)
+  (loop []
+    (when-let [buf ^ByteBuf (<!! pending-ch)]
+      (.write channel buf (.voidPromise channel))
+      (recur)))
+  (.flush channel))
+
+(defprotocol IConnectionManager
+  (connect [_])
+  (write [connection buf])
+  (reset-connection [_])
+  (enqueue-pending [_ buf])
+  (close [_]))
+
+(defprotocol IConnectionState 
+  (initializing [this])
+  (reset [this])
+  (connecting [this])
+  (failed [this])
+  (connected [this]))
+
+(defn add-failed-check 
+  "Check if the message failed to send"
+  [^ChannelFuture f connection buf]
+  (.addListener f (reify GenericFutureListener
+                    (operationComplete [_ _]
+                      (when-not (.isSuccess f)
+                        (timbre/error "Message failed to send: " (.cause f))
+                        (reset-connection connection))))))
+
+(defn make-pending-chan [messenger]
+  (chan (sliding-buffer (:pending-buffer-size messenger))))
+
+(defn state->connecting [state]
+  (compare-and-set! state :initializing :connecting))
+
+(defn state->reset [state] 
+    (compare-and-set! state :connected :reset))
+
+(defn state->connecting [state]
+  (or (compare-and-set! state :reset :connecting)
+      (compare-and-set! state :initializing :connecting)
+      (compare-and-set! state :failed :connecting)))
+
+(defn state->failed [state]
+  (compare-and-set! state :connecting :failed))
+
+(defn state->connected [state]
+  (compare-and-set! state :connecting :connected))
+
+(defrecord ConnectionManager [messenger site state pending-ch channel]
+  IConnectionManager
+  (reset-connection [connection]
+    (when (state->reset state)
+      (reset! pending-ch (make-pending-chan messenger))
+      (reset! channel nil)
+      (connect connection)))
+
+  (enqueue-pending [connection buf]
+    (case @state
+      :initializing (>!! @pending-ch buf)
+      :connecting (>!! @pending-ch buf)
+      :reset (connect connection)
+      :failed (connect connection)
+      ;; may have finished connecting in the time between
+      ;; so we should check if it's established now before trying to reconnect
+      :connected (let [channel-val ^Channel @channel] 
+                   (if (established? channel-val)
+                     (.writeAndFlush channel-val buf (.voidPromise channel-val))
+                     (reset-connection connection)))))
+
+  (write [connection buf]
+    (let [channel-val ^Channel @channel] 
+      (if (and channel-val (.isActive channel-val))
+        (let [fut (.writeAndFlush channel-val ^ByteBuf buf)] 
+          (add-failed-check fut connection ^ByteBuf buf)) 
+        (enqueue-pending connection buf))))
+
+  (close [_] 
+    (let [cval @channel] (if cval (.close ^Channel cval)))
+    (some-> @pending-ch close!))
+
+  (connect [_]
+    ; The state machine decides who gets to connect to ensure only one thread
+    ; will connect, and the remaining will write out to the pending channel
+    (when (state->connecting state)
+      (future
+        (if-let [opened-channel (create-client (:client-group messenger) 
+                                               (:netty/external-addr site) 
+                                               (:netty/port site))] 
+          (let [_ (reset! channel opened-channel)
+                connected? (state->connected state)] 
+            (assert connected?)
+            (flush-pending opened-channel @pending-ch))
+          (do
+            (state->failed state)
+            (reset! channel nil)
+            (reset! pending-ch (make-pending-chan messenger))))))))
+
 (defmethod extensions/connect-to-peer NettyTcpSockets
-  [messenger event {:keys [netty/external-addr netty/port]}]
-  (create-client (:client-group messenger) external-addr port))
+  [messenger event site]
+  (doto 
+    (->ConnectionManager messenger 
+                         site
+                         (atom :initializing) 
+                         (atom (make-pending-chan messenger))
+                         (atom nil))
+    connect))
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -308,31 +427,21 @@
         segments))))
 
 (defmethod extensions/send-messages NettyTcpSockets
-  [messenger event ^Channel peer-link messages]
-  ;(taoensso.timbre/info "SENDING messages " messages)
-  (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-messages-msg-buf (:compress-f messenger) messages) 
-                  (.voidPromise ^Channel peer-link)))
+  [messenger event peer-link messages]
+  (write peer-link (protocol/build-messages-msg-buf (:compress-f messenger) messages)))
 
-(defmethod extensions/internal-ack-message NettyTcpSockets
-  [messenger event ^Channel peer-link message-id completion-id ack-val]
-  ;(taoensso.timbre/info "SENDING ACK: " message-id ack-val)
-  (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-ack-msg-buf message-id completion-id ack-val)
-                  (.voidPromise ^Channel peer-link)))
+(defmethod extensions/internal-ack-messages NettyTcpSockets
+  [messenger event peer-link acks]
+  (write peer-link (protocol/build-acks-msg-buf acks)))
 
 (defmethod extensions/internal-complete-message NettyTcpSockets
-  [messenger event id ^Channel peer-link]
-  (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-completion-msg-buf id)
-                  (.voidPromise ^Channel peer-link)))
+  [messenger event id peer-link]
+  (write peer-link (protocol/build-completion-msg-buf id)))
 
 (defmethod extensions/internal-retry-message NettyTcpSockets
-  [messenger event id ^Channel peer-link]
-  (.writeAndFlush peer-link 
-                  ^ByteBuf (protocol/build-retry-msg-buf id)
-                  (.voidPromise ^Channel peer-link)))
+  [messenger event id peer-link]
+  (write peer-link (protocol/build-retry-msg-buf id)))
 
 (defmethod extensions/close-peer-connection NettyTcpSockets
-  [messenger event ^Channel peer-link]
-  (-> peer-link .close .sync))
+  [messenger event peer-link]
+  (close peer-link))
