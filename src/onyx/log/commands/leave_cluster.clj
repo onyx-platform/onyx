@@ -10,8 +10,8 @@
 
 (defn enforce-flux-policy [replica id]
   (let [allocation (common/peer->allocated-job (:allocations replica) id)]
-    (if (= (get replica [:flux-policies (:job allocation) (:task allocation)]) :kill)
-      (apply-kill-job replica)
+    (if (= (get-in replica [:flux-policies (:job allocation) (:task allocation)]) :kill)
+      (apply-kill-job replica (:job allocation))
       replica)))
 
 (defmethod extensions/apply-log-entry :leave-cluster
@@ -23,6 +23,7 @@
         prep-observer (get (map-invert (:prepared replica)) id)
         accep-observer (get (map-invert (:accepted replica)) id)]
     (-> replica
+        (enforce-flux-policy id)
         (update-in [:peers] (partial remove #(= % id)))
         (update-in [:peers] vec)
         (update-in [:prepared] dissoc id)
@@ -35,7 +36,6 @@
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
         (common/remove-peers (:id args))
-        (enforce-flux-policy id)
         (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :leave-cluster
