@@ -104,16 +104,42 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(deftest min-peers-one-job
+(def job-4-id #uuid "60180f08-60b9-4584-9900-93dbbe2c3905")
+
+(def job-4
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 4
+              :onyx/flux-policy :kill
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
               job-1-id
               peer-config 
               job-1 
               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
-     "Checking that exactly 4 peers are assigned to task B, and if that drops
-      below 4, the job is killed due to the flux policy."
-     1
+     "Checking that exactly 4 peers are assigned to task B."
+     1000
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
@@ -127,6 +153,29 @@
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
+
+(deftest min-peers-one-job-no-upper-bound
+  (let [rets (api/create-submit-job-entry
+              job-4-id
+              peer-config 
+              job-4
+              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
+    (checking
+     "Checking that exactly at least 4 tasks are assigned to B."
+     1
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 14)) :job-4 [rets])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args rets))]
+       (is (= 5 (count (get (get (:allocations replica) job-4-id) t1))))
+       (is (= 5 (count (get (get (:allocations replica) job-4-id) t2))))
+       (is (= 4 (count (get (get (:allocations replica) job-4-id) t3))))))))
 
 (deftest min-peers-not-enough-peers
   (let [rets (api/create-submit-job-entry
@@ -215,3 +264,4 @@
        ;; before the peer boots up, making it irrelevant.
        (is (or (= [0 0 0] [c1 c2 c3])
                (= [1 2 1] [c1 c2 c3])))))))
+
