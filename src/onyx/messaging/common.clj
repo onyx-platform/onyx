@@ -31,7 +31,7 @@
        (catch Throwable e
          (fatal e
                 (str "Error loading messenging. "
-                     "If your peer is AOT compiled you wiil need to manually require " sym))
+                     "If your peer is AOT compiled you will need to manually require " sym))
          (throw e))))
 
 (defmethod messaging-require :aeron [_]

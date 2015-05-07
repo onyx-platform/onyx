@@ -11,7 +11,7 @@
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
-                 [com.taoensso/nippy "2.8.0"]
+                 [com.taoensso/nippy "2.9.0-RC2"]
                  [uk.co.real-logic/Agrona "0.3.1-SNAPSHOT"]
                  [uk.co.real-logic/aeron-client "0.1-SNAPSHOT"]
                  [uk.co.real-logic/aeron-driver "0.1-SNAPSHOT"]
