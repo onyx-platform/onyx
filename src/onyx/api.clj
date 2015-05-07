@@ -2,7 +2,7 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [warn fatal]]
+            [taoensso.timbre :refer [warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
@@ -102,11 +102,15 @@
     (create-log-entry :submit-job args)))
 
 (defn ^{:added "0.6.0"} submit-job [config job]
-  (validator/validate-peer-config config)
+  (try (validator/validate-peer-config config)
+       (validator/validate-job (assoc job :workflow (:workflow job)))
+       (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+       (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+       (catch Throwable t 
+         (println t)
+         (error t) 
+         (throw t)))
   (let [id (java.util.UUID/randomUUID)
-        _ (validator/validate-job (assoc job :workflow (:workflow job)))
-        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-        _ (validator/validate-lifecycles (:lifecycles job) (:catalog job))
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
         entry (create-submit-job-entry id config job tasks)
         client (component/start (system/onyx-client config))]

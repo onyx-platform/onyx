@@ -102,9 +102,10 @@
 
 (defn validate-lifecycles [lifecycles catalog]
   (doseq [lifecycle lifecycles]
-    (assert (or (= (:lifecycle/task lifecycle) :all)
-                (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
-            (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle)))
+    (when-not (or (= (:lifecycle/task lifecycle) :all)
+                  (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
+      (throw (ex-info (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle))
+                      {:lifecycle lifecycle :catalog catalog})))
     (schema/validate
      {:lifecycle/task schema/Keyword
       (schema/optional-key :lifecycle/pre) schema/Keyword
