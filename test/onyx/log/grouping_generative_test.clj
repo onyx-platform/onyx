@@ -240,33 +240,3 @@
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
-
-(deftest kill-flux-policy
-  (let [rets (api/create-submit-job-entry
-              job-3-id
-              peer-config
-              job-3
-              (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
-    (checking "The job is killed after a peer drops out of the grouping task."
-     1000
-     [{:keys [replica log peer-choices]}
-      (log-gen/apply-entries-gen
-       (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                   :messaging {:onyx.messaging/impl :dummy-messenger}}
-         :message-id 0
-         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 4))
-                    :job-3 [rets
-                            {:fn :leave-cluster :args {:id :p1} :immediate? true}])
-         :log []
-         :peer-choices []}))]
-     (let [[t1 t2 t3] (:tasks (:args rets))
-           c1 (count (get (get (:allocations replica) job-3-id) t1))
-           c2 (count (get (get (:allocations replica) job-3-id) t2))
-           c3 (count (get (get (:allocations replica) job-3-id) t3))]
-       ;; Either no peers are allocated or they all are. The option
-       ;; is because of the timing of the kill signal. It may pop up
-       ;; before the peer boots up, making it irrelevant.
-       (is (or (= [0 0 0] [c1 c2 c3])
-               (= [1 2 1] [c1 c2 c3])))))))
-
