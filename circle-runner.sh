@@ -2,6 +2,11 @@
 
 set -e
 
+if [ $CIRCLE_BRANCH == "master" ]; then
+	export TEST_CHECK_FACTOR=20
+fi
+
+
 i=0
 files=""
 
