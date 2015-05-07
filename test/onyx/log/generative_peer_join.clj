@@ -226,3 +226,23 @@
    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+
+
+(deftest peer-leave
+  (checking
+    "Checking balanced allocation causes peers to be evenly split"
+    1000
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-entries (log-gen/generate-peer-ids 4))
+              (assoc :leave-anytime [{:fn :leave-cluster 
+                                      :args {:id :p1} 
+                                      :immediate? true}]))
+          :log []
+          :peer-choices []}))]
+    (= 3 (count (:peers replica)))))
