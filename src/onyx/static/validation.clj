@@ -121,10 +121,13 @@
                    :lifecycle/post
                    :lifecycle/doc]))))
 
+(def deployment-id-schema
+  (schema/either schema/Uuid schema/Str))
+
 (defn validate-env-config [env-config]
   (schema/validate
     {:zookeeper/address schema/Str
-     :onyx/id schema/Uuid
+     :onyx/id deployment-id-schema
      (schema/optional-key :zookeeper/server?) schema/Bool
      (schema/optional-key :zookeeper.server/port) schema/Int}
     (select-keys env-config 
@@ -133,7 +136,7 @@
 (defn validate-peer-config [peer-config]
   (schema/validate
     {:zookeeper/address schema/Str
-     :onyx/id schema/Uuid
+     :onyx/id deployment-id-schema
      :onyx.peer/job-scheduler schema/Keyword
      :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
      :onyx.messaging/bind-addr schema/Str
