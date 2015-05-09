@@ -182,23 +182,3 @@
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
         deallocated (deallocate-starved-jobs replica)]
     (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))
-
-;; xx  Offer: Should be the "essence" of the scheduler. Doesn't know about minimum requirements, saturation, etc.
-;;          - Greedy: gets all peers. Balanced: does an even spread. Pct: does a staggered spread
-;; xx Claims: Here's a task, and N peers for the job - how many do you want? Should be common. Knows about saturation, min requirements.
-;; xx Spare: Computes the difference between what was offered and what was taken.
-
-;; Max utilization: You claimed X, and I have Y more to give. How do you want to disperse them? Scheduler specific, but must respect bounds. This might be a good spot to update the replica to only allow job updates to peers without limit constraints.
-;; We can look at each job and compute its upper bound for peers and pass that in as a parameter to the scheduler specific blocks.
-
-;; Displaced: Find peers that aren't being used and peers that are on jobs that need to give up some peers. This is common, and we need to make sure that peers from grouped tasks never get displaced.
-;; Reallocate: Takes the displaced peers and disperses them over the tasks. Scheduler specific, but must respect lower and upper bounds - which all schedulers have in common.
-
-
-
-;; Invariants for grouped tasks:
-;; - Grouped tasks must be allocated a minimum number of peers, no less. [done]
-;; - Once a task has been allocated to, it never receives more peers in a future allocation [done]
-;; - Once a task has been allocated to, none of its peers may ever be reallocated to another task
-;; - If a task loses a peer and its Flux Policy is kill, the job gets completely deallocated [done]
-;; - If a task loses a peer and its Flux Policy is continue, the task remains exactly as is [done]
