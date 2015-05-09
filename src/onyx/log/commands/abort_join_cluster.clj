@@ -24,7 +24,7 @@
 (defmethod extensions/reactions :abort-join-cluster
   [{:keys [args]} old new diff peer-args]
   (when (and (= (:id args) (:id peer-args))
-             (:onyx.peer/try-join-once? (:opts peer-args)))
+             (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
              :peer-site (extensions/peer-site (:messenger peer-args))}

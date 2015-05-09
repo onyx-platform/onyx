@@ -1,6 +1,6 @@
 (ns onyx.log.generators
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
@@ -10,7 +10,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]))
 
-(def messenger (->DummyMessenger))
+(def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
 (defn bump-forward-immediates 
   "If peer hasn't finished joining yet, bump all their 
@@ -45,7 +45,8 @@
                                                                         diff 
                                                                         {:messenger messenger
                                                                          :id peer-id
-                                                                         :opts {:onyx.peer/try-join-once? true}})]
+                                                                         :opts {:onyx.peer/try-join-once?
+                                                                                (:onyx.peer/try-join-once? (:opts messenger) true)}})]
                                  (when (seq reactions)
                                    [peer-id reactions])))
                              peers)
@@ -60,7 +61,6 @@
                           entries
                           peer-reactions)]
     (vector new-replica unapplied)))
-
 
 (defn apply-peer-queue-entry 
   "Applies the next log message in the selected peer's queue.

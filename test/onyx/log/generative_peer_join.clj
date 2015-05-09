@@ -1,5 +1,5 @@
 (ns onyx.log.generative-peer-join
-  (:require [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
@@ -18,7 +18,7 @@
   {:onyx/id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
-(def messenger (->DummyMessenger))
+(def messenger (dummy-messenger {}))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 

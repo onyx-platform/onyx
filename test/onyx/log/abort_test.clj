@@ -1,11 +1,11 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(let [peer-state {:id :d :messenger (->DummyMessenger)}
+(let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
       entry (create-log-entry :abort-join-cluster {:id :d})
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
@@ -19,6 +19,8 @@
   (fact (:pairs new-replica) => {:a :b :b :c :c :a})
   (fact (:peers new-replica) => [:a :b :c])
   (fact diff => {:aborted :d})
-  ;; Test messaging layer never tries to rejoin after abort.
-  (fact reactions => nil?))
+  (fact reactions => [{:fn :prepare-join-cluster 
+                       :args {:joiner :d
+                              :peer-site {:address 1}} 
+                       :immediate? true}]))
 
