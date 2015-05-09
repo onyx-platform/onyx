@@ -46,16 +46,6 @@
     :onyx/medium :core.async
     :onyx/batch-size 5}])
 
-(def illegal-grouper-catalog
-  [{:onyx/name :inc
-    :onyx/type :grouper
-    :onyx/batch-size 5}])
-
-(def illegal-aggregator-catalog
-  [{:onyx/name :inc
-    :onyx/type :aggregator
-    :onyx/batch-size 5}])
-
 (def incomplete-catalog
   [{:onyx/name :in-bootstrapped
     :onyx/type :input
@@ -76,12 +66,6 @@
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
-
-(fact (onyx.api/submit-job peer-config {:catalog illegal-grouper-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
-
-(fact (onyx.api/submit-job peer-config {:catalog illegal-aggregator-catalog :workflow workflow
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
 (fact (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
@@ -187,4 +171,3 @@
   (fact (:e (:egress-ids d)) => (:id e))
   (fact (:f (:egress-ids e)) => (:id f))
   (fact (:g (:egress-ids f)) => (:id g)))
-

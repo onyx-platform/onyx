@@ -353,8 +353,8 @@
           (apply-fn)
           (build-new-segments)
           (write-batch)
-          (ack-messages)
           (flow-retry-messages)
+          (ack-messages)
           (close-batch-resources)))
     (catch Throwable e
       (ex-f e))))
