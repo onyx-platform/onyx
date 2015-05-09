@@ -52,12 +52,21 @@
   (fn [replica jobs n]
     (:job-scheduler replica)))
 
+(defmulti sort-job-priority
+  (fn [replica jobs]
+    (:job-scheduler replica)))
+
 (defmethod job-offer-n-peers :default
   [replica]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
 (defmethod claim-spare-peers :default
+  [replica]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:job-scheduler (:job-scheduler replica)})))
+
+(defmethod sort-job-priority :default
   [replica]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
@@ -102,7 +111,7 @@
                                       (when (< (or (get current t) 0) (get desired t))
                                         [job t]))
                                     tasks)))
-                           (:jobs replica)))]
+                           (sort-job-priority replica (:jobs replica))))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
                (let [removed (common/remove-peers replica (first peer-pool))

@@ -65,6 +65,6 @@
                    :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}}
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (:allocations (f old-replica)) => {:j1 {:t1 [:a]} :j2 {:t2 [:b]}})
+  (fact (:allocations new-replica) => {:j1 {:t1 [:a]} :j2 {:t2 [:b]}})
   (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
   (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil))

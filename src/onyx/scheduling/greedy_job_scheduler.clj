@@ -22,3 +22,10 @@
   ;; them. Return the same job claims since nothing will change.
   ;; 
   jobs)
+
+(defmethod cjs/sort-job-priority :onyx.job-scheduler/greedy
+  [replica jobs]
+  ;; We only care about the first job in a Greedy scheduler.
+  (if-let [x (first jobs)]
+    (vector x)
+    []))

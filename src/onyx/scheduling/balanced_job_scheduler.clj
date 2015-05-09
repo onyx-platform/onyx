@@ -32,6 +32,12 @@
        (map vector jobs (range))))
     {}))
 
+(defmethod cjs/sort-job-priority :onyx.job-scheduler/balanced
+  [replica jobs]
+  (sort-by (juxt (fn [job] (apply + (map count (vals (get-in replica [:allocations job])))))
+                 #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
+           (:jobs replica)))
+
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
   (let [ordered-jobs (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %)

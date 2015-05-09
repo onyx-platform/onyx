@@ -36,6 +36,12 @@
         init-allocations (min-allocations jobs-to-use n-peers)]
     (into {} (map (fn [j] {(:job j) (:capacity j)}) init-allocations))))
 
+(defmethod cjs/sort-job-priority :onyx.job-scheduler/percentage
+  [replica jobs]
+  (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %)
+                 (fn [job] (apply + (map count (vals (get-in replica [:allocations job]))))))
+           (:jobs replica)))
+
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/percentage
   [replica jobs n]
   ;; We can get away with using the exact same algorithm as the
