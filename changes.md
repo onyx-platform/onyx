@@ -17,6 +17,8 @@
 - New feature: Custom compression and decompression functions through Peer configuration
 - New feature: Data driven lifecycles
 - New feature: Internal core.async plugin
+- New feature: Flux policies
+- New feature: `:onyx/min-peers` can be set on grouping tasks to create a lower bound on the number of peers required to start a task
 - New documentation: Event context map information model
 - API: Added metadata to all public API functions indicating which Onyx version they were added in
 - API: `onyx.api/start-peers!` API renamed to `onyx.api/start-peers`
