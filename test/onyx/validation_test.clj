@@ -85,6 +85,11 @@
     :onyx/medium :core.async
     :onyx/batch-size 5}])
 
+(def dupes-workflow
+  [[:in :intermediate]
+   [:in :intermediate]
+   [:intermediate :out]])
+
 (def illegal-incoming-inputs-workflow
   [[:intermediate :in]])
 
@@ -118,6 +123,11 @@
                                         :workflow illegal-intermediate-nodes-workflow
                                         :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
+
+(fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                        :workflow dupes-workflow
+                                        :task-scheduler :onyx.task-scheduler/balanced})
+      => (throws clojure.lang.ExceptionInfo))
 
 (onyx.api/shutdown-env env)
 
