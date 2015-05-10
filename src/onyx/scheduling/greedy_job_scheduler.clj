@@ -4,16 +4,14 @@
             [onyx.log.commands.common :as common]))
 
 (defn job-coverable? [replica job]
-  (let [tasks (get-in replica [:tasks job])]
-    (>= (count (get-in replica [:peers])) (count tasks))))
+  (let [min-req (apply + (vals (get-in replica [:min-required-peers job])))]
+    (>= (count (get-in replica [:peers])) min-req)))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
   [replica]
   (if (seq (:jobs replica))
-    (let [[active & passive] (:jobs replica)
-          coverable? (job-coverable? replica active)
-          n (if coverable? (count (:peers replica)) 0)]
-      (merge {active n} (zipmap passive (repeat 0))))
+    (let [[active & passive] (:jobs replica)]
+      (merge {active (count (:peers replica))} (zipmap passive (repeat 0))))
     {}))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/greedy
@@ -24,3 +22,10 @@
   ;; them. Return the same job claims since nothing will change.
   ;; 
   jobs)
+
+(defmethod cjs/sort-job-priority :onyx.job-scheduler/greedy
+  [replica jobs]
+  ;; We only care about the first job in a Greedy scheduler.
+  (if-let [x (first jobs)]
+    (vector x)
+    []))

@@ -1,5 +1,5 @@
 (ns onyx.log.generative-peer-join
-  (:require [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
@@ -18,7 +18,7 @@
   {:onyx/id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
-(def messenger (->DummyMessenger))
+(def messenger (dummy-messenger {}))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -92,22 +92,10 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(defn generate-join-entries [peer-ids]
-  (zipmap peer-ids 
-          (map (fn [id] [{:fn :prepare-join-cluster 
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messenger)
-                                :joiner id}}])
-               peer-ids)))
-
-(defn generate-peer-ids [n]
-  (map #(keyword (str "p" %))
-       (range 1 (inc n))))
-
 (deftest greedy-allocation
   (checking
    "Checking greedy allocation causes all peers to be allocated to one of two jobs"
-   1000
+   50
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
@@ -115,7 +103,7 @@
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
        :entries (assoc
-                    (generate-join-entries (generate-peer-ids 8))
+                    (log-gen/generate-join-entries (log-gen/generate-peer-ids 8))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -136,14 +124,14 @@
 (deftest greedy-allocation-reallocated
   (checking
    "Checking peers reallocated to other job when killed"
-   1000
+   50
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
       {:replica {:job-scheduler :onyx.job-scheduler/greedy
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 8))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 8))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -161,14 +149,14 @@
 (deftest balanced-task-balancing
   (checking
    "Checking Balanced allocation causes peers to be evenly over tasks"
-   1000
+   50
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 6))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 6))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -185,14 +173,14 @@
 (deftest balanced-allocations-uneven
   (checking
    "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
-   1000
+   50
    [{:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 7))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 7))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config
                                                        job-1
@@ -212,14 +200,14 @@
 (deftest balanced-allocations
   (checking
    "Checking balanced allocation causes peers to be evenly split"
-   1000
+   50
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
       {:replica {:job-scheduler :onyx.job-scheduler/balanced
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
-       :entries (assoc (generate-join-entries (generate-peer-ids 12))
+       :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 12))
                   :job-1 [(api/create-submit-job-entry job-1-id
                                                        peer-config 
                                                        job-1 
@@ -238,3 +226,23 @@
    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+
+
+(deftest peer-leave
+  (checking
+    "Checking balanced allocation causes peers to be evenly split"
+    1000
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-entries (log-gen/generate-peer-ids 4))
+              (assoc :leave-anytime [{:fn :leave-cluster 
+                                      :args {:id :p1} 
+                                      :immediate? true}]))
+          :log []
+          :peer-choices []}))]
+    (= 3 (count (:peers replica)))))

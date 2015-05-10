@@ -8,6 +8,42 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [taoensso.timbre :refer [info]]))
 
+(defn job-upper-bound [replica job]
+  ;; We need to handle a special case here when figuring out the upper saturation limit.
+  ;; If this is a job with a grouped task that has already been allocated,
+  ;; we can't allocate to the grouped task anymore, even if it's saturation
+  ;; level is Infinity.
+  (let [tasks (get-in replica [:tasks job])
+        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+    (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
+      (apply + (map (fn [task]
+                      (if (some #{task} grouped-tasks)
+                        ;; Cannot allocate anymore, you have what you have.
+                        (count (get-in replica [:allocations job task]))
+                        ;; Allocate as much the original task saturation allows since it hasn't
+                        ;; been allocated yet.
+                        (get-in replica [:task-saturation job task])))
+                    tasks))
+      (get-in replica [:saturation job] Double/POSITIVE_INFINITY))))
+
+(defn job-lower-bound [replica job]
+  ;; Again, we handle the special case of a grouped task that has already
+  ;; begun.
+  (let [tasks (get-in replica [:tasks job])
+        grouped-tasks (filter (fn [task] (get-in replica [:flux-policies job task])) tasks)]
+    (if (seq (filter (fn [task] (seq (get-in replica [:allocations job task]))) grouped-tasks))
+      (apply + (map (fn [task]
+                      (if (some #{task} grouped-tasks)
+                        ;; Cannot allocate anymore, you have what you have.
+                        (count (get-in replica [:allocations job task]))
+                        ;; Grab the absolute minimum for this task, no constraints.
+                        (get-in replica [:min-required-peers job task])))
+                    tasks))
+      (apply + (vals (get-in replica [:min-required-peers job]))))))
+
+(defn job-coverable? [replica job n]
+  (>= n (job-lower-bound replica job)))
+
 (defmulti job-offer-n-peers
   (fn [replica]
     (:job-scheduler replica)))
@@ -16,12 +52,21 @@
   (fn [replica jobs n]
     (:job-scheduler replica)))
 
+(defmulti sort-job-priority
+  (fn [replica jobs]
+    (:job-scheduler replica)))
+
 (defmethod job-offer-n-peers :default
   [replica]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
 (defmethod claim-spare-peers :default
+  [replica]
+  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
+                  {:job-scheduler (:job-scheduler replica)})))
+
+(defmethod sort-job-priority :default
   [replica]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
@@ -42,27 +87,31 @@
                         (get-in replica [:tasks j])))})
         (:jobs replica))))
 
-(defn job->task-claims [replica job-offers]
+(defn job-claim-peers [replica job-offers]
   (reduce-kv
-   (fn [all j claim]
-     (assoc all j (cts/task-claim-n-peers replica j claim)))
+   (fn [all j n]
+     (if (job-coverable? replica j n)
+       (let [sat (job-upper-bound replica j)]
+         (assoc all j (min sat n)))
+       (assoc all j 0)))
    {}
    job-offers))
 
 (defn reallocate-peers [origin-replica displaced-peers max-utilization]
   (loop [peer-pool displaced-peers
          replica origin-replica]
-    (let [candidate-jobs (filter identity
-                                 (mapcat
-                                  (fn [job]
-                                    (let [current (get (current-task-allocations replica) job)
-                                          desired (cts/task-distribute-peer-count replica job (get max-utilization job))
-                                          tasks (get-in replica [:tasks job])]
-                                      (map (fn [t]
-                                             (when (< (or (get current t) 0) (get desired t))
-                                               [job t]))
-                                           tasks)))
-                                  (:jobs replica)))]
+    (let [candidate-jobs (remove
+                          nil?
+                          (mapcat
+                           (fn [job]
+                             (let [current (get (current-task-allocations replica) job)
+                                   desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job))
+                                   tasks (get-in replica [:tasks job])]
+                               (map (fn [t]
+                                      (when (< (or (get current t) 0) (get desired t))
+                                        [job t]))
+                                    tasks)))
+                           (sort-job-priority replica (:jobs replica))))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
                (let [removed (common/remove-peers replica (first peer-pool))
@@ -120,11 +169,25 @@
    replica
    (:jobs replica)))
 
+(defn deallocate-starved-jobs
+  "Strips out allocations from jobs that no longer meet the minimum number
+   of peers. This can happen if a peer leaves from a running job."
+  [replica]
+  (reduce
+   (fn [result job]
+     (if (< (apply + (map count (vals (get-in result [:allocations job]))))
+            (apply + (vals (get-in result [:min-required-peers job]))))
+       (update-in result [:allocations] dissoc job)
+       result))
+   replica
+   (:jobs replica)))
+
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
-        job-claims (job->task-claims replica job-offers)
+        job-claims (job-claim-peers replica job-offers)
         spare-peers (apply + (vals (merge-with - job-offers job-claims)))
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
-        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)]
-    (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))))
+        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
+        deallocated (deallocate-starved-jobs replica)]
+    (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))

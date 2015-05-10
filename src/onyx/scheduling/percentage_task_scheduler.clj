@@ -34,13 +34,6 @@
        (drop-last allocation (get-in replica [:allocations job task])))
      balanced)))
 
-(defmethod cts/task-claim-n-peers :onyx.task-scheduler/percentage
-  [replica job n]
-  ;; We can reuse the Balanced task scheduler algorithm as is.
-  (cts/task-claim-n-peers
-   (assoc-in replica [:task-schedulers job] :onyx.task-scheduler/balanced)
-   job n))
-
 (defn reuse-spare-peers [replica job tasks spare-peers]
   (loop [[head & tail :as task-seq] (get-in replica [:tasks job])
          results tasks

@@ -1,6 +1,6 @@
 (ns onyx.log.generators
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.messaging.dummy-messenger :refer [->DummyMessenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
@@ -10,7 +10,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]))
 
-(def messenger (->DummyMessenger))
+(def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
 (defn bump-forward-immediates 
   "If peer hasn't finished joining yet, bump all their 
@@ -44,7 +44,9 @@
                                                                         new-replica 
                                                                         diff 
                                                                         {:messenger messenger
-                                                                         :id peer-id})]
+                                                                         :id peer-id
+                                                                         :opts {:onyx.peer/try-join-once?
+                                                                                (:onyx.peer/try-join-once? (:opts messenger) true)}})]
                                  (when (seq reactions)
                                    [peer-id reactions])))
                              peers)
@@ -59,7 +61,6 @@
                           entries
                           peer-reactions)]
     (vector new-replica unapplied)))
-
 
 (defn apply-peer-queue-entry 
   "Applies the next log message in the selected peer's queue.
@@ -98,10 +99,10 @@
                                                         (contains? joined-peers peer))))
                                           (map key)
                                           set)
-                    selectable-queues (into selectable-peers peerless-queues)] 
-                (when (empty? selectable-queues)
-                  (println "No playable log messages. State: " state))
-                (gen/elements selectable-queues)))))
+                    selectable-queues (into selectable-peers peerless-queues)]
+                (if (empty? selectable-queues)
+                  (throw (Exception. (str "No playable log messages. State: " state)))
+                  (gen/elements selectable-queues))))))
 
 (defn apply-entry-gen 
   "Apply an entry from one of the peers log queues
@@ -124,7 +125,20 @@
               (let [g (gen/return state)] 
                 (when (> (count (:log state))
                          1000)
-                  (throw (Exception. (str "Log entry generator overflow. Likely issue with uncompletable log\n" state))))
+                  (throw (Exception. (str "Log entry generator overflow. Likely issue with uncompletable log\n" 
+                                          (with-out-str (clojure.pprint/pprint state))))))
                 (if (empty? (:entries state))
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))
+
+(defn generate-join-entries [peer-ids]
+  (zipmap peer-ids
+          (map (fn [id] [{:fn :prepare-join-cluster
+                         :immediate? true
+                         :args {:peer-site (extensions/peer-site messenger)
+                                :joiner id}}])
+               peer-ids)))
+
+(defn generate-peer-ids [n]
+  (map #(keyword (str "p" %))
+       (range 1 (inc n))))

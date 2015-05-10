@@ -189,8 +189,14 @@
    {:lifecycle/task :green-out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
+(def seen-before? (atom false))
+
 (defn black? [event old {:keys [color]} all-new]
-  (= color "black"))
+  (if (and (not @seen-before?) (= color "black"))
+    (do
+      (swap! seen-before? (constantly true))
+      true)
+    false))
 
 (defn white? [event old {:keys [color]} all-new]
   (= color "white"))

@@ -42,6 +42,8 @@
       (assoc-in [:allocations (:id args)] {})
       (assoc-in [:saturation (:id args)] (:saturation args))
       (assoc-in [:task-saturation (:id args)] (:task-saturation args))
+      (assoc-in [:flux-policies (:id args)] (:flux-policies args))
+      (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
       (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
       (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
       (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))

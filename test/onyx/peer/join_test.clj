@@ -76,6 +76,8 @@
     :onyx/fn :onyx.peer.join-test/join-person
     :onyx/type :function
     :onyx/group-by-key :id
+    :onyx/min-peers 1
+    :onyx/flux-policy :kill
     :onyx/batch-size batch-size}
 
    {:onyx/name :out

@@ -57,6 +57,8 @@
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-key :name
+    :onyx/min-peers 1
+    :onyx/flux-policy :kill
     :onyx/batch-size 40}
 
    {:onyx/name :out
