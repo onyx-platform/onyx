@@ -8,7 +8,7 @@
    {}
    (remove
     (fn [[k v]]
-      (not (nil? (get-in replica [:flux-policies replica job k]))))
+      (not (nil? (get-in replica [:flux-policies job k]))))
     allocations)))
 
 (defmethod cts/drop-peers :onyx.task-scheduler/balanced
@@ -17,7 +17,6 @@
    (reduce
     (fn [[peers-to-drop allocations] _]
       (let [max-peers (->> allocations
-                           (filter-grouped-tasks replica job)
                            (sort-by (comp count val))
                            reverse
                            first
@@ -26,7 +25,7 @@
             task-most-peers (ffirst (filter (fn [x] (= max-peers (count (second x)))) allocations))]
         [(conj peers-to-drop (last (allocations task-most-peers)))
          (update-in allocations [task-most-peers] butlast)]))
-    [[] (get-in replica [:allocations job])]
+    [[] (filter-grouped-tasks replica job (get-in replica [:allocations job]))]
     (range n))))
 
 (defn preallocated-grouped-task? [replica job task]
