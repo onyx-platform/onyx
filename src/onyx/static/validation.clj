@@ -65,12 +65,6 @@
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
 
-(defn validate-workflow-no-dupes [{:keys [workflow]}]
-  (when-not (= (count workflow)
-               (count (set workflow)))
-    (throw (ex-info "Workflows entries cannot contain duplicates"
-                    {:workflow workflow}))))
-
 (defn catalog->type-task-names [catalog type-pred]
   (set (map :onyx/name
             (filter (fn [task]
@@ -104,8 +98,7 @@
 
 (defn validate-workflow [job]
   (validate-workflow-graph job)
-  (validate-workflow-names job)
-  (validate-workflow-no-dupes job))
+  (validate-workflow-names job))
 
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
