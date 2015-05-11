@@ -269,10 +269,19 @@
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (chunk-path prefix) "/" id "/chunk")
+     (let [unique-id (java.util.UUID/randomUUID)
+           node (str (chunk-path prefix) "/" id "/chunk-" unique-id)
            bytes (compress chunk)]
        (zk/create-all conn node :persistent? true :data bytes)
-       id))))
+       unique-id))))
+
+(defmethod extensions/write-chunk [ZooKeeper :chunk-index]
+  [{:keys [conn opts prefix] :as log} kw chunk id]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (chunk-path prefix) "/" id "/index")
+           bytes (compress chunk)]
+       (zk/create-all conn node :persistent? true :data bytes)))))
 
 (defmethod extensions/write-chunk [ZooKeeper :job-scheduler]
   [{:keys [conn opts prefix] :as log} kw chunk id]
@@ -294,7 +303,7 @@
   [{:keys [conn opts prefix] :as log} kw chunk id]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (chunk-path prefix) "/" id "/chunk")
+     (let [node (str (chunk-path prefix) "/" id "/chunk-" (:id chunk))
            version (:version (zk/exists conn node))
            bytes (compress chunk)]
        (zk/set-data conn node bytes version)))))
@@ -342,10 +351,17 @@
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :chunk]
-  [{:keys [conn opts prefix] :as log} kw id & _]
+  [{:keys [conn opts prefix] :as log} kw id & {:keys [task-id]}]
   (clean-up-broken-connections
    (fn []
-     (let [node (str (chunk-path prefix) "/" id "/chunk")]
+     (let [node (str (chunk-path prefix) "/" task-id "/chunk-" id)]
+       (decompress (:data (zk/data conn node)))))))
+
+(defmethod extensions/read-chunk [ZooKeeper :chunk-index]
+  [{:keys [conn opts prefix] :as log} kw id & {:keys [task-id]}]
+  (clean-up-broken-connections
+   (fn []
+     (let [node (str (chunk-path prefix) "/" task-id "/index")]
        (decompress (:data (zk/data conn node)))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
