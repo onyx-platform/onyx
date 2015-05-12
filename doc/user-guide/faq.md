@@ -10,4 +10,4 @@
 
 ##### What does Onyx use internally for compression by default?
 
-Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Nippy](https://github.com/ptaoussanis/nippy). This can be override by setting the peer configuration with `:onyx.messaginge/compress-fn` and `:onyx.messaginge/decompress-fn`. See the Information Model documentation for more information.
+Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Nippy](https://github.com/ptaoussanis/nippy). This can be override by setting the peer configuration with `:onyx.messaging/compress-fn` and `:onyx.messaging/decompress-fn`. See the Information Model documentation for more information.

@@ -39,7 +39,7 @@ onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.6.x/WALKTHROUGH.md).
 
 ### User Guide 0.6.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
