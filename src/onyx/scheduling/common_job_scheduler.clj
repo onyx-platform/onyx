@@ -189,8 +189,5 @@
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        deallocated (deallocate-starved-jobs replica)
-        rets (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))]
-    (info (format "Peer Scheduler finished allocations (job id -> number of peers): %s"
-                  (into {} (map (fn [[k v]] {k (apply + (map count (vals v)))}) (:allocations rets)))))
-    rets))
+        deallocated (deallocate-starved-jobs replica)]
+    (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))
