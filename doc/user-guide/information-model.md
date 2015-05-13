@@ -72,7 +72,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |--------------------------|------------|---------|--------
 |`:onyx/group-by-key`      | `keyword`  | `any`   |
 |`:onyx/group-by-fn`       | `keyword`  | `any`   |
-|`:onyx/side-effects-only?`| `boolean`  |         | `false`
+|`:onyx/bulk?`             | `boolean`  |         | `false`
 
 #### Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys
 
