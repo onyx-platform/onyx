@@ -1,7 +1,7 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal warn]]
+            [taoensso.timbre :refer [fatal warn trace]]
             [zookeeper :as zk]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]])
@@ -209,9 +209,11 @@
                      (recur)))))
              (recur (inc position)))))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+         (trace e)
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
          (close! ch))
        (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+         (trace e)
          (close! ch))
        (catch Throwable e
          (fatal e))))
