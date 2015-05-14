@@ -467,11 +467,11 @@
                            :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
 
-        (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                    (not (munge-start-lifecycle pipeline-data)))
-          (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
+            _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+                          (not (munge-start-lifecycle pipeline-data)))
+                (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
