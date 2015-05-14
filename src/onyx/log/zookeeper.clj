@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [fatal warn trace]]
             [zookeeper :as zk]
             [onyx.extensions :as extensions]
+            [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]])
   (:import [org.apache.curator.test TestingServer]))
 
@@ -55,8 +56,10 @@
   (try
     (f)
     (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+      (trace e)
       (throw-subscriber-closed))
     (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+      (trace e)
       (throw-subscriber-closed))))
 
 (defn initialize-origin! [conn config prefix]
@@ -73,7 +76,7 @@
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))]
+          conn (zk/connect (:zookeeper/address config) {:timeout-msec (:onyx.peer/zookeeper-timeout defaults)})]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
@@ -147,6 +150,7 @@
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
         (>!! ch true))
       (catch Throwable e
+        (trace e)
         ;; Node doesn't exist.
         (>!! ch true)))))
 
