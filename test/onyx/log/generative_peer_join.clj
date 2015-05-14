@@ -10,6 +10,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
@@ -95,7 +96,7 @@
 (deftest greedy-allocation
   (checking
    "Checking greedy allocation causes all peers to be allocated to one of two jobs"
-   50
+   (times 50)
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
@@ -124,7 +125,7 @@
 (deftest greedy-allocation-reallocated
   (checking
    "Checking peers reallocated to other job when killed"
-   50
+   (times 50)
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
@@ -173,7 +174,7 @@
 (deftest balanced-allocations-uneven
   (checking
    "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
-   50
+   (times 50)
    [{:keys [replica log peer-choices]}
     (log-gen/apply-entries-gen
      (gen/return
@@ -200,7 +201,7 @@
 (deftest balanced-allocations
   (checking
    "Checking balanced allocation causes peers to be evenly split"
-   50
+   (times 50)
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
@@ -231,7 +232,7 @@
 (deftest peer-leave
   (checking
     "Checking balanced allocation causes peers to be evenly split"
-    1000
+    (times 50)
     [{:keys [replica log peer-choices]} 
      (log-gen/apply-entries-gen 
        (gen/return

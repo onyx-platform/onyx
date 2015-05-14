@@ -11,6 +11,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
@@ -139,7 +140,7 @@
               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
      "Checking that exactly 4 peers are assigned to task B."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
@@ -162,7 +163,7 @@
               (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
      "Checking at least 4 tasks are assigned to B."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
@@ -191,7 +192,7 @@
     (checking
      "Checking no peers are ever allocated to this job since this job needs at least
       12 peers to run."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
@@ -219,7 +220,7 @@
                     (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking peers are allocated to job 1 even though job 2 is submitted and can't start."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
