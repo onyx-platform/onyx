@@ -10,7 +10,7 @@
    :onyx/batch-timeout 1000
 
    ; zookeeper defaults
-   :onyx.peer/zookeeper-timeout 50000
+   :onyx.peer/zookeeper-timeout 6000
 
    ; peer defaults
    :onyx.peer/inbox-capacity 1000
