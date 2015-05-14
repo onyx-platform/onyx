@@ -76,7 +76,7 @@
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config) {:timeout-msec (:onyx.peer/zookeeper-timeout defaults)})]
+          conn (zk/connect (:zookeeper/address config) :timeout-msec (:onyx.peer/zookeeper-timeout defaults))]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
