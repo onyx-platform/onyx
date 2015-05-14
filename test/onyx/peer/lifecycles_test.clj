@@ -24,26 +24,26 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(def counter (atom 0))
+(def counter (atom []))
 
 (defn start-task? [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :task-started)))
   true)
 
 (defn before-task [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :task-before)))
   {})
 
 (defn after-task [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :task-after)))
   {})
 
 (defn before-batch [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :batch-before)))
   {})
 
 (defn after-batch [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :batch-after)))
   {})
 
 (def catalog
@@ -127,11 +127,30 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-;; Counter is inc'ed 14 times. 1 time on start up,
+;; Counter is conj'd 14 times. 1 time on start up,
 ;; 5 for each start/stop of a batch, 2 more times
 ;; for starting and stopping the lifecycle, and 1 more post-batch for
 ;; shutting down the task.
-(fact @counter => 14)
+(fact (count @counter) => 14)
+
+(def expected-order
+  [:task-before
+   :task-started
+   :batch-before
+   :batch-after ; 1
+   :batch-before
+   :batch-after ; 2
+   :batch-before
+   :batch-after ; 3
+   :batch-before
+   :batch-after ; 4
+   :batch-before
+   :batch-after ; 5
+   :batch-before
+   :batch-after
+   :task-after])
+
+(fact @counter => expected-order)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
