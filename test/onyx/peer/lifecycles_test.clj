@@ -134,8 +134,8 @@
 (fact (count @counter) => 14)
 
 (def expected-order
-  [:task-before
-   :task-started
+  [:task-started
+   :task-before
    :batch-before
    :batch-after ; 1
    :batch-before
