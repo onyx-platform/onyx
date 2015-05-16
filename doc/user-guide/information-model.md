@@ -30,43 +30,43 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - a single Clojure vector which is EDN serializable/deserializable
 - all elements in the vector must be Clojure maps
 
-#### All maps in the vector must have these keys
+##### All maps in the vector must have these keys
 
-| key name             | type       | choices                          | default
-|----------------------|------------|----------------------------------|--------
+| key name             | type       | choices                          |
+|----------------------|------------|----------------------------------|
 |`:onyx/name`          | `keyword`  | `any`                            |
 |`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
 |`:onyx/batch-size`    | `integer`  | `>= 0`                           |
 
-#### All maps may optionally have these keys
+##### All maps may optionally have these keys
 
-| key name             | type       | choices    | default
-|----------------------|------------|------------|--------
-|`:onyx/ident`         | `keyword`  | `any`      |
-|`:onyx/batch-timeout` | `integer`  | `>= 0`     | `1000`
-|`:onyx/max-peers`     | `integer`  | `> 0`      |
+| key name             | type       | choices    | default|
+|----------------------|------------|------------|--------|
+|`:onyx/ident`         | `keyword`  | `any`      |        |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`     | `1000` |
+|`:onyx/max-peers`     | `integer`  | `> 0`      |        |
 
-#### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
+##### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/medium`     | `keyword`  | `any`
 
-#### Maps with `:onyx/type` set to `:input` may optionally have these keys
+##### Maps with `:onyx/type` set to `:input` may optionally have these keys
 
-| key name                   | type     | default
-|----------------------------|----------|--------
-|`:onyx/pending-timeout`     |`integer` | `60000`
-|`:onyx/input-retry-timeout `|`integer` | `1000`
-|`:onyx/max-pending`         |`integer` | `10000`
+| key name                   | type     | default | unit        |
+|----------------------------|----------|---------|-------------|
+|`:onyx/pending-timeout`     |`integer` | `60000` | milliseconds|
+|`:onyx/input-retry-timeout `|`integer` | `1000`  | milliseconds|
+|`:onyx/max-pending`         |`integer` | `10000` | segments    |
 
-#### Maps with `:onyx/type` set to `:function` must have these keys
+##### Maps with `:onyx/type` set to `:function` must have these keys
 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/fn`         | `keyword`  | `any`
 
-#### Maps with `:onyx/type` set to `:function` may optionally have these keys
+##### Maps with `:onyx/type` set to `:function` may optionally have these keys
 
 | key name                 | type       | choices | default
 |--------------------------|------------|---------|--------
@@ -74,7 +74,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:onyx/group-by-fn`       | `keyword`  | `any`   |
 |`:onyx/bulk?`             | `boolean`  |         | `false`
 
-#### Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys
+##### Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys
 
 | key name                 | type       | choices             |
 |--------------------------|------------|---------------------|

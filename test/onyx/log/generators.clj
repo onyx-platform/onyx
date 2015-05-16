@@ -131,13 +131,15 @@
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))
 
+(defn build-join-entry [peer-id]
+  {:fn :prepare-join-cluster
+   :immediate? true
+   :args {:peer-site (extensions/peer-site messenger) 
+          :joiner peer-id}})
+
 (defn generate-join-entries [peer-ids]
   (zipmap peer-ids
-          (map (fn [id] [{:fn :prepare-join-cluster
-                         :immediate? true
-                         :args {:peer-site (extensions/peer-site messenger)
-                                :joiner id}}])
-               peer-ids)))
+          (map build-join-entry peer-ids)))
 
 (defn generate-peer-ids [n]
   (map #(keyword (str "p" %))
