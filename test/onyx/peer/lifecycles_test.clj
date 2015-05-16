@@ -30,7 +30,7 @@
   (swap! counter inc)
   true)
 
-(defn before-task [event lifecycle]
+(defn before-task-start [event lifecycle]
   (swap! counter inc)
   {})
 
@@ -82,16 +82,16 @@
 
 (def calls
   {:lifecycle/start-task? start-task?
-   :lifecycle/before-task before-task
+   :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task after-task})
+   :lifecycle/after-task-end after-task})
 
 (def in-calls
-  {:lifecycle/before-task inject-in-ch})
+  {:lifecycle/before-task-start inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in

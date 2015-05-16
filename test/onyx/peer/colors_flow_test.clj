@@ -160,16 +160,16 @@
   {:core.async/chan green-out-chan})
 
 (def colors-in-calls
-  {:lifecycle/before-task inject-colors-in-ch})
+  {:lifecycle/before-task-start inject-colors-in-ch})
 
 (def red-out-calls
-  {:lifecycle/before-task inject-red-out-ch})
+  {:lifecycle/before-task-start inject-red-out-ch})
 
 (def blue-out-calls
-  {:lifecycle/before-task inject-blue-out-ch})
+  {:lifecycle/before-task-start inject-blue-out-ch})
 
 (def green-out-calls
-  {:lifecycle/before-task inject-green-out-ch})
+  {:lifecycle/before-task-start inject-green-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :colors-in

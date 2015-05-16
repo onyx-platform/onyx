@@ -400,8 +400,8 @@
      identity
      matched)))
 
-(defn compile-before-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
+(defn compile-before-task-start-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task-start))
 
 (defn compile-before-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
@@ -410,7 +410,7 @@
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
 (defn compile-after-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-end))
 
 (defn resolve-task-fn [entry]
   (when (= (:onyx/type entry) :function)
@@ -446,7 +446,7 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/compiled-start-task-fn (compile-start-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-task-fn (compile-before-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-task-start-fn (compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
@@ -467,7 +467,7 @@
                            :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (munge-start-lifecycle pipeline-data)))
