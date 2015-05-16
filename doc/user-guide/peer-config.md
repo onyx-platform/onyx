@@ -120,10 +120,22 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 |`:onyx.peer/retry-start-interval`       | `int`      | `2000`                             |
 |`:onyx.peer/sequential-back-off`        | `int`      | `2000`                             |
 |`:onyx.peer/drained-back-off`           | `int`      | `400`                              |
+|`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
+|`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
+|`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
+|`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
+|`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:aeron`, `:core.async`  |
+|`:onyx.messaging/bind-addr`             | `string`   | `nil`                              |
+|`:onyx.messaging/peer-port-range`       | `vector`   | `[]`                               |
+|`:onyx.messaging/peer-ports`            | `vector`   | `[]`                               |
+
+#### Aeron Peer Configuration
+
+#### Netty Peer Configuration
 
 ##### `:onyx.peer/inbox-capacity`
 
@@ -145,19 +157,35 @@ Number of ms to wait before retrying to execute a sequential task in the presenc
 
 Number of ms to wait before executing peer pipeline run if all ingress queues have been exhausted.
 
+##### `:onyx:onyx.peer/job-not-ready-back-off`
+
+Number of ms to back off and wait before trying to discover configuration needed to start the subscription after discovery failure.
+
+##### `onyx.peer/join-failure-back-off`
+
+Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
+
 ##### `onyx.peer/fn-params`
 
 A map of keywords to vectors. Keywords represent task names, vectors represent the first parameters to apply
 to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
 underlying `:add` with `(f 42 <segment>)`.
 
-##### `onyx.peer/join-failure-back-off`
+##### `:onyx.peer/zookeeper-timeout`
 
-Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
+Number of ms to timeout from the ZooKeeper client connection on disconnection.
 
 ##### `onyx.messaging/completion-buffer-size`
 
-The number of messages to buffer in the core.async channel for completing messages on an input task.
+Number of messages to buffer in the core.async channel for completing messages on an input task.
+
+##### `:onyx.messaging/release-ch-buffer-size`
+
+Number of messages to buffer in the core.async channel for released completed messages.
+
+##### `:onyx.messaging/retry-ch-buffer-size`
+
+Number of messages to buffer in the core.async channel for retrying timed-out messages.
 
 ##### `onyx.messaging/decompress-fn`
 
@@ -168,6 +196,22 @@ the decompressed value of the byte array.
 
 The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte
 array representing the segment seq.
+
+##### `:onyx.messaging/impl`
+
+The messaging protocol to use for peer-to-peer communication.
+
+##### `:onyx.messaging/bind-addr`
+
+An IP address to bind the peer to for messaging. Defaults to `nil`, binds to it's external IP to the result of calling `http://checkip.amazonaws.com`.
+
+##### `:onyx.messaging/peer-port-range`
+
+A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictable in-order.
+
+##### `onyx.messaging/peer-ports`
+
+A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictable in-order.
 
 ### Peer Full Example
 
