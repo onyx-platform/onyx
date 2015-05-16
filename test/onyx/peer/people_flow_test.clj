@@ -148,19 +148,19 @@
   {:core.async/chan everyone-out-chan})
 
 (def people-in-calls
-  {:lifecycle/before-task inject-people-in-ch})
+  {:lifecycle/before-task-start inject-people-in-ch})
 
 (def children-out-calls
-  {:lifecycle/before-task inject-children-out-ch})
+  {:lifecycle/before-task-start inject-children-out-ch})
 
 (def adults-out-calls
-  {:lifecycle/before-task inject-adults-out-ch})
+  {:lifecycle/before-task-start inject-adults-out-ch})
 
 (def athletes-wa-out-calls
-  {:lifecycle/before-task inject-athletes-wa-out-ch})
+  {:lifecycle/before-task-start inject-athletes-wa-out-ch})
 
 (def everyone-out-calls
-  {:lifecycle/before-task inject-everyone-out-ch})
+  {:lifecycle/before-task-start inject-everyone-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :people-in

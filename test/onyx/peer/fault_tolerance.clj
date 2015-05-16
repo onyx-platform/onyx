@@ -67,10 +67,10 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.peer.fault-tolerance/inject-in-ch})
+  {:lifecycle/before-task-start :onyx.peer.fault-tolerance/inject-in-ch})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.peer.fault-tolerance/inject-out-ch})
+  {:lifecycle/before-task-start :onyx.peer.fault-tolerance/inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
