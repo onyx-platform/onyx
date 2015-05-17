@@ -25,6 +25,10 @@
   [config peer-site peer-sites]
   peer-site)
 
+(defmethod extensions/get-peer-site :core.async
+  [replica peer]
+  "localhost")
+
 (defrecord CoreAsync [peer-group]
   component/Lifecycle
 

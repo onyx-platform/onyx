@@ -41,6 +41,9 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
+(defmulti get-peer-site (fn [replica peer]
+                          (:onyx.messaging/impl (:messaging replica))))
+
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
