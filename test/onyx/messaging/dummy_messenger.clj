@@ -14,5 +14,5 @@
   [messenger]
   {:address 1})
 
-(defmethod extensions/open-peer-site :dummy-messenger
+(defmethod extensions/open-peer-site :default
   [_ _] "localhost")
