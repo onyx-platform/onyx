@@ -60,3 +60,6 @@
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 
 (defmulti internal-retry-message (fn [messenger event id peer-link] (type messenger)))
+
+(defmethod extensions/open-peer-site :default
+  [_ _] "localhost")

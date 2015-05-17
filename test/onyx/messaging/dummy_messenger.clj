@@ -13,6 +13,3 @@
 (defmethod extensions/peer-site onyx.messaging.dummy_messenger.DummyMessenger
   [messenger]
   {:address 1})
-
-(defmethod extensions/open-peer-site :default
-  [_ _] "localhost")
