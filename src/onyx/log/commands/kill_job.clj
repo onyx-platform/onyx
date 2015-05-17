@@ -4,9 +4,10 @@
             [onyx.log.commands.common :refer [peer->allocated-job] :as common]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]
-            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [taoensso.timbre :refer [warn]]))
 
-;; Pull this out of the defmethod because it's reused across other log entries.
+;; Pulled this out of the defmethod because it's reused across other log entries.
 (defn apply-kill-job [replica job-id]
   (if-not (some #{job-id} (:killed-jobs replica))
     (let [peers (mapcat identity (vals (get-in replica [:allocations job-id])))]
@@ -23,7 +24,11 @@
 
 (defmethod extensions/apply-log-entry :kill-job
   [{:keys [args]} replica]
-  (apply-kill-job replica (:job args)))
+  (try
+    (apply-kill-job replica (:job args))
+    (catch Throwable e
+      (warn e)
+      replica)))
 
 (defmethod extensions/replica-diff :kill-job
   [entry old new]
