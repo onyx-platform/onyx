@@ -63,7 +63,7 @@ Number of ms to wait before trying to reboot a virtual peer after failure.
 
 ##### `:onyx.peer/drained-back-off`
 
-Number of ms to wait before executing peer pipeline run if all ingress queues have been exhausted.
+Number of ms to wait before trying to complete the job if all input tasks have been exhausted. Completing the job may not succeed if the cluster configuration is being shifted around.
 
 ##### `:onyx:onyx.peer/peer-not-ready-back-off`
 
