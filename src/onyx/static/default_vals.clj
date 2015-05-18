@@ -16,7 +16,6 @@
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
-   :onyx.peer/sequential-back-off 2000
    :onyx.peer/job-not-ready-back-off 500
 
    ; messaging defaults

@@ -471,7 +471,7 @@
 
         (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                     (not (munge-start-lifecycle pipeline-data)))
-          (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
+          (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
