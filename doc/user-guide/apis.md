@@ -35,9 +35,13 @@ The [Core API](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/api.clj
 
 Starts a development environment with in-memory ZooKeeper. Helpful for developing locally without needing to start any other services.
 
+##### `start-peer-group`
+
+Starts a resource pool to be shared across a group of peers. You should only start one peer group per physical machine.
+
 ##### `start-peers`
 
-Starts N virtual peers to execute tasks.
+Starts N virtual peers to execute tasks. In a production environment, you should start by booting up N virtual peers for N cores on the physical machine. Tune performance from there.
 
 ##### `submit-job`
 
@@ -47,46 +51,33 @@ Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:cat
 
 Given a job ID, blocks the calling thread until all the tasks for this job have been completed.
 
+##### `gc`
+
+Invokes the garbage collector. Compresses the replica in Zookeeper, freeing up storage and deleting log history. Frees up memory on the local, in memory replica on all peers.
+
+##### `kill-job`
+
+Stops this job from executing, never allowing it to be run again.
+
+##### `subscribe-to-log`
+
+Sends all events in the log to a core.async channel. Events are received in the order that they appeared in the log. Starts from the beginning of the log, blocking until more entries are available.
+
 ##### `shutdown-peer`
 
 Shuts down a single peer, stopping any task that it is presently executing.
+
+##### `shutdown-peer-group`
+
+Shuts down the peer group, releasing any messaging resources it was holding open.
 
 ##### `shutdown-env`
 
 Shuts down the development environment, stopping in memory HornetQ and ZooKeeper.
 
-### Task Lifecycle API
-
-Each time a virtual peer receives a task to execute, a lifecycle of functions are called. Onyx creates a map of useful data for the functions at the start of the lifecycle and proceeds to pass the map through to each function. The [Task Lifecycle API](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/peer/task_lifecycle_extensions.clj) facilitates this flow.
-
-Onyx provides hooks for user-level modification of this map both before the task begins executing, before each segment batch begins, after each segment batch is completed, and after the task is completed. See below for a description of each. Each of these functions allows dispatch based on the name, identity, type, and type/medium combination of a task. Map merge precedence happens in this exact order, allowing you to override behavior specified by a plugin, or Onyx itself.
-
-##### `start-lifecycle?`
-
-Just before beginning the task, this function is called to check whether the peer is ready to begin. For reasons external
-to Onyx, the peer might need to block and wait for another event. This function must return a map with key
-`:onyx.core/start-lifecycle?` and a boolean value. If true, the task will begin executing. If false, the peer will back off
-for `:onyx.peer/retry-start-interval` before recalling `start-lifecycle?`.
-
-##### `inject-lifecycle-resources`
-
-Adds data once to the start of a peer's task execution. This data can be accessed in every iteration of the pipeline.
-
-##### `inject-batch-resources`
-
-Adds data to each iteration of the pipeline per peer task execution. Called at the start of each pipeline.
-
-##### `close-batch-resources`
-
-Hook for closing out any stateful data injected into the pipeline. Called once at the end of each iteration.
-
-##### `close-lifecycle-resources`
-
-Hook for closing out any stateful data injected into the pipeline. Called once at the end of task execution. Called regardless of the task execution status.
-
 ### Peer Pipeline API
 
-The virtual peer process is extensively pipelined, providing asynchrony between each lifecycle function. Hence, each virtual peer allocates at least 11 threads. Each function may be extended for new behavior. The [Peer Pipeline API](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/peer/pipeline_extensions.clj) allows you to latch on.
+The [Peer Pipeline API](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/peer/pipeline_extensions.clj) allows you to interact with data storage mediums to read and write data for plugins.
 
 ##### `read-batch`
 
@@ -100,3 +91,18 @@ Writes the batch with the function applied to the output stream.
 
 Called by one peer exactly once (subsequent calls occur if the sealing peer fails) when the task is completing. Close out target output resources.
 
+##### `ack-message`
+
+Acknowledges a segment natively on the input medium, causing the segment to be released from durable storage.
+
+##### `retry-message`
+
+Processes a segment again from the root of the workflow.
+
+##### `pending?`
+
+Given a segment ID, returns true if this segment is pending completion.
+
+##### `drained?`
+
+Returns true if all messages on the input medium have successfully been processed. Never returns true for an infinite message stream.

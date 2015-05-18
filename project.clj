@@ -1,5 +1,5 @@
 (defproject com.mdrogalis/onyx "0.6.0-SNAPSHOT"
-  :description "Distributed, masterless, fault tolerant data processing for Clojure"
+  :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
@@ -12,10 +12,6 @@
                  [com.stuartsierra/component "0.2.1"]
                  [com.taoensso/timbre "3.0.1"]
                  [com.taoensso/nippy "2.9.0-RC2"]
-                 [uk.co.real-logic/Agrona "0.3.1-SNAPSHOT"]
-                 [uk.co.real-logic/aeron-client "0.1-SNAPSHOT"]
-                 [uk.co.real-logic/aeron-driver "0.1-SNAPSHOT"]
-                 [uk.co.real-logic/aeron-common "0.1-SNAPSHOT"]
                  [prismatic/schema "0.4.0"]
                  [zookeeper-clj "0.9.1" :exclusions [io.netty/netty]]
                  [io.netty/netty-all "4.0.26.Final"]
