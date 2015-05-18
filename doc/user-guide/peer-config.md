@@ -44,7 +44,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
-|`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:aeron`, `:core.async`  |
+|`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
 |`:onyx.messaging/bind-addr`             | `string`   | `nil`                              |
 |`:onyx.messaging/peer-port-range`       | `vector`   | `[]`                               |
 |`:onyx.messaging/peer-ports`            | `vector`   | `[]`                               |
