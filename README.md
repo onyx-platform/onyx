@@ -55,7 +55,6 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
-- [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
