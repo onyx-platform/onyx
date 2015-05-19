@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.core-async
-    (:require [clojure.core.async :refer [chan >!! <!! alts!! dropping-buffer timeout close!]]
+    (:require [clojure.core.async :refer [chan >!! <!! alts!! sliding-buffer timeout close!]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
@@ -48,7 +48,7 @@
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         id (java.util.UUID/randomUUID)
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
-        ch (chan (dropping-buffer 10000))]
+        ch (chan (sliding-buffer 100000))]
     (future
       (try
         (loop []

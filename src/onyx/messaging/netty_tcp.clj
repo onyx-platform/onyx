@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.messaging.netty-tcp
     (:require [clojure.core.async :refer [chan >!! >! <!! alts!! timeout close! 
-                                          thread go-loop sliding-buffer dropping-buffer]]
+                                          thread go-loop sliding-buffer]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
@@ -245,8 +245,8 @@
     (taoensso.timbre/info "Starting Netty TCP Sockets")
     (let [{:keys [client-group worker-group boss-group]} (:messaging-group peer-group)
           config (:config peer-group)
-          release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
-          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
+          release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)

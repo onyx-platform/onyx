@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
