@@ -180,6 +180,19 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 
 ### Messaging
 
+The messaging layer of Onyx employees the same technique that Apache Storm uses to achieve fault tolerance. Any errors are our own.
+
+#### The Algorithm
+
+Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a semgment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
+
+#### Acking Daemon
+
+An acking daemon is a process that runs alongside each peer and maintains state. This state is a map of segment ID to another map. The map in the value maintains the current "ack val" and the peer to send completion messages to. When the ack val for a segment is set to zero, a message is send to the appropriate peer to release the message from durable storage. This concludes the processing of the segment, and it is considered successful. Key/value pairs are periodically reaped if peers that are operating on these segments are lost. If these values are reaped, the message is automatically replayed from the root of the workflow on the input task on a rolling basis.
+
+We can depict all of this visually:
+
+<img src="../design/images/messaging-summary.png">
 
 #### Phases of Execution
 
