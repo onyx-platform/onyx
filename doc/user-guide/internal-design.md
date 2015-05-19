@@ -272,16 +272,6 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: None
 
 -------------------------------------------------
-[`complete-task`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/complete_task.clj)
-
-- Submitter: peer (P), who has successfully sealed the task
-- Purpose: Indicates to the replica that all downstream tasks have received the sentinel, so this task can be marked complete
-- Arguments: P's ID (`:id`), the job ID (`:job`), and the task ID (`:task`)
-- Replica update: Updates `:completions` to associate job ID to a vector of task ID that have been completed. Removes all peers under `:allocations` for this task. Sets `:peer-state` for all peers executing this task to `:idle`
-- Side effects: Stops this task lifecycle
-- Reactions: Any peer executing this task reacts with `:volunteer-for-task`
-
--------------------------------------------------
 [`submit-job`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/submit_job.clj)
 
 - Submitter: Client, via public facing API
