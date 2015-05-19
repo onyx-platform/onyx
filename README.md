@@ -45,7 +45,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
 - [APIs](doc/user-guide/apis.md)
-- [Internal Design](doc/user-guide/internal-design.md)
+- [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
 - [Peer Configuration](doc/user-guide/peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
