@@ -30,8 +30,8 @@
 
   (start [component]
     (taoensso.timbre/info "Starting core.async Messaging Channel")
-    (let [release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
-          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))]
+    (let [release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))]
       (assoc component :release-ch release-ch :retry-ch retry-ch)))
 
   (stop [component]
