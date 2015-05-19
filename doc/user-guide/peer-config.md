@@ -129,8 +129,24 @@ A vector of integers denoting ports that may be used for peer communication. Thi
 
 ```clojure
 (def peer-opts
-  {:zookeeper/address "127.0.0.1:2181"
-   :onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
-   :onyx.peer/retry-start-interval 2000
-   :onyx.peer/fn-params {:add [42]}})
+  {:onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
+   :zookeeper/address "127.0.0.1:2181"
+   :onyx.peer/inbox-capacity 2000
+   :onyx.peer/outbox-capacity 2000
+   :onyx.peer/retry-start-interval 4000
+   :onyx.peer/join-failure-back-off 500
+   :onyx.peer/drained-back-off 400
+   :onyx.peer/peer-not-ready-back-off 5000
+   :onyx.peer/job-not-ready-back-off 1000
+   :onyx.peer/fn-params {:add [42]}
+   :onyx.peer/zookeeper-timeout 10000
+   :onyx.messaging/completion-buffer-size 2000
+   :onyx.messaging/release-ch-buffer-size 50000
+   :onyx.messaging/retry-ch-buffer-size 100000
+   :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
+   :onyx.messaging/compress-fn onyx.compression.nippy/compress
+   :onyx.messaging/impl :netty
+   :onyx.messaging/bind-addr "localhost"
+   :onyx.messaging/peer-port-range [50000 60000]
+   :onyx.messaging/peer-ports [45000 45002 42008]})
 ```
