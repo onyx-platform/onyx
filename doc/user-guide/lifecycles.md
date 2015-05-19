@@ -77,12 +77,12 @@ Next, define a map that wires all these functions together by mapping predefined
 
 Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
 
-Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the calls map that we just defined. Pass it to your `onyx.api/submit-job` call:
+Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the fully qualified namespaced keyword that represents the calls map that we just defined. Pass it to your `onyx.api/submit-job` call:
 
 ```clojure
 (def lifecycles
   [{:lifecycle/task :my-task-name-here
-    :lifecycle/calls my.ns/calls
+    :lifecycle/calls :my.ns/calls
     :lifecycle/doc "Test lifecycles and print a message at each stage"}])
 
 (onyx.api/submit-job
