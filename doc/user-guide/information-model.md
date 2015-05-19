@@ -75,6 +75,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 - a single Clojure vector which is EDN serializable/deserializable
 - all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
 
 | key name                |type                          | optional?| default
 |-------------------------|------------------------------|----------|--------
@@ -91,9 +92,10 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 - a single Clojure vector which is EDN serializable/deserializable
 - all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
 
-| key name                |type                          | optional?| default
-|-------------------------|------------------------------|----------|--------
+| key name                |type                          | optional?|
+|-------------------------|------------------------------|----------|
 |`:lifecycle/name`        |`keyword`                     | no       |
 |`:lifecycle/calls`       |`keyword`                     | no       |
 |`:lifecycle/doc`         |`string`                      | yes      |
