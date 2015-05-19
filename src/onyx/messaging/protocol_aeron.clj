@@ -1,10 +1,11 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
   (:require [taoensso.timbre :as timbre]
             [onyx.types :refer [->Leaf]])
-  (:import [java.util UUID]
+  #_(:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
 
+(comment
 ;;;;;;
 ;; Constants
 
@@ -137,3 +138,4 @@
                (next payloads)
                (+ offset message-base-length))
         (persistent! messages)))))
+)
