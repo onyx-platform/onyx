@@ -6,15 +6,6 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Workflow](#workflow)
-- [Catalog](#catalog)
-  - [All maps in the vector must have these keys](#all-maps-in-the-vector-must-have-these-keys)
-  - [All maps may optionally have these keys](#all-maps-may-optionally-have-these-keys)
-  - [Maps with `:onyx/type` set to `:input` or `:output` must have these keys](#maps-with-onyxtype-set-to-input-or-output-must-have-these-keys)
-  - [Maps with `:onyx/type` set to `:function` must have these keys](#maps-with-onyxtype-set-to-function-must-have-these-keys)
-  - [Maps with `:onyx/type` set to `:function` may optionally have these keys](#maps-with-onyxtype-set-to-function-may-optionally-have-these-keys)
-- [Flow Conditions](#flow-conditions)
-
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Workflow
@@ -23,7 +14,6 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - all elements in the inner vectors are keywords
 - all keywords must correspond to an `:onyx/name` entry in the catalog
 - the "root" keywords of the workflow must have catalog entries of `:onyx/type` that map to `:input`
-- the "leaf" values of the workflow must have catalog entries of `:onyx/type` that map to `:output`
 
 ### Catalog
 
