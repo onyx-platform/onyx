@@ -142,10 +142,6 @@ The Balanced Scheduler takes a topological sort of the workflow for a specific j
 
 To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/balanced`.
 
-**Task Completion**
-
-When a task is complete, this scheduler moves all peers executing that task and balanced assigns them, starting with the first incomplete task. the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns each peer *from the completed task* to tasks B, C, D, B, C, D, ... and so on.
-
 **Peer Removal**
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is assigned the next task in the balanced sequence.
@@ -162,19 +158,10 @@ This scheduler handles corner cases (fractions of peers) in the same way as the 
 
 To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/percentage`.
 
-**Task Completion**
-
-When a task is complete, this scheduler moves all peers executing and adds them all to the next incomplete task with the largest percentage.
-
 **Peer Removal**
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler rebalances all the peers for even distribution.
 
-**Max Peer Parameter**
-
-This task scheduler is *not* composable with `:onyx/max-peers`.
-
 #### Examples
 
 - [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Balanced task scheduler](/doc/design/allocate-examples/example-1.md)
-
