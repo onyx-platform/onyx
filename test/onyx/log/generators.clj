@@ -137,9 +137,10 @@
    :args {:peer-site (extensions/peer-site messenger) 
           :joiner peer-id}})
 
-(defn generate-join-entries [peer-ids]
+(defn generate-join-queues [peer-ids]
   (zipmap peer-ids
-          (map build-join-entry peer-ids)))
+          (map (comp vector build-join-entry) 
+               peer-ids)))
 
 (defn generate-peer-ids [n]
   (map #(keyword (str "p" %))
