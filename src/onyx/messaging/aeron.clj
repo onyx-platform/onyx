@@ -54,6 +54,10 @@
     (assert port "Couldn't assign port - ran out of available ports.")
     {:aeron/port port}))
 
+(defmethod extensions/get-peer-site :aeron
+  [replica peer]
+  (get-in replica [:peer-sites peer :aeron/external-addr]))
+
 (defn handle-sent-message [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]
   (let [messages (protocol/read-messages-buf decompress-f buffer offset length)]
     (doseq [message messages]

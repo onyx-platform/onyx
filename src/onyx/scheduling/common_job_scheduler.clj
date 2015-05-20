@@ -150,15 +150,43 @@
       (and (get-in replica [:acker-exclude-outputs job])
            (some #{task} (get-in replica [:output-tasks job])))))
 
-(defn choose-acker-candidates [replica peers]
-  (remove
-   (fn [p]
-     (let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) p)]
-       (exempt-from-acker? replica job task)))
+(defn find-physically-colocated-peers
+  "Takes replica and a peer. Returns a set of peers, exluding this peer,
+   that reside on the same physical machine."
+  [replica peer]
+  (let [peers (remove (fn [p] (= p peer)) (:peers replica))
+        peer-site (extensions/get-peer-site replica peer)]
+    (filter
+     (fn [p]
+       (= (extensions/get-peer-site replica p) peer-site))
+     peers)))
+
+(defn sort-acker-candidates
+  "We try to be smart about which ackers we pick. If we can avoid
+   colocating an acker and any peers executing an exempt task,
+   we try to. It's a best effort, though, so if it's not possible
+   we proceed anyway."
+  [replica peers]
+  (sort-by
+   (fn [peer]
+     (let [colocated-peers (find-physically-colocated-peers replica peer)
+           statuses (map
+                     #(let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) %)]
+                        (exempt-from-acker? replica job task))
+                     colocated-peers)]
+       (some #{true} statuses)))
    peers))
 
+(defn choose-acker-candidates [replica peers]
+  (sort-acker-candidates
+   replica
+   (remove
+    (fn [p]
+      (let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) p)]
+        (exempt-from-acker? replica job task)))
+    peers)))
+
 (defn choose-ackers [replica]
-  ;; TODO: ensure this behaves consistently with respect to ordering
   (reduce
    (fn [result job]
      (let [peers (apply concat (vals (get-in result [:allocations job])))

@@ -101,6 +101,10 @@
     (assert port "Couldn't assign port - ran out of available ports.")
     {:netty/port port}))
 
+(defmethod extensions/get-peer-site :netty
+  [replica peer]
+  (get-in replica [:peer-sites peer :netty/external-addr]))
+
 (defn int32-frame-decoder
   []
   ; Offset 0, 4 byte header, skip those 4 bytes.
