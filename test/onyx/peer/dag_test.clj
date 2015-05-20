@@ -75,6 +75,7 @@
   [{:onyx/name :A
     :onyx/ident :core.async/read-from-chan
     :onyx/type :input
+    :onyx/pending-timeout 200000
     :onyx/medium :core.async
     :onyx/batch-size batch-size
     :onyx/max-peers 1
@@ -83,6 +84,7 @@
    {:onyx/name :B
     :onyx/ident :core.async/read-from-chan
     :onyx/type :input
+    :onyx/pending-timeout 200000
     :onyx/medium :core.async
     :onyx/batch-size batch-size
     :onyx/max-peers 1
@@ -91,6 +93,7 @@
    {:onyx/name :C
     :onyx/ident :core.async/read-from-chan
     :onyx/type :input
+    :onyx/pending-timeout 200000
     :onyx/medium :core.async
     :onyx/batch-size batch-size
     :onyx/max-peers 1
