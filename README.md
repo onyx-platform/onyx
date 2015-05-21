@@ -4,12 +4,11 @@
 
 ### What is it?
 
-- a masterless, cloud scale, fault tolerant, distributed computation system
-- written in Clojure, for Clojure
-- batch and stream processing hybrid
+- a masterless, cloud scale, fault tolerant, high performance distributed computation system
+- batch and stream hybrid processing model
 - exposes an information model for the description and construction of distributed workflows
-- enabled by hardware advances in the last 10 years
-- Competes against Storm, Cascading, Map/Reduce, Dryad, Apache Sqoop, Twitter Crane, etc
+- Competes against Storm, Cascading, Cascalog, Spark, Map/Reduce, Sqoop, etc
+- written in pure Clojure
 
 ### What would I use this for?
 
@@ -17,15 +16,15 @@
 - Continuous computation 
 - Extract, transform, load
 - Data transformation à la map-reduce
-- Data cleaning
 - Data ingestion and storage medium transfer
+- Data cleaning
 
 ### Installation
 
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.6.0-alpha2"]
+[com.mdrogalis/onyx "0.6.0-beta1"]
 ```
 
 ### Build Status
@@ -39,15 +38,14 @@ onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://gist.github.com/MichaelDrogalis/bc620a7617396704125b).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.6.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
 ### User Guide 0.6.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Environment](doc/user-guide/environment.md)
 - [APIs](doc/user-guide/apis.md)
-- [Constraints](doc/user-guide/constraints.md)
-- [Internal Design](doc/user-guide/internal-design.md)
+- [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
 - [Peer Configuration](doc/user-guide/peer-config.md)
 - [Information Model](doc/user-guide/information-model.md)
 - [Functions](doc/user-guide/functions.md)
@@ -57,7 +55,6 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Plugins](doc/user-guide/plugins.md)
 - [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
-- [Reliability Guarantees](doc/user-guide/reliability-guarantees.md)
 - [Logging](doc/user-guide/logging.md)
 - [Performance Tuning](doc/user-guide/performance-tuning.md)
 - [Examples](doc/user-guide/examples.md)
@@ -141,7 +138,7 @@ At the time of writing this, I do not have any performance benchmarks to publish
 
 ### Author
 
-This project is authored by [Michael Drogalis](https://twitter.com/MichaelDrogalis). You can get me directly at (mjd3089.at.rit.edu) if needed.
+The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator. You can get me directly at (mjd3089.at.rit.edu) if needed.
 
 ### License
 

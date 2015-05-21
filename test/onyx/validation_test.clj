@@ -1,6 +1,7 @@
 (ns onyx.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.test-helper :refer [load-config]]
+            [taoensso.timbre :refer [info] :as timbre]
             [midje.sweet :refer :all]
             [onyx.api]))
 
@@ -8,7 +9,10 @@
 
 (def config (load-config))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) 
+                       :onyx/id id
+                       :onyx.log/config {:appenders {:standard-out {:enabled? false}
+                                                     :spit {:enabled? false}}}))
 
 (def peer-config
   (assoc (:peer-config config)
@@ -46,16 +50,6 @@
     :onyx/medium :core.async
     :onyx/batch-size 5}])
 
-(def illegal-grouper-catalog
-  [{:onyx/name :inc
-    :onyx/type :grouper
-    :onyx/batch-size 5}])
-
-(def illegal-aggregator-catalog
-  [{:onyx/name :inc
-    :onyx/type :aggregator
-    :onyx/batch-size 5}])
-
 (def incomplete-catalog
   [{:onyx/name :in-bootstrapped
     :onyx/type :input
@@ -78,12 +72,6 @@
 (fact (onyx.api/submit-job peer-config {:catalog illegal-dispatch-catalog :workflow workflow
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
-(fact (onyx.api/submit-job peer-config {:catalog illegal-grouper-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
-
-(fact (onyx.api/submit-job peer-config {:catalog illegal-aggregator-catalog :workflow workflow
-                                        :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
-
 (fact (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
@@ -100,6 +88,11 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 5}])
+
+(def dupes-workflow
+  [[:in :intermediate]
+   [:in :intermediate]
+   [:intermediate :out]])
 
 (def illegal-incoming-inputs-workflow
   [[:intermediate :in]])
@@ -134,6 +127,11 @@
                                         :workflow illegal-intermediate-nodes-workflow
                                         :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
+
+(fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
+                                        :workflow dupes-workflow
+                                        :task-scheduler :onyx.task-scheduler/balanced})
+      => (throws clojure.lang.ExceptionInfo))
 
 (onyx.api/shutdown-env env)
 
@@ -187,4 +185,3 @@
   (fact (:e (:egress-ids d)) => (:id e))
   (fact (:f (:egress-ids e)) => (:id f))
   (fact (:g (:egress-ids f)) => (:id g)))
-

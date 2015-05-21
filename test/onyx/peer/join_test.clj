@@ -76,6 +76,8 @@
     :onyx/fn :onyx.peer.join-test/join-person
     :onyx/type :function
     :onyx/group-by-key :id
+    :onyx/min-peers 1
+    :onyx/flux-policy :kill
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
@@ -104,16 +106,16 @@
   {:onyx.core/params [(atom {})]})
 
 (def names-calls
-  {:lifecycle/before-task inject-names-ch})
+  {:lifecycle/before-task-start inject-names-ch})
 
 (def ages-calls
-  {:lifecycle/before-task inject-ages-ch})
+  {:lifecycle/before-task-start inject-ages-ch})
 
 (def join-calls
-  {:lifecycle/before-task inject-join-state})
+  {:lifecycle/before-task-start inject-join-state})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :names

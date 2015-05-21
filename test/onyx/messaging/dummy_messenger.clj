@@ -5,7 +5,14 @@
   [config peer-site peer-sites]
   {:port 1})
 
-(defrecord DummyMessenger [])
+(defmethod extensions/get-peer-site :dummy-messenger
+  [replica peer]
+  "localhost")
+
+(defrecord DummyMessenger [peer-opts])
+
+(defn dummy-messenger [peer-opts]
+  (->DummyMessenger peer-opts))
 
 (defmethod extensions/peer-site onyx.messaging.dummy_messenger.DummyMessenger
   [messenger]

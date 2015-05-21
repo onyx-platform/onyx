@@ -22,11 +22,11 @@ In this chapter, I'll enumerate and explain the reasons why we built Onyx.
 
 Information models are often superior to APIs, and almost always better than DSLs. The hyper-flexibility of a data structure literal allows Onyx workflows and catalogs to be constructed *at a distance*, meaning on another machine, in a different language, by another program, etc.
 
-The information model for an Onyx workflow has the distinct advantage that it's possible to compile *other* workflow representations (perhaps a datalog or SQL query) into the workflow that Onyx understands. The Information Model chapter describes a potential target for compilation.
+The information model for an Onyx workflow has the distinct advantage that it's possible to compile *other* workflow representations (perhaps a datalog or SQL query) into the workflow that Onyx understands. The Information Model chapter describes a target for data structure compilation.
 
 #### Temporal Decoupling
 
-To the extent that Onyx places data at the highest importance, very few Onyx constructs actually need to be generated at the same time as job submission or peer registration. Programs can create workflows, drop them to a database, and pull them out at a later time without any problems. We've removed the context that Cascading always seems to require.
+To the extent that Onyx places data at the highest importance, very few Onyx constructs actually need to be generated at the same time as program deployment or peer registration. Programs can create workflows, drop them to a database, and pull them out at a later time without any problems.
 
 #### Elimination of Macros
 
@@ -38,11 +38,11 @@ To the same point above, we want plain Clojure functions to be the building bloc
 
 #### Testing Without Mocking
 
-In general, your design is in trouble when you've reached for `with-redefs` or something along those lines to mock functions. Onyx places a high importance around programming against interfaces, and even more-so around putting space in-between small components with channels. Onyx programs can be tested in development mode, and moved to production mode with little to no changes. If you'd like to change your input or output plugins, all you need to do is reassociate the catalog entry with something like an in-memory plugin. No mocking code required.
+In general, your design is in trouble when you've reached for `with-redefs` or something along those lines to mock functions. Onyx places a high importance around programming against interfaces, and even more-so around putting space in-between small components with channels. Onyx programs can be tested in development mode, and moved to production mode with only a small configuration file change. If you'd like to change your input or output plugins, all you need to do is reassociate the catalog entry with something like an in-memory plugin. No interface mocking code required.
 
 #### Easy Parameterization of Workflows
 
-It's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peers to spin up their own parameters at boot-up time. See [the tests](https://github.com/onyx-platform/onyx/blob/0.4.x/test/onyx/peer/params_test.clj) for an example of this alternate technique for parameterization.
+It's particularly telling that many compute frameworks don't offer an easy way to parameterize workflows. Onyx puts space between the caller and the function definition. Parameterize tasks inside the catalog, and update the catalog entry at will. Additionally, Onyx allows peers to spin up their own parameters at boot-up time.
 
 #### Transparent Code Reuse for Batch and Streaming
 
@@ -50,7 +50,7 @@ Onyx uses the notion of a *sentinel value* to transparently switch between strea
 
 #### Aspect Orientation
 
-Clojure functions again serve as a huge win. [Dire](https://github.com/onyx-platform/dire) is a library that supports aspects, meaning you can keep your application logic water-tight away from logging, preconditions, and error handling.
+Clojure functions again serve as a huge win. [Dire](https://github.com/onyx-platform/dire) is a library that supports aspects, meaning you can keep your application logic airtight away from logging, preconditions, and error handling.
 
 #### AOT Nothing
 

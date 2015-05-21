@@ -1,38 +1,10 @@
-## Internal Design
+## Onyx's Architecture and Low Level Design
 
 This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a formal proof nor an iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad. If something doesn't make sense, *keep moving*. There are inevitable forward references.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-  - [High Level Components](#high-level-components)
-    - [Peer](#peer)
-    - [Virtual Peer](#virtual-peer)
-    - [ZooKeeper](#zookeeper)
-    - [HornetQ](#hornetq)
-    - [The Log](#the-log)
-    - [The Inbox and Outbox](#the-inbox-and-outbox)
-  - [Applying Log Entries](#applying-log-entries)
-  - [Joining the Cluster](#joining-the-cluster)
-    - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
-    - [Examples](#examples)
-  - [Dead peer removal](#dead-peer-removal)
-    - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
-    - [Examples](#examples-1)
-  - [Messaging](#messaging)
-    - [HornetQ Single Server](#hornetq-single-server)
-    - [HornetQ Cluster](#hornetq-cluster)
-    - [Client Side Load Balancing](#client-side-load-balancing)
-    - [Message Dispersal Under Failure](#message-dispersal-under-failure)
-  - [Virtual Peer Task Execution](#virtual-peer-task-execution)
-    - [Phases of Execution](#phases-of-execution)
-    - [Pipelining](#pipelining)
-    - [Local State](#local-state)
-  - [Sentinel Values in a Distributed Setting](#sentinel-values-in-a-distributed-setting)
-    - [Sentinel-in-the-Middle](#sentinel-in-the-middle)
-    - [Leader Election](#leader-election)
-  - [Garbage collection](#garbage-collection)
 - [Command Reference](#command-reference)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -45,15 +17,15 @@ A Peer is a node in the cluster responsible for processing data. It is similar t
 
 #### Virtual Peer
 
-A Virtual Peer refers to a single peer process running on a single physical machine. Each virtual peer spawns about 15 threads to support itself since it is a pipelined process. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers *never* communicate with each other - they communicate with the log and HornetQ.
+A Virtual Peer refers to a single peer process running on a single physical machine. Each virtual peer spawns a small number threads (about 5) since it uses asynchronous messaging. All virtual peers are equal, whether they are on the same physical machine or not. Virtual peers communicate segments *directly* to one another, and coordinate *strictly* via the log in ZooKeeper.
 
 #### ZooKeeper
 
-Apache ZooKeeper is used as both storage and communication layer. ZooKeeper takes care of things like CAS, consensus, leader election, and sequential file creation. ZooKeeper watches are at the heart of how Onyx virtual peers detect machine failure.
+Apache ZooKeeper is used as both storage and communication layer. ZooKeeper takes care of things like CAS, consensus, and atomic counting. ZooKeeper watches are at the heart of how Onyx virtual peers detect machine failure.
 
-#### HornetQ
+#### Netty
 
-HornetQ is employed for shuttling segments between virtual peers for processing. HornetQ is a queuing platform from the JBoss stack. HornetQ queues can cluster for scalability.
+Netty is the primary messaging transport layer. The transport layer is pluggable, and you may use core.async instead for development on a single machine.
 
 #### The Log
 
@@ -208,85 +180,36 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 
 ### Messaging
 
-#### HornetQ Single Server
+The messaging layer of Onyx employees the same technique that Apache Storm uses to achieve fault tolerance. Any errors are our own.
 
-Using a single HornetQ server, we are guaranteed ordering of messages. Peers connect to the HornetQ server and consume messages.
+#### The Algorithm
 
-#### HornetQ Cluster
+Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a semgment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
 
-In order to scale, we need a *cluster* of queues between each link the workflow. Using one queue would limit the network bandwidth to move data. HornetQ itself implements clustering, and some useful facts to know are:
+#### Acking Daemon
 
-- Each server in the cluster holds *its own* queue that participates in the cluster.
-- Servers use *symmetric* clustering. Every HornetQ server knows about every other HornetQ server.
-- Producing messages onto a clustered queue will load balance them round-robin across all queues in the cluster.
-- Consuming messages from a clustered queue will read them round-robin from all queues in the cluster.
-- Producing and consuming messages happens in the context of a transaction.
-- Transactions happen in the context of a HornetQ *session*.
-- A session may be only manipulated by one thread at a time.
+An acking daemon is a process that runs alongside each peer and maintains state. This state is a map of segment ID to another map. The map in the value maintains the current "ack val" and the peer to send completion messages to. When the ack val for a segment is set to zero, a message is send to the appropriate peer to release the message from durable storage. This concludes the processing of the segment, and it is considered successful. Key/value pairs are periodically reaped if peers that are operating on these segments are lost. If these values are reaped, the message is automatically replayed from the root of the workflow on the input task on a rolling basis.
 
-#### Client Side Load Balancing
+We can depict all of this visually:
 
-During client side load balancing, messages can be read in a variety of ways. Below, we see a peer reading off of two HornetQ servers. Messages can be read starting at either server, causing at least two different streams of messages to be read. Round robin isn't a promise, though. The network may hiccup, and we might see messages in a completely jumbled up stream. Note, though, that individual queue messages are consistently ordered.
-
-![Client side load balancing](img/client-side-load-balancing.png)
-
-#### Message Dispersal Under Failure
-
-As long as a HornetQ consumer is connected to a queue on a HornetQ server, it will be included in the round-robin message load balancing. If, however, the consumer disconnects and there are no other consumers, that queues messages are sent to another queue in the cluster. This prevents consumers on other queues being starved if they cannot access the messages on a machine with no open consumers. The messages are stacked on the back of other queues, again in a load balanced fashion:
-
-![Peer failure reorder](img/peer-failure-reorder.png)
-
-### Virtual Peer Task Execution
-
-One virtual peer may be executing at most one task. This section describes what activities the peer carries out during execution.
+<img src="../design/images/messaging-summary.png">
 
 #### Phases of Execution
 
-- Inject resources: Creates HornetQ session and opens transaction
-- Read message batch: consumes and acknowledges messages off of HornetQ
-- Decompress message batch: Uses Fressian's reader to obtain EDN maps of segments
-- Strip sentinel: removes sentinel from decompressed batch if present
-- Requeue sentinel: Requeues the sentinel on the ingress queue if it is the leader
+A batch of segments runs through the following phases of execution in sequential order:
+
+- Inject resources: Initiates any values for this particular batch
+- Read message batch: reads and decompresses messages from the transport layer
+- Tag messages: If these are messages from an input task, uniquely tags each segment to track it through its lifetime
+- Timeout pool: If these are messages from an input task, adds these messages to a timeout pool to automatically expire on a preconfigured schedule
+- Completion: Checks if this job has been completed, and shuts down the job if so
+- Strip sentinel: Removes the sentinel if it's in this batch, signal that the job may be completed
 - Apply function: Apply fns to batches of segments
-- Compress message batch: Uses Fressian's writer to compress segments to bytes
-- Write message batch: Writes messages to HornetQ
-- Commit transaction: Commits the transaction to HornetQ
-- Close resources: Closes open connections and sockets
-- Reset payload: Rotates the znode this virtual peer is listening on for new tasks
-- Seal egress queue: If this virtual peer is allowed, propagates the sentinel to the egress queues
-- Update local listeners: Rotates listeners for ZooKeeper for the next task
-
-#### Pipelining
-
-The Peer process is extensively pipelined for performance reasons. As it turns out, Onyx's peer faces the same situation as Datomic's transactor. You can listen to Rich talk about it [here](http://www.infoq.com/presentations/Datomic) (36:05).
-
-To talk about why this helps, we need an understanding of what properties Onyx requires to be correct and how HornetQ works. Onyx offers both concurrent and sequential processing. In the case of sequential processing, it's critical that we never jumble up the order that the messages are streamed in.
-
-When we produce and consume messages using HornetQ, we do so in the context of a "session". Onyx strictly uses transactional HornetQ sessions. That means we can move messages between queues *atomically*. That's how Onyx is able to offer its transactional semantics. HornetQ sessions, as it ends up, are hostile to being accessed by multiple threads. In fact, HornetQ sessions have built in detection for being accessed concurrently. An exception will be thrown indicating that this is happening.
-
-So in order to go fast and preserve message order for sequential processing, we *pipeline* the virtual peer. The trick with HornetQ is to understand that it's not the case that a session only ever needs to run on one thread - but that only a single thread can be using the session at an instance in time. In the case of using a session strictly serially as you suggested, we would: open the session, start the transaction, read messages off the queue, decompress messages, apply functions to messages, compress messages, and write messages back to the queue. There are more steps, but the point is that each of these steps can run on their *own* thread. The first step of the pipeline is to create a HornetQ session. Since each stage of the pipeline can only operate on one thing at a time, we're guaranteed that each HornetQ session is isolated to one thread at a time. At the same time, the process is still basically serial. Messages are processed in order. This is how Onyx efficiently utilizes all the cores of the box. If the box has 4 cores with 4 hyper-threads, 16 concurrent activities can run without much CPU contention.
-
-There is one other thing I'd like to point out. Pipelining definitely is trickier to do correctly. We have to worry about things like flushing values and closing sessions sequentially down the pipeline for a clean shutdown. That being said, there are a whole bag of neat testing tricks you can play when each activity is isolated to its own thread. The activities are now *temporally* decoupled - they all run on their own timelines. Connecting these with core.async channels that are multiplexed means that you can add additional listeners, or *spies*, if you will, in your test code. You can monitor the values that are being passed through the pipeline. You can work with each activity independently since they are fully decoupled.
-
-#### Local State
-
-Each virtual peer's task lifecycle maintains one atom that it uses for local state. It is a map that has a key for whether it has ever asked to seal, and a key for what the sentinel leader is. The latter is used as a local cache, whereas the former is used to avoid deadlock. Virtual peers can ask to seal exactly once. Subsequent requests are ignored. Since this process is pipelined, we need a way to convey this information *backwards* through the pipeline. The shared atom accomplishes this.
-
-### Sentinel Values in a Distributed Setting
-
-One of the challenges in working with distributed systems is the property that messages can be delayed, duplicated, dropped, and reordered. For the most part, HornetQ's transactions aid with a lot of these concerns. One particularly difficult point, though, is the notion of "sealing". In order to propagate the sentinel value from one queue to the next, all of the segments must be processed. This is the key attribute that allows for at-least-once processing semantics. Unfortunately, in-between the time that each peer asks if it can seal, and by time it actually does seal and reports back, the peer can fail. Worse yet, we have no way of knowing whether it successfully wrote the sentinel to the next queue. Therefore, we need to make this operation idempotent and handle multiple sentinel values. We also need to be able to handle sentinel values that appear in the middle of the queue due to the way HornetQ load balances.
-
-#### Sentinel-in-the-Middle
-
-As shown above, the sentinel value can easily sneak into the middle of a queue. Obviously, a sentinel found in the middle of the queue doesn't actually mark the end of a workload. Onyx combats this by querying the queue cluster for the total number of messages across all queues in this cluster. If this number is not *1* (just the sentinel that we're holding at present), there are presumably more segments behind it that need to be processed.
-
-We could requeue this sentinel and place it at the back of the queue. If we did this, though, we would spin into an infinite loop in the presence of multiple sentinel values. Instead, we *reduce* the number of sentinel values. We pick one sentinel value as the "leader", and drop all other sentinels. The leader is always requeued at the back. Eventually, we find the end and propagate the sentinel value to the egress queues.
-
-#### Leader Election
-
-Each sentinel value is marked with metadata when it is put on HornetQ. Specifically, each sentinel carries a UUID to uniquely identify it. When a peer encounters a sentinel for the first time in its lifecycle of a task, it tries to write the UUID of the sentinel to ZooKeeper. The semantics of ZooKeeper are such that multiple writers can try to write to the same znode, but only one will succeed. This guarantees that exactly one leader will be picked. After the peer writes, or votes, for the UUID, it immediately reads from ZooKeeper to see what the leader's UUID is. It caches the leader's UUID locally, since it will not change. If the sentinel it is holding matches the leader's UUID, it requeues the sentinel so that others may find it. If it does not match, the sentinel is discarded. Hence, the number of sentinels on an ingress queue converges towards 1.
-
-![Election](img/election.png)
+- Build new segments: Creates and IDs new segments based on the received segments
+- Write message batch: Writes messages to the next peer or output medium
+- Flow retry: Cause messages back at the input task to play again that are force-retried via flow conditions.
+- Ack messages: Acknowledges the segments that have been processed to the acking daemon
+- Close batch resources: Closes any resources opened for this specific batch
 
 ### Garbage collection
 
@@ -360,16 +283,6 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Replica update: If this peer is allowed to seal, updates `:sealing-task` with the task ID associated this peers ID.
 - Side effects: Puts the sentinel value onto the queue
 - Reactions: None
-
--------------------------------------------------
-[`complete-task`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/complete_task.clj)
-
-- Submitter: peer (P), who has successfully sealed the task
-- Purpose: Indicates to the replica that all downstream tasks have received the sentinel, so this task can be marked complete
-- Arguments: P's ID (`:id`), the job ID (`:job`), and the task ID (`:task`)
-- Replica update: Updates `:completions` to associate job ID to a vector of task ID that have been completed. Removes all peers under `:allocations` for this task. Sets `:peer-state` for all peers executing this task to `:idle`
-- Side effects: Stops this task lifecycle
-- Reactions: Any peer executing this task reacts with `:volunteer-for-task`
 
 -------------------------------------------------
 [`submit-job`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/submit_job.clj)

@@ -2,24 +2,29 @@
   (:require [clojure.set :refer [difference]]
             [clojure.data :refer [diff]]
             [onyx.log.commands.common :as common]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [warn]]))
 
 (defmethod extensions/apply-log-entry :gc
   [{:keys [args message-id]} replica]
-  (let [completed (:completed-jobs replica)
-        killed (:killed-jobs replica)
-        jobs (concat completed killed)]
-    (as-> replica x
-          (assoc x :killed-jobs [])
-          (assoc x :completed-jobs [])
-          (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:saturation] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:input-tasks] dissoc job)) x jobs)
-          (reduce (fn [new job] (update-in new [:output-tasks] dissoc job)) x jobs))))
+  (try
+    (let [completed (:completed-jobs replica)
+          killed (:killed-jobs replica)
+          jobs (concat completed killed)]
+      (as-> replica x
+            (assoc x :killed-jobs [])
+            (assoc x :completed-jobs [])
+            (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:saturation] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:input-tasks] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:output-tasks] dissoc job)) x jobs)))
+    (catch Throwable e
+      (warn e)
+      replica)))
 
 (defmethod extensions/replica-diff :gc
   [entry old new]

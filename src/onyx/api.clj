@@ -2,7 +2,7 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [warn fatal]]
+            [taoensso.timbre :refer [warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]
@@ -28,6 +28,23 @@
        (or (:onyx/max-peers (planning/find-task catalog (:name task)))
            Double/POSITIVE_INFINITY)})
     tasks)))
+
+(defn ^{:no-doc true} min-required-peers [catalog tasks]
+  (into
+   {}
+   (map
+    (fn [task]
+      {(:id task)
+       (or (:onyx/min-peers (planning/find-task catalog (:name task))) 1)})
+    tasks)))
+
+(defn ^{:no-doc true} flux-policies [catalog tasks]
+  (->> tasks
+       (map (fn [task]
+              (vector (:id task)
+                      (:onyx/flux-policy (planning/find-task catalog (:name task))))))
+       (filter second)
+       (into {})))
 
 (defn ^{:added "0.6.0"} map-set-workflow->workflow
   "Converts a workflow in format:
@@ -88,12 +105,20 @@
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)
+        min-reqs (min-required-peers (:catalog job) tasks)
+        task-flux-policies (flux-policies (:catalog job) tasks)
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
         exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
-        args {:id id :tasks task-ids :task-scheduler scheduler
-              :saturation sat :task-saturation task-saturation
-              :inputs input-task-ids :outputs output-task-ids
+        args {:id id
+              :tasks task-ids
+              :task-scheduler scheduler
+              :saturation sat
+              :task-saturation task-saturation
+              :min-required-peers min-reqs
+              :flux-policies task-flux-policies
+              :inputs input-task-ids
+              :outputs output-task-ids
               :exempt-tasks exempt-task-ids
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
@@ -102,11 +127,15 @@
     (create-log-entry :submit-job args)))
 
 (defn ^{:added "0.6.0"} submit-job [config job]
-  (validator/validate-peer-config config)
+  (try (validator/validate-peer-config config)
+       (validator/validate-job (assoc job :workflow (:workflow job)))
+       (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+       (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+       (catch Throwable t 
+         (println t)
+         (error t) 
+         (throw t)))
   (let [id (java.util.UUID/randomUUID)
-        _ (validator/validate-job (assoc job :workflow (:workflow job)))
-        _ (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-        _ (validator/validate-lifecycles (:lifecycles job) (:catalog job))
         tasks (planning/discover-tasks (:catalog job) (:workflow job))
         entry (create-submit-job-entry id config job tasks)
         client (component/start (system/onyx-client config))]

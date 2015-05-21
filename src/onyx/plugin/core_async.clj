@@ -17,10 +17,10 @@
   {})
 
 (def reader-calls
-  {:lifecycle/before-task inject-reader})
+  {:lifecycle/before-task-start inject-reader})
 
 (def writer-calls
-  {:lifecycle/before-task inject-writer})
+  {:lifecycle/before-task-start inject-writer})
 
 (defmethod p-ext/read-batch :core.async/read-from-chan
   [{:keys [onyx.core/task-map core.async/chan core.async/retry-ch 
@@ -32,10 +32,9 @@
         ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         step-ms (/ ms (:onyx/batch-size task-map))
         timeout-ch (timeout ms)
-        batch (if (zero? max-segments)
-                (<!! timeout-ch)
+        batch (if (pos? max-segments)
                 (loop [segments [] cnt 0]
-                  (if (= cnt batch-size)
+                  (if (= cnt max-segments)
                     segments
                     (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))] 
                       (recur (conj segments 
@@ -43,7 +42,8 @@
                                     :input :core.async
                                     :message message})
                              (inc cnt))
-                      segments))))]
+                      segments)))
+                (<!! timeout-ch))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
     (when (and (= 1 (count @pending-messages))

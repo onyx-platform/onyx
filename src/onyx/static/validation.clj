@@ -28,6 +28,12 @@
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
+(def group-entry-validator
+  {(schema/optional-key :onyx/group-by-key) schema/Keyword
+   (schema/optional-key :onyx/group-by-fn) schema/Keyword
+   :onyx/min-peers schema/Int
+   :onyx/flux-policy (schema/enum :continue :kill)})
+
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
            (:onyx/type task))
@@ -42,6 +48,12 @@
   [catalog]
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
+    (when (and (= (:onyx/type entry) :function)
+               (or (not (nil? (:onyx/group-by-key entry)))
+                   (not (nil? (:onyx/group-by-fn entry)))))
+      (let [kws (select-keys entry [:onyx/group-by-fn :onyx/group-by-key
+                                    :onyx/min-peers :onyx/flux-policy])]
+        (schema/validate group-entry-validator kws)))
     (name-and-type-not-equal entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
@@ -52,6 +64,12 @@
     (throw (Exception. (str "Catalog is missing :onyx/name values "
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
+
+(defn validate-workflow-no-dupes [{:keys [workflow]}]
+  (when-not (= (count workflow)
+               (count (set workflow)))
+    (throw (ex-info "Workflows entries cannot contain duplicates"
+                    {:workflow workflow}))))
 
 (defn catalog->type-task-names [catalog type-pred]
   (set (map :onyx/name
@@ -86,7 +104,8 @@
 
 (defn validate-workflow [job]
   (validate-workflow-graph job)
-  (validate-workflow-names job))
+  (validate-workflow-names job)
+  (validate-workflow-no-dupes job))
 
 (def job-validator
   {:catalog [(schema/pred map? 'map?)]
@@ -102,9 +121,10 @@
 
 (defn validate-lifecycles [lifecycles catalog]
   (doseq [lifecycle lifecycles]
-    (assert (or (= (:lifecycle/task lifecycle) :all)
-                (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
-            (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle)))
+    (when-not (or (= (:lifecycle/task lifecycle) :all)
+                  (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
+      (throw (ex-info (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle))
+                      {:lifecycle lifecycle :catalog catalog})))
     (schema/validate
      {:lifecycle/task schema/Keyword
       (schema/optional-key :lifecycle/pre) schema/Keyword
@@ -120,10 +140,13 @@
                    :lifecycle/post
                    :lifecycle/doc]))))
 
+(def deployment-id-schema
+  (schema/either schema/Uuid schema/Str))
+
 (defn validate-env-config [env-config]
   (schema/validate
     {:zookeeper/address schema/Str
-     :onyx/id schema/Uuid
+     :onyx/id deployment-id-schema
      (schema/optional-key :zookeeper/server?) schema/Bool
      (schema/optional-key :zookeeper.server/port) schema/Int}
     (select-keys env-config 
@@ -132,7 +155,7 @@
 (defn validate-peer-config [peer-config]
   (schema/validate
     {:zookeeper/address schema/Str
-     :onyx/id schema/Uuid
+     :onyx/id deployment-id-schema
      :onyx.peer/job-scheduler schema/Keyword
      :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
      :onyx.messaging/bind-addr schema/Str

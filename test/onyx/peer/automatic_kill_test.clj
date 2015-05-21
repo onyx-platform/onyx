@@ -100,16 +100,16 @@
   {:core.async/chan out-chan-2})
 
 (def in-calls-1
-  {:lifecycle/before-task inject-in-ch-1})
+  {:lifecycle/before-task-start inject-in-ch-1})
 
 (def out-calls-1
-  {:lifecycle/before-task inject-out-ch-1})
+  {:lifecycle/before-task-start inject-out-ch-1})
 
 (def in-calls-2
-  {:lifecycle/before-task inject-in-ch-2})
+  {:lifecycle/before-task-start inject-in-ch-2})
 
 (def out-calls-2
-  {:lifecycle/before-task inject-out-ch-2})
+  {:lifecycle/before-task-start inject-out-ch-2})
 
 (def lifecycles-1
   [{:lifecycle/task :in-1

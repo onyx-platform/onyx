@@ -1,112 +1,28 @@
 ## Peer Configuration
 
-The chapter describes the options available to configure the Virtual Peers.
+The chapter describes the all options available to configure the virtual peers and development environment.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Coordinator & Peer](#coordinator-&-peer)
-  - [Base Configuration](#base-configuration)
-  - [`:hornetq/mode`](#hornetqmode)
-  - [VM](#vm)
-  - [Standalone](#standalone)
-  - [UDP Configuration](#udp-configuration)
-  - [JGroups Configuration](#jgroups-configuration)
-- [Environment Only](#environment-only)
-    - [`:hornetq/server?`](#hornetqserver)
-    - [`:hornetq.server/type`](#hornetqservertype)
-    - [`:zookeeper/server?`](#zookeeperserver)
-  - [Embedded Configuration](#embedded-configuration)
-    - [`:hornetq.embedded/config hq-servers`](#hornetqembeddedconfig-hq-servers)
-- [Peer Only](#peer-only)
-  - [Base Configuration](#base-configuration-1)
-    - [`:onyx.peer/inbox-capacity`](#onyxpeerinbox-capacity)
-    - [`:onyx.peer/outbox-capacity`](#onyxpeeroutbox-capacity)
-    - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
-    - [`:onyx.peer/sequential-back-off`](#onyxpeersequential-back-off)
-    - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
-    - [`onyx.peer/fn-params`](#onyxpeerfn-params)
-    - [`onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
-- [Peer Full Example](#peer-full-example)
-
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-### Coordinator & Peer
-
-#### Base Configuration
+### Base Configuration
 
 | key name                      | type       |
 |-------------------------------|------------|
 |`:onyx/id`                     |  `any`     |
-|`:hornetq/mode`                |  `keyword` |
 |`:zookeeper/address`           |  `string`  |
 
-#### `:hornetq/mode`
-
-The mechanism by which to connect to one or more HornetQ servers. One of `:vm, :udp, :jgroups, :standalone`.
-
-#### VM
-
-None
-
-#### Standalone
-
-| key name                       | type       |
-|--------------------------------|------------|
-|`:hornetq.standalone/host`      |  `string`  |
-|`:hornetq.standalone/port`      |  `int`     |
-
-#### UDP Configuration
-
-| key name                       | type       |
-|--------------------------------|------------|
-|`:hornetq.udp/cluster-name`     |  `string`  |
-|`:hornetq.udp/group-address`    |  `string`  |
-|`:hornetq.udp/group-port`       |  `int`     |
-|`:hornetq.udp/refresh-timeout`  |  `int`     |
-|`:hornetq.udp/discovery-timeout`|  `int`     |
-
-#### JGroups Configuration
-
-| key name                                      | type      |
-|-----------------------------------------------|-----------|
-|`:hornetq.udp/cluster-name`                    |  `string` |
-|`:hornetq.jgroups/file jgroups-file`           |  `string` |
-|`:hornetq.jgroups/channel-name jgroups-channel`|  `string` |
-|`:hornetq.udp/refresh-timeout`                 |  `int`    |
-|`:hornetq.udp/discovery-timeout`               |  `int`    |
 
 ### Environment Only
 
 | key name               | type       | optional?  |
 |------------------------|------------|------------|
-|`:hornetq/server?`      |  `boolean` | Yes        |
-|`:hornetq.server/type`  |  `keyword` | No         |
 |`:zookeeper/server?`    |  `boolean` | Yes        |
 |`:zookeeper.server/port`|  `int`     | Yes        |
 
-##### `:hornetq/server?`
-
-True to spin up a HornetQ server inside the Coordinator for convenience.
-
-##### `:hornetq.server/type`
-
-The type of server to spin up inside the Coordinator on the developers behalf. One of `:embedded, :vm`.
-
-##### `:zookeeper/server?`
-
-True to spin up a ZooKeeper server inside the Coordinator for convenience.
-
-#### Embedded Configuration
-
-| key name                             | type      |
-|--------------------------------------|-----------|
-|`:hornetq.embedded/config hq-servers` |  `seq`    |
-
-##### `:hornetq.embedded/config hq-servers`
-
-A sequence of strings, each representing a HornetQ configuration file on the classpath.
 
 ### Peer Only
 
@@ -116,14 +32,22 @@ A sequence of strings, each representing a HornetQ configuration file on the cla
 |----------------------------------------|------------|------------------------------------|
 |`:onyx.peer/inbox-capacity`             | `int`      | `1000`                             |
 |`:onyx.peer/outbox-capacity`            | `int`      | `1000`                             |
-|`:onyx.peer/join-failure-back-off`      | `int`      | `250`                              |
 |`:onyx.peer/retry-start-interval`       | `int`      | `2000`                             |
-|`:onyx.peer/sequential-back-off`        | `int`      | `2000`                             |
+|`:onyx.peer/join-failure-back-off`      | `int`      | `250`                              |
 |`:onyx.peer/drained-back-off`           | `int`      | `400`                              |
+|`:onyx.peer/peer-not-ready-back-off`    | `int`      | `2000`                             |
+|`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
+|`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
+|`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
+|`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
+|`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
+|`:onyx.messaging/bind-addr`             | `string`   | `nil`                              |
+|`:onyx.messaging/peer-port-range`       | `vector`   | `[]`                               |
+|`:onyx.messaging/peer-ports`            | `vector`   | `[]`                               |
 
 ##### `:onyx.peer/inbox-capacity`
 
@@ -137,13 +61,21 @@ Maximum number of messages to buffer in the outbox for writing, since writing to
 
 Number of ms to wait before trying to reboot a virtual peer after failure.
 
-##### `:onyx.peer/sequential-back-off`
-
-Number of ms to wait before retrying to execute a sequential task in the presence of other queue consumers.
-
 ##### `:onyx.peer/drained-back-off`
 
-Number of ms to wait before executing peer pipeline run if all ingress queues have been exhausted.
+Number of ms to wait before trying to complete the job if all input tasks have been exhausted. Completing the job may not succeed if the cluster configuration is being shifted around.
+
+##### `:onyx:onyx.peer/peer-not-ready-back-off`
+
+Number of ms to back off and wait before retrying the call to `start-task?` lifecycle hook if it returns false.
+
+##### `:onyx:onyx.peer/job-not-ready-back-off`
+
+Number of ms to back off and wait before trying to discover configuration needed to start the subscription after discovery failure.
+
+##### `onyx.peer/join-failure-back-off`
+
+Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
 
 ##### `onyx.peer/fn-params`
 
@@ -151,13 +83,21 @@ A map of keywords to vectors. Keywords represent task names, vectors represent t
 to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
 underlying `:add` with `(f 42 <segment>)`.
 
-##### `onyx.peer/join-failure-back-off`
+##### `:onyx.peer/zookeeper-timeout`
 
-Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
+Number of ms to timeout from the ZooKeeper client connection on disconnection.
 
 ##### `onyx.messaging/completion-buffer-size`
 
-The number of messages to buffer in the core.async channel for completing messages on an input task.
+Number of messages to buffer in the core.async channel for completing messages on an input task.
+
+##### `:onyx.messaging/release-ch-buffer-size`
+
+Number of messages to buffer in the core.async channel for released completed messages.
+
+##### `:onyx.messaging/retry-ch-buffer-size`
+
+Number of messages to buffer in the core.async channel for retrying timed-out messages.
 
 ##### `onyx.messaging/decompress-fn`
 
@@ -169,19 +109,44 @@ the decompressed value of the byte array.
 The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte
 array representing the segment seq.
 
+##### `:onyx.messaging/impl`
+
+The messaging protocol to use for peer-to-peer communication.
+
+##### `:onyx.messaging/bind-addr`
+
+An IP address to bind the peer to for messaging. Defaults to `nil`, binds to it's external IP to the result of calling `http://checkip.amazonaws.com`.
+
+##### `:onyx.messaging/peer-port-range`
+
+A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictable in-order.
+
+##### `onyx.messaging/peer-ports`
+
+A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictable in-order.
+
 ### Peer Full Example
 
 ```clojure
 (def peer-opts
-  {:hornetq/mode :udp
-   :hornetq.udp/cluster-name "onyx-cluster"
-   :hornetq.udp/group-address "231.7.7.7"
-   :hornetq.udp/group-port 9876
-   :hornetq.udp/refresh-timeout 5000
-   :hornetq.udp/discovery-timeout 5000
+  {:onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
    :zookeeper/address "127.0.0.1:2181"
-   :onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
-   :onyx.peer/retry-start-interval 2000
-   :onyx.peer/sequential-back-off 2000
-   :onyx.peer/fn-params {:add [42]}})
+   :onyx.peer/inbox-capacity 2000
+   :onyx.peer/outbox-capacity 2000
+   :onyx.peer/retry-start-interval 4000
+   :onyx.peer/join-failure-back-off 500
+   :onyx.peer/drained-back-off 400
+   :onyx.peer/peer-not-ready-back-off 5000
+   :onyx.peer/job-not-ready-back-off 1000
+   :onyx.peer/fn-params {:add [42]}
+   :onyx.peer/zookeeper-timeout 10000
+   :onyx.messaging/completion-buffer-size 2000
+   :onyx.messaging/release-ch-buffer-size 50000
+   :onyx.messaging/retry-ch-buffer-size 100000
+   :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
+   :onyx.messaging/compress-fn onyx.compression.nippy/compress
+   :onyx.messaging/impl :netty
+   :onyx.messaging/bind-addr "localhost"
+   :onyx.messaging/peer-port-range [50000 60000]
+   :onyx.messaging/peer-ports [45000 45002 42008]})
 ```

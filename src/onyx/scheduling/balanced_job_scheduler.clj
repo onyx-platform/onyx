@@ -3,10 +3,6 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
-(defn job-coverable? [replica job n]
-  (let [tasks (get-in replica [:tasks job])]
-    (>= n (count tasks))))
-
 (defn allocate-peers [{:keys [jobs peers] :as replica}]
   (loop [results {}]
     (let [j (count jobs)
@@ -36,21 +32,28 @@
        (map vector jobs (range))))
     {}))
 
+(defmethod cjs/sort-job-priority :onyx.job-scheduler/balanced
+  [replica jobs]
+  (sort-by (juxt (fn [job] (apply + (map count (vals (get-in replica [:allocations job])))))
+                 #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
+           (:jobs replica)))
+
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]
   (let [ordered-jobs (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %)
-                                    #(count (get-in replica [:tasks %])))
+                                    #(cjs/job-lower-bound replica %))
                               (:jobs replica))]
-    (loop [[head & tail :as job-seq] ordered-jobs
-           results jobs
-           capacity n]
-      (let [tail (vec tail)
-            to-cover (- (count (get-in replica [:tasks head])) (get results head 0))]
-        (cond (or (<= capacity 0) (not (seq job-seq)))
-              results
-              (and (>= capacity to-cover) (pos? to-cover))
-              (recur (conj tail head) (update-in results [head] + to-cover) (- capacity to-cover))
-              (and (< (get results head) (get-in replica [:saturation head])) (pos? (- capacity to-cover)))
-              (recur (conj tail head) (update-in results [head] inc) (dec capacity))
-              :else
-              (recur tail results capacity))))))
+        (loop [[head & tail :as job-seq] ordered-jobs
+               results jobs
+               capacity n]
+          (let [tail (vec tail)
+                min-peers (cjs/job-lower-bound replica head)
+                to-cover (min (- min-peers (get results head 0)) (cjs/job-upper-bound replica head))]
+            (cond (or (<= capacity 0) (not (seq job-seq)))
+                  results
+                  (and (>= capacity to-cover) (pos? to-cover))
+                  (recur (conj tail head) (update-in results [head] + to-cover) (- capacity to-cover))
+                  (and (< (get results head) (cjs/job-upper-bound replica head)) (pos? (- capacity to-cover)))
+                  (recur (conj tail head) (update-in results [head] inc) (dec capacity))
+                  :else
+                  (recur tail results capacity))))))

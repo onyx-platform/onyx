@@ -6,7 +6,8 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.extensions :as extensions]
-            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
+            [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [taoensso.timbre :refer [warn]]))
 
 (defmulti job-scheduler-replica-update
   (fn [replica entry]
@@ -34,23 +35,29 @@
 
 (defmethod extensions/apply-log-entry :submit-job
   [{:keys [args] :as entry} replica]
-  (-> replica
-      (update-in [:jobs] conj (:id args))
-      (update-in [:jobs] vec)
-      (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
-      (assoc-in [:tasks (:id args)] (vec (:tasks args)))
-      (assoc-in [:allocations (:id args)] {})
-      (assoc-in [:saturation (:id args)] (:saturation args))
-      (assoc-in [:task-saturation (:id args)] (:task-saturation args))
-      (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
-      (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
-      (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
-      (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
-      (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
-      (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
-      (job-scheduler-replica-update entry)
-      (task-scheduler-replica-update entry)
-      (reconfigure-cluster-workload)))
+  (try
+    (-> replica
+        (update-in [:jobs] conj (:id args))
+        (update-in [:jobs] vec)
+        (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
+        (assoc-in [:tasks (:id args)] (vec (:tasks args)))
+        (assoc-in [:allocations (:id args)] {})
+        (assoc-in [:saturation (:id args)] (:saturation args))
+        (assoc-in [:task-saturation (:id args)] (:task-saturation args))
+        (assoc-in [:flux-policies (:id args)] (:flux-policies args))
+        (assoc-in [:min-required-peers (:id args)] (:min-required-peers args))
+        (assoc-in [:input-tasks (:id args)] (vec (:inputs args)))
+        (assoc-in [:output-tasks (:id args)] (vec (:outputs args)))
+        (assoc-in [:exempt-tasks (:id args)] (vec (:exempt-tasks args)))
+        (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
+        (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
+        (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
+        (job-scheduler-replica-update entry)
+        (task-scheduler-replica-update entry)
+        (reconfigure-cluster-workload))
+    (catch Throwable e
+      (warn e)
+      replica)))
 
 (defmethod extensions/replica-diff :submit-job
   [{:keys [args]} old new]

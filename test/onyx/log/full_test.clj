@@ -1,7 +1,6 @@
 (ns onyx.log.full-test
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [onyx.messaging.aeron :as aeron]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]
             [onyx.api :as api]

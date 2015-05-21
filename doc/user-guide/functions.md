@@ -38,13 +38,11 @@ A function can be parameterized before a job is submitted to Onyx. The segment i
 
 The function is then invoked with `(partial f :my-args-here)`.
 
-- Via the `:onyx.peer-fn-params` in the `inject-lifecycle-resources` multimethod
+- Via the `:onyx.peer-fn-params` in the `before-task-start` lifecycle hook
 
 ```clojure
-(defmethod onyx.peer.task-lifecycle-extensions/inject-lifecycle-resources
-  :my-fn-name-or-identity
-  [_ context]
-    {:onyx.core/fn-params [:my-args-here]})
+(defn before-task-start-hook [event lifecycle]
+  {:onyx.core/fn-params [:my-args-here]})
 ```
 
 The function is then invoked with `(partial f :my-args-here)`.
@@ -64,7 +62,7 @@ The function is then invoked with `(partial f "abc" "def")`. The order is contro
 
 #### Grouping & Aggregation
 
-Grouping means consolidates "like" values together to the same virtual peer to presumably compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. If a virtual peer receiving grouped segments fails, all remaining segments of the group will be pinned to another virtual peer.
+Grouping ensures that "like" values are always routed to the same virtual peer, presumably to compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. Grouped functions must set keys `:onyx/min-peers` and `:onyx/flux-policy`. See below for a description of these.
 
 #### Group By Key
 
@@ -76,6 +74,8 @@ To group by a key in a segment, use `:onyx/group-by-key` in the catalog entry:
  :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
  :onyx/type :function
  :onyx/group-by-key :name
+ :onyx/min-peers 3
+ :onyx/flux-policy :continue
  :onyx/batch-size 1000}
 ```
 
@@ -89,8 +89,26 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
  :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
  :onyx/type :function
  :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+ :onyx/min-peers 3
+ :onyx/flux-policy :continue
  :onyx/batch-size 1000}
 ```
+
+#### Flux Policies
+
+Functions that use the grouping feature are presumably stateful. For this reason, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. If we added more peers after the job began, the hashing algorithm lose its consistency, and stateful operations wouldn't work correctly.
+
+Given the fact the Onyx will not add more peers to a grouping task after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers`.
+
+One concern that immediately needs to be handled is adressing what happens if a peer on a grouping task leaves the cluster after the job has begun? Clearly, removing a peer from a grouping task also breaks the consistent hashing algorithm that supports statefulness. The policy that is enforced is configurable, and must be chosen by the developer. We offer two policies, outlined below.
+
+##### Continue Policy
+
+When `:onyx/flux-policy` is set to `:continue` on a catalog entry, a peer leaving a grouped task will allow the job to continue executing. The hashing algorithm will not be consistent with its previous behavior, but will be consistent from this point forward unless any other peers leave the task. This is desirable for streaming jobs where the data is theoretically infinite.
+
+##### Kill Policy
+
+When `:onyx/flux-policy` is set to `:kill`, the job is killed and all peers abort execution of the job. Some jobs cannot compute correct answers if there is a shift in the hashing algorithm's consistency. An example of this is a word count batch job.
 
 #### Bulk Functions
 

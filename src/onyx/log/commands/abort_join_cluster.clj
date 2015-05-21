@@ -21,18 +21,18 @@
     (when (or (seq prepared) (seq accepted))
       {:aborted (or (first prepared) (first accepted))})))
 
+(defmethod extensions/reactions :abort-join-cluster
+  [{:keys [args]} old new diff peer-args]
+  (when (and (= (:id args) (:id peer-args))
+             (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
+    [{:fn :prepare-join-cluster
+      :args {:joiner (:id peer-args)
+             :peer-site (extensions/peer-site (:messenger peer-args))}
+      :immediate? true}]))
+
 (defmethod extensions/fire-side-effects! :abort-join-cluster
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
     (Thread/sleep (or (:onyx.peer/join-failure-back-off (:opts state)) 250)))
   state)
-
-(defmethod extensions/reactions :abort-join-cluster
-  [{:keys [args]} old new diff peer-args]
-  (when (= (:id args) (:id peer-args))
-    [{:fn :prepare-join-cluster
-      :args {:joiner (:id peer-args)
-             :peer-site (extensions/peer-site (:messenger peer-args))}
-      :immediate? true}]))
-

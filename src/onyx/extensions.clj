@@ -41,6 +41,9 @@
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
+(defmulti get-peer-site (fn [replica peer]
+                          (:onyx.messaging/impl (:messaging replica))))
+
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
@@ -57,3 +60,6 @@
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 
 (defmulti internal-retry-message (fn [messenger event id peer-link] (type messenger)))
+
+(defmethod open-peer-site :default
+  [_ _] "localhost")

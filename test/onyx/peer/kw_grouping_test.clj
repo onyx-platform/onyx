@@ -57,6 +57,8 @@
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-key :name
+    :onyx/min-peers 1
+    :onyx/flux-policy :kill
     :onyx/batch-size 40}
 
    {:onyx/name :out
@@ -74,14 +76,14 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task inject-in-ch})
+  {:lifecycle/before-task-start inject-in-ch})
 
 (def sum-calls
-  {:lifecycle/before-task inject-sum-state
-   :lifecycle/after-task flush-sum-state})
+  {:lifecycle/before-task-start inject-sum-state
+   :lifecycle/after-task-stop flush-sum-state})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
