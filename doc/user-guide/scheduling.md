@@ -6,23 +6,11 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
-  - [Job Schedulers](#job-schedulers)
-    - [Greedy Job Scheduler](#greedy-job-scheduler)
-    - [Round Robin Job Scheduler](#round-robin-job-scheduler)
-    - [Round Robin Rebalancing Strategy](#round-robin-rebalancing-strategy)
-    - [Percentage Job Scheduler](#percentage-job-scheduler)
-    - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
-  - [Task Schedulers](#task-schedulers)
-    - [Round Robin Task Scheduler](#round-robin-task-scheduler)
-    - [Percentage Task Scheduler](#percentage-task-scheduler)
-  - [Examples](#examples)
-
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Allocating Peers to Jobs and Tasks
 
-In a masterless design, there is no single entity that assigns tasks to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" make distribute the workload across the cluster. Onyx `0.5.0` ships new job and task allocation policies. End users will be able to change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.
+In a masterless design, there is no single entity that assigns tasks to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" make distribute the workload across the cluster. Onyx ships job and task allocation policies. End users will be able to change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.
 
 #### Job Schedulers
 
@@ -50,19 +38,19 @@ If a job is submitted while this scheduler is running, no peers will be allocate
 
 If a job is completed or otherwise canceled, *all* of the peers executed that task will move to the job that was submitted after this job.
 
-##### Round Robin Job Scheduler
+##### Balanced Robin Job Scheduler
 
-The Round Robin job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Round Robin scheduler, job A would be allocated peer 1, job B would be allocated peer 2, job A would be allocated peer 3, and so on. In the end, both jobs will end up with 50 virtual peers allocated to each. Round robin begins allocating by selecting the first job submitted.
+The Balanced job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Balanced scheduler, job A would be allocated peer 1, job B would be allocated peer 2, job A would be allocated peer 3, and so on. In the end, both jobs will end up with 50 virtual peers allocated to each. Balanced begins allocating by selecting the first job submitted.
 
-To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/round-robin` in the Peer Options.
+To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/balanced` in the Peer Options.
 
 **Peer Addition**
 
-In the event that a peer joins the cluster while the Round Robin scheduler is running, that new peer will be allocated to the job *next* in the round robin sequence. The local replica has a reference to the job ID of the previous job that a peer was allocated for.
+In the event that a peer joins the cluster while the Balanced scheduler is running, that new peer will be allocated to the job *next* in the balanced sequence. The local replica has a reference to the job ID of the previous job that a peer was allocated for.
 
 **Peer Removal**
 
-In the event that a peer leaves the cluster while the Round Robin scheduler is running, the peers across *all* jobs will be rebalanced to evenly distribute the workflow. At most, one peer will change jobs to rebalance the workload.
+In the event that a peer leaves the cluster while the Balanced scheduler is running, the peers across *all* jobs will be rebalanced to evenly distribute the workflow. At most, one peer will change jobs to rebalance the workload.
 
 **Job Addition**
 
@@ -72,9 +60,9 @@ If a job is submitted while this scheduler is running, the entire cluster will b
 
 If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
 
-##### Round Robin Rebalancing Strategy
+##### Balanced Rebalancing Strategy
 
-When a job is added or removed in Onyx, the round robin peer allocation needs to change to ensure that all jobs receive about the same amount of resources. When an even number of virtual peers cannot be distributed across the cluster (8 virtual peers, 3 jobs of 2 tasks each), the *fraction* of peers that is left is allocated round-robin, starting with the oldest job, working forward. Consider the following scenario:
+When a job is added or removed in Onyx, the balanced peer allocation needs to change to ensure that all jobs receive about the same amount of resources. When an even number of virtual peers cannot be distributed across the cluster (8 virtual peers, 3 jobs of 2 tasks each), the *fraction* of peers that is left is allocated balanced, starting with the oldest job, working forward. Consider the following scenario:
 
 - There are 8 virtual peers running
 - There are 2 jobs, A and B, each using 4 virtual peers each
@@ -148,23 +136,19 @@ And now, for the reassignment phase:
 
 Each Onyx job is configured with exactly one task scheduler. The task scheduler is specified at the time of calling `submit-job`. The purpose of the task scheduler is to control the order in which available peers are allocated to which tasks. There are a few different Task Scheduler implementations, listed below. To use each, call `onyx.api/submit-job`. The second argument of this function is a map. Supply a `:task-scheduler` key and map it to the value specified below.
 
-##### Round Robin Task Scheduler
+##### Balanced Task Scheduler
 
-The Round Robin Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to tasks A, B, C, D, A, B, C, D, ... and so on.
+The Balanced Scheduler takes a topological sort of the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, this scheduler assigns each peer to tasks A, B, C, D, A, B, C, D, ... and so on.
 
-To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/round-robin`.
-
-**Task Completion**
-
-When a task is complete, this scheduler moves all peers executing that task and round robin assigns them, starting with the first incomplete task. the workflow for a specific job. As peers become available, this scheduler assigns tasks to peers in a rotating order. For example, if a workflow has a topological sort of tasks A, B, C, and D, and task A completes, this scheduler assigns each peer *from the completed task* to tasks B, C, D, B, C, D, ... and so on.
+To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/balanced`.
 
 **Peer Removal**
 
-If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is assigned the next task in the round robin sequence.
+If a peer fails, or is otherwise removed from the cluster, the Task scheduler defers to the Job scheduler to rebalance the cluster. If a new peer is added to this task as a result of a peer failing in another job, it is assigned the next task in the balanced sequence.
 
 **Max Peer Parameter**
 
-With the Round Robin Task Scheduler, each entry in the catalog can specify a key of `:onyx/max-peers` with an integer value > 0. When this key is set, Onyx will never assign that task more than that number of peers. Round Robin will simply skip the task for allocation when more peers are available, and continue assigning round robin to other tasks.
+With the Balanced Task Scheduler, each entry in the catalog can specify a key of `:onyx/max-peers` with an integer value > 0. When this key is set, Onyx will never assign that task more than that number of peers. Balanced will simply skip the task for allocation when more peers are available, and continue assigning balanced to other tasks.
 
 ##### Percentage Task Scheduler
 
@@ -174,19 +158,10 @@ This scheduler handles corner cases (fractions of peers) in the same way as the 
 
 To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/percentage`.
 
-**Task Completion**
-
-When a task is complete, this scheduler moves all peers executing and adds them all to the next incomplete task with the largest percentage.
-
 **Peer Removal**
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler rebalances all the peers for even distribution.
 
-**Max Peer Parameter**
-
-This task scheduler is *not* composable with `:onyx/max-peers`.
-
 #### Examples
 
-- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Round Robin task scheduler](/doc/design/allocate-examples/example-1.md)
-
+- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Balanced task scheduler](/doc/design/allocate-examples/example-1.md)

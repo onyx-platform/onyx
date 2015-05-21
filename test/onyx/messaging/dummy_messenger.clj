@@ -5,6 +5,10 @@
   [config peer-site peer-sites]
   {:port 1})
 
+(defmethod extensions/get-peer-site :dummy-messenger
+  [replica peer]
+  "localhost")
+
 (defrecord DummyMessenger [peer-opts])
 
 (defn dummy-messenger [peer-opts]

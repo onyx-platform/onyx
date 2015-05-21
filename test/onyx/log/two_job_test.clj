@@ -90,16 +90,16 @@
   {:core.async/chan f-chan})
 
 (def a-calls
-  {:lifecycle/before-task inject-a-ch})
+  {:lifecycle/before-task-start inject-a-ch})
 
 (def c-calls
-  {:lifecycle/before-task inject-c-ch})
+  {:lifecycle/before-task-start inject-c-ch})
 
 (def d-calls
-  {:lifecycle/before-task inject-d-ch})
+  {:lifecycle/before-task-start inject-d-ch})
 
 (def f-calls
-  {:lifecycle/before-task inject-f-ch})
+  {:lifecycle/before-task-start inject-f-ch})
 
 (def lifecycles-1
   [{:lifecycle/task :a

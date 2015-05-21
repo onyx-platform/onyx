@@ -6,7 +6,7 @@ In this chapter, we'll discuss what you need to set up a develop and production 
 
 #### Dependencies
 
-- Java 7+ (Java 8 if you're using Aeron as the message transport)
+- Java 7+
 - Clojure 1.6+
 
 #### Explanation
@@ -27,7 +27,7 @@ Add `:zookeeper/address "127.0.0.1:<my port>"` to the peer options as usual. In-
 
 #### Example
 
-Here's an example of using ZooKeeper in-memory.
+Here's an example of using ZooKeeper in-memory, with some non-ZooKeeper required parameters elided.
 
 ```clojure
 (def env-config
@@ -47,15 +47,15 @@ Running a good production Onyx cluster requires a multinode ZooKeeper cluster. O
 
 #### Dependencies
 
-- Java 7+ (Java 8 if you're using Aeron)
+- Java 7+
 - Clojure 1.6+
 - ZooKeeper 3.4.5+
 
 #### Explanation
 
-Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems. See [this link](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html) for getting set up. I won't go into detail since this is a particularly common set up.
+Running a ZooKeeper cluster is a requirement for a lot of fault tolerant systems. See [this link](http://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html) for getting set up. I won't go into detail since this is a particularly common set up. I recommend using [Exhibitor](https://github.com/Netflix/exhibitor) to manage clustered ZooKeeper.
 
-###### Example
+#### Example
 
 Notice that all we're doing is extending the address string to include more host:port pairs. This uses the standard ZooKeeper connection string, so you can use authentication here too if you need it.
 

@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.core-async
-    (:require [clojure.core.async :refer [chan >!! <!! alts!! dropping-buffer timeout close!]]
+    (:require [clojure.core.async :refer [chan >!! <!! alts!! sliding-buffer timeout close!]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
               [onyx.messaging.acking-daemon :as acker]
@@ -25,13 +25,17 @@
   [config peer-site peer-sites]
   peer-site)
 
+(defmethod extensions/get-peer-site :core.async
+  [replica peer]
+  "localhost")
+
 (defrecord CoreAsync [peer-group]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting core.async Messaging Channel")
-    (let [release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
-          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))]
+    (let [release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))]
       (assoc component :release-ch release-ch :retry-ch retry-ch)))
 
   (stop [component]
@@ -48,7 +52,7 @@
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         id (java.util.UUID/randomUUID)
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
-        ch (chan (dropping-buffer 10000))]
+        ch (chan (sliding-buffer 100000))]
     (future
       (try
         (loop []

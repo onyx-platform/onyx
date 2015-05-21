@@ -1,6 +1,7 @@
 (ns onyx.validation-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.test-helper :refer [load-config]]
+            [taoensso.timbre :refer [info] :as timbre]
             [midje.sweet :refer :all]
             [onyx.api]))
 
@@ -8,7 +9,10 @@
 
 (def config (load-config))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) 
+                       :onyx/id id
+                       :onyx.log/config {:appenders {:standard-out {:enabled? false}
+                                                     :spit {:enabled? false}}}))
 
 (def peer-config
   (assoc (:peer-config config)

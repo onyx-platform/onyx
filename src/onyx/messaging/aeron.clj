@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.messaging.aeron
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! dropping-buffer]]
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal] :as timbre]
             [onyx.messaging.protocol-aeron :as protocol]
@@ -8,7 +8,7 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults]])
-  (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
+  #_(:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
            [uk.co.real_logic.aeron Aeron$Context]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
@@ -17,7 +17,7 @@
            [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
-
+(comment
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
   (start [component]
@@ -53,6 +53,10 @@
         port (first (sort (remove used-ports (:aeron/ports peer-site))))]
     (assert port "Couldn't assign port - ran out of available ports.")
     {:aeron/port port}))
+
+(defmethod extensions/get-peer-site :aeron
+  [replica peer]
+  (get-in replica [:peer-sites peer :aeron/external-addr]))
 
 (defn handle-sent-message [inbound-ch decompress-f ^UnsafeBuffer buffer offset length header]
   (let [messages (protocol/read-messages-buf decompress-f buffer offset length)]
@@ -110,8 +114,8 @@
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)
-          release-ch (chan (dropping-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
-          retry-ch (chan (dropping-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
+          release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
+          retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
           bind-addr (bind-addr config)
           external-addr (external-addr config)
           ports (allowable-ports config)
@@ -266,3 +270,4 @@
     (reset! pub nil))
   (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
   {})
+)

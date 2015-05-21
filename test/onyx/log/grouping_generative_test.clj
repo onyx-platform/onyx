@@ -11,6 +11,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
@@ -139,14 +140,14 @@
               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
      "Checking that exactly 4 peers are assigned to task B."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 6)) :job-1 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-1 [rets])
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -162,25 +163,27 @@
               (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
      "Checking at least 4 tasks are assigned to B."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 14)) :job-4 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14)) :job-4 [rets])
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
        ;; If the job is submitted first, the second case occurs. Otherwise the first
        ;; case pins task B to 4 peers.
-       (or (is (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+       (is
+        (= true
+           (or (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
                     (= 4 (count (get (get (:allocations replica) job-4-id) t2)))
-                    (= 5 (count (get (get (:allocations replica) job-4-id) t3)))))
-           (is (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+                    (= 5 (count (get (get (:allocations replica) job-4-id) t3))))
+               (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
                     (= 5 (count (get (get (:allocations replica) job-4-id) t2)))
-                    (= 4 (count (get (get (:allocations replica) job-4-id) t3))))))))))
+                    (= 4 (count (get (get (:allocations replica) job-4-id) t3)))))))))))
 
 (deftest min-peers-not-enough-peers
   (let [rets (api/create-submit-job-entry
@@ -191,14 +194,14 @@
     (checking
      "Checking no peers are ever allocated to this job since this job needs at least
       12 peers to run."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 6)) :job-2 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-2 [rets])
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -219,14 +222,14 @@
                     (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking peers are allocated to job 1 even though job 2 is submitted and can't start."
-     50
+     (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
         {:replica {:job-scheduler :onyx.job-scheduler/balanced
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-entries (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
                     :job-1 [job-1-rets]
                     :job-2 [job-2-rets])
          :log []

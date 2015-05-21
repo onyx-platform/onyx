@@ -1,7 +1,9 @@
 ## Messaging
 
 This design document outlines the new approach that Onyx will take in implementing messaging from 0.6.0 forward.
-For a refresher of how Onyx messaging works as of 0.5.0, please refer to the Internal Design section of the User Guide.
+For a refresher of how Onyx messaging works as of 0.5.0, please refer to the 
+[Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
+section of the User Guide.
 
 ### The pros of using a message broker
 

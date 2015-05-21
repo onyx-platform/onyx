@@ -79,14 +79,14 @@
   {:core.async/chan out-chan})
 
 (def in-calls
-  {:lifecycle/before-task inject-in-ch})
+  {:lifecycle/before-task-start inject-in-ch})
 
 (def sum-calls
-  {:lifecycle/before-task inject-sum-state
-   :lifecycle/after-task flush-sum-state})
+  {:lifecycle/before-task-start inject-sum-state
+   :lifecycle/after-task-end flush-sum-state})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in

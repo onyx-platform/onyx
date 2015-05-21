@@ -22,6 +22,10 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
 
 ### Terminology
 
+#### Segment
+
+A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster.
+
 #### Task
 
 A task is the smallest unit of work in Onyx. It represents an activity of either input, processing, or output.
@@ -30,7 +34,7 @@ A task is the smallest unit of work in Onyx. It represents an activity of either
 
 A workflow is the structural specification of an Onyx program. Its purpose is to articulate the paths that data flows through the cluster at runtime. It is specified via a directed, acyclic graph.
 
-In the case of a directed acyclic graph, the workflow is a Clojure vector of vectors. Each inner vector contains exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge from the first node to the second.
+The workflow representation is a Clojure vector of vectors. Each inner vector contains exactly two elements, which are keywords. The keywords represent nodes in the graph, and the vector represents a directed edge from the first node to the second.
 
 ```clojure
 ;;;    in
@@ -109,10 +113,6 @@ Example:
   :flow/doc "Emits segment if this segment is an adult."}
 ```
 
-#### Segment
-
-A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster.
-
 #### Function
 
 A function is a construct that receives segments and emits segments for further processing. It literally is a Clojure function.
@@ -127,9 +127,8 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine.
+A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine, though we often use the terms peer and virtual peer interchangably when the difference doesn't matter.
 
 #### Virtual Peer
 
 A Virtual Peer refers to a single peer process running on a single physical machine. A single Virtual Peer executes at most one task at a time.
-

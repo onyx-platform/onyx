@@ -1,9 +1,10 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal warn]]
+            [taoensso.timbre :refer [fatal warn trace]]
             [zookeeper :as zk]
             [onyx.extensions :as extensions]
+            [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]])
   (:import [org.apache.curator.test TestingServer]))
 
@@ -55,8 +56,10 @@
   (try
     (f)
     (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+      (trace e)
       (throw-subscriber-closed))
     (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+      (trace e)
       (throw-subscriber-closed))))
 
 (defn initialize-origin! [conn config prefix]
@@ -73,7 +76,8 @@
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          conn (zk/connect (:zookeeper/address config))]
+          client-timeout (or (:onyx.peer/zookeeper-timeout config) (:onyx.peer/zookeeper-timeout defaults))
+          conn (zk/connect (:zookeeper/address config) :timeout-msec client-timeout)]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
@@ -147,6 +151,7 @@
       (when-not (zk/exists conn (str (pulse-path prefix) "/" id) :watcher f)
         (>!! ch true))
       (catch Throwable e
+        (trace e)
         ;; Node doesn't exist.
         (>!! ch true)))))
 
@@ -209,9 +214,11 @@
                      (recur)))))
              (recur (inc position)))))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+         (trace e)
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
          (close! ch))
        (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
+         (trace e)
          (close! ch))
        (catch Throwable e
          (fatal e))))

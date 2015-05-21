@@ -10,6 +10,8 @@ This chapter details how to inspect and modify the logs that Onyx produces.
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-### File System
+### Timbre
 
-By default, all Onyx output is logged to a file called `onyx.log` in the same directory as where the peer or coordinator jar is executing. The logging configuration can be overridden completely since it uses Timbre. Pass in the location of a configuration file for Timbre through the env config under the key `onyx.log/file`, or a Clojure-map configuration under `onyx.log/config`.
+By default, all Onyx output is logged to a file called `onyx.log` in the same directory as where the peer or coordinator jar is executing. The logging configuration can be overridden completely since it uses [Timbre](https://github.com/ptaoussanis/timbre). See the Timbre [example configuration](https://github.com/ptaoussanis/timbre#configuration).
+
+Onyx's logging configuration writes all `WARN` and `FATAL` messages to standard out, also.

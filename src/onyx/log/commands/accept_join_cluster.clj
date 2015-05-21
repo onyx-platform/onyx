@@ -12,8 +12,8 @@
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)
-        has-already-left? (get (map-invert (:accepted replica)) accepted-joiner)]
-    (if has-already-left? 
+        still-joining? (get (map-invert (:accepted replica)) accepted-joiner)]
+    (if still-joining? 
       (-> replica
           (update-in [:pairs] merge {accepted-observer accepted-joiner})
           (update-in [:pairs] merge {accepted-joiner target})

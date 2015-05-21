@@ -38,13 +38,11 @@ A function can be parameterized before a job is submitted to Onyx. The segment i
 
 The function is then invoked with `(partial f :my-args-here)`.
 
-- Via the `:onyx.peer-fn-params` in the `inject-lifecycle-resources` multimethod
+- Via the `:onyx.peer-fn-params` in the `before-task-start` lifecycle hook
 
 ```clojure
-(defmethod onyx.peer.task-lifecycle-extensions/inject-lifecycle-resources
-  :my-fn-name-or-identity
-  [_ context]
-    {:onyx.core/fn-params [:my-args-here]})
+(defn before-task-start-hook [event lifecycle]
+  {:onyx.core/fn-params [:my-args-here]})
 ```
 
 The function is then invoked with `(partial f :my-args-here)`.
@@ -64,7 +62,7 @@ The function is then invoked with `(partial f "abc" "def")`. The order is contro
 
 #### Grouping & Aggregation
 
-Grouping means consolidates "like" values together to the same virtual peer to presumably compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. Grouped functions must set keys `:onyx/min-peers` and `:onyx/flux-policy`. See below for a description of these.
+Grouping ensures that "like" values are always routed to the same virtual peer, presumably to compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. Grouped functions must set keys `:onyx/min-peers` and `:onyx/flux-policy`. See below for a description of these.
 
 #### Group By Key
 

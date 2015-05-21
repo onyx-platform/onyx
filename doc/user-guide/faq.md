@@ -17,7 +17,7 @@ Unless otherwise overridden in the Peer Pipeline API, Onyx will use [Nippy](http
 
 Onyx requires that for each task in a workflow, at least one vpeer is started. For example, the following workflow would require *at least* 4 peers
 
-```
+```clojure
 (def workflow
   [[:in :add]
   [:add :inc]

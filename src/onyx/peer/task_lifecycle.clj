@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go dropping-buffer]]
+    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
               [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
@@ -310,7 +310,7 @@
            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
              (doseq [m tail]
                (when (p-ext/pending? event m)
-                 (taoensso.timbre/info (format "Input retry message %s" m))
+                 (taoensso.timbre/trace (format "Input retry message %s" m))
                  (p-ext/retry-message event m)))
              (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
              (recur))))))))
@@ -400,8 +400,8 @@
      identity
      matched)))
 
-(defn compile-before-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task))
+(defn compile-before-task-start-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task-start))
 
 (defn compile-before-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
@@ -410,7 +410,7 @@
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
 (defn compile-after-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-end))
 
 (defn resolve-task-fn [entry]
   (when (= (:onyx/type entry) :function)
@@ -446,7 +446,7 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/compiled-start-task-fn (compile-start-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-task-fn (compile-before-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-task-start-fn (compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
@@ -467,11 +467,10 @@
                            :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
-
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
-                (Thread/sleep (or (:onyx.peer/sequential-back-off opts) 2000)))
-            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-fn pipeline-data) pipeline-data))]
+                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
@@ -502,15 +501,15 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      ((:onyx.core/compiled-after-task-fn event) event)
-
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
-
       (close! (:task-kill-ch component))
+
       (<!! (:input-retry-messages-ch component))
       (<!! (:aux-ch component))
+      
+      ((:onyx.core/compiled-after-task-fn event) event)
       
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]
