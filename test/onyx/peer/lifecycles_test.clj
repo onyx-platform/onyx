@@ -34,7 +34,7 @@
   (swap! counter (fn [counter] (conj counter :task-before)))
   {})
 
-(defn after-task-end [event lifecycle]
+(defn after-task-stop [event lifecycle]
   (swap! counter (fn [counter] (conj counter :task-after)))
   {})
 
@@ -85,7 +85,7 @@
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task-end after-task-end})
+   :lifecycle/after-task-stop after-task-stop})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})

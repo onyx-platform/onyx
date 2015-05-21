@@ -80,7 +80,7 @@
 
 (def sum-calls
   {:lifecycle/before-task-start inject-sum-state
-   :lifecycle/after-task-end flush-sum-state})
+   :lifecycle/after-task-stop flush-sum-state})
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})

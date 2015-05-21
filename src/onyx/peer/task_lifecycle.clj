@@ -410,7 +410,7 @@
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
 (defn compile-after-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-end))
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
 
 (defn resolve-task-fn [entry]
   (when (= (:onyx/type entry) :function)

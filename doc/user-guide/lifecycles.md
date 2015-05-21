@@ -49,7 +49,7 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
   (println "Executing once before the task starts.")
   {})
 
-(defn after-task-end [event lifecycle]
+(defn after-task-stop [event lifecycle]
   (println "Executing once after the task is over.")
   {})
 
@@ -72,7 +72,7 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/before-task-start before-task
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task-end after-task})
+   :lifecycle/after-task-stop after-task})
 ```
 
 Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
