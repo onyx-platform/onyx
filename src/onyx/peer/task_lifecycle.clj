@@ -467,11 +467,10 @@
                            :onyx.core/state (atom {:timeout-pool r-seq})}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
+            _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+                          (not (munge-start-lifecycle pipeline-data)))
+                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
             pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
-
-        (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                    (not (munge-start-lifecycle pipeline-data)))
-          (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
@@ -502,15 +501,15 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      ((:onyx.core/compiled-after-task-fn event) event)
-
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
-
       (close! (:task-kill-ch component))
+
       (<!! (:input-retry-messages-ch component))
       (<!! (:aux-ch component))
+      
+      ((:onyx.core/compiled-after-task-fn event) event)
       
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link] (:links state)]

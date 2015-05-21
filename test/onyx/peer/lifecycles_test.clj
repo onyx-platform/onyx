@@ -24,26 +24,26 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(def counter (atom 0))
+(def counter (atom []))
 
 (defn start-task? [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :task-started)))
   true)
 
 (defn before-task-start [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :task-before)))
   {})
 
-(defn after-task [event lifecycle]
-  (swap! counter inc)
+(defn after-task-end [event lifecycle]
+  (swap! counter (fn [counter] (conj counter :task-after)))
   {})
 
 (defn before-batch [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :batch-before)))
   {})
 
 (defn after-batch [event lifecycle]
-  (swap! counter inc)
+  (swap! counter (fn [counter] (conj counter :batch-after)))
   {})
 
 (def catalog
@@ -85,7 +85,7 @@
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task-end after-task})
+   :lifecycle/after-task-end after-task-end})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -127,11 +127,28 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-;; Counter is inc'ed 14 times. 1 time on start up,
-;; 5 for each start/stop of a batch, 2 more times
-;; for starting and stopping the lifecycle, and 1 more post-batch for
-;; shutting down the task.
-(fact @counter => 14)
+;; hacky wait to ensure that tasks have had a chance shutdown
+;; before we actually check whether the lifecycles were called
+(Thread/sleep 1000)
+
+(def expected-order
+  [:task-started
+   :task-before
+   :batch-before
+   :batch-after ; 1
+   :batch-before
+   :batch-after ; 2
+   :batch-before
+   :batch-after ; 3
+   :batch-before
+   :batch-after ; 4
+   :batch-before
+   :batch-after ; 5
+   :batch-before
+   :batch-after
+   :task-after])
+
+(fact @counter => expected-order)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
