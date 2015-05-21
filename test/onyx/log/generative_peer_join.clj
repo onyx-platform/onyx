@@ -228,6 +228,147 @@
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
+(deftest job-percentages-balance
+  (checking
+    "Checking percentages allocation causes peers to be evenly split"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (let [percentages-peer-config (assoc peer-config 
+                                          :onyx.peer/job-scheduler 
+                                          :onyx.job-scheduler/percentage)] 
+       (log-gen/apply-entries-gen 
+         (gen/return
+           {:replica {:job-scheduler :onyx.job-scheduler/percentage
+                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+            :message-id 0
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
+                            :job-1 [(api/create-submit-job-entry job-1-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-1 :percentage 30) 
+                                                                 (planning/discover-tasks (:catalog job-1) 
+                                                                                          (:workflow job-1)))]
+                            :job-2 [(api/create-submit-job-entry job-2-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-2 :percentage 30) 
+                                                                 (planning/discover-tasks (:catalog job-2) 
+                                                                                          (:workflow job-2)))]
+                            :job-3 [(api/create-submit-job-entry job-3-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-3 :percentage 40) 
+                                                                 (planning/discover-tasks (:catalog job-3) 
+                                                                                          (:workflow job-3)))
+                                    {:fn :kill-job :args {:job job-3-id}}])
+            :log []
+            :peer-choices []})))]
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+
+(def job-1-pct-tasks
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/percentage 25
+              :onyx/max-peers 1
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/percentage 37.5
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/percentage 37.5
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/percentage})
+
+(def job-2-pct-tasks
+  {:workflow [[:d :e] [:e :f]]
+   :catalog [{:onyx/name :d
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/percentage 25
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :e
+              :onyx/fn :mock/fn
+              :onyx/percentage 25
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :f
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/percentage 50
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/percentage})
+
+(def job-3-pct-tasks
+  {:workflow [[:g :h] [:h :i]]
+   :catalog [{:onyx/name :g
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/percentage 25
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :h
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/percentage 25
+              :onyx/batch-size 20}
+
+             {:onyx/name :i
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/percentage 50
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/percentage})
+
+(deftest percentage-task-allocations
+  (checking
+   "Checking percentage task allocations"
+   (times 50)
+   [{:keys [replica log peer-choices]} 
+    (log-gen/apply-entries-gen 
+     (gen/return
+      {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                 :messaging {:onyx.messaging/impl :dummy-messenger}}
+       :message-id 0
+       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
+                       :job-1 [(api/create-submit-job-entry job-1-id
+                                                            peer-config 
+                                                            job-1-pct-tasks 
+                                                            (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]
+                       :job-2 [(api/create-submit-job-entry job-2-id
+                                                            peer-config 
+                                                            job-2-pct-tasks 
+                                                            (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]
+                       :job-3 [(api/create-submit-job-entry job-3-id
+                                                            peer-config 
+                                                            job-3-pct-tasks
+                                                            (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
+                               {:fn :kill-job :args {:job job-3-id}}])
+       :log []
+       :peer-choices []}))]
+   (is (= (sort (map count (vals (get (:allocations replica) job-1-id)))) [1 3 4]))
+   (is (= (sort (map count (vals (get (:allocations replica) job-2-id)))) [2 2 4]))
+   (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
 (deftest peer-leave
   (checking
