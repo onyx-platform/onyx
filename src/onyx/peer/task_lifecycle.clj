@@ -128,20 +128,21 @@
 (defn build-new-segments
   [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))
-        results (map (fn [{:keys [root leaves] :as result}]
-                       (let [{:keys [id acker-id completion-id]} root] 
-                         (assoc result 
-                                :leaves 
-                                (map (fn [leaf]
-                                       (-> leaf 
-                                           (assoc :routes (add-route-data event result leaf downstream))
-                                           (assoc :id id)
-                                           (assoc :acker-id acker-id)
-                                           (assoc :completion-id completion-id)
-                                           (group-segments downstream catalog event)
-                                           (add-ack-vals)))
-                                     leaves))))
-                     results)]
+        results (doall
+                  (map (fn [{:keys [root leaves] :as result}]
+                         (let [{:keys [id acker-id completion-id]} root] 
+                           (assoc result 
+                                  :leaves 
+                                  (map (fn [leaf]
+                                         (-> leaf 
+                                             (assoc :routes (add-route-data event result leaf downstream))
+                                             (assoc :id id)
+                                             (assoc :acker-id acker-id)
+                                             (assoc :completion-id completion-id)
+                                             (group-segments downstream catalog event)
+                                             (add-ack-vals)))
+                                       leaves))))
+                       results))]
     (assoc event :onyx.core/results results)))
 
 (defn ack-routes? [routes]
@@ -164,16 +165,17 @@
 (defn ack-messages [{:keys [onyx.core/results onyx.core/task-map] :as event}]
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
     (let [link (operation/peer-link event acker-id)
-          acks (map (fn [result] (let [fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
-                                       fused-vals (if-let [ack-val (:ack-val (:root result))] 
-                                                    (bit-xor fused-leaf-vals ack-val)
-                                                    fused-leaf-vals)]
-                                   (->Ack (:id (:root result))
-                                          (:completion-id (:root result))
-                                          ;; or'ing by zero covers the case of flow conditions where an
-                                          ;; input task produces a segment that goes nowhere.
-                                          (or fused-vals 0))))
-                    results-by-acker)] 
+          acks (doall 
+                 (map (fn [result] (let [fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
+                                         fused-vals (if-let [ack-val (:ack-val (:root result))] 
+                                                      (bit-xor fused-leaf-vals ack-val)
+                                                      fused-leaf-vals)]
+                                     (->Ack (:id (:root result))
+                                            (:completion-id (:root result))
+                                            ;; or'ing by zero covers the case of flow conditions where an
+                                            ;; input task produces a segment that goes nowhere.
+                                            (or fused-vals 0))))
+                      results-by-acker))] 
       (extensions/internal-ack-messages (:onyx.core/messenger event) event link acks)))
   event)
 
@@ -241,12 +243,13 @@
   (assoc
    event
    :onyx.core/results
-    (map
-      (fn [segment]
-        (let [segments (collect-next-segments event (:message segment))
-              leaves (map leaf segments)]
-          (->Result segment leaves)))
-      batch)))
+   (doall
+     (map
+       (fn [segment]
+         (let [segments (collect-next-segments event (:message segment))
+               leaves (map leaf segments)]
+           (->Result segment leaves)))
+       batch))))
 
 (defn apply-fn-bulk [{:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
@@ -255,11 +258,12 @@
     (assoc
       event
       :onyx.core/results
-      (map
-        (fn [segment]
-          (let [leaves (map leaf segments)]
-            (->Result segment leaves)))
-        batch))))
+      (doall 
+        (map
+          (fn [segment]
+            (let [leaves (map leaf segments)]
+              (->Result segment leaves)))
+          batch)))))
 
 (defn apply-fn [event]
   (if (:onyx/bulk? (:onyx.core/task-map event))
