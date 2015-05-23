@@ -1,4 +1,4 @@
-(ns onyx.log.grouping-generative-test
+(ns onyx.log.balanced-grouping-generative-test
   (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]

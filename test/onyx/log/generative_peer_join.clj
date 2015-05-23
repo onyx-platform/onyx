@@ -343,7 +343,7 @@
 (deftest percentage-task-allocations
   (checking
    "Checking percentage task allocations"
-   (times 50)
+   1
    [{:keys [replica log peer-choices]} 
     (log-gen/apply-entries-gen 
      (gen/return
@@ -366,6 +366,9 @@
                                {:fn :kill-job :args {:job job-3-id}}])
        :log []
        :peer-choices []}))]
+   (prn "--")
+   (clojure.pprint/pprint replica)
+   (prn "--")
    (is (= (sort (map count (vals (get (:allocations replica) job-1-id)))) [1 3 4]))
    (is (= (sort (map count (vals (get (:allocations replica) job-2-id)))) [2 2 4]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))

@@ -1,5 +1,6 @@
 (ns onyx.scheduling.percentage-task-scheduler
-  (:require [onyx.scheduling.common-task-scheduler :as cts]
+  (:require [onyx.scheduling.common-job-scheduler :as cjs]
+            [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
 (defn tasks-by-pct [replica job tasks]
@@ -44,8 +45,8 @@
 
 (defn percentage-balanced-taskload 
   "Percentage balance taskload by allocating via largest remainders.
-  If a task becomes oversaturated, take it out of the pool, fully allocated,
-  and restart the process with the remaining peers and tasks"
+   If a task becomes oversaturated, take it out of the pool, fully allocated,
+   and restart the process with the remaining peers and tasks"
   [replica job candidate-tasks n-peers]
   {:post [(>= n-peers 0)
           (= n-peers (reduce + (map :allocation (vals %))))]}
@@ -69,15 +70,39 @@
 (defmethod cts/drop-peers :onyx.task-scheduler/percentage
   [replica job n]
   (let [tasks (keys (get-in replica [:allocations job]))
-        balanced (percentage-balanced-taskload replica job tasks n)]
+        balanced (percentage-balanced-taskload replica job tasks n)
+        tasks (cts/filter-grouped-tasks replica job balanced)]
     (mapcat
-      (fn [[task {:keys [allocation]}]]
-        (drop-last allocation (get-in replica [:allocations job task])))
-      balanced)))
+     (fn [[task {:keys [allocation]}]]
+       (drop-last allocation (get-in replica [:allocations job task])))
+     (take n (cycle tasks)))))
+
+(defn reuse-spare-peers [replica job init spare-peers]
+  (let [tasks (cts/remove-grouped-tasks replica job (get-in replica [:tasks job]))]
+    (merge-with
+     +
+     init
+     (->> (percentage-balanced-taskload replica job tasks spare-peers)
+          vals
+          (map (juxt :task :allocation))
+          (into {})))))
 
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/percentage
   [replica job n]
-  (->> (percentage-balanced-taskload replica job (get-in replica [:tasks job]) n)
-       vals
-       (map (juxt :task :allocation))
-       (into {})))
+  (let [tasks (get-in replica [:tasks job])
+        t (cjs/job-lower-bound replica job)]
+    (if (< n t)
+      (zipmap tasks (repeat 0))
+      (let [init
+            (reduce
+             (fn [all [task k]]
+               ;; If it's a grouped task that has already been allocated,
+               ;; we can't add more peers since that would break the hashing algorithm.
+               (if (cts/preallocated-grouped-task? replica job task)
+                 (assoc all task (count (get-in replica [:allocations job task])))
+                 (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
+                                      (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)))))
+             {}
+             (map vector tasks (range)))
+            spare-peers (- n (apply + (vals init)))]
+        (reuse-spare-peers replica job init spare-peers)))))
