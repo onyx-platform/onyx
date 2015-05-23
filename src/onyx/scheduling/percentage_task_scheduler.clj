@@ -17,13 +17,17 @@
            (update-in task [:pct] / total))
          tasks))) 
 
-(defn largest-remainder-allocations 
+(defn largest-remainder-allocations
   "Allocates remaining peers to the tasks with the largest remainder.
   e.g. 3 tasks pct allocated 3.5, 1.75, 1.75 -> 3, 2, 2"
-  [tasks n-peers]
+  [replica tasks n-peers job]
   (let [tasks* (rescale-task-percentages tasks)
-        unrounded (map (fn [task] 
-                         (* 0.01 (:pct task) n-peers))
+        unrounded (map (fn [task]
+                         (cond (cts/preallocated-grouped-task? replica job (:task task))
+                               (count (get-in replica [:allocations job (:task task)]))
+                               (not (nil? (get-in replica [:flux-policies job (:task task)])))
+                               (get-in replica [:min-required-peers job (:task task)] Double/POSITIVE_INFINITY)
+                               :else (* 0.01 (:pct task) n-peers)))
                        tasks*)
         full (map int unrounded) 
         taken (apply + full)
@@ -46,9 +50,10 @@
 (defn percentage-balanced-taskload
   [replica job candidate-tasks n-peers]
   {:post [(>= n-peers 0)
-          (= n-peers (reduce + (map :allocation (vals %))))]}
+;;          (= n-peers (reduce + (map :allocation (vals %))))
+          ]}
   (let [sorted-tasks (tasks-by-pct replica job candidate-tasks)
-        allocations (largest-remainder-allocations sorted-tasks n-peers)
+        allocations (largest-remainder-allocations replica sorted-tasks n-peers job)
         oversaturated (filter (fn [{:keys [task allocation]}]
                                 (> allocation (get-in replica [:task-saturation job task])))
                               allocations)
