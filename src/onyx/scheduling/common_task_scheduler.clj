@@ -29,12 +29,6 @@
       (not (nil? (get-in replica [:flux-policies job k]))))
     allocations)))
 
-(defn remove-grouped-tasks [replica job tasks]
-  (remove
-   (fn [t]
-     (not (nil? (get-in replica [:flux-policies job t]))))
-   tasks))
-
 (defmulti drop-peers
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))
