@@ -25,4 +25,9 @@
    :onyx.messaging.netty/pending-buffer-size 10000
    :onyx.messaging/completion-buffer-size 50000
    :onyx.messaging/release-ch-buffer-size 10000
-   :onyx.messaging/retry-ch-buffer-size 10000})
+   :onyx.messaging/retry-ch-buffer-size 10000
+   :onyx.messaging/ack-daemon-timeout 90000
+   :onyx.messaging/ack-daemon-clear-interval 15000})
+
+(defn arg-or-default [k opts]
+  (or (get opts k) (get defaults k)))
