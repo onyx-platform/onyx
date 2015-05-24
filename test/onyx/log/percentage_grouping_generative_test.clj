@@ -84,6 +84,33 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/percentage})
 
+(def job-3-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
+
+(def job-3
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 10
+              :onyx/flux-policy :continue
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
 (deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
               job-1-id
@@ -132,3 +159,27 @@
            c3 (count (get (get (:allocations replica) job-2-id) t3))]
        (is (>= c2 4))
        (is (= 10 (+ c1 c2 c3)))))))
+
+(deftest min-peers-not-enough-peers
+  (let [rets (api/create-submit-job-entry
+              job-3-id
+              peer-config
+              job-3
+              (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
+    (checking
+     "Checking no peers are ever allocated to this job since this job needs at least
+      12 peers to run."
+     (times 50)
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-3 [rets])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args rets))]
+       (is (= 0 (count (get (get (:allocations replica) job-3-id) t1))))
+       (is (= 0 (count (get (get (:allocations replica) job-3-id) t2))))
+       (is (= 0 (count (get (get (:allocations replica) job-3-id) t3))))))))
