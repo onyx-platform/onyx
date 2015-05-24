@@ -92,6 +92,7 @@
               :onyx/ident :core.async/read-from-chan
               :onyx/type :input
               :onyx/medium :core.async
+              :onyx/percentage 20
               :onyx/batch-size 20
               :onyx/doc "Reads segments from a core.async channel"}
 
@@ -100,6 +101,7 @@
               :onyx/type :function
               :onyx/group-by-kw :mock-key
               :onyx/min-peers 10
+              :onyx/percentage 50
               :onyx/flux-policy :continue
               :onyx/batch-size 20}
 
@@ -107,9 +109,10 @@
               :onyx/ident :core.async/write-to-chan
               :onyx/type :output
               :onyx/medium :core.async
+              :onyx/percentage 30
               :onyx/batch-size 20
               :onyx/doc "Writes segments to a core.async channel"}]
-   :task-scheduler :onyx.task-scheduler/balanced})
+   :task-scheduler :onyx.task-scheduler/percentage})
 
 (deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
