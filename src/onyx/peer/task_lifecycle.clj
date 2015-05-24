@@ -549,7 +549,8 @@
         (doseq [[_ link-map] (:links state)]
           (extensions/close-peer-connection (:onyx.core/messenger event) event (:link link-map)))))
 
-    (future-cancel (:peer-link-gc-thread component))
+    (when-let [t (:peer-link-gc-thread component)]
+      (future-cancel t))
 
     (assoc component
       :pipeline-data nil
