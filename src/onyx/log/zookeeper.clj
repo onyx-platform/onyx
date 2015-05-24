@@ -214,6 +214,10 @@
                      (>!! ch position)
                      (recur)))))
              (recur (inc position)))))
+       (catch java.lang.IllegalStateException e
+         (trace e)
+         ;; Curator client has been shutdown, close the subscriber cleanly.
+         (close! ch))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
          (trace e)
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
