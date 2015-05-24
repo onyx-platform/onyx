@@ -50,9 +50,7 @@
 
 (defn percentage-balanced-taskload
   [replica job candidate-tasks n-peers]
-  {:post [(>= n-peers 0)
-;;          (= n-peers (reduce + (map :allocation (vals %))))
-          ]}
+  {:post [(>= n-peers 0)]}
   (let [sorted-tasks (tasks-by-pct replica job candidate-tasks)
         allocations (largest-remainder-allocations replica sorted-tasks n-peers job)
         oversaturated (filter (fn [{:keys [task allocation]}]
