@@ -68,12 +68,11 @@
 
         (facts "Deleted value"
                (fact 
-                 (cu/data client "/ab") => (throws Exception)))
+                 (cu/data client3 "/ab2") => (throws Exception)))
         
         (facts "Check exists after delete"
-               (fact (cu/exists client3 "/ab2") => nil)))))
-
+               (fact (cu/exists client3 "/ab2") => nil))
+        
+        (cu/close client3))))
     (finally
       (onyx.api/shutdown-env env))))
-
-
