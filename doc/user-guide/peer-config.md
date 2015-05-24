@@ -44,6 +44,8 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
 |`:onyx.messaging/max-downstream-links`  | `int`      | `10`                               |
 |`:onyx.messaging/max-acker-links`       | `int`      | `5`                                |
+|`:onyx.messaging/peer-link-gc-interval` | `int`      | `90000`                            |
+|`:onyx.messaging/peer-link-idle-timeout`| `int`      | `60000`                            |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
 |`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
@@ -108,6 +110,14 @@ The maximum number of network connections that should be opened to downstream pe
 ##### `:onyx.messaging/max-acker-links`
 
 The maximum number of network connections that should be opened to acking daemons from a peer. Useful for very large clusters.
+
+##### `:onyx.messaging/peer-link-gc-interval`
+
+The interval in milliseconds to wait between closing idle peer links.
+
+##### `:onyx.messaging/peer-link-idle-timeout`
+
+The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is elligible to be closed. The connection will be reopened from scratch the next time it is needed.
 
 ##### `onyx.messaging/decompress-fn`
 

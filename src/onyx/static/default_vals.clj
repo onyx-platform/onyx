@@ -27,4 +27,6 @@
    :onyx.messaging/release-ch-buffer-size 10000
    :onyx.messaging/retry-ch-buffer-size 10000
    :onyx.messaging/max-downstream-links 10
-   :onyx.messaging/max-acker-links 5})
+   :onyx.messaging/max-acker-links 5
+   :onyx.messaging/peer-link-gc-interval 90000
+   :onyx.messaging/peer-link-idle-timeout 60000})

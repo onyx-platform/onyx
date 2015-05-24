@@ -375,6 +375,28 @@
       (operation/resolve-fn f)
       onyx.compression.nippy/compress)))
 
+(defn gc-peer-links [event state opts]
+  (let [interval (or (:onyx.messaging/peer-link-gc-interval opts)
+                     (:onyx.messaging/peer-link-gc-interval defaults))
+        idle (or (:onyx.messaging/peer-link-idle-timeout opts)
+                 (:onyx.messaging/peer-link-idle-timeout defaults))]
+    (loop []
+      (try
+        (Thread/sleep interval)
+        (let [t (System/currentTimeMillis)]
+          (swap! state
+                 (fn [x]
+                   (let [to-remove (map first (filter (fn [[k v]] (>= (- t (:timestamp v)) idle)) (:links x)))
+                         result (into {} (remove (fn [[k v]] (some #{k} to-remove)) (:links x)))]
+                     (doseq [p to-remove]
+                       (extensions/close-peer-connection (:onyx.core/messenger event) event (:link (get (:links x) p))))
+                     (assoc x :links result)))))
+        (catch InterruptedException e
+          (throw e))
+        (catch Throwable e
+          (fatal e)))
+      (recur))))
+
 (defn any-ackers? [replica job-id]
   (> (count (get-in replica [:ackers job-id])) 0))
 
@@ -440,6 +462,7 @@
             pending-timeout (or (:onyx/pending-timeout catalog-entry) 
                                 (:onyx/pending-timeout defaults))
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
+            state (atom {:timeout-pool r-seq})
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
@@ -473,7 +496,7 @@
                                                           (:onyx.messaging/max-acker-links defaults))
                            :onyx.core/fn (resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
-                           :onyx.core/state (atom {:timeout-pool r-seq})}
+                           :onyx.core/state state}
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
@@ -495,14 +518,16 @@
 
         (let [input-retry-messages-ch (input-retry-messages! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
+              peer-link-gc-thread (future (gc-peer-links pipeline-data state opts))]
           (assoc component 
             :pipeline-data pipeline-data
             :seal-ch seal-resp-ch
             :task-kill-ch task-kill-ch
             :task-lifecycle-ch task-lifecycle-ch
             :input-retry-messages-ch input-retry-messages-ch
-            :aux-ch aux-ch)))
+            :aux-ch aux-ch
+            :peer-link-gc-thread peer-link-gc-thread)))
       (catch Throwable e
         (handle-exception e restart-ch outbox-ch job-id)
         component)))
@@ -521,8 +546,10 @@
       ((:onyx.core/compiled-after-task-fn event) event)
       
       (let [state @(:onyx.core/state event)]
-        (doseq [[_ link] (:links state)]
-          (extensions/close-peer-connection (:onyx.core/messenger event) event link))))
+        (doseq [[_ link-map] (:links state)]
+          (extensions/close-peer-connection (:onyx.core/messenger event) event (:link link-map)))))
+
+    (future-cancel (:peer-link-gc-thread component))
 
     (assoc component
       :pipeline-data nil
@@ -530,7 +557,8 @@
       :aux-ch nil
       :input-retry-messages-ch nil
       :task-lifecycle-ch nil
-      :task-lifecycle-ch nil)))
+      :task-lifecycle-ch nil
+      :peer-link-gc-thread nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
