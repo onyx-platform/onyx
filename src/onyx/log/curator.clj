@@ -1,6 +1,7 @@
 (ns onyx.log.curator
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [taoensso.timbre :refer [fatal warn trace]]
+            [onyx.static.default-vals :refer [defaults]]
             [zookeeper :as zk]
             [zookeeper.internal :as zi])
   (:import [org.apache.zookeeper CreateMode]
@@ -18,7 +19,11 @@
   ([connection-string]
    (connect connection-string ""))
   ([connection-string ns]
-   (connect connection-string ns (BoundedExponentialBackoffRetry. 1000 30000 3)))
+   (connect connection-string ns 
+            (BoundedExponentialBackoffRetry. 
+              (:onyx.zookeeper/backoff-base-sleep-time-ms defaults) 
+              (:onyx.zookeeper/backoff-max-sleep-time-ms defaults)
+              (:onyx.zookeeper/backoff-max-retries defaults))))
   ([connection-string ns ^RetryPolicy retry-policy]
    (doto
      (.. (CuratorFrameworkFactory/builder)

@@ -10,7 +10,9 @@
    :onyx/batch-timeout 1000
 
    ; zookeeper defaults
-   ;; TODO ADD CURATOR RETRY POLICIES
+   :onyx.zookeeper/backoff-base-sleep-time-ms 1000
+   :onyx.zookeeper/backoff-max-sleep-time-ms 30000
+   :onyx.zookeeper/backoff-max-retries 5
 
    ; peer defaults
    :onyx.peer/inbox-capacity 1000
