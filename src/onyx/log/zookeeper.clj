@@ -2,7 +2,6 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn trace]]
-            ;[onyx.log.curator :as zk]
             [onyx.log.curator :as zk]
             [zookeeper.internal :as zi]
             [onyx.extensions :as extensions]
