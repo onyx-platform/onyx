@@ -238,5 +238,7 @@
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
        (is (= 1 (count (get (get (:allocations replica) job-4-id) t1))))
-       (is (= 3 (count (get (get (:allocations replica) job-4-id) t2))))
-       (is (= 6 (count (get (get (:allocations replica) job-4-id) t3))))))))
+       (is (<= 3 (count (get (get (:allocations replica) job-4-id) t2))))
+       (is (>= 6 (count (get (get (:allocations replica) job-4-id) t3))))
+       (is (= 9 (+ (count (get (get (:allocations replica) job-4-id) t2))
+                   (count (get (get (:allocations replica) job-4-id) t3)))))))))
