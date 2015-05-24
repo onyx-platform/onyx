@@ -10,7 +10,7 @@
    :onyx/batch-timeout 1000
 
    ; zookeeper defaults
-   :onyx.peer/zookeeper-timeout 6000
+   ;; TODO ADD CURATOR RETRY POLICIES
 
    ; peer defaults
    :onyx.peer/inbox-capacity 1000

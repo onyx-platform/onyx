@@ -2,7 +2,9 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn trace]]
-            [zookeeper :as zk]
+            ;[onyx.log.curator :as zk]
+            [onyx.log.curator :as zk]
+            [zookeeper.internal :as zi]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]])
@@ -76,8 +78,7 @@
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          client-timeout (or (:onyx.peer/zookeeper-timeout config) (:onyx.peer/zookeeper-timeout defaults))
-          conn (zk/connect (:zookeeper/address config) :timeout-msec client-timeout)]
+          conn (zk/connect (:zookeeper/address config))]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
