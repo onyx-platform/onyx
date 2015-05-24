@@ -114,6 +114,37 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/percentage})
 
+(def job-4-id #uuid "c4774cac-57d0-4993-b19e-3d1de20e61ca")
+
+(def job-4
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/ident :core.async/read-from-chan
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/percentage 25
+              :onyx/max-peers 1
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/group-by-kw :mock-key
+              :onyx/min-peers 3
+              :onyx/percentage 50
+              :onyx/flux-policy :continue
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/ident :core.async/write-to-chan
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/percentage 25
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/percentage})
+
 (deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
               job-1-id
@@ -186,3 +217,26 @@
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t3))))))))
+
+(deftest min-and-max-peers-compose
+  (let [rets (api/create-submit-job-entry
+              job-4-id
+              peer-config
+              job-4
+              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
+    (checking
+     "Checking that using min and max peers in the same catalog works together"
+     (times 50)
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) :job-4 [rets])
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args rets))]
+       (is (= 1 (count (get (get (:allocations replica) job-4-id) t1))))
+       (is (= 3 (count (get (get (:allocations replica) job-4-id) t2))))
+       (is (= 6 (count (get (get (:allocations replica) job-4-id) t3))))))))
