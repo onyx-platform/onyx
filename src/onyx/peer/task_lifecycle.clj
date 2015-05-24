@@ -466,6 +466,8 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
+                           :onyx.core/max-downstream-links (or (:onyx.messaging/max-downstream-links opts)
+                                                               (:onyx.messaging/max-downstream-links defaults))
                            :onyx.core/fn (resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/state (atom {:timeout-pool r-seq})}
