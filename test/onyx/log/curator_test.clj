@@ -40,9 +40,9 @@
 
         (facts "Check sequential children can be found"
                (fact 
-                 (cu/children client2 "/ab/zd/hi" :watcher (fn [_] (swap! watcher-sentinel inc))) 
+                 (sort (cu/children client2 "/ab/zd/hi" :watcher (fn [_] (swap! watcher-sentinel inc)))) 
                  => 
-                 ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"]))
+                 (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"])))
         
         ;; add another child so watcher will be triggered
         (cu/create client2 "/ab/zd/hi/entry-" :sequential? true :persistent? true)
@@ -56,8 +56,8 @@
 
         (facts "Check only sequential persistent children remain"
                (fact 
-                 (cu/children client3 "/ab/zd/hi") => 
-                 ["entry-0000000000" "entry-0000000002" "entry-0000000004"]))
+                 (sort (cu/children client3 "/ab/zd/hi")) => 
+                 (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"])))
 
         (cu/create client3 "/ab2" :data (into-array Byte/TYPE value) :persistent? true)
 
