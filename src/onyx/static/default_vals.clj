@@ -26,4 +26,5 @@
    :onyx.messaging/completion-buffer-size 50000
    :onyx.messaging/release-ch-buffer-size 10000
    :onyx.messaging/retry-ch-buffer-size 10000
-   :onyx.messaging/max-downstream-links 10})
+   :onyx.messaging/max-downstream-links 10
+   :onyx.messaging/max-acker-links 5})
