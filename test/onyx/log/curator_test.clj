@@ -47,6 +47,9 @@
         ;; add another child so watcher will be triggered
         (cu/create client2 "/ab/zd/hi/entry-" :sequential? true :persistent? true)
 
+        ;; Give it a second before checking watch
+        (Thread/sleep 200)
+
         (facts "Check watcher triggered"
                (fact @watcher-sentinel => 1))
 
