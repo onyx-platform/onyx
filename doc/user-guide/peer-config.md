@@ -42,7 +42,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
-|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `90000`                            |
+|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `60000`                            |
 |`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                         |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |

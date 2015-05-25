@@ -1,9 +1,11 @@
 (ns onyx.static.default-vals)
 
+(def default-pending-timeout 60000)
+
 (def defaults
   {; input task defaults
    :onyx/input-retry-timeout 1000
-   :onyx/pending-timeout 60000
+   :onyx/pending-timeout default-pending-timeout
    :onyx/max-pending 10000
 
    ; task defaults
@@ -26,7 +28,7 @@
    :onyx.messaging/completion-buffer-size 50000
    :onyx.messaging/release-ch-buffer-size 10000
    :onyx.messaging/retry-ch-buffer-size 10000
-   :onyx.messaging/ack-daemon-timeout 90000
+   :onyx.messaging/ack-daemon-timeout default-pending-timeout
    :onyx.messaging/ack-daemon-clear-interval 15000})
 
 (defn arg-or-default [k opts]
