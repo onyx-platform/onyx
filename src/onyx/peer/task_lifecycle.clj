@@ -174,7 +174,8 @@
                                             (:completion-id (:root result))
                                             ;; or'ing by zero covers the case of flow conditions where an
                                             ;; input task produces a segment that goes nowhere.
-                                            (or fused-vals 0))))
+                                            (or fused-vals 0)
+                                            (System/currentTimeMillis))))
                       results-by-acker))] 
       (extensions/internal-ack-messages (:onyx.core/messenger event) event link acks)))
   event)
