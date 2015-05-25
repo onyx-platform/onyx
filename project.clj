@@ -20,7 +20,7 @@
                  [io.netty/netty-all "4.0.26.Final"]
                  [dire "0.5.1"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
-                                  [org.clojars.czan/stateful-check "0.2.0"]
+                                  [org.clojars.czan/stateful-check "0.3.0-20150522.062325-1"]
                                   [org.clojure/test.check "0.7.0"]
                                   [com.gfredericks/test.chuck "0.1.16"]
                                   [org.clojure/data.generators "0.1.2"]
