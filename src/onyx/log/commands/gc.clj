@@ -44,4 +44,3 @@
       (doseq [k (range 0 message-id)]
         (extensions/gc-log-entry (:log state) k))))
   state)
-
