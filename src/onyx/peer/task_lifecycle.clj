@@ -467,7 +467,6 @@
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
 
             pipeline-data {:onyx.core/id id
-                           :onyx.core/hashed-id (hash id)
                            :onyx.core/job-id job-id
                            :onyx.core/task-id task-id
                            :onyx.core/task (:name task)
