@@ -14,10 +14,11 @@
     (loop []
       (try
         (Thread/sleep interval)
-        (let [t (now)]
-          (swap! state
-                 (fn [x]
-                   (into {} (remove (fn [[k v]] (>= (- t (:timestamp v)) timeout)) x)))))
+        (let [t (now)
+              snapshot @state
+              dead (map first (remove (fn [[k v]] (>= (- t (:timestamp v)) timeout)) snapshot))]
+          (doseq [k dead]
+            (swap! state dissoc k)))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
