@@ -24,7 +24,9 @@
                                   [org.clojure/test.check "0.7.0"]
                                   [com.gfredericks/test.chuck "0.1.16"]
                                   [org.clojure/data.generators "0.1.2"]
-                                  [org.clojure/tools.nrepl "0.2.3"]]
+                                  [org.clojure/tools.nrepl "0.2.3"]
+                                  [lein-jammin "0.1.1"]
+                                  [yeller-timbre-appender "0.4.1"]]
                    :plugins [[lein-midje "3.1.1"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx3g"]}}
