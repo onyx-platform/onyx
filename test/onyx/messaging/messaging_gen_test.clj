@@ -14,13 +14,9 @@
             [onyx.test-helper :refer [load-config]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]])
-  (:import 
-             [io.netty.buffer ByteBuf]
+  (:import [io.netty.buffer ByteBuf]
              [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer ChannelPipeline
-              MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]
-             )
-  
-  )
+              MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]))
 
 (def id (java.util.UUID/randomUUID))
 
