@@ -99,7 +99,7 @@
                    :outbox-ch outbox-ch :kill-ch kill-ch
                    :restart-ch restart-ch)))
         (catch Throwable e
-          (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
+          (taoensso.timbre/fatal e (format "Error starting Virtual Peer %s" id))
           (throw e)))))
 
   (stop [component]

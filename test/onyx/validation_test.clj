@@ -9,15 +9,16 @@
 
 (def config (load-config))
 
-(def env-config (assoc (:env-config config) 
-                       :onyx/id id
-                       :onyx.log/config {:appenders {:standard-out {:enabled? false}
-                                                     :spit {:enabled? false}}}))
+(def env-config 
+  (assoc (:env-config config) 
+         :onyx/id id
+         :onyx.log/config {:appenders {:standard-out {:enabled? false}
+                                       :spit {:enabled? false}}}))
 
 (def peer-config
   (assoc (:peer-config config)
-    :onyx/id id
-    :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
+         :onyx/id id
+         :onyx.peer/job-scheduler :onyx.job-scheduler/balanced))
 
 (def env (onyx.api/start-env env-config))
 

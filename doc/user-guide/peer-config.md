@@ -39,6 +39,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
 |`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
+|`:onyx.messaging/inbound-buffer-size`   | `int`      | `20000`                            |
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
@@ -86,6 +87,10 @@ underlying `:add` with `(f 42 <segment>)`.
 ##### `:onyx.peer/zookeeper-timeout`
 
 Number of ms to timeout from the ZooKeeper client connection on disconnection.
+
+##### `onyx.messaging/inbound-buffer-size`
+
+Number of messages to buffer in the core.async channel for received segments.
 
 ##### `onyx.messaging/completion-buffer-size`
 

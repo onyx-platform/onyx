@@ -6,14 +6,14 @@
 
 (defn inject-reader
   [event lifecycle]
-  (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
+  (assert (:core.async/chan event) ":core.async/chan not found - add it using a :before-task-start lifecycle")
   {:core.async/pending-messages (atom {})
    :core.async/drained? (atom false)
    :core.async/retry-ch (chan 1000)})
 
 (defn inject-writer
   [event lifecycle]
-  (assert (:core.async/chan event) ":core.async/chan not found - add it via inject-lifecycle-resources.")
+  (assert (:core.async/chan event) ":core.async/chan not found - add it using a :before-task-start lifecycle")
   {})
 
 (def reader-calls
