@@ -23,6 +23,17 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
+;; TODO: may want to consider memoizing this
+;; must be careful about ensuring we don't bloat memory wise
+;; use clojure.core.memoize with LRU
+(defn select-n-peers 
+  "Stably select n peers using our id and the downstream task ids.
+  If a peer is added or removed, the set can only change by one value at max"
+  [id all-peers n]
+  (take n 
+        (sort-by (fn [peer-id] (hash [id peer-id]))
+                 all-peers)))
+
 (defn peer-link
   [{:keys [onyx.core/state] :as event} peer-id]
   (if-let [link (:link (get (:links @state) peer-id))]

@@ -38,12 +38,12 @@
 (defn munge-start-lifecycle [event]
   ((:onyx.core/compiled-start-task-fn event) event))
 
-(defn add-acker-id [{:keys [onyx.core/max-acker-links] :as event} m]
+(defn add-acker-id [{:keys [onyx.core/id onyx.core/max-acker-links] :as event} m]
   (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
     (if-not (seq peers)
       (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
           (throw (ex-info "Not enough acker peers" {:peers peers})))
-      (let [candidates (take max-acker-links peers)
+      (let [candidates (operation/select-n-peers id peers max-acker-links)
             n (mod (hash (:message m)) (count candidates))]
         (assoc m :acker-id (nth candidates n))))))
 
