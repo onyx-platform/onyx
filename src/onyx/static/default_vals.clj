@@ -10,7 +10,9 @@
    :onyx/batch-timeout 1000
 
    ; zookeeper defaults
-   :onyx.peer/zookeeper-timeout 6000
+   :onyx.zookeeper/backoff-base-sleep-time-ms 1000
+   :onyx.zookeeper/backoff-max-sleep-time-ms 30000
+   :onyx.zookeeper/backoff-max-retries 5
 
    ; peer defaults
    :onyx.peer/inbox-capacity 1000

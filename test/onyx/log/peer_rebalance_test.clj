@@ -5,7 +5,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
