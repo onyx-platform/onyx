@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn trace]]
             [onyx.log.curator :as zk]
-            [zookeeper.internal :as zi]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]])
