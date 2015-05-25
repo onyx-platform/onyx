@@ -304,7 +304,9 @@
      (let [node (str (chunk-path prefix) "/" id "/chunk")
            version (:version (zk/exists conn node))
            bytes (compress chunk)]
-       (zk/set-data conn node bytes version)))))
+       (if (nil? version)
+         (zk/create-all conn node :persistent? true :data bytes)
+         (zk/set-data conn node bytes version))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id & _]
