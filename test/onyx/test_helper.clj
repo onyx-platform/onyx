@@ -1,7 +1,10 @@
 (ns onyx.test-helper
   (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
+            [yeller-timbre-appender]
+            [taoensso.timbre :refer  [info warn trace fatal error] :as timbre]
             [onyx.extensions :as extensions]))
 
+;; Following with macros marked for deletion
 (defmacro with-env [[symbol-name env-config] & body]
   `(let [~symbol-name (onyx.api/start-env ~env-config)]
      (try
@@ -24,9 +27,6 @@
          (doseq [v-peer# ~symbol-name]
            (onyx.api/shutdown-peer v-peer#))))))
 
-(defn load-config [filename]
-  (read-string (slurp (clojure.java.io/resource filename))))
-
 (defn playback-log [log replica ch timeout-ms]
   (loop [replica replica]
     (if-let [position (first (alts!! [ch (timeout timeout-ms)]))]
@@ -45,13 +45,21 @@
   (map (partial job-allocation-counts replica)
        job-infos))
 
-(defn load-config []
-  (let [cfg (read-string (slurp (clojure.java.io/resource "test-config.edn")))]
-    (let [impl (System/getenv "TEST_TRANSPORT_IMPL")]
-      (cond (= impl "aeron")
-            (assoc-in cfg [:peer-config :onyx.messaging/impl] :aeron)
-            (= impl "netty")
-            (assoc-in cfg [:peer-config :onyx.messaging/impl] :netty)
-            (= impl "core.async")
-            (assoc-in cfg [:peer-config :onyx.messaging/impl] :core.async)
-            :else cfg))))
+(defn load-config 
+  ([]
+   (load-config "test-config.edn"))
+  ([filename]
+   (let [yeller-token (System/getenv "YELLER_TOKEN")
+         impl (System/getenv "TEST_TRANSPORT_IMPL")] 
+     (cond-> (read-string (slurp (clojure.java.io/resource filename)))
+       (not-empty yeller-token) 
+       (assoc-in [:peer-config :onyx.log/config :appenders :yeller] 
+                 (yeller-timbre-appender/make-yeller-appender
+                   {:token yeller-token
+                    :environment "citests"}))
+       (= impl "aeron")
+       (assoc-in [:peer-config :onyx.messaging/impl] :aeron)
+       (= impl "netty")
+       (assoc-in [:peer-config :onyx.messaging/impl] :netty)
+       (= impl "core.async")
+       (assoc-in [:peer-config :onyx.messaging/impl] :core.async)))))

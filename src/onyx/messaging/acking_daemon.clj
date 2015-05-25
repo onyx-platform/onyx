@@ -1,23 +1,48 @@
 (ns ^:no-doc onyx.messaging.acking-daemon
     (:require [clojure.core.async :refer [chan >!! close! sliding-buffer]]
               [com.stuartsierra.component :as component]
-              [onyx.static.default-vals :refer [defaults]]
+              [onyx.static.default-vals :refer [arg-or-default]]
               [onyx.types :refer [->Ack]]
               [taoensso.timbre :as timbre]))
+
+(defn now []
+  (System/currentTimeMillis))
+
+(defn clear-messages-loop [state opts]
+  (let [timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts)
+        interval (arg-or-default :onyx.messaging/ack-daemon-clear-interval opts)]
+    (loop []
+      (try
+        (Thread/sleep interval)
+        (let [t (now)
+              snapshot @state
+              dead (map first (remove (fn [[k v]] (>= (- t (:timestamp v)) timeout)) snapshot))]
+          (doseq [k dead]
+            (swap! state dissoc k)))
+        (catch InterruptedException e
+          (throw e))
+        (catch Throwable e
+          (timbre/fatal e)))
+      (recur))))
 
 (defrecord AckingDaemon [opts]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Acking Daemon")
-    (let [buffer-size (or (:onyx.messaging/completion-buffer-size opts) 
-                          (:onyx.messaging/completion-buffer-size defaults))]
-      (assoc component :ack-state (atom {}) :completions-ch (chan (sliding-buffer buffer-size)))))
+    (let [buffer-size (arg-or-default :onyx.messaging/completion-buffer-size opts)
+          state (atom {})
+          timeout-fut (future (clear-messages-loop state opts))]
+      (assoc component
+        :ack-state state
+        :completions-ch (chan (sliding-buffer buffer-size))
+        :timeout-fut timeout-fut)))
 
   (stop [component]
     (taoensso.timbre/info "Stopping Acking Daemon")
     (close! (:completions-ch component))
-    (assoc component :ack-state nil :completions-ch nil)))
+    (future-cancel (:timeout-fut component))
+    (assoc component :ack-state nil :completions-ch nil :timeout-fut nil)))
 
 (defn acking-daemon [config]
   (map->AckingDaemon {:opts config}))
@@ -34,10 +59,10 @@
                   (assoc state message-id (assoc ack :ack-val updated-ack-val))))
               (if (zero? ack-val) 
                 state
-                (assoc state message-id (->Ack nil completion-id ack-val))))))]
+                (assoc state message-id (->Ack nil completion-id ack-val (now)))))))]
     (when-not (get rets message-id)
-      (>!! (:completions-ch daemon) {:id message-id
-                                     :peer-id completion-id}))))
+      (>!! (:completions-ch daemon)
+           {:id message-id :peer-id completion-id}))))
 
 (defn gen-message-id
   "Generates a unique ID for a message - acts as the root id."
@@ -58,5 +83,3 @@
         (persistent! coll)
         (recur (inc n) 
                (conj! coll (.nextLong rng)))))))
-
-

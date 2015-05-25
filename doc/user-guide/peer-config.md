@@ -39,6 +39,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
 |`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
+|`:onyx.messaging/inbound-buffer-size`   | `int`      | `20000`                            |
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
@@ -46,6 +47,8 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/max-acker-links`       | `int`      | `5`                                |
 |`:onyx.messaging/peer-link-gc-interval` | `int`      | `90000`                            |
 |`:onyx.messaging/peer-link-idle-timeout`| `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                         |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
 |`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
@@ -91,6 +94,10 @@ underlying `:add` with `(f 42 <segment>)`.
 
 Number of ms to timeout from the ZooKeeper client connection on disconnection.
 
+##### `onyx.messaging/inbound-buffer-size`
+
+Number of messages to buffer in the core.async channel for received segments.
+
 ##### `onyx.messaging/completion-buffer-size`
 
 Number of messages to buffer in the core.async channel for completing messages on an input task.
@@ -118,6 +125,14 @@ The interval in milliseconds to wait between closing idle peer links.
 ##### `:onyx.messaging/peer-link-idle-timeout`
 
 The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is elligible to be closed. The connection will be reopened from scratch the next time it is needed.
+
+#### `:onyx.messaging/ack-daemon-timeout`
+
+Number of milliseconds that an ack value can go without being updates on a daemon before it is elligible to time out.
+
+#### `:onyx.messaging/ack-daemon-clear-interval`
+
+Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon.
 
 ##### `onyx.messaging/decompress-fn`
 
@@ -163,6 +178,8 @@ A vector of integers denoting ports that may be used for peer communication. Thi
    :onyx.messaging/completion-buffer-size 2000
    :onyx.messaging/release-ch-buffer-size 50000
    :onyx.messaging/retry-ch-buffer-size 100000
+   :onyx.messaging/ack-daemon-timeout 90000
+   :onyx.messaging/ack-daemon-clear-interval 15000
    :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
    :onyx.messaging/impl :netty
