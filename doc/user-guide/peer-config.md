@@ -43,6 +43,8 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
+|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                         |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
 |`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
@@ -104,6 +106,14 @@ Number of messages to buffer in the core.async channel for released completed me
 
 Number of messages to buffer in the core.async channel for retrying timed-out messages.
 
+#### `:onyx.messaging/ack-daemon-timeout`
+
+Number of milliseconds that an ack value can go without being updates on a daemon before it is elligible to time out.
+
+#### `:onyx.messaging/ack-daemon-clear-interval`
+
+Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon.
+
 ##### `onyx.messaging/decompress-fn`
 
 The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return
@@ -148,6 +158,8 @@ A vector of integers denoting ports that may be used for peer communication. Thi
    :onyx.messaging/completion-buffer-size 2000
    :onyx.messaging/release-ch-buffer-size 50000
    :onyx.messaging/retry-ch-buffer-size 100000
+   :onyx.messaging/ack-daemon-timeout 90000
+   :onyx.messaging/ack-daemon-clear-interval 15000
    :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
    :onyx.messaging/impl :netty
