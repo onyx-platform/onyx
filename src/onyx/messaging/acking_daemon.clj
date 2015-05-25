@@ -55,7 +55,7 @@
               (let [updated-ack-val (bit-xor (:ack-val ack) ack-val)]
                 (if (zero? updated-ack-val)
                   (dissoc state message-id) 
-                  (assoc state message-id (assoc ack :ack-val updated-ack-val :timestamp (now)))))
+                  (assoc state message-id (assoc ack :ack-val updated-ack-val))))
               (if (zero? ack-val) 
                 state
                 (assoc state message-id (->Ack nil completion-id ack-val (now)))))))]
