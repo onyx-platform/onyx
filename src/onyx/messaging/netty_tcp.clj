@@ -336,7 +336,7 @@
   (.addListener f (reify GenericFutureListener
                     (operationComplete [_ _]
                       (when-not (.isSuccess f)
-                        (timbre/error (ex-info "Message failed to send" {:cause (.cause f)}))
+                        (timbre/trace (ex-info "Message failed to send" {:cause (.cause f)}))
                         (reset-connection connection))))))
 
 (defn make-pending-chan [messenger]
