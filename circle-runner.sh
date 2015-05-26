@@ -42,5 +42,6 @@ mkdir -p log_artifact/$ARTIFACT_DIR/
 
 lein with-profile dev,circle-ci jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
 cp onyx.log* log_artifact/$ARTIFACT_DIR/
-cp recording.jfr log_artifact/$ARTIFACT_DIR/
+bzip2 -9 recording.jfr
+cp recording.jfr.bz2 log_artifact/$ARTIFACT_DIR/
 aws s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR
