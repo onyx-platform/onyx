@@ -36,7 +36,7 @@ echo "Running " $files
 
 export TEST_TRANSPORT_IMPL=$1 
 
-ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$BR"_"$1
+ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
