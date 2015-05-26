@@ -35,7 +35,7 @@ files+=" "$TEST_NSES_GENERATIVE
 echo "Running " $files
 
 export TEST_TRANSPORT_IMPL=$1 
-lein with-profile dev,circle-ci midje $files
+lein with-profile dev,circle-ci lein jammin 360 midje $files
 
 ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$BR"_"$1
 
