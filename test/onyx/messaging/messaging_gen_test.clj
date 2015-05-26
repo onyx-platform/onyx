@@ -148,5 +148,3 @@
                                   (test-send-commands peer-group commands)))))))
 
       (finally (onyx.api/shutdown-peer-group peer-group)))))
-
-
