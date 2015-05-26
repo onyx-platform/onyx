@@ -30,9 +30,11 @@
   "Stably select n peers using our id and the downstream task ids.
   If a peer is added or removed, the set can only change by one value at max"
   [id all-peers n]
-  (take n 
-        (sort-by (fn [peer-id] (hash [id peer-id]))
-                 all-peers)))
+  (if (<= (count all-peers) n)
+    all-peers
+    (take n 
+          (sort-by (fn [peer-id] (hash [id peer-id]))
+                   all-peers))))
 
 (defn peer-link
   [{:keys [onyx.core/state] :as event} peer-id]
