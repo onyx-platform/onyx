@@ -42,7 +42,7 @@ mkdir -p log_artifact/$ARTIFACT_DIR/
 
 lein with-profile dev,circle-ci jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
 
-EXIT_CODE=$?
+EXIT_CODE=${PIPESTATUS[0]}
 
 cp onyx.log* log_artifact/$ARTIFACT_DIR/
 bzip2 -9 recording.jfr
