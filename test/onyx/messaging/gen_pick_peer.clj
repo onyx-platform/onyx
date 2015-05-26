@@ -20,9 +20,9 @@
              (gen/tuple 
                peer-id-gen
                (gen/vector peer-id-gen)
-               (gen/such-that pos? gen/int)
+               gen/s-pos-int
                (gen/vector peer-id-gen)
-               (gen/such-that pos? gen/int))] 
+               gen/s-pos-int)] 
 
             (let [selected-start (operation/select-n-peers id peer-ids n-select)
                   peer-ids-after (drop n-remove (shuffle (concat peer-ids peers-to-add)))  
