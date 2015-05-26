@@ -35,11 +35,12 @@ files+=" "$TEST_NSES_GENERATIVE
 echo "Running " $files
 
 export TEST_TRANSPORT_IMPL=$1 
-lein with-profile dev,circle-ci lein jammin 360 midje $files
 
 ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
+
+lein with-profile dev,circle-ci lein jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
 cp onyx.log* log_artifact/$ARTIFACT_DIR/
 cp recording.jfr log_artifact/$ARTIFACT_DIR/
 s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR
