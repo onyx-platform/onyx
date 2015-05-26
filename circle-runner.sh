@@ -39,6 +39,6 @@ lein with-profile dev,circle-ci midje $files
 
 ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$BR"_"$1
 
-cp -p onyx.log* log_artifact/$ARTIFACT_DIR
-
+cp -p onyx.log* log_artifact/$ARTIFACT_DIR/
+cp recording.jfr log_artifact/$ARTIFACT_DIR/
 s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR
