@@ -59,8 +59,8 @@
 (defmethod p-ext/retry-message :core.async/read-from-chan
   [{:keys [core.async/pending-messages core.async/retry-ch]} message-id]
   (when-let [msg (get @pending-messages message-id)]
-    (>!! retry-ch msg)
-    (swap! pending-messages dissoc message-id)))
+    (swap! pending-messages dissoc message-id)
+    (>!! retry-ch msg)))
 
 (defmethod p-ext/pending? :core.async/read-from-chan
   [{:keys [core.async/pending-messages]} message-id]
