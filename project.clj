@@ -29,5 +29,5 @@
                                   [yeller-timbre-appender "0.4.1"]]
                    :plugins [[lein-midje "3.1.1"]
                              [codox "0.8.8"]]}
-             :circle-ci {:jvm-opts ["-Xmx3g"]}}
+             :circle-ci {:jvm-opts ["-Xmx2500M"]}}
   :codox {:output-dir "doc/api"})
