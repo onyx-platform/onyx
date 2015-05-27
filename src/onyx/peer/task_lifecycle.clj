@@ -14,7 +14,7 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
-              [onyx.static.default-vals :refer [defaults]])
+              [onyx.static.default-vals :refer [defaults arg-or-default]])
     (:import [java.security MessageDigest]))
 
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
@@ -440,6 +440,11 @@
   (when (= (:onyx/type entry) :function)
     (operation/kw->fn (:onyx/fn entry))))
 
+(defn validate-pending-timeout [pending-timeout opts]
+  (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
+    (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
+                    {:opts opts :pending-timeout pending-timeout}))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -462,6 +467,7 @@
             state (atom {:timeout-pool r-seq})
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
+            _ (validate-pending-timeout pending-timeout opts)
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
