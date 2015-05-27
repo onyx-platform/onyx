@@ -80,7 +80,7 @@
 
 (>!! in-chan :done)
 
-(def v-peers (onyx.api/start-peers 8 peer-group))
+(def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
  peer-config
