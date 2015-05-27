@@ -17,6 +17,18 @@
         completed (get-in replica [:completions job])]
     (filter identity (second (diff completed tasks)))))
 
+(defn preallocated-grouped-task? [replica job task]
+  (and (not (nil? (get-in replica [:flux-policies job task])))
+       (> (count (get-in replica [:allocations job task])) 0)))
+
+(defn filter-grouped-tasks [replica job allocations]
+  (into
+   {}
+   (remove
+    (fn [[k v]]
+      (not (nil? (get-in replica [:flux-policies job k]))))
+    allocations)))
+
 (defmulti drop-peers
   (fn [replica job n]
     (get-in replica [:task-schedulers job])))

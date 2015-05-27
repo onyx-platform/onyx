@@ -85,9 +85,7 @@
               restart-ch (chan 1)
               completion-ch (:completions-ch acking-daemon)
               peer-site (extensions/peer-site messenger)
-              entry (create-log-entry :prepare-join-cluster
-                                      {:joiner id 
-                                       :peer-site peer-site})
+              entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site})
               origin (extensions/subscribe-to-log log inbox-ch)]
           (extensions/register-pulse log id)
           (>!! outbox-ch entry)
@@ -101,7 +99,7 @@
                    :outbox-ch outbox-ch :kill-ch kill-ch
                    :restart-ch restart-ch)))
         (catch Throwable e
-          (taoensso.timbre/fatal (format "Error starting Virtual Peer %s" id) e)
+          (taoensso.timbre/fatal e (format "Error starting Virtual Peer %s" id))
           (throw e)))))
 
   (stop [component]

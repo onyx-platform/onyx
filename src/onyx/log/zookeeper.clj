@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal warn trace]]
-            [zookeeper :as zk]
+            [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]])
@@ -76,8 +76,7 @@
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection"))
     (let [onyx-id (:onyx/id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
-          client-timeout (or (:onyx.peer/zookeeper-timeout config) (:onyx.peer/zookeeper-timeout defaults))
-          conn (zk/connect (:zookeeper/address config) :timeout-msec client-timeout)]
+          conn (zk/connect (:zookeeper/address config))]
       (zk/create conn root-path :persistent? true)
       (zk/create conn (prefix-path onyx-id) :persistent? true)
       (zk/create conn (pulse-path onyx-id) :persistent? true)
@@ -213,6 +212,10 @@
                      (>!! ch position)
                      (recur)))))
              (recur (inc position)))))
+       (catch java.lang.IllegalStateException e
+         (trace e)
+         ;; Curator client has been shutdown, close the subscriber cleanly.
+         (close! ch))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
          (trace e)
          ;; ZooKeeper has been shutdown, close the subscriber cleanly.
@@ -304,7 +307,9 @@
      (let [node (str (chunk-path prefix) "/" id "/chunk")
            version (:version (zk/exists conn node))
            bytes (compress chunk)]
-       (zk/set-data conn node bytes version)))))
+       (if (nil? version)
+         (zk/create-all conn node :persistent? true :data bytes)
+         (zk/set-data conn node bytes version))))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix] :as log} kw id & _]

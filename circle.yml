@@ -1,10 +1,10 @@
 test:
   override:
     - ./circle-runner.sh core.async:
-        timeout: 360
+        timeout: 1080
         parallel: true
     - ./circle-runner.sh netty:
-        timeout: 360
+        timeout: 1080
         parallel: true
 
 machine:
@@ -14,6 +14,10 @@ machine:
 dependencies:
   pre:
     - bash ./install-aeron.sh
+    - bash ./install-zookeeper.sh
+    - /home/ubuntu/onyx/zookeeper-3.4.6/bin/zkServer.sh start:
+        background: true
+    - sudo pip install awscli
   cache_directories:
     - Aeron
     - Agrona

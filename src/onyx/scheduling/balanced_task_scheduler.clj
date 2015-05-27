@@ -3,14 +3,6 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]))
 
-(defn filter-grouped-tasks [replica job allocations]
-  (into
-   {}
-   (remove
-    (fn [[k v]]
-      (not (nil? (get-in replica [:flux-policies job k]))))
-    allocations)))
-
 (defmethod cts/drop-peers :onyx.task-scheduler/balanced
   [replica job n]
   (first
@@ -25,12 +17,8 @@
             task-most-peers (ffirst (filter (fn [x] (= max-peers (count (second x)))) allocations))]
         [(conj peers-to-drop (last (allocations task-most-peers)))
          (update-in allocations [task-most-peers] butlast)]))
-    [[] (filter-grouped-tasks replica job (get-in replica [:allocations job]))]
+    [[] (cts/filter-grouped-tasks replica job (get-in replica [:allocations job]))]
     (range n))))
-
-(defn preallocated-grouped-task? [replica job task]
-  (and (not (nil? (get-in replica [:flux-policies job task])))
-       (> (count (get-in replica [:allocations job task])) 0)))
 
 (defn reuse-spare-peers [replica job tasks spare-peers]
   (loop [task-seq (into #{} (get-in replica [:tasks job]))
@@ -53,7 +41,7 @@
        (and (< (get results least-allocated-task)
                (or (get-in replica [:task-saturation job least-allocated-task]
                            Double/POSITIVE_INFINITY)))
-            (not (preallocated-grouped-task? replica job least-allocated-task)))
+            (not (cts/preallocated-grouped-task? replica job least-allocated-task)))
        (recur task-seq (update-in results [least-allocated-task] inc) (dec capacity))
 
        ;; This task doesn't want more peers, throw it away from the rotating sequence.
@@ -71,7 +59,7 @@
              (fn [all [task k]]
                ;; If it's a grouped task that has already been allocated,
                ;; we can't add more peers since that would break the hashing algorithm.
-               (if (preallocated-grouped-task? replica job task)
+               (if (cts/preallocated-grouped-task? replica job task)
                  (assoc all task (count (get-in replica [:allocations job task])))
                  (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
                                       (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)))))

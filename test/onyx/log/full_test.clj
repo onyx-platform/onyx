@@ -6,7 +6,7 @@
             [onyx.api :as api]
             [onyx.test-helper :refer [with-env with-peer-group with-peers load-config]]
             [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [onyx.log.curator :as zk]))
 
 (facts "peers all join and watch each other"
        (let [config (load-config)

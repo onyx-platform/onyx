@@ -230,17 +230,14 @@
             (.group client-group)
             (.channel channel)
             (.handler (client-channel-initializer (new-client-handler))))
-        ch-fut ^ChannelFuture (.awaitUninterruptibly ^ChannelFuture (.connect ^Bootstrap b ^String host ^Integer port) 
-                                                     ;; TODO, add connection timeout
-                                                     ;(:onyx.messaging.netty/connect-timeout-millis defaults)
-                                                     ;TimeUnit/MILLISECONDS
-                                                     )
-        ch (.channel ch-fut)]
-    (if (and (.isSuccess ^ChannelFuture ch-fut) 
-             (established? ch))
-      ch
-      (do (.close ch)
-          nil))))
+        ch-fut ^ChannelFuture (.connect ^Bootstrap b ^String host ^Integer port)]
+    (if (.awaitUninterruptibly ch-fut (:onyx.messaging.netty/connect-timeout-millis defaults))
+      (let [ch (.channel ch-fut)]
+        (if (and (.isSuccess ch-fut) 
+                 (established? ch))
+          ch
+          (do (.close ch)
+              nil))))))
 
 (defrecord NettyTcpSockets [peer-group]
   component/Lifecycle
@@ -336,7 +333,7 @@
   (.addListener f (reify GenericFutureListener
                     (operationComplete [_ _]
                       (when-not (.isSuccess f)
-                        (timbre/error "Message failed to send: " (.cause f))
+                        (timbre/trace (ex-info "Message failed to send" {:cause (.cause f)}))
                         (reset-connection connection))))))
 
 (defn make-pending-chan [messenger]

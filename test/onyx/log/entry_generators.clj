@@ -1,5 +1,5 @@
 (ns onyx.log.entry-generators
-  (:require [stateful-check.core :refer [reality-matches-model? print-test-results]]
+  (:require [stateful-check.core :refer [reality-matches-model print-test-results]]
             [onyx.log.generators :as loggen]
             [onyx.extensions :as ext]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
@@ -76,9 +76,9 @@
                    (gen/return (:peer-counter state))))
    :model/precondition (fn [state _] 
                          (:peer-counter state))
-   :real/postcondition (fn [state args updated-real]
+   :real/postcondition (fn [state next-state args updated-real]
                          (= (count (:peers (:replica updated-real)))
-                            (inc (count (:peers state)))))
+                            (count (:peers next-state))))
    :real/command #'apply-join-entry
    :next-state (fn [state [_ peer-counter] _]
                  (-> state 
@@ -92,9 +92,9 @@
                    (gen/elements (:peers state))))
    :model/precondition (fn [state _] 
                          (not-empty (:peers state)))
-   :real/postcondition (fn [state args updated-real]
+   :real/postcondition (fn [state next-state args updated-real]
                          (= (count (:peers (:replica updated-real)))
-                            (dec (count (:peers state)))))
+                            (count (:peers next-state))))
    :real/command #'apply-leave-entry
    :next-state (fn [state [_ peer-id] _]
                  (update-in state [:peers] disj peer-id))})
