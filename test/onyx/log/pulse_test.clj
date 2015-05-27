@@ -37,7 +37,7 @@
 
 (extensions/subscribe-to-log (:log env) ch)
 
-(def read-entry (extensions/read-log-entry (:log env) (<!! ch)))
+(def read-entry (<!! ch))
 
 (def f (partial extensions/apply-log-entry read-entry))
 
@@ -68,7 +68,7 @@
 
 (zk/close conn)
 
-(def entry (extensions/read-log-entry (:log env) (<!! ch)))
+(def entry (<!! ch))
 
 (fact (:fn entry) => :leave-cluster)
 (fact (:args entry) => {:id "d"})

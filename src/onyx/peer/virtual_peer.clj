@@ -37,10 +37,9 @@
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
-              position (first (alts!! [kill-ch inbox-ch] :priority true))]
-          (if position
-            (let [entry (extensions/read-log-entry log position)
-                  new-replica (extensions/apply-log-entry entry replica)
+              entry (first (alts!! [kill-ch inbox-ch] :priority true))]
+          (if entry
+            (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]

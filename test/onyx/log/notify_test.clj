@@ -43,9 +43,7 @@
 
 (extensions/subscribe-to-log (:log env) ch)
 
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
+(def read-entry (<!! ch))
 
 (def f (partial extensions/apply-log-entry read-entry))
 
@@ -73,9 +71,7 @@
 (def new-local-state
   (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
 
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
+(def read-entry (<!! ch))
 
 (fact (:fn read-entry) => :notify-join-cluster)
 (fact (:args read-entry) => {:observer d-id :subject b-id})
@@ -103,9 +99,7 @@
 (def new-local-state
   (extensions/fire-side-effects! read-entry old-replica new-replica diff old-local-state))
 
-(def message-id (<!! ch))
-
-(def read-entry (extensions/read-log-entry (:log env) message-id))
+(def read-entry (<!! ch))
 
 (fact (:fn read-entry) => :accept-join-cluster)
 (fact (:args read-entry) => {:accepted-joiner "d"
@@ -119,7 +113,7 @@
 
 (zk/close conn)
 
-(def entry (extensions/read-log-entry (:log env) (<!! ch)))
+(def entry (<!! ch))
 
 (fact (:fn entry) => :leave-cluster)
 (fact (:args entry) => {:id "d"})

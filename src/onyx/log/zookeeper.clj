@@ -5,8 +5,10 @@
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
-            [onyx.compression.nippy :refer [compress decompress]])
-  (:import [org.apache.curator.test TestingServer]))
+            [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.log.entry :refer [create-log-entry]])
+  (:import [org.apache.curator.test TestingServer]
+           [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
 
@@ -180,6 +182,22 @@
       (do (Thread/sleep 500)
           (recur)))))
 
+(defn seek-to-new-origin! [log ch]
+  (let [origin (extensions/read-chunk log :origin nil)
+        starting-position (inc (:message-id origin))
+        entry (create-log-entry :set-replica! {:replica origin})]
+    (>!! ch entry)
+    starting-position))
+
+(defn seek-and-put-entry! [log position ch]
+  (try
+    (let [entry (extensions/read-log-entry log position)]
+      (>!! ch entry))
+    (catch KeeperException$NoNodeException e
+      (seek-to-new-origin!))
+    (catch KeeperException$NodeExistsException e
+      (seek-to-new-origin!))))
+
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]
   (let [rets (chan)]
@@ -196,7 +214,7 @@
          (loop [position starting-position]
            (let [path (str (log-path prefix) "/entry-" (pad-sequential-id position))]
              (if (zk/exists conn path)
-               (>!! ch position)
+               (seek-and-put-entry! log position ch)
                (loop []
                  (let [read-ch (chan 2)]
                    (zk/children conn (log-path prefix) :watcher (fn [_] (>!! read-ch true)))
@@ -209,7 +227,7 @@
                    ;; Requires one more check. Watch may have been triggered by a delete
                    ;; from a GC call.
                    (if (zk/exists conn path)
-                     (>!! ch position)
+                     (seek-and-put-entry! log position ch)
                      (recur)))))
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e

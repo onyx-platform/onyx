@@ -29,9 +29,8 @@
 
 (defn playback-log [log replica ch timeout-ms]
   (loop [replica replica]
-    (if-let [position (first (alts!! [ch (timeout timeout-ms)]))]
-      (let [entry (extensions/read-log-entry log position)
-            new-replica (extensions/apply-log-entry entry replica)]
+    (if-let [entry (first (alts!! [ch (timeout timeout-ms)]))]
+      (let [new-replica (extensions/apply-log-entry entry replica)]
         (recur new-replica))
       replica)))
 
