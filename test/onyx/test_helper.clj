@@ -36,13 +36,12 @@
 
 (defn job-allocation-counts [replica job-info]
   (if-let [allocations (get-in replica [:allocations (:job-id job-info)])]
-    (map (comp count allocations :id) 
-         (:task-ids job-info))
+    (mapv (comp count allocations :id)
+          (:task-ids job-info))
     []))
 
 (defn get-counts [replica job-infos]
-  (map (partial job-allocation-counts replica)
-       job-infos))
+  (sort (mapv (partial job-allocation-counts replica) job-infos)))
 
 (defn load-config 
   ([]
