@@ -154,8 +154,7 @@
 
   ;; Make sure we find the killed job in the replica, then bail
   (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-    (let [position (<!! ch)
-          entry (extensions/read-log-entry (:log env) position)
+    (let [entry (<!! ch)
           new-replica (extensions/apply-log-entry entry replica)]
       (when-not (= (first (:killed-jobs new-replica)) j1)
         (recur new-replica))))

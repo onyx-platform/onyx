@@ -18,7 +18,7 @@ Onyx uses an internal log to totally order all coordination events across nodes 
 
 ### Subscribing to the Log
 
-The following is a complete example to pretty print all events as they are written to the log. You need to provide the ZooKeeper address, Onyx ID, and shared job scheduler in the peer config.
+The following is a complete example to pretty print all events as they are written to the log. You need to provide the ZooKeeper address, Onyx ID, and shared job scheduler in the peer config. The subscriber will automatically track recover from sequentially reading errors in the case that a garbage collection is triggered, deleting log entries in its path.
 
 ```clojure
 (def peer-config
@@ -34,8 +34,7 @@ The following is a complete example to pretty print all events as they are writt
 
 ;; Loops forever
 (loop [replica (:replica subscription)]
-  (let [position (<!! ch)
-        entry (onyx.extensions/read-log-entry log position)
+  (let [entry (<!! ch)
         new-replica (onyx.extensions/apply-log-entry entry replica)]
     (clojure.pprint/pprint new-replica)
     (recur new-replica)))

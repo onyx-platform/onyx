@@ -49,7 +49,7 @@
                           (.printStackTrace e))))]
       (facts
         "We can asynchronously write log entries and read them back in order"
-        (fact (count (map (fn [n] (<!! ch) (extensions/read-log-entry (:log env) n))
+        (fact (count (map (fn [n] (<!! ch))
                           (range entries)))
               => entries))
 

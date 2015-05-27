@@ -59,8 +59,7 @@
         (let [peer-group (onyx.api/start-peer-group peer-config)
               !replica (atom {})
               _ (go-loop [replica (extensions/subscribe-to-log (:log env) log-ch)]
-                         (let [position (<!! log-ch)
-                               entry (extensions/read-log-entry (:log env) position)
+                         (let [entry (<!! log-ch)
                                new-replica (extensions/apply-log-entry entry replica)]
                            (reset! !replica new-replica)
                            (recur new-replica)))] 

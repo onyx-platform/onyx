@@ -324,4 +324,12 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: None.
 
 -------------------------------------------------
+[`set-replica!`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/set_replica.clj)
 
+- Submitter: This is a special entry that should never be appended to the log
+- Purpose: Perform a hard reset of the replica, replacing its entire value. This is useful if a log subscriber is reading behind a garbage collection call and tries to read a non-existent entry. The new origin can be found and its value applied locally via the subscriber.
+- Replica update: Replaces the entire value of the replica with a new value
+- Side effects: None.
+- Reactions: None.
+
+-------------------------------------------------

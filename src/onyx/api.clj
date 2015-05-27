@@ -194,8 +194,7 @@
     (extensions/write-log-entry (:log client) entry)
     
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log client) position)
+      (let [entry (<!! ch)
             new-replica (extensions/apply-log-entry entry replica)]
         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
           (let [diff (extensions/replica-diff entry replica new-replica)]
@@ -210,8 +209,7 @@
   (let [client (component/start (system/onyx-client config))
         ch (chan 100)]
     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-      (let [position (<!! ch)
-            entry (extensions/read-log-entry (:log client) position)
+      (let [entry (<!! ch)
             new-replica (extensions/apply-log-entry entry replica)]
         (if-not (some #{job-id} (:completed-jobs new-replica))
           (recur new-replica)
