@@ -259,8 +259,7 @@
       (doall 
         (map
           (fn [segment]
-            (let [leaves (map leaf segments)]
-              (->Result segment leaves)))
+            (->Result segment (list (leaf (:message segment)))))
           batch)))))
 
 (defn apply-fn [event]
