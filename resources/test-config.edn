@@ -1,10 +1,10 @@
 {:env-config
- {:zookeeper/address "127.0.0.1:43500"
-  :zookeeper/server? false
-  :zookeeper.server/port 43500}
+ {:zookeeper/address "127.0.0.1:2188"
+  :zookeeper/server? true
+  :zookeeper.server/port 2188}
 
  :peer-config
- {:zookeeper/address "127.0.0.1:43500"
+ {:zookeeper/address "127.0.0.1:2188"
   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout 60000
   :onyx.messaging/impl :netty

@@ -93,16 +93,12 @@
     (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
-(defn hash-value [x]
-  (let [md5 (MessageDigest/getInstance "MD5")]
-    (apply str (.digest md5 (.getBytes (pr-str x) "UTF-8")))))
-
 (defn group-message [segment catalog task]
   (let [t (find-task-fast catalog task)]
     (if-let [k (:onyx/group-by-key t)]
-      (hash-value (get segment k))
+      (hash (get segment k))
       (when-let [f (:onyx/group-by-fn t)]
-        (hash-value ((operation/resolve-fn {:onyx/fn f}) segment))))))
+        (hash ((operation/resolve-fn {:onyx/fn f}) segment))))))
 
 (defn group-segments [leaf next-tasks catalog event]
   (let [post-transformation (:post-transformation (:routes leaf))

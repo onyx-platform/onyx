@@ -35,4 +35,19 @@ files+=" "$TEST_NSES_GENERATIVE
 echo "Running " $files
 
 export TEST_TRANSPORT_IMPL=$1 
-lein with-profile dev,circle-ci midje $files
+
+ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
+
+mkdir -p log_artifact/$ARTIFACT_DIR/
+
+lein with-profile dev,circle-ci jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
+
+EXIT_CODE=${PIPESTATUS[0]}
+
+cp onyx.log* log_artifact/$ARTIFACT_DIR/
+bzip2 -9 recording.jfr
+cp recording.jfr.bz2 log_artifact/$ARTIFACT_DIR/
+aws s3 sync log_artifact/$ARTIFACT_DIR s3://onyxcircleresults/$ARTIFACT_DIR
+rm recording.jfr.bz2
+
+exit $EXIT_CODE

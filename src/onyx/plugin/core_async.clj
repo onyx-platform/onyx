@@ -2,14 +2,20 @@
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <!]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
-            [taoensso.timbre :refer [debug] :as timbre]))
+            [taoensso.timbre :refer [debug info] :as timbre]))
 
 (defn inject-reader
   [event lifecycle]
   (assert (:core.async/chan event) ":core.async/chan not found - add it using a :before-task-start lifecycle")
   {:core.async/pending-messages (atom {})
    :core.async/drained? (atom false)
-   :core.async/retry-ch (chan 1000)})
+   :core.async/retry-ch (chan 10000)
+   :core.async/retry-count (atom 0)})
+
+(defn log-retry-count
+  [event lifecycle]
+  (info "core.async input plugin stopping. Retry count:" @(:core.async/retry-count event))
+  {})
 
 (defn inject-writer
   [event lifecycle]
@@ -17,7 +23,8 @@
   {})
 
 (def reader-calls
-  {:lifecycle/before-task-start inject-reader})
+  {:lifecycle/before-task-start inject-reader
+   :lifecycle/after-task-stop log-retry-count})
 
 (def writer-calls
   {:lifecycle/before-task-start inject-writer})
@@ -57,10 +64,12 @@
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/retry-message :core.async/read-from-chan
-  [{:keys [core.async/pending-messages core.async/retry-ch]} message-id]
+  [{:keys [core.async/pending-messages core.async/retry-count core.async/retry-ch]} message-id]
   (when-let [msg (get @pending-messages message-id)]
-    (>!! retry-ch msg)
-    (swap! pending-messages dissoc message-id)))
+    (swap! pending-messages dissoc message-id)
+    (when-not (= msg :done)
+      (swap! retry-count inc))
+    (>!! retry-ch msg)))
 
 (defmethod p-ext/pending? :core.async/read-from-chan
   [{:keys [core.async/pending-messages]} message-id]
