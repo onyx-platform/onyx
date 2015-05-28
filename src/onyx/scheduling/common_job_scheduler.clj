@@ -210,6 +210,14 @@
    replica
    (:jobs replica)))
 
+(defmulti equivalent-allocation?
+  (fn [replica replica-new]
+    (:job-scheduler replica)))
+
+(defmethod equivalent-allocation? :default
+  [_ _]
+  true)
+
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
         job-claims (job-claim-peers replica job-offers)
@@ -217,5 +225,8 @@
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        deallocated (deallocate-starved-jobs replica)]
-    (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))))
+        deallocated (deallocate-starved-jobs replica)
+        updated-replica (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))]
+    (if (equivalent-allocation? replica updated-replica)
+      replica
+      updated-replica)))
