@@ -41,7 +41,7 @@
     []))
 
 (defn get-counts [replica job-infos]
-  (sort (mapv (partial job-allocation-counts replica) job-infos)))
+  (mapv (partial job-allocation-counts replica) job-infos))
 
 (defn load-config 
   ([]
