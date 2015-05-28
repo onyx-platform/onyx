@@ -139,7 +139,6 @@
 
 (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" id))
 
-
 (zk/close conn)
 
 (def replica-2
