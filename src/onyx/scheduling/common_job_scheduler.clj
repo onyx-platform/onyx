@@ -216,7 +216,7 @@
 
 (defmethod equivalent-allocation? :default
   [_ _]
-  true)
+  false)
 
 (defn reconfigure-cluster-workload [replica]
   (let [job-offers (job-offer-n-peers replica)
