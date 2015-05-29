@@ -144,12 +144,19 @@
    :batch-after
    :task-after])
 
+
 ;; shutdown-peer ensure peers are fully shutdown so that 
 ;; :task-after will have been set
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(fact @counter => expected-order)
+(fact (take 2 @counter) => [:task-started :task-before])
+
+(def batches 
+  (butlast (drop 2 @counter)))
+
+(fact batches => (take (count batches) (cycle [:batch-before :batch-after])))
+(fact (last @counter) => :task-after)
 
 (onyx.api/shutdown-peer-group peer-group)
 
