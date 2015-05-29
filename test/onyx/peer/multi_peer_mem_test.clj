@@ -51,9 +51,7 @@
 
 (def in-chan (chan (inc n-messages)))
 
-(def maximum-retried-segments 500)
-
-(def out-chan (chan (sliding-buffer (+ n-messages maximum-retried-segments 1))))
+(def out-chan (chan (sliding-buffer (inc n-messages))))
 
 (defn inject-in-ch [event lifecycle]
   {:core.async/chan in-chan})
