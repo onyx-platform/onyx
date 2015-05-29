@@ -70,20 +70,23 @@
 ;; Needs a performance boost
 (defmethod p-ext/write-batch :default
   [{:keys [onyx.core/id onyx.core/results onyx.core/messenger onyx.core/job-id onyx.core/max-downstream-links] :as event}]
-  (let [leaves (fast-concat (map :leaves results))
-        egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
+  (let [leaves (fast-concat (map :leaves results))]
     (when-not (empty? leaves)
-      (let [replica @(:onyx.core/replica event)
+      (let [egress-tasks (:egress-ids (:onyx.core/serialized-task event))
+            replica @(:onyx.core/replica event)
             peer-state (:peer-state replica)
             segments (build-segments-to-send leaves)
             groups (group-by :route segments)
             allocations (get (:allocations replica) job-id)]
-        (doseq [[route segs] groups]
-          (let [peers (get allocations (get egress-tasks route))
-                active-peers (filter #(= (get peer-state %) :active) peers)
-                groups-hash (group-by :hash-group segs)]
-            (doseq [[hash-group segs*] groups-hash]
-              (when-let [target (pick-peer id active-peers hash-group max-downstream-links)]
-                (let [link (operation/peer-link event target)]
-                  (onyx.extensions/send-messages messenger event link segs*))))))
+        (doall 
+          (map (fn [[route segs]]
+                 (let [peers (get allocations (get egress-tasks route))
+                       active-peers (filter #(= (get peer-state %) :active) peers)
+                       groups-hash (group-by :hash-group segs)]
+                   (map (fn [[hash-group segs*]]
+                          (when-let [target (pick-peer id active-peers hash-group max-downstream-links)]
+                            (let [link (operation/peer-link event target)]
+                              (onyx.extensions/send-messages messenger event link segs*))))
+                        groups-hash)))
+               groups))
         {}))))
