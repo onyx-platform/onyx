@@ -379,14 +379,16 @@
     (loop []
       (try
         (Thread/sleep interval)
-        (let [t (System/currentTimeMillis)]
-          (swap! state
-                 (fn [x]
-                   (let [to-remove (map first (filter (fn [[k v]] (>= (- t (:timestamp v)) idle)) (:links x)))
-                         result (into {} (remove (fn [[k v]] (some #{k} to-remove)) (:links x)))]
-                     (doseq [p to-remove]
-                       (extensions/close-peer-connection (:onyx.core/messenger event) event (:link (get (:links x) p))))
-                     (assoc x :links result)))))
+        (let [t (System/currentTimeMillis)
+              snapshot @state
+              to-remove (map first 
+                             (filter (fn [[k v]] (>= (- t (:timestamp v)) idle)) 
+                                     (:links snapshot)))]
+          (doseq [k to-remove]
+            (swap! state dissoc k)
+            (extensions/close-peer-connection (:onyx.core/messenger event) 
+                                              event 
+                                              (:link (get (:links snapshot) k)))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e

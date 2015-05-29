@@ -1,5 +1,6 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
+            [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-function [f params segment]
@@ -38,8 +39,10 @@
 
 (defn peer-link
   [{:keys [onyx.core/state] :as event} peer-id]
-  (if-let [link (:link (get (:links @state) peer-id))]
-    link
+  (if-let [link (get (:links @state) peer-id)]
+    (do 
+      (swap! state assoc-in [:links peer-id] (assoc link :timestamp (System/currentTimeMillis)))
+      (:link link))
     (let [site (-> @(:onyx.core/replica event)
                    :peer-sites
                    (get peer-id))]
@@ -48,8 +51,8 @@
                  [:links peer-id] 
                  (fn [link]
                    (or link 
-                       {:link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
-                        :timestamp (System/currentTimeMillis)})))
+                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
+                               (System/currentTimeMillis)))))
           :links
           (get peer-id)
           :link))))

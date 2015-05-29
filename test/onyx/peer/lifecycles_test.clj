@@ -150,13 +150,7 @@
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
-(fact (take 2 @counter) => [:task-started :task-before])
-
-(def batches 
-  (butlast (drop 2 @counter)))
-
-(fact batches => (take (count batches) (cycle [:batch-before :batch-after])))
-(fact (last @counter) => :task-after)
+(fact @counter => expected-order)
 
 (onyx.api/shutdown-peer-group peer-group)
 

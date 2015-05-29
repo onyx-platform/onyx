@@ -11,3 +11,5 @@
 (defrecord Ack [id completion-id ack-val timestamp])
 
 (defrecord Result [root leaves])
+
+(defrecord Link [link timestamp])
