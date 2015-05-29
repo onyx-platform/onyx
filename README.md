@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.6.0-beta1"]
+[org.onyxplatform/onyx "0.6.0-beta1"]
 ```
 
 ### Build Status
