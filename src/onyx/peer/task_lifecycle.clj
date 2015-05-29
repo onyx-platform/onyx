@@ -38,9 +38,8 @@
 (defn munge-start-lifecycle [event]
   ((:onyx.core/compiled-start-task-fn event) event))
 
-(defn add-acker-id [id peers m]
-  (let [n (mod (hash (:message m)) (count peers))]
-    (assoc m :acker-id (nth peers n))))
+(defn add-acker-id [peers m]
+  (assoc m :acker-id (rand-nth peers)))
 
 (defn add-completion-id [id m]
   (assoc m :completion-id id))
@@ -210,7 +209,7 @@
          [:onyx.core/batch]
          (fn [batch]
            (map (comp (partial add-completion-id id)
-                      (partial add-acker-id id candidates))
+                      (partial add-acker-id candidates))
                 batch)))))))
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
