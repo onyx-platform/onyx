@@ -24,6 +24,8 @@ A Function is a construct that takes a segment as a parameter and outputs a segm
   (assoc segment :n (inc n)))
 ```
 
+Note that you may *only* pass segments between functions - no other shape of data is allowed.
+
 #### Function Parameterization
 
 A function can be parameterized before a job is submitted to Onyx. The segment is always the last argument to the function. If more than one of these options are used, the arguments are concatenated in the order that this documentation section lists them. There are three ways to parameterize a function:

@@ -24,7 +24,7 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
 
 #### Segment
 
-A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster.
+A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster. Segments are the only shape of data that Onyx allows you to emit between functions.
 
 #### Task
 
