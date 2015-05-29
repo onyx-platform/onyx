@@ -38,17 +38,12 @@
 (defn munge-start-lifecycle [event]
   ((:onyx.core/compiled-start-task-fn event) event))
 
-(defn add-acker-id [{:keys [onyx.core/id onyx.core/max-acker-links] :as event} m]
-  (let [peers (get-in @(:onyx.core/replica event) [:ackers (:onyx.core/job-id event)])]
-    (if-not (seq peers)
-      (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
-          (throw (ex-info "Not enough acker peers" {:peers peers})))
-      (let [candidates (operation/select-n-peers id peers max-acker-links)
-            n (mod (hash (:message m)) (count candidates))]
-        (assoc m :acker-id (nth candidates n))))))
+(defn add-acker-id [id peers m]
+  (let [n (mod (hash (:message m)) (count peers))]
+    (assoc m :acker-id (nth peers n))))
 
-(defn add-completion-id [event m]
-  (assoc m :completion-id (:onyx.core/id event)))
+(defn add-completion-id [id m]
+  (assoc m :completion-id id))
 
 (defn sentinel-found? [event]
   (seq (filter (partial = :done) (map :message (:onyx.core/batch event)))))
@@ -204,13 +199,19 @@
   (merge
    event
    (when (= (:onyx/type (:onyx.core/task-map event)) :input)
-     (update-in
-      event
-      [:onyx.core/batch]
-      (fn [batch]
-        (map (comp (partial add-completion-id event)
-                   (partial add-acker-id event))
-             batch))))))
+     (let [{:keys [onyx.core/id onyx.core/max-acker-links]} event
+           peers (get (:ackers @(:onyx.core/replica event)) (:onyx.core/job-id event))
+           candidates (operation/select-n-peers id peers max-acker-links)] 
+       (when-not (seq peers)
+         (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
+             (throw (ex-info "Not enough acker peers" {:peers peers}))))
+       (update-in
+         event
+         [:onyx.core/batch]
+         (fn [batch]
+           (map (comp (partial add-completion-id id)
+                      (partial add-acker-id id candidates))
+                batch)))))))
 
 (defn add-messages-to-timeout-pool [{:keys [onyx.core/state] :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :input)
