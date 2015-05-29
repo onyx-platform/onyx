@@ -16,7 +16,7 @@
         (Thread/sleep interval)
         (let [t (now)
               snapshot @state
-              dead (map first (remove (fn [[k v]] (>= (- t (:timestamp v)) timeout)) snapshot))]
+              dead (map first (filter (fn [[k v]] (>= (- t (:timestamp v)) timeout)) snapshot))]
           (doseq [k dead]
             (swap! state dissoc k)))
         (catch InterruptedException e
