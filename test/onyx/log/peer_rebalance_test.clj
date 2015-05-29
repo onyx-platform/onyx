@@ -144,7 +144,8 @@
 (def replica-2
   (playback-log (:log env) replica-1 ch 2000))
 
-(fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 3] [3 2]])
+
+(fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 2] [3 3]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

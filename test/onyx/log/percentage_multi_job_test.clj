@@ -129,7 +129,7 @@
 (def ch (chan 10000))
 
 (def replica
-  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 3000))
 
 (fact "70/30% split for percentage job scheduler succeeded" 
       (map (partial apply +) 
@@ -138,7 +138,7 @@
 (def v-peers-2 (onyx.api/start-peers n-peers peer-group))
 
 (def replica-2
-  (playback-log (:log env) replica ch 2000))
+  (playback-log (:log env) replica ch 3000))
 
 (fact "70/30% split for percentage job scheduler succeeded after rebalance" 
       (map (partial apply +) 
