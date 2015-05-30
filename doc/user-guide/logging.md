@@ -6,7 +6,7 @@ This chapter details how to inspect and modify the logs that Onyx produces.
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [File System](#file-system)
+- [Timbre](#timbre)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

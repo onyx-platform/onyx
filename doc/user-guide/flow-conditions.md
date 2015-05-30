@@ -6,18 +6,17 @@ This section covers flow conditions. Flow conditions are used for isolating logi
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Flow Conditions](#flow-conditions)
-  - [Summary](#summary)
-  - [Motivating Example](#motivating-example)
-  - [Predicate Function Signatures](#predicate-function-signatures)
-  - [Predicate Parameters](#predicate-parameters)
-  - [Key Exclusion](#key-exclusion)
-  - [Predicate Composition](#predicate-composition)
-  - [Match All/None](#match-allnone)
-  - [Short Circuiting](#short-circuiting)
-  - [Exceptions](#exceptions)
-  - [Post-transform](#post-transform)
-  - [Actions](#actions)
+- [Summary](#summary)
+- [Motivating Example](#motivating-example)
+- [Predicate Function Signatures](#predicate-function-signatures)
+- [Predicate Parameters](#predicate-parameters)
+- [Key Exclusion](#key-exclusion)
+- [Predicate Composition](#predicate-composition)
+- [Match All/None](#match-allnone)
+- [Short Circuiting](#short-circuiting)
+- [Exceptions](#exceptions)
+- [Post-transform](#post-transform)
+- [Actions](#actions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -68,7 +67,7 @@ There is *one* flow conditions data structure per job - that is, there is one ve
 
 ### Predicate Function Signatures
 
-A predicate function is a Clojure function that takes at least four parameters - a context map, the old segment, the new semgent, and the collection of all new segments produced from the old segment. Predicates can take parameters at runtime. They will be appended to the end of the function invocation. See Predicate Parameters for further discussion of how to use runtime parameters.
+A predicate function is a Clojure function that takes at least four parameters - a context map, the old segment, the new segment, and the collection of all new segments produced from the old segment. Predicates can take parameters at runtime. They will be appended to the end of the function invocation. See Predicate Parameters for further discussion of how to use runtime parameters.
 
 Predicates for the above examples can be seen below:
 
@@ -188,7 +187,7 @@ And an example post-transform function might be:
 
 ### Actions
 
-After a set of flow conditons has been evaluated for a segment, you usually want to send the segment downstream to the next set of tasks. Other times, you want to retry to process the segment because something went wrong. Perhaps a database connection wasn't available, or an email couldn't be sent.
+After a set of flow conditions has been evaluated for a segment, you usually want to send the segment downstream to the next set of tasks. Other times, you want to retry to process the segment because something went wrong. Perhaps a database connection wasn't available, or an email couldn't be sent.
 
 Onyx provides Flow Conditions `:flow/action` to accomplish this. By setting `:flow/action` to `:retry`, a segment will expire from the internal pool of pending messages and be automatically retried from its input task. If any of the `:flow/action`s from the matching flow conditions are `:retry`, the segment will be retried and *will not* be sent downstream. This parameter is optional, and it's default value is `nil`. `nil` will cause the segment to be sent to all downstream tasks that were selected from evaluating the flow conditions. Any flow condition clauses with `:flow/action` set to `:retry` must also have `:flow/short-circuit?` set to `true`, and `:flow/to` set to `:none`.
 

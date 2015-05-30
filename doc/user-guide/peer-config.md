@@ -6,6 +6,37 @@ The chapter describes the all options available to configure the virtual peers a
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Base Configuration](#base-configuration)
+- [Environment Only](#environment-only)
+- [Peer Only](#peer-only)
+  - [Base Configuration](#base-configuration-1)
+    - [`:onyx.peer/inbox-capacity`](#onyxpeerinbox-capacity)
+    - [`:onyx.peer/outbox-capacity`](#onyxpeeroutbox-capacity)
+    - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
+    - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
+    - [`:onyx:onyx.peer/peer-not-ready-back-off`](#onyxonyxpeerpeer-not-ready-back-off)
+    - [`:onyx:onyx.peer/job-not-ready-back-off`](#onyxonyxpeerjob-not-ready-back-off)
+    - [`onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
+    - [`onyx.peer/fn-params`](#onyxpeerfn-params)
+    - [`:onyx.peer/zookeeper-timeout`](#onyxpeerzookeeper-timeout)
+    - [`onyx.messaging/inbound-buffer-size`](#onyxmessaginginbound-buffer-size)
+    - [`onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
+    - [`:onyx.messaging/release-ch-buffer-size`](#onyxmessagingrelease-ch-buffer-size)
+    - [`:onyx.messaging/retry-ch-buffer-size`](#onyxmessagingretry-ch-buffer-size)
+    - [`:onyx.messaging/max-downstream-links`](#onyxmessagingmax-downstream-links)
+    - [`:onyx.messaging/max-acker-links`](#onyxmessagingmax-acker-links)
+    - [`:onyx.messaging/peer-link-gc-interval`](#onyxmessagingpeer-link-gc-interval)
+    - [`:onyx.messaging/peer-link-idle-timeout`](#onyxmessagingpeer-link-idle-timeout)
+    - [`:onyx.messaging/ack-daemon-timeout`](#onyxmessagingack-daemon-timeout)
+    - [`:onyx.messaging/ack-daemon-clear-interval`](#onyxmessagingack-daemon-clear-interval)
+    - [`onyx.messaging/decompress-fn`](#onyxmessagingdecompress-fn)
+    - [`onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
+    - [`:onyx.messaging/impl`](#onyxmessagingimpl)
+    - [`:onyx.messaging/bind-addr`](#onyxmessagingbind-addr)
+    - [`:onyx.messaging/peer-port-range`](#onyxmessagingpeer-port-range)
+    - [`onyx.messaging/peer-ports`](#onyxmessagingpeer-ports)
+- [Peer Full Example](#peer-full-example)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Base Configuration
@@ -39,9 +70,16 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
 |`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
+|`:onyx.messaging/inbound-buffer-size`   | `int`      | `20000`                            |
 |`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
+|`:onyx.messaging/max-downstream-links`  | `int`      | `10`                               |
+|`:onyx.messaging/max-acker-links`       | `int`      | `5`                                |
+|`:onyx.messaging/peer-link-gc-interval` | `int`      | `90000`                            |
+|`:onyx.messaging/peer-link-idle-timeout`| `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                         |
 |`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
 |`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
@@ -87,6 +125,10 @@ underlying `:add` with `(f 42 <segment>)`.
 
 Number of ms to timeout from the ZooKeeper client connection on disconnection.
 
+##### `onyx.messaging/inbound-buffer-size`
+
+Number of messages to buffer in the core.async channel for received segments.
+
 ##### `onyx.messaging/completion-buffer-size`
 
 Number of messages to buffer in the core.async channel for completing messages on an input task.
@@ -98,6 +140,30 @@ Number of messages to buffer in the core.async channel for released completed me
 ##### `:onyx.messaging/retry-ch-buffer-size`
 
 Number of messages to buffer in the core.async channel for retrying timed-out messages.
+
+##### `:onyx.messaging/max-downstream-links`
+
+The maximum number of network connections that should be opened to downstream peers from a task. Useful for very large clusters.
+
+##### `:onyx.messaging/max-acker-links`
+
+The maximum number of network connections that should be opened to acking daemons from a peer. Useful for very large clusters.
+
+##### `:onyx.messaging/peer-link-gc-interval`
+
+The interval in milliseconds to wait between closing idle peer links.
+
+##### `:onyx.messaging/peer-link-idle-timeout`
+
+The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is eligible to be closed. The connection will be reopened from scratch the next time it is needed.
+
+##### `:onyx.messaging/ack-daemon-timeout`
+
+Number of milliseconds that an ack value can go without being updates on a daemon before it is eligible to time out.
+
+##### `:onyx.messaging/ack-daemon-clear-interval`
+
+Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon.
 
 ##### `onyx.messaging/decompress-fn`
 
@@ -143,6 +209,8 @@ A vector of integers denoting ports that may be used for peer communication. Thi
    :onyx.messaging/completion-buffer-size 2000
    :onyx.messaging/release-ch-buffer-size 50000
    :onyx.messaging/retry-ch-buffer-size 100000
+   :onyx.messaging/ack-daemon-timeout 90000
+   :onyx.messaging/ack-daemon-clear-interval 15000
    :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
    :onyx.messaging/impl :netty

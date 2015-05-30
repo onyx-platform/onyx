@@ -6,11 +6,24 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Workflow](#workflow)
+- [Catalog](#catalog)
+    - [All maps in the vector must have these keys](#all-maps-in-the-vector-must-have-these-keys)
+    - [All maps may optionally have these keys](#all-maps-may-optionally-have-these-keys)
+    - [Maps with `:onyx/type` set to `:input` or `:output` must have these keys](#maps-with-onyxtype-set-to-input-or-output-must-have-these-keys)
+    - [Maps with `:onyx/type` set to `:input` may optionally have these keys](#maps-with-onyxtype-set-to-input-may-optionally-have-these-keys)
+    - [Maps with `:onyx/type` set to `:function` must have these keys](#maps-with-onyxtype-set-to-function-must-have-these-keys)
+    - [Maps with `:onyx/type` set to `:function` may optionally have these keys](#maps-with-onyxtype-set-to-function-may-optionally-have-these-keys)
+    - [Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys](#maps-with-onyxgroup-by-key-or-onyxgroup-by-fn-must-have-these-keys)
+- [Flow Conditions](#flow-conditions)
+- [Lifecycles](#lifecycles)
+- [Event Context](#event-context)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Workflow
 
-- a single Clojure vector of vectores which is EDN serializable/deserializable
+- a single Clojure vector of vectors which is EDN serializable/deserializable
 - all elements in the inner vectors are keywords
 - all keywords must correspond to an `:onyx/name` entry in the catalog
 - the "root" keywords of the workflow must have catalog entries of `:onyx/type` that map to `:input`
@@ -109,7 +122,7 @@ may be added by the user as the context is associated to throughout the task pip
 | key name                     |value type | Meaning       |
 |------------------------------|-----------|---------------|
 |`:onyx.core/id`               |`uuid`     | The unique ID of this peer's lifecycle|
-|`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecyle|
+|`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecycle|
 |`:onyx.core/job-id`           |`uuid`     | The Job ID of the task that this peer is executing|
 |`:onyx.core/task-id`          |`uuid`     | The Task ID that this peer is executing|
 |`:onyx.core/task`             |`keyword`  | The task name that this peer is executing|

@@ -19,6 +19,7 @@ This chapter details a few tips for getting your Onyx cluster to run as fast as 
 - For small segments, batch multiple segments into a single segment, and treat each new segment as a rolled up batch.
 - Tweak the batch timeout in each catalog entry to trade off increased latency for higher throughput.
 - Use a custom compression scheme, rather than Nippy. You can configure custom compression/decompression functions via the peer configuration.
+- Increase the number of acker peers through the peer configuration as your cluster gets larger
 
 ### ZooKeeper
 

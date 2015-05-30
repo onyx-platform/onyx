@@ -6,7 +6,7 @@
             [onyx.api :as api]
             [onyx.test-helper :refer [with-env with-peer-group with-peers load-config]]
             [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [onyx.log.curator :as zk]))
 
 (facts "peers all join and watch each other"
        (let [config (load-config)
@@ -19,8 +19,7 @@
              (with-peers [v-peers n-peers peer-group]
                (let [ch (chan n-peers)
                      replica (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-                               (let [position (<!! ch)
-                                     entry (extensions/read-log-entry (:log env) position)
+                               (let [entry (<!! ch)
                                      new-replica (extensions/apply-log-entry entry replica)]
                                  (if (< (count (:pairs new-replica)) n-peers)
                                    (recur new-replica)

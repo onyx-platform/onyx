@@ -6,7 +6,7 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
-            [zookeeper :as zk]))
+            [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
@@ -31,8 +31,7 @@
 (def ch (chan 100))
 
 (loop [replica (extensions/subscribe-to-log (:log env) ch)]
-  (let [position (<!! ch)
-        entry (extensions/read-log-entry (:log env) position)
+  (let [entry (<!! ch)
         new-replica (extensions/apply-log-entry entry replica)]
     (when-not (= (count (:peers new-replica)) 10)
       (recur new-replica))))
@@ -42,5 +41,6 @@
 (doseq [v-peer (concat v-peers v-peers2)]
   (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
 (onyx.api/shutdown-peer-group peer-group)
+
+(onyx.api/shutdown-env env)

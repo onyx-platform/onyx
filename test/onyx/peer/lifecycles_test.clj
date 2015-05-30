@@ -127,10 +127,6 @@
   (fact (set (butlast results)) => expected)
   (fact (last results) => :done))
 
-;; hacky wait to ensure that tasks have had a chance shutdown
-;; before we actually check whether the lifecycles were called
-(Thread/sleep 1000)
-
 (def expected-order
   [:task-started
    :task-before
@@ -148,10 +144,13 @@
    :batch-after
    :task-after])
 
-(fact @counter => expected-order)
 
+;; shutdown-peer ensure peers are fully shutdown so that 
+;; :task-after will have been set
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
+
+(fact @counter => expected-order)
 
 (onyx.api/shutdown-peer-group peer-group)
 

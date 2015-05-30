@@ -129,8 +129,8 @@
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
 (fact "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B" 
-      (get-counts replica-1 [j1 j2]) => (fn [x] (or (= x [[5 5] [0 0]])
-                                                    (= x [[5 5] []]))))
+      (get-counts replica-1 [j1 j2]) => (fn [x] (or (= (sort x) [[0 0]] [5 5])
+                                                    (= (sort x) [[] [5 5]]))))
 
 (>!! a-chan :done)
 (close! a-chan)
@@ -139,8 +139,8 @@
   (playback-log (:log env) replica-1 ch 2000))
 
 (fact "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D" 
-      (get-counts replica-2 [j1 j2]) => (fn [x] (or (= x [[0 0] [5 5]])
-                                                    (= x [[] [5 5]]))))
+      (get-counts replica-2 [j1 j2]) => (fn [x] (or (= (sort x) [[0 0] [5 5]])
+                                                    (= (sort x) [[] [5 5]]))))
 
 (>!! c-chan :done)
 (close! c-chan)

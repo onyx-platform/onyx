@@ -14,6 +14,7 @@
             [onyx.log.commands.exhaust-input]
             [onyx.log.commands.seal-output]
             [onyx.log.commands.signal-ready]
+            [onyx.log.commands.set-replica]
             [onyx.log.commands.leave-cluster]
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]

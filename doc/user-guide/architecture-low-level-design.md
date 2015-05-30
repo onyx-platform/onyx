@@ -5,6 +5,26 @@ This chapter outlines how Onyx works on the inside to meet the required properti
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+  - [High Level Components](#high-level-components)
+    - [Peer](#peer)
+    - [Virtual Peer](#virtual-peer)
+    - [ZooKeeper](#zookeeper)
+    - [Netty](#netty)
+    - [The Log](#the-log)
+    - [The Inbox and Outbox](#the-inbox-and-outbox)
+  - [Applying Log Entries](#applying-log-entries)
+  - [Joining the Cluster](#joining-the-cluster)
+    - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
+    - [Examples](#examples)
+  - [Dead peer removal](#dead-peer-removal)
+    - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
+    - [Examples](#examples-1)
+  - [Messaging](#messaging)
+    - [The Algorithm](#the-algorithm)
+    - [Acking Daemon](#acking-daemon)
+    - [Phases of Execution](#phases-of-execution)
+  - [Garbage collection](#garbage-collection)
 - [Command Reference](#command-reference)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -184,7 +204,7 @@ The messaging layer of Onyx employees the same technique that Apache Storm uses 
 
 #### The Algorithm
 
-Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a semgment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
+Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a segment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
 
 #### Acking Daemon
 
@@ -320,8 +340,16 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Submitter: peer (P), who has successfully started its incoming buffer
 - Purpose: Indicates that this peer is ready to receive segments as input
 - Replica update: Updates `:peer-state` under the `:id` of this peer to set its state to `:active`.
-- Side effects: If this task should immediatelely be sealed, seals this task
+- Side effects: If this task should immediately be sealed, seals this task
 - Reactions: None.
 
 -------------------------------------------------
+[`set-replica!`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/set_replica.clj)
 
+- Submitter: This is a special entry that should never be appended to the log
+- Purpose: Perform a hard reset of the replica, replacing its entire value. This is useful if a log subscriber is reading behind a garbage collection call and tries to read a non-existent entry. The new origin can be found and its value applied locally via the subscriber.
+- Replica update: Replaces the entire value of the replica with a new value
+- Side effects: None.
+- Reactions: None.
+
+-------------------------------------------------

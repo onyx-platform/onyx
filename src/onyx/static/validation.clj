@@ -123,7 +123,7 @@
   (doseq [lifecycle lifecycles]
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
-      (throw (ex-info (str ":lifecycle/task must either name a task in the catalog or be :all, it was: " (:lifecycle/task lifecycle))
+      (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))
     (schema/validate
      {:lifecycle/task schema/Keyword

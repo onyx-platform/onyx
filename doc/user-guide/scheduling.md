@@ -6,6 +6,18 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
+  - [Job Schedulers](#job-schedulers)
+    - [Greedy Job Scheduler](#greedy-job-scheduler)
+    - [Balanced Robin Job Scheduler](#balanced-robin-job-scheduler)
+    - [Balanced Rebalancing Strategy](#balanced-rebalancing-strategy)
+    - [Percentage Job Scheduler](#percentage-job-scheduler)
+    - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
+  - [Task Schedulers](#task-schedulers)
+    - [Balanced Task Scheduler](#balanced-task-scheduler)
+    - [Percentage Task Scheduler](#percentage-task-scheduler)
+  - [Examples](#examples)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Allocating Peers to Jobs and Tasks

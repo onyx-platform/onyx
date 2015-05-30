@@ -6,9 +6,8 @@ Onyx's log-based design provides open-ended access to react to all coordination 
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-  - [Event Subscription](#event-subscription)
-    - [Explanation](#explanation)
-    - [Subscribing to the Log](#subscribing-to-the-log)
+- [Explanation](#explanation)
+- [Subscribing to the Log](#subscribing-to-the-log)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -18,7 +17,7 @@ Onyx uses an internal log to totally order all coordination events across nodes 
 
 ### Subscribing to the Log
 
-The following is a complete example to pretty print all events as they are written to the log. You need to provide the ZooKeeper address, Onyx ID, and shared job scheduler in the peer config.
+The following is a complete example to pretty print all events as they are written to the log. You need to provide the ZooKeeper address, Onyx ID, and shared job scheduler in the peer config. The subscriber will automatically track recover from sequentially reading errors in the case that a garbage collection is triggered, deleting log entries in its path.
 
 ```clojure
 (def peer-config
@@ -34,8 +33,7 @@ The following is a complete example to pretty print all events as they are writt
 
 ;; Loops forever
 (loop [replica (:replica subscription)]
-  (let [position (<!! ch)
-        entry (onyx.extensions/read-log-entry log position)
+  (let [entry (<!! ch)
         new-replica (onyx.extensions/apply-log-entry entry replica)]
     (clojure.pprint/pprint new-replica)
     (recur new-replica)))

@@ -1,5 +1,6 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
+            [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-function [f params segment]
@@ -23,10 +24,25 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
+;; TODO: may want to consider memoizing this
+;; must be careful about ensuring we don't bloat memory wise
+;; use clojure.core.memoize with LRU
+(defn select-n-peers 
+  "Stably select n peers using our id and the downstream task ids.
+  If a peer is added or removed, the set can only change by one value at max"
+  [id all-peers n]
+  (if (<= (count all-peers) n)
+    all-peers
+    (take n 
+          (sort-by (fn [peer-id] (hash [id peer-id]))
+                   all-peers))))
+
 (defn peer-link
   [{:keys [onyx.core/state] :as event} peer-id]
   (if-let [link (get (:links @state) peer-id)]
-    link
+    (do 
+      (swap! state assoc-in [:links peer-id] (assoc link :timestamp (System/currentTimeMillis)))
+      (:link link))
     (let [site (-> @(:onyx.core/replica event)
                    :peer-sites
                    (get peer-id))]
@@ -35,6 +51,8 @@
                  [:links peer-id] 
                  (fn [link]
                    (or link 
-                       (extensions/connect-to-peer (:onyx.core/messenger event) event site))))
+                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
+                               (System/currentTimeMillis)))))
           :links
-          (get peer-id)))))
+          (get peer-id)
+          :link))))

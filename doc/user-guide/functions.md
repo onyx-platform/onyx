@@ -11,6 +11,9 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 - [Grouping & Aggregation](#grouping-&-aggregation)
 - [Group By Key](#group-by-key)
 - [Group By Function](#group-by-function)
+- [Flux Policies](#flux-policies)
+  - [Continue Policy](#continue-policy)
+  - [Kill Policy](#kill-policy)
 - [Bulk Functions](#bulk-functions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -23,6 +26,8 @@ A Function is a construct that takes a segment as a parameter and outputs a segm
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 ```
+
+Note that you may *only* pass segments between functions - no other shape of data is allowed.
 
 #### Function Parameterization
 
@@ -100,7 +105,7 @@ Functions that use the grouping feature are presumably stateful. For this reason
 
 Given the fact the Onyx will not add more peers to a grouping task after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers`.
 
-One concern that immediately needs to be handled is adressing what happens if a peer on a grouping task leaves the cluster after the job has begun? Clearly, removing a peer from a grouping task also breaks the consistent hashing algorithm that supports statefulness. The policy that is enforced is configurable, and must be chosen by the developer. We offer two policies, outlined below.
+One concern that immediately needs to be handled is addressing what happens if a peer on a grouping task leaves the cluster after the job has begun? Clearly, removing a peer from a grouping task also breaks the consistent hashing algorithm that supports statefulness. The policy that is enforced is configurable, and must be chosen by the developer. We offer two policies, outlined below.
 
 ##### Continue Policy
 

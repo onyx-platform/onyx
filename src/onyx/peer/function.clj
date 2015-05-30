@@ -59,17 +59,17 @@
                      ack-vals))))
        fast-concat))
 
-(defn pick-peer [active-peers hash-group]
+(defn pick-peer [id active-peers hash-group max-downstream-links]
   (when-not (empty? active-peers)
     (if hash-group
       (nth active-peers
            (mod (hash hash-group)
                 (count active-peers)))
-      (rand-nth active-peers))))
+      (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
 ;; Needs a performance boost
 (defmethod p-ext/write-batch :default
-  [{:keys [onyx.core/results onyx.core/messenger onyx.core/job-id] :as event}]
+  [{:keys [onyx.core/id onyx.core/results onyx.core/messenger onyx.core/job-id onyx.core/max-downstream-links] :as event}]
   (let [leaves (fast-concat (map :leaves results))
         egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
     (when-not (empty? leaves)
@@ -80,7 +80,7 @@
         (doseq [[[route hash-group] segs] groups]
           (let [peers (get allocations (get egress-tasks route))
                 active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-                target (pick-peer active-peers hash-group)]
+                target (pick-peer id active-peers hash-group max-downstream-links)]
             (when target
               (let [link (operation/peer-link event target)]
                 (onyx.extensions/send-messages messenger event link segs)))))

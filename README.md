@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[com.mdrogalis/onyx "0.6.0-beta1"]
+[org.onyxplatform/onyx "0.6.0-RC1"]
 ```
 
 ### Build Status
@@ -43,14 +43,15 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 ### User Guide 0.6.0
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
-- [Environment](doc/user-guide/environment.md)
-- [APIs](doc/user-guide/apis.md)
 - [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
-- [Peer Configuration](doc/user-guide/peer-config.md)
-- [Information Model](doc/user-guide/information-model.md)
+- [APIs](doc/user-guide/apis.md)
 - [Functions](doc/user-guide/functions.md)
 - [Flow Conditions](doc/user-guide/flow-conditions.md)
 - [Lifecycles](doc/user-guide/lifecycles.md)
+- [Deployment](doc/user-guide/deployment.md)
+- [Environment](doc/user-guide/environment.md)
+- [Peer Configuration](doc/user-guide/peer-config.md)
+- [Information Model](doc/user-guide/information-model.md)
 - [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
 - [Event Subscription](doc/user-guide/subscription.md)
 - [Plugins](doc/user-guide/plugins.md)
@@ -72,6 +73,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
+- [`onyx-s3`](https://github.com/onyx-platform/onyx-s3)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 

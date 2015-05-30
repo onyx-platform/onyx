@@ -7,16 +7,18 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
 - [Terminology](#terminology)
+  - [Segment](#segment)
   - [Task](#task)
   - [Workflow](#workflow)
   - [Catalog](#catalog)
   - [Flow Conditions](#flow-conditions)
-  - [Segment](#segment)
   - [Function](#function)
+  - [Lifecycle](#lifecycle)
   - [Plugin](#plugin)
   - [Sentinel](#sentinel)
   - [Peer](#peer)
   - [Virtual Peer](#virtual-peer)
+  - [Job](#job)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -24,7 +26,7 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
 
 #### Segment
 
-A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster.
+A segment is the unit of data in Onyx, and it's represented by a Clojure map. Segments represent the data flowing through the cluster. Segments are the only shape of data that Onyx allows you to emit between functions.
 
 #### Task
 
@@ -117,6 +119,10 @@ Example:
 
 A function is a construct that receives segments and emits segments for further processing. It literally is a Clojure function.
 
+#### Lifecycle
+
+A lifecycle is a construct that describes the lifetime of a task. There is an entire chapter devoted to lifecycles, but to be brief, a lifecycle allows you to hook in and execute arbitrary code at critical points during a task. A lifecycle carries a context map that you can merge results back into for use later.
+
 #### Plugin
 
 A plugin is a means for hooking into data sources to extract data as input and produce data as output. Onyx comes with a few plugins, but you can craft your own, too.
@@ -127,8 +133,12 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine, though we often use the terms peer and virtual peer interchangably when the difference doesn't matter.
+A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine, though we often use the terms peer and virtual peer interchangeably when the difference doesn't matter.
 
 #### Virtual Peer
 
 A Virtual Peer refers to a single peer process running on a single physical machine. A single Virtual Peer executes at most one task at a time.
+
+#### Job
+
+A job is the collection of a workflow, catalog, flow conditions, lifecycles, and execution parameters. A job is most coarse unit of work, and every task is associated with exactly one job - hence a peer can only be working at least most one job at any given time.

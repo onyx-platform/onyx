@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.test-helper :refer [load-config]]
-            [onyx.plugin.core-async]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -88,7 +88,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan)))))
+(def results (take-segments! out-chan))
 
 (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
   (fact (set (butlast results)) => expected)
