@@ -6,7 +6,7 @@
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
-              [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
+              [onyx.static.planning :refer [find-task build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -87,14 +87,13 @@
     (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
-(defn group-message [segment catalog task]
-  (let [t (find-task-fast catalog task)]
-    (if-let [k (:onyx/group-by-key t)]
-      (hash (get segment k))
-      (when-let [f (:onyx/group-by-fn t)]
-        (hash ((operation/resolve-fn {:onyx/fn f}) segment))))))
+(defn group-message [segment task]
+  (if-let [k (:onyx/group-by-key task)]
+    (hash (get segment k))
+    (if-let [f (:onyx/group-by-fn task)]
+      (hash ((operation/resolve-fn {:onyx/fn f}) segment)))))
 
-(defn group-segments [leaf next-tasks catalog event]
+(defn group-segments [leaf next-tasks tasks-by-name event]
   (let [post-transformation (:post-transformation (:routes leaf))
         message (:message leaf)
         msg (if (and (operation/exception? message) post-transformation)
@@ -105,11 +104,9 @@
     (-> leaf 
         (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
         (assoc :hash-group (reduce (fn [groups t]
-                                     (assoc groups t (group-message msg catalog t)))
+                                     (assoc groups t (group-message msg (tasks-by-name t))))
                                    {} 
                                    next-tasks)))))
-
-
 
 (defn add-ack-vals [leaf]
   (assoc leaf 
@@ -117,22 +114,24 @@
          (acker/generate-acks (count (:flow (:routes leaf))))))
 
 (defn build-new-segments
-  [{:keys [onyx.core/results onyx.core/serialized-task onyx.core/catalog] :as event}]
+  [{:keys [onyx.core/results onyx.core/serialized-task 
+           onyx.core/catalog onyx.core/tasks-by-name] :as event}]
   (let [downstream (keys (:egress-ids serialized-task))
         results (doall
                   (map (fn [{:keys [root leaves] :as result}]
                          (let [{:keys [id acker-id completion-id]} root] 
                            (assoc result 
                                   :leaves 
-                                  (map (fn [leaf]
-                                         (-> leaf 
-                                             (assoc :routes (add-route-data event result leaf downstream))
-                                             (assoc :id id)
-                                             (assoc :acker-id acker-id)
-                                             (assoc :completion-id completion-id)
-                                             (group-segments downstream catalog event)
-                                             (add-ack-vals)))
-                                       leaves))))
+                                  (doall 
+                                    (map (fn [leaf]
+                                           (-> leaf 
+                                               (assoc :routes (add-route-data event result leaf downstream))
+                                               (assoc :id id)
+                                               (assoc :acker-id acker-id)
+                                               (assoc :completion-id completion-id)
+                                               (group-segments downstream tasks-by-name event)
+                                               (add-ack-vals)))
+                                         leaves)))))
                        results))]
     (assoc event :onyx.core/results results)))
 
@@ -484,6 +483,7 @@
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
+                           :onyx.core/tasks-by-name (zipmap (map :onyx/name catalog) catalog)
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params catalog-entry opts)

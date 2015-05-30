@@ -18,16 +18,6 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn find-task-fast 
-  "find-task fast version - task must be in catalog
-   (this should fail validation anyway."
-  [catalog task-name]
-  (loop [vs catalog]
-    (let [task (first vs)]
-      (if (= task-name (:onyx/name task))
-        task
-        (recur (rest vs))))))
-
 (defn egress-ids-from-children [task-ids elements]
   (into {} 
         (map (juxt identity task-ids) 
