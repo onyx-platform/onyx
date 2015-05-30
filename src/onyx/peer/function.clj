@@ -76,14 +76,13 @@
       (let [replica @(:onyx.core/replica event)
             peer-state (:peer-state replica)
             segments (build-segments-to-send leaves)
-            groups (group-by :route segments)
+            groups (group-by (juxt :route :hash-group) segments)
             allocations (get (:allocations replica) job-id)]
-        (doseq [[route segs] groups]
+        (doseq [[[route hash-group] segs] groups]
           (let [peers (get allocations (get egress-tasks route))
                 active-peers (filter #(= (get peer-state %) :active) peers)
-                groups-hash (group-by :hash-group segs)]
-            (doseq [[hash-group segs*] groups-hash]
-              (when-let [target (pick-peer id active-peers hash-group max-downstream-links)]
-                (let [link (operation/peer-link event target)]
-                  (onyx.extensions/send-messages messenger event link segs*))))))
+                target (pick-peer id active-peers hash-group max-downstream-links)]
+            (when target
+              (let [link (operation/peer-link event target)]
+                (onyx.extensions/send-messages messenger event link segs)))))
         {}))))
