@@ -6,6 +6,37 @@ The chapter describes the all options available to configure the virtual peers a
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Base Configuration](#base-configuration)
+- [Environment Only](#environment-only)
+- [Peer Only](#peer-only)
+  - [Base Configuration](#base-configuration-1)
+    - [`:onyx.peer/inbox-capacity`](#onyxpeerinbox-capacity)
+    - [`:onyx.peer/outbox-capacity`](#onyxpeeroutbox-capacity)
+    - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
+    - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
+    - [`:onyx:onyx.peer/peer-not-ready-back-off`](#onyxonyxpeerpeer-not-ready-back-off)
+    - [`:onyx:onyx.peer/job-not-ready-back-off`](#onyxonyxpeerjob-not-ready-back-off)
+    - [`onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
+    - [`onyx.peer/fn-params`](#onyxpeerfn-params)
+    - [`:onyx.peer/zookeeper-timeout`](#onyxpeerzookeeper-timeout)
+    - [`onyx.messaging/inbound-buffer-size`](#onyxmessaginginbound-buffer-size)
+    - [`onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
+    - [`:onyx.messaging/release-ch-buffer-size`](#onyxmessagingrelease-ch-buffer-size)
+    - [`:onyx.messaging/retry-ch-buffer-size`](#onyxmessagingretry-ch-buffer-size)
+    - [`:onyx.messaging/max-downstream-links`](#onyxmessagingmax-downstream-links)
+    - [`:onyx.messaging/max-acker-links`](#onyxmessagingmax-acker-links)
+    - [`:onyx.messaging/peer-link-gc-interval`](#onyxmessagingpeer-link-gc-interval)
+    - [`:onyx.messaging/peer-link-idle-timeout`](#onyxmessagingpeer-link-idle-timeout)
+    - [`:onyx.messaging/ack-daemon-timeout`](#onyxmessagingack-daemon-timeout)
+    - [`:onyx.messaging/ack-daemon-clear-interval`](#onyxmessagingack-daemon-clear-interval)
+    - [`onyx.messaging/decompress-fn`](#onyxmessagingdecompress-fn)
+    - [`onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
+    - [`:onyx.messaging/impl`](#onyxmessagingimpl)
+    - [`:onyx.messaging/bind-addr`](#onyxmessagingbind-addr)
+    - [`:onyx.messaging/peer-port-range`](#onyxmessagingpeer-port-range)
+    - [`onyx.messaging/peer-ports`](#onyxmessagingpeer-ports)
+- [Peer Full Example](#peer-full-example)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Base Configuration
@@ -126,11 +157,11 @@ The interval in milliseconds to wait between closing idle peer links.
 
 The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is elligible to be closed. The connection will be reopened from scratch the next time it is needed.
 
-#### `:onyx.messaging/ack-daemon-timeout`
+##### `:onyx.messaging/ack-daemon-timeout`
 
 Number of milliseconds that an ack value can go without being updates on a daemon before it is elligible to time out.
 
-#### `:onyx.messaging/ack-daemon-clear-interval`
+##### `:onyx.messaging/ack-daemon-clear-interval`
 
 Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon.
 

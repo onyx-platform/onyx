@@ -8,24 +8,26 @@ Onyx ships with three distinct APIs to accommodate different needs. A descriptio
 
 - [Core API](#core-api)
     - [`start-env`](#start-env)
+    - [`start-peer-group`](#start-peer-group)
     - [`start-peers`](#start-peers)
     - [`submit-job`](#submit-job)
     - [`await-job-completion`](#await-job-completion)
+    - [`gc`](#gc)
+    - [`kill-job`](#kill-job)
+    - [`subscribe-to-log`](#subscribe-to-log)
     - [`shutdown-peer`](#shutdown-peer)
+    - [`shutdown-peer-group`](#shutdown-peer-group)
     - [`shutdown-env`](#shutdown-env)
-- [Task Lifecycle API](#task-lifecycle-api)
-    - [`start-lifecycle?`](#start-lifecycle)
-    - [`inject-lifecycle-resources`](#inject-lifecycle-resources)
-    - [`inject-batch-resources`](#inject-batch-resources)
-    - [`close-batch-resources`](#close-batch-resources)
-    - [`close-lifecycle-resources`](#close-lifecycle-resources)
 - [Peer Pipeline API](#peer-pipeline-api)
     - [`read-batch`](#read-batch)
     - [`write-batch`](#write-batch)
     - [`seal-resource`](#seal-resource)
+    - [`ack-message`](#ack-message)
+    - [`retry-message`](#retry-message)
+    - [`pending?`](#pending)
+    - [`drained?`](#drained)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 
 ### Core API
 

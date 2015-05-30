@@ -11,6 +11,9 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 - [Grouping & Aggregation](#grouping-&-aggregation)
 - [Group By Key](#group-by-key)
 - [Group By Function](#group-by-function)
+- [Flux Policies](#flux-policies)
+  - [Continue Policy](#continue-policy)
+  - [Kill Policy](#kill-policy)
 - [Bulk Functions](#bulk-functions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->

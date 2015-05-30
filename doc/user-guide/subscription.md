@@ -6,9 +6,8 @@ Onyx's log-based design provides open-ended access to react to all coordination 
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-  - [Event Subscription](#event-subscription)
-    - [Explanation](#explanation)
-    - [Subscribing to the Log](#subscribing-to-the-log)
+- [Explanation](#explanation)
+- [Subscribing to the Log](#subscribing-to-the-log)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

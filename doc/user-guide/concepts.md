@@ -7,16 +7,18 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
 - [Terminology](#terminology)
+  - [Segment](#segment)
   - [Task](#task)
   - [Workflow](#workflow)
   - [Catalog](#catalog)
   - [Flow Conditions](#flow-conditions)
-  - [Segment](#segment)
   - [Function](#function)
+  - [Lifecycle](#lifecycle)
   - [Plugin](#plugin)
   - [Sentinel](#sentinel)
   - [Peer](#peer)
   - [Virtual Peer](#virtual-peer)
+  - [Job](#job)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

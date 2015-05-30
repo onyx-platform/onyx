@@ -6,18 +6,17 @@ This section covers flow conditions. Flow conditions are used for isolating logi
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Flow Conditions](#flow-conditions)
-  - [Summary](#summary)
-  - [Motivating Example](#motivating-example)
-  - [Predicate Function Signatures](#predicate-function-signatures)
-  - [Predicate Parameters](#predicate-parameters)
-  - [Key Exclusion](#key-exclusion)
-  - [Predicate Composition](#predicate-composition)
-  - [Match All/None](#match-allnone)
-  - [Short Circuiting](#short-circuiting)
-  - [Exceptions](#exceptions)
-  - [Post-transform](#post-transform)
-  - [Actions](#actions)
+- [Summary](#summary)
+- [Motivating Example](#motivating-example)
+- [Predicate Function Signatures](#predicate-function-signatures)
+- [Predicate Parameters](#predicate-parameters)
+- [Key Exclusion](#key-exclusion)
+- [Predicate Composition](#predicate-composition)
+- [Match All/None](#match-allnone)
+- [Short Circuiting](#short-circuiting)
+- [Exceptions](#exceptions)
+- [Post-transform](#post-transform)
+- [Actions](#actions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

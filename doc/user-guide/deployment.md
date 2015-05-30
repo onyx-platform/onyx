@@ -6,6 +6,12 @@ Onyx has no built-in mechanism for deployment. Rather, we let you deploy at your
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Deployment Style](#deployment-style)
+  - [Shared File System](#shared-file-system)
+  - [Docker](#docker)
+  - [Mesos and Marathon](#mesos-and-marathon)
+  - [Kubernates](#kubernates)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
