@@ -132,10 +132,9 @@
     (clojure.set/difference (set (:peers replica)) (set used-peers))))
 
 (defn find-displaced-peers [replica current-allocations max-util]
-  (clojure.set/union
-   (find-unused-peers replica)
-   (into
-    #{}
+  (distinct
+   (concat
+    (find-unused-peers replica)
     (remove
      nil?
      (mapcat
@@ -230,8 +229,8 @@
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        deallocated (deallocate-starved-jobs replica)
-        updated-replica (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))]
-    (if (equivalent-allocation? replica updated-replica)
+        updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
+        final-replica (deallocate-starved-jobs updated-replica)]
+    (if (equivalent-allocation? replica final-replica)
       replica
-      updated-replica)))
+      final-replica)))
