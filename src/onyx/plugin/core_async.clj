@@ -66,7 +66,6 @@
 (defmethod p-ext/retry-message :core.async/read-from-chan
   [{:keys [core.async/pending-messages core.async/retry-count core.async/retry-ch]} message-id]
   (when-let [msg (get @pending-messages message-id)]
-    (timbre/info "Retrying " msg)
     (swap! pending-messages dissoc message-id)
     (when-not (= msg :done)
       (swap! retry-count inc))
