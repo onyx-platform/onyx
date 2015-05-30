@@ -205,10 +205,13 @@
   [replica]
   (reduce
    (fn [result job]
-     (if (< (apply + (map count (vals (get-in result [:allocations job]))))
-            (apply + (vals (get-in result [:min-required-peers job]))))
-       (update-in result [:allocations] dissoc job)
-       result))
+     (let [tasks (get-in replica [:tasks job])]
+       (if (every? (fn [t]
+                     (>= (count (get-in result [:allocations job t]))
+                         (get-in result [:min-required-peers job t])))
+                   tasks)
+         result
+         (update-in result [:allocations] dissoc job))))
    replica
    (:jobs replica)))
 
