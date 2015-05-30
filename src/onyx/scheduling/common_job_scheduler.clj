@@ -134,14 +134,16 @@
 (defn find-displaced-peers [replica current-allocations max-util]
   (clojure.set/union
    (find-unused-peers replica)
-   (remove
-    nil?
-    (mapcat
-     (fn [job]
-       (let [overflow (- (get current-allocations job) (get max-util job))]
-         (when (pos? overflow)
-           (cts/drop-peers replica job overflow))))
-     (:jobs replica)))))
+   (into
+    #{}
+    (remove
+     nil?
+     (mapcat
+      (fn [job]
+        (let [overflow (- (get current-allocations job) (get max-util job))]
+          (when (pos? overflow)
+            (cts/drop-peers replica job overflow))))
+      (:jobs replica))))))
 
 (defn exempt-from-acker? [replica job task]
   (or (some #{task} (get-in replica [:exempt-tasks job]))
