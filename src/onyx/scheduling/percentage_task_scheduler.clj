@@ -85,8 +85,7 @@
          {}
          (map
           (fn [[k v]]
-            (let [n-to-drop (- (count (get-in replica [:allocations job k])) (:allocation v))]
-              {k (take-last n-to-drop (get-in replica [:allocations job k]))}))  tasks))]
+            {k (take-last n (get-in replica [:allocations job k]))}) tasks))]
     (loop [k 0
            pool candidates
            peers []]
