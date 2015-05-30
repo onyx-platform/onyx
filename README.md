@@ -133,6 +133,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [David Rupp](https://github.com/davidrupp)
 - [sbennett33](https://github.com/sbennett33)
 - [Tyler van Hensbergen](https://github.com/tvanhens)
+- [David Leatherman](https://github.com/leathekd)
 
 #### Performance Benchmarks
 
