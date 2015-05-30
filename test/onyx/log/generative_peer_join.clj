@@ -366,8 +366,20 @@
                                {:fn :kill-job :args {:job job-3-id}}])
        :log []
        :peer-choices []}))]
-   (is (= (sort (map count (vals (get (:allocations replica) job-1-id)))) [1 4 3]))
-   (is (= (sort (map count (vals (get (:allocations replica) job-2-id)))) [2 2 4]))
+   (is
+    (=
+     (map
+      (fn [t]
+        (count (get-in replica [:allocations job-1-id t])))
+      (get-in replica [:tasks job-1-id]))
+     [1 4 3]))
+   (is
+    (=
+     (map
+      (fn [t]
+        (count (get-in replica [:allocations job-2-id t])))
+      (get-in replica [:tasks job-2-id]))
+     [2 2 4]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
 (deftest peer-leave
