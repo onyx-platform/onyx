@@ -133,7 +133,7 @@ A sentinel is a value that can be pushed into Onyx to signal the end of a stream
 
 #### Peer
 
-A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine, though we often use the terms peer and virtual peer interchangably when the difference doesn't matter.
+A Peer is a node in the cluster responsible for processing data. A single "peer" refers to a physical machine, though we often use the terms peer and virtual peer interchangeably when the difference doesn't matter.
 
 #### Virtual Peer
 

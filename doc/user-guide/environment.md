@@ -62,7 +62,7 @@ Here's an example of using ZooKeeper in-memory, with some non-ZooKeeper required
 
 ### Production Environment
 
-Running a good production Onyx cluster requires a multinode ZooKeeper cluster. Otherwise, your configuration will remain exactly the same.
+Running a good production Onyx cluster requires a multi-node ZooKeeper cluster. Otherwise, your configuration will remain exactly the same.
 
 #### Dependencies
 

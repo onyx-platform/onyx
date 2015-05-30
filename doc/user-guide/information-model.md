@@ -23,7 +23,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 ### Workflow
 
-- a single Clojure vector of vectores which is EDN serializable/deserializable
+- a single Clojure vector of vectors which is EDN serializable/deserializable
 - all elements in the inner vectors are keywords
 - all keywords must correspond to an `:onyx/name` entry in the catalog
 - the "root" keywords of the workflow must have catalog entries of `:onyx/type` that map to `:input`
@@ -122,7 +122,7 @@ may be added by the user as the context is associated to throughout the task pip
 | key name                     |value type | Meaning       |
 |------------------------------|-----------|---------------|
 |`:onyx.core/id`               |`uuid`     | The unique ID of this peer's lifecycle|
-|`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecyle|
+|`:onyx.core/lifecycle-id`     |`uuid`     | The unique ID for this *execution* of the lifecycle|
 |`:onyx.core/job-id`           |`uuid`     | The Job ID of the task that this peer is executing|
 |`:onyx.core/task-id`          |`uuid`     | The Task ID that this peer is executing|
 |`:onyx.core/task`             |`keyword`  | The task name that this peer is executing|

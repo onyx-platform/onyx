@@ -155,11 +155,11 @@ The interval in milliseconds to wait between closing idle peer links.
 
 ##### `:onyx.messaging/peer-link-idle-timeout`
 
-The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is elligible to be closed. The connection will be reopened from scratch the next time it is needed.
+The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is eligible to be closed. The connection will be reopened from scratch the next time it is needed.
 
 ##### `:onyx.messaging/ack-daemon-timeout`
 
-Number of milliseconds that an ack value can go without being updates on a daemon before it is elligible to time out.
+Number of milliseconds that an ack value can go without being updates on a daemon before it is eligible to time out.
 
 ##### `:onyx.messaging/ack-daemon-clear-interval`
 

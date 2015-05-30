@@ -204,7 +204,7 @@ The messaging layer of Onyx employees the same technique that Apache Storm uses 
 
 #### The Algorithm
 
-Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a semgment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
+Onyx guarantees that each segment read from an input task will be processed, and provide at-least-once delivery semantics. Every segment that comes off an input task is given a UUID to track it through its lifetime. It is also given a peer ID that it uses as an "acking daemon", explained in more detail below. The segment also receives an initial "ack val". The ack val is a random 64-bit integer. Each time a segment is successfully processed at each task, this ack-val is XOR'ed with itself. Further, any *new* segments that are generated as a result of this segment being completed are given random ack vals, too. These ack vals are also XOR'ed against the previous XOR value. When no new segments are generated, the result of XOR'ing all the segment ack vals returns 0. Finding 0 means that the segment has been successfully processed throughout the entire workflow.
 
 #### Acking Daemon
 
@@ -340,7 +340,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Submitter: peer (P), who has successfully started its incoming buffer
 - Purpose: Indicates that this peer is ready to receive segments as input
 - Replica update: Updates `:peer-state` under the `:id` of this peer to set its state to `:active`.
-- Side effects: If this task should immediatelely be sealed, seals this task
+- Side effects: If this task should immediately be sealed, seals this task
 - Reactions: None.
 
 -------------------------------------------------

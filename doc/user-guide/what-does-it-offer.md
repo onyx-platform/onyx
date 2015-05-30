@@ -38,7 +38,7 @@ To the same point above, we want plain Clojure functions to be the building bloc
 
 #### Testing Without Mocking
 
-In general, your design is in trouble when you've reached for `with-redefs` or something along those lines to mock functions. Onyx places a high importance around programming against interfaces, and even more-so around putting space in-between small components with channels. Onyx programs can be tested in development mode, and moved to production mode with only a small configuration file change. If you'd like to change your input or output plugins, all you need to do is reassociate the catalog entry with something like an in-memory plugin. No interface mocking code required.
+In general, your design is in trouble when you've reached for `with-redefs` or something along those lines to mock functions. Onyx places a high importance around programming against interfaces, and even more-so around putting space in-between small components with channels. Onyx programs can be tested in development mode, and moved to production mode with only a small configuration file change. If you'd like to change your input or output plugins, all you need to do is re-associate the catalog entry with something like an in-memory plugin. No interface mocking code required.
 
 #### Easy Parameterization of Workflows
 

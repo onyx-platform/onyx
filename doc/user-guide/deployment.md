@@ -10,7 +10,7 @@ Onyx has no built-in mechanism for deployment. Rather, we let you deploy at your
   - [Shared File System](#shared-file-system)
   - [Docker](#docker)
   - [Mesos and Marathon](#mesos-and-marathon)
-  - [Kubernates](#kubernates)
+  - [Kubernetes](#kubernetes)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -33,6 +33,6 @@ We recommend packaging your uberjar into a Docker container. This is useful for 
 
 Mesos and Marathon are a pair of applications that work together to manage your entire cluster of machines. I recommend deploying your Docker image onto Marathon, which will allow you to scale at runtime and avoid any scripting. Marathon ensures that if your Docker container goes down, it will be restarted. This is one of our favorite solutions for production scale, cluster-wide management at the moment.
 
-#### Kubernates
+#### Kubernetes
 
 We are less familiar with Kubernetes as it's a bit younger than Mesos and Marathon, but Kubernetes will deliver roughly the same functionality that Mesos and Marathon will.
