@@ -6,8 +6,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [taoensso.timbre :as timbre :refer [debug info]]
-              [onyx.types :refer [->Leaf]]
-              [dire.core :refer [with-post-hook!]])
+              [onyx.types :refer [->Leaf]])
     (:import [java.util UUID]))
 
 (defmethod p-ext/read-batch :default
