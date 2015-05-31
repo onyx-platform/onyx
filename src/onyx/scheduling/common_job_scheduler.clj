@@ -207,7 +207,7 @@
      (let [tasks (get-in replica [:tasks job])]
        (if (every? (fn [t]
                      (>= (count (get-in result [:allocations job t]))
-                         (get-in result [:min-required-peers job t])))
+                         (get-in result [:min-required-peers job t] 1)))
                    tasks)
          result
          (update-in result [:allocations] dissoc job))))
