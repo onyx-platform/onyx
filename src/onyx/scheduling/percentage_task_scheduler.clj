@@ -4,10 +4,14 @@
             [onyx.log.commands.common :as common]))
 
 (defn tasks-by-pct [replica job tasks]
-  (map
+  (sort-by
+   (juxt
+    :pct
+    #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) (:task %)))
+   (map
     (fn [t]
       {:task t :pct (get-in replica [:task-percentages job t])})
-    tasks))
+    tasks)))
 
 (defn rescale-task-percentages 
   "Rescale task percentages after saturated tasks were removed"
@@ -91,11 +95,14 @@
            peers []]
       (if (or (>= k n) (not (seq pool)))
         peers
-        (let [max-task (first (reverse (map first (sort-by
-                                                   (juxt
-                                                    (fn [[k v]] (- (count v) (:allocation (get balanced k))))
-                                                    (fn [[k v]] (.indexOf ^clojure.lang.PersistentVector (get-in replica [:tasks job]) k)))
-                                                   pool))))
+        (let [max-task (first
+                        (reverse
+                         (map first (sort-by
+                                     (juxt
+                                      (fn [[k v]] (- (count v) (:allocation (get balanced k))))
+                                      (fn [[k v]] (.indexOf ^clojure.lang.PersistentVector
+                                                           (vec (get-in replica [:tasks job])) k)))
+                                     pool))))
               target (last (get-in pool [max-task]))]
           (recur (inc k) (update-in pool [max-task] (comp vec butlast)) (conj peers target)))))))
 
