@@ -63,3 +63,6 @@
 
 (defmethod open-peer-site :default
   [_ _] "localhost")
+
+(defmethod get-peer-site :default
+  [_ _] "localhost")
