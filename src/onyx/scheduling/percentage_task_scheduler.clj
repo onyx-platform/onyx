@@ -42,7 +42,11 @@
                                (vector task (- v (int v)))) 
                              tasks*
                              unrounded)
-                        (sort-by second)
+                        (sort-by
+                         (juxt
+                          second
+                          #(.indexOf ^clojure.lang.PersistentVector (vec (reverse (get-in replica [:tasks job]))) (:task (first %)))))
+                        (reverse)
                         (take remaining)
                         (map (juxt first (constantly 1)))
                         (into {}))

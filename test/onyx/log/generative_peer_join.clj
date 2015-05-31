@@ -351,19 +351,19 @@
                  :messaging {:onyx.messaging/impl :dummy-messenger}}
        :message-id 0
        :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
-                       :job-1 [(api/create-submit-job-entry job-1-id
-                                                            peer-config 
-                                                            job-1-pct-tasks 
-                                                            (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]
-                       :job-2 [(api/create-submit-job-entry job-2-id
-                                                            peer-config 
-                                                            job-2-pct-tasks 
-                                                            (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]
-                       :job-3 [(api/create-submit-job-entry job-3-id
-                                                            peer-config 
-                                                            job-3-pct-tasks
-                                                            (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
-                               {:fn :kill-job :args {:job job-3-id}}])
+                  :job-1 [(api/create-submit-job-entry job-1-id
+                                                       peer-config 
+                                                       job-1-pct-tasks 
+                                                       (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]
+                  :job-2 [(api/create-submit-job-entry job-2-id
+                                                       peer-config 
+                                                       job-2-pct-tasks 
+                                                       (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]
+                  :job-3 [(api/create-submit-job-entry job-3-id
+                                                       peer-config 
+                                                       job-3-pct-tasks
+                                                       (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
+                          {:fn :kill-job :args {:job job-3-id}}])
        :log []
        :peer-choices []}))]
    (is
