@@ -91,7 +91,11 @@
            peers []]
       (if (or (>= k n) (not (seq pool)))
         peers
-        (let [max-task (first (reverse (map first (sort-by (fn [[k v]] (count v)) pool))))
+        (let [max-task (first (reverse (map first (sort-by
+                                                   (juxt
+                                                    (fn [[k v]] (- (count v) (:allocation (get balanced k))))
+                                                    (fn [[k v]] (.indexOf ^clojure.lang.PersistentVector (get-in replica [:tasks job]) k)))
+                                                   pool))))
               target (last (get-in pool [max-task]))]
           (recur (inc k) (update-in pool [max-task] (comp vec butlast)) (conj peers target)))))))
 
