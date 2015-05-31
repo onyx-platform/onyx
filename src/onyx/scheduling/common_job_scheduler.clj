@@ -132,16 +132,17 @@
     (clojure.set/difference (set (:peers replica)) (set used-peers))))
 
 (defn find-displaced-peers [replica current-allocations max-util]
-  (clojure.set/union
-   (find-unused-peers replica)
-   (remove
-    nil?
-    (mapcat
-     (fn [job]
-       (let [overflow (- (get current-allocations job) (get max-util job))]
-         (when (pos? overflow)
-           (cts/drop-peers replica job overflow))))
-     (:jobs replica)))))
+  (distinct
+   (concat
+    (find-unused-peers replica)
+    (remove
+     nil?
+     (mapcat
+      (fn [job]
+        (let [overflow (- (get current-allocations job) (get max-util job))]
+          (when (pos? overflow)
+            (cts/drop-peers replica job overflow))))
+      (:jobs replica))))))
 
 (defn exempt-from-acker? [replica job task]
   (or (some #{task} (get-in replica [:exempt-tasks job]))
@@ -189,7 +190,7 @@
 (defn choose-ackers [replica]
   (reduce
    (fn [result job]
-     (let [peers (apply concat (vals (get-in result [:allocations job])))
+     (let [peers (sort (apply concat (vals (get-in result [:allocations job]))))
            pct (or (get-in result [:acker-percentage job]) 10)
            n (int (Math/ceil (* 0.01 pct (count peers))))
            candidates (choose-acker-candidates result peers)]
@@ -203,10 +204,13 @@
   [replica]
   (reduce
    (fn [result job]
-     (if (< (apply + (map count (vals (get-in result [:allocations job]))))
-            (apply + (vals (get-in result [:min-required-peers job]))))
-       (update-in result [:allocations] dissoc job)
-       result))
+     (let [tasks (get-in replica [:tasks job])]
+       (if (every? (fn [t]
+                     (>= (count (get-in result [:allocations job t]))
+                         (get-in result [:min-required-peers job t] 1)))
+                   tasks)
+         result
+         (update-in result [:allocations] dissoc job))))
    replica
    (:jobs replica)))
 
@@ -225,8 +229,8 @@
         max-utilization (claim-spare-peers replica job-claims spare-peers)
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        deallocated (deallocate-starved-jobs replica)
-        updated-replica (choose-ackers (reallocate-peers deallocated peers-to-displace max-utilization))]
-    (if (equivalent-allocation? replica updated-replica)
+        updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
+        final-replica (deallocate-starved-jobs updated-replica)]
+    (if (equivalent-allocation? replica final-replica)
       replica
-      updated-replica)))
+      final-replica)))

@@ -4,10 +4,14 @@
             [onyx.log.commands.common :as common]))
 
 (defn tasks-by-pct [replica job tasks]
-  (map
+  (sort-by
+   (juxt
+    :pct
+    #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) (:task %)))
+   (map
     (fn [t]
       {:task t :pct (get-in replica [:task-percentages job t])})
-    tasks))
+    tasks)))
 
 (defn rescale-task-percentages 
   "Rescale task percentages after saturated tasks were removed"
@@ -38,7 +42,10 @@
                                (vector task (- v (int v)))) 
                              tasks*
                              unrounded)
-                        (sort-by second)
+                        (sort-by
+                         (juxt
+                          second
+                          #(.indexOf ^clojure.lang.PersistentVector (vec (reverse (get-in replica [:tasks job]))) (:task (first %)))))
                         (reverse)
                         (take remaining)
                         (map (juxt first (constantly 1)))
@@ -68,15 +75,40 @@
         (merge (percentage-balanced-taskload replica job unallocated-tasks n-remaining-peers)
                cutoff-oversaturated)))))
 
+(defn sort-by-saturation [replica job tasks]
+  (sort-by
+   (fn [t]
+     (- (or (count (get-in replica [:allocations job t])) 0)
+        (get-in replica [:min-required-peers job t])))
+   tasks))
+
 (defmethod cts/drop-peers :onyx.task-scheduler/percentage
   [replica job n]
   (let [tasks (keys (get-in replica [:allocations job]))
-        balanced (percentage-balanced-taskload replica job tasks n)
-        tasks (cts/filter-grouped-tasks replica job balanced)]
-    (mapcat
-     (fn [[task {:keys [allocation]}]]
-       (drop-last allocation (get-in replica [:allocations job task])))
-     (take n (cycle tasks)))))
+        current (apply + (map count (vals (get-in replica [:allocations job]))))
+        balanced (percentage-balanced-taskload replica job tasks (- current n))
+        tasks (cts/filter-grouped-tasks replica job balanced)
+        candidates
+        (into
+         {}
+         (map
+          (fn [[k v]]
+            {k (take-last n (get-in replica [:allocations job k]))}) tasks))]
+    (loop [k 0
+           pool candidates
+           peers []]
+      (if (or (>= k n) (not (seq pool)))
+        peers
+        (let [max-task (first
+                        (reverse
+                         (map first (sort-by
+                                     (juxt
+                                      (fn [[k v]] (- (count v) (:allocation (get balanced k))))
+                                      (fn [[k v]] (.indexOf ^clojure.lang.PersistentVector
+                                                           (vec (get-in replica [:tasks job])) k)))
+                                     pool))))
+              target (last (get-in pool [max-task]))]
+          (recur (inc k) (update-in pool [max-task] (comp vec butlast)) (conj peers target)))))))
 
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/percentage
   [replica job n]

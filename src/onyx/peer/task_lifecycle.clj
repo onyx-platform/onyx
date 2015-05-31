@@ -1,7 +1,6 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
     (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
-              [dire.core :as dire]
               [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
@@ -36,7 +35,14 @@
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
-  ((:onyx.core/compiled-start-task-fn event) event))
+  (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
+    (when (or (nil? level-compile-time)
+              (= level-compile-time :info)
+              (= level-compile-time :trace))
+      (when-not (:onyx.core/start-lifecycle? rets)
+        (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
+                             (:onx.core/id rets) (:onyx.core/lifecycle-id rets)))))
+    rets))
 
 (defn add-acker-id [peers m]
   (assoc m :acker-id (rand-nth peers)))
@@ -108,8 +114,6 @@
                                      (assoc groups t (group-message msg catalog t)))
                                    {} 
                                    next-tasks)))))
-
-
 
 (defn add-ack-vals [leaf]
   (assoc leaf 
@@ -183,9 +187,13 @@
   event)
 
 (defn inject-batch-resources [event]
-  (-> event 
-      (merge ((:onyx.core/compiled-before-batch-fn event) event))
-      (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID))))
+  (let [rets (-> event 
+                 (merge ((:onyx.core/compiled-before-batch-fn event) event))
+                 (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID)))]
+    (when (or (nil? level-compile-time) (= level-compile-time :trace))
+      (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
+                                     (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
+    rets))
 
 (defn read-batch [event]
   (let [rets (p-ext/read-batch event)]
@@ -263,15 +271,35 @@
           batch)))))
 
 (defn apply-fn [event]
-  (if (:onyx/bulk? (:onyx.core/task-map event))
-    (apply-fn-bulk event)
-    (apply-fn-single event)))
+  (let [rets
+        (if (:onyx/bulk? (:onyx.core/task-map event))
+          (apply-fn-bulk event)
+          (apply-fn-single event))]
+    (when (or (nil? level-compile-time)
+              (= level-compile-time :trace))
+      (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
+                                     (:onyx.core/id rets)
+                                     (:onyx.core/lifecycle-id rets)
+                                     (count (:onyx.core/results rets)))))
+    rets))
 
 (defn write-batch [event]
-  (merge event (p-ext/write-batch event)))
+  (let [rets (merge event (p-ext/write-batch event))]
+    (when (or (nil? level-compile-time) (= level-compile-time :trace))
+      (= level-compile-time :trace)
+      (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
+                                     (:onyx.core/id rets)
+                                     (:onyx.core/lifecycle-id rets)
+                                     (count (:onyx.core/results rets)))))
+    rets))
 
 (defn close-batch-resources [event]
-  (merge event ((:onyx.core/compiled-after-batch-fn event) event)))
+  (let [rets (merge event ((:onyx.core/compiled-after-batch-fn event) event))]
+    (when (or (nil? level-compile-time) (= level-compile-time :trace))
+      (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
+                                     (:onyx.core/id rets)
+                                     (:onyx.core/lifecycle-id rets))))
+    rets))
 
 (defn launch-aux-threads!
   [{:keys [release-ch retry-ch] :as messenger} event outbox-ch seal-ch completion-ch task-kill-ch]
@@ -572,30 +600,3 @@
                        :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
                        :opts opts :task-kill-ch task-kill-ch}))
-
-(when (or (nil? level-compile-time) (= level-compile-time :info) (= level-compile-time :trace))
-  (dire/with-post-hook! #'munge-start-lifecycle
-    (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/start-lifecycle?] :as event}]
-      (when-not start-lifecycle?
-        (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..." id lifecycle-id))))))
-
-(when (or (nil? level-compile-time) (= level-compile-time :trace))
-  (dire/with-post-hook! #'inject-batch-resources
-    (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-      (taoensso.timbre/trace (format "[%s / %s] Started a new batch" id lifecycle-id)))))
-
-(when (or (nil? level-compile-time) (= level-compile-time :trace))
-  (dire/with-post-hook! #'apply-fn
-  (fn [{:keys [onyx.core/id onyx.core/results onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments" id lifecycle-id (count results))))))
-
-(when (or (nil? level-compile-time) (= level-compile-time :trace))
-  (= level-compile-time :trace)
-  (dire/with-post-hook! #'write-batch
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id onyx.core/results]}]
-    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments" id lifecycle-id (count results))))))
-
-(when (or (nil? level-compile-time) (= level-compile-time :trace))
-  (dire/with-post-hook! #'close-batch-resources
-  (fn [{:keys [onyx.core/id onyx.core/lifecycle-id]}]
-    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources" id lifecycle-id)))))
