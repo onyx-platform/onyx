@@ -136,10 +136,6 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Tyler van Hensbergen](https://github.com/tvanhens)
 - [David Leatherman](https://github.com/leathekd)
 
-#### Performance Benchmarks
-
-At the time of writing this, I do not have any performance benchmarks to publish. Creating a correct, useful benchmark is extremely difficult. I'm working on it - hang tight.
-
 ### Author
 
 The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator. You can get me directly at (mjd3089.at.rit.edu) if needed.
