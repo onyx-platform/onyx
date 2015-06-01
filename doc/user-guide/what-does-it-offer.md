@@ -50,7 +50,7 @@ Onyx uses the notion of a *sentinel value* to transparently switch between strea
 
 #### Aspect Orientation
 
-Clojure functions again serve as a huge win. [Dire](https://github.com/onyx-platform/dire) is a library that supports aspects, meaning you can keep your application logic airtight away from logging, preconditions, and error handling.
+Clojure functions again serve as a huge win. [Dire](https://github.com/MichaelDrogalis/dire) is a library that supports aspects, meaning you can keep your application logic airtight away from logging, preconditions, and error handling.
 
 #### AOT Nothing
 
