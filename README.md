@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.6.0-RC1"]
+[org.onyxplatform/onyx "0.6.0"]
 ```
 
 ### Build Status
@@ -41,6 +41,7 @@ onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.6.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
 ### User Guide 0.6.0
+
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
@@ -63,7 +64,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### API Docs 0.6.0
 
-Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.6.0).
 
 ### Official plugin listing
 
