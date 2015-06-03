@@ -36,12 +36,9 @@
 
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
-    (when (or (nil? level-compile-time)
-              (= level-compile-time :info)
-              (= level-compile-time :trace))
-      (when-not (:onyx.core/start-lifecycle? rets)
-        (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
-                             (:onx.core/id rets) (:onyx.core/lifecycle-id rets)))))
+    (when-not (:onyx.core/start-lifecycle? rets)
+      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
+                           (:onx.core/id rets) (:onyx.core/lifecycle-id rets))))
     rets))
 
 (defn add-acker-id [peers m]
@@ -190,9 +187,8 @@
   (let [rets (-> event 
                  (merge ((:onyx.core/compiled-before-batch-fn event) event))
                  (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID)))]
-    (when (or (nil? level-compile-time) (= level-compile-time :trace))
-      (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
-                                     (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
+    (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
+                                   (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
     rets))
 
 (defn read-batch [event]
@@ -275,30 +271,25 @@
         (if (:onyx/bulk? (:onyx.core/task-map event))
           (apply-fn-bulk event)
           (apply-fn-single event))]
-    (when (or (nil? level-compile-time)
-              (= level-compile-time :trace))
-      (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
-                                     (:onyx.core/id rets)
-                                     (:onyx.core/lifecycle-id rets)
-                                     (count (:onyx.core/results rets)))))
+    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
+                                   (:onyx.core/id rets)
+                                   (:onyx.core/lifecycle-id rets)
+                                   (count (:onyx.core/results rets))))
     rets))
 
 (defn write-batch [event]
   (let [rets (merge event (p-ext/write-batch event))]
-    (when (or (nil? level-compile-time) (= level-compile-time :trace))
-      (= level-compile-time :trace)
-      (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
-                                     (:onyx.core/id rets)
-                                     (:onyx.core/lifecycle-id rets)
-                                     (count (:onyx.core/results rets)))))
+    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
+                                   (:onyx.core/id rets)
+                                   (:onyx.core/lifecycle-id rets)
+                                   (count (:onyx.core/results rets))))
     rets))
 
 (defn close-batch-resources [event]
   (let [rets (merge event ((:onyx.core/compiled-after-batch-fn event) event))]
-    (when (or (nil? level-compile-time) (= level-compile-time :trace))
-      (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
-                                     (:onyx.core/id rets)
-                                     (:onyx.core/lifecycle-id rets))))
+    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
+                                   (:onyx.core/id rets)
+                                   (:onyx.core/lifecycle-id rets)))
     rets))
 
 (defn launch-aux-threads!
