@@ -11,7 +11,7 @@
                  [com.mdrogalis/rotating-seq "0.1.3"]
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
-                 [com.taoensso/timbre "3.0.1"]
+                 [com.taoensso/timbre "3.4.0"]
                  [com.taoensso/nippy "2.9.0"]
                  [prismatic/schema "0.4.0"]
                  [org.apache.zookeeper/zookeeper "3.4.1" :exclusions [org.slf4j/slf4j-log4j12 io.netty/netty]]
