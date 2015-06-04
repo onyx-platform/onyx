@@ -37,6 +37,7 @@
 (def ^:const acks-base-length (int 4))
 ; id uuid, completion-id uuid, ack-val long
 (def ^:const ack-base-length (int 40))
+(def ^:const acks-header-length (int (+ acks-base-length type-header-length)))
 
 ; message length without nippy segments
 ; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
@@ -68,11 +69,10 @@
   (take-uuid buf))
 
 (defn build-acks-msg-buf [acks] 
-  (let [^ByteBuf buf (byte-buffer (+ acks-base-length 
-                                     type-header-length 
-                                     (* (count acks) ack-base-length)))] 
+  (let [cnt (int (count acks))
+        ^ByteBuf buf (byte-buffer (+ acks-header-length (* cnt ack-base-length)))] 
     (.writeByte buf ack-type-id)
-    (.writeInt buf (int (count acks)))
+    (.writeInt buf cnt)
     (doseq [ack acks]
       (write-uuid buf (:id ack))
       (write-uuid buf (:completion-id ack))
