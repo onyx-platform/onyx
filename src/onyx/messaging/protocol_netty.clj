@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.messaging.protocol-netty
     (:require [taoensso.timbre :as timbre]
-              [onyx.types :refer [->Leaf]])
+              [onyx.types :refer [->Leaf ->Ack]])
     (:import [java.util UUID]
              [io.netty.buffer ByteBuf Unpooled UnpooledByteBufAllocator
               PooledByteBufAllocator ByteBufAllocator]))
@@ -62,12 +62,10 @@
     buf))
 
 (defn read-completion-buf [^ByteBuf buf]
-  {:type completion-type-id 
-   :id (take-uuid buf)})
+  (take-uuid buf))
 
 (defn read-retry-buf [^ByteBuf buf]
-  {:type retry-type-id 
-   :id (take-uuid buf)})
+  (take-uuid buf))
 
 (defn build-acks-msg-buf [acks] 
   (let [^ByteBuf buf (byte-buffer (+ acks-base-length 
@@ -83,16 +81,16 @@
 
 (defn read-acks-buf [^ByteBuf buf]
   (let [cnt (.readInt buf)] 
-    {:type ack-type-id
-     :acks (doall 
-             (repeatedly cnt 
-                         (fn [] 
-                           (let [id (take-uuid buf)
-                                 completion-id (take-uuid buf)
-                                 ack-val (.readLong buf)]
-                             {:id id 
-                              :completion-id completion-id
-                              :ack-val ack-val}))))}))
+    (loop [n cnt
+           acks (list)]
+      (if (zero? n)
+        acks
+        (recur (dec n) 
+               (conj acks  
+                     (let [id (take-uuid buf)
+                           completion-id (take-uuid buf)
+                           ack-val (.readLong buf)]
+                       (->Ack id completion-id ack-val nil))))))))
 
 (defn write-message-msg [^ByteBuf buf {:keys [id acker-id completion-id ack-val message]}]
   (write-uuid buf id)
@@ -100,7 +98,7 @@
   (write-uuid buf completion-id)
   (.writeLong buf ack-val))
 
-(defn read-message-buf [decompress-f ^ByteBuf buf message]
+(defn read-message-buf [^ByteBuf buf message]
   (let [id (take-uuid buf)
         acker-id (take-uuid buf)
         completion-id (take-uuid buf)
@@ -125,27 +123,14 @@
     buf))
 
 (defn read-messages-buf [decompress-f ^ByteBuf buf]
-  {:type messages-type-id 
-   :messages (let [message-count (.readInt buf)
-                   messages-payload-size (.readInt buf)
-                   arr (byte-array messages-payload-size)
-                   _ (.readBytes buf arr)
-                   messages (decompress-f arr)]
-               (doall (map (fn [msg] 
-                             (read-message-buf decompress-f buf msg)) 
-                           messages)))})
+  (let [message-count (.readInt buf)
+        messages-payload-size (.readInt buf)
+        arr (byte-array messages-payload-size)
+        _ (.readBytes buf arr)
+        messages (decompress-f arr)]
+    (doall (map (fn [msg] 
+                  (read-message-buf buf msg)) 
+                messages))))
 
-(defn read-buf [decompress-f ^ByteBuf buf]
-  (let [msg-type ^byte (.readByte buf)] 
-    (cond (= msg-type messages-type-id) 
-          (read-messages-buf decompress-f buf)
-          (= msg-type ack-type-id) 
-          (read-acks-buf buf)
-          (= msg-type completion-type-id) 
-          (read-completion-buf buf)
-          (= msg-type retry-type-id)
-          (read-retry-buf buf)
-          :else (throw (Exception. (str "Invalid message type: " msg-type))))))
-
-
-
+(defn read-msg-type [^ByteBuf buf]
+  (.readByte buf))
