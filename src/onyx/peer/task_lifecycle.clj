@@ -82,12 +82,13 @@
       (->Route #{} #{} nil nil)
       compiled-flow-conditions)))
 
-
 (defn add-route-data
   [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
     :as event} result leaf downstream]
   (if (operation/exception? (:message leaf))
-    (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
+    (if (seq compiled-ex-fcs)
+      (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
+      (throw (:message leaf)))
     (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
 
 (defn group-message [segment catalog task]
