@@ -35,6 +35,7 @@ onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.6.x.
 onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
 onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
+onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 
 ### Quick Start Guide
 
@@ -75,6 +76,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-s3`](https://github.com/onyx-platform/onyx-s3)
+- [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 
