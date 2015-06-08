@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.6.0-RC1"]
+[org.onyxplatform/onyx "0.6.0"]
 ```
 
 ### Build Status
@@ -35,12 +35,14 @@ onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.6.x.
 onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
 onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
+onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.6.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.6.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.6.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
 ### User Guide 0.6.0
+
 - [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
 - [Concepts](doc/user-guide/concepts.md)
 - [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
@@ -63,7 +65,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### API Docs 0.6.0
 
-Code level API documentation [can be found here](http://michaeldrogalis.github.io/onyx/).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.6.0).
 
 ### Official plugin listing
 
@@ -74,6 +76,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
 - [`onyx-s3`](https://github.com/onyx-platform/onyx-s3)
+- [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 
@@ -133,10 +136,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [David Rupp](https://github.com/davidrupp)
 - [sbennett33](https://github.com/sbennett33)
 - [Tyler van Hensbergen](https://github.com/tvanhens)
-
-#### Performance Benchmarks
-
-At the time of writing this, I do not have any performance benchmarks to publish. Creating a correct, useful benchmark is extremely difficult. I'm working on it - hang tight.
+- [David Leatherman](https://github.com/leathekd)
 
 ### Author
 
