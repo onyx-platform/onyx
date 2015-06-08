@@ -57,7 +57,7 @@
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-key :name
-    :onyx/min-peers 1
+    :onyx/min-peers 2
     :onyx/flux-policy :kill
     :onyx/batch-size 40}
 
@@ -154,7 +154,7 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -164,7 +164,12 @@
 
 (def results (take-segments! out-chan))
 
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
 (def out-val @output)
+
+(fact (not (empty? out-val)))
 
 ;;; Scan the key set, dropping any nils. Count the distinct keys.
 ;;; Do the same for the right hand side of the expression, but turn it into a set.
@@ -174,10 +179,6 @@
 
 (fact results => [:done])
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-
