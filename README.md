@@ -138,6 +138,13 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Tyler van Hensbergen](https://github.com/tvanhens)
 - [David Leatherman](https://github.com/leathekd)
 
+#### Acknowledgements
+
+Some code has been incorporated from the following projects:
+
+- [Riemann] (https://github.com/aphyr/riemann)
+- [zookeeper-clj] (https://github.com/liebke/zookeeper-clj)
+
 ### Author
 
 The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator. You can get me directly at (mjd3089.at.rit.edu) if needed.
