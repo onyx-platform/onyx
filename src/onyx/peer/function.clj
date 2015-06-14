@@ -9,10 +9,6 @@
               [onyx.types :refer [->Leaf]])
     (:import [java.util UUID]))
 
-(defmethod p-ext/read-batch :default
-  [{:keys [onyx.core/messenger] :as event}]
-  {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
-
 (defn apply-fn
   [{:keys [onyx.core/params] :as event} segment]
   (if-let [f (:onyx.core/fn event)]
@@ -66,21 +62,28 @@
                 (count active-peers)))
       (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
-;; Needs a performance boost
-(defmethod p-ext/write-batch :default
-  [{:keys [onyx.core/id onyx.core/results onyx.core/messenger onyx.core/job-id onyx.core/max-downstream-links] :as event}]
-  (let [leaves (fast-concat (map :leaves results))
-        egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
-    (when-not (empty? leaves)
-      (let [replica @(:onyx.core/replica event)
-            segments (build-segments-to-send leaves)
-            groups (group-by (juxt :route :hash-group) segments)
-            allocations (get (:allocations replica) job-id)]
-        (doseq [[[route hash-group] segs] groups]
-          (let [peers (get allocations (get egress-tasks route))
-                active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-                target (pick-peer id active-peers hash-group max-downstream-links)]
-            (when target
-              (let [link (operation/peer-link event target)]
-                (onyx.extensions/send-messages messenger event link segs)))))
-        {}))))
+(defrecord Function []
+  p-ext/IPipelineExtension
+  (read-batch 
+    [this {:keys [onyx.core/messenger] :as event}]
+    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
+
+  (write-batch 
+    [this {:keys [onyx.core/id onyx.core/results 
+                  onyx.core/messenger onyx.core/job-id 
+                  onyx.core/max-downstream-links] :as event}]
+    (let [leaves (fast-concat (map :leaves results))
+          egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
+      (when-not (empty? leaves)
+        (let [replica @(:onyx.core/replica event)
+              segments (build-segments-to-send leaves)
+              groups (group-by (juxt :route :hash-group) segments)
+              allocations (get (:allocations replica) job-id)]
+          (doseq [[[route hash-group] segs] groups]
+            (let [peers (get allocations (get egress-tasks route))
+                  active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
+                  target (pick-peer id active-peers hash-group max-downstream-links)]
+              (when target
+                (let [link (operation/peer-link event target)]
+                  (onyx.extensions/send-messages messenger event link segs)))))
+          {})))))
