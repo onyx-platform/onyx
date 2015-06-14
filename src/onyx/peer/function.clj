@@ -62,16 +62,13 @@
                 (count active-peers)))
       (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
-(defrecord Function []
-  p-ext/IPipelineExtension
-  (read-batch 
-    [this {:keys [onyx.core/messenger] :as event}]
-    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
+(defn read-batch [{:keys [onyx.core/messenger] :as event}]
+  {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
 
-  (write-batch 
-    [this {:keys [onyx.core/id onyx.core/results 
-                  onyx.core/messenger onyx.core/job-id 
-                  onyx.core/max-downstream-links] :as event}]
+(defn write-batch 
+  [{:keys [onyx.core/id onyx.core/results 
+           onyx.core/messenger onyx.core/job-id 
+           onyx.core/max-downstream-links] :as event}]
     (let [leaves (fast-concat (map :leaves results))
           egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
       (when-not (empty? leaves)
@@ -86,4 +83,40 @@
               (when target
                 (let [link (operation/peer-link event target)]
                   (onyx.extensions/send-messages messenger event link segs)))))
+          {}))))
+
+(defrecord Function [replica id messenger job-id max-downstream-links egress-tasks]
+  p-ext/IPipelineExtension
+  (read-batch 
+    [_ event]
+    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
+
+  (write-batch 
+    [_ {:keys [onyx.core/results] :as event}]
+    (let [leaves (fast-concat (map :leaves results))]
+      (when-not (empty? leaves)
+        (let [replica-val @replica
+              segments (build-segments-to-send leaves)
+              groups (group-by (juxt :route :hash-group) segments)
+              allocations (get (:allocations replica-val) job-id)]
+          (doseq [[[route hash-group] segs] groups]
+            (let [peers (get allocations (get egress-tasks route))
+                  active-peers (filter #(= (get-in replica-val [:peer-state %]) :active) peers)
+                  target (pick-peer id active-peers hash-group max-downstream-links)]
+              (when target
+                (let [link (operation/peer-link event target)]
+                  (onyx.extensions/send-messages messenger event link segs)))))
           {})))))
+
+(defn function [{:keys [onyx.core/replica
+                        onyx.core/id 
+                        onyx.core/messenger 
+                        onyx.core/job-id 
+                        onyx.core/max-downstream-links
+                        onyx.core/serialized-task] :as pipeline-data}]
+  (->Function replica
+              id
+              messenger
+              job-id
+              max-downstream-links
+              (:egress-ids serialized-task)))

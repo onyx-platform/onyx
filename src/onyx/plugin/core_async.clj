@@ -1,5 +1,6 @@
 (ns onyx.plugin.core-async
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <!]]
+            [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
             [taoensso.timbre :refer [debug info] :as timbre]))
@@ -7,10 +8,11 @@
 (defn inject-reader
   [event lifecycle]
   (assert (:core.async/chan event) ":core.async/chan not found - add it using a :before-task-start lifecycle")
-  {:core.async/pending-messages (atom {})
-   :core.async/drained? (atom false)
-   :core.async/retry-ch (chan 10000)
-   :core.async/retry-count (atom 0)})
+  (let [pipeline (:onyx.core/pipeline event)] 
+    {:core.async/pending-messages (:pending-messages pipeline) 
+     :core.async/drained? (:drained? pipeline)
+     :core.async/retry-ch (:retry-ch pipeline)
+     :core.async/retry-count (:retry-count pipeline)}))
 
 (defn log-retry-count
   [event lifecycle]
@@ -29,18 +31,17 @@
 (def writer-calls
   {:lifecycle/before-task-start inject-writer})
 
-(defrecord CoreAsyncInput []
+(defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages 
+                           drained? retry-ch retry-count]
   p-ext/IPipelineExtension
-  (read-batch [this 
-               {:keys [onyx.core/task-map core.async/chan core.async/retry-ch 
-                       core.async/pending-messages core.async/drained?] :as event}]
+  (write-batch 
+    [this event]
+    (function/write-batch event))
+
+  (read-batch [_ {:keys [core.async/chan] :as event}]
     (let [pending (count @pending-messages)
-          max-pending (or (:onyx/max-pending task-map) (:onyx/max-pending defaults))
-          batch-size (:onyx/batch-size task-map)
           max-segments (min (- max-pending pending) batch-size)
-          ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
-          step-ms (/ ms (:onyx/batch-size task-map))
-          timeout-ch (timeout ms)
+          timeout-ch (timeout batch-timeout)
           batch (if (pos? max-segments)
                   (loop [segments [] cnt 0]
                     (if (= cnt max-segments)
@@ -61,39 +62,51 @@
         (reset! drained? true))
       {:onyx.core/batch batch}))
 
-  (ack-message [this {:keys [core.async/pending-messages]} message-id]
+  (ack-message [_ _ message-id]
     (swap! pending-messages dissoc message-id))
 
   (retry-message 
-    [this {:keys [core.async/pending-messages 
-                  core.async/retry-count 
-                  core.async/retry-ch]} 
-     message-id]
+    [_ _ message-id]
     (when-let [msg (get @pending-messages message-id)]
       (swap! pending-messages dissoc message-id)
       (when-not (= msg :done)
         (swap! retry-count inc))
       (>!! retry-ch msg)))
 
-  (pending 
-    [this {:keys [core.async/pending-messages]} message-id]
+  (pending?
+    [_ _ message-id]
     (get @pending-messages message-id))
 
   (drained? 
-    [this {:keys [core.async/drained? core.async/pending-messages] :as event}]
+    [_ _]
     @drained?))
+
+(defn input [pipeline-data]
+  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+        max-pending (or (:onyx/max-pending catalog-entry) (:onyx/max-pending defaults))
+        batch-size (:onyx/batch-size catalog-entry)
+        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout defaults))] 
+    (->CoreAsyncInput max-pending batch-size batch-timeout 
+                      (atom {}) (atom false) (chan 10000) (atom 0))))
 
 (defrecord CoreAsyncOutput []
   p-ext/IPipelineExtension
+  (read-batch 
+    [_ event]
+    (function/read-batch event))
+
   (write-batch 
-    [this {:keys [onyx.core/results core.async/chan] :as event}]
+    [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves results)]
       (>!! chan (:message msg)))
     {})
 
   (seal-resource 
-    [this {:keys [core.async/chan]}]
+    [_ {:keys [core.async/chan]}]
     (>!! chan :done)))
+
+(defn output [pipeline-data]
+  (->CoreAsyncOutput))
 
 (defn take-segments!
   "Takes segments off the channel until :done is found.
