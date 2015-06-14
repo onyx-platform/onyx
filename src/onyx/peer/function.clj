@@ -81,11 +81,11 @@
                   active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
                   target (pick-peer id active-peers hash-group max-downstream-links)]
               (when target
-                (let [link (operation/peer-link event target)]
+                (let [link (operation/peer-link replica (:onyx.core/state event) event target)]
                   (onyx.extensions/send-messages messenger event link segs)))))
           {}))))
 
-(defrecord Function [replica id messenger job-id max-downstream-links egress-tasks]
+(defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
   p-ext/IPipelineExtension
   (read-batch 
     [_ event]
@@ -104,17 +104,19 @@
                   active-peers (filter #(= (get-in replica-val [:peer-state %]) :active) peers)
                   target (pick-peer id active-peers hash-group max-downstream-links)]
               (when target
-                (let [link (operation/peer-link event target)]
+                (let [link (operation/peer-link replica-val state event target)]
                   (onyx.extensions/send-messages messenger event link segs)))))
           {})))))
 
 (defn function [{:keys [onyx.core/replica
+                        onyx.core/state
                         onyx.core/id 
                         onyx.core/messenger 
                         onyx.core/job-id 
                         onyx.core/max-downstream-links
                         onyx.core/serialized-task] :as pipeline-data}]
   (->Function replica
+              state
               id
               messenger
               job-id

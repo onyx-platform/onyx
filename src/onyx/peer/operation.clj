@@ -38,12 +38,12 @@
                    all-peers))))
 
 (defn peer-link
-  [{:keys [onyx.core/state] :as event} peer-id]
+  [replica-val state event peer-id]
   (if-let [link (get (:links @state) peer-id)]
     (do 
       (swap! state assoc-in [:links peer-id] (assoc link :timestamp (System/currentTimeMillis)))
       (:link link))
-    (let [site (-> @(:onyx.core/replica event)
+    (let [site (-> replica-val
                    :peer-sites
                    (get peer-id))]
       (-> state 
