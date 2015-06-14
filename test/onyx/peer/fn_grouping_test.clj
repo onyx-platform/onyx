@@ -60,7 +60,7 @@
     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
-    :onyx/min-peers 1
+    :onyx/min-peers 2
     :onyx/flux-policy :kill
     :onyx/batch-size 40}
 
@@ -156,7 +156,7 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -166,18 +166,21 @@
 
 (def results (take-segments! out-chan))
 
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
 (def out-val @output)
+
+(fact (not (empty? out-val)))
 
 ;;; Scan the key set, dropping any nils. Count the distinct keys.
 ;;; Do the same for the right hand side of the expression, but turn it into a set.
 ;;; If there's the same number of elements, then the grouping was mutually exclusive.
+
 (fact (count (filter identity (mapcat keys out-val))) =>
       (count (into #{} (filter identity (mapcat keys out-val)))))
 
 (fact results => [:done])
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
 
 (onyx.api/shutdown-peer-group peer-group)
 
