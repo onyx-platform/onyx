@@ -7,7 +7,8 @@
 
 (defn inject-reader
   [event lifecycle]
-  (assert (:core.async/chan event) ":core.async/chan not found - add it using a :before-task-start lifecycle")
+  (assert (:core.async/chan event) 
+          ":core.async/chan not found - add it using a :before-task-start lifecycle")
   (let [pipeline (:onyx.core/pipeline event)] 
     {:core.async/pending-messages (:pending-messages pipeline) 
      :core.async/drained? (:drained? pipeline)

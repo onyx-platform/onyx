@@ -201,12 +201,11 @@
       (Thread/sleep (:onyx.core/drained-back-off event)))
     (merge event rets)))
 
-(defn tag-messages [task-type replica job-id event]
+(defn tag-messages [task-type replica id job-id max-acker-links event]
   (merge
    event
    (when (= task-type :input)
-     (let [{:keys [onyx.core/id onyx.core/max-acker-links]} event
-           peers (get (:ackers @replica) job-id)
+     (let [peers (get (:ackers @replica) job-id)
            candidates (operation/select-n-peers id peers max-acker-links)] 
        (when-not (seq peers)
          (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
@@ -375,6 +374,8 @@
            onyx.core/compiled-before-batch-fn
            onyx.core/serialized-task
            onyx.core/messenger
+           onyx.core/id 
+           onyx.core/max-acker-links 
            onyx.core/job-id] :as init-event} seal-ch kill-ch ex-f]
   (let [task-type (:onyx/type task-map)
         bulk? (:onyx/bulk? task-map)
@@ -384,7 +385,7 @@
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
              (read-batch pipeline)
-             (tag-messages task-type replica job-id)
+             (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
              (strip-sentinel)
@@ -540,10 +541,17 @@
                            :onyx.core/replica replica
                            :onyx.core/state state}
 
-            pipeline (case (:onyx/ident catalog-entry) 
-                       :core.async/read-from-chan (onyx.plugin.core-async/input pipeline-data)
-                       :core.async/write-to-chan (onyx.plugin.core-async/output pipeline-data)
-                       (onyx.peer.function/function pipeline-data))
+            pipeline (cond (= (:onyx/ident catalog-entry)
+                              :core.async/read-from-chan) 
+                           (onyx.plugin.core-async/input pipeline-data)
+                           (= (:onyx/ident catalog-entry)
+                              :core.async/write-to-chan) 
+                           (onyx.plugin.core-async/output pipeline-data)
+                           (= (:onyx/ident catalog-entry)
+                              :generator)
+                           ((ns-resolve 'onyx.plugin.bench-plugin 'generator) pipeline-data)
+                           :else 
+                           (onyx.peer.function/function pipeline-data))
 
 
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
