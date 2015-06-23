@@ -1,13 +1,15 @@
 (ns ^:no-doc onyx.peer.function
-    (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
-              [onyx.static.planning :refer [find-task]]
-              [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.pipeline-extensions :as p-ext]
-              [onyx.peer.operation :as operation]
-              [onyx.extensions :as extensions]
-              [taoensso.timbre :as timbre :refer [debug info]]
-              [onyx.types :refer [->Leaf]])
-    (:import [java.util UUID]))
+  (:gen-class :name onyx.peer.Function
+              :methods [^{:static true} [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
+  (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
+            [onyx.static.planning :refer [find-task]]
+            [onyx.messaging.acking-daemon :as acker]
+            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.operation :as operation]
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :as timbre :refer [debug info]]
+            [onyx.types :refer [->Leaf]])
+  (:import [java.util UUID]))
 
 (defn apply-fn
   [{:keys [onyx.core/params] :as event} segment]
@@ -86,7 +88,7 @@
           {}))))
 
 (defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
-  p-ext/IPipelineExtension
+  p-ext/IPipelineInput
   (read-batch 
     [_ event]
     {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
