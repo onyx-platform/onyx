@@ -88,7 +88,7 @@
           {}))))
 
 (defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
-  p-ext/IPipelineInput
+  p-ext/IPipeline
   (read-batch 
     [_ event]
     {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})

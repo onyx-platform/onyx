@@ -11,7 +11,7 @@
           ":core.async/chan not found - add it using a :before-task-start lifecycle")
   (let [pipeline (:onyx.core/pipeline event)] 
     {:core.async/pending-messages (:pending-messages pipeline) 
-     :core.async/drained? (:drained? pipeline)
+     :core.async/drained (:drained pipeline)
      :core.async/retry-ch (:retry-ch pipeline)
      :core.async/retry-count (:retry-count pipeline)}))
 
@@ -33,8 +33,8 @@
   {:lifecycle/before-task-start inject-writer})
 
 (defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages 
-                           drained? retry-ch retry-count]
-  p-ext/IPipelineExtension
+                           drained retry-ch retry-count]
+  p-ext/IPipeline
   (write-batch 
     [this event]
     (function/write-batch event))
@@ -60,8 +60,10 @@
       (when (and (= 1 (count @pending-messages))
                  (= (count batch) 1)
                  (= (:message (first batch)) :done))
-        (reset! drained? true))
+        (reset! drained true))
       {:onyx.core/batch batch}))
+
+  p-ext/IPipelineInput
 
   (ack-message [_ _ message-id]
     (swap! pending-messages dissoc message-id))
@@ -74,13 +76,13 @@
         (swap! retry-count inc))
       (>!! retry-ch msg)))
 
-  (pending?
+  (pending
     [_ _ message-id]
     (get @pending-messages message-id))
 
-  (drained? 
+  (drained 
     [_ _]
-    @drained?))
+    @drained))
 
 (defn input [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
@@ -91,7 +93,7 @@
                       (atom {}) (atom false) (chan 10000) (atom 0))))
 
 (defrecord CoreAsyncOutput []
-  p-ext/IPipelineExtension
+  p-ext/IPipeline
   (read-batch 
     [_ event]
     (function/read-batch event))

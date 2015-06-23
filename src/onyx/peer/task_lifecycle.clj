@@ -226,7 +226,7 @@
 
 (defn try-complete-job [pipeline event]
   (when (sentinel-found? event)
-    (if (p-ext/drained? pipeline event)
+    (if (p-ext/drained pipeline event)
       (complete-job event)
       (p-ext/retry-message pipeline event (sentinel-id event))))
   event)
@@ -336,7 +336,7 @@
           (when (= ch timeout-ch)
             (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
               (doseq [m tail]
-                (when (p-ext/pending? pipeline event m)
+                (when (p-ext/pending pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (p-ext/retry-message pipeline event m)))
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
