@@ -479,6 +479,11 @@
   (when (= (:onyx/type entry) :function)
     (operation/kw->fn (:onyx/fn entry))))
 
+(defn resolve-pipeline-builder [entry]
+  (if (:onyx/fn entry)
+    onyx.peer.function/function
+    (operation/kw->fn (:onyx/ident entry))))
+
 (defn validate-pending-timeout [pending-timeout opts]
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
     (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
@@ -541,19 +546,8 @@
                            :onyx.core/replica replica
                            :onyx.core/state state}
 
-            pipeline (cond (= (:onyx/ident catalog-entry)
-                              :core.async/read-from-chan) 
-                           (onyx.plugin.core-async/input pipeline-data)
-                           (= (:onyx/ident catalog-entry)
-                              :core.async/write-to-chan) 
-                           (onyx.plugin.core-async/output pipeline-data)
-                           (= (:onyx/ident catalog-entry)
-                              :generator)
-                           ((ns-resolve 'onyx.plugin.bench-plugin 'generator) pipeline-data)
-                           :else 
-                           (onyx.peer.function/function pipeline-data))
-
-
+            pipeline ((resolve-pipeline-builder catalog-entry) pipeline-data)
+            
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))

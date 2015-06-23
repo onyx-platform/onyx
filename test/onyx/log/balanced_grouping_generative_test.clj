@@ -28,7 +28,7 @@
 (def job-1
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :core.async/read-from-chan
+              :onyx/ident :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -44,7 +44,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :core.async/write-to-chan
+              :onyx/ident :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -56,7 +56,7 @@
 (def job-2
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :core.async/read-from-chan
+              :onyx/ident :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -71,7 +71,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :core.async/write-to-chan
+              :onyx/ident :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -83,7 +83,7 @@
 (def job-3
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :core.async/read-from-chan
+              :onyx/ident :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -98,7 +98,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :core.async/write-to-chan
+              :onyx/ident :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -110,7 +110,7 @@
 (def job-4
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :core.async/read-from-chan
+              :onyx/ident :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -125,7 +125,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :core.async/write-to-chan
+              :onyx/ident :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20

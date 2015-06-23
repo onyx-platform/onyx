@@ -44,7 +44,7 @@
 
 (def catalog
   [{:onyx/name :people-in
-    :onyx/ident :core.async/read-from-chan
+    :onyx/ident :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -72,7 +72,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :children-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/ident :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -80,7 +80,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :adults-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/ident :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -88,7 +88,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :athletes-wa-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/ident :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -96,7 +96,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :everyone-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/ident :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size

@@ -22,7 +22,7 @@
 
 (def catalog
   [{:onyx/name :in
-    :onyx/ident :core.async/read-from-chan
+    :onyx/ident :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-timeout batch-timeout
@@ -43,7 +43,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/ident :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/batch-timeout batch-timeout
     :onyx/medium :core.async

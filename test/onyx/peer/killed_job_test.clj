@@ -42,7 +42,7 @@
 
   (def catalog-1
     [{:onyx/name :in-1
-      :onyx/ident :core.async/read-from-chan
+      :onyx/ident :onyx.plugin.core-async/input
       :onyx/type :input
       :onyx/medium :core.async
       :onyx/batch-size batch-size
@@ -55,7 +55,7 @@
       :onyx/batch-size batch-size}
 
      {:onyx/name :out-1
-      :onyx/ident :core.async/write-to-chan
+      :onyx/ident :onyx.plugin.core-async/output
       :onyx/type :output
       :onyx/medium :core.async
       :onyx/batch-size batch-size
@@ -64,7 +64,7 @@
 
   (def catalog-2
     [{:onyx/name :in-2
-      :onyx/ident :core.async/read-from-chan
+      :onyx/ident :onyx.plugin.core-async/input
       :onyx/type :input
       :onyx/medium :core.async
       :onyx/batch-size batch-size
@@ -77,7 +77,7 @@
       :onyx/batch-size batch-size}
 
      {:onyx/name :out-2
-      :onyx/ident :core.async/write-to-chan
+      :onyx/ident :onyx.plugin.core-async/output
       :onyx/type :output
       :onyx/medium :core.async
       :onyx/batch-size batch-size
