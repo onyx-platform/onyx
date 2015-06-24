@@ -43,7 +43,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### User Guide 0.6.0
 
-- [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content)
+- [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 
