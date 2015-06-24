@@ -1,3 +1,7 @@
+#### 0.6.1
+
+- Use GitBook for documentation. [#119](https://github.com/onyx-platform/onyx/issues/119)
+
 #### 0.6.0
 
 - Dropped feature: support for `:sequential` tasks
