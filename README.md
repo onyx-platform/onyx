@@ -119,7 +119,7 @@ Contributions are welcome. Please fork the repository and send a pull request to
 
 #### Branching
 
-Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on master or feature branches and dropped into a major.minor.x branch when it's time to cut a new release. Pull requests into the master branch are welcome.
+Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on develop or feature branches and dropped into a major.minor.x branch when it's time to cut a new release. Pull requests into the develop branch are welcome.
 
 #### Commit rights
 
@@ -137,6 +137,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [sbennett33](https://github.com/sbennett33)
 - [Tyler van Hensbergen](https://github.com/tvanhens)
 - [David Leatherman](https://github.com/leathekd)
+- [Daniel Compton](https://github.com/danielcompton)
 
 #### Acknowledgements
 
