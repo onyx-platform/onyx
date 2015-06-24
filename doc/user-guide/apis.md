@@ -75,7 +75,7 @@ Shuts down the peer group, releasing any messaging resources it was holding open
 
 ##### `shutdown-env`
 
-Shuts down the development environment, stopping in memory HornetQ and ZooKeeper.
+Shuts down the development environment and stops in memory ZooKeeper.
 
 ### Peer Pipeline API
 
