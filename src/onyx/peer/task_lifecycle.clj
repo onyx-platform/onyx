@@ -226,7 +226,7 @@
 
 (defn try-complete-job [pipeline event]
   (when (sentinel-found? event)
-    (if (p-ext/drained pipeline event)
+    (if (p-ext/drained? pipeline event)
       (complete-job event)
       (p-ext/retry-message pipeline event (sentinel-id event))))
   event)
@@ -336,7 +336,7 @@
           (when (= ch timeout-ch)
             (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
               (doseq [m tail]
-                (when (p-ext/pending pipeline event m)
+                (when (p-ext/pending? pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (p-ext/retry-message pipeline event m)))
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
@@ -479,10 +479,25 @@
   (when (= (:onyx/type entry) :function)
     (operation/kw->fn (:onyx/fn entry))))
 
-(defn resolve-pipeline-builder [entry]
-  (if (:onyx/fn entry)
-    onyx.peer.function/function
-    (operation/kw->fn (:onyx/ident entry))))
+(defn instantiate-plugin-instance [class-name pipeline-data]
+  (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
+                                         (into-array Class [clojure.lang.IPersistentMap]))
+                (into-array [pipeline-data])))
+
+(defn build-pipeline [task-map pipeline-data]
+  (let [kw (:onyx/ident task-map)]
+    (try 
+      (if (#{:input :output} (:onyx/type task-map))
+        (let [user-ns (namespace kw)
+              user-fn (name kw)]
+          (if (and user-ns user-fn)
+            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+              (f pipeline-data)    
+              (throw (Exception.)))
+            (instantiate-plugin-instance user-fn pipeline-data)))
+        (onyx.peer.function/function pipeline-data))
+      (catch Throwable e 
+        (throw (ex-info "Could not resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e})))))) 
 
 (defn validate-pending-timeout [pending-timeout opts]
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
@@ -546,7 +561,8 @@
                            :onyx.core/replica replica
                            :onyx.core/state state}
 
-            pipeline ((resolve-pipeline-builder catalog-entry) pipeline-data)
+            pipeline (build-pipeline catalog-entry pipeline-data)
+            _ (taoensso.timbre/info "Built " pipeline " for " (:name task))
             
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))

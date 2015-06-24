@@ -1,16 +1,19 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
+            [clojure.reflect :refer [resolve-class]]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-function [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
 
+
 (defn kw->fn [kw]
   (try
     (let [user-ns (symbol (name (namespace kw)))
           user-fn (symbol (name kw))]
-      (or (ns-resolve user-ns user-fn) (throw (Exception.))))
+      (or (ns-resolve user-ns user-fn) 
+          (throw (Exception.))))
     (catch Throwable e
       (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:symbol kw})))))
 

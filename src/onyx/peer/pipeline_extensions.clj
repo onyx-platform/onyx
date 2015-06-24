@@ -4,29 +4,40 @@
 
 (gen-interface
   :name onyx.peer.IPipelineInput
-  :methods [[ack_message [clojure.lang.IPersistentMap java.util.UUID] Object]
-            [retry_message [clojure.lang.IPersistentMap java.util.UUID] Object]
-            [pending [clojure.lang.IPersistentMap java.util.UUID] Object]
-            [drained [clojure.lang.IPersistentMap] boolean]])
+  :methods [[ackMessage [clojure.lang.IPersistentMap java.util.UUID] Object]
+            [retryMessage [clojure.lang.IPersistentMap java.util.UUID] Object]
+            [isPending [clojure.lang.IPersistentMap java.util.UUID] Object]
+            [isDrained [clojure.lang.IPersistentMap] boolean]])
 
 (gen-interface
   :name onyx.peer.IPipeline
-  :methods [[read_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
-            [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
-            [seal_resource [clojure.lang.IPersistentMap] Object]])
+  :methods [[readBatch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
+            [writeBatch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
+            [sealResource [clojure.lang.IPersistentMap] Object]])
 
-(defprotocol IPipelineInput 
+(defprotocol PipelineInput 
   ;   "Acknowledges a message at the native level for a batch of message ids.
   ;    Must return a map."
   (ack-message [this event message-id])
   ;   "Releases a message id from the pending message pool and retries it."
   (retry-message [this event message-id])
   ;   "Returns true if this message ID is pending."
-  (pending [this event message-id])
+  (pending? [this event message-id])
   ;   "Returns true if this input resource has been exhausted."
-  (drained [this event]))
+  (drained? [this event]))
 
-(defprotocol IPipeline 
+(extend-protocol PipelineInput
+  onyx.peer.IPipelineInput
+  (ack-message [this event message-id]
+    (.ackMessage this event message-id))
+  (retry-message [this event message-id]
+    (.retryMessage this event message-id))
+  (pending? [this event message-id]
+    (.isPending this event message-id))
+  (drained? [this event]
+    (.isDrained this event)))
+
+(defprotocol Pipeline 
   ;   "Reads :onyx/batch-size segments off the incoming data source.
   ;    Must return a map with key :onyx.core/batch and value seq representing
   ;    the ingested segments. The seq must be maps of two keys:
@@ -44,3 +55,13 @@
   ;    Called once at the end of a task for each virtual peer after the incoming
   ;    queue has been exhausted. Only called once globally for a single task."
   (seal-resource [this event]))
+
+(extend-protocol Pipeline
+  onyx.peer.IPipeline
+  (read-batch [this event]
+    (.readBatch this event))
+  (write-batch [this event]
+    (.writeBatch this event))
+  (seal-resource [this event]
+    (.sealResource this event)))
+

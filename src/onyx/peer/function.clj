@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.function
   (:gen-class :name onyx.peer.Function
-              :methods [^{:static true} [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
+              :methods [^:static [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
   (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
             [onyx.static.planning :refer [find-task]]
             [onyx.messaging.acking-daemon :as acker]
@@ -87,8 +87,28 @@
                   (onyx.extensions/send-messages messenger event link segs)))))
           {}))))
 
+(defn -write_batch 
+  [{:keys [onyx.core/id onyx.core/results 
+           onyx.core/messenger onyx.core/job-id 
+           onyx.core/max-downstream-links] :as event}]
+    (let [leaves (fast-concat (map :leaves results))
+          egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
+      (when-not (empty? leaves)
+        (let [replica @(:onyx.core/replica event)
+              segments (build-segments-to-send leaves)
+              groups (group-by (juxt :route :hash-group) segments)
+              allocations (get (:allocations replica) job-id)]
+          (doseq [[[route hash-group] segs] groups]
+            (let [peers (get allocations (get egress-tasks route))
+                  active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
+                  target (pick-peer id active-peers hash-group max-downstream-links)]
+              (when target
+                (let [link (operation/peer-link replica (:onyx.core/state event) event target)]
+                  (onyx.extensions/send-messages messenger event link segs)))))
+          {}))))
+
 (defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
-  p-ext/IPipeline
+  p-ext/Pipeline
   (read-batch 
     [_ event]
     {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
@@ -108,7 +128,10 @@
               (when target
                 (let [link (operation/peer-link replica-val state event target)]
                   (onyx.extensions/send-messages messenger event link segs)))))
-          {})))))
+          {}))))
+
+  (seal-resource [_ _]
+    nil))
 
 (defn function [{:keys [onyx.core/replica
                         onyx.core/state

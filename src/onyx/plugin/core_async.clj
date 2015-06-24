@@ -34,7 +34,7 @@
 
 (defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages 
                            drained retry-ch retry-count]
-  p-ext/IPipeline
+  p-ext/Pipeline
   (write-batch 
     [this event]
     (function/write-batch event))
@@ -63,7 +63,7 @@
         (reset! drained true))
       {:onyx.core/batch batch}))
 
-  p-ext/IPipelineInput
+  p-ext/PipelineInput
 
   (ack-message [_ _ message-id]
     (swap! pending-messages dissoc message-id))
@@ -76,11 +76,11 @@
         (swap! retry-count inc))
       (>!! retry-ch msg)))
 
-  (pending
+  (pending?
     [_ _ message-id]
     (get @pending-messages message-id))
 
-  (drained 
+  (drained? 
     [_ _]
     @drained))
 
@@ -93,7 +93,7 @@
                       (atom {}) (atom false) (chan 10000) (atom 0))))
 
 (defrecord CoreAsyncOutput []
-  p-ext/IPipeline
+  p-ext/Pipeline
   (read-batch 
     [_ event]
     (function/read-batch event))
