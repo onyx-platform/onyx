@@ -64,55 +64,57 @@
         :else (into (set all) to-add)))
 
 (defn choose-output-paths
-  [event compiled-flow-conditions result leaf serialized-task downstream]
-  (if (empty? compiled-flow-conditions)
-    {:flow downstream}
-    (reduce
-      (fn [{:keys [flow exclusions] :as all} entry]
-        (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
-          (if (:flow/short-circuit? entry)
-            (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
-                              (into (set exclusions) (:flow/exclude-keys entry))
-                              (:flow/post-transform entry)
-                              (:flow/action entry)))
-            (->Route (join-output-paths flow (:flow/to entry) downstream)
-                     (into (set exclusions) (:flow/exclude-keys entry))
-                     nil
-                     nil))
-          all))
-      (->Route #{} #{} nil nil)
-      compiled-flow-conditions)))
+  [event compiled-flow-conditions result leaf downstream]
+  (reduce
+    (fn [{:keys [flow exclusions] :as all} entry]
+      (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
+        (if (:flow/short-circuit? entry)
+          (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
+                            (into (set exclusions) (:flow/exclude-keys entry))
+                            (:flow/post-transform entry)
+                            (:flow/action entry)))
+          (->Route (join-output-paths flow (:flow/to entry) downstream)
+                   (into (set exclusions) (:flow/exclude-keys entry))
+                   nil
+                   nil))
+        all))
+    (->Route #{} #{} nil nil)
+    compiled-flow-conditions))
 
 (defn add-route-data
-  [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
-    :as event} result leaf downstream]
-  (if (operation/exception? (:message leaf))
-    (if (seq compiled-ex-fcs)
-      (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
-      (throw (:message leaf)))
-    (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
+  [event result leaf downstream]
+  (if (nil? (:onyx.core/flow-conditions event))
+    (->Route downstream nil nil nil)
+    (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
+      (if (operation/exception? (:message leaf))
+        (if (seq compiled-ex-fcs)
+          (choose-output-paths event compiled-ex-fcs result leaf downstream)  
+          (throw (:message leaf)))
+        (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
+          (if (seq compiled-norm-fcs) 
+            (choose-output-paths event compiled-norm-fcs result leaf downstream)   
+            (->Route downstream nil nil nil)))))))
 
-(defn group-message [segment catalog task]
-  (let [t (find-task-fast catalog task)]
-    (if-let [k (:onyx/group-by-key t)]
-      (hash (get segment k))
-      (when-let [f (:onyx/group-by-fn t)]
-        (hash ((operation/resolve-fn {:onyx/fn f}) segment))))))
-
+ 
 (defn group-segments [leaf next-tasks catalog event]
-  (let [post-transformation (:post-transformation (:routes leaf))
+  (let [task->group-by-fn (:onyx.core/task->group-by-fn event)
+        post-transformation (:post-transformation (:routes leaf))
         message (:message leaf)
         msg (if (and (operation/exception? message) post-transformation)
               (operation/apply-function (operation/kw->fn post-transformation)
                                         [event] 
                                         message)
               message)]
-    (-> leaf 
-        (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
-        (assoc :hash-group (reduce (fn [groups t]
-                                     (assoc groups t (group-message msg catalog t)))
-                                   {} 
-                                   next-tasks)))))
+    (cond-> leaf 
+      (:onyx.core/flow-conditions event) 
+      (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
+      (not-empty task->group-by-fn)
+      (assoc :hash-group (reduce (fn [groups t]
+                                   (if-let [group-fn (task->group-by-fn t)]
+                                     (assoc groups t (hash (group-fn msg)))
+                                     groups))
+                                 {} 
+                                 next-tasks)))))
 
 (defn add-ack-vals [leaf]
   (assoc leaf 
@@ -202,21 +204,21 @@
     (merge event rets)))
 
 (defn tag-messages [task-type replica id job-id max-acker-links event]
-  (merge
-   event
-   (when (= task-type :input)
-     (let [peers (get (:ackers @replica) job-id)
-           candidates (operation/select-n-peers id peers max-acker-links)] 
-       (when-not (seq peers)
-         (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
-             (throw (ex-info "Not enough acker peers" {:peers peers}))))
-       (update-in
-         event
-         [:onyx.core/batch]
-         (fn [batch]
-           (map (comp (partial add-completion-id id)
-                      (partial add-acker-id candidates))
-                batch)))))))
+  (if (= task-type :input)
+    (let [peers (get (:ackers @replica) job-id)
+          candidates (operation/select-n-peers id peers max-acker-links)] 
+      (when-not (seq peers)
+        (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
+            (throw (ex-info "Not enough acker peers" {:peers peers}))))
+      (update-in
+        event
+        [:onyx.core/batch]
+        (fn [batch]
+          (map (comp (partial add-completion-id id)
+                     (partial add-acker-id candidates))
+               batch))))
+    
+    event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
   (when (= task-type :input)
@@ -232,13 +234,14 @@
   event)
 
 (defn strip-sentinel
-  ;; should only be neccessary for input tasks?
   [event]
-  (update-in event
-             [:onyx.core/batch]
-             (fn [batch]
-               (remove (fn [v] (= :done (:message v)))
-                       batch))))
+  (if (= (:onyx/type (:onyx.core/task-map event)) :input)
+    (update-in event
+               [:onyx.core/batch]
+               (fn [batch]
+                 (remove (fn [v] (= :done (:message v)))
+                         batch)))
+    event))
 
 (defn collect-next-segments [event input]
   (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
@@ -504,6 +507,31 @@
     (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
                     {:opts opts :pending-timeout pending-timeout}))))
 
+(defn compile-grouping-fn 
+  "Compiles grouping outgoing grouping task info into a task->group-fn map
+  for quick lookup and group fn calls"
+  [catalog egress-ids]
+  (merge (->> catalog
+              (filter (fn [entry] 
+                        (and (:onyx/group-by-key entry)
+                             egress-ids
+                             (egress-ids (:onyx/name entry)))))
+              (map (fn [entry] 
+                     (let [group-key (:onyx/group-by-key entry)
+                           group-fn (if (keyword? group-key)
+                                      group-key
+                                      #(get % group-key))] 
+                       [(:onyx/name entry) group-fn])))
+              (into {}))
+         (->> catalog 
+              (filter (fn [entry] 
+                        (and (:onyx/group-by-fn entry)
+                             egress-ids
+                             (egress-ids (:onyx/name entry)))))
+              (map (fn [entry]
+                     [(:onyx/name entry)
+                      (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
+              (into {}))))
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -543,6 +571,7 @@
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
+                           :onyx.core/task->group-by-fn (compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params catalog-entry opts)

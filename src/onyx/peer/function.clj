@@ -15,11 +15,6 @@
     (operation/apply-function f params segment)
     segment))
 
-; (defn filter-by-route [messages task-name]
-;   (->> messages
-;        (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
-;        (map #(dissoc % :routes :hash-group))))
-
 (defn into-transient [coll vs]
   (loop [rs (seq vs) updated-coll coll]
     (if rs 
