@@ -131,7 +131,7 @@
 (def gen-command
   (gen/one-of [gen-messages gen-acks gen-completion gen-retry]))
 
-(deftest messenger-gen-test 
+#_(deftest messenger-gen-test 
   (let [peer-group (onyx.api/start-peer-group peer-config)] 
     (try 
       (checking "all generated messages are received"
