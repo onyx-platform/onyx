@@ -417,11 +417,12 @@
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
+  (let [batch-size (:onyx/batch-size task-map)
+        ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
-      (if (< i (:onyx/batch-size task-map))
+      (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
           (recur (conj segments v) (inc i))
           segments)
