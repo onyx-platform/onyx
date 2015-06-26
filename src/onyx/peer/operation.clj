@@ -7,15 +7,32 @@
 (defn apply-function [f params segment]
   ((reduce #(partial %1 %2) f params) segment))
 
+(defn get-method-java [class-name method-name] 
+  (let [ms (filter #(= (.getName %) method-name) 
+                   (.getMethods (Class/forName class-name)))]
+    (if (= 1 (count ms)) 
+      (first ms)   
+      (throw (Exception. (format "Multiple methods found for %s/%s. Only one method may be defined." class-name method-name))))))
+
+(defn build-fn-java 
+  "Builds a clojure fn from a static java method. 
+  Note, may be slower than it should be because of varargs, and the many
+  (unnecessary) calls to partial in apply-function above."
+  [method]
+  (fn [& args] 
+    (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args))))
 
 (defn kw->fn [kw]
   (try
-    (let [user-ns (symbol (name (namespace kw)))
-          user-fn (symbol (name kw))]
-      (or (ns-resolve user-ns user-fn) 
+    (let [user-ns (name (namespace kw))
+          user-fn (name kw)]
+      (or (try (ns-resolve (symbol user-ns) (symbol user-fn))
+               (catch Throwable _)) 
+          (build-fn-java (get-method-java user-ns user-fn))
           (throw (Exception.))))
     (catch Throwable e
-      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:symbol kw})))))
+      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" 
+                      {:symbol kw :exception e})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))
