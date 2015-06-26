@@ -10,7 +10,7 @@
 
 (gen-interface
   :name onyx.IPipelineInput
-  :methods [[ackMessage [clojure.lang.IPersistentMap java.util.UUID] Object]
+  :methods [[ackMessage [clojure.lang.IPersistentMap java.util.UUID] void]
             [retryMessage [clojure.lang.IPersistentMap java.util.UUID] Object]
             [isPending [clojure.lang.IPersistentMap java.util.UUID] Object]
             [isDrained [clojure.lang.IPersistentMap] boolean]])
