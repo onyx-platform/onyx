@@ -423,7 +423,7 @@
         (let [t (System/currentTimeMillis)
               snapshot @state
               to-remove (map first 
-                             (filter (fn [[k v]] (>= (- t (:timestamp v)) idle)) 
+                             (filter (fn [[k v]] (>= (- t @(:timestamp v)) idle)) 
                                      (:links snapshot)))]
           (doseq [k to-remove]
             (swap! state dissoc k)
