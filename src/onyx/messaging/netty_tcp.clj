@@ -382,12 +382,6 @@
           (add-failed-check fut connection ^ByteBuf buf)) 
         (enqueue-pending connection buf))))
 
-<<<<<<< HEAD
-=======
-  (backpressure? [_]
-    (>= @incomplete-bytes 100000000))
-
->>>>>>> 423cf82... Many cumulative performance improvements in netty
   (close [_] 
     (let [cval @channel] (if cval (.close ^Channel cval)))
     (some-> @pending-ch close!))
