@@ -1,7 +1,6 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
-            [clojure.reflect :refer [resolve-class]]
             [taoensso.timbre :refer [info]]))
 
 (defn apply-function [f params segment]
