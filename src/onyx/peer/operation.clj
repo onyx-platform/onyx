@@ -53,7 +53,7 @@
   (if (<= (count all-peers) n)
     all-peers
     (take n 
-          (sort-by (fn [peer-id] (hash-combine id peer-id))
+          (sort-by (fn [peer-id] (hash-combine (.hashCode id) (.hashCode peer-id)))
                    all-peers))))
 
 (defn peer-link

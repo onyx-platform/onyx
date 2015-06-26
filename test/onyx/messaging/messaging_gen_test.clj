@@ -73,7 +73,7 @@
                         :acks (ext/internal-ack-messages send-messenger nil send-link (:payload command)))) 
                     nil commands)
 
-            (Thread/sleep 5000)
+            (Thread/sleep 1000)
             (ext/close-peer-connection send-messenger nil send-link)
             @received)
           (finally 
@@ -135,7 +135,7 @@
   (let [peer-group (onyx.api/start-peer-group peer-config)] 
     (try 
       (checking "all generated messages are received"
-                (times 20)
+                (times 10)
                 [commands (gen/vector gen-command)]
                 (let [grouped-model (group-by :command commands) 
                       model-results (zipmap (keys grouped-model)
