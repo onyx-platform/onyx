@@ -4,7 +4,7 @@
             [taoensso.timbre :refer [fatal] :as timbre]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.acking-daemon :as acker]
-            [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
+            [onyx.messaging.common :as common]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults]])
@@ -66,10 +66,10 @@
 
 (defn handle-aux-message [daemon release-ch retry-ch buffer offset length header]
   (let [msg-type (protocol/read-message-type buffer offset)
-        offset-rest (inc offset)] 
+        offset-rest (long (inc offset))] 
     (cond (= msg-type protocol/ack-msg-id)
-          (let [[id completion-id ack-val] (protocol/read-acker-message buffer offset-rest)]
-            (acker/ack-message daemon id completion-id ack-val))
+          (let [ack (protocol/read-acker-message buffer offset-rest)]
+            (acker/ack-message daemon (:id ack) (:completion-id ack) (:ack-val ack)))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset-rest)]
@@ -87,7 +87,7 @@
 
 (defn backoff-strategy [strategy]
   (case strategy
-    :low-restart-latency (BackoffIdleStrategy. 100 
+    :low-restart-latency (BackoffIdleStrategy. 1 
                                                10
                                                (.toNanos TimeUnit/MICROSECONDS 1)
                                                (.toNanos TimeUnit/MICROSECONDS 100))
@@ -96,42 +96,45 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10000)
                                                 (.toNanos TimeUnit/MICROSECONDS 100000))))
 
-(defn consumer [handler idle-strategy limit]
+(defn consumer [handler ^IdleStrategy idle-strategy limit]
   (proxy [Consumer] []
     (accept [subscription]
-      ;; TODO, evaluate different idle strategies.
-      (let [strategy ^IdleStrategy (backoff-strategy idle-strategy)]
-        (while (not (Thread/interrupted))
-          (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
-            (.idle strategy fragments-read)))))))
+      (while (not (Thread/interrupted))
+        (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
+          (.idle idle-strategy fragments-read))))))
 
 (def no-op-error-handler
   (proxy [ErrorHandler] []
     (onError [x] (taoensso.timbre/warn x))))
 
-(defrecord AeronConnection [peer-group]
+(defrecord AeronConnection [peer-group bind-addr external-addr 
+                            inbound-ch send-idle-strategy receive-idle-strategy ports resources 
+                            release-ch retry-ch decompress-f compress-f]
   component/Lifecycle
-
   (start [component]
-    (taoensso.timbre/info "Starting Aeron")
+    (taoensso.timbre/info "Starting Aeron" (:messenger-buffer component))
     (let [config (:config peer-group)
+          inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
           retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
-          bind-addr (bind-addr config)
-          external-addr (external-addr config)
-          ports (allowable-ports config)
-          backpressure-strategy (or (:onyx.messaging.aeron/backpressure-strategy config) 
-                                    :high-restart-latency)]
+          bind-addr (common/bind-addr config)
+          external-addr (common/external-addr config)
+          ports (common/allowable-ports config)
+          backpressure-strategy (or (:onyx.messaging.aeron/backpressure-strategy config) :high-restart-latency)
+          send-idle-strategy (backoff-strategy backpressure-strategy)
+          receive-idle-strategy (backoff-strategy backpressure-strategy)]
       (assoc component 
-        :bind-addr bind-addr 
-        :external-addr external-addr
-        :backpressure-strategy backpressure-strategy
-        :ports ports
-        :resources (atom nil) 
-        :release-ch release-ch
-        :retry-ch retry-ch
-        :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
-        :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
+             :bind-addr bind-addr 
+             :external-addr external-addr
+             :inbound-ch inbound-ch
+             :send-idle-strategy send-idle-strategy
+             :receive-idle-strategy receive-idle-strategy
+             :ports ports
+             :resources (atom nil) 
+             :release-ch release-ch
+             :retry-ch retry-ch
+             :decompress-f (or (:onyx.messaging/decompress-fn (:config peer-group)) decompress)
+             :compress-f (or (:onyx.messaging/compress-fn (:config peer-group)) compress))))
 
   (stop [{:keys [aeron resources release-ch] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
@@ -153,8 +156,9 @@
       (catch Throwable e (fatal e)))
 
     (assoc component
-      :bind-addr nil :external-addr nil
-      :site-resources nil :release-ch nil :retry-ch nil)))
+           :bind-addr nil :external-addr nil :inbound-ch nil :send-idle-strategy nil 
+           :receive-idle-strategy nil :ports nil :resources nil
+           :release-ch nil :retry-ch nil :decompress-f nil :compress-f nil)))
 
 (defn aeron [peer-group]
   (map->AeronConnection {:peer-group peer-group}))
@@ -170,33 +174,35 @@
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
+(defrecord AeronResources [conn accept-send-fut accept-aux-fut send-subscriber aux-subscriber])
+
 (defmethod extensions/open-peer-site AeronConnection
   [messenger assigned]
   (let [inbound-ch (:inbound-ch (:messenger-buffer messenger))
-        {:keys [release-ch retry-ch acking-daemon backpressure-strategy bind-addr]} messenger
+        {:keys [release-ch retry-ch acking-daemon bind-addr]} messenger
         ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         aeron (Aeron/connect ctx)
         channel (aeron-channel bind-addr (:aeron/port assigned))
-        send-idle-strategy (backoff-strategy backpressure-strategy)
+        decompress-f (:decompress-f messenger)
+        send-handler (data-handler (fn [buffer offset length header] 
+                                     (handle-sent-message inbound-ch decompress-f buffer offset length header)))
+        aux-handler (data-handler (fn [buffer offset length header] 
+                                    (handle-aux-message acking-daemon release-ch retry-ch buffer offset length header)))
 
-        send-handler (data-handler (partial handle-sent-message inbound-ch (:decompress-f messenger)))
-        aux-handler (data-handler (partial handle-aux-message acking-daemon release-ch retry-ch))
+        send-subscriber (.addSubscription aeron channel send-stream-id)
+        aux-subscriber (.addSubscription aeron channel aux-stream-id)
 
-        send-subscriber (.addSubscription aeron channel send-stream-id #_send-handler)
-        aux-subscriber (.addSubscription aeron channel aux-stream-id #_aux-handler)
+        receive-idle-strategy (:receive-idle-strategy messenger)
 
         ;; pass in handler to consumer constructor
-        accept-send-fut (future (try (.accept ^Consumer (consumer send-handler backpressure-strategy 10) send-subscriber) 
+        accept-send-fut (future (try (.accept ^Consumer (consumer send-handler receive-idle-strategy 10) send-subscriber) 
                                      (catch Throwable e (fatal e))))
-        accept-aux-fut (future (try (.accept ^Consumer (consumer aux-handler backpressure-strategy 10) aux-subscriber) 
+        accept-aux-fut (future (try (.accept ^Consumer (consumer aux-handler receive-idle-strategy 10) aux-subscriber) 
                                       (catch Throwable e (fatal e))))]
     (reset! (:resources messenger)
-            {:conn aeron
-             :send-idle-strategy send-idle-strategy
-             :accept-send-fut accept-send-fut
-             :accept-aux-fut accept-aux-fut
-             :send-subscriber send-subscriber
-             :aux-subscriber aux-subscriber})))
+            (->AeronResources aeron accept-send-fut accept-aux-fut send-subscriber aux-subscriber))))
+
+(defrecord AeronPeerConnection [conn send-pub-f-create send-pub aux-pub-f-create aux-pub])
 
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger event {:keys [aeron/external-addr aeron/port]}]
@@ -205,69 +211,70 @@
         channel (aeron-channel external-addr port)
         f-send-pub #(.addPublication aeron channel send-stream-id)
         f-aux-pub #(.addPublication aeron channel aux-stream-id)]
-    {:conn aeron 
-     :send-pub {:f-create f-send-pub
-                :pub (atom nil)} 
-     :aux-pub {:f-create f-aux-pub
-               :pub (atom nil)}}))
+    (->AeronPeerConnection aeron f-send-pub (atom nil) f-aux-pub (atom nil))))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
-        ch (:inbound-ch (:onyx.core/messenger-buffer event))
+  (let [ch (:inbound-ch messenger)
+        batch-size (:onyx/batch-size task-map)
+        ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
-      (if (< i (:onyx/batch-size task-map))
+      (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
           (recur (conj segments v) (inc i))
           segments)
         segments))))
 
-(defn get-peer-link-pub [peer-link k]
-  (if-let [pub @(get-in peer-link [k :pub])]
+(defn get-peer-link-pub [peer-link link-key create-key]
+  (if-let [pub @(get peer-link link-key)]
     pub
-    (reset! (get-in peer-link [k :pub]) ((get-in peer-link [k :f-create])))))
+    (reset! (get peer-link link-key) ((get peer-link create-key)))))
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event peer-link batch]
   (let [[len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) batch)
-        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :send-pub)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 len))]
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :send-pub :send-pub-f-create)
+        offer-f (fn [] (.offer pub unsafe-buffer 0 len))
+        idle-strategy (:send-idle-strategy messenger)]
     (while (not (offer-f))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+      (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/internal-ack-messages AeronConnection
   [messenger event peer-link acks]
   ; TODO: Might want to batch in a single buffer as in netty
-  (let [pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)] 
+  (let [pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub :aux-pub-f-create)
+        idle-strategy (:send-idle-strategy messenger)] 
     (doseq [{:keys [id completion-id ack-val]} acks] 
       (let [unsafe-buffer (protocol/build-acker-message id completion-id ack-val)
             offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
         (while (not (offer-f))
-          (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))))
+          (.idle ^IdleStrategy idle-strategy 0))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id peer-link]
-  (let [unsafe-buffer (protocol/build-completion-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
+  (let [idle-strategy (:send-idle-strategy messenger)
+        unsafe-buffer (protocol/build-completion-msg-buf id)
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub :aux-pub-f-create)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
     (while (not (offer-f))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+      (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event id peer-link]
-  (let [unsafe-buffer (protocol/build-retry-msg-buf id)
-        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub)
+  (let [idle-strategy (:send-idle-strategy messenger)
+        unsafe-buffer (protocol/build-retry-msg-buf id)
+        pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub :aux-pub-f-create)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
     (while (not (offer-f))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+      (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
-  (when-let [pub (get-in peer-link [:send-pub :pub])] 
+  (when-let [pub (get peer-link :send-pub)] 
     (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
-  (when-let [pub (get-in peer-link [:send-pub :aux-pub])]
+  (when-let [pub (get peer-link :aux-pub)]
     (when @pub (.close ^uk.co.real_logic.aeron.Publication @pub))
     (reset! pub nil))
   (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
