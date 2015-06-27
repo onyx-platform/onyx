@@ -8,16 +8,17 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults]])
-  #_(:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
+  (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
            [uk.co.real_logic.aeron Aeron$Context]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-           [uk.co.real_logic.aeron.common.concurrent.logbuffer DataHandler]
+           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona CloseHelper]
+           [uk.co.real_logic.agrona ErrorHandler]
            [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
-(comment
+
 (defrecord AeronPeerGroup [opts]
   component/Lifecycle
   (start [component]
@@ -80,8 +81,8 @@
 
 (defn data-handler [f]
   (FragmentAssemblyAdapter. 
-    (proxy [DataHandler] []
-      (onData [buffer offset length header]
+    (proxy [FragmentHandler] []
+      (onFragment [buffer offset length header]
         (f buffer offset length header)))))
 
 (defn backoff-strategy [strategy]
@@ -95,18 +96,18 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10000)
                                                 (.toNanos TimeUnit/MICROSECONDS 100000))))
 
-(defn consumer [idle-strategy limit]
+(defn consumer [handler idle-strategy limit]
   (proxy [Consumer] []
     (accept [subscription]
       ;; TODO, evaluate different idle strategies.
       (let [strategy ^IdleStrategy (backoff-strategy idle-strategy)]
         (while (not (Thread/interrupted))
-          (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription limit)]
+          (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
             (.idle strategy fragments-read)))))))
 
 (def no-op-error-handler
-  (proxy [Consumer] []
-    (accept [x] (taoensso.timbre/warn x))))
+  (proxy [ErrorHandler] []
+    (onError [x] (taoensso.timbre/warn x))))
 
 (defrecord AeronConnection [peer-group]
   component/Lifecycle
@@ -181,12 +182,13 @@
         send-handler (data-handler (partial handle-sent-message inbound-ch (:decompress-f messenger)))
         aux-handler (data-handler (partial handle-aux-message acking-daemon release-ch retry-ch))
 
-        send-subscriber (.addSubscription aeron channel send-stream-id send-handler)
-        aux-subscriber (.addSubscription aeron channel aux-stream-id aux-handler)
+        send-subscriber (.addSubscription aeron channel send-stream-id #_send-handler)
+        aux-subscriber (.addSubscription aeron channel aux-stream-id #_aux-handler)
 
-        accept-send-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) send-subscriber) 
+        ;; pass in handler to consumer constructor
+        accept-send-fut (future (try (.accept ^Consumer (consumer send-handler backpressure-strategy 10) send-subscriber) 
                                      (catch Throwable e (fatal e))))
-        accept-aux-fut (future (try (.accept ^Consumer (consumer backpressure-strategy 10) aux-subscriber) 
+        accept-aux-fut (future (try (.accept ^Consumer (consumer aux-handler backpressure-strategy 10) aux-subscriber) 
                                       (catch Throwable e (fatal e))))]
     (reset! (:resources messenger)
             {:conn aeron
@@ -270,4 +272,4 @@
     (reset! pub nil))
   (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
   {})
-)
+

@@ -1,11 +1,11 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
   (:require [taoensso.timbre :as timbre]
             [onyx.types :refer [->Leaf]])
-  #_(:import [java.util UUID]
+  (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
 
-(comment
+;comment
 ;;;;;;
 ;; Constants
 
@@ -88,6 +88,7 @@
 
 (def ^:const message-count-size 4)
 (def ^:const payload-size-size 4)
+(def ^:const messages-header-size (+ message-count-size payload-size-size))
 
 (defn meta-message-offsets [start-pos cnt]
   (reductions + start-pos (repeat cnt message-base-length)))
@@ -99,17 +100,13 @@
   (let [message-count (count messages)
         message-payloads ^bytes (compress-f (map :message messages))
         payload-size (alength message-payloads)
-        buf-size (+ message-count-size
-                    payload-size-size
-                    payload-size 
-                    (* message-count message-base-length))
+        buf-size (+ messages-header-size
+                    (+ payload-size 
+                       (* message-count message-base-length)))
         buf (UnsafeBuffer. (byte-array buf-size))] 
-    (.putInt buf 0 (int (count messages))) ; number of messages
+    (.putInt buf 0 message-count) ; number of messages
     (.putInt buf message-count-size payload-size)
-    (.putBytes buf 
-               (+ message-count-size
-                  payload-size-size) 
-               message-payloads)
+    (.putBytes buf (+ message-count-size payload-size-size) message-payloads)
     (let [offset (+ message-count-size payload-size-size payload-size)
           buf-size (reduce (fn [offset msg]
                              (write-message-meta buf offset msg) 
@@ -138,4 +135,4 @@
                (next payloads)
                (+ offset message-base-length))
         (persistent! messages)))))
-)
+
