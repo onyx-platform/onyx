@@ -93,8 +93,8 @@
                                                (.toNanos TimeUnit/MICROSECONDS 100))
     :high-restart-latency (BackoffIdleStrategy. 10
                                                 100
-                                                (.toNanos TimeUnit/MICROSECONDS 10000)
-                                                (.toNanos TimeUnit/MICROSECONDS 100000))))
+                                                (.toNanos TimeUnit/MICROSECONDS 100)
+                                                (.toNanos TimeUnit/MICROSECONDS 10000))))
 
 (defn consumer [handler ^IdleStrategy idle-strategy limit]
   (proxy [Consumer] []
@@ -120,7 +120,8 @@
           bind-addr (common/bind-addr config)
           external-addr (common/external-addr config)
           ports (common/allowable-ports config)
-          backpressure-strategy (or (:onyx.messaging.aeron/backpressure-strategy config) :high-restart-latency)
+          backpressure-strategy (or (:onyx.messaging.aeron/idle-strategy config) 
+                                    (:onyx.messaging.aeron/idle-strategy defaults))
           send-idle-strategy (backoff-strategy backpressure-strategy)
           receive-idle-strategy (backoff-strategy backpressure-strategy)]
       (assoc component 
