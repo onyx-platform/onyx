@@ -254,27 +254,26 @@
                          batch)))
     event))
 
-(defn collect-next-segments [event input]
-  ;;; Some optimisation on params and onyx.core/fn can be performed here
-  (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
+(defn collect-next-segments [f params input]
+  (let [segments (try (operation/apply-function f params input) (catch Throwable e e))]
     (if (sequential? segments) segments (vector segments))))
 
-(defn apply-fn-single [{:keys [onyx.core/batch] :as event}]
+(defn apply-fn-single [f params {:keys [onyx.core/batch] :as event}]
   (assoc
    event
    :onyx.core/results
    (doall
      (map
        (fn [segment]
-         (let [segments (collect-next-segments event (:message segment))
+         (let [segments (collect-next-segments f params (:message segment))
                leaves (map leaf segments)]
            (->Result segment leaves)))
        batch))))
 
-(defn apply-fn-bulk [{:keys [onyx.core/batch] :as event}]
+(defn apply-fn-bulk [f params {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
-    (function/apply-fn event segments)
+    (operation/apply-function f params segments)
     (assoc
       event
       :onyx.core/results
@@ -284,11 +283,11 @@
             (->Result segment (list (leaf (:message segment)))))
           batch)))))
 
-(defn apply-fn [bulk? event]
+(defn apply-fn [f params bulk? event]
   (let [rets
         (if bulk?
-          (apply-fn-bulk event)
-          (apply-fn-single event))]
+          (apply-fn-bulk f params event)
+          (apply-fn-single f params event))]
     (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)
@@ -390,6 +389,8 @@
            onyx.core/serialized-task
            onyx.core/messenger
            onyx.core/id 
+           onyx.core/params
+           onyx.core/fn
            onyx.core/max-acker-links 
            onyx.core/job-id] :as init-event} seal-ch kill-ch ex-f]
   (let [task-type (:onyx/type task-map)
@@ -404,7 +405,7 @@
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
              (strip-sentinel)
-             (apply-fn bulk?)
+             (apply-fn fn params bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
              (flow-retry-messages replica state messenger)
@@ -598,7 +599,7 @@
                                                                (:onyx.messaging/max-downstream-links defaults))
                            :onyx.core/max-acker-links (or (:onyx.messaging/max-acker-links opts)
                                                           (:onyx.messaging/max-acker-links defaults))
-                           :onyx.core/fn (resolve-task-fn catalog-entry)
+                           :onyx.core/fn (or (resolve-task-fn catalog-entry) identity)
                            :onyx.core/replica replica
                            :onyx.core/state state}
 
