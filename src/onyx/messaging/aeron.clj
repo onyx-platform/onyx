@@ -120,10 +120,10 @@
           bind-addr (common/bind-addr config)
           external-addr (common/external-addr config)
           ports (common/allowable-ports config)
-          backpressure-strategy (or (:onyx.messaging.aeron/idle-strategy config) 
-                                    (:onyx.messaging.aeron/idle-strategy defaults))
-          send-idle-strategy (backoff-strategy backpressure-strategy)
-          receive-idle-strategy (backoff-strategy backpressure-strategy)]
+          idle-strategy-config (or (:onyx.messaging.aeron/idle-strategy config) 
+                                   (:onyx.messaging.aeron/idle-strategy defaults))
+          send-idle-strategy (backoff-strategy idle-strategy-config)
+          receive-idle-strategy (backoff-strategy idle-strategy-config)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr
