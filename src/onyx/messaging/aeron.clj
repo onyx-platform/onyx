@@ -76,7 +76,7 @@
             (>!! release-ch completion-id))
 
           (= msg-type protocol/retry-msg-id)
-          (let [retry-id (protocol/read-retry buffer offset)]
+          (let [retry-id (protocol/read-retry buffer offset-rest)]
             (>!! retry-ch retry-id)))))
 
 (defn data-handler [f]
@@ -197,6 +197,8 @@
         receive-idle-strategy (:receive-idle-strategy messenger)
 
         ;; pass in handler to consumer constructor
+        ;;;;; FIXME: 10 is not the right fragment limit to use here
+        ;;;;; should at least be configurable
         accept-send-fut (future (try (.accept ^Consumer (consumer send-handler receive-idle-strategy 10) send-subscriber) 
                                      (catch Throwable e (fatal e))))
         accept-aux-fut (future (try (.accept ^Consumer (consumer aux-handler receive-idle-strategy 10) aux-subscriber) 
@@ -281,4 +283,3 @@
     (reset! pub nil))
   (.close ^uk.co.real_logic.aeron.Aeron (:conn peer-link)) 
   {})
-
