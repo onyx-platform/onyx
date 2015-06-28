@@ -55,7 +55,7 @@
             (if-let [ack (get state message-id)]
               (let [updated-ack-val (bit-xor ^long (:ack-val ack) ^long ack-val)]
                 (if (zero? updated-ack-val)
-                  (dissoc state message-id) 
+                  (dissoc state message-id)
                   (assoc state message-id (assoc ack :ack-val updated-ack-val))))
               (if (zero? ^long ack-val) 
                 state
