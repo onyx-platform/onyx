@@ -62,51 +62,45 @@
                 (count active-peers)))
       (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
-(defn read-batch [{:keys [onyx.core/messenger] :as event}]
-  {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
+(defn read-batch 
+  ([event]
+   (read-batch event (:onyx.core/messenger event)))
+  ([event messenger]
+   {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
 
-(defn write-batch 
-  [{:keys [onyx.core/id onyx.core/results 
-           onyx.core/messenger onyx.core/job-id 
-           onyx.core/max-downstream-links] :as event}]
-    (let [leaves (fast-concat (map :leaves results))
-          egress-tasks (:egress-ids (:onyx.core/serialized-task event))]
-      (when-not (empty? leaves)
-        (let [replica @(:onyx.core/replica event)
-              segments (build-segments-to-send leaves)
-              groups (group-by (juxt :route :hash-group) segments)
-              allocations (get (:allocations replica) job-id)]
-          (doseq [[[route hash-group] segs] groups]
-            (let [peers (get allocations (get egress-tasks route))
-                  active-peers (filter #(= (get-in replica [:peer-state %]) :active) peers)
-                  target (pick-peer id active-peers hash-group max-downstream-links)]
-              (when target
-                (let [link (operation/peer-link replica (:onyx.core/state event) event target)]
-                  (onyx.extensions/send-messages messenger event link segs)))))
-          {}))))
+(defn write-batch
+  ([event replica state id messenger job-id max-downstream-links egress-tasks]
+   (let [leaves (fast-concat (map :leaves (:onyx.core/results event)))]
+     (when-not (empty? leaves)
+       (let [replica-val @replica
+             peer-state (:peer-state replica-val)
+             segments (build-segments-to-send leaves)
+             groups (group-by #(list (:route %) (:hash-group %)) segments)
+             allocations (get (:allocations replica-val) job-id)]
+         (doseq [[[route hash-group] segs] groups]
+           (let [peers (get allocations (get egress-tasks route))
+                 active-peers (filter #(= (peer-state %) :active) peers)
+                 target (pick-peer id active-peers hash-group max-downstream-links)]
+             (when target
+               (let [link (operation/peer-link replica-val state event target)]
+                 (onyx.extensions/send-messages messenger event link segs)))))
+         {}))))
+  ([{:keys [onyx.core/id onyx.core/results 
+            onyx.core/messenger onyx.core/job-id 
+            onyx.core/state onyx.core/replica 
+            onyx.core/serialized-task 
+            onyx.core/max-downstream-links] :as event}]
+   (write-batch event replica state id messenger job-id max-downstream-links (:egress-ids serialized-task))))
 
 (defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
   p-ext/Pipeline
   (read-batch 
     [_ event]
-    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)})
+    (read-batch event messenger))
 
   (write-batch 
-    [_ {:keys [onyx.core/results] :as event}]
-    (let [leaves (fast-concat (map :leaves results))]
-      (when-not (empty? leaves)
-        (let [replica-val @replica
-              segments (build-segments-to-send leaves)
-              groups (group-by (juxt :route :hash-group) segments)
-              allocations (get (:allocations replica-val) job-id)]
-          (doseq [[[route hash-group] segs] groups]
-            (let [peers (get allocations (get egress-tasks route))
-                  active-peers (filter #(= (get-in replica-val [:peer-state %]) :active) peers)
-                  target (pick-peer id active-peers hash-group max-downstream-links)]
-              (when target
-                (let [link (operation/peer-link replica-val state event target)]
-                  (onyx.extensions/send-messages messenger event link segs)))))
-          {}))))
+    [_ event]
+    (write-batch event replica state id messenger job-id max-downstream-links egress-tasks))
 
   (seal-resource [_ _]
     nil))
