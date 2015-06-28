@@ -3,11 +3,6 @@
             [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
-(defn apply-function [f params segment]
-  ;; TODO: may be able to pre-apply the reductions once
-  ;; when the pipeline starts (assuming no params are injected later)
-  ((reduce #(partial %1 %2) f params) segment))
-
 (defn get-method-java [class-name method-name] 
   (let [ms (filter #(= (.getName %) method-name) 
                    (.getMethods (Class/forName class-name)))]

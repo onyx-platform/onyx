@@ -102,9 +102,7 @@
         routes (:routes leaf)
         post-transformation (:post-transformation routes)
         msg (if (and (operation/exception? message) post-transformation)
-              (operation/apply-function (operation/kw->fn post-transformation)
-                                        (list event) 
-                                        message)
+              ((operation/kw->fn post-transformation) event message)
               message)]
     (assoc leaf :message (reduce dissoc msg (:exclusions routes)))))
 
@@ -254,26 +252,26 @@
                          batch)))
     event))
 
-(defn collect-next-segments [f params input]
-  (let [segments (try (operation/apply-function f params input) (catch Throwable e e))]
-    (if (sequential? segments) segments (vector segments))))
+(defn collect-next-segments [f input]
+  (let [segments (try (f input) (catch Throwable e e))]
+    (if (sequential? segments) segments (list segments))))
 
-(defn apply-fn-single [f params {:keys [onyx.core/batch] :as event}]
+(defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
   (assoc
    event
    :onyx.core/results
    (doall
      (map
        (fn [segment]
-         (let [segments (collect-next-segments f params (:message segment))
+         (let [segments (collect-next-segments f (:message segment))
                leaves (map leaf segments)]
            (->Result segment leaves)))
        batch))))
 
-(defn apply-fn-bulk [f params {:keys [onyx.core/batch] :as event}]
+(defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
-    (operation/apply-function f params segments)
+    (f segments)
     (assoc
       event
       :onyx.core/results
@@ -283,11 +281,15 @@
             (->Result segment (list (leaf (:message segment)))))
           batch)))))
 
-(defn apply-fn [f params bulk? event]
-  (let [rets
+(defn curry-params [f params]
+  (reduce #(partial %1 %2) f params))
+
+(defn apply-fn [f bulk? event]
+  (let [g (curry-params f (:onyx.core/params event))
+        rets
         (if bulk?
-          (apply-fn-bulk f params event)
-          (apply-fn-single f params event))]
+          (apply-fn-bulk g event)
+          (apply-fn-single g event))]
     (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)
@@ -405,7 +407,7 @@
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
              (strip-sentinel)
-             (apply-fn fn params bulk?)
+             (apply-fn fn bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
              (flow-retry-messages replica state messenger)
