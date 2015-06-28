@@ -15,7 +15,7 @@
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona CloseHelper]
            [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy]
+           [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
@@ -87,6 +87,7 @@
 
 (defn backoff-strategy [strategy]
   (case strategy
+    :busy-spin (BusySpinIdleStrategy.)
     :low-restart-latency (BackoffIdleStrategy. 1 
                                                10
                                                (.toNanos TimeUnit/MICROSECONDS 1)
