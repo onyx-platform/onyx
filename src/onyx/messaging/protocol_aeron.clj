@@ -91,7 +91,6 @@
         ack-val (.getLong buf (unchecked-add offset 48))]
     (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
 
-
 (defn build-messages-msg-buf [compress-f messages]
   ;; Performance consideration:
   ;; We would rather write to one contiguous byte array or a byteoutputstream
@@ -100,19 +99,19 @@
         message-payloads ^bytes (compress-f (map :message messages))
         payload-size (alength message-payloads)
         buf-size (unchecked-add messages-header-size
-                    (unchecked-add payload-size 
-                       (* message-count message-base-length)))
-        buf (UnsafeBuffer. (byte-array buf-size))] 
-    (.putInt buf 0 message-count) ; number of messages
-    (.putInt buf message-count-size payload-size)
-    (.putBytes buf (unchecked-add message-count-size payload-size-size) message-payloads)
-    (let [offset (unchecked-add message-count-size (unchecked-add payload-size-size payload-size))
-          buf-size (reduce (fn [offset msg]
-                             (write-message-meta buf offset msg) 
-                             (unchecked-add message-base-length ^long offset))
-                           offset
-                           messages)]
-      (list buf-size buf))))
+                                (unchecked-add payload-size 
+                                               (* message-count message-base-length)))
+        buf (UnsafeBuffer. (byte-array buf-size))
+        _ (.putInt buf 0 message-count) ; number of messages
+        _ (.putInt buf message-count-size payload-size)
+        _ (.putBytes buf messages-header-size message-payloads)
+        offset (unchecked-add messages-header-size payload-size)
+        buf-size (reduce (fn [offset msg]
+                           (write-message-meta buf offset msg) 
+                           (unchecked-add message-base-length ^long offset))
+                         offset
+                         messages)] 
+    (list buf-size buf)))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
   (let [message-count (.getInt buf offset)
@@ -134,4 +133,3 @@
                (next payloads)
                (unchecked-add offset message-base-length))
         (persistent! messages)))))
-
