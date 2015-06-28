@@ -16,7 +16,6 @@
                  [uk.co.real-logic/Agrona "0.3.2-SNAPSHOT"]
                  [uk.co.real-logic/aeron-client "0.1-SNAPSHOT"]
                  [uk.co.real-logic/aeron-driver "0.1-SNAPSHOT"]
-                 [uk.co.real-logic/aeron-common "0.1-SNAPSHOT"]
                  [prismatic/schema "0.4.0"]
                  [org.apache.zookeeper/zookeeper "3.4.1" :exclusions [org.slf4j/slf4j-log4j12 io.netty/netty]]
                  [log4j/log4j "1.2.17"]
