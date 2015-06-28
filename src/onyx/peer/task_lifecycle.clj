@@ -330,7 +330,7 @@
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
                        peer-link (operation/peer-link @replica state event peer-id)]
-                   (extensions/internal-complete-message (:onyx.core/messenger event) event id peer-link))
+                   (extensions/internal-complete-message messenger event id peer-link))
 
                  (= ch seal-ch)
                  (do
@@ -547,6 +547,7 @@
                      [(:onyx/name entry)
                       (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
               (into {}))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
