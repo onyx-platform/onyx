@@ -25,7 +25,7 @@
           (timbre/fatal e)))
       (recur))))
 
-(defrecord AckingDaemon [opts]
+(defrecord AckingDaemon [opts ack-state completions-ch timeout-ch]
   component/Lifecycle
 
   (start [component]

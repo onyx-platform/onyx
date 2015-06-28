@@ -49,14 +49,16 @@
   (assoc m :completion-id id))
 
 (defn sentinel-found? [event]
-  (seq (filter (partial = :done) (map :message (:onyx.core/batch event)))))
+  (seq (filter #(= :done (:message %)) 
+               (:onyx.core/batch event))))
 
 (defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event}]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:onyx.core/outbox-ch event) entry)))
 
 (defn sentinel-id [event]
-  (:id (first (filter #(= :done (:message %)) (:onyx.core/batch event)))))
+  (:id (first (filter #(= :done (:message %)) 
+                      (:onyx.core/batch event)))))
 
 (defn join-output-paths [all to-add downstream]
   (cond (= to-add :all) (set downstream)
@@ -95,26 +97,32 @@
             (choose-output-paths event compiled-norm-fcs result leaf downstream)   
             (->Route downstream nil nil nil)))))))
 
- 
-(defn group-segments [leaf next-tasks catalog event]
-  (let [task->group-by-fn (:onyx.core/task->group-by-fn event)
-        post-transformation (:post-transformation (:routes leaf))
-        message (:message leaf)
+(defn apply-post-transformation [leaf event]
+  (let [message (:message leaf) 
+        routes (:routes leaf)
+        post-transformation (:post-transformation routes)
         msg (if (and (operation/exception? message) post-transformation)
               (operation/apply-function (operation/kw->fn post-transformation)
-                                        [event] 
+                                        (list event) 
                                         message)
               message)]
-    (cond-> leaf 
-      (:onyx.core/flow-conditions event) 
-      (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
-      (not-empty task->group-by-fn)
-      (assoc :hash-group (reduce (fn [groups t]
-                                   (if-let [group-fn (task->group-by-fn t)]
-                                     (assoc groups t (hash (group-fn msg)))
-                                     groups))
-                                 {} 
-                                 next-tasks)))))
+    (assoc leaf :message (reduce dissoc msg (:exclusions routes)))))
+
+(defn add-hash-groups [leaf next-tasks task->group-by-fn]
+  (let [message (:message leaf)]
+    (assoc leaf :hash-group (reduce (fn [groups t]
+                                      (if-let [group-fn (task->group-by-fn t)]
+                                        (assoc groups t (hash (group-fn message)))
+                                        groups))
+                                    {} 
+                                    next-tasks))))
+ 
+(defn group-segments [leaf next-tasks catalog {:keys [onyx.core/flow-conditions onyx.core/task->group-by-fn] :as event}]
+  (cond-> leaf 
+    flow-conditions
+    (apply-post-transformation event)
+    (not-empty task->group-by-fn)
+    (add-hash-groups next-tasks task->group-by-fn)))
 
 (defn add-ack-vals [leaf]
   (assoc leaf 
@@ -122,8 +130,7 @@
          (acker/generate-acks (count (:flow (:routes leaf))))))
 
 (defn build-new-segments
-  [egress-ids {:keys [onyx.core/results 
-                      onyx.core/catalog] :as event}]
+  [egress-ids {:keys [onyx.core/results onyx.core/catalog] :as event}]
   (let [results (doall
                   (map (fn [{:keys [root leaves] :as result}]
                          (let [{:keys [id acker-id completion-id]} root] 
@@ -131,6 +138,8 @@
                                   :leaves 
                                   (map (fn [leaf]
                                          (-> leaf 
+                                             ;;; TODO; probably don't need routes in leaf.
+                                             ;;; just need to pass the route into group-segments and add-ack-vals
                                              (assoc :routes (add-route-data event result leaf egress-ids))
                                              (assoc :id id)
                                              (assoc :acker-id acker-id)
@@ -162,12 +171,13 @@
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
     (let [link (operation/peer-link @replica state event acker-id)
           acks (doall 
-                 (map (fn [result] (let [fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
-                                         fused-vals (if-let [ack-val (:ack-val (:root result))] 
+                 (map (fn [result] (let [root (:root result)
+                                         fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
+                                         fused-vals (if-let [ack-val (:ack-val root)] 
                                                       (bit-xor fused-leaf-vals ack-val)
                                                       fused-leaf-vals)]
-                                     (->Ack (:id (:root result))
-                                            (:completion-id (:root result))
+                                     (->Ack (:id root)
+                                            (:completion-id root)
                                             ;; or'ing by zero covers the case of flow conditions where an
                                             ;; input task produces a segment that goes nowhere.
                                             (or fused-vals 0)
@@ -179,11 +189,12 @@
 (defn flow-retry-messages [replica state messenger {:keys [onyx.core/results] :as event}]
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
-      (let [link (operation/peer-link @replica state event (:completion-id (:root result)))]
+      (let [root (:root result)
+            link (operation/peer-link @replica state event (:completion-id root))]
         (extensions/internal-retry-message
           messenger
           event
-          (:id (:root result))
+          (:id root)
           link))))
   event)
 
@@ -244,6 +255,7 @@
     event))
 
 (defn collect-next-segments [event input]
+  ;;; Some optimisation on params and onyx.core/fn can be performed here
   (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
     (if (sequential? segments) segments (vector segments))))
 
