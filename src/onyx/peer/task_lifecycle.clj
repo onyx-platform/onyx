@@ -421,10 +421,8 @@
       onyx.compression.nippy/compress)))
 
 (defn gc-peer-links [event state opts]
-  (let [interval (or (:onyx.messaging/peer-link-gc-interval opts)
-                     (:onyx.messaging/peer-link-gc-interval defaults))
-        idle (or (:onyx.messaging/peer-link-idle-timeout opts)
-                 (:onyx.messaging/peer-link-idle-timeout defaults))]
+  (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
+        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
     (loop []
       (try
         (Thread/sleep interval)
@@ -553,10 +551,8 @@
 
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
-            input-retry-timeout (or (:onyx/input-retry-timeout catalog-entry) 
-                                    (:onyx/input-retry-timeout defaults))
-            pending-timeout (or (:onyx/pending-timeout catalog-entry) 
-                                (:onyx/pending-timeout defaults))
+            input-retry-timeout (arg-or-default :onyx/input-retry-timeout catalog-entry) 
+            pending-timeout (arg-or-default :onyx/pending-timeout catalog-entry) 
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
             state (atom {:timeout-pool r-seq})
 
@@ -588,10 +584,8 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
-                           :onyx.core/max-downstream-links (or (:onyx.messaging/max-downstream-links opts)
-                                                               (:onyx.messaging/max-downstream-links defaults))
-                           :onyx.core/max-acker-links (or (:onyx.messaging/max-acker-links opts)
-                                                          (:onyx.messaging/max-acker-links defaults))
+                           :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
+                           :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (or (resolve-task-fn catalog-entry) identity)
                            :onyx.core/replica replica
                            :onyx.core/state state}

@@ -7,7 +7,7 @@
             [onyx.messaging.common :as common]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
-            [onyx.static.default-vals :refer [defaults]])
+            [onyx.static.default-vals :refer [defaults arg-or-default]])
   (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
            [uk.co.real_logic.aeron Aeron$Context]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
@@ -126,13 +126,12 @@
     (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)
           inbound-ch (:inbound-ch (:messenger-buffer component))
-          release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
-          retry-ch (chan (sliding-buffer (:onyx.messaging/retry-ch-buffer-size defaults)))
+          release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
+          retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           bind-addr (common/bind-addr config)
           external-addr (common/external-addr config)
           ports (common/allowable-ports config)
-          idle-strategy-config (or (:onyx.messaging.aeron/idle-strategy config) 
-                                   (:onyx.messaging.aeron/idle-strategy defaults))
+          idle-strategy-config (arg-or-default :onyx.messaging.aeron/idle-strategy config) 
           send-idle-strategy (backoff-strategy idle-strategy-config)
           receive-idle-strategy (backoff-strategy idle-strategy-config)]
       (assoc component 
@@ -208,7 +207,6 @@
 
         receive-idle-strategy (:receive-idle-strategy messenger)
 
-        ;; pass in handler to consumer constructor
         ;;;;; FIXME: 10 is not the right fragment limit to use here
         ;;;;; should at least be configurable
         accept-send-fut (future (try (.accept ^Consumer (consumer send-handler receive-idle-strategy 10) send-subscriber) 
@@ -233,7 +231,7 @@
   [messenger {:keys [onyx.core/task-map] :as event}]
   (let [ch (:inbound-ch messenger)
         batch-size (:onyx/batch-size task-map)
-        ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
+        ms (arg-or-default :onyx/batch-timeout task-map)
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
       (if (< i batch-size)
