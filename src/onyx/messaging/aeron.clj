@@ -253,7 +253,9 @@
         pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :send-pub :send-pub-f-create)
         offer-f (fn [] (.offer pub unsafe-buffer 0 len))
         idle-strategy (:send-idle-strategy messenger)]
-    (while (not (offer-f))
+    ;;; TODO: offer will return a particular code when the publisher is down
+    ;;; we should probably re-restablish the publication in this case
+    (while (neg? (offer-f))
       (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/internal-ack-messages AeronConnection
@@ -264,7 +266,7 @@
     (doseq [{:keys [id completion-id ack-val]} acks] 
       (let [unsafe-buffer (protocol/build-acker-message id completion-id ack-val)
             offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-        (while (not (offer-f))
+        (while (neg? (offer-f))
           (.idle ^IdleStrategy idle-strategy 0))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
@@ -273,7 +275,7 @@
         unsafe-buffer (protocol/build-completion-msg-buf id)
         pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub :aux-pub-f-create)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
-    (while (not (offer-f))
+    (while (neg? (offer-f))
       (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/internal-retry-message AeronConnection
@@ -282,7 +284,7 @@
         unsafe-buffer (protocol/build-retry-msg-buf id)
         pub ^uk.co.real_logic.aeron.Publication (get-peer-link-pub peer-link :aux-pub :aux-pub-f-create)
         offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
-    (while (not (offer-f))
+    (while (neg? (offer-f))
       (.idle ^IdleStrategy idle-strategy 0))))
 
 (defmethod extensions/close-peer-connection AeronConnection
