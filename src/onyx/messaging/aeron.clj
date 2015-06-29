@@ -118,7 +118,7 @@
                             release-ch retry-ch decompress-f compress-f]
   component/Lifecycle
   (start [component]
-    (taoensso.timbre/info "Starting Aeron" (:messenger-buffer component))
+    (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (sliding-buffer (:onyx.messaging/release-ch-buffer-size defaults)))
