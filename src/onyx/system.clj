@@ -19,6 +19,8 @@
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
+            [onyx.log.commands.backpressure-start]
+            [onyx.log.commands.backpressure-stop]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]

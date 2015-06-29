@@ -6,7 +6,7 @@
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
               [onyx.log.entry :refer [create-log-entry]]
-              [onyx.static.default-vals :refer [defaults]]))
+              [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (if (:stall-output? state)
@@ -63,6 +63,21 @@
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
 
+(defn track-backpressure [id messenger-buffer outbox-ch low-water-pct high-water-pct check-interval]
+  (let [on? (atom false)
+        buf (.buf (:inbound-ch messenger-buffer))
+        low-water-ratio (/ low-water-pct 100)
+        high-water-ratio (/ high-water-pct 100)] 
+    (while (not (Thread/interrupted))
+      (let [ratio (/ (count buf) (.n buf))] 
+        (cond (and (not @on?) (> ratio high-water-ratio))
+              (do (reset! on? true)
+                  (>!! outbox-ch (create-log-entry :backpressure-start {:peer id})))
+              (and @on? (< ratio low-water-ratio))
+              (do (reset! on? false)
+                  (>!! outbox-ch (create-log-entry :backpressure-stop {:peer id})))))
+      (Thread/sleep check-interval))))
+
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
@@ -76,10 +91,8 @@
         (extensions/write-chunk log :job-scheduler {:job-scheduler (:onyx.peer/job-scheduler opts)} nil)
         (extensions/write-chunk log :messaging {:messaging (select-keys opts [:onyx.messaging/impl])} nil)
 
-        (let [inbox-ch (chan (or (:onyx.peer/inbox-capacity opts) 
-                                 (:onyx.peer/inbox-capacity defaults)))
-              outbox-ch (chan (or (:onyx.peer/outbox-capacity opts) 
-                                  (:onyx.peer/outbox-capacity defaults)))
+        (let [inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity opts))
+              outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
               completion-ch (:completions-ch acking-daemon)
@@ -90,10 +103,15 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))]
+                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
+                track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch
+                                                                   (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
+                                                                   (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
+                                                                   (arg-or-default :onyx.peer/backpressure-check-interval opts)))]
             (assoc component 
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
+                   :track-backpressure-fut track-backpressure-fut
                    :id id :inbox-ch inbox-ch
                    :outbox-ch outbox-ch :kill-ch kill-ch
                    :restart-ch restart-ch)))
@@ -104,6 +122,7 @@
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
+    (future-cancel (:track-backpressure-fut component))
     (close! (:inbox-ch component))
     (close! (:outbox-ch component))
     (close! (:kill-ch component))
@@ -111,8 +130,9 @@
     (<!! (:outbox-loop-ch component))
     (<!! (:processing-loop-ch component))
 
-    component))
+    (assoc component :track-backpressure-fut nil :inbox-ch nil 
+           :outbox-loop-ch nil :kill-ch nil :restart-ch nil
+           :outbox-loop-ch nil :processing-loop-ch nil)))
 
 (defn virtual-peer [opts]
   (map->VirtualPeer {:opts opts}))
-

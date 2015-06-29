@@ -68,7 +68,11 @@
              allocations (get (:allocations replica-val) job-id)]
          (doseq [[[route hash-group] segs] groups]
            (let [peers (get allocations (get egress-tasks route))
-                 active-peers (filter #(= (peer-state %) :active) peers)
+                 active-peers (filter (fn [peer] 
+                                        (let [ps (peer-state peer)] 
+                                          (or (= ps :active)
+                                              (= ps :backpressure)))) 
+                                      peers)
                  target (pick-peer id active-peers hash-group max-downstream-links)]
              (when target
                (let [link (operation/peer-link replica-val state event target)]

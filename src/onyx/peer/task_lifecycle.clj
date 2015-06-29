@@ -194,13 +194,16 @@
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
     rets))
 
-(defn read-batch [pipeline event]
-  (let [rets (p-ext/read-batch pipeline event)
-        batch (:onyx.core/batch rets)]
-    (when (and (= (count batch) 1)
-               (= (:message (first batch)) :done))
-      (Thread/sleep (:onyx.core/drained-back-off event)))
-    (merge event rets)))
+(defn read-batch [task-type replica job-id pipeline event]
+  (if (and (= task-type :input) 
+           (common/job-backpressuring? @replica job-id)) 
+    event
+    (let [rets (p-ext/read-batch pipeline event)
+          batch (:onyx.core/batch rets)]
+      (when (and (= (count batch) 1)
+                 (= (:message (first batch)) :done))
+        (Thread/sleep (:onyx.core/drained-back-off event)))
+      (merge event rets))))
 
 (defn tag-messages [task-type replica id job-id max-acker-links event]
   (if (= task-type :input)
@@ -392,7 +395,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
-             (read-batch pipeline)
+             (read-batch task-type replica job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
