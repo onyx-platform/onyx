@@ -20,16 +20,6 @@
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
 (def restartable-exceptions [])
 
-(defn at-least-one-active? [replica peers]
-  (->> peers
-       (map #(get-in replica [:peer-state %]))
-       (filter (partial = :active))
-       (seq)))
-
-(defn job-covered? [replica job]
-  (let [tasks (get-in replica [:tasks job])
-        active? (partial at-least-one-active? replica)]
-    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
@@ -451,9 +441,6 @@
           (fatal e)))
       (recur))))
 
-(defn any-ackers? [replica job-id]
-  (> (count (get-in replica [:ackers job-id])) 0))
-
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
         fs
@@ -621,8 +608,8 @@
 
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                     (or (not (job-covered? replica-state job-id))
-                         (not (any-ackers? replica-state job-id))))
+                     (or (not (common/job-covered? replica-state job-id))
+                         (not (common/any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
             (Thread/sleep 500)
             (recur @replica)))

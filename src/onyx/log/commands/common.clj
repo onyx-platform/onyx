@@ -66,6 +66,20 @@
        (executing-output-task? replica (:id state))
        (elected-sealer? replica message-id (:id state))))
 
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
