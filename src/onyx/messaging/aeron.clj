@@ -84,11 +84,16 @@
           (let [retry-id (protocol/read-retry buffer offset-rest)]
             (>!! retry-ch retry-id)))))
 
-(defn data-handler [f]
+(defn fragment-data-handler [f]
   (FragmentAssemblyAdapter. 
     (proxy [FragmentHandler] []
       (onFragment [buffer offset length header]
         (f buffer offset length header)))))
+
+(defn data-handler [f]
+  (proxy [FragmentHandler] []
+    (onFragment [buffer offset length header]
+      (f buffer offset length header))))
 
 (defn backoff-strategy [strategy]
   (case strategy
@@ -191,10 +196,12 @@
         aeron (Aeron/connect ctx)
         channel (aeron-channel bind-addr (:aeron/port assigned))
         decompress-f (:decompress-f messenger)
-        send-handler (data-handler (fn [buffer offset length header] 
-                                     (handle-sent-message inbound-ch decompress-f buffer offset length header)))
-        aux-handler (data-handler (fn [buffer offset length header] 
-                                    (handle-aux-message acking-daemon release-ch retry-ch buffer offset length header)))
+        send-handler (fragment-data-handler 
+                       (fn [buffer offset length header] 
+                         (handle-sent-message inbound-ch decompress-f buffer offset length header)))
+        aux-handler (data-handler 
+                      (fn [buffer offset length header] 
+                        (handle-aux-message acking-daemon release-ch retry-ch buffer offset length header)))
 
         send-subscriber (.addSubscription aeron channel send-stream-id)
         aux-subscriber (.addSubscription aeron channel aux-stream-id)
