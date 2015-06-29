@@ -593,16 +593,14 @@
                            :onyx.core/replica replica
                            :onyx.core/state state}
 
+            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))
             pipeline (build-pipeline catalog-entry pipeline-data)
-            _ (taoensso.timbre/info "Built " pipeline " for " (:name task))
-            
+            pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
+
             ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
-                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
-            pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
-            pipeline-data (merge pipeline-data 
-                                 ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
+                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
