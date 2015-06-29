@@ -124,7 +124,7 @@
         message-payload-bytes (byte-array payload-size)
         _ (.getBytes buf offset message-payload-bytes)
         message-payloads (decompress-f message-payload-bytes)
-        offset (long (unchecked-add offset payload-size))]
+        offset (unchecked-add offset payload-size)]
     (loop [messages (transient []) 
            payloads (seq message-payloads) 
            offset offset]
