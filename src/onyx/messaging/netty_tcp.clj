@@ -98,7 +98,13 @@
                         set)
         port (first (remove used-ports
                             (:netty/ports peer-site)))]
-    (assert port "Couldn't assign port - ran out of available ports.")
+    (when-not port
+      (throw (ex-info "Couldn't assign port - ran out of available ports.
+                      Available ports can be configured in the peer-config.
+                      e.g. {:onyx.messaging/peer-ports [40000, 40002],
+                            :onyx.messaging/peer-port-range [40200 40260]}"
+                      {}
+                      #_peer-site)))
     {:netty/port port}))
 
 (defmethod extensions/get-peer-site :netty
