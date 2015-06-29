@@ -24,19 +24,19 @@
    id))
 
 (defn allocations->peers [allocations]
-  (reduce-kv
-   (fn [all job tasks]
-     (merge all
-            (reduce-kv
-             (fn [all task allocations]
-               (->> allocations
-                    (map (fn [peer] {peer {:job job :task task}}))
-                    (into {})
-                    (merge all)))
-             {}
-             tasks)))
-   {}
-   allocations))
+   (reduce-kv
+     (fn [all job tasks]
+       (merge all
+              (reduce-kv
+                (fn [all task allocations]
+                  (->> allocations
+                       (map (fn [peer] {peer {:job job :task task}}))
+                       (into {})
+                       (merge all)))
+                {}
+                tasks)))
+     {}
+     allocations))
 
 (defn remove-peers [replica id]
   (let [prev (get (allocations->peers (:allocations replica)) id)]
