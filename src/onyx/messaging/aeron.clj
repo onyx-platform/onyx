@@ -86,13 +86,13 @@
 
 (defn fragment-data-handler [f]
   (FragmentAssemblyAdapter. 
-    (proxy [FragmentHandler] []
-      (onFragment [buffer offset length header]
+    (reify FragmentHandler 
+      (onFragment [this buffer offset length header]
         (f buffer offset length header)))))
 
 (defn data-handler [f]
-  (proxy [FragmentHandler] []
-    (onFragment [buffer offset length header]
+  (reify FragmentHandler 
+    (onFragment [this buffer offset length header]
       (f buffer offset length header))))
 
 (defn backoff-strategy [strategy]
@@ -108,15 +108,15 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10000))))
 
 (defn consumer [handler ^IdleStrategy idle-strategy limit]
-  (proxy [Consumer] []
-    (accept [subscription]
+  (reify Consumer 
+    (accept [this subscription]
       (while (not (Thread/interrupted))
         (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
 (def no-op-error-handler
-  (proxy [ErrorHandler] []
-    (onError [x] (taoensso.timbre/warn x))))
+  (reify ErrorHandler 
+    (onError [this x] (taoensso.timbre/warn x))))
 
 (defrecord AeronConnection [peer-group bind-addr external-addr 
                             inbound-ch send-idle-strategy receive-idle-strategy ports resources 
