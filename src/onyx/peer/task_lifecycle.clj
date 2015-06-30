@@ -194,24 +194,32 @@
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
     rets))
 
+(defn handle-backoff! [event]
+  (let [batch (:onyx.core/batch event)]
+    (when (and (= (count batch) 1)
+               (= (:message (first batch)) :done))
+      (Thread/sleep (:onyx.core/drained-back-off event)))))
+
 (defn read-batch [task-type replica job-id pipeline event]
   (if (and (= task-type :input) 
+           ;; rename backpressuring?
+           ;; add note about how it'll be slow with big clusters
            (common/job-backpressuring? @replica job-id)) 
-    event
-    (let [rets (p-ext/read-batch pipeline event)
-          batch (:onyx.core/batch rets)]
-      (when (and (= (count batch) 1)
-                 (= (:message (first batch)) :done))
-        (Thread/sleep (:onyx.core/drained-back-off event)))
+    (assoc event :onyx.core/batch [])
+    (let [rets (p-ext/read-batch pipeline event)]
+      (handle-backoff! event)
       (merge event rets))))
+
+(defn validate-ackable! [peers event]
+  (when-not (seq peers)
+    (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
+        (throw (ex-info "Not enough acker peers" {:peers peers}))))) 
 
 (defn tag-messages [task-type replica id job-id max-acker-links event]
   (if (= task-type :input)
     (let [peers (get (:ackers @replica) job-id)
+          _ (validate-ackable! peers event)
           candidates (operation/select-n-peers id peers max-acker-links)] 
-      (when-not (seq peers)
-        (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
-            (throw (ex-info "Not enough acker peers" {:peers peers}))))
       (update-in
         event
         [:onyx.core/batch]
@@ -219,7 +227,6 @@
           (map (comp (partial add-completion-id id)
                      (partial add-acker-id candidates))
                batch))))
-    
     event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
