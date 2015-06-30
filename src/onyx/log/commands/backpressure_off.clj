@@ -1,4 +1,4 @@
-(ns onyx.log.commands.backpressure-stop
+(ns onyx.log.commands.backpressure-off
   (:require [taoensso.timbre :as timbre :refer [info error]]
             [clojure.core.async :refer [>!!]]
             [clojure.data :refer [diff]]
@@ -6,7 +6,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]))
 
-(defmethod extensions/apply-log-entry :backpressure-stop
+(defmethod extensions/apply-log-entry :backpressure-off
   [{:keys [args]} replica]
   (if (= :backpressure (get-in replica [:peer-state (:peer args)]))
     (assoc-in replica [:peer-state (:peer args)] :backpressure) 
@@ -14,15 +14,15 @@
 
   (assoc-in replica [:peer-state (:peer args)] :active))
 
-(defmethod extensions/replica-diff :backpressure-stop
+(defmethod extensions/replica-diff :backpressure-off
   [{:keys [args]} old new]
   (second (diff (:peer-state old) (:peer-state new))))
 
-(defmethod extensions/reactions :backpressure-stop
+(defmethod extensions/reactions :backpressure-off
   [{:keys [args]} old new diff peer-args]
   [])
 
-(defmethod extensions/fire-side-effects! :backpressure-stop
+(defmethod extensions/fire-side-effects! :backpressure-off
   [{:keys [args]} old new diff state]
   state)
 
