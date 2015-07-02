@@ -233,46 +233,46 @@
    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
-; (deftest job-percentages-balance
-;   (checking
-;     "Checking percentages allocation causes peers to be evenly split"
-;     (times 50)
-;     [{:keys [replica log peer-choices]} 
-;      (let [percentages-peer-config (assoc peer-config 
-;                                           :onyx.peer/job-scheduler 
-;                                           :onyx.job-scheduler/percentage)] 
-;        (log-gen/apply-entries-gen 
-;          (gen/return
-;            {:replica {:job-scheduler :onyx.job-scheduler/percentage
-;                       :messaging {:onyx.messaging/impl :dummy-messenger}}
-;             :message-id 0
-;             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
-;                             :job-1 [(api/create-submit-job-entry job-1-id
-;                                                                  percentages-peer-config 
-;                                                                  (assoc job-1 :percentage 30) 
-;                                                                  (planning/discover-tasks (:catalog job-1) 
-;                                                                                           (:workflow job-1)))]
-;                             :job-2 [(api/create-submit-job-entry job-2-id
-;                                                                  percentages-peer-config 
-;                                                                  (assoc job-2 :percentage 30) 
-;                                                                  (planning/discover-tasks (:catalog job-2) 
-;                                                                                           (:workflow job-2)))]
-;                             :job-3 [(api/create-submit-job-entry job-3-id
-;                                                                  percentages-peer-config 
-;                                                                  (assoc job-3 :percentage 40) 
-;                                                                  (planning/discover-tasks (:catalog job-3) 
-;                                                                                           (:workflow job-3)))
-;                                     {:fn :kill-job :args {:job job-3-id}}])
-;             :log []
-;             :peer-choices []})))]
-;     (let [peer-state-group (group-by val (:peer-state replica))] 
-;       (is (= (count (:active peer-state-group)) 12))
-;       (is (= (count (:idle peer-state-group)) 8))
-;       (is (= (count (:backpressure peer-state-group)) 0))
-;       (is (= (count (:warming-up peer-state-group)) 0)))
-;     (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
-;     (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
-;     (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+(deftest job-percentages-balance
+  (checking
+    "Checking percentages allocation causes peers to be evenly split"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (let [percentages-peer-config (assoc peer-config 
+                                          :onyx.peer/job-scheduler 
+                                          :onyx.job-scheduler/percentage)] 
+       (log-gen/apply-entries-gen 
+         (gen/return
+           {:replica {:job-scheduler :onyx.job-scheduler/percentage
+                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+            :message-id 0
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
+                            :job-1 [(api/create-submit-job-entry job-1-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-1 :percentage 30) 
+                                                                 (planning/discover-tasks (:catalog job-1) 
+                                                                                          (:workflow job-1)))]
+                            :job-2 [(api/create-submit-job-entry job-2-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-2 :percentage 30) 
+                                                                 (planning/discover-tasks (:catalog job-2) 
+                                                                                          (:workflow job-2)))]
+                            :job-3 [(api/create-submit-job-entry job-3-id
+                                                                 percentages-peer-config 
+                                                                 (assoc job-3 :percentage 40) 
+                                                                 (planning/discover-tasks (:catalog job-3) 
+                                                                                          (:workflow job-3)))
+                                    {:fn :kill-job :args {:job job-3-id}}])
+            :log []
+            :peer-choices []})))]
+    (let [peer-state-group (group-by val (:peer-state replica))] 
+      (is (= (count (:active peer-state-group)) 12))
+      (is (= (count (:idle peer-state-group)) 8))
+      (is (= (count (:backpressure peer-state-group)) 0))
+      (is (= (count (:warming-up peer-state-group)) 0)))
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
 (def job-1-pct-tasks
   {:workflow [[:a :b] [:b :c]]
