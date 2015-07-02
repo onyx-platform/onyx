@@ -7,7 +7,8 @@
 
 (defmethod extensions/apply-log-entry :signal-ready
   [{:keys [args]} replica]
-  (if (some #{(:id args)} (into #{} (:peers replica)))
+  (if (and (some #{(:id args)} (:peers replica))
+           (#{:idle :warming-up :nil} (get (:peer-state replica) (:id args) :nil)))
     (assoc-in replica [:peer-state (:id args)] :active)
     replica))
 
@@ -25,4 +26,3 @@
     (when (common/should-seal? new {:job job} state message-id)
       (>!! (:seal-ch state) true)))
   state)
-
