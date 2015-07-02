@@ -1,7 +1,10 @@
 (ns ^:no-doc onyx.static.logging-configuration
   (:require [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info] :as timbre]
-            [taoensso.timbre.appenders.rotor :as rotor]))
+            [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
+
+(def MAX-LOG-SIZE (* 512 102400))
+(def MAX-LOG-FILES 5)
 
 (defrecord LoggingConfiguration [file config]
   component/Lifecycle
@@ -9,22 +12,15 @@
   (start [component]
     (if config
       (timbre/merge-config! config)
-      (do
-        (timbre/set-config!
-          [:appenders :rotor]
-          {:min-level :info
-           :enabled? true
-           :async? false
-           :max-message-per-msecs nil
-           :fn rotor/appender-fn})
-        (timbre/set-config!
-          [:shared-appender-config :rotor]
-          {:path file :max-size (* 512 102400) :backlog 5})
-        (timbre/merge-config! 
-          {:appenders {:standard-out
-                       {:min-level :error 
-                        :enabled? true}}})
-        (timbre/set-config! [:appenders :spit :enabled?] false)))
+      (let [rotor-appender (rotor/rotor-appender
+                             {:path file
+                              :max-size MAX-LOG-SIZE
+                              :backlog MAX-LOG-FILES})
+            rotor-appender (assoc rotor-appender
+                                  :min-level :info)]
+        (timbre/merge-config!
+          {:appenders
+           {:rotor rotor-appender}})))
 
     (info "Starting Logging Configuration")
     component)
