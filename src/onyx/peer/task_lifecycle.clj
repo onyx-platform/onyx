@@ -29,7 +29,7 @@
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
-                           (:onx.core/id rets) (:onyx.core/lifecycle-id rets))))
+                           (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
     rets))
 
 (defn add-acker-id [peers m]
