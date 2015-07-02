@@ -216,13 +216,12 @@
     (let [peers (get (:ackers @replica) job-id)
           _ (validate-ackable! peers event)
           candidates (operation/select-n-peers id peers max-acker-links)] 
-      (update-in
-        event
-        [:onyx.core/batch]
-        (fn [batch]
-          (map (comp (partial add-completion-id id)
-                     (partial add-acker-id candidates))
-               batch))))
+      (assoc event 
+             :onyx.core/batch
+             (map (fn [segment] 
+                    (add-acker-id candidates 
+                                  (add-completion-id id segment)))
+                  (:onyx.core/batch event))))
     event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
