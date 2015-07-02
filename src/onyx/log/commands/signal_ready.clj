@@ -7,10 +7,11 @@
 
 (defmethod extensions/apply-log-entry :signal-ready
   [{:keys [args]} replica]
-  (if (and (some #{(:id args)} (:peers replica))
-           (#{:idle :warming-up :nil} (get (:peer-state replica) (:id args) :nil)))
-    (assoc-in replica [:peer-state (:id args)] :active)
-    replica))
+  (let [id (:id args)] 
+    (if (and (common/peer->allocated-job (:allocations replica) id)
+             (#{:idle :warming-up :nil} (get (:peer-state replica) id :nil)))
+      (assoc-in replica [:peer-state id] :active)
+      replica)))
 
 (defmethod extensions/replica-diff :signal-ready
   [{:keys [args]} old new]
