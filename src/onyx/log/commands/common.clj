@@ -44,14 +44,15 @@
   (->> job-id
        allocations
        vals
-       (reduce into [])))
+       (reduce into (t/vector))))
 
 (defn job-backpressuring? [replica job-id]
   (let [peers (job-allocations->peer-ids (:allocations replica) job-id)]
-    (not (empty? 
-           (filter #(= % :backpressure) 
-                   (map (:peer-state replica) 
-                        peers))))))
+    (boolean 
+      (first 
+        (filter #(= % :backpressure) 
+                (map (:peer-state replica) 
+                     peers))))))
 
 (defn remove-peers [replica id]
   (let [prev (get (allocations->peers (:allocations replica)) id)]
