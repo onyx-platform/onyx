@@ -118,7 +118,7 @@
     (is (= :active (get (:peer-state replica) :p1)))
     (is (= :backpressure (get (:peer-state replica) :p2)))))
 
-#_(deftest balanced-allocations
+(deftest backpressure-kill-job
   (checking
     "Checking balanced allocation causes peers to be evenly split"
     (times 50)
@@ -141,7 +141,6 @@
                                                                    peer-config 
                                                                    job-3 
                                                                    (planning/discover-tasks (:catalog job-3) (:workflow job-3)))
-                                      ;; check backpressure is off if peer may have moved
                                       {:fn :backpressure-on :args {:peer :p3}}
                                       {:fn :kill-job :args {:job job-3-id}}])
                        (assoc :bp1 [{:fn :backpressure-on :args {:peer :p1}}
@@ -150,38 +149,5 @@
           :log []
           :peer-choices []}))]
     (is (= :active (get (:peer-state replica) :p1)))
-    (is (= :backpressure (get (:peer-state replica) :p2)))
+    (is (#{:backpressure :active} (get (:peer-state replica) :p2)))
     (is (not= :idle (get (:peer-state replica) :p3)))))
-
-#_(deftest simple-backpressure
-  (checking
-    "Checking backpressure handled correctly"
-    (times 50)
-    [{:keys [entries replica log peer-choices]} 
-     (log-gen/apply-entries-gen 
-       (gen/return
-         {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
-          :message-id 0
-          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
-                       (assoc :job-1 [(api/create-submit-job-entry job-1-id
-                                                                   peer-config 
-                                                                   job-1 
-                                                                   (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                              :job-2 [(api/create-submit-job-entry job-2-id
-                                                                   peer-config 
-                                                                   job-2 
-                                                                   (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
-                              :job-3 [(api/create-submit-job-entry job-3-id
-                                                                   peer-config 
-                                                                   job-3 
-                                                                   (planning/discover-tasks (:catalog job-3) (:workflow job-3)))])
-                       (assoc :bp1 [{:fn :backpressure-on :args {:peer :p1}}
-                                    {:fn :backpressure-off :args {:peer :p1}}])
-                       (assoc :bp2 [{:fn :backpressure-on :args {:peer :p2}}]))
-          :log []
-          :peer-choices []}))]
-    ;(spit "log.edn" (pr-str log))
-    (is (empty? (apply concat (vals entries))))
-    (is (= :active (get (:peer-state replica) :p1)))
-    (is (= :backpressure (get (:peer-state replica) :p2)))))
