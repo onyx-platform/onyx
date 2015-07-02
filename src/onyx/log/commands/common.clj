@@ -4,6 +4,7 @@
             [clojure.set :refer [map-invert]]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
+            [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
 (defn job->peers [replica]
@@ -93,6 +94,38 @@
   (let [tasks (get-in replica [:tasks job])
         active? (partial at-least-one-active? replica)]
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
+(defrecord PeerReplicaView [backpressure active-peers])
+
+(defn transform-job-allocations [peer-state allocations]
+  (into (t/hash-map) 
+        (map (fn [[task-id peers]]
+               (t/vector task-id
+                         (into (t/vector) 
+                               (filter (fn [peer] 
+                                         (let [ps (peer-state peer)] 
+                                           (or (= ps :active)
+                                               (= ps :backpressure)))) 
+                                       peers))))
+             allocations)))
+
+
+(defn peer-replica-view [replica peer-id]
+  ;; This should be smarter about making a more personalised view
+  ;; e.g. only calculate receivable peers for job the task is on and for downstream ids
+  (let [allocations (:allocations replica)
+        backpressure (into (t/hash-map) 
+                           (map (fn [job-id] 
+                                  (t/vector job-id 
+                                            (job-backpressuring? replica job-id)))
+                                (keys allocations)))
+        peer-state (:peer-state replica)
+        receivable-peers (into (t/hash-map)
+                               (map (fn [[job-id job-allocations]]
+                                      (t/vector job-id 
+                                                (transform-job-allocations peer-state job-allocations)))
+                                    allocations))] 
+    (->PeerReplicaView backpressure receivable-peers)))
 
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))

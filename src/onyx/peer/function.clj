@@ -58,34 +58,30 @@
    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
 
 (defn write-batch
-  ([event replica state id messenger job-id max-downstream-links egress-tasks]
+  ([event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
    (let [leaves (fast-concat (map :leaves (:onyx.core/results event)))]
      (when-not (empty? leaves)
        (let [replica-val @replica
-             peer-state (:peer-state replica-val)
+             peer-replica-val @peer-replica-view
              segments (build-segments-to-send leaves)
              groups (group-by #(list (:route %) (:hash-group %)) segments)
-             allocations (get (:allocations replica-val) job-id)]
+             active-peers (get (:active-peers peer-replica-val) job-id)]
          (doseq [[[route hash-group] segs] groups]
-           (let [peers (get allocations (get egress-tasks route))
-                 active-peers (filter (fn [peer] 
-                                        (let [ps (peer-state peer)] 
-                                          (or (= ps :active)
-                                              (= ps :backpressure)))) 
-                                      peers)
-                 target (pick-peer id active-peers hash-group max-downstream-links)]
+           (let [task-peers (get active-peers (get egress-tasks route))
+                 target (pick-peer id task-peers hash-group max-downstream-links)]
              (when target
                (let [link (operation/peer-link replica-val state event target)]
                  (onyx.extensions/send-messages messenger event link segs)))))
          {}))))
+
   ([{:keys [onyx.core/id onyx.core/results 
             onyx.core/messenger onyx.core/job-id 
             onyx.core/state onyx.core/replica 
-            onyx.core/serialized-task 
+            onyx.core/peer-replica-view onyx.core/serialized-task 
             onyx.core/max-downstream-links] :as event}]
-   (write-batch event replica state id messenger job-id max-downstream-links (:egress-ids serialized-task))))
+   (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links (:egress-ids serialized-task))))
 
-(defrecord Function [replica state id messenger job-id max-downstream-links egress-tasks]
+(defrecord Function [replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
   p-ext/Pipeline
   (read-batch 
     [_ event]
@@ -93,12 +89,13 @@
 
   (write-batch 
     [_ event]
-    (write-batch event replica state id messenger job-id max-downstream-links egress-tasks))
+    (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks))
 
   (seal-resource [_ _]
     nil))
 
 (defn function [{:keys [onyx.core/replica
+                        onyx.core/peer-replica-view
                         onyx.core/state
                         onyx.core/id 
                         onyx.core/messenger 
@@ -106,6 +103,7 @@
                         onyx.core/max-downstream-links
                         onyx.core/serialized-task] :as pipeline-data}]
   (->Function replica
+              peer-replica-view
               state
               id
               messenger

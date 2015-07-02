@@ -385,6 +385,7 @@
   [{:keys [onyx.core/task-map
            onyx.core/pipeline
            onyx.core/replica
+           onyx.core/peer-replica-view
            onyx.core/state
            onyx.core/compiled-before-batch-fn
            onyx.core/serialized-task
@@ -543,7 +544,7 @@
               (into {}))))
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica restart-ch
+    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
   component/Lifecycle
 
@@ -594,6 +595,7 @@
                            :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (or (resolve-task-fn catalog-entry) identity)
                            :onyx.core/replica replica
+                           :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
@@ -664,10 +666,11 @@
       :task-lifecycle-ch nil
       :peer-link-gc-thread nil)))
 
-(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica
+(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica peer-replica-view
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job :task-id task :restart-ch restart-ch
+                       :peer-replica-view peer-replica-view
                        :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
                        :opts opts :task-kill-ch task-kill-ch}))

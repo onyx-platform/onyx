@@ -5,6 +5,7 @@
               [onyx.extensions :as extensions]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+              [onyx.log.commands.common :refer [peer-replica-view]]
               [onyx.log.entry :refer [create-log-entry]]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -21,10 +22,12 @@
 
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts]
   (try
-    (let [replica-atom (atom {})]
+    (let [replica-atom (atom {})
+          peer-view-atom (atom {})]
       (reset! replica-atom origin)
       (loop [state (merge {:id id
                            :replica replica-atom
+                           :peer-replica-view peer-view-atom
                            :log log
                            :messenger-buffer buffer
                            :messenger messenger
@@ -37,13 +40,16 @@
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
+              peer @peer-view-atom
               entry (first (alts!! [kill-ch inbox-ch] :priority true))]
           (if entry
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
+                  new-peer-view (peer-replica-view replica id)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
+              (reset! peer-view-atom new-peer-view)
               (recur (send-to-outbox new-state reactions)))
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
