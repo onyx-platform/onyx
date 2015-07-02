@@ -268,8 +268,7 @@
     (let [peer-state-group (group-by val (:peer-state replica))] 
       (is (= (count (:active peer-state-group)) 12))
       (is (= (count (:idle peer-state-group)) 8))
-      (is (= (count (:backpressure peer-state-group)) 0))
-      (is (= (count (:warming-up peer-state-group)) 0)))
+      (is (= (count (:backpressure peer-state-group)) 0)))
     (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
     (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
     (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))

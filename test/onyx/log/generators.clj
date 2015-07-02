@@ -99,10 +99,12 @@
      :peer-choices (conj peer-choices next-peer)}))
 
 ;; This should be a predicate that can be setup on the queue
+;; to decide when to allow the queue to progress - makes things easier
+;; so you can start backpressure events and have known results
 (defn allow-queue? [{:keys [peer-state] :as replica} 
                     [{:keys [args] :as entry} & es]] 
   (and (#{:backpressure-on :backpressure-off} (:fn entry))
-       (not (#{:warming-up :idle :nil} (get peer-state (:peer args) :nil)))))
+       (not (contains? #{:idle nil} (get peer-state (:peer args))))))
 
 (defn queue-select-gen 
   "Generator to look into all of the peer's write queues

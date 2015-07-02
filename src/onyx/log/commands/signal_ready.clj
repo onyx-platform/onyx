@@ -9,7 +9,7 @@
   [{:keys [args]} replica]
   (let [id (:id args)] 
     (if (and (common/peer->allocated-job (:allocations replica) id)
-             (#{:idle :warming-up :nil} (get (:peer-state replica) id :nil)))
+             (contains? #{:idle nil} (get (:peer-state replica) id)))
       (assoc-in replica [:peer-state id] :active)
       replica)))
 
