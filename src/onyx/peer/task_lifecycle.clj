@@ -14,8 +14,7 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
-              [onyx.static.default-vals :refer [defaults arg-or-default]])
-    (:import [java.security MessageDigest]))
+              [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
 (def restartable-exceptions [])
