@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! timeout chan close! thread go]]
+    (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
               [rotating-seq.core :as rsc]
@@ -539,6 +539,12 @@
                       (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
               (into {}))))
 
+(defn clear-messenger-buffer! 
+  "Clears the messenger buffer of all messages related to prevous task lifecycle.
+  In an ideal case, this might transfer messages over to another peer first as it help with retries."
+  [{:keys [inbound-ch] :as messenger-buffer}]
+  (while (first (alts!! [inbound-ch] :default false))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -604,6 +610,7 @@
 
             pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
 
+        (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
