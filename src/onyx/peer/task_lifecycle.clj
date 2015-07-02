@@ -199,12 +199,9 @@
                (= (:message (first batch)) :done))
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
-(defn read-batch [task-type replica job-id pipeline event]
-  (if (and (= task-type :input) 
-           ;; rename backpressuring?
-           ;; add note about how it'll be slow with big clusters
-           (common/job-backpressuring? @replica job-id)) 
-    (assoc event :onyx.core/batch [])
+(defn read-batch [task-type replica peer-replica-view job-id pipeline event]
+  (if (and (= task-type :input) (get (:backpressure peer-replica-view) job-id)) 
+    (assoc event :onyx.core/batch '())
     (let [rets (p-ext/read-batch pipeline event)]
       (handle-backoff! event)
       (merge event rets))))
