@@ -54,7 +54,7 @@
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
     (catch Throwable e
-      (taoensso.timbre/info e))
+      (taoensso.timbre/error e))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
 
