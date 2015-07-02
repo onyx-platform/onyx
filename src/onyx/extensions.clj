@@ -12,6 +12,10 @@
 
 (defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
 
+;; Peer replica view interface
+
+(defmulti peer-replica-view (fn [entry old new diff peer-id] :default))
+
 ;; Log interface
 
 (defmulti write-log-entry (fn [log data] (type log)))

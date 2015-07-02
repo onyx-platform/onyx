@@ -5,7 +5,6 @@
               [onyx.extensions :as extensions]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
-              [onyx.log.commands.common :refer [peer-replica-view]]
               [onyx.log.entry :refer [create-log-entry]]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -44,9 +43,11 @@
               entry (first (alts!! [kill-ch inbox-ch] :priority true))]
           (if entry
             (let [new-replica (extensions/apply-log-entry entry replica)
+                  ;;; Or could have materialized view here so things are ready for next replica application
+                  ;;; Or maybe two, materialized replica (with map-invert here)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
-                  new-peer-view (peer-replica-view replica id)
+                  new-peer-view (extensions/peer-replica-view entry replica new-replica diff id)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)

@@ -21,6 +21,7 @@
             [onyx.log.commands.gc]
             [onyx.log.commands.backpressure-on]
             [onyx.log.commands.backpressure-off]
+            [onyx.log.commands.peer-replica-view]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]

@@ -46,7 +46,7 @@
        vals
        (reduce into (t/vector))))
 
-(defn job-backpressuring? [replica job-id]
+(defn backpressure? [replica job-id]
   (let [peers (job-allocations->peer-ids (:allocations replica) job-id)]
     (boolean 
       (first 
@@ -96,8 +96,6 @@
         active? (partial at-least-one-active? replica)]
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
-(defrecord PeerReplicaView [backpressure active-peers])
-
 (defn transform-job-allocations [peer-state allocations]
   (into (t/hash-map) 
         (map (fn [[task-id peers]]
@@ -109,24 +107,6 @@
                                                (= ps :backpressure)))) 
                                        peers))))
              allocations)))
-
-
-(defn peer-replica-view [replica peer-id]
-  ;; This should be smarter about making a more personalised view
-  ;; e.g. only calculate receivable peers for job the task is on and for downstream ids
-  (let [allocations (:allocations replica)
-        backpressure (into (t/hash-map) 
-                           (map (fn [job-id] 
-                                  (t/vector job-id 
-                                            (job-backpressuring? replica job-id)))
-                                (keys allocations)))
-        peer-state (:peer-state replica)
-        receivable-peers (into (t/hash-map)
-                               (map (fn [[job-id job-allocations]]
-                                      (t/vector job-id 
-                                                (transform-job-allocations peer-state job-allocations)))
-                                    allocations))] 
-    (->PeerReplicaView backpressure receivable-peers)))
 
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
