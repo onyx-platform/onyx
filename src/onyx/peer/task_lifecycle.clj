@@ -19,7 +19,6 @@
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
 (def restartable-exceptions [])
 
-
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
@@ -319,13 +318,13 @@
            (cond (= ch release-ch)
                  (p-ext/ack-message pipeline event v)
 
-                 (= ch retry-ch)
-                 (p-ext/retry-message pipeline event v)
-
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
                        peer-link (operation/peer-link @replica state event peer-id)]
                    (extensions/internal-complete-message messenger event id peer-link))
+
+                 (= ch retry-ch)
+                 (p-ext/retry-message pipeline event v)
 
                  (= ch seal-ch)
                  (do
@@ -398,6 +397,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
+             ;;; TODO, use @ version of replica in all these fns
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
