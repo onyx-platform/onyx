@@ -78,10 +78,10 @@
       (let [ratio (/ (count buf) (.n buf))] 
         (cond (and (not @on?) (> ratio high-water-ratio))
               (do (reset! on? true)
-                  (>!! outbox-ch (create-log-entry :backpressure-start {:peer id})))
+                  (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
               (and @on? (< ratio low-water-ratio))
               (do (reset! on? false)
-                  (>!! outbox-ch (create-log-entry :backpressure-stop {:peer id})))))
+                  (>!! outbox-ch (create-log-entry :backpressure-off {:peer id})))))
       (Thread/sleep check-interval))))
 
 (defrecord VirtualPeer [opts]
