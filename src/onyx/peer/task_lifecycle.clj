@@ -398,7 +398,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
-             (read-batch task-type replica job-id pipeline)
+             (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
