@@ -14,7 +14,7 @@
 
 ;; Peer replica view interface
 
-(defmulti peer-replica-view (fn [entry old new diff peer-id] :default))
+(defmulti peer-replica-view (fn [entry old new diff old-view peer-id] :default))
 
 ;; Log interface
 

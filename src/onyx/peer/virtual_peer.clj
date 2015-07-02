@@ -39,7 +39,7 @@
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
-              peer @peer-view-atom
+              peer-view @peer-view-atom
               entry (first (alts!! [kill-ch inbox-ch] :priority true))]
           (if entry
             (let [new-replica (extensions/apply-log-entry entry replica)
@@ -47,7 +47,7 @@
                   ;;; Or maybe two, materialized replica (with map-invert here)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
-                  new-peer-view (extensions/peer-replica-view entry replica new-replica diff id)
+                  new-peer-view (extensions/peer-replica-view entry replica new-replica peer-view diff id)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)

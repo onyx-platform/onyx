@@ -8,7 +8,7 @@
 
 (defrecord PeerReplicaView [backpressure active-peers])
 
-(defmethod extensions/peer-replica-view :default [entry old new diff peer-id]
+(defmethod extensions/peer-replica-view :default [entry old new diff old-view peer-id]
   ;; This should be smarter about making a more personalised view
   ;; e.g. only calculate receivable peers for job the task is on and for downstream ids
   (let [allocations (:allocations new)
