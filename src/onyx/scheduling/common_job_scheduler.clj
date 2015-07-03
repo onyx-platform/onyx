@@ -83,7 +83,7 @@
    (map (fn [j]
           {j (into {}
                    (map (fn [t]
-                          {t (count (filter identity (get-in replica [:allocations j t])))})
+                          {t (count (remove nil? (get-in replica [:allocations j t])))})
                         (get-in replica [:tasks j])))})
         (:jobs replica))))
 
@@ -114,13 +114,14 @@
                            (sort-job-priority replica (:jobs replica))))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
-               (let [removed (common/remove-peers replica (first peer-pool))
-                     reset-state (assoc-in removed [:peer-state (first peer-pool)] :idle)]
+               (let [peer (first peer-pool)
+                     removed (common/remove-peers replica peer)
+                     reset-state (assoc-in removed [:peer-state peer] :idle)]
                  (-> reset-state
                      (update-in [:allocations
                                  (ffirst candidate-jobs)
                                  (second (first candidate-jobs))]
-                                conj (first peer-pool))
+                                conj peer)
                      (update-in [:allocations
                                  (ffirst candidate-jobs)
                                  (second (first candidate-jobs))]

@@ -103,8 +103,9 @@
 ;; so you can start backpressure events and have known results
 (defn allow-queue? [{:keys [peer-state] :as replica} 
                     [{:keys [args] :as entry} & es]] 
-  (and (#{:backpressure-on :backpressure-off} (:fn entry))
-       (not (contains? #{:idle nil} (get peer-state (:peer args))))))
+  (or (and (= :backpressure-on (:fn entry))
+           (= :active (get peer-state (:peer args))))
+      (= :backpressure-off (:fn entry))))
 
 (defn queue-select-gen 
   "Generator to look into all of the peer's write queues
