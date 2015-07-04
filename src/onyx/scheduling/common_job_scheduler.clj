@@ -77,7 +77,7 @@
 (defn current-job-allocations [replica]
   (into {}
         (map (fn [j]
-               {j (count (remove nil? (apply concat (vals (get-in replica [:allocations j])))))})
+               {j (count (remove nil? (replica->job-peers replica j)))})
              (:jobs replica))))
 
 (defn current-task-allocations [replica]
@@ -118,17 +118,13 @@
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
                (let [peer (first peer-pool)
-                     removed (common/remove-peers replica peer)
-                     reset-state (assoc-in removed [:peer-state peer] :idle)]
-                 (-> reset-state
-                     (update-in [:allocations
-                                 (ffirst candidate-jobs)
-                                 (second (first candidate-jobs))]
-                                conj peer)
-                     (update-in [:allocations
-                                 (ffirst candidate-jobs)
-                                 (second (first candidate-jobs))]
-                                vec))))
+                     [job-id task-id] (first candidate-jobs)]
+                 (-> replica
+                     (common/remove-peers peer)
+                     (assoc-in [:peer-state peer] :idle)
+                     (update-in [:allocations job-id task-id] 
+                                (fn [allocation]
+                                  (vec (conj allocation peer)))))))
         replica))))
 
 (defn find-unused-peers [replica]
@@ -194,7 +190,7 @@
 (defn choose-ackers [replica]
   (reduce
    (fn [result job]
-     (let [peers (sort (apply concat (vals (get-in result [:allocations job]))))
+     (let [peers (sort (replica->job-peers replica job))
            pct (or (get-in result [:acker-percentage job]) 10)
            n (int (Math/ceil (* 0.01 pct (count peers))))
            candidates (choose-acker-candidates result peers)]
