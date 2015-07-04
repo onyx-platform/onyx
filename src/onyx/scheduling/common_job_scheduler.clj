@@ -71,6 +71,9 @@
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
+(defn replica->job-peers [replica job-id]
+  (apply concat (vals (get-in replica [:allocations job-id]))))
+
 (defn current-job-allocations [replica]
   (into {}
         (map (fn [j]
@@ -199,6 +202,16 @@
    replica
    (:jobs replica)))
 
+(defn remove-job [replica job]
+  (let [peers (sort (replica->job-peers replica job))] 
+    (-> replica
+        (update-in [:allocations] dissoc job)
+        (update-in [:peer-state] (fn [peer-state]
+                                   (reduce (fn [ps peer] 
+                                             (assoc ps peer :idle)) 
+                                           peer-state 
+                                           peers))))))
+
 (defn deallocate-starved-jobs
   "Strips out allocations from jobs that no longer meet the minimum number
    of peers. This can happen if a peer leaves from a running job."
@@ -211,7 +224,7 @@
                          (get-in result [:min-required-peers job t] 1)))
                    tasks)
          result
-         (update-in result [:allocations] dissoc job))))
+         (remove-job result job))))
    replica
    (:jobs replica)))
 
