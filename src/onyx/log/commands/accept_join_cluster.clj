@@ -12,8 +12,10 @@
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)
-        still-joining? (get (map-invert (:accepted replica)) accepted-joiner)]
-    (if still-joining? 
+        already-joined? (some #{accepted-joiner} (:peers replica))
+        no-observer? (not (some #{target} (:peers replica)))]
+    (if (or already-joined? no-observer?) 
+      replica
       (-> replica
           (update-in [:pairs] merge {accepted-observer accepted-joiner})
           (update-in [:pairs] merge {accepted-joiner target})
@@ -21,8 +23,7 @@
           (update-in [:peers] vec)
           (update-in [:peers] conj accepted-joiner)
           (assoc-in [:peer-state accepted-joiner] :idle)
-          (reconfigure-cluster-workload))
-      replica)))
+          (reconfigure-cluster-workload)))))
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
@@ -34,8 +35,15 @@
          :subject (first (vals rets))}))))
 
 (defmethod extensions/reactions :accept-join-cluster
-  [entry old new diff state]
-  [])
+  [{:keys [args] :as entry} old new diff state]
+  (let [accepted-joiner (:accepted-joiner args)
+        already-joined? (some #{accepted-joiner} (:peers old))] 
+    (if (and (not already-joined?) 
+             (nil? diff) 
+             (= (:id state) accepted-joiner))
+      [{:fn :abort-join-cluster
+        :args {:id accepted-joiner}
+        :immediate? true}])))
 
 (defn unbuffer-messages [state diff new]
   (if (= (:id state) (:subject diff))
