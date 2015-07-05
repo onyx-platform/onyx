@@ -71,32 +71,34 @@
                                  (when (seq reactions)
                                    [peer-id reactions])))
                              peers)
-        side-effects (keep (partial generate-side-effects entry replica new-replica diff) peers)
-        new-entries (concat peer-reactions side-effects)
+        side-effects (keep (partial generate-side-effects entry replica new-replica diff) 
+                           peers)
+        new (concat peer-reactions side-effects)
         ; it does not matter that multiple reactions are processed
         ; together because they may be processed interleaved depending on 
         ; the choice of peer queue being popped
         unapplied (reduce (fn [new-entries [peer-id reactions]]
-                            (update-in new-entries 
-                                       [peer-id] 
-                                       (fn [entries] (-> entries
-                                                         vec
-                                                         (into reactions)
-                                                         (bump-forward-immediates (:peers replica) peer-id)))))
+                            (-> new-entries 
+                                (update-in [peer-id :queue] 
+                                           (fn [queue]
+                                             (-> queue
+                                                 vec
+                                                 (into reactions)
+                                                 (bump-forward-immediates (:peers replica) peer-id))))))
                           entries
-                          new-entries)]
+                          new)]
     (vector new-replica diff unapplied)))
 
 (defn apply-peer-queue-entry 
   "Applies the next log message in the selected peer's queue.
   Effectively, the next peer that wrote its message to ZK"
   [{:keys [replica message-id entries peer-choices log]} next-peer] 
-  (let [peer-queue (entries next-peer)
+  (let [peer-queue (:queue (entries next-peer))
         next-entry (first peer-queue)
         new-peer-queue (vec (rest peer-queue))
         new-entries (if (empty? new-peer-queue)
                       (dissoc entries next-peer)
-                      (assoc entries next-peer new-peer-queue))
+                      (assoc-in entries [next-peer :queue] new-peer-queue))
         message (assoc next-entry :message-id message-id)
         [new-replica diff updated-entries] (apply-entry replica new-entries message)] 
     {:replica new-replica
@@ -104,15 +106,6 @@
      :entries updated-entries
      :log (conj log [message diff])
      :peer-choices (conj peer-choices next-peer)}))
-
-;; This should be a predicate that can be setup on the queue
-;; to decide when to allow the queue to progress - makes things easier
-;; so you can start backpressure events and have known results
-(defn allow-queue? [{:keys [peer-state] :as replica} 
-                    [{:keys [args] :as entry} & es]] 
-  (or (and (= :backpressure-on (:fn entry))
-           (= :active (get peer-state (:peer args))))
-      (= :backpressure-off (:fn entry))))
 
 (defn queue-select-gen 
   "Generator to look into all of the peer's write queues
@@ -125,15 +118,18 @@
               ; because non-immediate reactions are buffered til join
               (let [replica (:replica state)
                     peerless-queues (->> (:entries state)
-                                         (filter (fn [[queue-id queue]] 
+                                         (filter (fn [[queue-id {:keys [predicate queue]}]] 
                                                    (or (peerless-entry? (first queue))
-                                                       (allow-queue? replica queue))))
+                                                       ((or predicate (constantly true)) 
+                                                        replica 
+                                                        (first queue)))))
                                          (map key))
                     joined-peers (set (:peers replica))
                     selectable-peers (->> (:entries state)
-                                          (filter (fn [[peer [entry]]]
-                                                    (or (:immediate? entry)
-                                                        (contains? joined-peers peer))))
+                                          (filter (fn [[peer {:keys [queue]}]]
+                                                    (let [entry (first queue)] 
+                                                      (or (:immediate? entry)
+                                                          (contains? joined-peers peer)))))
                                           (map key)
                                           set)
                     selectable-queues (into selectable-peers peerless-queues)]
@@ -176,8 +172,9 @@
 
 (defn generate-join-queues [peer-ids]
   (zipmap peer-ids
-          (map (comp vector build-join-entry) 
-               peer-ids)))
+          (map (fn [peer] 
+                 {:queue [(build-join-entry peer)]}) 
+               peer-ids))) 
 
 (defn generate-peer-ids [n]
   (map #(keyword (str "p" %))
