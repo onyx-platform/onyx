@@ -10,9 +10,7 @@
   [{:keys [args]} replica]
   (if (= :backpressure (get-in replica [:peer-state (:peer args)]))
     (assoc-in replica [:peer-state (:peer args)] :active) 
-    replica)
-
-  (assoc-in replica [:peer-state (:peer args)] :active))
+    replica))
 
 (defmethod extensions/replica-diff :backpressure-off
   [{:keys [args]} old new]
