@@ -243,6 +243,6 @@
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 3 (count (get (get (:allocations replica) job-1-id) t3))))
 
-       (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
-       (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
-       (is (= 1 (count (get (get (:allocations replica) job-2-id) t3))))))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t4))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t5))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t6))))))))
