@@ -307,36 +307,42 @@
 
 (defn launch-aux-threads!
   [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
+                                                       onyx.core/compiled-after-ack-message-fn 
+                                                       onyx.core/compiled-after-retry-message-fn 
                                                        onyx.core/replica
                                                        onyx.core/state] :as event} 
    outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
-   (try
-     (loop []
-       (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
-         (when v
-           (cond (= ch release-ch)
-                 (p-ext/ack-message pipeline event v)
+    (try
+      (loop []
+        (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
+          (when v
+            (cond (= ch release-ch)
+                  (->> (p-ext/ack-message pipeline event v)
+                       (compiled-after-ack-message-fn event v))
 
-                 (= ch completion-ch)
-                 (let [{:keys [id peer-id]} v
-                       peer-link (operation/peer-link @replica state event peer-id)]
-                   (extensions/internal-complete-message messenger event id peer-link))
+                  (= ch completion-ch)
+                  (let [{:keys [id peer-id]} v
+                        peer-link (operation/peer-link @replica state event peer-id)]
+                    (extensions/internal-complete-message messenger event id peer-link))
 
-                 (= ch retry-ch)
-                 (p-ext/retry-message pipeline event v)
+                  (= ch retry-ch)
+                  (->> (p-ext/retry-message pipeline event v)
+                       (compiled-after-retry-message-fn event v))
 
-                 (= ch seal-ch)
-                 (do
-                   (p-ext/seal-resource pipeline event)
-                   (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
-                                                                     :task (:onyx.core/task-id event)})]
-                     (>!! outbox-ch entry))))
-           (recur))))
-     (catch Throwable e
-       (fatal e)))))
+                  (= ch seal-ch)
+                  (do
+                    (p-ext/seal-resource pipeline event)
+                    (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                      :task (:onyx.core/task-id event)})]
+                      (>!! outbox-ch entry))))
+            (recur))))
+      (catch Throwable e
+        (fatal e)))))
 
-(defn input-retry-messages! [messenger {:keys [onyx.core/pipeline] :as event} 
+(defn input-retry-messages! [messenger {:keys [onyx.core/pipeline
+                                               onyx.core/compiled-after-retry-message-fn] 
+                                        :as event} 
                              input-retry-timeout task-kill-ch]
   (go
     (when (= :input (:onyx/type (:onyx.core/task-map event)))
@@ -348,7 +354,8 @@
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
-                  (p-ext/retry-message pipeline event m)))
+                  (->> (p-ext/retry-message pipeline event m)
+                       (compiled-after-retry-message-fn event m))))
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
               (recur))))))))
 
@@ -472,6 +479,20 @@
      identity
      matched)))
 
+(defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
+  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
+        fns (keep (fn [lifecycle] 
+                    (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+                      (if-let [g (get calls-map kw)]
+                        (vector lifecycle g)))) 
+                  matched)]
+    (reduce (fn [g [lifecycle f]] 
+              (fn [event message-id rets] 
+                (g event message-id rets)
+                (f event message-id rets lifecycle)))
+            (fn [event message-id rets])
+            fns)))
+
 (defn compile-before-task-start-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task-start))
 
@@ -483,6 +504,12 @@
 
 (defn compile-after-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
+
+(defn compile-after-ack-message-functions [lifecycles task-name]
+  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-message))
+
+(defn compile-after-retry-message-functions [lifecycles task-name]
+  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-message))
 
 (defn resolve-task-fn [entry]
   (when (= (:onyx/type entry) :function)
@@ -580,6 +607,8 @@
                            :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-ack-message-fn (compile-after-ack-message-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-retry-message-fn (compile-after-retry-message-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task->group-by-fn (compile-grouping-fn catalog (:egress-ids task))
