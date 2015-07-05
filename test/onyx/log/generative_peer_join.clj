@@ -408,7 +408,7 @@
      [2 2 4]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
-(deftest peer-leave
+(deftest peer-leave-4
   (checking
     "Checking peer leave is correctly performed"
     (times 50)
@@ -420,9 +420,59 @@
           :message-id 0
           :entries 
           (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 4))
-              (assoc :leave-anytime [{:fn :leave-cluster 
-                                      :args {:id :p1} 
-                                      :immediate? true}]))
+              (assoc :leave {:predicate (fn [replica entry]
+                                          (some #{:p1} (:peers replica)))
+                             :queue [{:fn :leave-cluster 
+                                      :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
-    (= 3 (count (:peers replica)))))
+    (is (= 3 (count (:peer-state replica))))
+    (is (= 3 (count (:peers replica))))))
+
+(deftest peer-leave
+  (checking
+    "Checking peer leave is correctly performed"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 3))
+              (assoc :leave-anytime {:queue [{:fn :leave-cluster 
+                                              :args {:id :p1}}]}))
+          :log []
+          :peer-choices []}))]
+    (is (or (= 2 (count (:peer-state replica)))
+            (= 3 (count (:peer-state replica)))))
+    (is (or (= 2 (count (:peers replica)))
+            (= 3 (count (:peers replica)))))))
+
+
+(deftest peer-leave-still-running
+  (checking
+    "Checking peer leave is correctly performed"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 9))
+              (assoc :job-1 {:queue [(api/create-submit-job-entry 
+                                       job-1-id
+                                       peer-config 
+                                       job-1-pct-tasks 
+                                       (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]})
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+          :log []
+          :peer-choices []}))]
+    ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
+    ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
+    ;; job must be able to go on
+    (is (>= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 7))))
