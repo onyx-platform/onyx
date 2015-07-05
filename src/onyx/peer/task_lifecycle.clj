@@ -492,7 +492,7 @@
           (if (and user-ns user-fn)
             (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
               (f pipeline-data)    
-              (throw (Exception. "Failure to ns-resolve at " user-ns " " user-fn)))
+              (throw (Exception. (str "Failure to ns-resolve at " user-ns " " user-fn))))
             (instantiate-plugin-instance user-fn pipeline-data)))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e 
