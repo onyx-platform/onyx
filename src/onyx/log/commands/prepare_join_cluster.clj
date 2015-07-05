@@ -20,11 +20,11 @@
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]
-  (let [n (count (:peers replica))]
+  (let [peers (:peers replica)
+        n (count peers)]
     (if (> n 0)
       (let [joining-peer (:joiner args)
-            cluster (:peers replica)
-            all-joined-peers (set (concat (keys (:pairs replica)) cluster))
+            all-joined-peers (set (concat (keys (:pairs replica)) peers))
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))
