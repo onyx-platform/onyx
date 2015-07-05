@@ -88,7 +88,7 @@
   (map->NettyPeerGroup {:opts opts}))
 
 (defmethod extensions/assign-site-resources :netty
-  [config peer-site peer-sites]
+  [_ peer-site peer-sites]
   (let [used-ports (->> (vals peer-sites) 
                         (filter 
                          (fn [s]
@@ -102,9 +102,8 @@
       (throw (ex-info "Couldn't assign port - ran out of available ports.
                       Available ports can be configured in the peer-config.
                       e.g. {:onyx.messaging/peer-ports [40000, 40002],
-                            :onyx.messaging/peer-port-range [40200 40260]}"
-                      {}
-                      #_peer-site)))
+                      :onyx.messaging/peer-port-range [40200 40260]}"
+                      peer-site)))
     {:netty/port port}))
 
 (defmethod extensions/get-peer-site :netty

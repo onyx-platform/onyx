@@ -43,7 +43,7 @@
   (map->AeronPeerGroup {:opts opts}))
 
 (defmethod extensions/assign-site-resources :aeron
-  [config peer-site peer-sites]
+  [replica peer-site peer-sites]
   (let [used-ports (->> (vals peer-sites) 
                         (filter 
                           (fn [s]
