@@ -147,7 +147,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-1 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) 
+                         :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -170,7 +171,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14)) :job-4 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14)) 
+                         :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -201,7 +203,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-2 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) 
+                         :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -230,8 +233,8 @@
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
-                    :job-1 [job-1-rets]
-                    :job-2 [job-2-rets])
+                         :job-1 {:queue [job-1-rets]}
+                         :job-2 {:queue [job-2-rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))
@@ -242,4 +245,4 @@
 
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
-       (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
+       (is (= 1 (count (get (get (:allocations replica) job-2-id) t3))))))))

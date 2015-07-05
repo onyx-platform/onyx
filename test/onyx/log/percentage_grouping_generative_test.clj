@@ -161,7 +161,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) :job-1 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) 
+                         :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -184,7 +185,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) :job-2 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) 
+                         :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))
@@ -210,7 +212,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) :job-3 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) 
+                         :job-3 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
@@ -233,7 +236,8 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) :job-4 [rets])
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10)) 
+                         :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
