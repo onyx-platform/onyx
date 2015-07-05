@@ -43,7 +43,8 @@
              (= (:id state) accepted-joiner))
       [{:fn :abort-join-cluster
         :args {:id accepted-joiner}
-        :immediate? true}])))
+        :immediate? true}]
+      [])))
 
 (defn unbuffer-messages [state diff new]
   (if (= (:id state) (:subject diff))
