@@ -73,10 +73,9 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.peer/job-not-ready-back-off`        | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                     | `map`      | `{}`                               |
 |`:onyx.peer/zookeeper-timeout`             | `int`      | `6000`                             |
-|`:onyx.peer/backpessure-check-interval`    | `int`      | `10`                               |
-|`:onyx.peer/backpessure-check-interval`    | `int`      | `10`                               |
-|`:onyx.peer/backpessure-low-water-pct`     | `int`      | `30`                               |
-|`:onyx.peer/backpessure-high-water-pct`    | `int`      | `60`                               |
+|`:onyx.peer/backpressure-check-interval`   | `int`      | `10`                               |
+|`:onyx.peer/backpressure-low-water-pct`    | `int`      | `30`                               |
+|`:onyx.peer/backpressure-high-water-pct`   | `int`      | `60`                               |
 |`:onyx.messaging/inbound-buffer-size`      | `int`      | `20000`                            |
 |`:onyx.messaging/completion-buffer-size`   | `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`   | `int`      | `10000`                            |
