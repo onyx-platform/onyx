@@ -1,3 +1,13 @@
+#### 0.7.0
+
+- BREAKING CHANGE: :onyx/ident has been renamed :onyx/plugin, and now takes a keyword path to a fn that instantiates the plugin e.g. :onyx.plugin.core-async/input. 
+- BREAKING CHANGE: plugins are now implemented by the Pipeline and PipelineInput protocols.
+- New lifecycle functions "after-ack-message" and "after-retry-message" are now available.
+- Several log / replica edge cases were fixed.
+- Jobs will now exhibit a backpressure mode when internal peer buffers fill up
+  past a high water mark, and will be turned off after reaching a low water
+  mark. See [Backpressure](doc/user-guide/backpressure.md) for more details.
+
 #### 0.6.0
 
 - Dropped feature: support for `:sequential` tasks
