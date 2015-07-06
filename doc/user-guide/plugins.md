@@ -13,7 +13,7 @@ Plugins serve as an abstract to compose mechanisms for getting data in and out o
 
 ### Interfaces
 
-In order to implement a plugin, a number of multimethods need to be extended from the [Pipeline Extensions API](../../src/onyx/peer/pipeline_extensions.clj). Reader plugins will implement `read-batch`, `ack-message`, `retry-message`, `pending?`, and `drained?`. Writer plugins will implement `write-batch` and `seal-resource`. See the docstrings for instructions on implementation.
+In order to implement a plugin, one or more protocols need to be implemented from the [Pipeline Extensions API](../../src/onyx/peer/pipeline_extensions.clj). Reader plugins will implement PipelineInput and Pipeline. Writer plugins will implement Pipeline. See the docstrings for instructions on implementation.
 
 ### Templates
 
