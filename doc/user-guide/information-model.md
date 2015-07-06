@@ -45,7 +45,6 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 | key name             | type       | choices    | default|
 |----------------------|------------|------------|--------|
-|`:onyx/ident`         | `keyword`  | `any`      |        |
 |`:onyx/batch-timeout` | `integer`  | `>= 0`     | `1000` |
 |`:onyx/max-peers`     | `integer`  | `> 0`      |        |
 
@@ -54,6 +53,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 | key name          | type       | choices
 |-------------------|------------|----------
 |`:onyx/medium`     | `keyword`  | `any`
+|`:onyx/plugin`     | `keyword`  | `any`
 
 ##### Maps with `:onyx/type` set to `:input` may optionally have these keys
 

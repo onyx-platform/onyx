@@ -9,7 +9,6 @@
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
-              [onyx.plugin.core-async]
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
@@ -521,7 +520,7 @@
                 (into-array [pipeline-data])))
 
 (defn build-pipeline [task-map pipeline-data]
-  (let [kw (:onyx/ident task-map)]
+  (let [kw (:onyx/plugin task-map)]
     (try 
       (if (#{:input :output} (:onyx/type task-map))
         (let [user-ns (namespace kw)
@@ -529,7 +528,7 @@
           (if (and user-ns user-fn)
             (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
               (f pipeline-data)    
-              (throw (Exception.)))
+              (throw (Exception. (str "Failure to ns-resolve at " user-ns " " user-fn))))
             (instantiate-plugin-instance user-fn pipeline-data)))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e 
