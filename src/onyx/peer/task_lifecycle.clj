@@ -484,7 +484,7 @@
                 (into-array [pipeline-data])))
 
 (defn build-pipeline [task-map pipeline-data]
-  (let [kw (:onyx/ident task-map)]
+  (let [kw (:onyx/plugin task-map)]
     (try 
       (if (#{:input :output} (:onyx/type task-map))
         (let [user-ns (namespace kw)

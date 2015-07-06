@@ -21,7 +21,7 @@ one of two output tasks (:out1, :out2) one can currently define a workflow:
 ##### Catalog
 ```
  [{:onyx/name :in
-   :onyx/ident :core.async/read-from-chan
+   :onyx/plugin :onyx.plugin.core-async/input
    :onyx/type :input
    :onyx/medium :core.async
    :onyx/consumption :concurrent
@@ -41,7 +41,7 @@ one of two output tasks (:out1, :out2) one can currently define a workflow:
    :onyx/batch-size batch-size}
 
   {:onyx/name :even-out
-   :onyx/ident :core.async/write-to-chan
+   :onyx/plugin :onyx.plugin.core-async/output
    :onyx/type :output
    :onyx/medium :core.async
    :onyx/consumption :concurrent
@@ -49,7 +49,7 @@ one of two output tasks (:out1, :out2) one can currently define a workflow:
    :onyx/doc "Writes segments to a core.async channel"}
 
   {:onyx/name :odd-out
-   :onyx/ident :core.async/write-to-chan
+   :onyx/plugin :onyx.plugin.core-async/output
    :onyx/type :output
    :onyx/medium :core.async
    :onyx/consumption :concurrent
@@ -108,7 +108,7 @@ Alternative definition under this format:
 #### Catalog
 ```
  [{:onyx/name :in
-   :onyx/ident :core.async/read-from-chan
+   :onyx/plugin :onyx.plugin.core-async/input
    :onyx/type :input
    :onyx/medium :core.async
    :onyx/route-filter-fn :filter.core/even-odd-router
@@ -117,7 +117,7 @@ Alternative definition under this format:
    :onyx/doc "Reads segments from a core.async channel"}
 
   {:onyx/name :even-out
-   :onyx/ident :core.async/write-to-chan
+   :onyx/plugin :onyx.plugin.core-async/output
    :onyx/type :output
    :onyx/medium :core.async
    :onyx/consumption :concurrent
@@ -125,7 +125,7 @@ Alternative definition under this format:
    :onyx/doc "Writes segments to a core.async channel"}
 
   {:onyx/name :odd-out
-   :onyx/ident :core.async/write-to-chan
+   :onyx/plugin :onyx.plugin.core-async/output
    :onyx/type :output
    :onyx/medium :core.async
    :onyx/consumption :concurrent

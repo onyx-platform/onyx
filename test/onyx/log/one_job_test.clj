@@ -27,7 +27,7 @@
 
 (def catalog
   [{:onyx/name :a
-    :onyx/ident :onyx.plugin.core-async/input
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -39,7 +39,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :c
-    :onyx/ident :onyx.plugin.core-async/output
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size

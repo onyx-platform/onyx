@@ -75,7 +75,6 @@ To group by a key in a segment, use `:onyx/group-by-key` in the catalog entry:
 
 ```clojure
 {:onyx/name :sum-balance
- :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
  :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
  :onyx/type :function
  :onyx/group-by-key :name
@@ -90,7 +89,6 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 ```clojure
 {:onyx/name :sum-balance
- :onyx/ident :onyx.peer.fn-grouping-test/sum-balance
  :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
  :onyx/type :function
  :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name

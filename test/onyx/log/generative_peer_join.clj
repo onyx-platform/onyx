@@ -26,7 +26,7 @@
 (def job-1
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -38,7 +38,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -50,7 +50,7 @@
 (def job-2
   {:workflow [[:d :e] [:e :f]]
    :catalog [{:onyx/name :d
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -62,7 +62,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :f
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -74,7 +74,7 @@
 (def job-3
   {:workflow [[:g :h] [:h :i]]
    :catalog [{:onyx/name :g
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -86,7 +86,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :i
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -267,7 +267,7 @@
 (def job-1-pct-tasks
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/percentage 25
               :onyx/max-peers 1
@@ -282,7 +282,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/percentage 37.5
               :onyx/medium :core.async
@@ -293,7 +293,7 @@
 (def job-2-pct-tasks
   {:workflow [[:d :e] [:e :f]]
    :catalog [{:onyx/name :d
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/percentage 25
               :onyx/medium :core.async
@@ -307,7 +307,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :f
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/percentage 50
               :onyx/medium :core.async
@@ -318,7 +318,7 @@
 (def job-3-pct-tasks
   {:workflow [[:g :h] [:h :i]]
    :catalog [{:onyx/name :g
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/percentage 25
               :onyx/medium :core.async
@@ -332,7 +332,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :i
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/percentage 50
               :onyx/medium :core.async
