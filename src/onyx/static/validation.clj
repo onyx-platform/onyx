@@ -24,7 +24,8 @@
 
 (def catalog-entry-validator
   (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
-                      (merge base-catalog-entry-validator {:onyx/medium schema/Keyword})
+                      (merge base-catalog-entry-validator {:onyx/plugin schema/Keyword
+                                                           :onyx/medium schema/Keyword})
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
