@@ -66,3 +66,10 @@
 
 (defmethod get-peer-site :default
   [_ _] "localhost")
+
+;; Monitoring interface
+
+(defmulti monitoring-agent :monitoring)
+
+(defprotocol IEmitEvent
+  (emit [_ event]))
