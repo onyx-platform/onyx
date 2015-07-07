@@ -80,7 +80,11 @@
 (>!! in-chan :done)
 (close! in-chan)
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def monitoring
+  {:monitoring :custom
+   :onyx.zookeeper/read-origin (fn [config event] (prn "Got: " event))})
+
+(def v-peers (onyx.api/start-peers 3 peer-group monitoring))
 
 (onyx.api/submit-job
  peer-config

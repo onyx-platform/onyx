@@ -380,6 +380,7 @@
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
   [{:keys [conn opts prefix] :as log} kw id & _]
+  (extensions/emit (:monitoring log) {:event :onyx.zookeeper/read-origin :chunk kw :id id})
   (clean-up-broken-connections
    (fn []
      (let [node (str (origin-path prefix) "/origin")]

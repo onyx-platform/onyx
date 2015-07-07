@@ -6,11 +6,11 @@
    (fn [config callback-kw]
      (get config callback-kw (constantly nil)))))
 
-(defrecord CustomMonitoringAgent [config]
+(defrecord CustomMonitoringAgent [monitoring-config]
   extensions/IEmitEvent
   (extensions/emit [_ event]
-    ((look-up-callback config (:event event)) config event)))
+    ((look-up-callback monitoring-config (:event event)) monitoring-config event)))
 
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]
-  (map->CustomMonitoringAgent monitoring-config))
+  (->CustomMonitoringAgent monitoring-config))
