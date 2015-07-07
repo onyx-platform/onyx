@@ -95,7 +95,7 @@
   (let [t (find-task-fast catalog task)]
     (if-let [k (:onyx/group-by-key t)]
       (if (sequential? k)
-        (hash (sort ((apply juxt k) segment)))
+        (hash (select-keys segment k))
         (hash (get segment k)))
       (when-let [f (:onyx/group-by-fn t)]
         (hash ((operation/resolve-fn {:onyx/fn f}) segment))))))
