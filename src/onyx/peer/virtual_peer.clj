@@ -43,8 +43,6 @@
               entry (first (alts!! [kill-ch inbox-ch] :priority true))]
           (if entry
             (let [new-replica (extensions/apply-log-entry entry replica)
-                  ;;; Or could have materialized view here so things are ready for next replica application
-                  ;;; Or maybe two, materialized replica (with map-invert here)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-peer-view (extensions/peer-replica-view entry replica new-replica peer-view diff id)
