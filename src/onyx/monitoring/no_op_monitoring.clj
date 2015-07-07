@@ -7,4 +7,4 @@
 
 (defmethod extensions/monitoring-agent :no-op
   [monitoring-config]
-  (map->NoOpMonitoringAgent))
+  (->NoOpMonitoringAgent))
