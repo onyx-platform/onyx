@@ -120,7 +120,7 @@
   ([{:keys [config] :as peer-group} monitoring-config]
      (map->OnyxPeer
       {:monitoring (extensions/monitoring-agent monitoring-config)
-       :messaging-require (component/using (messaging-require-ctor config) [:monitoring])
+       :messaging-require (messaging-require-ctor config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
        :messenger-buffer (component/using (messenger-buffer config)[:monitoring :log :acking-daemon])

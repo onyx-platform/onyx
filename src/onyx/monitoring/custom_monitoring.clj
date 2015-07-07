@@ -8,7 +8,7 @@
 
 (defrecord CustomMonitoringAgent [config]
   extensions/IEmitEvent
-  (emit [_ event]
+  (extensions/emit [_ event]
     ((look-up-callback config (:event event)) config event)))
 
 (defmethod extensions/monitoring-agent :custom

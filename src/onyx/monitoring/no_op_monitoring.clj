@@ -3,7 +3,7 @@
 
 (defrecord NoOpMonitoringAgent []
   extensions/IEmitEvent
-  (emit [_ event]))
+  (extensions/emit [_ event]))
 
 (defmethod extensions/monitoring-agent :no-op
   [monitoring-config]
