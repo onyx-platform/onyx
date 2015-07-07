@@ -71,7 +71,7 @@ Grouping ensures that "like" values are always routed to the same virtual peer, 
 
 #### Group By Key
 
-To group by a key in a segment, use `:onyx/group-by-key` in the catalog entry:
+To group by a key or a vector of keys in a segment, use `:onyx/group-by-key` in the catalog entry:
 
 ```clojure
 {:onyx/name :sum-balance
