@@ -37,7 +37,7 @@
                   (assoc hm id item)) @balance))
 
 (defn sum-balance [state {:keys [name first-name amount] :as segment}]
-  (let [name (or name first-name)]
+  (let [name (or name first-name [:first-name :first_name])]
     (swap! state (fn [v]
                    (assoc v name (+ (get v name 0) amount))))
     []))
@@ -59,7 +59,7 @@
     :onyx/ident :onyx.peer.kw-grouping-test/sum-balance
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
-    :onyx/group-by-key [:name :first-name]
+    :onyx/group-by-key [:name :first-name [:first-name :first_name]]
     :onyx/min-peers 2
     :onyx/flux-policy :kill
     :onyx/batch-size 40}
@@ -151,7 +151,8 @@
     (map (fn [_] {:name "Eusebia" :amount 10}) (range size))
     (map (fn [_] {:name "Fletcher" :amount 10}) (range size))
     (map (fn [_] {:first-name "Trey" :amount 10}) (range size))
-    (map (fn [_] {:first-name "Jon" :amount 10}) (range size)))))
+    (map (fn [_] {:first-name "Jon" :amount 10}) (range size))
+    (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size)))))
 
 (doseq [x data]
   (>!! in-chan x))
