@@ -94,7 +94,7 @@
 (defn group-message [segment catalog task]
   (let [t (find-task-fast catalog task)]
     (if-let [k (:onyx/group-by-key t)]
-      (if (vector? k)
+      (if (sequential? k)
         (hash (sort ((apply juxt k) segment)))
         (hash (get segment k)))
       (when-let [f (:onyx/group-by-fn t)]
