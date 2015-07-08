@@ -255,7 +255,6 @@
 
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
-    (prn "c:" monitoring (keys log))
   (let [bytes (compress chunk)]
     (measure-latency
      #(clean-up-broken-connections

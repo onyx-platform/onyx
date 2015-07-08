@@ -109,11 +109,11 @@
      :log (component/using (zookeeper config) [:logging-config])}))
 
 (defn onyx-client
-  [config]
+  [peer-config monitoring-config]
   (map->OnyxClient
-   {:monitoring (extensions/monitoring-agent {:monitoring :no-op})
-    :messaging-require (messaging-require-ctor config)
-    :log (component/using (zookeeper config) [:monitoring])}))
+   {:monitoring (extensions/monitoring-agent monitoring-config)
+    :messaging-require (messaging-require-ctor peer-config)
+    :log (component/using (zookeeper peer-config) [:monitoring])}))
 
 (defn onyx-peer
   [{:keys [config] :as peer-group} monitoring-config]
