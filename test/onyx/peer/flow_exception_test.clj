@@ -105,10 +105,10 @@
 (defn five-exception? [event old e all-new]
   (= (:error (ex-data e)) :five))
 
-(defn transform-even [event e]
-  {:error? true :value (:n (ex-data e))})
+(defn transform-even [event segment e]
+  {:error? true :value (:n segment)})
 
-(defn transform-five [event e]
+(defn transform-five [event segment e]
   {:error? true :value "abc"})
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
@@ -152,4 +152,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-

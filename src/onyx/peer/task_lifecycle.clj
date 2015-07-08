@@ -63,33 +63,33 @@
         :else (into (set all) to-add)))
 
 (defn choose-output-paths
-  [event compiled-flow-conditions result leaf serialized-task downstream]
+  [event compiled-flow-conditions result message serialized-task downstream]
   (if (empty? compiled-flow-conditions)
     {:flow downstream}
     (reduce
-      (fn [{:keys [flow exclusions] :as all} entry]
-        (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
-          (if (:flow/short-circuit? entry)
-            (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
-                              (into (set exclusions) (:flow/exclude-keys entry))
-                              (:flow/post-transform entry)
-                              (:flow/action entry)))
-            (->Route (join-output-paths flow (:flow/to entry) downstream)
-                     (into (set exclusions) (:flow/exclude-keys entry))
-                     nil
-                     nil))
-          all))
-      (->Route #{} #{} nil nil)
-      compiled-flow-conditions)))
+     (fn [{:keys [flow exclusions] :as all} entry]
+       (if ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
+         (if (:flow/short-circuit? entry)
+           (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
+                             (into (set exclusions) (:flow/exclude-keys entry))
+                             (:flow/post-transform entry)
+                             (:flow/action entry)))
+           (->Route (join-output-paths flow (:flow/to entry) downstream)
+                    (into (set exclusions) (:flow/exclude-keys entry))
+                    nil
+                    nil))
+         all))
+     (->Route #{} #{} nil nil)
+     compiled-flow-conditions)))
 
 (defn add-route-data
   [{:keys [onyx.core/serialized-task onyx.core/compiled-norm-fcs onyx.core/compiled-ex-fcs]
     :as event} result leaf downstream]
   (if (operation/exception? (:message leaf))
     (if (seq compiled-ex-fcs)
-      (choose-output-paths event compiled-ex-fcs result leaf serialized-task downstream)
-      (throw (:message leaf)))
-    (choose-output-paths event compiled-norm-fcs result leaf serialized-task downstream)))
+      (choose-output-paths event compiled-ex-fcs result (:exception (ex-data (:message leaf))) serialized-task downstream)
+      (throw (:exception (ex-data (:message leaf)))))
+    (choose-output-paths event compiled-norm-fcs result (:message leaf) serialized-task downstream)))
 
 (defn group-message [segment catalog task]
   (let [t (find-task-fast catalog task)]
@@ -102,9 +102,10 @@
   (let [post-transformation (:post-transformation (:routes leaf))
         message (:message leaf)
         msg (if (and (operation/exception? message) post-transformation)
-              (operation/apply-function (operation/kw->fn post-transformation)
-                                        [event] 
-                                        message)
+              (let [data (ex-data message)]
+                (operation/apply-function (operation/kw->fn post-transformation)
+                                          [event (:segment data)]
+                                          (:exception data)))
               message)]
     (-> leaf 
         (assoc :message (reduce dissoc msg (:exclusions (:routes leaf))))
@@ -239,7 +240,10 @@
                        batch))))
 
 (defn collect-next-segments [event input]
-  (let [segments (try (function/apply-fn event input) (catch Throwable e e))]
+  (let [segments (try (function/apply-fn event input)
+                      (catch Throwable e
+                        (ex-info "Segment threw exception"
+                                 {:exception e :segment input})))]
     (if (sequential? segments) segments (vector segments))))
 
 (defn apply-fn-single [{:keys [onyx.core/batch] :as event}]
