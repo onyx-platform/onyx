@@ -177,10 +177,9 @@
 
 (fact (not (empty? out-val)))
 
-;;;; We flush out each result set based on
-;;;; the peer id, then we do a diff. If the
-;;;; last collection is empty, we know that
-;;;; each map is mutually exclusive.
+;;;; We flush out each result set based on the peer id, then we do a diff. If the
+;;;; last collection is empty, we know that each map is mutually exclusive.
+
 (let [l (first (vals out-val))
       r (second (vals out-val))]
   (fact (empty? (last (clojure.data/diff l r)))))
