@@ -31,7 +31,7 @@
 
 (def development-components [:logging-config :log])
 
-(def client-components [:log :messaging-require])
+(def client-components [:monitoring :log :messaging-require])
 
 (def peer-components
   [:monitoring :log :messaging-require
@@ -111,8 +111,9 @@
 (defn onyx-client
   [config]
   (map->OnyxClient
-    {:messaging-require (messaging-require-ctor config)
-     :log (zookeeper config)}))
+   {:monitoring (extensions/monitoring-agent {:monitoring :no-op})
+    :messaging-require (messaging-require-ctor config)
+    :log (component/using (zookeeper config) [:monitoring])}))
 
 (defn onyx-peer
   ([peer-group]
