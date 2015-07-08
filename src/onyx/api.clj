@@ -285,9 +285,11 @@
 
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
-  [env-config]
-  (validator/validate-env-config env-config)
-  (component/start (system/onyx-development-env env-config)))
+  ([env-config]
+     (start-env env-config {:monitoring :no-op}))
+  ([env-config monitoring-config]
+     (validator/validate-env-config env-config)
+     (component/start (system/onyx-development-env env-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-env
   "Shuts down the given development environment."

@@ -29,7 +29,7 @@
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 
-(def development-components [:logging-config :log])
+(def development-components [:monitoring :logging-config :log])
 
 (def client-components [:monitoring :log :messaging-require])
 
@@ -103,10 +103,13 @@
     rets))
 
 (defn onyx-development-env
-  [config]
-  (map->OnyxDevelopmentEnv
-    {:logging-config (logging-config/logging-configuration config)
-     :log (component/using (zookeeper config) [:logging-config])}))
+  ([peer-config]
+     (onyx-development-env peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (map->OnyxDevelopmentEnv
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :logging-config (logging-config/logging-configuration peer-config)
+       :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client
   ([peer-config]
