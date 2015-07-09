@@ -16,12 +16,14 @@
 (def ^:const retry-msg-length (long 33))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ^:const ack-msg-length (long 57))
+(def ^:const ack-msg-length (long 43))
 
 (def ^:const completion-msg-id (byte 0))
 (def ^:const retry-msg-id (byte 1))
 (def ^:const ack-msg-id (byte 2))
 (def ^:const messages-msg-id (byte 3))
+
+(def ^:const short-size 2)
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
@@ -32,9 +34,7 @@
 
 (def ^:const message-count-size (long 4))
 (def ^:const payload-size-size (long 4))
-(def ^:const messages-header-size (long (+ message-count-size payload-size-size 1 
-                                           ;; peer id
-                                           16)))
+(def ^:const messages-header-size (long (+ message-count-size payload-size-size short-size 1)))
 
 (defn write-uuid [^MutableDirectBuffer buf ^long offset ^UUID uuid]
   (.putLong buf offset (.getMostSignificantBits uuid))
@@ -45,46 +45,46 @@
         lsb (.getLong buf (unchecked-add 8 offset))]
     (java.util.UUID. msb lsb)))
 
-(defn build-acker-message [^UUID peer-id ^UUID id ^UUID completion-id ^long ack-val]
+(defn build-acker-message [peer-id ^UUID id ^UUID completion-id ^long ack-val]
   (let [buf (UnsafeBuffer. (byte-array ack-msg-length))]
     (.putByte buf 0 ack-msg-id)
-    (write-uuid buf 1 peer-id)
-    (write-uuid buf 17 id)
-    (write-uuid buf 33 completion-id)
-    (.putLong buf 49 ack-val)
+    (.putShort buf 1 (short peer-id))
+    (write-uuid buf 3 id)
+    (write-uuid buf 19 completion-id)
+    (.putLong buf 35 ack-val)
     buf))
 
 (defn read-message-type [buf offset]
   (.getByte ^UnsafeBuffer buf ^long offset))
 
 (defn read-acker-message [^UnsafeBuffer buf ^long offset]
-  (let [peer-id (get-uuid buf offset)
-        id (get-uuid buf (unchecked-add offset 16))
-        completion-id (get-uuid buf (unchecked-add offset 32))
-        ack-val (.getLong buf (unchecked-add offset 48))]
+  (let [peer-id (.getShort buf offset)
+        id (get-uuid buf (unchecked-add offset short-size))
+        completion-id (get-uuid buf (unchecked-add offset 18))
+        ack-val (.getLong buf (unchecked-add offset 34))]
     (->Message peer-id 
                (->Ack id completion-id ack-val nil))))
 
 (defn read-completion [^UnsafeBuffer buf ^long offset]
-  (->Message (get-uuid buf offset) 
-             (get-uuid buf (unchecked-add offset 16))))
+  (->Message (.getShort buf offset) 
+             (get-uuid buf (unchecked-add offset short-size))))
 
 (defn read-retry [^UnsafeBuffer buf ^long offset]
-  (->Message (get-uuid buf offset) 
-             (get-uuid buf (unchecked-add offset 16))))
+  (->Message (.getShort buf offset) 
+             (get-uuid buf (unchecked-add offset short-size))))
 
 (defn build-completion-msg-buf [peer-id id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
     (.putByte buf 0 completion-msg-id)
-    (write-uuid buf 1 peer-id)
-    (write-uuid buf 17 id)
+    (.putShort buf 1 (short peer-id))
+    (write-uuid buf 3 id)
     buf))
 
 (defn build-retry-msg-buf [peer-id id]
   (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
     (.putByte buf 0 retry-msg-id)
-    (write-uuid buf 1 peer-id)
-    (write-uuid buf 17 id)
+    (.putShort buf 1 (short peer-id))
+    (write-uuid buf 3 id)
     buf))
 
 (defn write-message-meta [^MutableDirectBuffer buf ^long offset msg]
@@ -112,9 +112,9 @@
                                                (* message-count message-base-length)))
         buf (UnsafeBuffer. (byte-array buf-size))
         _ (.putByte buf 0 messages-msg-id)
-        _ (write-uuid buf 1 peer-id)
-        _ (.putInt buf 17 message-count) ; number of messages
-        _ (.putInt buf 21 payload-size)
+        _ (.putShort buf 1 (short peer-id))
+        _ (.putInt buf 3 message-count) ; number of messages
+        _ (.putInt buf 7 payload-size)
         _ (.putBytes buf messages-header-size message-payloads)
         offset (unchecked-add messages-header-size payload-size)
         buf-size (reduce (fn [offset msg]
@@ -125,8 +125,8 @@
     (list buf-size buf)))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset length]
-  (let [peer-id (get-uuid buf offset)
-        offset (unchecked-add offset 16)
+  (let [peer-id (.getShort buf offset)
+        offset (unchecked-add offset short-size)
         message-count (.getInt buf offset)
         offset (unchecked-add offset message-count-size)
         payload-size (.getInt buf offset)

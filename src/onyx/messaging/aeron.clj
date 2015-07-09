@@ -76,7 +76,7 @@
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
 (defmethod extensions/open-peer-site AeronConnection
-  [{:keys [virtual-peers id] :as messenger} assigned]
+  [{:keys [virtual-peers] :as messenger} {:keys [aeron/id]}]
   (swap! virtual-peers assoc id messenger)) 
 
 (def no-op-error-handler
@@ -114,27 +114,27 @@
     (cond (= msg-type protocol/ack-msg-id)
           (let [message (protocol/read-acker-message buffer offset-rest)
                 ack (:payload message)
-                peer-id (:peer-id message)]
-            (>!! (:acking-ch (get @virtual-peers peer-id)) ack))
+                id (:id message)]
+            (>!! (:acking-ch (get @virtual-peers id)) ack))
 
           (= msg-type protocol/messages-msg-id)
           (let [message (protocol/read-messages-buf decompress-f buffer offset-rest length)
                 segments (:payload message)
-                peer-id (:peer-id message)
-                inbound-ch (:inbound-ch (get @virtual-peers peer-id))]
+                id (:id message)
+                inbound-ch (:inbound-ch (get @virtual-peers id))]
             (doseq [segment segments]
               (>!! inbound-ch segment)))
 
           (= msg-type protocol/completion-msg-id)
           (let [message (protocol/read-completion buffer offset-rest)
                 completion-id (:payload message)]
-            (>!! (:release-ch (get @virtual-peers (:peer-id message)))
+            (>!! (:release-ch (get @virtual-peers (:id message)))
                  completion-id))
 
           (= msg-type protocol/retry-msg-id)
           (let [message (protocol/read-retry buffer offset-rest)
                 retry-id (:payload message)]
-            (>!! (:retry-ch (get @virtual-peers (:peer-id message))) 
+            (>!! (:retry-ch (get @virtual-peers (:id message))) 
                  retry-id)))))
 
 (defn start-subscriber! [bind-addr port virtual-peers decompress-f idle-strategy]
@@ -263,9 +263,28 @@
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 
+(def possible-ids 
+  (set (range -32768 32768)))
+
+(defn choose-id [used]
+  (short (first (clojure.set/difference possible-ids used))))
+
+;;; Assigns a unique id to each peer so that messages do not need
+;;; to send the entire peer-id in a payload, saving 14 bytes per
+;;; message
 (defmethod extensions/assign-site-resources :aeron
   [replica peer-site peer-sites]
-  {})
+  (let [used-ids (->> (vals peer-sites) 
+                      (filter 
+                        (fn [s]
+                          (= (:aeron/external-addr peer-site) 
+                             (:aeron/external-addr s))))
+                      (map :aeron/id)
+                      set)
+        id (choose-id used-ids)]
+    (when-not id
+      (throw (ex-info "Couldn't assign id. Ran out of aeron ids. This should only happen if more than 65356 virtual peers have been started up on a single external addr")))
+    {:aeron/id id}))
 
 (defmethod extensions/get-peer-site :aeron
   [replica peer]
@@ -279,12 +298,12 @@
   {:aeron/external-addr (:external-addr (:messaging-group messenger))
    :aeron/port (:port (:messaging-group messenger))})
 
-(defrecord AeronPeerConnection [channel peer-id])
+(defrecord AeronPeerConnection [channel id])
 
 ;;;; THIS CAN BE MADE FASTER BY NOT GOING THROUGH PEER-LINK IN OPERATION
 (defmethod extensions/connect-to-peer AeronConnection
-  [messenger peer-id event {:keys [aeron/external-addr aeron/port]}]
-  (->AeronPeerConnection (aeron-channel external-addr port) peer-id))
+  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id]}]
+  (->AeronPeerConnection (aeron-channel external-addr port) id))
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
@@ -299,11 +318,11 @@
           segments)
         segments))))
 
-(defn short-circuit-ch [messenger peer-id ch-k]
+(defn short-circuit-ch [messenger id ch-k]
   (-> messenger 
       :virtual-peers 
       deref 
-      (get peer-id)
+      (get id)
       ch-k))
 
 (defn send-messages-short-circuit [ch batch]
@@ -311,11 +330,11 @@
     (>!! ch segment)))
 
 (defmethod extensions/send-messages AeronConnection
-  [messenger event {:keys [peer-id channel]} batch]
+  [messenger event {:keys [id channel]} batch]
   (if ((:short-circuitable? messenger) channel) 
-    (send-messages-short-circuit (short-circuit-ch messenger peer-id :inbound-ch) batch)
+    (send-messages-short-circuit (short-circuit-ch messenger id :inbound-ch) batch)
     (let [pub ^Publication (get-publication messenger channel)
-          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) peer-id batch)
+          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)
           offer-f (fn [] (.offer pub unsafe-buffer 0 len))
           idle-strategy (:send-idle-strategy messenger)]
       ;;; TODO: offer will return a particular code when the publisher is down
@@ -328,13 +347,13 @@
     (>!! ch ack)))
 
 (defmethod extensions/internal-ack-messages AeronConnection
-  [messenger event {:keys [peer-id channel]} acks]
+  [messenger event {:keys [id channel]} acks]
   (if ((:short-circuitable? messenger) channel) 
-    (ack-messages-short-circuit (short-circuit-ch messenger peer-id :acking-ch) acks)
+    (ack-messages-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
     (let [pub ^Publication (get-publication messenger channel)
           idle-strategy (:send-idle-strategy messenger)] 
-      (doseq [{:keys [id completion-id ack-val]} acks] 
-        (let [unsafe-buffer (protocol/build-acker-message peer-id id completion-id ack-val)
+      (doseq [ack acks] 
+        (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))
               offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
           (while (neg? ^long (offer-f))
             (.idle ^IdleStrategy idle-strategy 0)))))))
@@ -343,12 +362,12 @@
   (>!! ch completion-id))
 
 (defmethod extensions/internal-complete-message AeronConnection
-  [messenger event id {:keys [peer-id channel]}]
+  [messenger event completion-id {:keys [id channel]}]
   (if ((:short-circuitable? messenger) channel) 
-    (complete-message-short-circuit (short-circuit-ch messenger peer-id :release-ch) id)
+    (complete-message-short-circuit (short-circuit-ch messenger id :release-ch) completion-id)
     (let [idle-strategy (:send-idle-strategy messenger)
           pub ^Publication (get-publication messenger channel)
-          unsafe-buffer (protocol/build-completion-msg-buf peer-id id)
+          unsafe-buffer (protocol/build-completion-msg-buf id completion-id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
       (while (neg? ^long (offer-f))
         (.idle ^IdleStrategy idle-strategy 0)))))
@@ -357,12 +376,12 @@
   (>!! ch retry-id))
 
 (defmethod extensions/internal-retry-message AeronConnection
-  [messenger event id {:keys [peer-id channel]}]
+  [messenger event retry-id {:keys [id channel]}]
   (if ((:short-circuitable? messenger) channel) 
-    (retry-message-short-circuit (short-circuit-ch messenger peer-id :retry-ch) id)
+    (retry-message-short-circuit (short-circuit-ch messenger id :retry-ch) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
           pub ^Publication (get-publication messenger channel)
-          unsafe-buffer (protocol/build-retry-msg-buf peer-id id)
+          unsafe-buffer (protocol/build-retry-msg-buf id retry-id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
       (while (neg? ^long (offer-f))
         (.idle ^IdleStrategy idle-strategy 0)))))

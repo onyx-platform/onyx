@@ -29,7 +29,7 @@
                            :peer-replica-view peer-view-atom
                            :log log
                            :messenger-buffer buffer
-                           :messenger (assoc messenger :id id)
+                           :messenger messenger
                            :outbox-ch outbox-ch
                            :completion-ch completion-ch
                            :opts opts
