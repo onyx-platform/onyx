@@ -44,7 +44,4 @@
    :onyx.messaging/ack-daemon-clear-interval 15000})
 
 (defn arg-or-default [k opts]
-  (let [opts-val (get opts k)]
-    (if (nil? opts-val)
-      (get defaults k)
-      opts-val)))
+  (get opts k (get defaults k)))
