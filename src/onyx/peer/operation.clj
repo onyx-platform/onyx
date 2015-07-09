@@ -3,9 +3,6 @@
             [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
-(defn apply-function [f params segment]
-  ((reduce #(partial %1 %2) f params) segment))
-
 (defn get-method-java [class-name method-name] 
   (let [ms (filter #(= (.getName %) method-name) 
                    (.getMethods (Class/forName class-name)))]
@@ -56,14 +53,14 @@
   (if (<= (count all-peers) n)
     all-peers
     (take n 
-          (sort-by (fn [peer-id] (hash [id peer-id]))
+          (sort-by (fn [peer-id] (hash-combine (.hashCode id) (.hashCode peer-id)))
                    all-peers))))
 
 (defn peer-link
   [replica-val state event peer-id]
   (if-let [link (get (:links @state) peer-id)]
     (do 
-      (swap! state assoc-in [:links peer-id] (assoc link :timestamp (System/currentTimeMillis)))
+      (reset! (:timestamp link) (System/currentTimeMillis))
       (:link link))
     (let [site (-> replica-val
                    :peer-sites
@@ -74,7 +71,7 @@
                  (fn [link]
                    (or link 
                        (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
-                               (System/currentTimeMillis)))))
+                               (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)
           :link))))

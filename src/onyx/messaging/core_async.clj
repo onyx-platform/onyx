@@ -22,7 +22,7 @@
   (map->CoreAsyncPeerGroup {}))
 
 (defmethod extensions/assign-site-resources :core.async
-  [config peer-site peer-sites]
+  [replica peer-site peer-sites]
   peer-site)
 
 (defmethod extensions/get-peer-site :core.async

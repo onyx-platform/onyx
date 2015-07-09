@@ -9,7 +9,7 @@
             [onyx.system :as system]
             [onyx.extensions :as ext]
             [onyx.api]
-            [onyx.types :refer [map->Leaf]]
+            [onyx.types :refer [map->Leaf map->Ack]]
             [com.stuartsierra.component :as component]
             [onyx.test-helper :refer [load-config]]
             [com.gfredericks.test.chuck :refer [times]]
@@ -31,23 +31,22 @@
   (fn [messenger _ _ _] 
     (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
       (try 
-        (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
-          (let [t ^byte (:type msg)]
-            (cond (= t protocol/messages-type-id) 
-                  (doseq [message (:messages msg)]
-                    (swap! received update-in [:messages] conj message))
+        (let [t ^byte (protocol/read-msg-type buf)]
+          (cond (= t protocol/messages-type-id) 
+                (doseq [message (protocol/read-messages-buf (:decompress-f messenger) buf)]
+                  (swap! received update-in [:messages] conj message))
 
-                  (= t protocol/ack-type-id)
-                  (swap! received update-in [:acks] into (:acks msg))
+                (= t protocol/ack-type-id)
+                (swap! received update-in [:acks] into (protocol/read-acks-buf buf))
 
-                  (= t protocol/completion-type-id)
-                  (swap! received update-in [:complete] conj (:id msg))
+                (= t protocol/completion-type-id)
+                (swap! received update-in [:complete] conj (protocol/read-completion-buf buf))
 
-                  (= t protocol/retry-type-id)
-                  (swap! received update-in [:retry] conj (:id msg))
+                (= t protocol/retry-type-id)
+                (swap! received update-in [:retry] conj (protocol/read-retry-buf buf))
 
-                  :else
-                  (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
+                :else
+                (throw (ex-info "Unexpected message received from Netty" {:type t}))))
         (catch Throwable e
           (taoensso.timbre/error e)
           (throw e))))))
@@ -74,7 +73,7 @@
                         :acks (ext/internal-ack-messages send-messenger nil send-link (:payload command)))) 
                     nil commands)
 
-            (Thread/sleep 5000)
+            (Thread/sleep 1000)
             (ext/close-peer-connection send-messenger nil send-link)
             @received)
           (finally 
@@ -110,10 +109,12 @@
                 :payload 
                 (gen/such-that not-empty 
                                (gen/vector 
-                                 (gen/hash-map 
-                                   :id uuid-gen
-                                   :completion-id uuid-gen
-                                   :ack-val gen/int)))))
+                                 (gen/fmap
+                                   map->Ack
+                                   (gen/hash-map 
+                                     :id uuid-gen
+                                     :completion-id uuid-gen
+                                     :ack-val gen/int))))))
 
 (def gen-completion
   (gen/hash-map :command 
@@ -134,9 +135,8 @@
   (let [peer-group (onyx.api/start-peer-group peer-config)] 
     (try 
       (checking "all generated messages are received"
-                (times 500)
+                (times 10)
                 [commands (gen/vector gen-command)]
-                (println "Commands " commands)
                 (let [grouped-model (group-by :command commands) 
                       model-results (zipmap (keys grouped-model)
                                             (map (fn [v] (set (flatten (map :payload v)))) 

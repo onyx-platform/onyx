@@ -24,10 +24,15 @@
 
 (defmethod extensions/reactions :notify-join-cluster
   [entry old new diff peer-args]
-  (when (= (:id peer-args) (:observer diff))
-    [{:fn :accept-join-cluster
-      :args diff
-      :immediate? true}]))
+  (cond (and (= (vals diff) (remove nil? (vals diff))) 
+             (= (:id peer-args) (:observer diff)))
+        [{:fn :accept-join-cluster
+          :args diff
+          :immediate? true}]  
+        (= (:id peer-args) (:observer (:args entry)))
+        [{:fn :abort-join-cluster
+          :args {:id (:observer (:args entry))}
+          :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
   [{:keys [args]} old new diff state]

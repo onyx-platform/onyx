@@ -95,138 +95,153 @@
 
 (deftest greedy-allocation
   (checking
-   "Checking greedy allocation causes all peers to be allocated to one of two jobs"
-   (times 50)
-   [{:keys [replica log peer-choices]} 
-    (log-gen/apply-entries-gen 
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc
-                    (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config 
-                                                       job-1 
-                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config 
-                                                       job-2 
-                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
-       :log []
-       :peer-choices []}))]
+    "Checking greedy allocation causes all peers to be allocated to one of two jobs"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config 
+                                            job-1 
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config 
+                                            job-2 
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
+          :log []
+          :peer-choices []}))]
 
-   (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
-                        (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
-     (is 
-      (or (= allocs [0 8])
-          (= allocs [8 0]))))))
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
+                         (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
+      (is 
+        (or (= allocs [0 8])
+            (= allocs [8 0]))))))
 
 (deftest greedy-allocation-reallocated
   (checking
-   "Checking peers reallocated to other job when killed"
-   (times 50)
-   [{:keys [replica log peer-choices]} 
-    (log-gen/apply-entries-gen 
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/greedy
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config 
-                                                       job-1 
-                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config 
-                                                       job-2 
-                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))
-                          {:fn :kill-job :args {:job job-2-id}}])
-       :log []
-       :peer-choices []}))]
-   (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
-   (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
+    "Checking peers reallocated to other job when killed"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/greedy
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 8))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config 
+                                            job-1 
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config 
+                                            job-2 
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))
+                                          {:fn :kill-job :args {:job job-2-id}}]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
+    (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
 
 (deftest balanced-task-balancing
   (checking
-   "Checking Balanced allocation causes peers to be evenly over tasks"
-   50
-   [{:keys [replica log peer-choices]} 
-    (log-gen/apply-entries-gen 
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config 
-                                                       job-1 
-                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config 
-                                                       job-2 
-                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
-       :log []
-       :peer-choices []}))]
-   (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
-   (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
+    "Checking Balanced allocation causes peers to be evenly over tasks"
+    50
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config 
+                                            job-1 
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config 
+                                            job-2 
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
 
 (deftest balanced-allocations-uneven
   (checking
-   "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
-   (times 50)
-   [{:keys [replica log peer-choices]}
-    (log-gen/apply-entries-gen
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 7))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config
-                                                       job-1
-                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config
-                                                       job-2
-                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))])
-       :log []
-       :peer-choices []}))]
-   (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
-         j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
-     ;; Since job IDs are reused, we can't know which order they'll be in.
-     (is (= (set [(map count j1-allocations) (map count j2-allocations)])
-            #{[2 1 1] [1 1 1]})))))
+    "Checking Balanced allocation causes peers to be evenly over tasks when the spread is uneven"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 7))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config
+                                            job-1
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config
+                                            job-2
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
+          j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
+      ;; Since job IDs are reused, we can't know which order they'll be in.
+      (is (= (set [(map count j1-allocations) (map count j2-allocations)])
+             #{[2 1 1] [1 1 1]})))))
 
 (deftest balanced-allocations
   (checking
-   "Checking balanced allocation causes peers to be evenly split"
-   (times 50)
-   [{:keys [replica log peer-choices]} 
-    (log-gen/apply-entries-gen 
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config 
-                                                       job-1 
-                                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config 
-                                                       job-2 
-                                                       (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
-                  :job-3 [(api/create-submit-job-entry job-3-id
-                                                       peer-config 
-                                                       job-3 
-                                                       (planning/discover-tasks (:catalog job-3) (:workflow job-3)))
-                          {:fn :kill-job :args {:job job-3-id}}])
-       :log []
-       :peer-choices []}))]
-   (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
-   (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
-   (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+    "Checking balanced allocation causes peers to be evenly split"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config 
+                                            job-1 
+                                            (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config 
+                                            job-2 
+                                            (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]}
+                          :job-3 {:queue [(api/create-submit-job-entry 
+                                            job-3-id
+                                            peer-config 
+                                            job-3 
+                                            (planning/discover-tasks (:catalog job-3) (:workflow job-3)))
+                                          {:fn :kill-job :args {:job job-3-id}}]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
+    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
 (deftest job-percentages-balance
   (checking
@@ -242,24 +257,31 @@
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
-                            :job-1 [(api/create-submit-job-entry job-1-id
-                                                                 percentages-peer-config 
-                                                                 (assoc job-1 :percentage 30) 
-                                                                 (planning/discover-tasks (:catalog job-1) 
-                                                                                          (:workflow job-1)))]
-                            :job-2 [(api/create-submit-job-entry job-2-id
-                                                                 percentages-peer-config 
-                                                                 (assoc job-2 :percentage 30) 
-                                                                 (planning/discover-tasks (:catalog job-2) 
-                                                                                          (:workflow job-2)))]
-                            :job-3 [(api/create-submit-job-entry job-3-id
-                                                                 percentages-peer-config 
-                                                                 (assoc job-3 :percentage 40) 
-                                                                 (planning/discover-tasks (:catalog job-3) 
-                                                                                          (:workflow job-3)))
-                                    {:fn :kill-job :args {:job job-3-id}}])
+                            :job-1 {:queue [(api/create-submit-job-entry 
+                                              job-1-id
+                                              percentages-peer-config 
+                                              (assoc job-1 :percentage 30) 
+                                              (planning/discover-tasks (:catalog job-1) 
+                                                                       (:workflow job-1)))]}
+                            :job-2 {:queue [(api/create-submit-job-entry 
+                                              job-2-id
+                                              percentages-peer-config 
+                                              (assoc job-2 :percentage 30) 
+                                              (planning/discover-tasks (:catalog job-2) 
+                                                                       (:workflow job-2)))]}
+                            :job-3 {:queue [(api/create-submit-job-entry 
+                                              job-3-id
+                                              percentages-peer-config 
+                                              (assoc job-3 :percentage 40) 
+                                              (planning/discover-tasks (:catalog job-3) 
+                                                                       (:workflow job-3)))
+                                            {:fn :kill-job :args {:job job-3-id}}]})
             :log []
             :peer-choices []})))]
+    (let [peer-state-group (group-by val (:peer-state replica))] 
+      (is (= (count (:active peer-state-group)) 12))
+      (is (= (count (:idle peer-state-group)) 8))
+      (is (= (count (:backpressure peer-state-group)) 0)))
     (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
     (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
     (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
@@ -342,37 +364,41 @@
 
 (deftest percentage-task-allocations
   (checking
-   "Checking percentage task allocations"
-   (times 50)
-   [{:keys [replica log peer-choices]} 
-    (log-gen/apply-entries-gen 
-     (gen/return
-      {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                 :messaging {:onyx.messaging/impl :dummy-messenger}}
-       :message-id 0
-       :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
-                  :job-1 [(api/create-submit-job-entry job-1-id
-                                                       peer-config 
-                                                       job-1-pct-tasks 
-                                                       (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]
-                  :job-2 [(api/create-submit-job-entry job-2-id
-                                                       peer-config 
-                                                       job-2-pct-tasks 
-                                                       (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]
-                  :job-3 [(api/create-submit-job-entry job-3-id
-                                                       peer-config 
-                                                       job-3-pct-tasks
-                                                       (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
-                          {:fn :kill-job :args {:job job-3-id}}])
-       :log []
-       :peer-choices []}))]
-   (is
-    (=
-     (map
-      (fn [t]
-        (count (get-in replica [:allocations job-1-id t])))
-      (get-in replica [:tasks job-1-id]))
-     [1 4 3]))
+    "Checking percentage task allocations"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 16))
+                          :job-1 {:queue [(api/create-submit-job-entry 
+                                            job-1-id
+                                            peer-config 
+                                            job-1-pct-tasks 
+                                            (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry 
+                                            job-2-id
+                                            peer-config 
+                                            job-2-pct-tasks 
+                                            (planning/discover-tasks (:catalog job-2-pct-tasks) (:workflow job-2-pct-tasks)))]}
+                          :job-3 {:queue [(api/create-submit-job-entry 
+                                            job-3-id
+                                            peer-config 
+                                            job-3-pct-tasks
+                                            (planning/discover-tasks (:catalog job-3-pct-tasks) (:workflow job-3-pct-tasks)))
+                                          {:fn :kill-job :args {:job job-3-id}}]})
+          :log []
+          :peer-choices []}))]
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is
+      (=
+       (map
+         (fn [t]
+           (count (get-in replica [:allocations job-1-id t])))
+         (get-in replica [:tasks job-1-id]))
+       [1 4 3]))
    (is
     (=
      (map
@@ -382,9 +408,9 @@
      [2 2 4]))
    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
 
-(deftest peer-leave
+(deftest peer-leave-4
   (checking
-    "Checking balanced allocation causes peers to be evenly split"
+    "Checking peer leave is correctly performed"
     (times 50)
     [{:keys [replica log peer-choices]} 
      (log-gen/apply-entries-gen 
@@ -394,9 +420,59 @@
           :message-id 0
           :entries 
           (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 4))
-              (assoc :leave-anytime [{:fn :leave-cluster 
-                                      :args {:id :p1} 
-                                      :immediate? true}]))
+              (assoc :leave {:predicate (fn [replica entry]
+                                          (some #{:p1} (:peers replica)))
+                             :queue [{:fn :leave-cluster 
+                                      :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
-    (= 3 (count (:peers replica)))))
+    (is (= 3 (count (:peer-state replica))))
+    (is (= 3 (count (:peers replica))))))
+
+(deftest peer-leave
+  (checking
+    "Checking peer leave is correctly performed"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 3))
+              (assoc :leave-anytime {:queue [{:fn :leave-cluster 
+                                              :args {:id :p1}}]}))
+          :log []
+          :peer-choices []}))]
+    (is (or (= 2 (count (:peer-state replica)))
+            (= 3 (count (:peer-state replica)))))
+    (is (or (= 2 (count (:peers replica)))
+            (= 3 (count (:peers replica)))))))
+
+
+(deftest peer-leave-still-running
+  (checking
+    "Checking peer leave is correctly performed"
+    (times 50)
+    [{:keys [replica log peer-choices]} 
+     (log-gen/apply-entries-gen 
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries 
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 9))
+              (assoc :job-1 {:queue [(api/create-submit-job-entry 
+                                       job-1-id
+                                       peer-config 
+                                       job-1-pct-tasks 
+                                       (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]})
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+          :log []
+          :peer-choices []}))]
+    ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
+    ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
+    ;; job must be able to go on
+    (is (>= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 7))))

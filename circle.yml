@@ -6,6 +6,9 @@ test:
     - ./circle-runner.sh netty:
         timeout: 360
         parallel: true
+    - ./circle-runner.sh aeron:
+        timeout: 360
+        parallel: true
 
 machine:
   java:
@@ -13,7 +16,7 @@ machine:
 
 dependencies:
   pre:
-          #- bash ./install-aeron.sh
+    - bash ./install-aeron.sh
           #- bash ./install-zookeeper.sh
           #- /home/ubuntu/onyx/zookeeper-3.4.6/bin/zkServer.sh start:
           #background: true

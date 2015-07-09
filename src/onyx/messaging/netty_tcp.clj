@@ -88,7 +88,7 @@
   (map->NettyPeerGroup {:opts opts}))
 
 (defmethod extensions/assign-site-resources :netty
-  [config peer-site peer-sites]
+  [_ peer-site peer-sites]
   (let [used-ports (->> (vals peer-sites) 
                         (filter 
                          (fn [s]
@@ -98,7 +98,12 @@
                         set)
         port (first (remove used-ports
                             (:netty/ports peer-site)))]
-    (assert port "Couldn't assign port - ran out of available ports.")
+    (when-not port
+      (throw (ex-info "Couldn't assign port - ran out of available ports.
+                      Available ports can be configured in the peer-config.
+                      e.g. {:onyx.messaging/peer-ports [40000, 40002],
+                      :onyx.messaging/peer-port-range [40200 40260]}"
+                      peer-site)))
     {:netty/port port}))
 
 (defmethod extensions/get-peer-site :netty
@@ -142,32 +147,30 @@
   "Given a core, a channel, and a message, applies the message to 
   core and writes a response back on this channel."
   [messenger inbound-ch release-ch retry-ch] 
-  (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
-    (try 
-      (let [msg (protocol/read-buf (:decompress-f messenger) buf)]
-        (let [t ^byte (:type msg)]
+  (let [acking-daemon (:acking-daemon messenger)
+        decompress-f (:decompress-f messenger)] 
+    (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
+      (try 
+        (let [t ^byte (protocol/read-msg-type buf)]
           (cond (= t protocol/messages-type-id) 
-                (doseq [message (:messages msg)]
+                (doseq [message (protocol/read-messages-buf decompress-f buf)]
                   (>!! inbound-ch message))
 
                 (= t protocol/ack-type-id)
-                (doseq [ack (:acks msg)]
-                  (acker/ack-message (:acking-daemon messenger)
+                (doseq [ack (protocol/read-acks-buf buf)]
+                  (acker/ack-message acking-daemon
                                      (:id ack)
                                      (:completion-id ack)
                                      (:ack-val ack)))
 
                 (= t protocol/completion-type-id)
-                (>!! release-ch (:id msg))
+                (>!! release-ch (protocol/read-completion-buf buf))
 
                 (= t protocol/retry-type-id)
-                (>!! retry-ch (:id msg))
-
-                :else
-                (throw (ex-info "Unexpected message received from Netty" {:message msg})))))
-      (catch Throwable e
-        (taoensso.timbre/error e)
-        (throw e)))))
+                (>!! retry-ch (protocol/read-retry-buf buf))))
+        (catch Throwable e
+          (taoensso.timbre/error e)
+          (throw e))))))
 
 (defn start-netty-server
   [boss-group worker-group host port messenger inbound-ch release-ch retry-ch]
@@ -417,11 +420,12 @@
 
 (defmethod extensions/receive-messages NettyTcpSockets
   [messenger {:keys [onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
+  (let [batch-size (:onyx/batch-size task-map)
+        ms (or (:onyx/batch-timeout task-map) (:onyx/batch-timeout defaults))
         ch (:inbound-ch (:onyx.core/messenger-buffer event))
         timeout-ch (timeout ms)]
     (loop [segments [] i 0]
-      (if (< i (:onyx/batch-size task-map))
+      (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
           (recur (conj segments v) (inc i))
           segments)
