@@ -24,7 +24,7 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronConnection 
-  [peer-group messaging-group acking-daemon acking-ch 
+  [peer-group messaging-group publications virtual-peers acking-daemon acking-ch 
    send-idle-strategy compress-f inbound-ch release-ch retry-ch]
   component/Lifecycle
   (start [component]
@@ -32,6 +32,7 @@
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
           publications (:publications messaging-group)
+          virtual-peers (:virtual-peers messaging-group)
           inbound-ch (:inbound-ch (:messenger-buffer component))
           release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
@@ -41,6 +42,7 @@
       (assoc component 
              :messaging-group messaging-group
              :publications publications
+             :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
              :compress-f compress-f
              :acking-ch acking-ch
@@ -58,6 +60,8 @@
 
     (assoc component
            :send-idle-strategy nil 
+           :publications nil
+           :virtual-peers nil
            :compress-f nil :decompress-f nil 
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
@@ -174,9 +178,10 @@
                              #_(.threadingMode ThreadingMode/DEDICATED)
                              #_(.dirsDeleteOnExit true))))
 
-          port (opts->port opts)
           bind-addr (common/bind-addr opts)
           external-addr (common/external-addr opts)
+          port (opts->port opts)
+          external-channel (aeron-channel external-addr port)
           idle-strategy-config (arg-or-default :onyx.messaging.aeron/idle-strategy opts) 
           send-idle-strategy (backoff-strategy idle-strategy-config)
           receive-idle-strategy (backoff-strategy idle-strategy-config)
@@ -188,6 +193,7 @@
       (assoc component 
              :bind-addr bind-addr
              :external-addr external-addr
+             :external-channel external-channel
              :port port
              :media-driver media-driver 
              :publications publications
@@ -225,6 +231,8 @@
   {:aeron/external-addr (:external-addr (:messaging-group messenger))
    :aeron/port (:port (:messaging-group messenger))})
 
+(defrecord AeronPeerConnection [channel peer-id])
+
 ;;;; THIS CAN BE MADE FASTER BY NOT GOING THROUGH PEER-LINK IN OPERATION
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port]}]
@@ -243,53 +251,81 @@
           segments)
         segments))))
 
+(defn short-circuitable? [messenger channel]
+  (= (:external-channel (:messaging-group messenger))
+     channel))
+
+(defn short-circuit-ch [messenger peer-id ch-k]
+  (-> messenger 
+      :virtual-peers 
+      deref 
+      (get peer-id)
+      ch-k))
+
+(defn send-messages-short-circuit [ch batch]
+  (doseq [segment batch]
+    (>!! ch segment)))
+
 (defmethod extensions/send-messages AeronConnection
-  [messenger event peer-link batch]
-  (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                 (:channel peer-link))
-        peer-id (:peer-id peer-link)
-        [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) peer-id batch)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 len))
-        idle-strategy (:send-idle-strategy messenger)]
-    ;;; TODO: offer will return a particular code when the publisher is down
-    ;;; we should probably re-restablish the publication in this case
-    (while (neg? ^long (offer-f))
-      (.idle ^IdleStrategy idle-strategy 0))))
+  [messenger event {:keys [peer-id channel]} batch]
+  (if (short-circuitable? messenger channel) 
+    (send-messages-short-circuit (short-circuit-ch messenger peer-id :inbound-ch) batch)
+    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
+                                                                   channel)
+          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) peer-id batch)
+          offer-f (fn [] (.offer pub unsafe-buffer 0 len))
+          idle-strategy (:send-idle-strategy messenger)]
+      ;;; TODO: offer will return a particular code when the publisher is down
+      ;;; we should probably re-restablish the publication in this case
+      (while (neg? ^long (offer-f))
+        (.idle ^IdleStrategy idle-strategy 0)))))
+
+(defn ack-messages-short-circuit [ch acks]
+  (doseq [ack acks]
+    (>!! ch ack)))
 
 (defmethod extensions/internal-ack-messages AeronConnection
-  [messenger event peer-link acks]
-  ; TODO: Might want to batch in a single buffer as in netty
-  (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                 (:channel peer-link))
-        peer-id (:peer-id peer-link)
-        idle-strategy (:send-idle-strategy messenger)] 
-    (doseq [{:keys [id completion-id ack-val]} acks] 
-      (let [unsafe-buffer (protocol/build-acker-message peer-id id completion-id ack-val)
-            offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-        (while (neg? ^long (offer-f))
-          (.idle ^IdleStrategy idle-strategy 0))))))
+  [messenger event {:keys [peer-id channel]} acks]
+  (if (short-circuitable? messenger channel) 
+    (ack-messages-short-circuit (short-circuit-ch messenger peer-id :acking-ch) acks)
+    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
+                                                                   channel)
+          idle-strategy (:send-idle-strategy messenger)] 
+      (doseq [{:keys [id completion-id ack-val]} acks] 
+        (let [unsafe-buffer (protocol/build-acker-message peer-id id completion-id ack-val)
+              offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
+          (while (neg? ^long (offer-f))
+            (.idle ^IdleStrategy idle-strategy 0)))))))
+
+
+(defn complete-message-short-circuit [ch completion-id]
+  (>!! ch completion-id))
 
 (defmethod extensions/internal-complete-message AeronConnection
-  [messenger event id peer-link]
-  (let [idle-strategy (:send-idle-strategy messenger)
-        pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                 (:channel peer-link))
-        peer-id (:peer-id peer-link)
-        unsafe-buffer (protocol/build-completion-msg-buf peer-id id)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
-    (while (neg? ^long (offer-f))
-      (.idle ^IdleStrategy idle-strategy 0))))
+  [messenger event id {:keys [peer-id channel]}]
+  (if (short-circuitable? messenger channel) 
+    (complete-message-short-circuit (short-circuit-ch messenger peer-id :release-ch) id)
+    (let [idle-strategy (:send-idle-strategy messenger)
+          pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) channel)
+          unsafe-buffer (protocol/build-completion-msg-buf peer-id id)
+          offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
+      (while (neg? ^long (offer-f))
+        (.idle ^IdleStrategy idle-strategy 0)))))
+
+(defn retry-message-short-circuit [ch retry-id]
+  (>!! ch retry-id))
 
 (defmethod extensions/internal-retry-message AeronConnection
-  [messenger event id peer-link]
-  (let [idle-strategy (:send-idle-strategy messenger)
-        pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                 (:channel peer-link))
-        peer-id (:peer-id peer-link)
-        unsafe-buffer (protocol/build-retry-msg-buf peer-id id)
-        offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
-    (while (neg? ^long (offer-f))
-      (.idle ^IdleStrategy idle-strategy 0))))
+  [messenger event id {:keys [peer-id channel]}]
+  (if (short-circuitable? messenger channel) 
+    (retry-message-short-circuit (short-circuit-ch messenger peer-id :retry-ch) id)
+    (let [idle-strategy (:send-idle-strategy messenger)
+          pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
+                                                                   channel)
+          unsafe-buffer (protocol/build-retry-msg-buf peer-id id)
+          offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
+      (while (neg? ^long (offer-f))
+        (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
