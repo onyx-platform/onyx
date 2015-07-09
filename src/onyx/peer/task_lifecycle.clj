@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
     (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info warn trace fatal level-compile-time] :as timbre]
+              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
@@ -13,6 +13,7 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
+              [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
@@ -403,7 +404,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
-             ;;; TODO, use @ version of replica in all these fns
+             ;;; TODO, pass value version of replica/replica-view into these fns
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
@@ -511,8 +512,11 @@
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-message))
 
 (defn resolve-task-fn [entry]
-  (when (= (:onyx/type entry) :function)
-    (operation/kw->fn (:onyx/fn entry))))
+  (if (or (:onyx/fn entry) 
+          (= (:onyx/type entry) :function))
+    (case (:onyx/language entry)
+      :java (operation/build-fn-java (:onyx/fn entry))
+      (operation/kw->fn (:onyx/fn entry)))))
 
 (defn instantiate-plugin-instance [class-name pipeline-data]
   (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
@@ -523,16 +527,19 @@
   (let [kw (:onyx/plugin task-map)]
     (try 
       (if (#{:input :output} (:onyx/type task-map))
-        (let [user-ns (namespace kw)
-              user-fn (name kw)]
-          (if (and user-ns user-fn)
-            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-              (f pipeline-data)    
-              (throw (Exception. (str "Failure to ns-resolve at " user-ns " " user-fn))))
-            (instantiate-plugin-instance user-fn pipeline-data)))
+        (case (:onyx/language task-map)
+          :java (instantiate-plugin-instance (name kw) pipeline-data)
+          (let [user-ns (namespace kw)
+                user-fn (name kw)
+                pipeline (if (and user-ns user-fn)
+                           (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+                             (f pipeline-data)))]
+            (or pipeline
+                (throw (ex-info "Failure to resolve plugin builder fn. 
+                                 Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e 
-        (throw (ex-info "Could not resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e})))))) 
+        (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e})))))) 
 
 (defn validate-pending-timeout [pending-timeout opts]
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
@@ -550,9 +557,12 @@
                              (egress-ids (:onyx/name entry)))))
               (map (fn [entry] 
                      (let [group-key (:onyx/group-by-key entry)
-                           group-fn (if (keyword? group-key)
-                                      group-key
-                                      #(get % group-key))] 
+                           group-fn (cond (keyword? group-key)
+                                          group-key
+                                          (sequential? group-key)
+                                          #(select-keys % group-key)
+                                          :else
+                                          #(get % group-key))] 
                        [(:onyx/name entry) group-fn])))
               (into {}))
          (->> catalog 

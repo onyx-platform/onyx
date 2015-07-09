@@ -20,7 +20,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def output (atom []))
+(def output (atom {}))
 
 (def in-chan (chan 1000000))
 
@@ -29,15 +29,18 @@
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
     {:onyx.core/params [balance]
-     :test/balance balance}))
+     :test/balance balance
+     :test/id (:onyx.core/id event)}))
 
-(defn flush-sum-state [{:keys [test/balance] :as event} lifecycle]
-  (swap! output conj @balance)
-  {})
+(defn flush-sum-state [{:keys [test/balance test/id] :as event} lifecycle]
+  (swap! output (fn [hm item]
+                  (assoc hm id item)) @balance))
 
-(defn sum-balance [state {:keys [name amount] :as segment}]
-  (swap! state (fn [v] (assoc v name (+ (get v name 0) amount))))
-  [])
+(defn sum-balance [state {:keys [name first-name amount] :as segment}]
+  (let [name (or name first-name [:first-name :first_name])]
+    (swap! state (fn [v]
+                   (assoc v name (+ (get v name 0) amount))))
+    []))
 
 (def workflow
   [[:in :sum-balance]
@@ -56,7 +59,7 @@
     :onyx/plugin :onyx.peer.kw-grouping-test/sum-balance
     :onyx/fn :onyx.peer.kw-grouping-test/sum-balance
     :onyx/type :function
-    :onyx/group-by-key :name
+    :onyx/group-by-key [:name :first-name [:first-name :first_name]]
     :onyx/min-peers 2
     :onyx/flux-policy :kill
     :onyx/batch-size 40}
@@ -100,53 +103,56 @@
 (def size 3000)
 
 (def data
-  (shuffle 
-    (concat
-      (map (fn [_] {:name "Mike" :amount 10}) (range size))
-      (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
-      (map (fn [_] {:name "Benti" :amount 10}) (range size))
-      (map (fn [_] {:name "John" :amount 10}) (range size))
-      (map (fn [_] {:name "Shannon" :amount 10}) (range size))
-      (map (fn [_] {:name "Kristen" :amount 10}) (range size))
-      (map (fn [_] {:name "Benti" :amount 10}) (range size))
-      (map (fn [_] {:name "Mike" :amount 10}) (range size))
-      (map (fn [_] {:name "Steven" :amount 10}) (range size))
-      (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
-      (map (fn [_] {:name "John" :amount 10}) (range size))
-      (map (fn [_] {:name "Shannon" :amount 10}) (range size))
-      (map (fn [_] {:name "Santana" :amount 10}) (range size))
-      (map (fn [_] {:name "Roselyn" :amount 10}) (range size))
-      (map (fn [_] {:name "Krista" :amount 10}) (range size))
-      (map (fn [_] {:name "Starla" :amount 10}) (range size))
-      (map (fn [_] {:name "Derick" :amount 10}) (range size))
-      (map (fn [_] {:name "Orlando" :amount 10}) (range size))
-      (map (fn [_] {:name "Rupert" :amount 10}) (range size))
-      (map (fn [_] {:name "Kareem" :amount 10}) (range size))
-      (map (fn [_] {:name "Lesli" :amount 10}) (range size))
-      (map (fn [_] {:name "Carol" :amount 10}) (range size))
-      (map (fn [_] {:name "Willie" :amount 10}) (range size))
-      (map (fn [_] {:name "Noriko" :amount 10}) (range size))
-      (map (fn [_] {:name "Corine" :amount 10}) (range size))
-      (map (fn [_] {:name "Leandra" :amount 10}) (range size))
-      (map (fn [_] {:name "Chadwick" :amount 10}) (range size))
-      (map (fn [_] {:name "Teressa" :amount 10}) (range size))
-      (map (fn [_] {:name "Tijuana" :amount 10}) (range size))
-      (map (fn [_] {:name "Verna" :amount 10}) (range size))
-      (map (fn [_] {:name "Alona" :amount 10}) (range size))
-      (map (fn [_] {:name "Wilson" :amount 10}) (range size))
-      (map (fn [_] {:name "Carly" :amount 10}) (range size))
-      (map (fn [_] {:name "Nubia" :amount 10}) (range size))
-      (map (fn [_] {:name "Hollie" :amount 10}) (range size))
-      (map (fn [_] {:name "Allison" :amount 10}) (range size))
-      (map (fn [_] {:name "Edwin" :amount 10}) (range size))
-      (map (fn [_] {:name "Zola" :amount 10}) (range size))
-      (map (fn [_] {:name "Britany" :amount 10}) (range size))
-      (map (fn [_] {:name "Courtney" :amount 10}) (range size))
-      (map (fn [_] {:name "Mathew" :amount 10}) (range size))
-      (map (fn [_] {:name "Luz" :amount 10}) (range size))
-      (map (fn [_] {:name "Tyesha" :amount 10}) (range size))
-      (map (fn [_] {:name "Eusebia" :amount 10}) (range size))
-      (map (fn [_] {:name "Fletcher" :amount 10}) (range size)))))
+  (shuffle
+   (concat
+    (map (fn [_] {:name "Mike" :amount 10}) (range size))
+    (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
+    (map (fn [_] {:name "Benti" :amount 10}) (range size))
+    (map (fn [_] {:name "John" :amount 10}) (range size))
+    (map (fn [_] {:name "Shannon" :amount 10}) (range size))
+    (map (fn [_] {:name "Kristen" :amount 10}) (range size))
+    (map (fn [_] {:name "Benti" :amount 10}) (range size))
+    (map (fn [_] {:name "Mike" :amount 10}) (range size))
+    (map (fn [_] {:name "Steven" :amount 10}) (range size))
+    (map (fn [_] {:name "Dorrene" :amount 10}) (range size))
+    (map (fn [_] {:name "John" :amount 10}) (range size))
+    (map (fn [_] {:name "Shannon" :amount 10}) (range size))
+    (map (fn [_] {:name "Santana" :amount 10}) (range size))
+    (map (fn [_] {:name "Roselyn" :amount 10}) (range size))
+    (map (fn [_] {:name "Krista" :amount 10}) (range size))
+    (map (fn [_] {:name "Starla" :amount 10}) (range size))
+    (map (fn [_] {:name "Derick" :amount 10}) (range size))
+    (map (fn [_] {:name "Orlando" :amount 10}) (range size))
+    (map (fn [_] {:name "Rupert" :amount 10}) (range size))
+    (map (fn [_] {:name "Kareem" :amount 10}) (range size))
+    (map (fn [_] {:name "Lesli" :amount 10}) (range size))
+    (map (fn [_] {:name "Carol" :amount 10}) (range size))
+    (map (fn [_] {:name "Willie" :amount 10}) (range size))
+    (map (fn [_] {:name "Noriko" :amount 10}) (range size))
+    (map (fn [_] {:name "Corine" :amount 10}) (range size))
+    (map (fn [_] {:name "Leandra" :amount 10}) (range size))
+    (map (fn [_] {:name "Chadwick" :amount 10}) (range size))
+    (map (fn [_] {:name "Teressa" :amount 10}) (range size))
+    (map (fn [_] {:name "Tijuana" :amount 10}) (range size))
+    (map (fn [_] {:name "Verna" :amount 10}) (range size))
+    (map (fn [_] {:name "Alona" :amount 10}) (range size))
+    (map (fn [_] {:name "Wilson" :amount 10}) (range size))
+    (map (fn [_] {:name "Carly" :amount 10}) (range size))
+    (map (fn [_] {:name "Nubia" :amount 10}) (range size))
+    (map (fn [_] {:name "Hollie" :amount 10}) (range size))
+    (map (fn [_] {:name "Allison" :amount 10}) (range size))
+    (map (fn [_] {:name "Edwin" :amount 10}) (range size))
+    (map (fn [_] {:name "Zola" :amount 10}) (range size))
+    (map (fn [_] {:name "Britany" :amount 10}) (range size))
+    (map (fn [_] {:name "Courtney" :amount 10}) (range size))
+    (map (fn [_] {:name "Mathew" :amount 10}) (range size))
+    (map (fn [_] {:name "Luz" :amount 10}) (range size))
+    (map (fn [_] {:name "Tyesha" :amount 10}) (range size))
+    (map (fn [_] {:name "Eusebia" :amount 10}) (range size))
+    (map (fn [_] {:name "Fletcher" :amount 10}) (range size))
+    (map (fn [_] {:first-name "Trey" :amount 10}) (range size))
+    (map (fn [_] {:first-name "Jon" :amount 10}) (range size))
+    (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size)))))
 
 (doseq [x data]
   (>!! in-chan x))
@@ -171,11 +177,12 @@
 
 (fact (not (empty? out-val)))
 
-;;; Scan the key set, dropping any nils. Count the distinct keys.
-;;; Do the same for the right hand side of the expression, but turn it into a set.
-;;; If there's the same number of elements, then the grouping was mutually exclusive.
-(fact (count (filter identity (mapcat keys out-val))) =>
-      (count (into #{} (filter identity (mapcat keys out-val)))))
+;;;; We flush out each result set based on the peer id, then we do a diff. If the
+;;;; last collection is empty, we know that each map is mutually exclusive.
+
+(let [l (first (vals out-val))
+      r (second (vals out-val))]
+  (fact (empty? (last (clojure.data/diff l r)))))
 
 (fact results => [:done])
 

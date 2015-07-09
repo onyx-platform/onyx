@@ -14,21 +14,24 @@
   "Builds a clojure fn from a static java method. 
   Note, may be slower than it should be because of varargs, and the many
   (unnecessary) calls to partial in apply-function above."
-  [method]
-  (fn [& args] 
-    (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args))))
+  [kw]
+  (when (namespace kw)
+    (throw (ex-info "Namespaced keywords cannot be used for java static method fns. Use in form :java.lang.Math.sqrt" {:kw kw})))
+  (let [path (clojure.string/split (name kw) #"[.]")
+        class-name (clojure.string/join "." (butlast path))
+        method-name (last path)
+        method (get-method-java class-name method-name)] 
+    (fn [& args] 
+    (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args)))))
 
 (defn kw->fn [kw]
   (try
-    (let [user-ns (name (namespace kw))
-          user-fn (name kw)]
-      (or (try (ns-resolve (symbol user-ns) (symbol user-fn))
-               (catch Throwable _)) 
-          (build-fn-java (get-method-java user-ns user-fn))
+    (let [user-ns (symbol (namespace kw))
+          user-fn (symbol (name kw))]
+      (or (ns-resolve user-ns user-fn)
           (throw (Exception.))))
     (catch Throwable e
-      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" 
-                      {:symbol kw :exception e})))))
+      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:kw kw})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))

@@ -1,6 +1,6 @@
 ## APIs
 
-Onyx ships with three distinct APIs to accommodate different needs. A description of each follows.
+Onyx ships with two distinct APIs to accommodate different needs. A description of each follows.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -75,7 +75,7 @@ Shuts down the peer group, releasing any messaging resources it was holding open
 
 ##### `shutdown-env`
 
-Shuts down the development environment, stopping in memory HornetQ and ZooKeeper.
+Shuts down the development environment and stops in memory ZooKeeper.
 
 ### Peer Pipeline API
 

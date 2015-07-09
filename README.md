@@ -43,25 +43,9 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### User Guide 0.6.0
 
-- [What does Onyx offer?](doc/user-guide/what-does-it-offer.md)
-- [Concepts](doc/user-guide/concepts.md)
-- [Onyx's Architecture and Low Level Design](doc/user-guide/architecture-low-level-design.md)
-- [APIs](doc/user-guide/apis.md)
-- [Functions](doc/user-guide/functions.md)
-- [Flow Conditions](doc/user-guide/flow-conditions.md)
-- [Lifecycles](doc/user-guide/lifecycles.md)
-- [Deployment](doc/user-guide/deployment.md)
-- [Environment](doc/user-guide/environment.md)
-- [Peer Configuration](doc/user-guide/peer-config.md)
-- [Information Model](doc/user-guide/information-model.md)
-- [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
-- [Event Subscription](doc/user-guide/subscription.md)
-- [Plugins](doc/user-guide/plugins.md)
-- [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
-- [Logging](doc/user-guide/logging.md)
-- [Performance Tuning](doc/user-guide/performance-tuning.md)
-- [Examples](doc/user-guide/examples.md)
-- [Frequently Asked Questions](doc/user-guide/faq.md)
+- [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
+- [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
+- [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 
 ### API Docs 0.6.0
 
@@ -119,7 +103,7 @@ Contributions are welcome. Please fork the repository and send a pull request to
 
 #### Branching
 
-Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on master or feature branches and dropped into a major.minor.x branch when it's time to cut a new release. Pull requests into the master branch are welcome.
+Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on develop or feature branches and dropped into a major.minor.x branch when it's time to cut a new release. Pull requests into the develop branch are welcome.
 
 #### Commit rights
 
@@ -137,6 +121,8 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [sbennett33](https://github.com/sbennett33)
 - [Tyler van Hensbergen](https://github.com/tvanhens)
 - [David Leatherman](https://github.com/leathekd)
+- [Daniel Compton](https://github.com/danielcompton)
+- [Jeff Rose](https://github.com/rosejn)
 
 #### Acknowledgements
 

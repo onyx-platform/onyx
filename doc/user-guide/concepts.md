@@ -141,4 +141,4 @@ A Virtual Peer refers to a single peer process running on a single physical mach
 
 #### Job
 
-A job is the collection of a workflow, catalog, flow conditions, lifecycles, and execution parameters. A job is most coarse unit of work, and every task is associated with exactly one job - hence a peer can only be working at least most one job at any given time.
+A job is the collection of a workflow, catalog, flow conditions, lifecycles, and execution parameters. A job is most coarse unit of work, and every task is associated with exactly one job - hence a peer can only be working at most one job at any given time.
