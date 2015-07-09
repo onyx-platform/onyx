@@ -140,7 +140,7 @@
             (>!! (:retry-ch (get @virtual-peers (:peer-id message))) 
                  retry-id)))))
 
-(defn start-subscriber! [bind-addr port virtual-peers decompress-f]
+(defn start-subscriber! [bind-addr port virtual-peers decompress-f idle-strategy]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
         conn (Aeron/connect ctx)
         channel (aeron-channel bind-addr port)
@@ -150,8 +150,7 @@
                                     buffer offset length header)))
 
         subscription (.addSubscription conn channel send-stream-id)
-        receive-idle-strategy (backoff-strategy :high-restart-latency)
-        subscriber-fut (future (try (.accept ^Consumer (consumer handler receive-idle-strategy 10) subscription) 
+        subscriber-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10) subscription) 
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
@@ -197,7 +196,7 @@
           virtual-peers (atom {})
           publications (atom {})
           connections (atom {})
-          subscriber (start-subscriber! bind-addr port virtual-peers decompress-f)]
+          subscriber (start-subscriber! bind-addr port virtual-peers decompress-f receive-idle-strategy)]
       (assoc component 
              :bind-addr bind-addr
              :external-addr external-addr
