@@ -35,7 +35,7 @@
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
 (def group-entry-validator
-  {(schema/optional-key :onyx/group-by-key) schema/Keyword
+  {(schema/optional-key :onyx/group-by-key) schema/Any
    (schema/optional-key :onyx/group-by-fn) schema/Keyword
    :onyx/min-peers schema/Int
    :onyx/flux-policy (schema/enum :continue :kill)})
