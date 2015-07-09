@@ -397,7 +397,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
-             ;;; TODO, use @ version of replica in all these fns
+             ;;; TODO, pass value version of replica/replica-view into these fns
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
