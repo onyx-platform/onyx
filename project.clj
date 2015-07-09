@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.6.1-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.7.0-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -6,13 +6,13 @@
   :jvm-opts ["-Xmx4g"]
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [org.apache.curator/curator-framework "2.8.0"] 
+                 [org.apache.curator/curator-framework "2.8.0"]
                  [org.apache.curator/curator-test "2.8.0"]
                  [clj-tuple "0.2.2"]
                  [com.mdrogalis/rotating-seq "0.1.3"]
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.1"]
-                 [com.taoensso/timbre "3.0.1"]
+                 [com.taoensso/timbre "4.0.2"]
                  [com.taoensso/nippy "2.9.0"]
                  [uk.co.real-logic/Agrona "0.3.2-SNAPSHOT"]
                  [uk.co.real-logic/aeron-client "0.1-SNAPSHOT"]

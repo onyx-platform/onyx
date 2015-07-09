@@ -131,9 +131,10 @@
           bind-addr (common/bind-addr config)
           external-addr (common/external-addr config)
           ports (common/allowable-ports config)
-          idle-strategy-config (arg-or-default :onyx.messaging.aeron/idle-strategy config) 
-          send-idle-strategy (backoff-strategy idle-strategy-config)
-          receive-idle-strategy (backoff-strategy idle-strategy-config)]
+          poll-idle-strategy-config (arg-or-default :onyx.messaging.aeron/poll-idle-strategy config) 
+          offer-idle-strategy-config (arg-or-default :onyx.messaging.aeron/offer-idle-strategy config) 
+          send-idle-strategy (backoff-strategy poll-idle-strategy-config)
+          receive-idle-strategy (backoff-strategy offer-idle-strategy-config)]
       (assoc component 
              :bind-addr bind-addr 
              :external-addr external-addr

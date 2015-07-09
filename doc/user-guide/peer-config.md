@@ -16,11 +16,14 @@ The chapter describes the all options available to configure the virtual peers a
     - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
     - [`:onyx:onyx.peer/peer-not-ready-back-off`](#onyxonyxpeerpeer-not-ready-back-off)
     - [`:onyx:onyx.peer/job-not-ready-back-off`](#onyxonyxpeerjob-not-ready-back-off)
-    - [`onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
-    - [`onyx.peer/fn-params`](#onyxpeerfn-params)
+    - [`:onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
+    - [`:onyx.peer/fn-params`](#onyxpeerfn-params)
     - [`:onyx.peer/zookeeper-timeout`](#onyxpeerzookeeper-timeout)
-    - [`onyx.messaging/inbound-buffer-size`](#onyxmessaginginbound-buffer-size)
-    - [`onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
+    - [`:onyx.peer/backpressure-low-water-pct`](#onyxpeerbackpressure-low-water-pct)
+    - [`:onyx.peer/backpressure-high-water-pct`](#onyxpeerbackpressure-high-water-pct)
+    - [`:onyx.peer/backpressure-check-interval`](#onyxpeerbackpressure-check-interval)
+    - [`:onyx.messaging/inbound-buffer-size`](#onyxmessaginginbound-buffer-size)
+    - [`:onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
     - [`:onyx.messaging/release-ch-buffer-size`](#onyxmessagingrelease-ch-buffer-size)
     - [`:onyx.messaging/retry-ch-buffer-size`](#onyxmessagingretry-ch-buffer-size)
     - [`:onyx.messaging/max-downstream-links`](#onyxmessagingmax-downstream-links)
@@ -29,12 +32,12 @@ The chapter describes the all options available to configure the virtual peers a
     - [`:onyx.messaging/peer-link-idle-timeout`](#onyxmessagingpeer-link-idle-timeout)
     - [`:onyx.messaging/ack-daemon-timeout`](#onyxmessagingack-daemon-timeout)
     - [`:onyx.messaging/ack-daemon-clear-interval`](#onyxmessagingack-daemon-clear-interval)
-    - [`onyx.messaging/decompress-fn`](#onyxmessagingdecompress-fn)
-    - [`onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
+    - [`:onyx.messaging/decompress-fn`](#onyxmessagingdecompress-fn)
+    - [`:onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
     - [`:onyx.messaging/impl`](#onyxmessagingimpl)
     - [`:onyx.messaging/bind-addr`](#onyxmessagingbind-addr)
     - [`:onyx.messaging/peer-port-range`](#onyxmessagingpeer-port-range)
-    - [`onyx.messaging/peer-ports`](#onyxmessagingpeer-ports)
+    - [`:onyx.messaging/peer-ports`](#onyxmessagingpeer-ports)
 - [Peer Full Example](#peer-full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -59,33 +62,39 @@ The chapter describes the all options available to configure the virtual peers a
 
 #### Base Configuration
 
-| key name                               | type       | default                            |
-|----------------------------------------|------------|------------------------------------|
-|`:onyx.peer/inbox-capacity`             | `int`      | `1000`                             |
-|`:onyx.peer/outbox-capacity`            | `int`      | `1000`                             |
-|`:onyx.peer/retry-start-interval`       | `int`      | `2000`                             |
-|`:onyx.peer/join-failure-back-off`      | `int`      | `250`                              |
-|`:onyx.peer/drained-back-off`           | `int`      | `400`                              |
-|`:onyx.peer/peer-not-ready-back-off`    | `int`      | `2000`                             |
-|`:onyx.peer/job-not-ready-back-off`     | `int`      | `500`                              |
-|`:onyx.peer/fn-params`                  | `map`      | `{}`                               |
-|`:onyx.peer/zookeeper-timeout`          | `int`      | `6000`                             |
-|`:onyx.messaging/inbound-buffer-size`   | `int`      | `20000`                            |
-|`:onyx.messaging/completion-buffer-size`| `int`      | `1000`                             |
-|`:onyx.messaging/release-ch-buffer-size`| `int`      | `10000`                            |
-|`:onyx.messaging/retry-ch-buffer-size`  | `int`      | `10000`                            |
-|`:onyx.messaging/max-downstream-links`  | `int`      | `10`                               |
-|`:onyx.messaging/max-acker-links`       | `int`      | `5`                                |
-|`:onyx.messaging/peer-link-gc-interval` | `int`      | `90000`                            |
-|`:onyx.messaging/peer-link-idle-timeout`| `int`      | `60000`                            |
-|`:onyx.messaging/ack-daemon-timeout`    | `int`      | `60000`                            |
-|`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                         |
-|`:onyx.messaging/decompress-fn`         | `function` | `onyx.compression.nippy/decompress`|
-|`:onyx.messaging/compress-fn`           | `function` | `onyx.compression.nippy/compress`  |
-|`:onyx.messaging/impl`                  | `keyword`  | `:netty`, `:core.async`            |
-|`:onyx.messaging/bind-addr`             | `string`   | `nil`                              |
-|`:onyx.messaging/peer-port-range`       | `vector`   | `[]`                               |
-|`:onyx.messaging/peer-ports`            | `vector`   | `[]`                               |
+| key name                                  | type       | default                            |
+|-------------------------------------------|------------|------------------------------------|
+|`:onyx.peer/inbox-capacity`                | `int`      | `1000`                             |
+|`:onyx.peer/outbox-capacity`               | `int`      | `1000`                             |
+|`:onyx.peer/retry-start-interval`          | `int`      | `2000`                             |
+|`:onyx.peer/join-failure-back-off`         | `int`      | `250`                              |
+|`:onyx.peer/drained-back-off`              | `int`      | `400`                              |
+|`:onyx.peer/peer-not-ready-back-off`       | `int`      | `2000`                             |
+|`:onyx.peer/job-not-ready-back-off`        | `int`      | `500`                              |
+|`:onyx.peer/fn-params`                     | `map`      | `{}`                               |
+|`:onyx.peer/zookeeper-timeout`             | `int`      | `6000`                             |
+|`:onyx.peer/backpressure-check-interval`   | `int`      | `10`                               |
+|`:onyx.peer/backpressure-low-water-pct`    | `int`      | `30`                               |
+|`:onyx.peer/backpressure-high-water-pct`   | `int`      | `60`                               |
+|`:onyx.messaging/inbound-buffer-size`      | `int`      | `20000`                            |
+|`:onyx.messaging/completion-buffer-size`   | `int`      | `1000`                             |
+|`:onyx.messaging/release-ch-buffer-size`   | `int`      | `10000`                            |
+|`:onyx.messaging/retry-ch-buffer-size`     | `int`      | `10000`                            |
+|`:onyx.messaging/max-downstream-links`     | `int`      | `10`                               |
+|`:onyx.messaging/max-acker-links`          | `int`      | `5`                                |
+|`:onyx.messaging/peer-link-gc-interval`    | `int`      | `90000`                            |
+|`:onyx.messaging/peer-link-idle-timeout`   | `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-timeout`       | `int`      | `60000`                            |
+|`:onyx.messaging/ack-daemon-clear-interval`| `int`      | `15000`                            |
+|`:onyx.messaging/decompress-fn`            | `function` | `onyx.compression.nippy/decompress`|
+|`:onyx.messaging/compress-fn`              | `function` | `onyx.compression.nippy/compress`  |
+|`:onyx.messaging/impl`                     | `keyword`  | `:aeron`, `:netty`, `:core.async`  |
+|`:onyx.messaging/bind-addr`                | `string`   | `nil`                              |
+|`:onyx.messaging/peer-port-range`          | `vector`   | `[]`                               |
+|`:onyx.messaging/peer-ports`               | `vector`   | `[]`                               |
+|`:onyx.messaging.aeron/embedded-driver?`   | `boolean`  | `true`                             |
+|`:onyx.messaging.aeron/poll-idle-strategy` | `keyword`  | `:high-restart-latency`            |
+|`:onyx.messaging.aeron/offer-idle-strategy`| `keyword`  | `:high-restart-latency`            |
 
 ##### `:onyx.peer/inbox-capacity`
 
@@ -111,11 +120,11 @@ Number of ms to back off and wait before retrying the call to `start-task?` life
 
 Number of ms to back off and wait before trying to discover configuration needed to start the subscription after discovery failure.
 
-##### `onyx.peer/join-failure-back-off`
+##### `:onyx.peer/join-failure-back-off`
 
 Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted.
 
-##### `onyx.peer/fn-params`
+##### `:onyx.peer/fn-params`
 
 A map of keywords to vectors. Keywords represent task names, vectors represent the first parameters to apply
 to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
@@ -125,11 +134,23 @@ underlying `:add` with `(f 42 <segment>)`.
 
 Number of ms to timeout from the ZooKeeper client connection on disconnection.
 
-##### `onyx.messaging/inbound-buffer-size`
+##### `:onyx.peer/backpressure-low-water-pct`
+
+Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes.
+
+##### `:onyx.peer/backpressure-high-water-pct`
+
+Percentage of messaging inbound-buffer-size that constitutes a high water mark for backpressure purposes.
+
+##### `:onyx.peer/backpressure-check-interval`
+
+Number of ms between checking whether the virtual peer should notify the cluster of backpressure-on/backpressure-off.
+
+##### `:onyx.messaging/inbound-buffer-size`
 
 Number of messages to buffer in the core.async channel for received segments.
 
-##### `onyx.messaging/completion-buffer-size`
+##### `:onyx.messaging/completion-buffer-size`
 
 Number of messages to buffer in the core.async channel for completing messages on an input task.
 
@@ -165,12 +186,12 @@ Number of milliseconds that an ack value can go without being updates on a daemo
 
 Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon.
 
-##### `onyx.messaging/decompress-fn`
+##### `:onyx.messaging/decompress-fn`
 
 The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return
 the decompressed value of the byte array.
 
-##### `onyx.messaging/compress-fn`
+##### `:onyx.messaging/compress-fn`
 
 The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte
 array representing the segment seq.
@@ -187,9 +208,23 @@ An IP address to bind the peer to for messaging. Defaults to `nil`, binds to it'
 
 A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictable in-order.
 
-##### `onyx.messaging/peer-ports`
+##### `:onyx.messaging/peer-ports`
 
 A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictable in-order.
+
+##### `:onyx.messaging.aeron/embedded-driver?`
+
+A boolean denoting whether an Aeron media driver should be started up with the environment.
+See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
+
+##### `:onyx.messaging.aeron/poll-idle-strategy`
+
+The Aeron idle strategy to use between when polling for new messages. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput.
+
+##### `:onyx.messaging.aeron/offer-idle-strategy`
+
+The Aeron idle strategy to use between when offering messages to another peer. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput.
+
 
 ### Peer Full Example
 
