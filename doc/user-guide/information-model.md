@@ -43,10 +43,11 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 ##### All maps may optionally have these keys
 
-| key name             | type       | choices    | default|
-|----------------------|------------|------------|--------|
-|`:onyx/batch-timeout` | `integer`  | `>= 0`     | `1000` |
-|`:onyx/max-peers`     | `integer`  | `> 0`      |        |
+| key name             | type       | choices              | default    |    Meaning                                                            |
+|----------------------|------------|----------------------|------------|                                                                       |
+|`:onyx/batch-timeout` | `integer`  | `>= 0`               | `1000`     |                                                                       |
+|`:onyx/max-peers`     | `integer`  | `> 0`                |            |                                                                       |
+|`:onyx/language`      | `keyword`  | `:clojure`, `:java`  | `:clojure` | Affects `:onyx/fn` and `:onyx/plugin` function and plugin resolution  |
 
 ##### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 

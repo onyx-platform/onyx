@@ -13,7 +13,8 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
-              [onyx.static.default-vals :refer [defaults arg-or-default]])
+              [onyx.static.default-vals :refer [defaults arg-or-default]]
+              [onyx.interop])
     (:import [java.security MessageDigest]))
 
 ;; TODO: Are there any exceptions that a peer should autoreboot itself?
@@ -475,8 +476,11 @@
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
 
 (defn resolve-task-fn [entry]
-  (when (= (:onyx/type entry) :function)
-    (operation/kw->fn (:onyx/fn entry))))
+  (if (or (:onyx/fn entry) 
+          (= (:onyx/type entry) :function))
+    (case (:onyx/language entry)
+      :java (operation/build-fn-java (:onyx/fn entry))
+      (operation/kw->fn (:onyx/fn entry)))))
 
 (defn instantiate-plugin-instance [class-name pipeline-data]
   (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
@@ -487,16 +491,19 @@
   (let [kw (:onyx/plugin task-map)]
     (try 
       (if (#{:input :output} (:onyx/type task-map))
-        (let [user-ns (namespace kw)
-              user-fn (name kw)]
-          (if (and user-ns user-fn)
-            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
-              (f pipeline-data)    
-              (throw (Exception. (str "Failure to ns-resolve at " user-ns " " user-fn))))
-            (instantiate-plugin-instance user-fn pipeline-data)))
+        (case (:onyx/language task-map)
+          :java (instantiate-plugin-instance (name kw) pipeline-data)
+          (let [user-ns (namespace kw)
+                user-fn (name kw)
+                pipeline (if (and user-ns user-fn)
+                           (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
+                             (f pipeline-data)))]
+            (or pipeline
+                (throw (ex-info "Failure to resolve plugin builder fn. 
+                                 Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e 
-        (throw (ex-info "Could not resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e})))))) 
+        (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e})))))) 
 
 (defn validate-pending-timeout [pending-timeout opts]
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))

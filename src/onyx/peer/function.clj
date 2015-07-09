@@ -12,7 +12,7 @@
 (defn apply-fn
   [{:keys [onyx.core/params] :as event} segment]
   (if-let [f (:onyx.core/fn event)]
-    (operation/apply-function f params segment)
+   (operation/apply-function f params segment)
     segment))
 
 ; (defn filter-by-route [messages task-name]
