@@ -31,6 +31,7 @@
    :onyx.messaging.netty/thread-pool-sizes 1
    :onyx.messaging.netty/connect-timeout-millis 1000
    :onyx.messaging.netty/pending-buffer-size 10000
+   :onyx.messaging/allow-short-circuit? true
    :onyx.messaging/inbound-buffer-size 200000
    :onyx.messaging/completion-buffer-size 50000
    :onyx.messaging/release-ch-buffer-size 10000
@@ -43,4 +44,7 @@
    :onyx.messaging/ack-daemon-clear-interval 15000})
 
 (defn arg-or-default [k opts]
-  (or (get opts k) (get defaults k)))
+  (let [opts-val (get opts k)]
+    (if (nil? opts-val)
+      (get defaults k)
+      opts-val)))

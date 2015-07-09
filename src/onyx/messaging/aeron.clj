@@ -24,7 +24,7 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronConnection 
-  [peer-group messaging-group publications virtual-peers acking-daemon acking-ch 
+  [peer-group messaging-group short-circuitable? publications connections virtual-peers acking-daemon acking-ch 
    send-idle-strategy compress-f inbound-ch release-ch retry-ch]
   component/Lifecycle
   (start [component]
@@ -32,8 +32,13 @@
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
           publications (:publications messaging-group)
+          connections (:connections messaging-group)
           virtual-peers (:virtual-peers messaging-group)
           inbound-ch (:inbound-ch (:messenger-buffer component))
+          external-channel (:external-channel messaging-group)
+          short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
+                               (fn [channel] (= channel external-channel))
+                               (constantly false))
           release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           acking-ch (:acking-ch (:acking-daemon component))
@@ -41,7 +46,9 @@
           compress-f (:compress-f (:messaging-group peer-group))]
       (assoc component 
              :messaging-group messaging-group
+             :short-circuitable? short-circuitable?
              :publications publications
+             :connections connections
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
              :compress-f compress-f
@@ -60,7 +67,9 @@
 
     (assoc component
            :send-idle-strategy nil 
+           :short-circuitable? nil
            :publications nil
+           :connections nil
            :virtual-peers nil
            :compress-f nil :decompress-f nil 
            :inbound-ch nil :release-ch nil :retry-ch nil )))
@@ -133,27 +142,28 @@
 
 (defn start-subscriber! [bind-addr port virtual-peers decompress-f]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-        aeron (Aeron/connect ctx)
+        conn (Aeron/connect ctx)
         channel (aeron-channel bind-addr port)
         handler (fragment-data-handler 
                   (fn [buffer offset length header] 
                     (handle-message decompress-f virtual-peers
                                     buffer offset length header)))
 
-        subscriber (.addSubscription aeron channel send-stream-id)
+        subscription (.addSubscription conn channel send-stream-id)
         receive-idle-strategy (backoff-strategy :high-restart-latency)
-        subscriber-fut (future (try (.accept ^Consumer (consumer handler receive-idle-strategy 10) subscriber) 
+        subscriber-fut (future (try (.accept ^Consumer (consumer handler receive-idle-strategy 10) subscription) 
                                     (catch Throwable e (fatal e))))]
-    {:subscriber subscriber :subscriber-fut subscriber-fut}))
+    {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
+
 
 ;; FIXME, race condition 
-(defn get-publication [publications channel]
-  (if-let [pub (get @publications channel)]
+(defn get-publication [messenger channel]
+  (if-let [pub (get @(:publications messenger) channel)]
     pub
-    (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-          aeron (Aeron/connect ctx)
-          pub (.addPublication aeron channel send-stream-id)]
-      (do (swap! publications assoc channel pub)
+    (let [conn (Aeron/connect (.errorHandler (Aeron$Context.) no-op-error-handler))
+          pub (.addPublication conn channel send-stream-id)]
+      (do (swap! (:publications messenger) assoc channel pub)
+          (swap! (:connections messenger) assoc channel conn)
           pub))))
 
 (defn opts->port [opts]
@@ -164,14 +174,11 @@
                  e.g. {:onyx.messaging/peer-ports [40000, 40002],
                  :onyx.messaging/peer-port-range [40200 40260]}"))))
 
-(defrecord AeronPeerGroup [opts publications compress-f decompress-f send-idle-strategy]
+(defrecord AeronPeerGroup [opts publications connections compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
-    (let [embedded-driver? (if-not (nil? (:onyx.messaging.aeron/embedded-driver? opts))
-                             (:onyx.messaging.aeron/embedded-driver? opts)
-                             (:onyx.messaging.aeron/embedded-driver? defaults))
-          
+    (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
           media-driver (if embedded-driver?
                          (MediaDriver/launch 
                            (doto (MediaDriver$Context.) 
@@ -189,6 +196,7 @@
           decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
           virtual-peers (atom {})
           publications (atom {})
+          connections (atom {})
           subscriber (start-subscriber! bind-addr port virtual-peers decompress-f)]
       (assoc component 
              :bind-addr bind-addr
@@ -197,6 +205,7 @@
              :port port
              :media-driver media-driver 
              :publications publications
+             :connections connections
              :virtual-peers virtual-peers
              :compress-f compress-f
              :decompress-f decompress-f
@@ -204,11 +213,18 @@
              :send-idle-strategy send-idle-strategy
              :subscriber subscriber)))
 
-  (stop [{:keys [media-driver subscriber] :as component}]
+  (stop [{:keys [media-driver subscriber publications connections] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (future-cancel (:subscriber-fut subscriber))
+    (.close (:subscription subscriber))
+    (.close (:conn subscriber))
+    (doseq [pub (vals @publications)]
+      (.close ^uk.co.real_logic.aeron.Publication pub))
+    (doseq [conn (vals @connections)]
+      (.close conn))
     (when media-driver (.close ^MediaDriver media-driver))
     (assoc component :media-driver nil :publications nil :virtual-peers nil
+           :external-channel nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscriber nil)))
 
@@ -251,10 +267,6 @@
           segments)
         segments))))
 
-(defn short-circuitable? [messenger channel]
-  (= (:external-channel (:messaging-group messenger))
-     channel))
-
 (defn short-circuit-ch [messenger peer-id ch-k]
   (-> messenger 
       :virtual-peers 
@@ -268,10 +280,9 @@
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [peer-id channel]} batch]
-  (if (short-circuitable? messenger channel) 
+  (if ((:short-circuitable? messenger) channel) 
     (send-messages-short-circuit (short-circuit-ch messenger peer-id :inbound-ch) batch)
-    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                   channel)
+    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
           [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) peer-id batch)
           offer-f (fn [] (.offer pub unsafe-buffer 0 len))
           idle-strategy (:send-idle-strategy messenger)]
@@ -286,10 +297,9 @@
 
 (defmethod extensions/internal-ack-messages AeronConnection
   [messenger event {:keys [peer-id channel]} acks]
-  (if (short-circuitable? messenger channel) 
+  (if ((:short-circuitable? messenger) channel) 
     (ack-messages-short-circuit (short-circuit-ch messenger peer-id :acking-ch) acks)
-    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                   channel)
+    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
           idle-strategy (:send-idle-strategy messenger)] 
       (doseq [{:keys [id completion-id ack-val]} acks] 
         (let [unsafe-buffer (protocol/build-acker-message peer-id id completion-id ack-val)
@@ -297,16 +307,15 @@
           (while (neg? ^long (offer-f))
             (.idle ^IdleStrategy idle-strategy 0)))))))
 
-
 (defn complete-message-short-circuit [ch completion-id]
   (>!! ch completion-id))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event id {:keys [peer-id channel]}]
-  (if (short-circuitable? messenger channel) 
+  (if ((:short-circuitable? messenger) channel) 
     (complete-message-short-circuit (short-circuit-ch messenger peer-id :release-ch) id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) channel)
+          pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
           unsafe-buffer (protocol/build-completion-msg-buf peer-id id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
       (while (neg? ^long (offer-f))
@@ -317,11 +326,10 @@
 
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event id {:keys [peer-id channel]}]
-  (if (short-circuitable? messenger channel) 
+  (if ((:short-circuitable? messenger) channel) 
     (retry-message-short-circuit (short-circuit-ch messenger peer-id :retry-ch) id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^uk.co.real_logic.aeron.Publication (get-publication (:publications messenger) 
-                                                                   channel)
+          pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
           unsafe-buffer (protocol/build-retry-msg-buf peer-id id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
       (while (neg? ^long (offer-f))
