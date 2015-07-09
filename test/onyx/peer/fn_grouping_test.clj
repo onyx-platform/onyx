@@ -48,7 +48,7 @@
 
 (def catalog
   [{:onyx/name :in
-    :onyx/ident :onyx.plugin.core-async/input
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size 40
@@ -56,7 +56,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :sum-balance
-    :onyx/ident :onyx.peer.fn-grouping-test/sum-balance
+    :onyx/plugin :onyx.peer.fn-grouping-test/sum-balance
     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
     :onyx/type :function
     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
@@ -65,7 +65,7 @@
     :onyx/batch-size 40}
 
    {:onyx/name :out
-    :onyx/ident :onyx.plugin.core-async/output
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 40

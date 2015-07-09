@@ -81,7 +81,7 @@ Example:
 
 ```clojure
 [{:onyx/name :in
-  :onyx/ident :core.async/read-from-chan
+  :onyx/plugin :onyx.plugin.core-async/input
   :onyx/type :input
   :onyx/medium :core.async
   :onyx/batch-size batch-size
@@ -94,7 +94,7 @@ Example:
   :onyx/batch-size batch-size}
 
  {:onyx/name :out
-  :onyx/ident :core.async/write-to-chan
+  :onyx/plugin :onyx.plugin.core-async/output
   :onyx/type :output
   :onyx/medium :core.async
   :onyx/batch-size batch-size
@@ -141,4 +141,4 @@ A Virtual Peer refers to a single peer process running on a single physical mach
 
 #### Job
 
-A job is the collection of a workflow, catalog, flow conditions, lifecycles, and execution parameters. A job is most coarse unit of work, and every task is associated with exactly one job - hence a peer can only be working at least most one job at any given time.
+A job is the collection of a workflow, catalog, flow conditions, lifecycles, and execution parameters. A job is most coarse unit of work, and every task is associated with exactly one job - hence a peer can only be working at most one job at any given time.

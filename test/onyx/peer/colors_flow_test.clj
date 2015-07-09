@@ -42,7 +42,7 @@
 
 (def catalog
   [{:onyx/name :colors-in
-    :onyx/ident :onyx.plugin.core-async/input
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -68,7 +68,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :red-out
-    :onyx/ident :onyx.plugin.core-async/output
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -76,7 +76,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :blue-out
-    :onyx/ident :onyx.plugin.core-async/output
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -84,7 +84,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :green-out
-    :onyx/ident :onyx.plugin.core-async/output
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size

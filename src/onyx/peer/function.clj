@@ -9,6 +9,20 @@
             [onyx.types :refer [->Leaf]])
   (:import [java.util UUID]))
 
+<<<<<<< HEAD
+=======
+(defn apply-fn
+  [{:keys [onyx.core/params] :as event} segment]
+  (if-let [f (:onyx.core/fn event)]
+   (operation/apply-function f params segment)
+    segment))
+
+; (defn filter-by-route [messages task-name]
+;   (->> messages
+;        (filter (fn [msg] (some #{task-name} (:flow (:routes msg)))))
+;        (map #(dissoc % :routes :hash-group))))
+
+>>>>>>> develop
 (defn into-transient [coll vs]
   (loop [rs (seq vs) updated-coll coll]
     (if rs 

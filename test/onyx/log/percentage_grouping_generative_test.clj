@@ -28,7 +28,7 @@
 (def job-1
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/percentage 20
@@ -46,7 +46,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/percentage 50
@@ -59,7 +59,7 @@
 (def job-2
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/percentage 20
@@ -76,7 +76,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/percentage 20
@@ -89,7 +89,7 @@
 (def job-3
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/percentage 20
@@ -106,7 +106,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/percentage 30
@@ -119,7 +119,7 @@
 (def job-4
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/percentage 25
@@ -137,7 +137,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/percentage 25
