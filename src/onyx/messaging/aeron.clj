@@ -9,6 +9,7 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]])
   (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
            [uk.co.real_logic.aeron Aeron$Context]
+           [uk.co.real_logic.aeron Publication]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
@@ -57,14 +58,14 @@
              :release-ch release-ch
              :retry-ch retry-ch)))
 
-  (stop [{:keys [aeron resources release-ch] :as component}]
+  (stop [{:keys [id release-ch retry-ch virtual-peers] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try 
       ;;; TODO; could handle the inbound-ch in a similar way - rather than using messenger-buffer
-      (close! (:release-ch component))
-      (close! (:retry-ch component))
+      (close! release-ch)
+      (close! retry-ch)
+      (swap! virtual-peers dissoc id)
       (catch Throwable e (fatal e)))
-
     (assoc component
            :send-idle-strategy nil 
            :short-circuitable? nil
@@ -75,11 +76,8 @@
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
 (defmethod extensions/open-peer-site AeronConnection
-  [messenger assigned]
-  (swap! (:virtual-peers (:messaging-group (:peer-group messenger)))
-         assoc 
-         (:id messenger)
-         messenger))
+  [{:keys [virtual-peers id] :as messenger} assigned]
+  (swap! virtual-peers assoc id messenger)) 
 
 (def no-op-error-handler
   (reify ErrorHandler 
@@ -109,7 +107,6 @@
       (while (not (Thread/interrupted))
         (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
-
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
   (let [msg-type (protocol/read-message-type buffer offset)
@@ -154,14 +151,18 @@
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
+(defrecord TrackedPublication [publication last-used])
 
-;; FIXME, race condition 
 (defn get-publication [messenger channel]
+  ;; FIXME, race condition may cause two publications to be created
+  ;; same goes for operation/peer-link
   (if-let [pub (get @(:publications messenger) channel)]
-    pub
+    (do 
+      (reset! (:last-used pub) (System/currentTimeMillis))
+      (:publication pub))
     (let [conn (Aeron/connect (.errorHandler (Aeron$Context.) no-op-error-handler))
           pub (.addPublication conn channel send-stream-id)]
-      (do (swap! (:publications messenger) assoc channel pub)
+      (do (swap! (:publications messenger) assoc channel (->TrackedPublication pub (atom (System/currentTimeMillis))))
           (swap! (:connections messenger) assoc channel conn)
           pub))))
 
@@ -172,6 +173,33 @@
                  Available ports can be configured in the peer-config.
                  e.g. {:onyx.messaging/peer-ports [40000, 40002],
                  :onyx.messaging/peer-port-range [40200 40260]}"))))
+
+
+;; FIXME: gc'ing publications could be racy if a publication is grabbed 
+;; just as it is being gc'd - though it is unlikely
+(defn gc-publications [publications connections opts]
+  (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
+        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
+    (loop []
+      (try
+        (Thread/sleep interval)
+        (let [t (System/currentTimeMillis)
+              snapshot @publications
+              to-remove (map first 
+                             (filter (fn [[k v]] (>= (- t @(:last-used v)) idle)) 
+                                     snapshot))]
+          (doseq [k to-remove]
+            (let [pub (:publication (snapshot k))
+                  conn (@connections k)] 
+              (swap! publications dissoc k)
+              (swap! connections dissoc k)
+              (.close pub)
+              (.close conn))))
+        (catch InterruptedException e
+          (throw e))
+        (catch Throwable e
+          (fatal e)))
+      (recur))))
 
 (defrecord AeronPeerGroup [opts publications connections compress-f decompress-f send-idle-strategy]
   component/Lifecycle
@@ -196,8 +224,10 @@
           virtual-peers (atom {})
           publications (atom {})
           connections (atom {})
-          subscriber (start-subscriber! bind-addr port virtual-peers decompress-f receive-idle-strategy)]
+          subscriber (start-subscriber! bind-addr port virtual-peers decompress-f receive-idle-strategy)
+          pub-gc-thread (future (gc-publications publications connections opts))]
       (assoc component 
+             :pub-gc-thread pub-gc-thread
              :bind-addr bind-addr
              :external-addr external-addr
              :external-channel external-channel
@@ -215,14 +245,17 @@
   (stop [{:keys [media-driver subscriber publications connections] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (future-cancel (:subscriber-fut subscriber))
+    (future-cancel (:pub-gc-thread component))
     (.close (:subscription subscriber))
     (.close (:conn subscriber))
     (doseq [pub (vals @publications)]
-      (.close ^uk.co.real_logic.aeron.Publication pub))
+      (.close ^Publication (:publication pub)))
     (doseq [conn (vals @connections)]
       (.close conn))
     (when media-driver (.close ^MediaDriver media-driver))
-    (assoc component :media-driver nil :publications nil :virtual-peers nil
+    (assoc component 
+           :pub-gc-thread nil
+           :media-driver nil :publications nil :virtual-peers nil
            :external-channel nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscriber nil)))
@@ -281,7 +314,7 @@
   [messenger event {:keys [peer-id channel]} batch]
   (if ((:short-circuitable? messenger) channel) 
     (send-messages-short-circuit (short-circuit-ch messenger peer-id :inbound-ch) batch)
-    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
+    (let [pub ^Publication (get-publication messenger channel)
           [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) peer-id batch)
           offer-f (fn [] (.offer pub unsafe-buffer 0 len))
           idle-strategy (:send-idle-strategy messenger)]
@@ -298,7 +331,7 @@
   [messenger event {:keys [peer-id channel]} acks]
   (if ((:short-circuitable? messenger) channel) 
     (ack-messages-short-circuit (short-circuit-ch messenger peer-id :acking-ch) acks)
-    (let [pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
+    (let [pub ^Publication (get-publication messenger channel)
           idle-strategy (:send-idle-strategy messenger)] 
       (doseq [{:keys [id completion-id ack-val]} acks] 
         (let [unsafe-buffer (protocol/build-acker-message peer-id id completion-id ack-val)
@@ -314,7 +347,7 @@
   (if ((:short-circuitable? messenger) channel) 
     (complete-message-short-circuit (short-circuit-ch messenger peer-id :release-ch) id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
+          pub ^Publication (get-publication messenger channel)
           unsafe-buffer (protocol/build-completion-msg-buf peer-id id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
       (while (neg? ^long (offer-f))
@@ -328,7 +361,7 @@
   (if ((:short-circuitable? messenger) channel) 
     (retry-message-short-circuit (short-circuit-ch messenger peer-id :retry-ch) id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^uk.co.real_logic.aeron.Publication (get-publication messenger channel)
+          pub ^Publication (get-publication messenger channel)
           unsafe-buffer (protocol/build-retry-msg-buf peer-id id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
       (while (neg? ^long (offer-f))
