@@ -530,9 +530,12 @@
                              (egress-ids (:onyx/name entry)))))
               (map (fn [entry] 
                      (let [group-key (:onyx/group-by-key entry)
-                           group-fn (if (keyword? group-key)
-                                      group-key
-                                      #(get % group-key))] 
+                           group-fn (cond (keyword? group-key)
+                                          group-key
+                                          (sequential? group-key)
+                                          #(select-keys % group-key)
+                                          :else
+                                          #(get % group-key))] 
                        [(:onyx/name entry) group-fn])))
               (into {}))
          (->> catalog 
