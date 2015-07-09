@@ -16,6 +16,8 @@
                  [prismatic/schema "0.4.0"]
                  [org.apache.zookeeper/zookeeper "3.4.1" :exclusions [org.slf4j/slf4j-log4j12 io.netty/netty]]
                  [log4j/log4j "1.2.17"]
+                 [org.slf4j/slf4j-api "1.7.12"]
+                 [org.slf4j/slf4j-nop "1.7.12"]
                  [io.netty/netty-all "4.0.26.Final"]]
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [org.clojars.czan/stateful-check "0.3.0-20150522.062325-1"]
