@@ -8,6 +8,10 @@
   past a high water mark, and will be turned off after reaching a low water
   mark. See [Backpressure](doc/user-guide/backpressure.md) for more details.
 
+#### 0.6.1
+
+- Use GitBook for documentation. [#119](https://github.com/onyx-platform/onyx/issues/119)
+
 #### 0.6.0
 
 - Dropped feature: support for `:sequential` tasks
