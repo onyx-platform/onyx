@@ -246,12 +246,12 @@
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (future-cancel (:subscriber-fut subscriber))
     (future-cancel (:pub-gc-thread component))
-    (.close (:subscription subscriber))
-    (.close (:conn subscriber))
+    (.close ^uk.co.real_logic.aeron.Subscription (:subscription subscriber))
+    (.close ^Aeron (:conn subscriber))
     (doseq [pub (vals @publications)]
       (.close ^Publication (:publication pub)))
     (doseq [conn (vals @connections)]
-      (.close conn))
+      (.close ^Aeron conn))
     (when media-driver (.close ^MediaDriver media-driver))
     (assoc component 
            :pub-gc-thread nil
@@ -264,10 +264,10 @@
   (map->AeronPeerGroup {:opts opts}))
 
 (def possible-ids 
-  (set (range -32768 32768)))
+  (set (map short (range -32768 32768))))
 
 (defn choose-id [used]
-  (short (first (clojure.set/difference possible-ids used))))
+  (first (clojure.set/difference possible-ids used)))
 
 ;;; Assigns a unique id to each peer so that messages do not need
 ;;; to send the entire peer-id in a payload, saving 14 bytes per
