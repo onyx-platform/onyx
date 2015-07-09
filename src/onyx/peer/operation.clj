@@ -67,7 +67,7 @@
                  [:links peer-id] 
                  (fn [link]
                    (or link 
-                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
+                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) peer-id event site)
                                (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)

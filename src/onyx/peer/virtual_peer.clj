@@ -29,7 +29,7 @@
                            :peer-replica-view peer-view-atom
                            :log log
                            :messenger-buffer buffer
-                           :messenger messenger
+                           :messenger (assoc messenger :id id)
                            :outbox-ch outbox-ch
                            :completion-ch completion-ch
                            :opts opts
@@ -100,7 +100,7 @@
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
-              completion-ch (:completions-ch acking-daemon)
+              completion-ch (:completion-ch acking-daemon)
               peer-site (extensions/peer-site messenger)
               entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site})
               origin (extensions/subscribe-to-log log inbox-ch)]

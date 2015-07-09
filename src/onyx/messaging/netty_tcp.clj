@@ -4,7 +4,6 @@
               [com.stuartsierra.component :as component]
               [taoensso.timbre :as timbre]
               [onyx.messaging.protocol-netty :as protocol]
-              [onyx.messaging.acking-daemon :as acker]
               [onyx.messaging.common :refer [bind-addr external-addr allowable-ports]]
               [onyx.compression.nippy :refer [compress decompress]]
               [onyx.extensions :as extensions]
@@ -147,7 +146,7 @@
   "Given a core, a channel, and a message, applies the message to 
   core and writes a response back on this channel."
   [messenger inbound-ch release-ch retry-ch] 
-  (let [acking-daemon (:acking-daemon messenger)
+  (let [acking-ch (:acking-ch (:acking-daemon messenger))
         decompress-f (:decompress-f messenger)] 
     (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
       (try 
@@ -158,10 +157,7 @@
 
                 (= t protocol/ack-type-id)
                 (doseq [ack (protocol/read-acks-buf buf)]
-                  (acker/ack-message acking-daemon
-                                     (:id ack)
-                                     (:completion-id ack)
-                                     (:ack-val ack)))
+                  (>!! acking-ch ack))
 
                 (= t protocol/completion-type-id)
                 (>!! release-ch (protocol/read-completion-buf buf))
@@ -409,7 +405,7 @@
             (reset! pending-ch (make-pending-chan messenger))))))))
 
 (defmethod extensions/connect-to-peer NettyTcpSockets
-  [messenger event site]
+  [messenger peer-id event site]
   (doto 
     (->ConnectionManager messenger 
                          site
