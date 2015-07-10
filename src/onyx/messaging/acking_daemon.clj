@@ -88,13 +88,3 @@
   "Generate a 64-bit value to bit-xor against the current ack-value."
   []
   (.nextLong (java.util.concurrent.ThreadLocalRandom/current)))
-
-(defn generate-acks 
-  "Batch generates acks."
-  [cnt] 
-  (let [rng (java.util.concurrent.ThreadLocalRandom/current)] 
-    (loop [n 0 coll (transient [])]
-      (if (= n cnt)
-        (persistent! coll)
-        (recur (inc n) 
-               (conj! coll (.nextLong rng)))))))

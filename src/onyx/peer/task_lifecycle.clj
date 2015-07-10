@@ -54,10 +54,10 @@
         :else (into (set all) to-add)))
 
 (defn choose-output-paths
-  [event compiled-flow-conditions result leaf downstream]
+  [event compiled-flow-conditions result message downstream]
   (reduce
     (fn [{:keys [flow exclusions] :as all} entry]
-      (if ((:flow/predicate entry) [event (:message (:root result)) (:message leaf) (map :message (:leaves result))])
+      (if ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
         (if (:flow/short-circuit? entry)
           (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
                             (into (set exclusions) (:flow/exclude-keys entry))
@@ -71,104 +71,125 @@
     (->Route #{} #{} nil nil)
     compiled-flow-conditions))
 
-(defn add-route-data
-  [event result leaf downstream]
+(defn route-data
+  [event result message downstream]
   (if (nil? (:onyx.core/flow-conditions event))
     (->Route downstream nil nil nil)
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
-      (if (operation/exception? (:message leaf))
+      (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result leaf downstream)  
-          (throw (:message leaf)))
+          (choose-output-paths event compiled-ex-fcs result message downstream)  
+          (throw message))
         (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
           (if (seq compiled-norm-fcs) 
-            (choose-output-paths event compiled-norm-fcs result leaf downstream)   
+            (choose-output-paths event compiled-norm-fcs result message downstream)   
             (->Route downstream nil nil nil)))))))
 
-(defn apply-post-transformation [leaf event]
-  (let [message (:message leaf) 
-        routes (:routes leaf)
-        post-transformation (:post-transformation routes)
+(defn apply-post-transformation [message routes event]
+  (let [post-transformation (:post-transformation routes)
         msg (if (and (operation/exception? message) post-transformation)
               ((operation/kw->fn post-transformation) event message)
               message)]
-    (assoc leaf :message (reduce dissoc msg (:exclusions routes)))))
+    (reduce dissoc msg (:exclusions routes))))
 
-(defn add-hash-groups [leaf next-tasks task->group-by-fn]
-  (let [message (:message leaf)]
-    (assoc leaf :hash-group (reduce (fn [groups t]
-                                      (if-let [group-fn (task->group-by-fn t)]
-                                        (assoc groups t (hash (group-fn message)))
-                                        groups))
-                                    {} 
-                                    next-tasks))))
- 
-(defn group-segments [leaf next-tasks catalog {:keys [onyx.core/flow-conditions onyx.core/task->group-by-fn] :as event}]
-  (cond-> leaf 
-    flow-conditions
-    (apply-post-transformation event)
-    (not-empty task->group-by-fn)
-    (add-hash-groups next-tasks task->group-by-fn)))
+(defn hash-groups [message next-tasks task->group-by-fn]
+  (if (not-empty task->group-by-fn)
+    (reduce (fn [groups t]
+              (if-let [group-fn (task->group-by-fn t)]
+                (assoc groups t (hash (group-fn message)))
+                groups))
+            {} 
+            next-tasks)))
 
-(defn add-ack-vals [leaf]
-  (assoc leaf 
-         :ack-vals 
-         (acker/generate-acks (count (:flow (:routes leaf))))))
+(defn flow-conditions-transform 
+  [message routes next-tasks flow-conditions event]
+  (if flow-conditions
+    (apply-post-transformation message routes event)
+    message))
 
+
+;;; should possibly build up acking stuff here, with acker-id/message-id
 (defn build-new-segments
-  [egress-ids {:keys [onyx.core/results onyx.core/catalog] :as event}]
-  (let [results (doall
-                  (map (fn [{:keys [root leaves] :as result}]
-                         (let [{:keys [id acker-id completion-id]} root] 
-                           (assoc result 
-                                  :leaves 
-                                  (map (fn [leaf]
-                                         (-> leaf 
-                                             ;;; TODO; probably don't need routes in leaf.
-                                             ;;; just need to pass the route into group-segments and add-ack-vals
-                                             (assoc :routes (add-route-data event result leaf egress-ids))
-                                             (assoc :id id)
-                                             (assoc :acker-id acker-id)
-                                             (assoc :completion-id completion-id)
-                                             (group-segments egress-ids catalog event)
-                                             (add-ack-vals)))
-                                       leaves))))
-                       results))]
+  [egress-ids 
+   {:keys [onyx.core/results onyx.core/task->group-by-fn onyx.core/flow-conditions] :as event}]
+  (let [;_ (info "EGress " egress-ids)
+        ;_ (info "Results to begin " (vec results))
+        results (reduce (fn [routed-segments {:keys [root leaves] :as result}]
+                          (reduce (fn [routed-segments* {:keys [message] :as leaf}]
+                                    ;(taoensso.timbre/info "Route on " egress-ids)
+                                    (let [routes (route-data event result message egress-ids)
+                                          message* (flow-conditions-transform message routes egress-ids flow-conditions event)
+                                          hash-group (hash-groups message* egress-ids task->group-by-fn)
+                                          ;; can make this conditional if message hasn't changed?
+                                          leaf* (assoc leaf :message message*)] 
+                                      (if (= :retry (:action routes))
+                                        routed-segments*
+                                        (reduce (fn [routed-segments** route]
+                                                  (let [ack-val (acker/gen-ack-value)
+                                                        leaf** (assoc leaf* :ack-val ack-val)
+                                                        g (get hash-group route)]
+                                                    ;(info "Route is " route)
+                                                    ;(info "Routed " routed-segments**)
+                                                    ;;; maybe should have actual route id here not the route name, since we look it up later
+                                                    (cond-> routed-segments** 
+                                                      true (update-in [:segments route g] conj leaf**)
+                                                      
+                                                      route (update-in [:acks (:acker-id leaf**) (list (:id leaf**)
+                                                                                                       (:completion-id leaf**))] 
+                                                                       (fn [fused-ack-val]
+                                                                         (if fused-ack-val
+                                                                           (bit-xor fused-ack-val ack-val)
+                                                                           ack-val))))))
+                                                ;; make sure initial ack is in there
+                                                (-> routed-segments* 
+                                                    (update-in [:acks (:acker-id root) (list (:id root) (:completion-id root))] 
+                                                               (fn [fused-ack-val]
+                                                                 (if fused-ack-val
+                                                                   (bit-xor fused-ack-val (:ack-val root))
+                                                                   (:ack-val root))))
+                                                    (update-in [:messages] conj message*))
+                                                (:flow routes)))))
+                                  routed-segments
+                                  leaves))
+                        {}
+                        results)]
+    ;(info "RESULTS " results)
     (assoc event :onyx.core/results results)))
 
-(defn ack-routes? [routes]
-  (and (not-empty (:flow routes))
-       (not= (:action routes) 
-             :retry)))
+; (defn ack-routes? [routes]
+;   (and (not-empty (:flow routes))
+;        (not= (:action routes) 
+;              :retry)))
 
-(defn gen-ack-fusion-vals 
-  "Prefuses acks to reduce packet size"
-  [task-map leaves]
-  (if-not (= (:onyx/type task-map) :output)
-    (reduce (fn [fused-ack leaf]
-              (if (ack-routes? (:routes leaf))
-                (reduce bit-xor fused-ack (:ack-vals leaf))
-                fused-ack)) 
-            0
-            leaves)
-    0))
+; (defn gen-ack-fusion-vals 
+;   "Prefuses acks to reduce packet size"
+;   [task-map ack-vals]
+;   (if-not (= (:onyx/type task-map) :output)
+;     (reduce (fn [fused-ack ack-val]
+;               (reduce bit-xor fused-ack ack-val)
+;               fused-ack) 
+;             0
+;             leaves)
+;     0))
 
 (defn ack-messages [task-map replica state messenger {:keys [onyx.core/results] :as event}]
-  (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
+  ;(info "Results are " results)
+  (info "Acking messages " (:acks results))
+  (doseq [[acker-id results-by-acker] (:acks results)]
     (let [link (operation/peer-link @replica state event acker-id)
-          acks (doall 
-                 (map (fn [result] (let [root (:root result)
-                                         fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
-                                         fused-vals (if-let [ack-val (:ack-val root)] 
-                                                      (bit-xor fused-leaf-vals ack-val)
-                                                      fused-leaf-vals)]
-                                     (->Ack (:id root)
-                                            (:completion-id root)
-                                            ;; or'ing by zero covers the case of flow conditions where an
-                                            ;; input task produces a segment that goes nowhere.
-                                            (or fused-vals 0)
-                                            (System/currentTimeMillis))))
-                      results-by-acker))] 
+          acks (map (fn [[[id completion-id] fused-ack-val]]
+                      (->Ack id
+                             completion-id
+                             ;; or'ing by zero covers the case of flow conditions where an
+                             ;; input task produces a segment that goes nowhere.
+                             
+                             ;; Does this actually work? Won't it complete an input segment if
+                             ;; only one of the output segments doesn't flow at a task
+                             (or fused-ack-val 0)
+                             ;;; putting the timestamp in here is bad - clock sync will ruin us
+                             (System/currentTimeMillis)))
+                    results-by-acker)]
+      ;(info "Acks " (vec acks))
       (extensions/internal-ack-messages messenger event link acks)))
   event)
 
@@ -258,7 +279,11 @@
      (map
        (fn [segment]
          (let [segments (collect-next-segments f (:message segment))
-               leaves (map leaf segments)]
+               leaves (map (fn [message]
+                             (-> segment
+                                 (assoc :message message)
+                                 (assoc :ack-val nil))) 
+                           segments)]
            (->Result segment leaves)))
        batch))))
 
@@ -272,7 +297,7 @@
       (doall 
         (map
           (fn [segment]
-            (->Result segment (list (leaf (:message segment)))))
+            (->Result segment (list (assoc segment :ack-val nil))))
           batch)))))
 
 (defn curry-params [f params]
@@ -413,7 +438,7 @@
              (apply-fn fn bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
-             (flow-retry-messages replica state messenger)
+             ;(flow-retry-messages replica state messenger)
              (ack-messages task-map replica state messenger)
              (close-batch-resources)))
       (catch Throwable e

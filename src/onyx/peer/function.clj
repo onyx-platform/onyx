@@ -59,19 +59,25 @@
 
 (defn write-batch
   ([event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
-   (let [leaves (fast-concat (map :leaves (:onyx.core/results event)))]
-     (when-not (empty? leaves)
+   (let [;leaves (fast-concat (map :leaves (:onyx.core/results event)))
+         results (:segments (:onyx.core/results event))]
+     (when-not (empty? results)
        (let [replica-val @replica
              peer-replica-val @peer-replica-view
-             segments (build-segments-to-send leaves)
-             groups (group-by #(list (:route %) (:hash-group %)) segments)
+             ;segments (build-segments-to-send leaves)
              active-peers (get (:active-peers peer-replica-val) job-id)]
-         (doseq [[[route hash-group] segs] groups]
-           (let [task-peers (get active-peers (get egress-tasks route))
-                 target (pick-peer id task-peers hash-group max-downstream-links)]
-             (when target
-               (let [link (operation/peer-link replica-val state event target)]
-                 (onyx.extensions/send-messages messenger event link segs)))))
+         (doseq [[route m] results]
+           (doseq [[hash-group segs] m]
+             ;; should be able to map to id directly in build-segments
+             (let [task-peers (get active-peers (get egress-tasks route))
+                   target (pick-peer id task-peers hash-group max-downstream-links)
+                   ;_ (println "Picked target " target)
+                   ]
+               (println " route " route  " hashgroup " hash-group " id " (get egress-tasks route)
+                        " target " target)
+               (when target
+                 (let [link (operation/peer-link replica-val state event target)]
+                   (onyx.extensions/send-messages messenger event link segs))))))
          {}))))
 
   ([{:keys [onyx.core/id onyx.core/results 
