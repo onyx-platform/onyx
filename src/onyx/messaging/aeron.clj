@@ -44,12 +44,14 @@
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
-          compress-f (:compress-f (:messaging-group peer-group))]
+          compress-f (:compress-f (:messaging-group peer-group))
+          multiplex-id (atom nil)]
       (assoc component 
              :messaging-group messaging-group
              :short-circuitable? short-circuitable?
              :publications publications
              :connections connections
+             :multiplex-id multiplex-id
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
              :compress-f compress-f
@@ -58,13 +60,14 @@
              :release-ch release-ch
              :retry-ch retry-ch)))
 
-  (stop [{:keys [id release-ch retry-ch virtual-peers] :as component}]
+  (stop [{:keys [release-ch retry-ch virtual-peers multiplex-id] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try 
       ;;; TODO; could handle the inbound-ch in a similar way - rather than using messenger-buffer
       (close! release-ch)
       (close! retry-ch)
-      (swap! virtual-peers dissoc id)
+      (when @multiplex-id 
+        (swap! virtual-peers dissoc @multiplex-id))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil 
@@ -72,12 +75,17 @@
            :publications nil
            :connections nil
            :virtual-peers nil
+           :multiplex-id nil
            :compress-f nil :decompress-f nil 
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
+(defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
+
 (defmethod extensions/open-peer-site AeronConnection
-  [{:keys [virtual-peers] :as messenger} {:keys [aeron/id]}]
-  (swap! virtual-peers assoc id messenger)) 
+  [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger} 
+   {:keys [aeron/id]}]
+  (reset! multiplex-id id)
+  (swap! virtual-peers assoc id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
 
 (def no-op-error-handler
   (reify ErrorHandler 
@@ -274,11 +282,11 @@
 (defn choose-id [used]
   (first (clojure.set/difference possible-ids used)))
 
-;;; Assigns a unique id to each peer so that messages do not need
-;;; to send the entire peer-id in a payload, saving 14 bytes per
-;;; message
 (defmethod extensions/assign-site-resources :aeron
   [replica peer-site peer-sites]
+  ;;; Assigns a unique id to each peer so that messages do not need
+  ;;; to send the entire peer-id in a payload, saving 14 bytes per
+  ;;; message
   (let [used-ids (->> (vals peer-sites) 
                       (filter 
                         (fn [s]
@@ -305,7 +313,6 @@
 
 (defrecord AeronPeerConnection [channel id])
 
-;;;; THIS CAN BE MADE FASTER BY NOT GOING THROUGH PEER-LINK IN OPERATION
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id]}]
   (->AeronPeerConnection (aeron-channel external-addr port) id))
