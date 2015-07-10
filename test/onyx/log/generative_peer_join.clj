@@ -466,8 +466,8 @@
               (assoc :job-1 {:queue [(api/create-submit-job-entry 
                                        job-1-id
                                        peer-config 
-                                       job-1-pct-tasks 
-                                       (planning/discover-tasks (:catalog job-1-pct-tasks) (:workflow job-1-pct-tasks)))]})
+                                       job-1 
+                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
               (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []

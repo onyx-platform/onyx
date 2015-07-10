@@ -35,7 +35,7 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
-        (common/remove-peers (:id args))
+        (common/remove-peers id)
         (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :leave-cluster
@@ -48,13 +48,11 @@
 
 (defmethod extensions/reactions :leave-cluster
   [{:keys [args]} old new diff state]
-  (let [allocation (common/peer->allocated-job (:allocations old) (:id state))
-        scheduler (get-in new [:task-schedulers (:job allocation)])]
-    (when (or (= (:id state) (get (:prepared old) (:id args)))
-              (= (:id state) (get (:accepted old) (:id args))))
-      [{:fn :abort-join-cluster
-        :args {:id (:id state)}
-        :immediate? true}])))
+  (when (or (= (:id state) (get (:prepared old) (:id args)))
+            (= (:id state) (get (:accepted old) (:id args))))
+    [{:fn :abort-join-cluster
+      :args {:id (:id state)}
+      :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]

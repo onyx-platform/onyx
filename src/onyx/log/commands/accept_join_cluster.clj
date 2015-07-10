@@ -12,9 +12,10 @@
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)
+        accepted? (get-in replica [:accepted accepted-observer])
         already-joined? (some #{accepted-joiner} (:peers replica))
         no-observer? (not (some #{target} (:peers replica)))]
-    (if (or already-joined? no-observer?) 
+    (if (or already-joined? no-observer? (not accepted?)) 
       replica
       (-> replica
           (update-in [:pairs] merge {accepted-observer accepted-joiner})
