@@ -7,7 +7,7 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron FragmentAssemblyAdapter]
+  (:import [uk.co.real_logic.aeron Aeron FragmentAssembler]
            [uk.co.real_logic.aeron Aeron$Context]
            [uk.co.real_logic.aeron Publication]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
@@ -84,7 +84,7 @@
     (onError [this x] (taoensso.timbre/warn x))))
 
 (defn fragment-data-handler [f]
-  (FragmentAssemblyAdapter. 
+  (FragmentAssembler. 
     (reify FragmentHandler 
       (onFragment [this buffer offset length header]
         (f buffer offset length header)))))
@@ -206,11 +206,12 @@
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
+          ;; TODO: evaluate whether we should be using the official
+          ;; launchEmbedded feature in media driver, rather than rolling our own
+          media-driver-context (if embedded-driver? 
+                                 (doto (MediaDriver$Context.)))
           media-driver (if embedded-driver?
-                         (MediaDriver/launch 
-                           (doto (MediaDriver$Context.) 
-                             #_(.threadingMode ThreadingMode/DEDICATED)
-                             #_(.dirsDeleteOnExit true))))
+                         (MediaDriver/launch media-driver-context))
 
           bind-addr (common/bind-addr opts)
           external-addr (common/external-addr opts)
@@ -233,6 +234,7 @@
              :external-addr external-addr
              :external-channel external-channel
              :port port
+             :media-driver-context media-driver-context
              :media-driver media-driver 
              :publications publications
              :connections connections
@@ -243,7 +245,7 @@
              :send-idle-strategy send-idle-strategy
              :subscriber subscriber)))
 
-  (stop [{:keys [media-driver subscriber publications connections] :as component}]
+  (stop [{:keys [media-driver media-driver-context subscriber publications connections] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (future-cancel (:subscriber-fut subscriber))
     (future-cancel (:pub-gc-thread component))
@@ -254,9 +256,11 @@
     (doseq [conn (vals @connections)]
       (.close ^Aeron conn))
     (when media-driver (.close ^MediaDriver media-driver))
+    (when media-driver-context (.deleteAeronDirectory media-driver-context))
     (assoc component 
            :pub-gc-thread nil
            :media-driver nil :publications nil :virtual-peers nil
+           :media-driver-context nil
            :external-channel nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscriber nil)))
