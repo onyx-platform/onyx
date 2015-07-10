@@ -47,7 +47,7 @@
   (when-not (empty? active-peers)
     (if hash-group
       (nth active-peers
-           (mod (hash hash-group)
+           (mod hash-group
                 (count active-peers)))
       (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
