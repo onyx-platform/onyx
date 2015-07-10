@@ -206,8 +206,8 @@
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
       ;; Since job IDs are reused, we can't know which order they'll be in.
-      (is (= (set [(map count j1-allocations) (map count j2-allocations)])
-             #{[2 1 1] [1 1 1]})))))
+      (is (= (set (map sort [(map count j1-allocations) (map count j2-allocations)]))
+             #{[1 1 2] [1 1 1]})))))
 
 (deftest balanced-allocations
   (checking
