@@ -136,7 +136,7 @@
                                   leaf** (assoc leaf* :ack-val ack-val)
                                   grp (get hash-group route)]
                               (->AccumAckSegments 
-                                (bit-xor (:ack-val accum2) ack-val)
+                                (bit-xor ^long (:ack-val accum2) ^long ack-val)
                                 (update-in2 (:segments accum2)
                                             route 
                                             grp 
