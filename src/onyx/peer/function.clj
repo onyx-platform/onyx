@@ -28,8 +28,7 @@
    (let [results (:segments (:onyx.core/results event))]
      (when-not (empty? results)
        (let [replica-val @replica
-             peer-replica-val @peer-replica-view
-             active-peers (get (:active-peers peer-replica-val) job-id)]
+             active-peers (:active-peers @peer-replica-view)]
          (doseq [[route m] results]
            (let [task-peers (get active-peers (get egress-tasks route))] 
              (doseq [[hash-group segs] m]

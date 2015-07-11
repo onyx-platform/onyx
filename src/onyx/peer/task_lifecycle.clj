@@ -203,7 +203,7 @@
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
 (defn read-batch [task-type replica peer-replica-view job-id pipeline event]
-  (if (and (= task-type :input) (get (:backpressure peer-replica-view) job-id)) 
+  (if (and (= task-type :input) (:backpressure? peer-replica-view)) 
     (assoc event :onyx.core/batch '())
     (let [rets (p-ext/read-batch pipeline event)]
       (handle-backoff! event)
