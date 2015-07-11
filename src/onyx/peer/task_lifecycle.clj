@@ -12,7 +12,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
+              [onyx.types :refer [->Leaf ->Route ->Ack ->Results ->Result]]
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
@@ -107,8 +107,6 @@
   (if flow-conditions
     (apply-post-transformation message routes event)
     message))
-
-(defrecord Results [tree acks segments])
 
 (defn update-in2 [coll k1 k2 f]
   (let [v1 (get coll k1 (t/hash-map))

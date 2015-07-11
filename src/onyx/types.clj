@@ -4,13 +4,11 @@
 
 (defrecord Leaf [message id acker-id completion-id ack-val])
 
-(defn leaf 
-  ([message] 
-     (->Leaf message nil nil nil nil)))
-
 (defrecord Route [flow exclusions post-transformation action])
 
 (defrecord Ack [id completion-id ack-val timestamp])
+
+(defrecord Results [tree acks segments])
 
 (defrecord Result [root leaves])
 
