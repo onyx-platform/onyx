@@ -115,14 +115,14 @@
         v2 (get v1 k2)]
     (assoc coll k1 (assoc v1 k2 (f v2)))))
 
-(defrecord Tuple2 [v1 v2])
+(defrecord AccumAckSegments [ack-val segments])
 
 ;;; TODO, do not want to have to pass in result here
-(defn add-from-leaves [accumulated event result egress-ids task->group-by-fn flow-conditions]
+(defn add-from-leaves [results event result egress-ids task->group-by-fn flow-conditions]
   (let [root (:root result)
         leaves (:leaves result)
-        fusing-ack-val (or (:ack-val root) 0)] 
-    (reduce (fn [accumulated* {:keys [message] :as leaf}]
+        start-ack-val (or (:ack-val root) 0)] 
+    (reduce (fn [accum {:keys [message] :as leaf}]
             ;;; TODO, do not want to have to pass in result here
             (let [routes (route-data event result message flow-conditions egress-ids)
                   message* (flow-conditions-transform message routes egress-ids flow-conditions event)
@@ -131,24 +131,23 @@
                           leaf
                           (assoc leaf :message message*))] 
               (if (= :retry (:action routes))
-                (->Tuple2 fusing-ack-val accumulated*)
-                (let [t (reduce (fn [t route]
-                                  (if route 
-                                    (let [fusing-ack-val* (:v1 t)
-                                          segments (:v2 t)
-                                          ack-val (acker/gen-ack-value)
-                                          leaf** (assoc leaf* :ack-val ack-val)
-                                          grp (get hash-group route)]
-                                      (->Tuple2 (bit-xor fusing-ack-val* ack-val)
-                                                (update-in2 segments route grp #(conj % leaf**))))
-                                    t))
-                                (->Tuple2 fusing-ack-val (:segments accumulated*))
-                                (:flow routes))
-                      fused-ack-val (:v1 t)
-                      segments (:v2 t)]
-                  (->Tuple2 fused-ack-val 
-                            (assoc accumulated* :segments segments))))))
-          accumulated
+                accum
+                (reduce (fn [accum2 route]
+                          (if route 
+                            (let [ack-val (acker/gen-ack-value)
+                                  leaf** (assoc leaf* :ack-val ack-val)
+                                  grp (get hash-group route)]
+                              (->AccumAckSegments 
+                                (bit-xor (:ack-val accum2) ack-val)
+                                (update-in2 (:segments accum2)
+                                            route 
+                                            grp 
+                                            (fn [segments]
+                                              (conj segments leaf**)))))
+                            accum2))
+                        accum 
+                        (:flow routes)))))
+          (->AccumAckSegments start-ack-val (:segments results))
           leaves)))
 
 (defn build-new-segments
@@ -158,15 +157,18 @@
          :onyx.core/results 
          (reduce (fn [accumulated result]
                    (let [root (:root result)
-                         ret (add-from-leaves accumulated event result egress-ids 
-                                              task->group-by-fn flow-conditions)
-                         fused-ack-val (:v1 ret)
-                         accumulated* (:v2 ret)] 
-                     (update-in2 accumulated* 
-                                 :acks 
-                                 (:completion-id root) 
-                                 #(conj %
-                                        (->Ack (:id root) (:completion-id root) fused-ack-val nil)))))
+                         ret (add-from-leaves accumulated event result 
+                                              egress-ids task->group-by-fn flow-conditions)] 
+                     (-> accumulated
+                         (assoc :segments (:segments ret))
+                         (update-in2 :acks 
+                                     (:completion-id root) 
+                                     (fn [acks]
+                                       (conj acks
+                                             (->Ack (:id root) 
+                                                    (:completion-id root)
+                                                    (:ack-val ret)
+                                                    nil)))))))
                  results
                  (:tree results))))
 
