@@ -100,9 +100,8 @@
 
   (write-batch 
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
-    (info "Writing batch " results)
-    (doseq [msg (:messages results)]
-      (>!! chan msg))
+    (doseq [msg (mapcat :leaves (:tree results))]
+      (>!! chan (:message msg)))
     {})
 
   (seal-resource 

@@ -9,40 +9,6 @@
             [onyx.types :refer [->Leaf]])
   (:import [java.util UUID]))
 
-(defn into-transient [coll vs]
-  (loop [rs (seq vs) updated-coll coll]
-    (if rs 
-      (recur (next rs) 
-             (conj! updated-coll (first rs)))
-      updated-coll)))
-
-(defn fast-concat [vvs]
-  (loop [vs (seq vvs) coll (transient [])]
-    (if vs
-      (recur (next vs) 
-             (into-transient coll (first vs)))
-      (persistent! coll))))
-
-;; needs a performance boost
-(defn build-segments-to-send [leaves]
-  (->> leaves
-       (map (fn [{:keys [routes ack-vals hash-group message] :as leaf}]
-              (if (= :retry (:action routes))
-                []
-                (map (fn [route ack-val]
-                       (->Leaf (:message leaf)
-                               (:id leaf)
-                               (:acker-id leaf)
-                               (:completion-id leaf)
-                               ack-val
-                               nil
-                               route
-                               nil
-                               (get hash-group route)))
-                     (:flow routes) 
-                     ack-vals))))
-       fast-concat))
-
 (defn pick-peer [id active-peers hash-group max-downstream-links]
   (when-not (empty? active-peers)
     (if hash-group
@@ -59,25 +25,18 @@
 
 (defn write-batch
   ([event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
-   (let [;leaves (fast-concat (map :leaves (:onyx.core/results event)))
-         results (:segments (:onyx.core/results event))]
+   (let [results (:segments (:onyx.core/results event))]
      (when-not (empty? results)
        (let [replica-val @replica
              peer-replica-val @peer-replica-view
-             ;segments (build-segments-to-send leaves)
              active-peers (get (:active-peers peer-replica-val) job-id)]
          (doseq [[route m] results]
-           (doseq [[hash-group segs] m]
-             ;; should be able to map to id directly in build-segments
-             (let [task-peers (get active-peers (get egress-tasks route))
-                   target (pick-peer id task-peers hash-group max-downstream-links)
-                   ;_ (println "Picked target " target)
-                   ]
-               (println " route " route  " hashgroup " hash-group " id " (get egress-tasks route)
-                        " target " target)
-               (when target
-                 (let [link (operation/peer-link replica-val state event target)]
-                   (onyx.extensions/send-messages messenger event link segs))))))
+           (let [task-peers (get active-peers (get egress-tasks route))] 
+             (doseq [[hash-group segs] m]
+               (let [target (pick-peer id task-peers hash-group max-downstream-links)]
+                 (when target
+                   (let [link (operation/peer-link replica-val state event target)]
+                     (onyx.extensions/send-messages messenger event link segs)))))))
          {}))))
 
   ([{:keys [onyx.core/id onyx.core/results 

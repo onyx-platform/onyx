@@ -117,6 +117,7 @@
           (.idle idle-strategy fragments-read))))))
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
+  ;;; Problem, all de-serialization is now done in a single subscriber thread
   (let [msg-type (protocol/read-message-type buffer offset)
         offset-rest (inc ^long offset)] 
     (cond (= msg-type protocol/ack-msg-id)

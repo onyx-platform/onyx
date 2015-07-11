@@ -13,6 +13,7 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
+              [clj-tuple :as t]
               [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -72,8 +73,8 @@
     compiled-flow-conditions))
 
 (defn route-data
-  [event result message downstream]
-  (if (nil? (:onyx.core/flow-conditions event))
+  [event result message flow-conditions downstream]
+  (if (nil? flow-conditions)
     (->Route downstream nil nil nil)
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
@@ -98,7 +99,7 @@
               (if-let [group-fn (task->group-by-fn t)]
                 (assoc groups t (hash (group-fn message)))
                 groups))
-            {} 
+            (t/hash-map)
             next-tasks)))
 
 (defn flow-conditions-transform 
@@ -107,89 +108,71 @@
     (apply-post-transformation message routes event)
     message))
 
+(defrecord Results [tree acks segments])
 
-;;; should possibly build up acking stuff here, with acker-id/message-id
+(defn update-in2 [coll k1 k2 f]
+  (let [v1 (get coll k1 (t/hash-map))
+        v2 (get v1 k2)]
+    (assoc coll k1 (assoc v1 k2 (f v2)))))
+
+(defrecord Tuple2 [v1 v2])
+
+;;; TODO, do not want to have to pass in result here
+(defn add-from-leaves [accumulated event result egress-ids task->group-by-fn flow-conditions]
+  (let [root (:root result)
+        leaves (:leaves result)
+        fusing-ack-val (or (:ack-val root) 0)] 
+    (reduce (fn [accumulated* {:keys [message] :as leaf}]
+            ;;; TODO, do not want to have to pass in result here
+            (let [routes (route-data event result message flow-conditions egress-ids)
+                  message* (flow-conditions-transform message routes egress-ids flow-conditions event)
+                  hash-group (hash-groups message* egress-ids task->group-by-fn)
+                  leaf* (if (= message message*)
+                          leaf
+                          (assoc leaf :message message*))] 
+              (if (= :retry (:action routes))
+                (->Tuple2 fusing-ack-val accumulated*)
+                (let [t (reduce (fn [t route]
+                                  (if route 
+                                    (let [fusing-ack-val* (:v1 t)
+                                          segments (:v2 t)
+                                          ack-val (acker/gen-ack-value)
+                                          leaf** (assoc leaf* :ack-val ack-val)
+                                          grp (get hash-group route)]
+                                      (->Tuple2 (bit-xor fusing-ack-val* ack-val)
+                                                (update-in2 segments route grp #(conj % leaf**))))
+                                    t))
+                                (->Tuple2 fusing-ack-val (:segments accumulated*))
+                                (:flow routes))
+                      fused-ack-val (:v1 t)
+                      segments (:v2 t)]
+                  (->Tuple2 fused-ack-val 
+                            (assoc accumulated* :segments segments))))))
+          accumulated
+          leaves)))
+
 (defn build-new-segments
   [egress-ids 
    {:keys [onyx.core/results onyx.core/task->group-by-fn onyx.core/flow-conditions] :as event}]
-  (let [;_ (info "EGress " egress-ids)
-        ;_ (info "Results to begin " (vec results))
-        results (reduce (fn [routed-segments {:keys [root leaves] :as result}]
-                          (reduce (fn [routed-segments* {:keys [message] :as leaf}]
-                                    ;(taoensso.timbre/info "Route on " egress-ids)
-                                    (let [routes (route-data event result message egress-ids)
-                                          message* (flow-conditions-transform message routes egress-ids flow-conditions event)
-                                          hash-group (hash-groups message* egress-ids task->group-by-fn)
-                                          ;; can make this conditional if message hasn't changed?
-                                          leaf* (assoc leaf :message message*)] 
-                                      (if (= :retry (:action routes))
-                                        routed-segments*
-                                        (reduce (fn [routed-segments** route]
-                                                  (let [ack-val (acker/gen-ack-value)
-                                                        leaf** (assoc leaf* :ack-val ack-val)
-                                                        g (get hash-group route)]
-                                                    ;(info "Route is " route)
-                                                    ;(info "Routed " routed-segments**)
-                                                    ;;; maybe should have actual route id here not the route name, since we look it up later
-                                                    (cond-> routed-segments** 
-                                                      true (update-in [:segments route g] conj leaf**)
-                                                      
-                                                      route (update-in [:acks (:acker-id leaf**) (list (:id leaf**)
-                                                                                                       (:completion-id leaf**))] 
-                                                                       (fn [fused-ack-val]
-                                                                         (if fused-ack-val
-                                                                           (bit-xor fused-ack-val ack-val)
-                                                                           ack-val))))))
-                                                ;; make sure initial ack is in there
-                                                (-> routed-segments* 
-                                                    (update-in [:acks (:acker-id root) (list (:id root) (:completion-id root))] 
-                                                               (fn [fused-ack-val]
-                                                                 (if fused-ack-val
-                                                                   (bit-xor fused-ack-val (:ack-val root))
-                                                                   (:ack-val root))))
-                                                    (update-in [:messages] conj message*))
-                                                (:flow routes)))))
-                                  routed-segments
-                                  leaves))
-                        {}
-                        results)]
-    ;(info "RESULTS " results)
-    (assoc event :onyx.core/results results)))
-
-; (defn ack-routes? [routes]
-;   (and (not-empty (:flow routes))
-;        (not= (:action routes) 
-;              :retry)))
-
-; (defn gen-ack-fusion-vals 
-;   "Prefuses acks to reduce packet size"
-;   [task-map ack-vals]
-;   (if-not (= (:onyx/type task-map) :output)
-;     (reduce (fn [fused-ack ack-val]
-;               (reduce bit-xor fused-ack ack-val)
-;               fused-ack) 
-;             0
-;             leaves)
-;     0))
+  (assoc event 
+         :onyx.core/results 
+         (reduce (fn [accumulated result]
+                   (let [root (:root result)
+                         ret (add-from-leaves accumulated event result egress-ids 
+                                              task->group-by-fn flow-conditions)
+                         fused-ack-val (:v1 ret)
+                         accumulated* (:v2 ret)] 
+                     (update-in2 accumulated* 
+                                 :acks 
+                                 (:completion-id root) 
+                                 #(conj %
+                                        (->Ack (:id root) (:completion-id root) fused-ack-val nil)))))
+                 results
+                 (:tree results))))
 
 (defn ack-messages [task-map replica state messenger {:keys [onyx.core/results] :as event}]
-  ;(info "Results are " results)
-  (info "Acking messages " (:acks results))
-  (doseq [[acker-id results-by-acker] (:acks results)]
-    (let [link (operation/peer-link @replica state event acker-id)
-          acks (map (fn [[[id completion-id] fused-ack-val]]
-                      (->Ack id
-                             completion-id
-                             ;; or'ing by zero covers the case of flow conditions where an
-                             ;; input task produces a segment that goes nowhere.
-                             
-                             ;; Does this actually work? Won't it complete an input segment if
-                             ;; only one of the output segments doesn't flow at a task
-                             (or fused-ack-val 0)
-                             ;;; putting the timestamp in here is bad - clock sync will ruin us
-                             (System/currentTimeMillis)))
-                    results-by-acker)]
-      ;(info "Acks " (vec acks))
+  (doseq [[acker-id acks] (:acks results)]
+    (let [link (operation/peer-link @replica state event acker-id)]
       (extensions/internal-ack-messages messenger event link acks)))
   event)
 
@@ -269,23 +252,26 @@
 
 (defn collect-next-segments [f input]
   (let [segments (try (f input) (catch Throwable e e))]
-    (if (sequential? segments) segments (list segments))))
+    (if (sequential? segments) segments (t/vector segments))))
 
 (defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
   (assoc
    event
    :onyx.core/results
-   (doall
-     (map
-       (fn [segment]
-         (let [segments (collect-next-segments f (:message segment))
-               leaves (map (fn [message]
-                             (-> segment
-                                 (assoc :message message)
-                                 (assoc :ack-val nil))) 
-                           segments)]
-           (->Result segment leaves)))
-       batch))))
+    (->Results (doall
+                 (map
+                   (fn [segment]
+                     (let [segments (collect-next-segments f (:message segment))
+                           leaves (map (fn [message]
+                                         (-> segment
+                                             (assoc :message message)
+                                             ;; not actually required, but it's safer
+                                             (assoc :ack-val nil))) 
+                                       segments)]
+                       (->Result segment leaves)))
+                   batch))
+               (t/hash-map)
+               (t/hash-map))))
 
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
@@ -294,11 +280,13 @@
     (assoc
       event
       :onyx.core/results
-      (doall 
-        (map
-          (fn [segment]
-            (->Result segment (list (assoc segment :ack-val nil))))
-          batch)))))
+      (->Results (doall 
+                   (map
+                     (fn [segment]
+                       (->Result segment (t/vector (assoc segment :ack-val nil))))
+                     batch))
+                 (t/hash-map)
+                 (t/hash-map)))))
 
 (defn curry-params [f params]
   (reduce #(partial %1 %2) f params))
@@ -589,7 +577,7 @@
                                           :else
                                           #(get % group-key))] 
                        [(:onyx/name entry) group-fn])))
-              (into {}))
+              (into (t/hash-map)))
          (->> catalog 
               (filter (fn [entry] 
                         (and (:onyx/group-by-fn entry)
@@ -598,7 +586,7 @@
               (map (fn [entry]
                      [(:onyx/name entry)
                       (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
-              (into {}))))
+              (into (t/hash-map)))))
 
 (defn clear-messenger-buffer! 
   "Clears the messenger buffer of all messages related to prevous task lifecycle.
