@@ -21,9 +21,14 @@
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
    :onyx.peer/job-not-ready-back-off 500
+   :onyx.peer/backpressure-check-interval 10
+   :onyx.peer/backpressure-low-water-pct 30
+   :onyx.peer/backpressure-high-water-pct 60
 
    ; messaging defaults
    :onyx.messaging.aeron/embedded-driver? true
+   :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
+   :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
    :onyx.messaging.netty/thread-pool-sizes 1
    :onyx.messaging.netty/connect-timeout-millis 1000
    :onyx.messaging.netty/pending-buffer-size 10000

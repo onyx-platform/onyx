@@ -122,6 +122,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Tyler van Hensbergen](https://github.com/tvanhens)
 - [David Leatherman](https://github.com/leathekd)
 - [Daniel Compton](https://github.com/danielcompton)
+- [Jeff Rose](https://github.com/rosejn)
 
 #### Acknowledgements
 

@@ -8,6 +8,9 @@
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
    :onyx/batch-size (schema/pred pos? 'pos?)
+   (schema/optional-key :onyx/language) (schema/enum :java :clojure)
+   (schema/optional-key :onyx/batch-timeout) (schema/pred pos? 'pos?)
+   (schema/optional-key :onyx/doc) schema/Str
    schema/Keyword schema/Any})
 
 (defn edge-two-nodes? [edge]
@@ -24,12 +27,15 @@
 
 (def catalog-entry-validator
   (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
-                      (merge base-catalog-entry-validator {:onyx/medium schema/Keyword})
+                      (merge base-catalog-entry-validator 
+                             {:onyx/plugin schema/Keyword
+                              :onyx/medium schema/Keyword
+                              (schema/optional-key :onyx/fn) schema/Keyword})
                       :else
                       (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
 
 (def group-entry-validator
-  {(schema/optional-key :onyx/group-by-key) schema/Keyword
+  {(schema/optional-key :onyx/group-by-key) schema/Any
    (schema/optional-key :onyx/group-by-fn) schema/Keyword
    :onyx/min-peers schema/Int
    :onyx/flux-policy (schema/enum :continue :kill)})

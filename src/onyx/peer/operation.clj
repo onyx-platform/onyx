@@ -3,16 +3,35 @@
             [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
-(defn apply-function [f params segment]
-  ((reduce #(partial %1 %2) f params) segment))
+(defn get-method-java [class-name method-name] 
+  (let [ms (filter #(= (.getName %) method-name) 
+                   (.getMethods (Class/forName class-name)))]
+    (if (= 1 (count ms)) 
+      (first ms)   
+      (throw (Exception. (format "Multiple methods found for %s/%s. Only one method may be defined." class-name method-name))))))
+
+(defn build-fn-java 
+  "Builds a clojure fn from a static java method. 
+  Note, may be slower than it should be because of varargs, and the many
+  (unnecessary) calls to partial in apply-function above."
+  [kw]
+  (when (namespace kw)
+    (throw (ex-info "Namespaced keywords cannot be used for java static method fns. Use in form :java.lang.Math.sqrt" {:kw kw})))
+  (let [path (clojure.string/split (name kw) #"[.]")
+        class-name (clojure.string/join "." (butlast path))
+        method-name (last path)
+        method (get-method-java class-name method-name)] 
+    (fn [& args] 
+    (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args)))))
 
 (defn kw->fn [kw]
   (try
-    (let [user-ns (symbol (name (namespace kw)))
+    (let [user-ns (symbol (namespace kw))
           user-fn (symbol (name kw))]
-      (or (ns-resolve user-ns user-fn) (throw (Exception.))))
+      (or (ns-resolve user-ns user-fn)
+          (throw (Exception.))))
     (catch Throwable e
-      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:symbol kw})))))
+      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:kw kw})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))
@@ -34,16 +53,16 @@
   (if (<= (count all-peers) n)
     all-peers
     (take n 
-          (sort-by (fn [peer-id] (hash [id peer-id]))
+          (sort-by (fn [peer-id] (hash-combine (.hashCode id) (.hashCode peer-id)))
                    all-peers))))
 
 (defn peer-link
-  [{:keys [onyx.core/state] :as event} peer-id]
+  [replica-val state event peer-id]
   (if-let [link (get (:links @state) peer-id)]
     (do 
-      (swap! state assoc-in [:links peer-id] (assoc link :timestamp (System/currentTimeMillis)))
+      (reset! (:timestamp link) (System/currentTimeMillis))
       (:link link))
-    (let [site (-> @(:onyx.core/replica event)
+    (let [site (-> replica-val
                    :peer-sites
                    (get peer-id))]
       (-> state 
@@ -52,7 +71,7 @@
                  (fn [link]
                    (or link 
                        (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
-                               (System/currentTimeMillis)))))
+                               (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)
           :link))))

@@ -24,14 +24,14 @@
 
 (def catalog-1
   [{:onyx/name :a
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size 20
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :b
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 20
@@ -39,14 +39,14 @@
 
 (def catalog-2
   [{:onyx/name :c
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size 20
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :d
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 20
