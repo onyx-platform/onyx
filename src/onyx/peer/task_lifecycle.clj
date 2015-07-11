@@ -79,17 +79,20 @@
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result message downstream)  
-          (throw message))
+          (choose-output-paths event compiled-ex-fcs result 
+                               (:exception (ex-data message)) downstream)  
+          (throw (:exception (ex-data message))))
         (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
           (if (seq compiled-norm-fcs) 
-            (choose-output-paths event compiled-norm-fcs result message downstream)   
+            (choose-output-paths event compiled-norm-fcs result message downstream)
             (->Route downstream nil nil nil)))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
         msg (if (and (operation/exception? message) post-transformation)
-              ((operation/kw->fn post-transformation) event message)
+              (let [data (ex-data message)
+                    f (operation/kw->fn post-transformation)] 
+                (f event (:segment data) (:exception data)))
               message)]
     (reduce dissoc msg (:exclusions routes))))
 
@@ -251,7 +254,10 @@
     event))
 
 (defn collect-next-segments [f input]
-  (let [segments (try (f input) (catch Throwable e e))]
+  (let [segments (try (f input)
+                      (catch Throwable e
+                        (ex-info "Segment threw exception"
+                                 {:exception e :segment input})))]
     (if (sequential? segments) segments (t/vector segments))))
 
 (defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
