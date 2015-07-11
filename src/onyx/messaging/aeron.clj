@@ -196,15 +196,15 @@
         (let [t (System/currentTimeMillis)
               snapshot @publications
               to-remove (map first 
-                             (filter (fn [[k v]] (>= (- t @(:last-used v)) idle)) 
+                             (filter (fn [[k v]] (>= (- ^long t ^long @(:last-used v)) idle)) 
                                      snapshot))]
           (doseq [k to-remove]
             (let [pub (:publication (snapshot k))
                   conn (@connections k)] 
               (swap! publications dissoc k)
               (swap! connections dissoc k)
-              (.close pub)
-              (.close conn))))
+              (.close ^Publication pub)
+              (.close ^Aeron conn))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
@@ -266,7 +266,7 @@
     (doseq [conn (vals @connections)]
       (.close ^Aeron conn))
     (when media-driver (.close ^MediaDriver media-driver))
-    (when media-driver-context (.deleteAeronDirectory media-driver-context))
+    (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component 
            :pub-gc-thread nil
            :media-driver nil :publications nil :virtual-peers nil
