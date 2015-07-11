@@ -589,7 +589,7 @@
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
-     kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
+     kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring]
   component/Lifecycle
 
   (start [component]
@@ -634,6 +634,7 @@
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
+                           :onyx.core/monitoring monitoring
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
@@ -714,10 +715,11 @@
       :peer-link-gc-thread nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica peer-replica-view
-                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch]}]
+                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch
+                                   monitoring]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
                        :messenger messenger :job-id job :task-id task :restart-ch restart-ch
                        :peer-replica-view peer-replica-view
                        :kill-ch kill-ch :outbox-ch outbox-ch
                        :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
-                       :opts opts :task-kill-ch task-kill-ch}))
+                       :opts opts :task-kill-ch task-kill-ch :monitoring monitoring}))
