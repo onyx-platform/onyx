@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ["-Xmx4g"]
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.apache.curator/curator-framework "2.8.0"]
                  [org.apache.curator/curator-test "2.8.0"]
@@ -20,6 +20,8 @@
                  [prismatic/schema "0.4.0"]
                  [org.apache.zookeeper/zookeeper "3.4.1" :exclusions [org.slf4j/slf4j-log4j12 io.netty/netty]]
                  [log4j/log4j "1.2.17"]
+                 [org.slf4j/slf4j-api "1.7.12"]
+                 [org.slf4j/slf4j-nop "1.7.12"]
                  [io.netty/netty-all "4.0.26.Final"]]
   :aot [onyx.interop]
   :profiles {:dev {:aot ^:replace []
