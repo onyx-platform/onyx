@@ -2,7 +2,7 @@
 
 (defrecord Message [id payload])
 
-(defrecord Leaf [message id acker-id completion-id ack-val])
+(defrecord Leaf [message id acker-id completion-id ack-val hash-group route])
 
 (defrecord Route [flow exclusions post-transformation action])
 

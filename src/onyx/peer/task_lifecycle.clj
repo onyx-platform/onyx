@@ -12,7 +12,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Leaf ->Route ->Ack ->Results ->Result]]
+              [onyx.types :refer [->Route ->Ack ->Results ->Result]]
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
@@ -111,10 +111,8 @@
     (apply-post-transformation message routes event)
     message))
 
-(defn update-in2 [coll k1 k2 f]
-  (let [v1 (get coll k1 (t/hash-map))
-        v2 (get v1 k2)]
-    (assoc coll k1 (assoc v1 k2 (f v2)))))
+(defn update! [coll k1 f]
+  (assoc! coll k1 (f (get coll k1))))
 
 (defrecord AccumAckSegments [ack-val segments])
 
@@ -136,15 +134,14 @@
                 (reduce (fn [accum2 route]
                           (if route 
                             (let [ack-val (acker/gen-ack-value)
-                                  leaf** (assoc leaf* :ack-val ack-val)
-                                  grp (get hash-group route)]
+                                  grp (get hash-group route)
+                                  leaf** (-> leaf* 
+                                             (assoc :ack-val ack-val)
+                                             (assoc :hash-group grp)
+                                             (assoc :route route))]
                               (->AccumAckSegments 
                                 (bit-xor ^long (:ack-val accum2) ^long ack-val)
-                                (update-in2 (:segments accum2)
-                                            route 
-                                            grp 
-                                            (fn [segments]
-                                              (conj segments leaf**)))))
+                                (conj (:segments accum2) leaf**)))
                             accum2))
                         accum 
                         (:flow routes)))))
@@ -154,27 +151,23 @@
 (defn build-new-segments
   [egress-ids 
    {:keys [onyx.core/results onyx.core/task->group-by-fn onyx.core/flow-conditions] :as event}]
-  (assoc event 
-         :onyx.core/results 
-         (reduce (fn [accumulated result]
-                   (let [root (:root result)
-                         ret (add-from-leaves accumulated event result 
-                                              egress-ids task->group-by-fn flow-conditions)] 
-                     (-> accumulated
-                         (assoc :segments (:segments ret))
-                         (update-in2 :acks 
-                                     (:completion-id root) 
-                                     (fn [acks]
-                                       (conj acks
+  (let [results (reduce (fn [accumulated result]
+                          (let [root (:root result)
+                                ret (add-from-leaves accumulated event result 
+                                                     egress-ids task->group-by-fn flow-conditions)] 
+                            (->Results (:tree results)
+                                       (conj (:acks accumulated)
                                              (->Ack (:id root) 
                                                     (:completion-id root)
                                                     (:ack-val ret)
-                                                    nil)))))))
-                 results
-                 (:tree results))))
+                                                    nil))
+                                       (:segments ret))))
+                        results
+                        (:tree results))]
+    (assoc event :onyx.core/results results)))
 
 (defn ack-messages [task-map replica state messenger {:keys [onyx.core/results] :as event}]
-  (doseq [[acker-id acks] (:acks results)]
+  (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
     (let [link (operation/peer-link @replica state event acker-id)]
       (extensions/internal-ack-messages messenger event link acks)))
   event)
@@ -276,8 +269,8 @@
                                        segments)]
                        (->Result segment leaves)))
                    batch))
-               (t/hash-map)
-               (t/hash-map))))
+               (list)
+               (list))))
 
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
@@ -291,8 +284,8 @@
                      (fn [segment]
                        (->Result segment (t/vector (assoc segment :ack-val nil))))
                      batch))
-                 (t/hash-map)
-                 (t/hash-map)))))
+                 (list)
+                 (list)))))
 
 (defn curry-params [f params]
   (reduce #(partial %1 %2) f params))
