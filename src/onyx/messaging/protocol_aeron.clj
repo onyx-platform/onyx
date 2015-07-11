@@ -98,7 +98,7 @@
         acker-id (get-uuid buf (unchecked-add offset 16))
         completion-id (get-uuid buf (unchecked-add offset 32))
         ack-val (.getLong buf (unchecked-add offset 48))]
-    (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
+    (->Leaf message id acker-id completion-id ack-val)))
 
 (defn build-messages-msg-buf [compress-f peer-id messages]
   ;; Performance consideration:
