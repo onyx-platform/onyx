@@ -197,7 +197,7 @@
         (let [t (System/currentTimeMillis)
               snapshot @publications
               to-remove (map first 
-                             (filter (fn [[k v]] (>= (- ^long t ^long @(:last-used v)) idle)) 
+                             (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle)) 
                                      snapshot))]
           (doseq [k to-remove]
             (let [pub (:publication (snapshot k))
