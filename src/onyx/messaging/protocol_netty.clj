@@ -103,7 +103,7 @@
         acker-id (take-uuid buf)
         completion-id (take-uuid buf)
         ack-val (.readLong buf)]
-    (->Leaf message id acker-id completion-id ack-val)))
+    (->Leaf message id acker-id completion-id ack-val nil nil)))
 
 (defn build-messages-msg-buf [compress-f messages] 
   (let [message-bytes ^bytes (compress-f (map :message messages))
