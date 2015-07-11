@@ -123,27 +123,29 @@
           (let [message (protocol/read-acker-message buffer offset-rest)
                 ack (:payload message)
                 id (:id message)]
-            (>!! (:acking-ch (get @virtual-peers id)) ack))
+            (when-let [chs (get @virtual-peers id)] 
+              (>!! (:acking-ch chs) ack)))
 
           (= msg-type protocol/messages-msg-id)
           (let [message (protocol/read-messages-buf decompress-f buffer offset-rest length)
                 segments (:payload message)
-                id (:id message)
-                inbound-ch (:inbound-ch (get @virtual-peers id))]
-            (doseq [segment segments]
-              (>!! inbound-ch segment)))
+                id (:id message)]
+            (when-let [chs (get @virtual-peers id)] 
+              (let [inbound-ch (:inbound-ch chs)] 
+                (doseq [segment segments]
+                  (>!! inbound-ch segment)))))
 
           (= msg-type protocol/completion-msg-id)
           (let [message (protocol/read-completion buffer offset-rest)
                 completion-id (:payload message)]
-            (>!! (:release-ch (get @virtual-peers (:id message)))
-                 completion-id))
+            (when-let [chs (get @virtual-peers (:id message))] 
+              (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
-          (let [message (protocol/read-retry buffer offset-rest)
-                retry-id (:payload message)]
-            (>!! (:retry-ch (get @virtual-peers (:id message))) 
-                 retry-id)))))
+            (let [message (protocol/read-retry buffer offset-rest)
+                  retry-id (:payload message)]
+              (when-let [chs (get @virtual-peers (:id message))] 
+                (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port virtual-peers decompress-f idle-strategy]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
