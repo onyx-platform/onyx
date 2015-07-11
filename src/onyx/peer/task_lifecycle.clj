@@ -432,7 +432,7 @@
              (apply-fn fn bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
-             ;(flow-retry-messages replica state messenger)
+             (flow-retry-messages replica state messenger)
              (ack-messages task-map replica state messenger)
              (close-batch-resources)))
       (catch Throwable e
