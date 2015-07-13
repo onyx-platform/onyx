@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
   (:require [taoensso.timbre :as timbre]
-            [onyx.types :refer [->Leaf ->Ack ->Message]])
+            [onyx.types :refer [->Leaf ->Ack]])
   (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
@@ -36,6 +36,12 @@
 (def ^:const payload-size-size (long 4))
 (def ^:const messages-header-size (long (+ message-count-size payload-size-size short-size 1)))
 
+(defn read-vpeer-id [^UnsafeBuffer buf ^long offset]
+  (.getShort buf offset))
+
+(defn write-vpeer-id [^UnsafeBuffer buf ^long offset peer-id]
+  (.putShort buf offset (short peer-id)))
+
 (defn write-uuid [^MutableDirectBuffer buf ^long offset ^UUID uuid]
   (.putLong buf offset (.getMostSignificantBits uuid))
   (.putLong buf (unchecked-add 8 offset) (.getLeastSignificantBits uuid)))
@@ -48,7 +54,7 @@
 (defn build-acker-message [peer-id ^UUID id ^UUID completion-id ^long ack-val]
   (let [buf (UnsafeBuffer. (byte-array ack-msg-length))]
     (.putByte buf 0 ack-msg-id)
-    (.putShort buf 1 (short peer-id))
+    (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 id)
     (write-uuid buf 19 completion-id)
     (.putLong buf 35 ack-val)
@@ -58,32 +64,28 @@
   (.getByte ^UnsafeBuffer buf ^long offset))
 
 (defn read-acker-message [^UnsafeBuffer buf ^long offset]
-  (let [peer-id (.getShort buf offset)
-        id (get-uuid buf (unchecked-add offset short-size))
-        completion-id (get-uuid buf (unchecked-add offset 18))
-        ack-val (.getLong buf (unchecked-add offset 34))]
-    (->Message peer-id 
-               (->Ack id completion-id ack-val nil))))
+  (let [id (get-uuid buf offset)
+        completion-id (get-uuid buf (unchecked-add offset 16))
+        ack-val (.getLong buf (unchecked-add offset 32))]
+    (->Ack id completion-id ack-val nil)))
 
 (defn read-completion [^UnsafeBuffer buf ^long offset]
-  (->Message (.getShort buf offset) 
-             (get-uuid buf (unchecked-add offset short-size))))
+  (get-uuid buf offset))
 
 (defn read-retry [^UnsafeBuffer buf ^long offset]
-  (->Message (.getShort buf offset) 
-             (get-uuid buf (unchecked-add offset short-size))))
+  (get-uuid buf offset))
 
 (defn build-completion-msg-buf [peer-id id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
     (.putByte buf 0 completion-msg-id)
-    (.putShort buf 1 (short peer-id))
+    (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 id)
     buf))
 
 (defn build-retry-msg-buf [peer-id id]
   (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
     (.putByte buf 0 retry-msg-id)
-    (.putShort buf 1 (short peer-id))
+    (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 id)
     buf))
 
@@ -112,7 +114,7 @@
                                                (* message-count message-base-length)))
         buf (UnsafeBuffer. (byte-array buf-size))
         _ (.putByte buf 0 messages-msg-id)
-        _ (.putShort buf 1 (short peer-id))
+        _ (write-vpeer-id buf 1 peer-id)
         _ (.putInt buf 3 message-count) ; number of messages
         _ (.putInt buf 7 payload-size)
         _ (.putBytes buf messages-header-size message-payloads)
@@ -125,9 +127,7 @@
     (list buf-size buf)))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset length]
-  (let [peer-id (.getShort buf offset)
-        offset (unchecked-add offset short-size)
-        message-count (.getInt buf offset)
+  (let [message-count (.getInt buf offset)
         offset (unchecked-add offset message-count-size)
         payload-size (.getInt buf offset)
         offset (unchecked-add offset payload-size-size)
@@ -146,4 +146,4 @@
                             (next payloads)
                             (unchecked-add offset message-base-length))
                      (persistent! messages)))]
-    (->Message peer-id segments)))
+    segments))

@@ -118,33 +118,29 @@
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
   (let [msg-type (protocol/read-message-type buffer offset)
-        offset-rest (inc ^long offset)] 
+        offset (inc ^long offset)
+        peer-id (protocol/read-vpeer-id buffer offset)
+        offset (+ offset protocol/short-size)] 
     (cond (= msg-type protocol/ack-msg-id)
-          (let [message (protocol/read-acker-message buffer offset-rest)
-                ack (:payload message)
-                id (:id message)]
-            (when-let [chs (get @virtual-peers id)] 
+          (let [ack (protocol/read-acker-message buffer offset)]
+            (when-let [chs (get @virtual-peers peer-id)] 
               (>!! (:acking-ch chs) ack)))
 
           (= msg-type protocol/messages-msg-id)
-          (let [message (protocol/read-messages-buf decompress-f buffer offset-rest length)
-                segments (:payload message)
-                id (:id message)]
-            (when-let [chs (get @virtual-peers id)] 
+          (let [segments (protocol/read-messages-buf decompress-f buffer offset length)]
+            (when-let [chs (get @virtual-peers peer-id)] 
               (let [inbound-ch (:inbound-ch chs)] 
                 (doseq [segment segments]
                   (>!! inbound-ch segment)))))
 
           (= msg-type protocol/completion-msg-id)
-          (let [message (protocol/read-completion buffer offset-rest)
-                completion-id (:payload message)]
-            (when-let [chs (get @virtual-peers (:id message))] 
+          (let [completion-id (protocol/read-completion buffer offset)]
+            (when-let [chs (get @virtual-peers peer-id)] 
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
-            (let [message (protocol/read-retry buffer offset-rest)
-                  retry-id (:payload message)]
-              (when-let [chs (get @virtual-peers (:id message))] 
+            (let [retry-id (protocol/read-retry buffer offset)]
+              (when-let [chs (get @virtual-peers peer-id)] 
                 (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port virtual-peers decompress-f idle-strategy]
@@ -274,6 +270,22 @@
            :external-channel nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscriber nil)))
+
+(Math/pow 2 16)
+(mod -30000 65536)
+
+(defn free-consistent-hash [existing v]
+  (let [initial-set (set (range 1 2) #_(range -32767 32766))] 
+    (loop [hs (hash (java.util.UUID/randomUUID))]
+      (let [mod-signed (- (mod hs 65536)
+                          32768)] 
+        (if (initial-set mod-signed)
+          (recur (hash hs))
+          mod-signed)))))
+
+(map short 
+     (for [v (range 1000000)]
+       (free-consistent-hash nil v)))
 
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))

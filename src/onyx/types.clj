@@ -1,7 +1,5 @@
 (ns onyx.types)
 
-(defrecord Message [id payload])
-
 (defrecord Leaf [message id acker-id completion-id ack-val ack-vals route routes hash-group])
 
 (defn leaf 
