@@ -185,8 +185,7 @@
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
-  (let [rets (-> event 
-                 (merge (compiled-before-batch-fn event))
+  (let [rets (-> (compiled-before-batch-fn event)
                  (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID)))]
     (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
@@ -310,7 +309,7 @@
     rets))
 
 (defn close-batch-resources [event]
-  (let [rets (merge event ((:onyx.core/compiled-after-batch-fn event) event))]
+  (let [rets ((:onyx.core/compiled-after-batch-fn event) event)]
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)))
@@ -657,7 +656,7 @@
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
-            pipeline-data (merge pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data))]
+            pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
