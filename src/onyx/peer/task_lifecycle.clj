@@ -31,8 +31,8 @@
                            (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
     rets))
 
-(defn add-acker-id [peers m]
-  (assoc m :acker-id (rand-nth peers)))
+(defn add-acker-id [id m]
+  (assoc m :acker-id id))
 
 (defn add-completion-id [id m]
   (assoc m :completion-id id))
@@ -210,15 +210,14 @@
     (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
         (throw (ex-info "Not enough acker peers" {:peers peers}))))) 
 
-(defn tag-messages [task-type replica id job-id max-acker-links event]
+(defn tag-messages [task-type replica peer-replica-view id event]
   (if (= task-type :input)
-    (let [peers (get (:ackers @replica) job-id)
-          _ (validate-ackable! peers event)
-          candidates (operation/select-n-peers id peers max-acker-links)] 
+    (let [; _ (validate-ackable! peers event)
+          candidates (:acker-candidates @peer-replica-view)] 
       (assoc event 
              :onyx.core/batch
              (map (fn [segment] 
-                    (add-acker-id candidates 
+                    (add-acker-id (rand-nth candidates)
                                   (add-completion-id id segment)))
                   (:onyx.core/batch event))))
     event))
@@ -418,7 +417,7 @@
              (inject-batch-resources compiled-before-batch-fn pipeline)
              ;;; TODO, pass value version of replica/replica-view into these fns
              (read-batch task-type replica peer-replica-view job-id pipeline)
-             (tag-messages task-type replica id job-id max-acker-links)
+             (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
              (try-complete-job pipeline)
              (strip-sentinel)
