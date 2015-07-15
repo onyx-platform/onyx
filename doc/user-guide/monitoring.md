@@ -22,6 +22,33 @@ Callback functions that are given to Onyx for monitoring take exactly two parame
   (send-to-riemann event latency bytes))
 ```
 
+### Registering Callbacks
+
+To register callbacks, create a map of event name key to callback function. This map must have a key `:monitoring`, mapped to keyword `:custom`. If you want to ignore all callbacks, you can instead supply `:no-op`. Monitoring is optional, so you can skip any monitoring code entirely if you don't want to use this feature.
+
+A registration example might look like:
+
+```clojure
+(defn std-out [config event-map]
+  ;; `config` is the `monitoring-config` var.
+  (prn event-map))
+
+(def monitoring-config
+  {:monitoring :custom
+   :zookeeper/write-log-entry std-out
+   :zookeeper/read-log-entry std-out
+   :zookeeper/write-catalog std-out
+   :zookeeper/write-workflow std-out
+   :zookeeper/write-flow-conditions std-out
+   :zookeeper/force-write-chunk std-out
+   :zookeeper/read-catalog std-out
+   :zookeeper/read-lifecycles std-out
+   :zookeeper/gc-log-entry std-out})
+
+;; Pass the monitoring config as a third parameter to the `start-peers` function.
+(def v-peers (onyx.api/start-peers 3 peer-group monitoring-config))
+```
+
 ### Monitoring Events
 
 This is the list of all monitoring events that you can register hooks for. The keys listed are present in the map that is passed to the callback function. The names of the events should readily identify what has taken place to trigger the callback.
