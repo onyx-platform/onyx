@@ -175,7 +175,7 @@
                       results-by-acker))]
       (measure-latency
        #(extensions/internal-ack-messages messenger event link acks)
-       #(extensions/emit (:onyx.core/monitoring) {:event :peer/ack-messages :latency %}))))
+       #(extensions/emit (:onyx.core/monitoring event) {:event :peer/ack-messages :latency %}))))
   event)
 
 (defn flow-retry-messages [replica state messenger {:keys [onyx.core/results] :as event}]
@@ -185,7 +185,7 @@
             link (operation/peer-link @replica state event (:completion-id root))]
         (measure-latency
          #(extensions/internal-retry-message messenger event (:id root) link)
-         #(extensions/emit (:onyx.core/monitoring) {:event :peer/retry-message :latency %})))))
+         #(extensions/emit (:onyx.core/monitoring event) {:event :peer/retry-message :latency %})))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -237,14 +237,14 @@
   (when (sentinel-found? event)
     (if (p-ext/drained? pipeline event)
       (do (complete-job event)
-          (extensions/emit (:onyx.core/monitoring) {:event :peer/try-complete-job}))
+          (extensions/emit (:onyx.core/monitoring event) {:event :peer/try-complete-job}))
       (p-ext/retry-message pipeline event (sentinel-id event))))
   event)
 
 (defn strip-sentinel
   [event]
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (do (extensions/emit (:onyx.core/monitoring) {:event :peer/strip-sentinel})
+    (do (extensions/emit (:onyx.core/monitoring event) {:event :peer/strip-sentinel})
         (update-in event
                    [:onyx.core/batch]
                    (fn [batch]
@@ -335,7 +335,7 @@
                         peer-link (operation/peer-link @replica state event peer-id)]
                     (measure-latency
                      #(extensions/internal-complete-message messenger event id peer-link)
-                     #(extensions/emit (:onyx.core/monitoring) {:event :peer/complete-message :latency %})))
+                     #(extensions/emit (:onyx.core/monitoring event) {:event :peer/complete-message :latency %})))
 
                   (= ch retry-ch)
                   (->> (p-ext/retry-message pipeline event v)
