@@ -5,6 +5,7 @@
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
+              [onyx.monitoring.measurements :refer [measure-latency]]
               [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -171,8 +172,10 @@
                                             ;; input task produces a segment that goes nowhere.
                                             (or fused-vals 0)
                                             (System/currentTimeMillis))))
-                      results-by-acker))] 
-      (extensions/internal-ack-messages messenger event link acks)))
+                      results-by-acker))]
+      (measure-latency
+       #(extensions/internal-ack-messages messenger event link acks)
+       #(extensions/emit (:onyx.core/monitoring) {:event :peer/ack-messages :latency %}))))
   event)
 
 (defn flow-retry-messages [replica state messenger {:keys [onyx.core/results] :as event}]
@@ -180,11 +183,9 @@
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [root (:root result)
             link (operation/peer-link @replica state event (:completion-id root))]
-        (extensions/internal-retry-message
-          messenger
-          event
-          (:id root)
-          link))))
+        (measure-latency
+         #(extensions/internal-retry-message messenger event (:id root) link)
+         #(extensions/emit (:onyx.core/monitoring) {:event :peer/retry-message :latency %})))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -235,18 +236,20 @@
 (defn try-complete-job [pipeline event]
   (when (sentinel-found? event)
     (if (p-ext/drained? pipeline event)
-      (complete-job event)
+      (do (complete-job event)
+          (extensions/emit (:onyx.core/monitoring) {:event :peer/try-complete-job}))
       (p-ext/retry-message pipeline event (sentinel-id event))))
   event)
 
 (defn strip-sentinel
   [event]
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (update-in event
-               [:onyx.core/batch]
-               (fn [batch]
-                 (remove (fn [v] (= :done (:message v)))
-                         batch)))
+    (do (extensions/emit (:onyx.core/monitoring) {:event :peer/strip-sentinel})
+        (update-in event
+                   [:onyx.core/batch]
+                   (fn [batch]
+                     (remove (fn [v] (= :done (:message v)))
+                             batch))))
     event))
 
 (defn collect-next-segments [f input]
@@ -330,7 +333,9 @@
                   (= ch completion-ch)
                   (let [{:keys [id peer-id]} v
                         peer-link (operation/peer-link @replica state event peer-id)]
-                    (extensions/internal-complete-message messenger event id peer-link))
+                    (measure-latency
+                     #(extensions/internal-complete-message messenger event id peer-link)
+                     #(extensions/emit (:onyx.core/monitoring) {:event :peer/complete-message :latency %})))
 
                   (= ch retry-ch)
                   (->> (p-ext/retry-message pipeline event v)
@@ -451,7 +456,8 @@
             (swap! state dissoc k)
             (extensions/close-peer-connection (:onyx.core/messenger event) 
                                               event 
-                                              (:link (get (:links snapshot) k)))))
+                                              (:link (get (:links snapshot) k)))
+            (extensions/emit (:onyx.core/monitoring event) {:event :peer/gc-peer-link})))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
