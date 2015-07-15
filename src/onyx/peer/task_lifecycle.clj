@@ -227,21 +227,17 @@
            (map :id (:onyx.core/batch event))))
   event)
 
-(defn try-complete-job [pipeline event]
-  (when (sentinel-found? event)
-    (if (p-ext/drained? pipeline event)
-      (complete-job event)
-      (p-ext/retry-message pipeline event (sentinel-id event))))
-  event)
-
-(defn strip-sentinel
-  [event]
-  (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (update-in event
-               [:onyx.core/batch]
-               (fn [batch]
-                 (remove (fn [v] (= :done (:message v)))
-                         batch)))
+(defn process-sentinel [task-type pipeline event]
+  (if (and (= task-type :input) 
+           (sentinel-found? event))
+    (do (if (p-ext/drained? pipeline event)
+          (complete-job event)
+          (p-ext/retry-message pipeline event (sentinel-id event)))
+        (update-in event
+                   [:onyx.core/batch]
+                   (fn [batch]
+                     (remove (fn [v] (= :done (:message v)))
+                             batch))))
     event))
 
 (defn collect-next-segments [f input]
@@ -418,8 +414,7 @@
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
-             (try-complete-job pipeline)
-             (strip-sentinel)
+             (process-sentinel task-type pipeline)
              (apply-fn fn bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
@@ -591,6 +586,8 @@
   [{:keys [inbound-ch] :as messenger-buffer}]
   (while (first (alts!! [inbound-ch] :default false))))
 
+(defrecord TaskState [timeout-pool links])
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch]
@@ -609,7 +606,8 @@
             input-retry-timeout (arg-or-default :onyx/input-retry-timeout catalog-entry) 
             pending-timeout (arg-or-default :onyx/pending-timeout catalog-entry) 
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
-            state (atom {:timeout-pool r-seq})
+            links {}
+            state (atom (->TaskState r-seq links))
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
             _ (validate-pending-timeout pending-timeout opts)
