@@ -6,6 +6,11 @@ When setting up an Onyx cluster in production, it's helpful to know what Onyx it
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Monitoring Hooks](#monitoring-hooks)
+- [Callback Specification](#callback-specification)
+- [Registering Callbacks](#registering-callbacks)
+- [Monitoring Events](#monitoring-events)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Monitoring Hooks
@@ -53,33 +58,33 @@ A registration example might look like:
 
 This is the list of all monitoring events that you can register hooks for. The keys listed are present in the map that is passed to the callback function. The names of the events should readily identify what has taken place to trigger the callback.
 
-Event name                       | Keys                             |
----------------------------------|----------------------------------|
-:zookeeper/write-log-entry       | `:event`, `:latency`, `:bytes`   |
-:zookeeper/read-log-entry        | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-catalog         | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-workflow        | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-flow-conditions | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-lifecycles      | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-task            | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-chunk           | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-job-scheduler   | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-messaging       | `:event`, `:latency`, `:bytes`   |
-:zookeeper/force-write-chunk     | `:event`, `:latency`, `:bytes`   |
-:zookeeper/write-origin          | `:event`, `:latency`, `:bytes`   |
-:zookeeper/read-catalog          | `:event`, `:latency`             |
-:zookeeper/read-workflow         | `:event`, `:latency`             |
-:zookeeper/read-flow-conditions  | `:event`, `:latency`             |
-:zookeeper/read-lifecycles       | `:event`, `:latency`             |
-:zookeeper/read-task             | `:event`, `:latency`             |
-:zookeeper/read-chunk            | `:event`, `:latency`             |
-:zookeeper/read-origin           | `:event`, `:latency`             |
-:zookeeper/read-job-scheduler    | `:event`, `:latency`             |
-:zookeeper/read-messaging        | `:event`, `:latency`             |
-:zookeeper/gc-log-entry          | `:event`, `:latency`, `:position`|
-:peer/ack-messages               | `:event`, `:latency`             |
-:peer/retry-message              | `:event`, `:latency`             |
-:peer/try-complete-job           | `:event`                         |
-:peer/strip-sentinel             | `:event`                         |
-:peer/complete-message           | `:event`, `:latency`             |
-:peer/gc-peer-link               | `:event`                         |
+Event name                         | Keys                             |
+-----------------------------------|----------------------------------|
+`:zookeeper/write-log-entry`       | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/read-log-entry`        | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-catalog`         | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-workflow`        | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-flow-conditions` | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-lifecycles`      | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-task`            | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-chunk`           | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-job-scheduler`   | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-messaging`       | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/force-write-chunk`     | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/write-origin`          | `:event`, `:latency`, `:bytes`   |
+`:zookeeper/read-catalog`          | `:event`, `:latency`             |
+`:zookeeper/read-workflow`         | `:event`, `:latency`             |
+`:zookeeper/read-flow-conditions`  | `:event`, `:latency`             |
+`:zookeeper/read-lifecycles`       | `:event`, `:latency`             |
+`:zookeeper/read-task`             | `:event`, `:latency`             |
+`:zookeeper/read-chunk`            | `:event`, `:latency`             |
+`:zookeeper/read-origin`           | `:event`, `:latency`             |
+`:zookeeper/read-job-scheduler`    | `:event`, `:latency`             |
+`:zookeeper/read-messaging`        | `:event`, `:latency`             |
+`:zookeeper/gc-log-entry`          | `:event`, `:latency`, `:position`|
+`:peer/ack-messages`               | `:event`, `:latency`             |
+`:peer/retry-message`              | `:event`, `:latency`             |
+`:peer/try-complete-job`           | `:event`                         |
+`:peer/strip-sentinel`             | `:event`                         |
+`:peer/complete-message`           | `:event`, `:latency`             |
+`:peer/gc-peer-link`               | `:event`                         |
