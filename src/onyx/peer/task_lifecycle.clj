@@ -111,9 +111,6 @@
     (apply-post-transformation message routes event)
     message))
 
-(defn update! [coll k1 f]
-  (assoc! coll k1 (f (get coll k1))))
-
 (defrecord AccumAckSegments [ack-val segments])
 
 ;;; TODO, do not want to have to pass in result here
