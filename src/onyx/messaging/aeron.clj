@@ -351,8 +351,8 @@
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id]}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
-        ;; ensure that each machine spreads their use of the peer streams evenly
-        ;; over the cluster
+        ;; ensure that each machine spreads their use of a node/peer-group's
+        ;; streams evenly over the cluster
         stream-id (mod (hash (str external-addr 
                                   (:external-addr (:messaging-group messenger)))) 
                        sub-count)] 
