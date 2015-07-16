@@ -19,8 +19,6 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
-(def send-stream-id 1)
-
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
