@@ -382,6 +382,8 @@
   (doseq [segment batch]
     (>!! ch segment)))
 
+(def ^:const publication-backpressured? (long -2))
+
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} batch]
   (if ((:short-circuitable? messenger) channel) 
@@ -391,8 +393,8 @@
           offer-f (fn [] (.offer pub unsafe-buffer 0 len))
           idle-strategy (:send-idle-strategy messenger)]
       ;;; TODO: offer will return a particular code when the publisher is down
-      ;;; we should probably re-restablish the publication in this case
-      (while (neg? ^long (offer-f))
+      ;;; we should probably re-establish the publication in this case
+      (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn ack-messages-short-circuit [ch acks]
@@ -408,8 +410,8 @@
       (doseq [ack acks] 
         (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))
               offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-          (while (neg? ^long (offer-f))
-            (.idle ^IdleStrategy idle-strategy 0)))))))
+      (while (= ^long (offer-f) publication-backpressured?)
+        (.idle ^IdleStrategy idle-strategy 0)))))))
 
 (defn complete-message-short-circuit [ch completion-id]
   (>!! ch completion-id))
@@ -422,7 +424,7 @@
           pub ^Publication (get-publication messenger conn-info)
           unsafe-buffer (protocol/build-completion-msg-buf id completion-id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
-      (while (neg? ^long (offer-f))
+      (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn retry-message-short-circuit [ch retry-id]
@@ -436,7 +438,7 @@
           pub ^Publication (get-publication messenger conn-info)
           unsafe-buffer (protocol/build-retry-msg-buf id retry-id)
           offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
-      (while (neg? ^long (offer-f))
+      (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defmethod extensions/close-peer-connection AeronConnection
