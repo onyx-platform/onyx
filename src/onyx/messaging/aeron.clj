@@ -362,8 +362,6 @@
           [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)
           offer-f (fn [] (.offer pub unsafe-buffer 0 len))
           idle-strategy (:send-idle-strategy messenger)]
-      ;;; TODO: offer will return a particular code when the publisher is down
-      ;;; we should probably re-establish the publication in this case
       (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
