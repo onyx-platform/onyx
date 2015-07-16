@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal] :as timbre]
+            [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.extensions :as extensions]
@@ -15,42 +16,11 @@
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona CloseHelper]
            [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.collections Int2ObjectHashMap]
            [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
 (defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
-
-(defprotocol PeerManager 
-  (clone [this])
-  (assoc!! [this k v])
-  (dissoc!! [this k])
-  (peer-channels [this k]))
-
-(deftype VPeerManager [^Int2ObjectHashMap m]
-  PeerManager
-  (assoc!! [this k v]
-    (let [vp ^VPeerManager (clone this)] 
-      (.put (.m vp) (int k) v)
-      vp))
-  (dissoc!! [this k]
-    (let [vp ^VPeerManager (clone this)] 
-      (.remove (.m vp) (int k))
-      vp))
-  (peer-channels [this k]
-    (.get m (int k)))
-  (clone [this]
-    (VPeerManager. 
-      (let [iterator (.iterator (.entrySet m))
-            new-hm (Int2ObjectHashMap.)]
-        (while (.hasNext iterator)
-          (let [kv (.next iterator)]
-            (.put new-hm (.getKey kv) (.getValue kv))))
-        new-hm))))
-
-(defn vpeer-manager []
-  (VPeerManager. (Int2ObjectHashMap.)))
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -98,7 +68,7 @@
       (close! release-ch)
       (close! retry-ch)
       (when @multiplex-id 
-        (swap! virtual-peers dissoc!! @multiplex-id))
+        (swap! virtual-peers pm/dissoc!! @multiplex-id))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil 
@@ -115,7 +85,7 @@
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger} 
    {:keys [aeron/id]}]
   (reset! multiplex-id id)
-  (swap! virtual-peers assoc!! id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
+  (swap! virtual-peers pm/assoc!! id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
 
 (def no-op-error-handler
   (reify ErrorHandler 
@@ -154,24 +124,24 @@
         offset (+ offset protocol/short-size)] 
     (cond (= msg-type protocol/ack-msg-id)
           (let [ack (protocol/read-acker-message buffer offset)]
-            (when-let [chs (peer-channels @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (>!! (:acking-ch chs) ack)))
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset length)]
-            (when-let [chs (peer-channels @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (let [inbound-ch (:inbound-ch chs)] 
                 (doseq [segment segments]
                   (>!! inbound-ch segment)))))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
-            (when-let [chs (peer-channels @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
             (let [retry-id (protocol/read-retry buffer offset)]
-              (when-let [chs (peer-channels @virtual-peers peer-id)] 
+              (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
                 (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
@@ -259,7 +229,7 @@
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
           compress-f (or (:onyx.messaging/compress-fn opts) compress)
           decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
-          virtual-peers (atom (vpeer-manager))
+          virtual-peers (atom (pm/vpeer-manager))
           publications (atom {})
           connections (atom {})
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
@@ -375,7 +345,7 @@
   (-> messenger 
       :virtual-peers 
       deref 
-      (peer-channels id)
+      (pm/peer-channels id)
       ch-k))
 
 (defn send-messages-short-circuit [ch batch]
