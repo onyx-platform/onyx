@@ -19,6 +19,8 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
+
+
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
@@ -275,31 +277,6 @@
            :subscriber-count nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscribers nil)))
-
-; (defn free-consistent-hash [existing v]
-;   (let [initial-set (set (range 1 2) #_(range -32767 32766))] 
-;     (loop [hs (hash (java.util.UUID/randomUUID))]
-;       (let [mod-signed (- (mod hs 65536)
-;                           32768)] 
-;         (if (initial-set mod-signed)
-;           (recur (hash hs))
-;           mod-signed)))))
-
-(Math/pow 2 16)
-(mod -30000 65536)
-
-(defn free-consistent-hash [existing v]
-  (let [initial-set (set (range 1 2) #_(range -32767 32766))] 
-    (loop [hs (hash (java.util.UUID/randomUUID))]
-      (let [mod-signed (- (mod hs 65536)
-                          32768)] 
-        (if (initial-set mod-signed)
-          (recur (hash hs))
-          mod-signed)))))
-
-(map short 
-     (for [v (range 1000000)]
-       (free-consistent-hash nil v)))
 
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
