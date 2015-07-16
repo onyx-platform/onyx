@@ -146,8 +146,7 @@
           leaves)))
 
 (defn build-new-segments
-  [egress-ids 
-   {:keys [onyx.core/results onyx.core/task->group-by-fn onyx.core/flow-conditions] :as event}]
+  [egress-ids task->group-by-fn flow-conditions {:keys [onyx.core/results] :as event}]
   (let [results (reduce (fn [accumulated result]
                           (let [root (:root result)
                                 ret (add-from-leaves accumulated event result 
@@ -393,6 +392,8 @@
            onyx.core/peer-replica-view
            onyx.core/state
            onyx.core/compiled-before-batch-fn
+           onyx.core/task->group-by-fn 
+           onyx.core/flow-conditions
            onyx.core/serialized-task
            onyx.core/messenger
            onyx.core/id 
@@ -413,7 +414,7 @@
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline)
              (apply-fn fn bulk?)
-             (build-new-segments egress-ids)
+             (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
              (flow-retry-messages replica state messenger)
              (ack-messages task-map replica state messenger)
