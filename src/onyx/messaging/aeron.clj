@@ -349,8 +349,9 @@
       ch-k))
 
 (defn send-messages-short-circuit [ch batch]
-  (doseq [segment batch]
-    (>!! ch segment)))
+  (when ch 
+    (doseq [segment batch]
+      (>!! ch segment))))
 
 (def ^:const publication-backpressured? (long -2))
 
@@ -366,8 +367,9 @@
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn ack-messages-short-circuit [ch acks]
-  (doseq [ack acks]
-    (>!! ch ack)))
+  (when ch 
+    (doseq [ack acks]
+      (>!! ch ack))))
 
 (defmethod extensions/internal-ack-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
@@ -382,7 +384,8 @@
         (.idle ^IdleStrategy idle-strategy 0)))))))
 
 (defn complete-message-short-circuit [ch completion-id]
-  (>!! ch completion-id))
+  (when ch 
+    (>!! ch completion-id)))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
@@ -396,7 +399,8 @@
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn retry-message-short-circuit [ch retry-id]
-  (>!! ch retry-id))
+  (when ch 
+    (>!! ch retry-id)))
 
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]
