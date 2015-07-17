@@ -90,3 +90,6 @@ Event name                         | Keys                             |
 `:peer/gc-peer-link`               | `:event`                         |
 `:peer/backpressure-on`            | `:event`, `:id`                  |
 `:peer/backpressure-off`           | `:event`, `:id`                  |
+`:peer/prepare-join`               | `:event`, `:id`                  |
+`:peer/notify-join`                | `:event`, `:id`                  |
+`:peer/accept-join`                | `:event`, `:id`                  |

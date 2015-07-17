@@ -35,9 +35,10 @@
           :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :notify-join-cluster
-  [{:keys [args]} old new diff state]
+  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]
+      (extensions/emit monitoring {:event :peer/notify-join :id (:id state)})
       (extensions/on-delete (:log state) (:subject diff) ch)
       (go (when (<! ch)
             (extensions/write-log-entry

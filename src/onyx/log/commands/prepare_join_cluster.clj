@@ -73,7 +73,7 @@
           :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
-  [{:keys [args]} old new diff state]
+  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
    (cond (= (:id state) (:observer diff))
@@ -86,7 +86,11 @@
                (close! ch))
            (assoc state :watch-ch ch))
          (= (:id state) (:subject diff))
+         ;;;; Mike's note: This doesn't look like. There should only be
+         ;;;; one watch set in this function. Need to fix this before PR
+         ;;;; is merged in - without Wifi right now.
          (let [ch (chan 1)]
+           (extensions/emit monitoring {:event :peer/prepare-join :id (:id state)})
            (extensions/on-delete (:log state) (:observer diff) ch)
            (go (when (<! ch)
                  (extensions/write-log-entry
