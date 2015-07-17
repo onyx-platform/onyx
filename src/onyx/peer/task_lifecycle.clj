@@ -138,12 +138,17 @@
                                              (assoc :route route))]
                               (->AccumAckSegments 
                                 (bit-xor ^long (:ack-val accum2) ^long ack-val)
-                                (conj (:segments accum2) leaf**)))
+                                (conj! (:segments accum2) leaf**)))
                             accum2))
                         accum 
                         (:flow routes)))))
           (->AccumAckSegments start-ack-val (:segments results))
           leaves)))
+
+(defn persistent-results! [results]
+  (->Results (:tree results)
+             (persistent! (:acks results))
+             (persistent! (:segments results))))
 
 (defn build-new-segments
   [egress-ids task->group-by-fn flow-conditions {:keys [onyx.core/results] :as event}]
@@ -152,15 +157,15 @@
                                 ret (add-from-leaves accumulated event result 
                                                      egress-ids task->group-by-fn flow-conditions)] 
                             (->Results (:tree results)
-                                       (conj (:acks accumulated)
-                                             (->Ack (:id root) 
-                                                    (:completion-id root)
-                                                    (:ack-val ret)
-                                                    nil))
+                                       (conj! (:acks accumulated)
+                                              (->Ack (:id root) 
+                                                     (:completion-id root)
+                                                     (:ack-val ret)
+                                                     nil))
                                        (:segments ret))))
                         results
                         (:tree results))]
-    (assoc event :onyx.core/results results)))
+    (assoc event :onyx.core/results (persistent-results! results))))
 
 (defn ack-messages [task-map replica state messenger {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
@@ -259,8 +264,8 @@
                                        segments)]
                        (->Result segment leaves)))
                    batch))
-               (list)
-               (list))))
+               (transient (t/vector))
+               (transient (t/vector)))))
 
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
@@ -274,8 +279,8 @@
                      (fn [segment]
                        (->Result segment (t/vector (assoc segment :ack-val nil))))
                      batch))
-                 (list)
-                 (list)))))
+                 (transient (t/vector))
+                 (transient (t/vector))))))
 
 (defn curry-params [f params]
   (reduce #(partial %1 %2) f params))
@@ -408,7 +413,6 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
-             ;;; TODO, pass value version of replica/replica-view into these fns
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
