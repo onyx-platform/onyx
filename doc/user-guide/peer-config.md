@@ -93,6 +93,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/peer-port-range`          | `vector`   | `[]`                               |
 |`:onyx.messaging/peer-ports`               | `vector`   | `[]`                               |
 |`:onyx.messaging.aeron/embedded-driver?`   | `boolean`  | `true`                             |
+|`:onyx.messaging.aeron/subscriber-count`   | `int`      | `2`                                |
 |`:onyx.messaging.aeron/poll-idle-strategy` | `keyword`  | `:high-restart-latency`            |
 |`:onyx.messaging.aeron/offer-idle-strategy`| `keyword`  | `:high-restart-latency`            |
 
@@ -216,6 +217,13 @@ A vector of integers denoting ports that may be used for peer communication. Thi
 
 A boolean denoting whether an Aeron media driver should be started up with the environment.
 See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
+
+##### `:onyx.messaging.aeron/subscriber-count`
+
+The number of Aeron subscriber threads that receive messages for the peer-group.
+As peer-groups are generally configured per-node (machine), this setting can
+bottleneck receive performance if many virtual peers are used per-node, or are
+receiving and/or de-serializing large volumes of data.
 
 ##### `:onyx.messaging.aeron/poll-idle-strategy`
 
