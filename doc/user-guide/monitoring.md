@@ -40,15 +40,15 @@ A registration example might look like:
 
 (def monitoring-config
   {:monitoring :custom
-   :zookeeper/write-log-entry std-out
-   :zookeeper/read-log-entry std-out
-   :zookeeper/write-catalog std-out
-   :zookeeper/write-workflow std-out
-   :zookeeper/write-flow-conditions std-out
-   :zookeeper/force-write-chunk std-out
-   :zookeeper/read-catalog std-out
-   :zookeeper/read-lifecycles std-out
-   :zookeeper/gc-log-entry std-out})
+   :zookeeper-write-log-entry std-out
+   :zookeeper-read-log-entry std-out
+   :zookeeper-write-catalog std-out
+   :zookeeper-write-workflow std-out
+   :zookeeper-write-flow-conditions std-out
+   :zookeeper-force-write-chunk std-out
+   :zookeeper-read-catalog std-out
+   :zookeeper-read-lifecycles std-out
+   :zookeeper-gc-log-entry std-out})
 
 ;; Pass the monitoring config as a third parameter to the `start-peers` function.
 (def v-peers (onyx.api/start-peers 3 peer-group monitoring-config))
@@ -60,36 +60,36 @@ This is the list of all monitoring events that you can register hooks for. The k
 
 Event name                         | Keys                             |
 -----------------------------------|----------------------------------|
-`:zookeeper/write-log-entry`       | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/read-log-entry`        | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-catalog`         | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-workflow`        | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-flow-conditions` | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-lifecycles`      | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-task`            | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-chunk`           | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-job-scheduler`   | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-messaging`       | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/force-write-chunk`     | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/write-origin`          | `:event`, `:latency`, `:bytes`   |
-`:zookeeper/read-catalog`          | `:event`, `:latency`             |
-`:zookeeper/read-workflow`         | `:event`, `:latency`             |
-`:zookeeper/read-flow-conditions`  | `:event`, `:latency`             |
-`:zookeeper/read-lifecycles`       | `:event`, `:latency`             |
-`:zookeeper/read-task`             | `:event`, `:latency`             |
-`:zookeeper/read-chunk`            | `:event`, `:latency`             |
-`:zookeeper/read-origin`           | `:event`, `:latency`             |
-`:zookeeper/read-job-scheduler`    | `:event`, `:latency`             |
-`:zookeeper/read-messaging`        | `:event`, `:latency`             |
-`:zookeeper/gc-log-entry`          | `:event`, `:latency`, `:position`|
-`:peer/ack-messages`               | `:event`, `:latency`             |
-`:peer/retry-message`              | `:event`, `:latency`             |
-`:peer/try-complete-job`           | `:event`                         |
-`:peer/strip-sentinel`             | `:event`                         |
-`:peer/complete-message`           | `:event`, `:latency`             |
-`:peer/gc-peer-link`               | `:event`                         |
-`:peer/backpressure-on`            | `:event`, `:id`                  |
-`:peer/backpressure-off`           | `:event`, `:id`                  |
-`:peer/prepare-join`               | `:event`, `:id`                  |
-`:peer/notify-join`                | `:event`, `:id`                  |
-`:peer/accept-join`                | `:event`, `:id`                  |
+`:zookeeper-write-log-entry`       | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-read-log-entry`        | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-catalog`         | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-workflow`        | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-flow-conditions` | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-lifecycles`      | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-task`            | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-chunk`           | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-job-scheduler`   | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-messaging`       | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-force-write-chunk`     | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-origin`          | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-read-catalog`          | `:event`, `:latency`             |
+`:zookeeper-read-workflow`         | `:event`, `:latency`             |
+`:zookeeper-read-flow-conditions`  | `:event`, `:latency`             |
+`:zookeeper-read-lifecycles`       | `:event`, `:latency`             |
+`:zookeeper-read-task`             | `:event`, `:latency`             |
+`:zookeeper-read-chunk`            | `:event`, `:latency`             |
+`:zookeeper-read-origin`           | `:event`, `:latency`             |
+`:zookeeper-read-job-scheduler`    | `:event`, `:latency`             |
+`:zookeeper-read-messaging`        | `:event`, `:latency`             |
+`:zookeeper-gc-log-entry`          | `:event`, `:latency`, `:position`|
+`:peer-ack-messages`               | `:event`, `:latency`             |
+`:peer-retry-message`              | `:event`, `:latency`             |
+`:peer-try-complete-job`           | `:event`                         |
+`:peer-strip-sentinel`             | `:event`                         |
+`:peer-complete-message`           | `:event`, `:latency`             |
+`:peer-gc-peer-link`               | `:event`                         |
+`:peer-backpressure-on`            | `:event`, `:id`                  |
+`:peer-backpressure-off`           | `:event`, `:id`                  |
+`:peer-prepare-join`               | `:event`, `:id`                  |
+`:peer-notify-join`                | `:event`, `:id`                  |
+`:peer-accept-join`                | `:event`, `:id`                  |
