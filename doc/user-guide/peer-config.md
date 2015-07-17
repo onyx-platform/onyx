@@ -220,10 +220,12 @@ See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an
 
 ##### `:onyx.messaging.aeron/subscriber-count`
 
-The number of Aeron subscriber threads that receive messages for the peer-group.
-As peer-groups are generally configured per-node (machine), this setting can
-bottleneck receive performance if many virtual peers are used per-node, or are
-receiving and/or de-serializing large volumes of data.
+The number of Aeron subscriber threads that receive messages for the
+peer-group.  As peer-groups are generally configured per-node (machine), this
+setting can bottleneck receive performance if many virtual peers are used
+per-node, or are receiving and/or de-serializing large volumes of data. A good
+guidline is is `num cores = num virtual peers + num subscribers`, assuming
+virtual peers are generally being fully utilised.
 
 ##### `:onyx.messaging.aeron/poll-idle-strategy`
 
