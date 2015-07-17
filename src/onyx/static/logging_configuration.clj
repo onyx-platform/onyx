@@ -20,7 +20,10 @@
                                   :min-level :info)]
         (timbre/merge-config!
           {:appenders
-           {:rotor rotor-appender}})))
+           {:println
+            {:min-level :error
+             :enabled? true}
+            :rotor rotor-appender}})))
 
     (info "Starting Logging Configuration")
     component)
