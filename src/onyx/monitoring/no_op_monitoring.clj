@@ -5,6 +5,9 @@
   extensions/IEmitEvent
   (extensions/emit [_ event]))
 
+(defn no-op-monitoring-agent []
+  (->NoOpMonitoringAgent))
+
 (defmethod extensions/monitoring-agent :no-op
   [monitoring-config]
   (->NoOpMonitoringAgent))
