@@ -88,3 +88,5 @@ Event name                         | Keys                             |
 `:peer/strip-sentinel`             | `:event`                         |
 `:peer/complete-message`           | `:event`, `:latency`             |
 `:peer/gc-peer-link`               | `:event`                         |
+`:peer/backpressure-on`            | `:event`, `:id`                  |
+`:peer/backpressure-off`           | `:event`, `:id`                  |
