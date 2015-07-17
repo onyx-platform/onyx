@@ -13,4 +13,3 @@
   :onyx.messaging/bind-addr "localhost"}
 
  :logging {}}
-
