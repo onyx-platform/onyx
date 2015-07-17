@@ -1,4 +1,5 @@
 (ns onyx.messaging.aeron.peer-manager
+  "Fast way for peer group subscribers to dispatch via short id to peer channels"
   (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap]))
 
 (defprotocol PeerManager 
