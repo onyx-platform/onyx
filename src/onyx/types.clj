@@ -13,3 +13,7 @@
 (defrecord Result [root leaves])
 
 (defrecord Link [link timestamp])
+
+(defrecord MonitorEvent [event])
+(defrecord MonitorEventLatency [event latency])
+(defrecord MonitorEventLatencyBytes [event latency bytes])
