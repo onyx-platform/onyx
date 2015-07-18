@@ -318,6 +318,7 @@
   [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
                                                        onyx.core/compiled-after-ack-message-fn 
                                                        onyx.core/compiled-after-retry-message-fn 
+                                                       onyx.core/monitoring
                                                        onyx.core/replica
                                                        onyx.core/state] :as event} 
    outbox-ch seal-ch completion-ch task-kill-ch]
@@ -335,7 +336,7 @@
                         peer-link (operation/peer-link @replica state event peer-id)]
                     (measure-latency
                      #(extensions/internal-complete-message messenger event id peer-link)
-                     #(extensions/emit (:onyx.core/monitoring event) {:event :peer-complete-message :latency %})))
+                     #(extensions/emit monitoring {:event :peer-complete-message :latency %})))
 
                   (= ch retry-ch)
                   (->> (p-ext/retry-message pipeline event v)
