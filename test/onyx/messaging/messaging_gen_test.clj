@@ -20,7 +20,7 @@
              [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer ChannelPipeline
               MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]))
 
-(def id (java.util.UUID/randomUUID))
+(comment (def id (java.util.UUID/randomUUID))
 
 (def config (load-config))
 
@@ -218,4 +218,4 @@
                              (map (juxt key (comp set val)) 
                                   (test-send-commands-aeron peer-group commands)))))))
 
-      (finally (onyx.api/shutdown-peer-group peer-group)))))
+      (finally (onyx.api/shutdown-peer-group peer-group))))))

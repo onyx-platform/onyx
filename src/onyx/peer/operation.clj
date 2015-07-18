@@ -43,9 +43,7 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
-;; TODO: may want to consider memoizing this
-;; must be careful about ensuring we don't bloat memory wise
-;; use clojure.core.memoize with LRU
+;; TODO: can be precalculated for peer in replica-view
 (defn select-n-peers 
   "Stably select n peers using our id and the downstream task ids.
   If a peer is added or removed, the set can only change by one value at max"
@@ -70,7 +68,7 @@
                  [:links peer-id] 
                  (fn [link]
                    (or link 
-                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) event site)
+                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) peer-id event site)
                                (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)
