@@ -16,9 +16,6 @@
               [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-;; TODO: Are there any exceptions that a peer should autoreboot itself?
-(def restartable-exceptions [])
-
 (defn resolve-calling-params [catalog-entry opts]
   (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
           (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
@@ -365,9 +362,9 @@
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
               (recur))))))))
 
-(defn handle-exception [e restart-ch outbox-ch job-id]
+(defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
   (warn e)
-  (if (some #{(type e)} restartable-exceptions)
+  (if (restart-pred-fn e)
     (>!! restart-ch true)
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
@@ -518,11 +515,17 @@
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-message))
 
 (defn resolve-task-fn [entry]
-  (if (or (:onyx/fn entry) 
-          (= (:onyx/type entry) :function))
-    (case (:onyx/language entry)
-      :java (operation/build-fn-java (:onyx/fn entry))
-      (operation/kw->fn (:onyx/fn entry)))))
+  (let [f (if (or (:onyx/fn entry) 
+                  (= (:onyx/type entry) :function))
+            (case (:onyx/language entry)
+              :java (operation/build-fn-java (:onyx/fn entry))
+              (operation/kw->fn (:onyx/fn entry))))]
+    (or f identity)))
+
+(defn resolve-restart-pred-fn [entry]
+  (if-let [kw (:onyx/restart-pred-fn entry)]
+    (operation/kw->fn kw)
+    (constantly false)))
 
 (defn instantiate-plugin-instance [class-name pipeline-data]
   (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
@@ -639,7 +642,7 @@
                            :onyx.core/peer-opts (resolve-compression-fn-impls opts)
                            :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
                            :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
-                           :onyx.core/fn (or (resolve-task-fn catalog-entry) identity)
+                           :onyx.core/fn (resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
@@ -647,7 +650,8 @@
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
-            ex-f (fn [e] (handle-exception e restart-ch outbox-ch job-id))
+            restart-pred-fn (resolve-restart-pred-fn catalog-entry)
+            ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
@@ -681,7 +685,7 @@
                  :aux-ch aux-ch
                  :peer-link-gc-thread peer-link-gc-thread)))
       (catch Throwable e
-        (handle-exception e restart-ch outbox-ch job-id)
+        (handle-exception (constantly false) e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
