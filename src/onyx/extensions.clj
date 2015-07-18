@@ -50,7 +50,7 @@
 
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
-(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
+(defmulti connect-to-peer (fn [messenger peer-id event peer-site] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
