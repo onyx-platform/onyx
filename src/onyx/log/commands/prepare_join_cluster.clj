@@ -78,7 +78,7 @@
    old new diff
    (cond (= (:id state) (:observer diff))
          (let [ch (chan 1)]
-           (extensions/emit monitoring {:event :peer/prepare-join :id (:id state)})
+           (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
            (extensions/on-delete (:log state) (:subject diff) ch)
            (go (when (<! ch)
                  (extensions/write-log-entry

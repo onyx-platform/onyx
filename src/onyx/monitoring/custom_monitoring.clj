@@ -38,7 +38,8 @@
      peer-accept-join]
   extensions/IEmitEvent
   (extensions/emit [this event]
-    ((get this (:event event)) config event)))
+    (when-let [f (get this (:event event))]
+      (f config event))))
 
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]

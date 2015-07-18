@@ -275,15 +275,6 @@
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscribers nil)))
 
-; (defn free-consistent-hash [existing v]
-;   (let [initial-set (set (range 1 2) #_(range -32767 32766))] 
-;     (loop [hs (hash (java.util.UUID/randomUUID))]
-;       (let [mod-signed (- (mod hs 65536)
-;                           32768)] 
-;         (if (initial-set mod-signed)
-;           (recur (hash hs))
-;           mod-signed)))))
-
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 

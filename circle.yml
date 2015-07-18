@@ -16,14 +16,7 @@ machine:
 
 dependencies:
   pre:
-          #- bash ./install-aeron.sh
-          #- bash ./install-zookeeper.sh
-          #- /home/ubuntu/onyx/zookeeper-3.4.6/bin/zkServer.sh start:
-          #background: true
     - sudo pip install awscli
-          #cache_directories:
-          #- Aeron
-          #- Agrona
 
 notify:
   webhooks:

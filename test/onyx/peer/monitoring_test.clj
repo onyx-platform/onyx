@@ -87,28 +87,28 @@
 
 (def monitoring-config
   {:monitoring :custom
-   :zookeeper/write-log-entry update-state
-   :zookeeper/read-log-entry update-state
-   :zookeeper/write-catalog update-state
-   :zookeeper/write-workflow update-state
-   :zookeeper/write-flow-conditions update-state
-   :zookeeper/write-lifecycles update-state
-   :zookeeper/write-task update-state
-   :zookeeper/write-chunk update-state
-   :zookeeper/write-job-scheduler update-state
-   :zookeeper/write-messaging update-state
-   :zookeeper/force-write-chunk update-state
-   :zookeeper/read-catalog update-state
-   :zookeeper/read-workflow update-state
-   :zookeeper/read-flow-conditions update-state
-   :zookeeper/read-lifecycles update-state
-   :zookeeper/read-task update-state
-   :zookeeper/read-chunk update-state
-   :zookeeper/read-origin update-state
-   :zookeeper/read-job-scheduler update-state
-   :zookeeper/read-messaging update-state
-   :zookeeper/write-origin update-state
-   :zookeeper/gc-log-entry update-state})
+   :zookeeper-write-log-entry update-state
+   :zookeeper-read-log-entry update-state
+   :zookeeper-write-catalog update-state
+   :zookeeper-write-workflow update-state
+   :zookeeper-write-flow-conditions update-state
+   :zookeeper-write-lifecycles update-state
+   :zookeeper-write-task update-state
+   :zookeeper-write-chunk update-state
+   :zookeeper-write-job-scheduler update-state
+   :zookeeper-write-messaging update-state
+   :zookeeper-force-write-chunk update-state
+   :zookeeper-read-catalog update-state
+   :zookeeper-read-workflow update-state
+   :zookeeper-read-flow-conditions update-state
+   :zookeeper-read-lifecycles update-state
+   :zookeeper-read-task update-state
+   :zookeeper-read-chunk update-state
+   :zookeeper-read-origin update-state
+   :zookeeper-read-job-scheduler update-state
+   :zookeeper-read-messaging update-state
+   :zookeeper-write-origin update-state
+   :zookeeper-gc-log-entry update-state})
 
 (def v-peers (onyx.api/start-peers 3 peer-group monitoring-config))
 
@@ -127,18 +127,18 @@
 
 (def metrics @state)
 
-(fact (:zookeeper/read-task metrics) => seq)
-(fact (:zookeeper/read-catalog metrics) => seq)
-(fact (:zookeeper/read-log-entry metrics) => seq)
-(fact (:zookeeper/read-workflow metrics) => seq)
-(fact (:zookeeper/read-flow-conditions metrics) => seq)
-(fact (:zookeeper/read-lifecycles metrics) => seq)
-(fact (:zookeeper/read-messaging metrics) => seq)
-(fact (:zookeeper/read-job-scheduler metrics) => seq)
-(fact (:zookeeper/read-origin metrics) => seq)
-(fact (:zookeeper/write-messaging metrics) => seq)
-(fact (:zookeeper/write-job-scheduler metrics) => seq)
-(fact (:zookeeper/write-log-entry metrics) => seq)
+(fact (:zookeeper-read-task metrics) => seq)
+(fact (:zookeeper-read-catalog metrics) => seq)
+(fact (:zookeeper-read-log-entry metrics) => seq)
+(fact (:zookeeper-read-workflow metrics) => seq)
+(fact (:zookeeper-read-flow-conditions metrics) => seq)
+(fact (:zookeeper-read-lifecycles metrics) => seq)
+(fact (:zookeeper-read-messaging metrics) => seq)
+(fact (:zookeeper-read-job-scheduler metrics) => seq)
+(fact (:zookeeper-read-origin metrics) => seq)
+(fact (:zookeeper-write-messaging metrics) => seq)
+(fact (:zookeeper-write-job-scheduler metrics) => seq)
+(fact (:zookeeper-write-log-entry metrics) => seq)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

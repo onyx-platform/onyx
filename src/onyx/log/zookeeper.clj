@@ -128,7 +128,7 @@
        (fn []
          (let [node (str (log-path prefix) "/entry-")]
            (zk/create conn node :data bytes :persistent? true :sequential? true))))
-     #(let [args {:event :zookeeper/write-log-entry
+     #(let [args {:event :zookeeper-write-log-entry
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -141,7 +141,7 @@
              data (zk/data conn node)
              content (decompress (:data data))]
          (assoc content :message-id position :created-at (:ctime (:stat data))))))
-   #(let [args {:event :zookeeper/read-log-entry :position position :latency %}]
+   #(let [args {:event :zookeeper-read-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/register-pulse ZooKeeper
@@ -261,7 +261,7 @@
        (fn []
          (let [node (str (catalog-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-catalog :id id
+     #(let [args {:event :zookeeper-write-catalog :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -273,7 +273,7 @@
        (fn []
          (let [node (str (workflow-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-workflow :id id
+     #(let [args {:event :zookeeper-write-workflow :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -285,7 +285,7 @@
        (fn []
          (let [node (str (flow-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-flow-conditions :id id
+     #(let [args {:event :zookeeper-write-flow-conditions :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -297,7 +297,7 @@
        (fn []
          (let [node (str (lifecycles-path prefix) "/" id)]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-lifecycles :id id
+     #(let [args {:event :zookeeper-write-lifecycles :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -309,7 +309,7 @@
        (fn []
          (let [node (str (task-path prefix) "/" (:id chunk))]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-task :id id
+     #(let [args {:event :zookeeper-write-task :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -322,7 +322,7 @@
          (let [node (str (chunk-path prefix) "/" id "/chunk")]
            (zk/create-all conn node :persistent? true :data bytes)
            id)))
-     #(let [args {:event :zookeeper/write-chunk :id id
+     #(let [args {:event :zookeeper-write-chunk :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -334,7 +334,7 @@
        (fn []
          (let [node (str (job-scheduler-path prefix) "/scheduler")]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-job-scheduler :id id
+     #(let [args {:event :zookeeper-write-job-scheduler :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -346,7 +346,7 @@
        (fn []
          (let [node (str (messaging-path prefix) "/messaging")]
            (zk/create conn node :persistent? true :data bytes))))
-     #(let [args {:event :zookeeper/write-messaging :id id
+     #(let [args {:event :zookeeper-write-messaging :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -361,7 +361,7 @@
            (if (nil? version)
              (zk/create-all conn node :persistent? true :data bytes)
              (zk/set-data conn node bytes version)))))
-     #(let [args {:event :zookeeper/force-write-chunk :id id
+     #(let [args {:event :zookeeper-force-write-chunk :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -372,7 +372,7 @@
      (fn []
        (let [node (str (catalog-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-catalog :id id :latency %}]
+   #(let [args {:event :zookeeper-read-catalog :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :workflow]
@@ -382,7 +382,7 @@
      (fn []
        (let [node (str (workflow-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-workflow :id id :latency %}]
+   #(let [args {:event :zookeeper-read-workflow :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :flow-conditions]
@@ -392,7 +392,7 @@
      (fn []
        (let [node (str (flow-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-flow-conditions :id id :latency %}]
+   #(let [args {:event :zookeeper-read-flow-conditions :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :lifecycles]
@@ -402,7 +402,7 @@
      (fn []
        (let [node (str (lifecycles-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-lifecycles :id id :latency %}]
+   #(let [args {:event :zookeeper-read-lifecycles :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]
@@ -412,7 +412,7 @@
      (fn []
        (let [node (str (task-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-task :id id :latency %}]
+   #(let [args {:event :zookeeper-read-task :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :chunk]
@@ -422,7 +422,7 @@
      (fn []
        (let [node (str (chunk-path prefix) "/" id "/chunk")]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-chunk :id id :latency %}]
+   #(let [args {:event :zookeeper-read-chunk :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :origin]
@@ -432,7 +432,7 @@
      (fn []
        (let [node (str (origin-path prefix) "/origin")]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-origin :id id :latency %}]
+   #(let [args {:event :zookeeper-read-origin :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :job-scheduler]
@@ -442,7 +442,7 @@
      (fn []
        (let [node (str (job-scheduler-path prefix) "/scheduler")]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-job-scheduler :id id :latency %}]
+   #(let [args {:event :zookeeper-read-job-scheduler :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :messaging]
@@ -452,7 +452,7 @@
      (fn []
        (let [node (str (messaging-path prefix) "/messaging")]
          (decompress (:data (zk/data conn node))))))
-   #(let [args {:event :zookeeper/read-messaging :id id :latency %}]
+   #(let [args {:event :zookeeper-read-messaging :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/update-origin! ZooKeeper
@@ -466,7 +466,7 @@
          (when (< (:message-id content) message-id)
            (let [new-content {:message-id message-id :replica replica}]
              (zk/set-data conn node (compress new-content) version))))))
-   #(let [args {:event :zookeeper/write-origin :message-id message-id :latency %}]
+   #(let [args {:event :zookeeper-write-origin :message-id message-id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/gc-log-entry ZooKeeper
@@ -476,5 +476,5 @@
      (fn []
        (let [node (str (log-path prefix) "/entry-" (pad-sequential-id position))]
          (zk/delete conn node))))
-   #(let [args {:event :zookeeper/gc-log-entry :position position :latency %}]
+   #(let [args {:event :zookeeper-gc-log-entry :position position :latency %}]
       (extensions/emit monitoring args))))
