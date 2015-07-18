@@ -92,6 +92,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/bind-addr`                | `string`   | `nil`                              |
 |`:onyx.messaging/peer-port-range`          | `vector`   | `[]`                               |
 |`:onyx.messaging/peer-ports`               | `vector`   | `[]`                               |
+|`:onyx.messaging/allow-short-circuit?`     | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/embedded-driver?`   | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/subscriber-count`   | `int`      | `2`                                |
 |`:onyx.messaging.aeron/poll-idle-strategy` | `keyword`  | `:high-restart-latency`            |
@@ -212,6 +213,15 @@ A vector of two integers that denotes the low and high values, inclusive, of por
 ##### `:onyx.messaging/peer-ports`
 
 A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictable in-order.
+
+##### `:onyx.messaging/allow-short-circuit?`
+
+A boolean denoting whether to allow virtual peers to short circuit networked
+messaging when colocated with the other virtual peer. Short circuiting allows
+for direct transfer of messages to a virtual peer's internal buffers, which
+improves performance where possible. This configuration option is primarily for
+use in perfomance testing, as peers will not generally be able to short circuit
+messaging after scaling to many nodes.
 
 ##### `:onyx.messaging.aeron/embedded-driver?`
 
