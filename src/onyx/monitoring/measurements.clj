@@ -1,4 +1,6 @@
-(ns onyx.monitoring.measurements)
+(ns onyx.monitoring.measurements
+  (:require [onyx.types :as t]
+            [onyx.extensions :as extensions]))
 
 (defn measure-latency
   "Calls f, and passing the amount of time it took
@@ -10,3 +12,12 @@
         end (- (System/currentTimeMillis) start)]
     (g end)
     rets))
+
+(defn emit-latency [event-type monitoring f]
+  (if (extensions/registered? monitoring event-type)
+    (let [start (System/currentTimeMillis)
+          rets (f)
+          elapsed (- (System/currentTimeMillis) start)]
+      (extensions/emit monitoring (t/->MonitorEventLatency event-type elapsed))
+      rets)
+    (f)))

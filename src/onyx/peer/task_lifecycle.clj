@@ -5,7 +5,7 @@
               [rotating-seq.core :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
-              [onyx.monitoring.measurements :refer [measure-latency]]
+              [onyx.monitoring.measurements :refer [emit-latency]]
               [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -13,7 +13,7 @@
               [onyx.peer.operation :as operation]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result]]
+              [onyx.types :refer [->Leaf leaf ->Route ->Ack ->Result ->MonitorEvent]]
               [onyx.interop]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -157,7 +157,7 @@
             leaves)
     0))
 
-(defn ack-messages [task-map replica state messenger {:keys [onyx.core/results] :as event}]
+(defn ack-messages [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
     (let [link (operation/peer-link @replica state event acker-id)
           acks (doall 
@@ -173,19 +173,19 @@
                                             (or fused-vals 0)
                                             (System/currentTimeMillis))))
                       results-by-acker))]
-      (measure-latency
-       #(extensions/internal-ack-messages messenger event link acks)
-       #(extensions/emit (:onyx.core/monitoring event) {:event :peer-ack-messages :latency %}))))
+      (emit-latency :peer-ack-messages
+                    monitoring
+                    #(extensions/internal-ack-messages messenger event link acks))))
   event)
 
-(defn flow-retry-messages [replica state messenger {:keys [onyx.core/results] :as event}]
+(defn flow-retry-messages [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [root (:root result)
             link (operation/peer-link @replica state event (:completion-id root))]
-        (measure-latency
-         #(extensions/internal-retry-message messenger event (:id root) link)
-         #(extensions/emit (:onyx.core/monitoring event) {:event :peer-retry-message :latency %})))))
+        (emit-latency :peer-retry-message
+                      monitoring
+                      #(extensions/internal-retry-message messenger event (:id root) link)))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -233,18 +233,18 @@
            (map :id (:onyx.core/batch event))))
   event)
 
-(defn try-complete-job [pipeline event]
+(defn try-complete-job [pipeline monitoring event]
   (when (sentinel-found? event)
     (if (p-ext/drained? pipeline event)
       (do (complete-job event)
-          (extensions/emit (:onyx.core/monitoring event) {:event :peer-try-complete-job}))
+          (extensions/emit monitoring (->MonitorEvent :peer-try-complete-job)))
       (p-ext/retry-message pipeline event (sentinel-id event))))
   event)
 
 (defn strip-sentinel
-  [event]
+  [monitoring event]
   (if (= (:onyx/type (:onyx.core/task-map event)) :input)
-    (do (extensions/emit (:onyx.core/monitoring event) {:event :peer-strip-sentinel})
+    (do (extensions/emit monitoring (->MonitorEvent :peer-strip-sentinel))
         (update-in event
                    [:onyx.core/batch]
                    (fn [batch]
@@ -334,9 +334,9 @@
                   (= ch completion-ch)
                   (let [{:keys [id peer-id]} v
                         peer-link (operation/peer-link @replica state event peer-id)]
-                    (measure-latency
-                     #(extensions/internal-complete-message messenger event id peer-link)
-                     #(extensions/emit monitoring {:event :peer-complete-message :latency %})))
+                    (emit-latency :peer-complete-message
+                                  monitoring 
+                                  #(extensions/internal-complete-message messenger event id peer-link)))
 
                   (= ch retry-ch)
                   (->> (p-ext/retry-message pipeline event v)
@@ -404,6 +404,7 @@
            onyx.core/compiled-before-batch-fn
            onyx.core/serialized-task
            onyx.core/messenger
+           onyx.core/monitoring
            onyx.core/id 
            onyx.core/params
            onyx.core/fn
@@ -420,13 +421,13 @@
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica id job-id max-acker-links)
              (add-messages-to-timeout-pool task-type state)
-             (try-complete-job pipeline)
-             (strip-sentinel)
+             (try-complete-job pipeline monitoring)
+             (strip-sentinel monitoring)
              (apply-fn fn bulk?)
              (build-new-segments egress-ids)
              (write-batch pipeline)
-             (flow-retry-messages replica state messenger)
-             (ack-messages task-map replica state messenger)
+             (flow-retry-messages replica state messenger monitoring)
+             (ack-messages task-map replica state messenger monitoring)
              (close-batch-resources)))
       (catch Throwable e
         (ex-f e)))))
@@ -444,7 +445,8 @@
 
 (defn gc-peer-links [event state opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
-        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
+        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)
+        monitoring (:onyx.core/monitoring event)]
     (loop []
       (try
         (Thread/sleep interval)
@@ -458,7 +460,7 @@
             (extensions/close-peer-connection (:onyx.core/messenger event) 
                                               event 
                                               (:link (get (:links snapshot) k)))
-            (extensions/emit (:onyx.core/monitoring event) {:event :peer-gc-peer-link})))
+            (extensions/emit monitoring (->MonitorEvent :peer-gc-peer-link))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
