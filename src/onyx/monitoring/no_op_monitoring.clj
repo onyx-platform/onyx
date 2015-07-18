@@ -3,6 +3,8 @@
 
 (defrecord NoOpMonitoringAgent []
   extensions/IEmitEvent
+  (extensions/registered? [this event-type]
+    false)
   (extensions/emit [_ event]))
 
 (defn no-op-monitoring-agent []

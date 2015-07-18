@@ -76,4 +76,5 @@
 (defmulti monitoring-agent :monitoring)
 
 (defprotocol IEmitEvent
+  (registered? [_ event-type])
   (emit [_ event]))

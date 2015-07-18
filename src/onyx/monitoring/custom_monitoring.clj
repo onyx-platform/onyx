@@ -37,6 +37,8 @@
      peer-notify-join
      peer-accept-join]
   extensions/IEmitEvent
+  (extensions/registered? [this event-type]
+    (boolean (this event-type)))
   (extensions/emit [this event]
     (when-let [f (get this (:event event))]
       (f config event))))
