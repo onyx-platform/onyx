@@ -73,7 +73,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 | key name                 | type       | choices | default
 |--------------------------|------------|---------|--------
-|`:onyx/group-by-key`      | `keyword`  | `any`   |
+|`:onyx/group-by-key`      | `[keyword]`| `any`   |
 |`:onyx/group-by-fn`       | `keyword`  | `any`   |
 |`:onyx/bulk?`             | `boolean`  |         | `false`
 
