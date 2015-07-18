@@ -8,6 +8,7 @@
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
    :onyx/batch-size (schema/pred pos? 'pos?)
+   (schema/optional-key :onyx/restart-pred-fn) schema/Keyword
    (schema/optional-key :onyx/language) (schema/enum :java :clojure)
    (schema/optional-key :onyx/batch-timeout) (schema/pred pos? 'pos?)
    (schema/optional-key :onyx/doc) schema/Str
