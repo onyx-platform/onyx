@@ -111,7 +111,7 @@
 
 #### 0.2.0
 
-- Rename internal API extensions to use "node" instead of "place.
+- Rename internal API extensions to use "node" instead of "place".
 - Throw an explicit error on function resolution failure.
 - Add state audits into test suite.
 - Remove Datomic log component, replace with ZooKeeper.
