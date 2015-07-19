@@ -70,3 +70,11 @@
 
 (defmethod get-peer-site :default
   [_ _] "localhost")
+
+;; Monitoring interface
+
+(defmulti monitoring-agent :monitoring)
+
+(defprotocol IEmitEvent
+  (registered? [_ event-type])
+  (emit [_ event]))

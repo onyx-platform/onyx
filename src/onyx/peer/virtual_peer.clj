@@ -19,7 +19,7 @@
         (clojure.core.async/>!! outbox-ch reaction))
       state)))
 
-(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts]
+(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
   (try
     (let [replica-atom (atom {})
           peer-view-atom (atom {})]
@@ -30,6 +30,7 @@
                            :log log
                            :messenger-buffer buffer
                            :messenger messenger
+                           :monitoring monitoring
                            :outbox-ch outbox-ch
                            :completion-ch completion-ch
                            :opts opts
@@ -86,7 +87,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log acking-daemon messenger-buffer messenger] :as component}]
+  (start [{:keys [log acking-daemon messenger-buffer messenger monitoring] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
       (try
@@ -108,7 +109,7 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts))
+                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring))
                 track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch
                                                                    (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
                                                                    (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
