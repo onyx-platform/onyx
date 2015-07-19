@@ -82,20 +82,7 @@ Feel free to use it anywhere. You can find [a few different versions here](https
 
 ### Running the tests
 
-A simple `lein midje` will run the full suite, which takes about 15-20 minutes on my quad-core MacBook Pro.
-
-N.B.: Leiningen may complain about not being able to find the Aeron jars on Clojars. If this happens, you'll need to clone and install Aeron and Agrona as follows:
-
-```
-git clone https://github.com/real-logic/Agrona.git
-cd Agrona
-./gradlew
-
-cd ..
-git clone https://github.com/real-logic/Aeron.git
-cd Aeron
-./gradlew
-```
+A simple `lein midje` will run the full suite.
 
 ### Contributing
 
