@@ -6,6 +6,8 @@
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
+            [onyx.monitoring.no-op-monitoring]
+            [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
@@ -19,18 +21,25 @@
             [onyx.log.commands.submit-job]
             [onyx.log.commands.kill-job]
             [onyx.log.commands.gc]
+            [onyx.log.commands.backpressure-on]
+            [onyx.log.commands.backpressure-off]
+            [onyx.log.commands.peer-replica-view]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
-            [onyx.plugin.core-async]))
+            [onyx.plugin.core-async]
+            [onyx.extensions :as extensions]))
 
-(def development-components [:logging-config :log])
+(def development-components [:monitoring :logging-config :log])
 
-(def client-components [:log :messaging-require])
+(def client-components [:monitoring :log :messaging-require])
 
-(def peer-components [:log :messaging-require :messenger-buffer :messenger :acking-daemon :virtual-peer])
+(def peer-components
+  [:monitoring :log :messaging-require
+   :messenger-buffer :messenger :acking-daemon
+   :virtual-peer])
 
 (def peer-group-components [:logging-config :messaging-require :messaging-group])
 
@@ -97,31 +106,42 @@
     rets))
 
 (defn onyx-development-env
-  [config]
-  (map->OnyxDevelopmentEnv
-    {:logging-config (logging-config/logging-configuration config)
-     :log (component/using (zookeeper config) [:logging-config])}))
+  ([peer-config]
+     (onyx-development-env peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (map->OnyxDevelopmentEnv
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :logging-config (logging-config/logging-configuration peer-config)
+       :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client
-  [config]
-  (map->OnyxClient
-    {:messaging-require (messaging-require-ctor config)
-     :log (zookeeper config)}))
+  ([peer-config]
+     (onyx-client peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (map->OnyxClient
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :messaging-require (messaging-require-ctor peer-config)
+       :log (component/using (zookeeper peer-config) [:monitoring])})))
 
 (defn onyx-peer
-  [{:keys [config] :as peer-group}]
-  (map->OnyxPeer
-   {:log (zookeeper config)
-    :messaging-require (messaging-require-ctor config)
-    :acking-daemon (component/using (acking-daemon config) [:log])
-    :messenger-buffer (component/using (messenger-buffer config) [:log :acking-daemon])
-    :messenger (component/using (messenger-ctor peer-group) [:messaging-require :acking-daemon :messenger-buffer])
-    :virtual-peer (component/using (virtual-peer config) [:log :acking-daemon :messenger-buffer :messenger])}))
+  ([peer-group]
+     (onyx-peer peer-group {:monitoring :no-op}))
+  ([{:keys [config] :as peer-group} monitoring-config]
+     (map->OnyxPeer
+      {:monitoring (extensions/monitoring-agent monitoring-config)
+       :messaging-require (messaging-require-ctor config)
+       :log (component/using (zookeeper config) [:monitoring])
+       :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
+       :messenger-buffer (component/using (messenger-buffer config)[:monitoring :log :acking-daemon])
+       :messenger (component/using (messenger-ctor peer-group)
+                                   [:monitoring :messaging-require :acking-daemon :messenger-buffer])
+       :virtual-peer (component/using (virtual-peer config)
+                                      [:monitoring :log :acking-daemon :messenger-buffer :messenger])})))
 
 (defn onyx-peer-group
   [config]
   (map->OnyxPeerGroup
-    {:config config
-     :logging-config (logging-config/logging-configuration config)
-     :messaging-require (messaging-require-ctor config)
-     :messaging-group (component/using (messaging-peer-group-ctor config) [:messaging-require :logging-config])}))
+   {:config config
+    :logging-config (logging-config/logging-configuration config)
+    :messaging-require (messaging-require-ctor config)
+    :messaging-group (component/using (messaging-peer-group-ctor config) [:messaging-require :logging-config])}))

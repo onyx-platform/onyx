@@ -12,6 +12,10 @@
 
 (defmulti reactions (fn [entry old new diff peer-args] (:fn entry)))
 
+;; Peer replica view interface
+
+(defmulti peer-replica-view (fn [entry old new diff old-view peer-id] :default))
+
 ;; Log interface
 
 (defmulti write-log-entry (fn [log data] (type log)))
@@ -36,8 +40,8 @@
 
 ;; Messaging interface
 
-(defmulti assign-site-resources (fn [config peer-site peer-sites] 
-                                  (:onyx.messaging/impl config)))
+(defmulti assign-site-resources (fn [replica peer-site peer-sites] 
+                                  (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
 
@@ -46,7 +50,7 @@
 
 (defmulti open-peer-site (fn [messenger assigned] (type messenger)))
 
-(defmulti connect-to-peer (fn [messenger event peer-site] (type messenger)))
+(defmulti connect-to-peer (fn [messenger peer-id event peer-site] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
@@ -66,3 +70,11 @@
 
 (defmethod get-peer-site :default
   [_ _] "localhost")
+
+;; Monitoring interface
+
+(defmulti monitoring-agent :monitoring)
+
+(defprotocol IEmitEvent
+  (registered? [_ event-type])
+  (emit [_ event]))

@@ -1,141 +1,149 @@
 (ns ^:no-doc onyx.messaging.protocol-aeron
   (:require [taoensso.timbre :as timbre]
-            [onyx.types :refer [->Leaf]])
-  #_(:import [java.util UUID]
+            [onyx.types :refer [->Leaf ->Ack]])
+  (:import [java.util UUID]
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
 
-(comment
+;comment
 ;;;;;;
 ;; Constants
 
 ;; id uuid 
-(def ^:const completion-msg-length (int 17))
+(def ^:const completion-msg-length (long 33))
 
 ;; id uuid
-(def ^:const retry-msg-length (int 17))
+(def ^:const retry-msg-length (long 33))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ^:const ack-msg-length (int 41))
+(def ^:const ack-msg-length (long 43))
 
 (def ^:const completion-msg-id (byte 0))
 (def ^:const retry-msg-id (byte 1))
 (def ^:const ack-msg-id (byte 2))
+(def ^:const messages-msg-id (byte 3))
+
+(def ^:const short-size 2)
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
-(def ^:const message-base-length (int 56))
+(def ^:const message-base-length (long 56))
 
 ;; messages with 0 messages in it
-(def ^:const messages-base-length (int 4))
+(def ^:const messages-base-length (long 4))
 
-(defn write-uuid [^MutableDirectBuffer buf offset ^UUID uuid]
+(def ^:const message-count-size (long 4))
+(def ^:const payload-size-size (long 4))
+(def ^:const messages-header-size (long (+ message-count-size payload-size-size short-size 1)))
+
+(defn read-vpeer-id [^UnsafeBuffer buf ^long offset]
+  (.getShort buf offset))
+
+(defn write-vpeer-id [^UnsafeBuffer buf ^long offset peer-id]
+  (.putShort buf offset (short peer-id)))
+
+(defn write-uuid [^MutableDirectBuffer buf ^long offset ^UUID uuid]
   (.putLong buf offset (.getMostSignificantBits uuid))
-  (.putLong buf (+ 8 offset) (.getLeastSignificantBits uuid)))
+  (.putLong buf (unchecked-add 8 offset) (.getLeastSignificantBits uuid)))
 
-(defn get-uuid [^UnsafeBuffer buf offset]
+(defn get-uuid [^UnsafeBuffer buf ^long offset]
   (let [msb (.getLong buf offset)
-        lsb (.getLong buf (+ 8 offset))]
+        lsb (.getLong buf (unchecked-add 8 offset))]
     (java.util.UUID. msb lsb)))
 
-(defn build-acker-message [^UUID id ^UUID completion-id ^long ack-val]
+(defn build-acker-message [peer-id ^UUID id ^UUID completion-id ^long ack-val]
   (let [buf (UnsafeBuffer. (byte-array ack-msg-length))]
     (.putByte buf 0 ack-msg-id)
-    (write-uuid buf 1 id)
-    (write-uuid buf 17 completion-id)
-    (.putLong buf 33 ack-val)
+    (write-vpeer-id buf 1 peer-id)
+    (write-uuid buf 3 id)
+    (write-uuid buf 19 completion-id)
+    (.putLong buf 35 ack-val)
     buf))
 
 (defn read-message-type [buf offset]
-  (.getByte ^UnsafeBuffer buf ^int offset))
+  (.getByte ^UnsafeBuffer buf ^long offset))
 
-(defn read-acker-message [^UnsafeBuffer buf offset]
+(defn read-acker-message [^UnsafeBuffer buf ^long offset]
   (let [id (get-uuid buf offset)
-        completion-id (get-uuid buf (+ offset 16))
-        ack-val (.getLong buf (+ offset 32))]
-    [id completion-id ack-val]))
+        completion-id (get-uuid buf (unchecked-add offset 16))
+        ack-val (.getLong buf (unchecked-add offset 32))]
+    (->Ack id completion-id ack-val nil)))
 
-(defn read-completion [^UnsafeBuffer buf offset]
+(defn read-completion [^UnsafeBuffer buf ^long offset]
   (get-uuid buf offset))
 
-(defn read-retry [^UnsafeBuffer buf offset]
+(defn read-retry [^UnsafeBuffer buf ^long offset]
   (get-uuid buf offset))
 
-(defn build-completion-msg-buf [id] 
+(defn build-completion-msg-buf [peer-id id] 
   (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
     (.putByte buf 0 completion-msg-id)
-    (write-uuid buf 1 id)
+    (write-vpeer-id buf 1 peer-id)
+    (write-uuid buf 3 id)
     buf))
 
-(defn build-retry-msg-buf [id]
+(defn build-retry-msg-buf [peer-id id]
   (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
     (.putByte buf 0 retry-msg-id)
-    (write-uuid buf 1 id)
+    (write-vpeer-id buf 1 peer-id)
+    (write-uuid buf 3 id)
     buf))
 
-(defn write-message-meta [^MutableDirectBuffer buf offset {:keys [id acker-id completion-id ack-val]}]
-  (write-uuid buf offset id)
-  (write-uuid buf (+ offset 16) acker-id)
-  (write-uuid buf (+ offset 32) completion-id)
-  (.putLong buf (+ offset 48) ack-val))
+(defn write-message-meta [^MutableDirectBuffer buf ^long offset msg]
+  (write-uuid buf offset (:id msg))
+  (write-uuid buf (unchecked-add offset 16) (:acker-id msg))
+  (write-uuid buf (unchecked-add offset 32) (:completion-id msg))
+  (.putLong buf (unchecked-add offset 48) (:ack-val msg)))
 
-(defn read-message [^UnsafeBuffer buf offset message]
+(defn read-message [^UnsafeBuffer buf ^long offset message]
   (let [id (get-uuid buf offset)
-        acker-id (get-uuid buf (+ offset 16))
-        completion-id (get-uuid buf (+ offset 32))
-        ack-val (.getLong buf (+ offset 48))]
+        acker-id (get-uuid buf (unchecked-add offset 16))
+        completion-id (get-uuid buf (unchecked-add offset 32))
+        ack-val (.getLong buf (unchecked-add offset 48))]
     (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
 
-(def ^:const message-count-size 4)
-(def ^:const payload-size-size 4)
-
-(defn meta-message-offsets [start-pos cnt]
-  (reductions + start-pos (repeat cnt message-base-length)))
-
-(defn build-messages-msg-buf [compress-f messages]
+(defn build-messages-msg-buf [compress-f peer-id messages]
   ;; Performance consideration:
   ;; We would rather write to one contiguous byte array or a byteoutputstream
   ;; that returns a byte array. This would require changes to nippy
   (let [message-count (count messages)
         message-payloads ^bytes (compress-f (map :message messages))
         payload-size (alength message-payloads)
-        buf-size (+ message-count-size
-                    payload-size-size
-                    payload-size 
-                    (* message-count message-base-length))
-        buf (UnsafeBuffer. (byte-array buf-size))] 
-    (.putInt buf 0 (int (count messages))) ; number of messages
-    (.putInt buf message-count-size payload-size)
-    (.putBytes buf 
-               (+ message-count-size
-                  payload-size-size) 
-               message-payloads)
-    (let [offset (+ message-count-size payload-size-size payload-size)
-          buf-size (reduce (fn [offset msg]
-                             (write-message-meta buf offset msg) 
-                             (+ message-base-length offset))
-                           offset
-                           messages)]
-      [buf-size buf])))
+        buf-size (unchecked-add messages-header-size
+                                (unchecked-add payload-size 
+                                               (* message-count message-base-length)))
+        buf (UnsafeBuffer. (byte-array buf-size))
+        _ (.putByte buf 0 messages-msg-id)
+        _ (write-vpeer-id buf 1 peer-id)
+        _ (.putInt buf 3 message-count) ; number of messages
+        _ (.putInt buf 7 payload-size)
+        _ (.putBytes buf messages-header-size message-payloads)
+        offset (unchecked-add messages-header-size payload-size)
+        buf-size (reduce (fn [offset msg]
+                           (write-message-meta buf offset msg) 
+                           (unchecked-add message-base-length ^long offset))
+                         offset
+                         messages)] 
+    (list buf-size buf)))
 
-(defn read-messages-buf [decompress-f ^UnsafeBuffer buf offset length]
+(defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset length]
   (let [message-count (.getInt buf offset)
-        offset (+ offset message-count-size)
+        offset (unchecked-add offset message-count-size)
         payload-size (.getInt buf offset)
-        offset (+ offset payload-size-size)
+        offset (unchecked-add offset payload-size-size)
         ;; Performance consideration:
         ;; We would rather that we didn't need to allocate an additional
         ;; byte array here and have nippy directly read from the buf bytes
         message-payload-bytes (byte-array payload-size)
         _ (.getBytes buf offset message-payload-bytes)
         message-payloads (decompress-f message-payload-bytes)
-        offset (+ offset payload-size)]
-    (loop [messages (transient []) 
-           payloads (seq message-payloads) 
-           offset offset]
-      (if-let [v (first payloads)] 
-        (recur (conj! messages (read-message buf offset v))
-               (next payloads)
-               (+ offset message-base-length))
-        (persistent! messages)))))
-)
+        offset (unchecked-add offset payload-size)
+        segments (loop [messages (transient []) 
+                        payloads (seq message-payloads) 
+                        offset offset]
+                   (if-let [v (first payloads)] 
+                     (recur (conj! messages (read-message buf offset v))
+                            (next payloads)
+                            (unchecked-add offset message-base-length))
+                     (persistent! messages)))]
+    segments))

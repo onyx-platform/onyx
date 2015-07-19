@@ -2,7 +2,6 @@
     (:require [clojure.core.async :refer [chan >!! <!! alts!! sliding-buffer timeout close!]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [fatal] :as timbre]
-              [onyx.messaging.acking-daemon :as acker]
               [onyx.static.default-vals :refer [defaults]]
               [onyx.extensions :as extensions]))
 
@@ -22,7 +21,7 @@
   (map->CoreAsyncPeerGroup {}))
 
 (defmethod extensions/assign-site-resources :core.async
-  [config peer-site peer-sites]
+  [replica peer-site peer-sites]
   peer-site)
 
 (defmethod extensions/get-peer-site :core.async
@@ -51,6 +50,7 @@
   [messenger]
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         id (java.util.UUID/randomUUID)
+        acking-ch (:acking-ch (:acking-daemon messenger))
         inbound-ch (:inbound-ch (:messenger-buffer messenger))
         ch (chan (sliding-buffer 100000))]
     (future
@@ -62,8 +62,7 @@
                     (>!! inbound-ch m))
 
                   (= (:type x) :ack)
-                  (acker/ack-message (:acking-daemon messenger)
-                                     (:id x) (:completion-id x) (:ack-val x))
+                  (>!! acking-ch x)
 
                   (= (:type x) :complete)
                   (>!! (:release-ch messenger) (:id x))
@@ -85,7 +84,7 @@
   )
 
 (defmethod extensions/connect-to-peer CoreAsync
-  [messenger event peer-site]
+  [messenger peer-id event peer-site]
   (let [chs (:channels (:messaging-group (:peer-group messenger)))
         ch (get @chs (:site peer-site))]
     (assert ch)

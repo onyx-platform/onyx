@@ -16,6 +16,7 @@
 * [Plugins](doc/user-guide/plugins.md)
 * [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
 * [Logging](doc/user-guide/logging.md)
+* [Monitoring](doc/user-guide/monitoring.md)
 * [Performance Tuning](doc/user-guide/performance-tuning.md)
 * [Examples](doc/user-guide/examples.md)
 * [Frequently Asked Questions](doc/user-guide/faq.md)
