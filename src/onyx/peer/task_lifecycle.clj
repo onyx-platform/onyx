@@ -161,18 +161,18 @@
   (doseq [[acker-id results-by-acker] (group-by (comp :acker-id :root) results)]
     (let [link (operation/peer-link @replica state event acker-id)
           acks (doall 
-                 (map (fn [result] (let [root (:root result)
-                                         fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
-                                         fused-vals (if-let [ack-val (:ack-val root)] 
-                                                      (bit-xor fused-leaf-vals ack-val)
-                                                      fused-leaf-vals)]
-                                     (->Ack (:id root)
-                                            (:completion-id root)
-                                            ;; or'ing by zero covers the case of flow conditions where an
-                                            ;; input task produces a segment that goes nowhere.
-                                            (or fused-vals 0)
-                                            (System/currentTimeMillis))))
-                      results-by-acker))]
+                (map (fn [result] (let [root (:root result)
+                                       fused-leaf-vals (gen-ack-fusion-vals task-map (:leaves result))
+                                       fused-vals (if-let [ack-val (:ack-val root)] 
+                                                    (bit-xor fused-leaf-vals ack-val)
+                                                    fused-leaf-vals)]
+                                   (->Ack (:id root)
+                                          (:completion-id root)
+                                          ;; or'ing by zero covers the case of flow conditions where an
+                                          ;; input task produces a segment that goes nowhere.
+                                          (or fused-vals 0)
+                                          (System/currentTimeMillis))))
+                     results-by-acker))]
       (emit-latency :peer-ack-messages
                     monitoring
                     #(extensions/internal-ack-messages messenger event link acks))))
@@ -323,34 +323,34 @@
                                                        onyx.core/state] :as event} 
    outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
-    (try
-      (loop []
-        (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
-          (when v
-            (cond (= ch release-ch)
-                  (->> (p-ext/ack-message pipeline event v)
-                       (compiled-after-ack-message-fn event v))
+   (try
+     (loop []
+       (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
+         (when v
+           (cond (= ch release-ch)
+                 (->> (p-ext/ack-message pipeline event v)
+                      (compiled-after-ack-message-fn event v))
 
-                  (= ch completion-ch)
-                  (let [{:keys [id peer-id]} v
-                        peer-link (operation/peer-link @replica state event peer-id)]
-                    (emit-latency :peer-complete-message
-                                  monitoring 
-                                  #(extensions/internal-complete-message messenger event id peer-link)))
+                 (= ch completion-ch)
+                 (let [{:keys [id peer-id]} v
+                       peer-link (operation/peer-link @replica state event peer-id)]
+                   (emit-latency :peer-complete-message
+                                 monitoring 
+                                 #(extensions/internal-complete-message messenger event id peer-link)))
 
-                  (= ch retry-ch)
-                  (->> (p-ext/retry-message pipeline event v)
-                       (compiled-after-retry-message-fn event v))
+                 (= ch retry-ch)
+                 (->> (p-ext/retry-message pipeline event v)
+                      (compiled-after-retry-message-fn event v))
 
-                  (= ch seal-ch)
-                  (do
-                    (p-ext/seal-resource pipeline event)
-                    (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
-                                                                      :task (:onyx.core/task-id event)})]
-                      (>!! outbox-ch entry))))
-            (recur))))
-      (catch Throwable e
-        (fatal e)))))
+                 (= ch seal-ch)
+                 (do
+                   (p-ext/seal-resource pipeline event)
+                   (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                     :task (:onyx.core/task-id event)})]
+                     (>!! outbox-ch entry))))
+           (recur))))
+     (catch Throwable e
+       (fatal e)))))
 
 (defn input-retry-messages! [messenger {:keys [onyx.core/pipeline
                                                onyx.core/compiled-after-retry-message-fn] 
