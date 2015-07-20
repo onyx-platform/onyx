@@ -64,7 +64,6 @@
   (stop [{:keys [release-ch retry-ch virtual-peers multiplex-id] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try 
-      ;;; TODO; could handle the inbound-ch in a similar way - rather than using messenger-buffer
       (close! release-ch)
       (close! retry-ch)
       (when @multiplex-id 
@@ -212,8 +211,6 @@
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
-          ;; TODO: evaluate whether we should be using the official
-          ;; launchEmbedded feature in media driver, rather than rolling our own
           media-driver-context (if embedded-driver? 
                                  (doto (MediaDriver$Context.)))
           media-driver (if embedded-driver?

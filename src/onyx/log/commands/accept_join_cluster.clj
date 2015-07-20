@@ -57,7 +57,9 @@
     state))
 
 (defmethod extensions/fire-side-effects! :accept-join-cluster
-  [entry old new diff state]
+  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
+  (when (= (:subject args) (:id state))
+    (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new) 
     (let [next-state (unbuffer-messages state diff new)]
       (common/start-new-lifecycle old new diff next-state))))

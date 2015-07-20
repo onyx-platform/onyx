@@ -22,6 +22,8 @@
   [])
 
 (defmethod extensions/fire-side-effects! :backpressure-on
-  [{:keys [args]} old new diff state]
-  state)
-
+  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
+  (if (= (:peer args) (:id state))
+    (do (extensions/emit monitoring {:event :peer/backpressure-on :id (:id state)})
+        state)
+    state))
