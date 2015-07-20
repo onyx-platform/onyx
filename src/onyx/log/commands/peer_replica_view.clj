@@ -15,10 +15,8 @@
     (if job 
       (let [peer-state (:peer-state new)
             backpressure? (common/backpressure? new job)
-            ;;; these could be filtered down to outgoing nodes only
+            ;;; these could be filtered down to outgoing tasks
             receivable-peers (common/job-receivable-peers peer-state allocations job)
-            ;; acker peers (TODO: only required when peers are on input task)
-            ;; Validate ackable needs to be re-implemented
             max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
             job-ackers (get (:ackers new) job)
             acker-candidates (operation/select-n-peers peer-id job-ackers max-acker-links)] 
