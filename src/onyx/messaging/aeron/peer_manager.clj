@@ -4,17 +4,17 @@
 
 (defprotocol PeerManager 
   (clone [this])
-  (assoc!! [this k v])
-  (dissoc!! [this k])
+  (add [this k v])
+  (remove [this k])
   (peer-channels [this k]))
 
 (deftype VPeerManager [^Int2ObjectHashMap m]
   PeerManager
-  (assoc!! [this k v]
+  (add [this k v]
     (let [vp ^VPeerManager (clone this)] 
       (.put (.m vp) (int k) v)
       vp))
-  (dissoc!! [this k]
+  (remove [this k]
     (let [vp ^VPeerManager (clone this)] 
       (.remove (.m vp) (int k))
       vp))
