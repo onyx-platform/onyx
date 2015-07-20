@@ -2,7 +2,8 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [midje.sweet :refer :all]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.extensions :as extensions]
+            [onyx.test-helper :refer [load-config playback-log get-counts]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -22,7 +23,6 @@
 (def batch-size 20)
 
 (defn my-inc [{:keys [n] :as segment}]
-  (Thread/sleep 20)
   (assoc segment :n (inc n)))
 
 (defn restartable? [e]
@@ -76,6 +76,9 @@
 (def check-restarted-calls
   {:lifecycle/before-task-start (fn [_ _ ]
                                   (swap! startup-counter inc)
+                                  (when (= 2 @startup-counter)
+                                    (>!! in-chan :done)
+                                    (close! in-chan))
                                   {})
    :lifecycle/before-batch (fn [_ _]
                              (when (= (swap! batch-counter inc) 2)
@@ -97,10 +100,7 @@
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
 
-(>!! in-chan :done)
-(close! in-chan)
-
-(def v-peers (onyx.api/start-peers 4 peer-group))
+(def v-peers (onyx.api/start-peers 3 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -111,7 +111,7 @@
 
 (def results (take-segments! out-chan))
 
-(fact @startup-counter => 3)
+(fact @startup-counter => 2)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
