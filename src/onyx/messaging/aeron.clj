@@ -67,7 +67,7 @@
       (close! release-ch)
       (close! retry-ch)
       (when @multiplex-id 
-        (swap! virtual-peers pm/dissoc!! @multiplex-id))
+        (swap! virtual-peers pm/remove @multiplex-id))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil 
@@ -84,7 +84,7 @@
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger} 
    {:keys [aeron/id]}]
   (reset! multiplex-id id)
-  (swap! virtual-peers pm/assoc!! id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
+  (swap! virtual-peers pm/add id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
 
 (def no-op-error-handler
   (reify ErrorHandler 

@@ -111,13 +111,13 @@
 
 (defrecord AccumAckSegments [ack-val segments])
 
-;;; TODO, do not want to have to pass in result here
-(defn add-from-leaves [results event result egress-ids task->group-by-fn flow-conditions]
+(defn add-from-leaves 
+  "Flattens root/leaves into an xor'd ack-val and accumulates new segments"
+  [segments event result egress-ids task->group-by-fn flow-conditions]
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)] 
-    (reduce (fn [accum {:keys [message] :as leaf}]
-            ;;; TODO, do not want to have to pass in result here
+    (reduce (fn process-leaf [accum {:keys [message] :as leaf}]
             (let [routes (route-data event result message flow-conditions egress-ids)
                   message* (flow-conditions-transform message routes egress-ids flow-conditions event)
                   hash-group (hash-groups message* egress-ids task->group-by-fn)
@@ -126,7 +126,7 @@
                           (assoc leaf :message message*))] 
               (if (= :retry (:action routes))
                 accum
-                (reduce (fn [accum2 route]
+                (reduce (fn process-route [accum2 route]
                           (if route 
                             (let [ack-val (acker/gen-ack-value)
                                   grp (get hash-group route)
@@ -140,7 +140,7 @@
                             accum2))
                         accum 
                         (:flow routes)))))
-          (->AccumAckSegments start-ack-val (:segments results))
+          (->AccumAckSegments start-ack-val segments)
           leaves)))
 
 (defn persistent-results! [results]
@@ -152,14 +152,12 @@
   [egress-ids task->group-by-fn flow-conditions {:keys [onyx.core/results] :as event}]
   (let [results (reduce (fn [accumulated result]
                           (let [root (:root result)
-                                ret (add-from-leaves accumulated event result 
-                                                     egress-ids task->group-by-fn flow-conditions)] 
+                                segments (:segments accumulated)
+                                ret (add-from-leaves segments event result egress-ids 
+                                                     task->group-by-fn flow-conditions)
+                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)] 
                             (->Results (:tree results)
-                                       (conj! (:acks accumulated)
-                                              (->Ack (:id root) 
-                                                     (:completion-id root)
-                                                     (:ack-val ret)
-                                                     nil))
+                                       (conj! (:acks accumulated) new-ack)
                                        (:segments ret))))
                         results
                         (:tree results))]
