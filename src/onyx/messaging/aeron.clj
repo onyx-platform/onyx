@@ -116,7 +116,9 @@
           (.idle idle-strategy fragments-read))))))
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
-  ;;; Problem, all de-serialization is now done in a single subscriber thread
+  ;;; All de-serialization is now done in a single subscriber thread
+  ;;; If a job is serialization heavy, additional subscriber threads can be created
+  ;;; via peer-config :onyx.messaging.aeron/subscriber-count
   (let [msg-type (protocol/read-message-type buffer offset)
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
