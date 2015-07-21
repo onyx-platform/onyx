@@ -96,7 +96,7 @@
         active? (partial at-least-one-active? replica)]
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
-(defn transform-job-allocations [peer-state allocations]
+(defn job-receivable-peers [peer-state allocations job-id]
   (into (t/hash-map) 
         (map (fn [[task-id peers]]
                (t/vector task-id
@@ -106,7 +106,7 @@
                                            (or (= ps :active)
                                                (= ps :backpressure)))) 
                                        peers))))
-             allocations)))
+             (allocations job-id))))
 
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))

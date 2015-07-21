@@ -23,7 +23,7 @@
 (def ^:const ack-msg-id (byte 2))
 (def ^:const messages-msg-id (byte 3))
 
-(def ^:const short-size 2)
+(def ^:const short-size (long 2))
 
 ;; message length without nippy segments
 ;; id (uuid), acker-id (uuid), completion-id (uuid), ack-val (long)
@@ -100,7 +100,7 @@
         acker-id (get-uuid buf (unchecked-add offset 16))
         completion-id (get-uuid buf (unchecked-add offset 32))
         ack-val (.getLong buf (unchecked-add offset 48))]
-    (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
+    (->Leaf message id acker-id completion-id ack-val nil nil)))
 
 (defn build-messages-msg-buf [compress-f peer-id messages]
   ;; Performance consideration:

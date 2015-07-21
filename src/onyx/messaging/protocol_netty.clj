@@ -103,8 +103,7 @@
         acker-id (take-uuid buf)
         completion-id (take-uuid buf)
         ack-val (.readLong buf)]
-    ;;; Maybe should have a new record type for the read messages
-    (->Leaf message id acker-id completion-id ack-val nil nil nil nil)))
+    (->Leaf message id acker-id completion-id ack-val nil nil)))
 
 (defn build-messages-msg-buf [compress-f messages] 
   (let [message-bytes ^bytes (compress-f (map :message messages))

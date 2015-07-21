@@ -3,6 +3,7 @@
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
+            [onyx.types :as t]
             [taoensso.timbre :refer [debug info] :as timbre]))
 
 (defn inject-reader
@@ -49,9 +50,8 @@
                       segments
                       (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))] 
                         (recur (conj segments 
-                                     {:id (java.util.UUID/randomUUID)
-                                      :input :core.async
-                                      :message message})
+                                     (t/input (java.util.UUID/randomUUID)
+                                              message))
                                (inc cnt))
                         segments)))
                   (<!! timeout-ch))]
@@ -100,7 +100,7 @@
 
   (write-batch 
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
-    (doseq [msg (mapcat :leaves results)]
+    (doseq [msg (mapcat :leaves (:tree results))]
       (>!! chan (:message msg)))
     {})
 

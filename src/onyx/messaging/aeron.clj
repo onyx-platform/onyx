@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal] :as timbre]
+            [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.extensions :as extensions]
@@ -18,6 +19,8 @@
            [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
+
+(defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -64,7 +67,7 @@
       (close! release-ch)
       (close! retry-ch)
       (when @multiplex-id 
-        (swap! virtual-peers dissoc @multiplex-id))
+        (swap! virtual-peers pm/remove @multiplex-id))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil 
@@ -76,13 +79,12 @@
            :compress-f nil :decompress-f nil 
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
-(defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
 
 (defmethod extensions/open-peer-site AeronConnection
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger} 
    {:keys [aeron/id]}]
   (reset! multiplex-id id)
-  (swap! virtual-peers assoc id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
+  (swap! virtual-peers pm/add id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
 
 (def no-op-error-handler
   (reify ErrorHandler 
@@ -114,30 +116,33 @@
           (.idle idle-strategy fragments-read))))))
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
+  ;;; All de-serialization is now done in a single subscriber thread
+  ;;; If a job is serialization heavy, additional subscriber threads can be created
+  ;;; via peer-config :onyx.messaging.aeron/subscriber-count
   (let [msg-type (protocol/read-message-type buffer offset)
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
         offset (+ offset protocol/short-size)] 
     (cond (= msg-type protocol/ack-msg-id)
           (let [ack (protocol/read-acker-message buffer offset)]
-            (when-let [chs (get @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (>!! (:acking-ch chs) ack)))
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset length)]
-            (when-let [chs (get @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (let [inbound-ch (:inbound-ch chs)] 
                 (doseq [segment segments]
                   (>!! inbound-ch segment)))))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
-            (when-let [chs (get @virtual-peers peer-id)] 
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
             (let [retry-id (protocol/read-retry buffer offset)]
-              (when-let [chs (get @virtual-peers peer-id)] 
+              (when-let [chs (pm/peer-channels @virtual-peers peer-id)] 
                 (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
@@ -223,7 +228,7 @@
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
           compress-f (or (:onyx.messaging/compress-fn opts) compress)
           decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
-          virtual-peers (atom {})
+          virtual-peers (atom (pm/vpeer-manager))
           publications (atom {})
           connections (atom {})
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
@@ -315,8 +320,8 @@
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id]}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
-        ;; ensure that each machine spreads their use of the peer streams evenly
-        ;; over the cluster
+        ;; ensure that each machine spreads their use of a node/peer-group's
+        ;; streams evenly over the cluster
         stream-id (mod (hash (str external-addr 
                                   (:external-addr (:messaging-group messenger)))) 
                        sub-count)] 
@@ -339,12 +344,13 @@
   (-> messenger 
       :virtual-peers 
       deref 
-      (get id)
+      (pm/peer-channels id)
       ch-k))
 
 (defn send-messages-short-circuit [ch batch]
-  (doseq [segment batch]
-    (>!! ch segment)))
+  (when ch 
+    (doseq [segment batch]
+      (>!! ch segment))))
 
 (def ^:const publication-backpressured? (long -2))
 
@@ -360,8 +366,9 @@
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn ack-messages-short-circuit [ch acks]
-  (doseq [ack acks]
-    (>!! ch ack)))
+  (when ch 
+    (doseq [ack acks]
+      (>!! ch ack))))
 
 (defmethod extensions/internal-ack-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
@@ -376,7 +383,8 @@
         (.idle ^IdleStrategy idle-strategy 0)))))))
 
 (defn complete-message-short-circuit [ch completion-id]
-  (>!! ch completion-id))
+  (when ch 
+    (>!! ch completion-id)))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
@@ -390,7 +398,8 @@
         (.idle ^IdleStrategy idle-strategy 0)))))
 
 (defn retry-message-short-circuit [ch retry-id]
-  (>!! ch retry-id))
+  (when ch 
+    (>!! ch retry-id)))
 
 (defmethod extensions/internal-retry-message AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]

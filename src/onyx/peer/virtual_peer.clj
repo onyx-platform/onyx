@@ -46,7 +46,7 @@
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
-                  new-peer-view (extensions/peer-replica-view entry replica new-replica peer-view diff id)
+                  new-peer-view (extensions/peer-replica-view entry replica new-replica peer-view diff id opts)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)
