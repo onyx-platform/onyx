@@ -97,7 +97,6 @@
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
 (defn job-receivable-peers [peer-state allocations job-id]
-  ;; can also filter down tasks?
   (into (t/hash-map) 
         (map (fn [[task-id peers]]
                (t/vector task-id

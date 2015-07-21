@@ -15,7 +15,7 @@
     (if job 
       (let [peer-state (:peer-state new)
             backpressure? (common/backpressure? new job)
-            ;;; these could be filtered down to outgoing tasks
+            ;;; TODO: filtered receivable peers down to outgress tasks
             receivable-peers (common/job-receivable-peers peer-state allocations job)
             max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
             job-ackers (get (:ackers new) job)

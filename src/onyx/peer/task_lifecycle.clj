@@ -2,7 +2,7 @@
     (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
               [taoensso.timbre :refer [info warn trace fatal] :as timbre]
-              [rotating-seq.core :as rsc]
+              [onyx.static.rotating-seq :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]

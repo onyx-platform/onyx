@@ -1,5 +1,5 @@
 (ns onyx.log.curator
-  (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
+  (:require ;[clojure.core.async :refer [chan >!! <!! close! thread]]
             [taoensso.timbre :refer [fatal warn trace]]
             [onyx.static.default-vals :refer [defaults]])
   (:import [org.apache.zookeeper CreateMode]
