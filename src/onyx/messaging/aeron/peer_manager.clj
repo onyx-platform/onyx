@@ -1,20 +1,21 @@
 (ns onyx.messaging.aeron.peer-manager
   "Fast way for peer group subscribers to dispatch via short id to peer channels"
+  (:refer-clojure :exclude [assoc dissoc])
   (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap]))
 
 (defprotocol PeerManager 
   (clone [this])
-  (add [this k v])
-  (remove [this k])
+  (assoc [this k v])
+  (dissoc [this k])
   (peer-channels [this k]))
 
 (deftype VPeerManager [^Int2ObjectHashMap m]
   PeerManager
-  (add [this k v]
+  (assoc [this k v]
     (let [vp ^VPeerManager (clone this)] 
       (.put (.m vp) (int k) v)
       vp))
-  (remove [this k]
+  (dissoc [this k]
     (let [vp ^VPeerManager (clone this)] 
       (.remove (.m vp) (int k))
       vp))

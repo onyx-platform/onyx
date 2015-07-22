@@ -67,7 +67,7 @@
       (close! release-ch)
       (close! retry-ch)
       (when @multiplex-id 
-        (swap! virtual-peers pm/remove @multiplex-id))
+        (swap! virtual-peers pm/dissoc @multiplex-id))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil 
@@ -84,7 +84,7 @@
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger} 
    {:keys [aeron/id]}]
   (reset! multiplex-id id)
-  (swap! virtual-peers pm/add id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
+  (swap! virtual-peers pm/assoc id (->PeerChannels acking-ch inbound-ch release-ch retry-ch))) 
 
 (def no-op-error-handler
   (reify ErrorHandler 
@@ -329,6 +329,11 @@
 
 (defmethod extensions/receive-messages AeronConnection
   [messenger {:keys [onyx.core/task-map] :as event}]
+  ;; We reuse a single timeout channel. This allows us to
+  ;; continually block against one thread that is continually
+  ;; expiring. This property lets us take variable amounts of
+  ;; time when reading each segment and still allows us to return
+  ;; within the predefined batch timeout limit.
   (let [ch (:inbound-ch messenger)
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
