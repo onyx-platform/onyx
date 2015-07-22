@@ -43,6 +43,11 @@
   (read-batch [_ {:keys [core.async/chan] :as event}]
     (let [pending (count @pending-messages)
           max-segments (min (- max-pending pending) batch-size)
+          ;; We reuse a single timeout channel. This allows us to
+          ;; continually block against one thread that is continually
+          ;; expiring. This property lets us take variable amounts of
+          ;; time when reading each segment and still allows us to return
+          ;; within the predefined batch timeout limit.
           timeout-ch (timeout batch-timeout)
           batch (if (pos? max-segments)
                   (loop [segments [] cnt 0]
