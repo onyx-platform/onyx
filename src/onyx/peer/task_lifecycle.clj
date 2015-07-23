@@ -163,22 +163,22 @@
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
 
-(defn ack-messages [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
+(defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
     (let [link (operation/peer-link @replica state event acker-id)]
-      (emit-latency :peer-ack-messages
+      (emit-latency :peer-ack-segments
                     monitoring
-                    #(extensions/internal-ack-messages messenger event link acks))))
+                    #(extensions/internal-ack-segments messenger event link acks))))
   event)
 
-(defn flow-retry-messages [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
+(defn flow-retry-segments [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [result results]
     (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
       (let [root (:root result)
             link (operation/peer-link @replica state event (:completion-id root))]
-        (emit-latency :peer-retry-message
+        (emit-latency :peer-retry-segment
                       monitoring
-                      #(extensions/internal-retry-message messenger event (:id root) link)))))
+                      #(extensions/internal-retry-segment messenger event (:id root) link)))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -231,7 +231,7 @@
       (extensions/emit monitoring (->MonitorEvent :peer-sentinel-found))
       (if (p-ext/drained? pipeline event)
           (complete-job event)
-          (p-ext/retry-message pipeline event (sentinel-id event)))
+          (p-ext/retry-segment pipeline event (sentinel-id event)))
         (update-in event
                    [:onyx.core/batch]
                    (fn [batch]
@@ -312,8 +312,8 @@
 
 (defn launch-aux-threads!
   [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
-                                                       onyx.core/compiled-after-ack-message-fn 
-                                                       onyx.core/compiled-after-retry-message-fn 
+                                                       onyx.core/compiled-after-ack-segment-fn 
+                                                       onyx.core/compiled-after-retry-segment-fn 
                                                        onyx.core/monitoring
                                                        onyx.core/replica
                                                        onyx.core/state] :as event} 
@@ -324,8 +324,8 @@
        (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
          (when v
            (cond (= ch release-ch)
-                 (->> (p-ext/ack-message pipeline event v)
-                      (compiled-after-ack-message-fn event v))
+                 (->> (p-ext/ack-segment pipeline event v)
+                      (compiled-after-ack-segment-fn event v))
 
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
@@ -335,8 +335,8 @@
                                  #(extensions/internal-complete-message messenger event id peer-link)))
 
                  (= ch retry-ch)
-                 (->> (p-ext/retry-message pipeline event v)
-                      (compiled-after-retry-message-fn event v))
+                 (->> (p-ext/retry-segment pipeline event v)
+                      (compiled-after-retry-segment-fn event v))
 
                  (= ch seal-ch)
                  (do
@@ -348,8 +348,8 @@
      (catch Throwable e
        (fatal e)))))
 
-(defn input-retry-messages! [messenger {:keys [onyx.core/pipeline
-                                               onyx.core/compiled-after-retry-message-fn] 
+(defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
+                                               onyx.core/compiled-after-retry-segment-fn] 
                                         :as event} 
                              input-retry-timeout task-kill-ch]
   (go
@@ -362,8 +362,8 @@
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
-                  (->> (p-ext/retry-message pipeline event m)
-                       (compiled-after-retry-message-fn event m))))
+                  (->> (p-ext/retry-segment pipeline event m)
+                       (compiled-after-retry-segment-fn event m))))
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
               (recur))))))))
 
@@ -422,8 +422,8 @@
              (apply-fn fn bulk?)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
-             (flow-retry-messages replica state messenger monitoring)
-             (ack-messages task-map replica state messenger monitoring)
+             (flow-retry-segments replica state messenger monitoring)
+             (ack-segments task-map replica state messenger monitoring)
              (close-batch-resources)))
       (catch Throwable e
         (ex-f e)))))
@@ -516,11 +516,11 @@
 (defn compile-after-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
 
-(defn compile-after-ack-message-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-message))
+(defn compile-after-ack-segment-functions [lifecycles task-name]
+  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-segment))
 
-(defn compile-after-retry-message-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-message))
+(defn compile-after-retry-segment-functions [lifecycles task-name]
+  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
 
 (defn resolve-task-fn [entry]
   (let [f (if (or (:onyx/fn entry) 
@@ -636,8 +636,8 @@
                            :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-ack-message-fn (compile-after-ack-message-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-retry-message-fn (compile-after-retry-message-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-ack-segment-fn (compile-after-ack-segment-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-retry-segment-fn (compile-after-retry-segment-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
                            :onyx.core/task->group-by-fn (compile-grouping-fn catalog (:egress-ids task))
@@ -683,7 +683,7 @@
 
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
-        (let [input-retry-messages-ch (input-retry-messages! messenger pipeline-data input-retry-timeout task-kill-ch)
+        (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
               peer-link-gc-thread (future (gc-peer-links pipeline-data state opts))]
@@ -693,7 +693,7 @@
                  :seal-ch seal-resp-ch
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
-                 :input-retry-messages-ch input-retry-messages-ch
+                 :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch
                  :peer-link-gc-thread peer-link-gc-thread)))
       (catch Throwable e
@@ -708,7 +708,7 @@
       (<!! (:task-lifecycle-ch component))
       (close! (:task-kill-ch component))
 
-      (<!! (:input-retry-messages-ch component))
+      (<!! (:input-retry-segments-ch component))
       (<!! (:aux-ch component))
       
       ((:onyx.core/compiled-after-task-fn event) event)
@@ -725,7 +725,7 @@
       :pipeline-data nil
       :seal-ch nil
       :aux-ch nil
-      :input-retry-messages-ch nil
+      :input-retry-segments-ch nil
       :task-lifecycle-ch nil
       :peer-link-gc-thread nil)))
 

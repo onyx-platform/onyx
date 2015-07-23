@@ -45,11 +45,11 @@ A function that takes two arguments - an event map, and the matching lifecycle m
 
 #### After ack message
 
-A function that takes four arguments - an event map, a message id, the return of an input plugin ack-message call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been fully acked.
+A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been fully acked.
 
 #### After retry message
 
-A function that takes four arguments - an event map, a message id, the return of an input plugin ack-message call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried.
+A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried.
 
 
 ### Example
@@ -79,10 +79,10 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
   (println "Executing once after each batch.")
   {})
 
-(defn after-ack-message [event message-id rets lifecycle]
+(defn after-ack-segment [event message-id rets lifecycle]
   (println "Message " message-id " is fully acked"))
 
-(defn after-retry-message [event message-id rets lifecycle]
+(defn after-retry-segment [event message-id rets lifecycle]
   (println "Retrying message " message-id))
 
 ```
@@ -98,8 +98,8 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task
-   :lifecycle/after-ack-message after-ack-message
-   :lifecycle/after-retry-message after-retry-message})
+   :lifecycle/after-ack-segment after-ack-segment
+   :lifecycle/after-retry-segment after-retry-segment})
 ```
 
 Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.

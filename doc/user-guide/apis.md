@@ -22,8 +22,8 @@ Onyx ships with two distinct APIs to accommodate different needs. A description 
     - [`read-batch`](#read-batch)
     - [`write-batch`](#write-batch)
     - [`seal-resource`](#seal-resource)
-    - [`ack-message`](#ack-message)
-    - [`retry-message`](#retry-message)
+    - [`ack-segment`](#ack-segment)
+    - [`retry-segment`](#retry-segment)
     - [`pending?`](#pending)
     - [`drained?`](#drained)
 
@@ -93,11 +93,11 @@ Writes the batch with the function applied to the output stream.
 
 Called by one peer exactly once (subsequent calls occur if the sealing peer fails) when the task is completing. Close out target output resources.
 
-##### `ack-message`
+##### `ack-segment`
 
 Acknowledges a segment natively on the input medium, causing the segment to be released from durable storage.
 
-##### `retry-message`
+##### `retry-segment`
 
 Processes a segment again from the root of the workflow.
 

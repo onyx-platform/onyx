@@ -370,15 +370,15 @@
       (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
-(defn ack-messages-short-circuit [ch acks]
+(defn ack-segments-short-circuit [ch acks]
   (when ch 
     (doseq [ack acks]
       (>!! ch ack))))
 
-(defmethod extensions/internal-ack-messages AeronConnection
+(defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
   (if ((:short-circuitable? messenger) channel) 
-    (ack-messages-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
+    (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
     (let [pub ^Publication (get-publication messenger conn-info)
           idle-strategy (:send-idle-strategy messenger)] 
       (doseq [ack acks] 
@@ -402,14 +402,14 @@
       (while (= ^long (offer-f) publication-backpressured?)
         (.idle ^IdleStrategy idle-strategy 0)))))
 
-(defn retry-message-short-circuit [ch retry-id]
+(defn retry-segment-short-circuit [ch retry-id]
   (when ch 
     (>!! ch retry-id)))
 
-(defmethod extensions/internal-retry-message AeronConnection
+(defmethod extensions/internal-retry-segment AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel) 
-    (retry-message-short-circuit (short-circuit-ch messenger id :retry-ch) retry-id)
+    (retry-segment-short-circuit (short-circuit-ch messenger id :retry-ch) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
           pub ^Publication (get-publication messenger conn-info)
           unsafe-buffer (protocol/build-retry-msg-buf id retry-id)

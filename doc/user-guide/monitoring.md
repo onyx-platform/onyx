@@ -82,8 +82,8 @@ Event name                         | Keys                             |
 `:zookeeper-read-job-scheduler`    | `:event`, `:latency`             |
 `:zookeeper-read-messaging`        | `:event`, `:latency`             |
 `:zookeeper-gc-log-entry`          | `:event`, `:latency`, `:position`|
-`:peer-ack-messages`               | `:event`, `:latency`             |
-`:peer-retry-message`              | `:event`, `:latency`             |
+`:peer-ack-segments`               | `:event`, `:latency`             |
+`:peer-retry-segment`              | `:event`, `:latency`             |
 `:peer-try-complete-job`           | `:event`                         |
 `:peer-strip-sentinel`             | `:event`                         |
 `:peer-complete-message`           | `:event`, `:latency`             |
