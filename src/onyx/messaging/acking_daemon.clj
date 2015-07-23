@@ -25,7 +25,7 @@
           (timbre/fatal e)))
       (recur))))
 
-(defrecord AckState [state last-action])
+(defrecord AckState [state completed?])
 
 (defn ack-segment [ack-state completion-ch message-id completion-id ack-val]
   (let [rets
@@ -37,12 +37,12 @@
               (if ack
                 (let [updated-ack-val (bit-xor ^long (:ack-val ack) ^long ack-val)]
                   (if (zero? updated-ack-val)
-                    (->AckState (dissoc state message-id) :completed)
-                    (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) :updated)))
+                    (->AckState (dissoc state message-id) true)
+                    (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) false)))
                 (if (zero? ^long ack-val) 
-                  (->AckState state :completed)
-                  (->AckState (assoc state message-id (->Ack nil completion-id ack-val (now))) :initialised))))))]
-    (when (= :completed (:last-action rets)) 
+                  (->AckState state false)
+                  (->AckState (assoc state message-id (->Ack nil completion-id ack-val (now))) false))))))]
+    (when (:completed? rets) 
       (>!! completion-ch
            {:id message-id :peer-id completion-id}))))
 
@@ -63,7 +63,7 @@
           completion-ch (chan completion-buffer-size)
           acking-buffer-size (arg-or-default :onyx.messaging/completion-buffer-size opts)
           acking-ch (chan acking-buffer-size)
-          state (atom (->AckState {} nil))
+          state (atom (->AckState {} false))
           ack-segments-fut (future (ack-segments-loop state acking-ch completion-ch))
           timeout-fut (future (clear-messages-loop state opts))]
       (assoc component
