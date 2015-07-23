@@ -9,7 +9,7 @@
 
 (defrecord Ack [id completion-id ack-val timestamp])
 
-(defrecord Results [tree acks segments])
+(defrecord Results [tree acks segments retries])
 
 (defrecord Result [root leaves])
 

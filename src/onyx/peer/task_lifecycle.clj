@@ -109,11 +109,11 @@
     (apply-post-transformation message routes event)
     message))
 
-(defrecord AccumAckSegments [ack-val segments])
+(defrecord AccumAckSegments [ack-val segments retries])
 
 (defn add-from-leaves 
   "Flattens root/leaves into an xor'd ack-val and accumulates new segments"
-  [segments event result egress-ids task->group-by-fn flow-conditions]
+  [segments retries event result egress-ids task->group-by-fn flow-conditions]
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)] 
@@ -125,7 +125,7 @@
                           leaf
                           (assoc leaf :message message*))] 
               (if (= :retry (:action routes))
-                accum
+                (assoc accum :retries (conj! (:retries accum) root))
                 (reduce (fn process-route [accum2 route]
                           (if route 
                             (let [ack-val (acker/gen-ack-value)
@@ -136,29 +136,33 @@
                                              (assoc :route route))]
                               (->AccumAckSegments 
                                 (bit-xor ^long (:ack-val accum2) ^long ack-val)
-                                (conj! (:segments accum2) leaf**)))
+                                (conj! (:segments accum2) leaf**)
+                                (:retries accum2)))
                             accum2))
                         accum 
                         (:flow routes)))))
-          (->AccumAckSegments start-ack-val segments)
+          (->AccumAckSegments start-ack-val segments retries)
           leaves)))
 
 (defn persistent-results! [results]
   (->Results (:tree results)
              (persistent! (:acks results))
-             (persistent! (:segments results))))
+             (persistent! (:segments results))
+             (persistent! (:retries results))))
 
 (defn build-new-segments
   [egress-ids task->group-by-fn flow-conditions {:keys [onyx.core/results] :as event}]
   (let [results (reduce (fn [accumulated result]
                           (let [root (:root result)
                                 segments (:segments accumulated)
-                                ret (add-from-leaves segments event result egress-ids 
+                                retries (:retries accumulated)
+                                ret (add-from-leaves segments retries event result egress-ids 
                                                      task->group-by-fn flow-conditions)
                                 new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)] 
                             (->Results (:tree results)
                                        (conj! (:acks accumulated) new-ack)
-                                       (:segments ret))))
+                                       (:segments ret)
+                                       (:retries ret))))
                         results
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
@@ -172,13 +176,11 @@
   event)
 
 (defn flow-retry-segments [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
-  (doseq [result results]
-    (when (seq (filter (fn [leaf] (= :retry (:action (:routes leaf)))) (:leaves result)))
-      (let [root (:root result)
-            link (operation/peer-link @replica state event (:completion-id root))]
-        (emit-latency :peer-retry-segment
-                      monitoring
-                      #(extensions/internal-retry-segment messenger event (:id root) link)))))
+  (doseq [root (:retries results)]
+    (let [link (operation/peer-link @replica state event (:completion-id root))]
+      (emit-latency :peer-retry-segment
+                    monitoring
+                    #(extensions/internal-retry-segment messenger event (:id root) link))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -263,6 +265,7 @@
                        (->Result segment leaves)))
                    batch))
                (transient (t/vector))
+               (transient (t/vector))
                (transient (t/vector)))))
 
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
@@ -277,6 +280,7 @@
                      (fn [segment]
                        (->Result segment (t/vector (assoc segment :ack-val nil))))
                      batch))
+                 (transient (t/vector))
                  (transient (t/vector))
                  (transient (t/vector))))))
 

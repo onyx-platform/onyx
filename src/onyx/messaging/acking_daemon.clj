@@ -40,7 +40,7 @@
                     (->AckState (dissoc state message-id) true)
                     (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) false)))
                 (if (zero? ^long ack-val) 
-                  (->AckState state false)
+                  (->AckState state true)
                   (->AckState (assoc state message-id (->Ack nil completion-id ack-val (now))) false))))))]
     (when (:completed? rets) 
       (>!! completion-ch
