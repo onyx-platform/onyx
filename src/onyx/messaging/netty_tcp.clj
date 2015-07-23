@@ -431,7 +431,7 @@
   [messenger event peer-link messages]
   (write peer-link (protocol/build-messages-msg-buf (:compress-f messenger) messages)))
 
-(defmethod extensions/internal-ack-messages NettyTcpSockets
+(defmethod extensions/internal-ack-segments NettyTcpSockets
   [messenger event peer-link acks]
   (write peer-link (protocol/build-acks-msg-buf acks)))
 
@@ -439,7 +439,7 @@
   [messenger event id peer-link]
   (write peer-link (protocol/build-completion-msg-buf id)))
 
-(defmethod extensions/internal-retry-message NettyTcpSockets
+(defmethod extensions/internal-retry-segment NettyTcpSockets
   [messenger event id peer-link]
   (write peer-link (protocol/build-retry-msg-buf id)))
 

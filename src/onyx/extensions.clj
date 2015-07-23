@@ -58,12 +58,12 @@
 
 (defmulti close-peer-connection (fn [messenger event link] (type messenger)))
 
-(defmulti internal-ack-messages (fn [messenger event peer-link acks]
+(defmulti internal-ack-segments (fn [messenger event peer-link acks]
                                   (type messenger)))
 
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 
-(defmulti internal-retry-message (fn [messenger event id peer-link] (type messenger)))
+(defmulti internal-retry-segment (fn [messenger event id peer-link] (type messenger)))
 
 (defmethod open-peer-site :default
   [_ _] "localhost")

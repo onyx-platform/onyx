@@ -25,8 +25,8 @@
      zookeeper-read-job-scheduler
      zookeeper-read-messaging
      zookeeper-gc-log-entry
-     peer-ack-messages
-     peer-retry-message
+     peer-ack-segments
+     peer-retry-segment
      peer-try-complete-job
      peer-strip-sentinel
      peer-complete-message
@@ -71,8 +71,8 @@
            :zookeeper-read-job-scheduler
            :zookeeper-read-messaging
            :zookeeper-gc-log-entry
-           :peer-ack-messages
-           :peer-retry-message
+           :peer-ack-segments
+           :peer-retry-segment
            :peer-try-complete-job
            :peer-strip-sentinel
            :peer-complete-message

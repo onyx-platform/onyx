@@ -109,7 +109,7 @@
   [messenger event peer-link messages]
   (>!! peer-link {:type :send :messages (map strip-message messages)}))
 
-(defmethod extensions/internal-ack-messages CoreAsync
+(defmethod extensions/internal-ack-segments CoreAsync
   [messenger event peer-link acks]
   (doseq [{:keys [id completion-id ack-val]} acks] 
     (>!! peer-link {:type :ack :id id :completion-id completion-id :ack-val ack-val})))
@@ -118,7 +118,7 @@
   [messenger event id peer-link]
   (>!! peer-link {:type :complete :id id}))
 
-(defmethod extensions/internal-retry-message CoreAsync
+(defmethod extensions/internal-retry-segment CoreAsync
   [messenger event id peer-link]
   (>!! peer-link {:type :retry :id id}))
 
