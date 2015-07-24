@@ -131,6 +131,8 @@ These functions implicitly shuffle their RDDs, and must take more than one upstr
 
 ### Implementation
 
+#### Execution Planning
+
 #### Partitions
 
 #### Log Interactions
@@ -138,5 +140,7 @@ These functions implicitly shuffle their RDDs, and must take more than one upstr
 #### Fusion
 
 #### Disk I/O
+
+#### Spillable Data Structures
 
 #### Dropping the sentinel value from streaming workloads
