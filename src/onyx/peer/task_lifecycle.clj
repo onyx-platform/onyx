@@ -158,11 +158,9 @@
                                 retries (:retries accumulated)
                                 ret (add-from-leaves segments retries event result egress-ids 
                                                      task->group-by-fn flow-conditions)
-                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)] 
-                            (->Results (:tree results)
-                                       (conj! (:acks accumulated) new-ack)
-                                       (:segments ret)
-                                       (:retries ret))))
+                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)
+                                acks (conj! (:acks accumulated) new-ack)] 
+                            (->Results (:tree results) acks (:segments ret) (:retries ret))))
                         results
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
