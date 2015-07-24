@@ -18,6 +18,35 @@ A question that will certainly come up time and time again will be: "If you're i
 
 - Other transformations, such as `group-by-key`, also become implicit. Spark allows users to construct their DAG via function calls, but leaves no other attachment points to parameterize operations on a node-by-node basis. Onyx decomplects most non-functional parameters through the catalog, and communicates information back to DAG tasks at runtime. Onyx's streaming API already handles grouping by one or more keys through the catalog, making grouping an implied step on a task that performs another operation - and only incidentally needs to have data shuffled before it can correctly return the result of its operations. This is again another relief from the incidental complexity of larger data sets. Programmers shouldn't need to pollute their computational structure (workflows) with instructions on how to rearrange data to satisfy a correctness condition for a computation.
 
+### Iteration
+
+#### Spark Analysis
+
+One of Spark's hallmark features is its ability to rapidly perform a seqence of operations over a dataset. Iteration in Spark by two critical design moves:
+
+- Extraordinarily fast task scheduling and launching, on the order of milliseconds.
+- Transfering the locus of control to the user's program space.
+
+Spark allows loops to take place in a normal, single threaded program on the user's box. Inside the loop, Spark jobs are parameterized and launched, and their results are collected. These results can be used on subsequent iterations of the loop. There is inherent power by moving the looping construct into the user's local program - running these programs becames a far more interactive experience. Loops can be stopped at any point in time, and values inside the loop can be incrementally inspected. Ultimately, Spark derives much of its flexibility by launching discrete, small jobs which can return their values back to user space. Spark, to my knowledge, doesn't actually use the notion of a loop inside the cluster. Results typically return fast enough that the user is given the illusion that the looping is happening on the network.
+
+Loops are a curious feature for distributed platforms to support because of the variety of programs that can be expressed within their bodies. There are a few components to the loop that require discussion for running on a cluster: local vars, the exit-test condition, the step function, and the loop body.
+
+##### Local Vars
+
+Loops in single threaded programs often create a set of variables that are manipulated within the loop's body. Onyx allow users to declare a set of variables bound to initial values. These values will be accessible within the exit test condition, the step function, and within the body of the loop. The workflows being looped over may update these values, or add new values to the local var set.
+
+##### The Exit Test Condition
+
+There are two kinds of loops that can be supported - `while` loops, and `do-while` loops. The former tests its condition, then tries to execute the body, then loops. The latter runs its body, then loops, then tests the condition. The implication for `while` loops in a distributed program would mean that entire sections of a workflow *may never get executed* if the initial exit condition passes the first time. Notably, the API exposing which version of the looping construct to offer is easy to represent via flow conditions.
+
+##### The Step Function
+
+In some cases, it's desired that the local var set get updated by a single function - think of a basic `for` loop that iterates from `0` to `n`. The step function would increment the index. Eventually the exit test condition would pass, and the loop would finish.
+
+##### Loop Body
+
+The loop body of an Onyx workflow are one or more subtrees on the full workflow. Each subworkflow receives the local vars as of the previous step function. Additionally, users can specify the order in which subworkflows should execute. This is useful in that each subworkflow can return values which will be used by another subworkflow. After all subworkflows execute, the output values are collected and passed back to the head of the loop. Notably, we need to identify the *leaves* of the subworkflows where the loop should finish. It's possible that the subworkflow could continue. Also note that subworkflows can establish loops of their own, enabling nested looping.
+
 ### API
 
 Here we sketch out what Onyx's API should look like after we add all of the internal design to support batch processing first class. We extend `:onyx/type` from the values `:input`, `:output`, and `:function` to include more values: `:batch-function` and `:merge-function`. The former allows a function to receive an entire partition of data, and produce an entire partition of data as a result, whereas the latter takes two or more entire partitions and produces one partition.
