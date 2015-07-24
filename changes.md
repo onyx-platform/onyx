@@ -3,11 +3,16 @@
 - API: :onyx/ident has been renamed :onyx/plugin, and now takes a keyword path to a fn that instantiates the plugin e.g. :onyx.plugin.core-async/input. (**Breaking change**)
 - API: plugins are now implemented by the Pipeline and PipelineInput protocols. (**Breaking change**)
 - API: New lifecycle functions "after-ack-message" and "after-retry-message" are now available.
+- API: `:onyx/group-by-key` can now group can now take a vector of keywords, or just a keyword.
+- API: `:onyx/restart-pred-fn` catalog entry points to a boolean function that permits a task to hot restart on an exception.
+- API: Peer configuration can now be instructed to short-circuit and skip network I/O if downstream peers are on the same machine.
 - Bug fix: Several log / replica edge cases were fixed.
+- Bug fix: Peers not picking up new job after current job was killed.
 - New feature: Jobs will now enter an automatic backpressure mode when internal peer buffers fill up past a high water mark, and will be turned off after reaching a low water mark. See [Backpressure](doc/user-guide/backpressure.md) for more details.
 - New documentation: Use GitBook for documentation. [#119](https://github.com/onyx-platform/onyx/issues/119)
 - New feature: Onyx Monitoring. Onyx emits a vast amount of metrics about its internal health.
 - New feature: Aeron messaging transport layer. Requires Java 8. Use the `:aeron` key for `:onyx.messaging/impl`.
+- New feature: Java integration via catalog entry `:onyx/language` set to `:java`.
 
 #### 0.6.0
 
