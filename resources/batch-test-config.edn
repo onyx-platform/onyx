@@ -1,0 +1,13 @@
+{:env-config
+ {:zookeeper/address "127.0.0.1:2188"
+  :zookeeper/server? true
+  :zookeeper.server/port 2188}
+
+ :peer-config
+ {:zookeeper/address "127.0.0.1:2188"
+  :onyx.peer/job-scheduler :onyx.job-scheduler/naive-job
+  :onyx.peer/zookeeper-timeout 60000
+  :onyx.batch/checkpoint-storage :local-fs
+  :onyx.batch/checkpoint-format :edn}
+
+ :logging {}}

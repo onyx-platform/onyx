@@ -61,3 +61,6 @@
        (assoc-in [:peer-config :onyx.messaging/impl] :netty)
        (= impl "core.async")
        (assoc-in [:peer-config :onyx.messaging/impl] :core.async)))))
+
+(defn load-batch-config []
+  (read-string (slurp (clojure.java.io/resource "batch-test-config.edn"))))
