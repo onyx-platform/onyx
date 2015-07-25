@@ -40,4 +40,5 @@
 (defprotocol CheckpointStorage
   "Protocol to implement for storing intermediate data."
   (read-blob [this location] "Reads the blob from the location.")
-  (write-blob [this blob] "Writes the blob to storage."))
+  (write-blob [this blob] "Writes the blob to storage.")
+  (delete-blob [this location] "Deletes this blob from storage."))
