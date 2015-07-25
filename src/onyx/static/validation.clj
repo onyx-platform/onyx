@@ -51,8 +51,7 @@
   (when (= (:onyx/name entry) (:onyx/type entry))
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
 
-(defn validate-catalog
-  [catalog]
+(defn validate-streaming-catalog [catalog]
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
     (when (and (= (:onyx/type entry) :function)
@@ -62,6 +61,15 @@
                                     :onyx/min-peers :onyx/flux-policy])]
         (schema/validate group-entry-validator kws)))
     (name-and-type-not-equal entry)))
+
+(defn validate-batch-catalog [catalog]
+  (doseq [entry catalog]
+    (schema/validate
+     {:onyx/name schema/Keyword
+      :onyx/type (schema/enum :input :output :function)
+      (schema/optional-key :onyx/doc) schema/Str
+      schema/Keyword schema/Any}
+     entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -185,8 +193,10 @@
 (defn validate-job
   [job]
   (schema/validate job-validator job)
-  (validate-catalog (:catalog job))
-  (validate-workflow job))
+  (validate-workflow job)
+  (if (= (:mode job) :streaming)
+    (validate-streaming-catalog (:catalog job))
+    (validate-batch-catalog (:catalog job))))
 
 (defn validate-flow-structure [flow-schema]
   (doseq [entry flow-schema]

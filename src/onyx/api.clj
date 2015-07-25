@@ -143,7 +143,7 @@
             (throw t)))
      (let [id (java.util.UUID/randomUUID)
            tasks (planning/discover-tasks (:catalog job) (:workflow job))
-           entry (create-submit-job-entry id peer-config job tasks (:mode job))
+           entry (create-submit-job-entry id peer-config job tasks)
            client (component/start (system/onyx-client peer-config monitoring-config))]
        (extensions/write-chunk (:log client) :catalog (:catalog job) id)
        (extensions/write-chunk (:log client) :workflow (:workflow job) id)

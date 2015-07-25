@@ -7,6 +7,12 @@
  {:zookeeper/address "127.0.0.1:2188"
   :onyx.peer/job-scheduler :onyx.job-scheduler/naive-job
   :onyx.peer/zookeeper-timeout 60000
+  :onyx.messaging.aeron/embedded-driver? true
+  :onyx.messaging/allow-short-circuit? false
+  :onyx.messaging/impl :aeron
+  :onyx.messaging/peer-port-range [40200 40260]
+  :onyx.messaging/peer-ports [40199]
+  :onyx.messaging/bind-addr "localhost"
   :onyx.batch/checkpoint-storage :local-fs
   :onyx.batch/checkpoint-format :edn}
 
