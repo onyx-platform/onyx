@@ -33,6 +33,13 @@
                  Called once at the end of a task for each virtual peer after the incoming
                  queue has been exhausted. Only called once globally for a single task."))
 
+(defprotocol PipelineBatchInput
+  "Batch input pipeline protocol. All batch inputs must implement this protocol."
+  (n-partitions [this]
+    "Returns the number of input partitions that this input creates.")
+  (read-partition [this part]
+    "Reads and returns a partition from input storage."))
+
 (defprotocol PipelineBatchOutput
   "Batch output pipeline protocol. All batch outputs must implement this protocol."
-  (write-blob [this blob] "Writes the blob to storage."))
+  (write-content [this content] "Writes the content to storage."))
