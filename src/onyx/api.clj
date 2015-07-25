@@ -120,6 +120,7 @@
               :inputs input-task-ids
               :outputs output-task-ids
               :exempt-tasks exempt-task-ids
+              :mode (:mode job)
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
               :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
@@ -142,7 +143,7 @@
             (throw t)))
      (let [id (java.util.UUID/randomUUID)
            tasks (planning/discover-tasks (:catalog job) (:workflow job))
-           entry (create-submit-job-entry id peer-config job tasks)
+           entry (create-submit-job-entry id peer-config job tasks (:mode job))
            client (component/start (system/onyx-client peer-config monitoring-config))]
        (extensions/write-chunk (:log client) :catalog (:catalog job) id)
        (extensions/write-chunk (:log client) :workflow (:workflow job) id)

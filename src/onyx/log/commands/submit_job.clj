@@ -39,6 +39,7 @@
     (-> replica
         (update-in [:jobs] conj (:id args))
         (update-in [:jobs] vec)
+        (assoc-in [:job-modes (:id args)] (:mode args))
         (assoc-in [:task-schedulers (:id args)] (:task-scheduler args))
         (assoc-in [:tasks (:id args)] (vec (:tasks args)))
         (assoc-in [:allocations (:id args)] {})

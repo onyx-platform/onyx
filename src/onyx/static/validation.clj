@@ -115,7 +115,8 @@
   (validate-workflow-no-dupes job))
 
 (def job-validator
-  {:catalog [(schema/pred map? 'map?)]
+  {:mode (schema/pred #(or (= :batch %) (= :streaming %)) 'batch-or-streaming?)
+   :catalog [(schema/pred map? 'map?)]
    :workflow workflow-validator
    :task-scheduler schema/Keyword
    (schema/optional-key :percentage) schema/Int
