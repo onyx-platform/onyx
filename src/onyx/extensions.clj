@@ -81,8 +81,8 @@
 
 ;; Checkpoint storage interface
 
-(defprotocol CheckpointStorage
+(defprotocol ICheckpointStorage
   "Protocol to implement for storing intermediate data."
-  (read-blob [this location] "Reads the blob from the location.")
-  (write-blob [this blob] "Writes the blob to storage.")
-  (delete-blob [this location] "Deletes this blob from storage."))
+  (read-content [this location] "Reads the content from the location.")
+  (write-content [this content] "Writes the content to storage.")
+  (delete-content [this location] "Deletes this content from storage."))
