@@ -47,6 +47,10 @@ In some cases, it's desired that the local var set get updated by a single funct
 
 The loop body of an Onyx workflow are one or more subtrees on the full workflow. Each subworkflow receives the local vars as of the previous step function. Additionally, users can specify the order in which subworkflows should execute. This is useful in that each subworkflow can return values which will be used by another subworkflow. After all subworkflows execute, the output values are collected and passed back to the head of the loop. Notably, we need to identify the *leaves* of the subworkflows where the loop should finish. It's possible that the subworkflow could continue. Also note that subworkflows can establish loops of their own, enabling nested looping.
 
+#### Strategy
+
+Loops will be a late feature in the release of batch processing for Onyx, so we'll defer further design of iteration and note our explorations for future thinking.
+
 ### API
 
 Here we sketch out what Onyx's API should look like after we add all of the internal design to support batch processing first class. We extend `:onyx/type` from the values `:input`, `:output`, and `:function` to include more values: `:batch-function` and `:merge-function`. The former allows a function to receive an entire partition of data, and produce an entire partition of data as a result, whereas the latter takes two or more entire partitions and produces one partition.
@@ -144,3 +148,22 @@ These functions implicitly shuffle their RDDs, and must take more than one upstr
 #### Spillable Data Structures
 
 #### Dropping the sentinel value from streaming workloads
+
+### Implementation Plan
+
+Bringing in new batch primitives is going to be a large job, and we're not going to try to do all of it at once. Here, we discuss the order of features that we'll implement. The important thing is to have a plan to get to high performance - using suboptimal approaches until we get there is fine.
+
+#### Phase 1
+
+To get on our feet with new batch primitives, we're going to implement a naive approach with no optimizations. This phase will help us separate the structure of the Onyx peer and abstract away the streaming primitives. A lot of code will move around in this phase, so we'll try to complete this and only add a few basic features. At the end, we'll take stock and make sure we didn't hurt the code base quality, or introduce any major streaming bugs.
+
+The feature plan for phase 1:
+
+- Input will strictly come from an in memory data structure.
+- Intermediate checkpoint files will be written to the local filesystem
+- Output will be written to the local file system
+- No task fusion or in-memory caching of data. *Always* checkpoint the dataset to storage.
+- We will presume that a partition of data will always fit in memory, and will not implement spillable storage.
+- New, very primitive job and task schedulers will be introduced to get a minimum example working. We'll expect to throw these schedulers away and write better ones.
+- Workflows will not use an optimizer to plan stages. Each task will complete, one at a time, until the job finishes.
+- We'll implement the basic functions that require no separate work, `map`, `filter`, `mapcat`, and `remove`, as well as grouping. Implementing grouping implies that Onyx wil be able to internally shuffle data. We'll implement `reduce` style functions, to be determined.
