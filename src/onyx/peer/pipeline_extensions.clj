@@ -13,6 +13,13 @@
   (drained? [this event]
             "Returns true if this input resource has been exhausted."))
 
+(defprotocol PipelineBatchInput
+  "Batch input pipeline protocol. All batch inputs must implement this protocol."
+  (n-partitions [this]
+    "Returns the number of input partitions that this input creates.")
+  (read-partition [this part]
+    "Reads and returns a partition from input storage."))
+
 (defprotocol Pipeline 
   "Pipeline protocol. All pipelines must implement this protocols i.e. input, output, functions"
   (read-batch [this event]
