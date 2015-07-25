@@ -13,13 +13,6 @@
   (drained? [this event]
             "Returns true if this input resource has been exhausted."))
 
-(defprotocol PipelineBatchInput
-  "Batch input pipeline protocol. All batch inputs must implement this protocol."
-  (n-partitions [this]
-    "Returns the number of input partitions that this input creates.")
-  (read-partition [this part]
-    "Reads and returns a partition from input storage."))
-
 (defprotocol Pipeline 
   "Pipeline protocol. All pipelines must implement this protocols i.e. input, output, functions"
   (read-batch [this event]
@@ -39,3 +32,7 @@
                  "Closes any resources that remain open during a task being executed.
                  Called once at the end of a task for each virtual peer after the incoming
                  queue has been exhausted. Only called once globally for a single task."))
+
+(defprotocol PipelineBatchOutput
+  "Batch output pipeline protocol. All batch outputs must implement this protocol."
+  (write-blob [this blob] "Writes the blob to storage."))
