@@ -675,29 +675,40 @@
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
-        (loop [replica-state @replica]
-          (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                     (or (not (common/job-covered? replica-state job-id))
-                         (not (common/any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
-            (Thread/sleep 500)
-            (recur @replica)))
+        ;;;;; TODO: << FIX ME >>
+        ;;;;; Huge hack to force the single active peer to partition
+        ;;;;; the data set and do nothing else, unless the data set
+        ;;;;; has already been partitioned.
+        (if (and (= :input (:onyx/type catalog-entry))
+                 (not (get-in @replica [:partitions job-id task-id])))
+          (let [partitions (p-ext/n-partitions pipeline)]
+            (>!! outbox-ch (entry/create-log-entry :broadcast-input-partitions {:job job-id :task task-id :n-partitions partitions}))
+            component)
+          (do
+            ;;; TODO: << FIX ME >>
+            #_(loop [replica-state @replica]
+              (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
+                         (or (not (common/job-covered? replica-state job-id))
+                             (not (common/any-ackers? replica-state job-id))))
+                (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
+                (Thread/sleep 500)
+                (recur @replica)))
 
-        (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
+            (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
-        (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
-              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
-              peer-link-gc-thread (future (gc-peer-links pipeline-data state opts))]
-          (assoc component 
-                 :pipeline pipeline
-                 :pipeline-data pipeline-data
-                 :seal-ch seal-resp-ch
-                 :task-kill-ch task-kill-ch
-                 :task-lifecycle-ch task-lifecycle-ch
-                 :input-retry-segments-ch input-retry-segments-ch
-                 :aux-ch aux-ch
-                 :peer-link-gc-thread peer-link-gc-thread)))
+            (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
+                  aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
+                  task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
+                  peer-link-gc-thread (future (gc-peer-links pipeline-data state opts))]
+              (assoc component 
+                :pipeline pipeline
+                :pipeline-data pipeline-data
+                :seal-ch seal-resp-ch
+                :task-kill-ch task-kill-ch
+                :task-lifecycle-ch task-lifecycle-ch
+                :input-retry-segments-ch input-retry-segments-ch
+                :aux-ch aux-ch
+                :peer-link-gc-thread peer-link-gc-thread)))))
       (catch Throwable e
         (handle-exception (constantly false) e restart-ch outbox-ch job-id)
         component)))

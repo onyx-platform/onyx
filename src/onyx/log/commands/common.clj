@@ -111,7 +111,8 @@
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
-    (if (not= old-allocation new-allocation)
+    ;; TODO: << FIX ME >>
+    (if true ; (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
             (close! (:task-kill-ch state))
             (component/stop @(:lifecycle state)))

@@ -24,6 +24,7 @@
             [onyx.log.commands.backpressure-on]
             [onyx.log.commands.backpressure-off]
             [onyx.log.commands.peer-replica-view]
+            [onyx.log.commands.broadcast-input-partitions]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]
@@ -31,6 +32,7 @@
             [onyx.scheduling.percentage-task-scheduler]
             [onyx.scheduling.naive-task-scheduler]
             [onyx.plugin.core-async]
+            [onyx.plugin.local-file]
             [onyx.extensions :as extensions]))
 
 (def development-components [:monitoring :logging-config :log])
