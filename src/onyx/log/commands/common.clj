@@ -112,17 +112,33 @@
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     ;; TODO: << FIX ME >>
-    (if true ; (not= old-allocation new-allocation)
-      (do (when (:lifecycle state)
+    (if (get-in new [:job-modes (:job new-allocation)]) ; (not= old-allocation new-allocation)
+
+      (if (= :batch (get-in new [:job-modes (:job new-allocation)]))
+        (do (when (:lifecycle state)
             (close! (:task-kill-ch state))
             (component/stop @(:lifecycle state)))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   task-kill-ch (chan)
                   new-state (assoc state :job (:job new-allocation) :task (:task new-allocation)
-                                   :seal-ch seal-ch :task-kill-ch task-kill-ch)
-                  new-lifecycle (future (component/start ((:task-lifecycle-fn state)
-                                                          (select-keys new-allocation [:job :task]) new-state)))]
+                                   :seal-ch seal-ch :task-kill-ch task-kill-ch
+                                   :partition (get-in new [:assigned-partition (:job new-allocation) (:task new-allocation) (:id state)]))
+                  new-lifecycle (future (component/start ((:batch-task-lifecycle-fn state)
+                                                          (select-keys new-allocation [:job :task :partition]) new-state)))]
               (assoc new-state :lifecycle new-lifecycle))
-            (assoc state :lifecycle nil :seal-ch nil :task-kill-ch nil :job nil :task nil)))
+            (assoc state :lifecycle nil :seal-ch nil :task-kill-ch nil :job nil :task nil :partition nil)))
+        
+        (do (when (:lifecycle state)
+              (close! (:task-kill-ch state))
+              (component/stop @(:lifecycle state)))
+            (if (not (nil? new-allocation))
+              (let [seal-ch (chan)
+                    task-kill-ch (chan)
+                    new-state (assoc state :job (:job new-allocation) :task (:task new-allocation)
+                                     :seal-ch seal-ch :task-kill-ch task-kill-ch)
+                    new-lifecycle (future (component/start ((:task-lifecycle-fn state)
+                                                            (select-keys new-allocation [:job :task]) new-state)))]
+                (assoc new-state :lifecycle new-lifecycle))
+              (assoc state :lifecycle nil :seal-ch nil :task-kill-ch nil :job nil :task nil))))
       state)))

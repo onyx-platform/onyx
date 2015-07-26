@@ -28,6 +28,9 @@
   (spit input-file-name {:n n} :append true)
   (spit input-file-name "\n" :append true))
 
+(defn my-inc [segment]
+  (update-in segment [:n] inc))
+
 (def catalog
   [{:onyx/name :in
     :onyx/plugin :onyx.plugin.local-file/input
@@ -36,10 +39,10 @@
     :file/path input-file-name
     :onyx/doc "Reads segments a local file"}
 
-   {:onyx/name :identity
-    :onyx/fn :clojure.core/identity
+   {:onyx/name :inc
+    :onyx/fn :onyx.batch.batch-test/my-inc
     :onyx/type :function
-    :onyx/batch "Maps over the segments, returning themselves"}
+    :onyx/batch "Maps over the segments, incrementing :n"}
 
    {:onyx/name :out
     :onyx/plugin :onyx.plugin.local-file/output
@@ -49,8 +52,8 @@
     :onyx/doc "Writes segments to a local file"}])
 
 (def workflow
-  [[:in :identity]
-   [:identity :out]])
+  [[:in :inc]
+   [:inc :out]])
 
 (def v-peers (onyx.api/start-peers 1 peer-group))
 
@@ -64,9 +67,5 @@
 #_(do
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))
-
     (onyx.api/shutdown-peer-group peer-group)
-
     (onyx.api/shutdown-env env))
-
-

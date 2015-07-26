@@ -5,6 +5,7 @@
               [onyx.extensions :as extensions]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+              [onyx.peer.batch-task-lifecycle :refer [batch-task-lifecycle]]
               [onyx.log.entry :refer [create-log-entry]]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -37,7 +38,8 @@
                            :kill-ch kill-ch
                            :restart-ch restart-ch
                            :stall-output? true
-                           :task-lifecycle-fn task-lifecycle}
+                           :task-lifecycle-fn task-lifecycle
+                           :batch-task-lifecycle-fn batch-task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
               peer-view @peer-view-atom

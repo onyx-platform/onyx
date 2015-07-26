@@ -233,15 +233,27 @@
   false)
 
 (defn reconfigure-cluster-workload [replica]
-  (let [job-offers (job-offer-n-peers replica)
-        job-claims (job-claim-peers replica job-offers)
-        spare-peers (apply + (vals (merge-with - job-offers job-claims)))
-        max-utilization (claim-spare-peers replica job-claims spare-peers)
-        current-allocations (current-job-allocations replica)
-        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
-        final-replica updated-replica ; TODO: << FIX ME >> (deallocate-starved-jobs updated-replica)
-        ]
-    (if (equivalent-allocation? replica final-replica)
-      replica
-      final-replica)))
+  ;; TODO: << FIX ME >>
+  #_(let [job-offers (job-offer-n-peers replica)
+          job-claims (job-claim-peers replica job-offers)
+          spare-peers (apply + (vals (merge-with - job-offers job-claims)))
+          max-utilization (claim-spare-peers replica job-claims spare-peers)
+          current-allocations (current-job-allocations replica)
+          peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
+          updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
+          final-replica updated-replica ; TODO: << FIX ME >> (deallocate-starved-jobs updated-replica)
+          ]
+      (if (equivalent-allocation? replica final-replica)
+        replica
+        final-replica))
+
+  (if-let [jobs (:jobs replica)]
+    (let [target-job (first jobs)
+          target-task (first (get-in replica [:tasks target-job]))
+          target-peer (first (:peers replica))]
+      (if (get-in replica [:partitions target-job target-task])
+        (-> replica
+            (update-in [:allocations target-job target-task] #(vec (conj % target-peer)))
+            (assoc-in [:assigned-partition target-job target-task target-peer] 0))
+        (update-in replica [:allocations target-job target-task] #(vec (conj % target-peer)))))
+    replica))

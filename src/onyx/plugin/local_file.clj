@@ -17,8 +17,11 @@
 
   (read-partition [this part]
     (with-open [rdr (clojure.java.io/reader location)]
-      (let [coll (line-seq rdr)]
-        (take partition-size (drop (* part partition-size) coll)))))
+      (->> (line-seq rdr)
+           (drop (* part partition-size))
+           (take partition-size)
+           (map read-string)
+           (doall))))
   
   p-ext/PipelineBatchOutput
   (write-content [this content]

@@ -17,7 +17,11 @@
     (read-string (slurp (str root-path "/" location ".edn"))))
   (write-content [this content]
     (let [location (java.util.UUID/randomUUID)]
-      (spit (str root-path "/" location ".edn") (pr-str content))
+      (doseq [c content]
+        (spit (str root-path "/" location ".edn") (str (pr-str c) "\n") :append true))
       location))
   (delete-content [this location]
     (clojure.java.io/delete-file (str root-path "/" location ".edn"))))
+
+(defn local-fs-storage [root-path]
+  (LocalFileSystemStorage. root-path))
