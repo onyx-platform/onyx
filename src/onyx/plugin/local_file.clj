@@ -23,3 +23,9 @@
   p-ext/PipelineBatchOutput
   (write-content [this content]
     (spit location content)))
+
+(defn input [pipeline-data]
+  (->LocalFile (:file/path (:onyx.core/task-map pipeline-data))))
+
+(defn output [pipeline-data]
+  (->LocalFile (:file/path (:onyx.core/task-map pipeline-data))))

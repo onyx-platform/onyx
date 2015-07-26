@@ -93,7 +93,7 @@
 (defn job-claim-peers [replica job-offers]
   (reduce-kv
    (fn [all j n]
-     (if (job-coverable? replica j n)
+     (if true ; TODO: << FIX ME >> (job-coverable? replica j n)
        (let [sat (job-upper-bound replica j)]
          (assoc all j (min sat n)))
        (assoc all j 0)))
@@ -111,7 +111,7 @@
                                    desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job))
                                    tasks (get-in replica [:tasks job])]
                                (map (fn [t]
-                                      (when (< (or (get current t) 0) (get desired t))
+                                      (when (< (get current t 0) (get desired t 0))
                                         [job t]))
                                     tasks)))
                            (sort-job-priority replica (:jobs replica))))]
@@ -240,7 +240,8 @@
         current-allocations (current-job-allocations replica)
         peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
         updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
-        final-replica (deallocate-starved-jobs updated-replica)]
+        final-replica updated-replica ; TODO: << FIX ME >> (deallocate-starved-jobs updated-replica)
+        ]
     (if (equivalent-allocation? replica final-replica)
       replica
       final-replica)))

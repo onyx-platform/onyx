@@ -5,7 +5,7 @@
 
  :peer-config
  {:zookeeper/address "127.0.0.1:2188"
-  :onyx.peer/job-scheduler :onyx.job-scheduler/naive-job
+  :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout 60000
   :onyx.messaging.aeron/embedded-driver? true
   :onyx.messaging/allow-short-circuit? false

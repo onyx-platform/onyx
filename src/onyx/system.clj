@@ -29,6 +29,7 @@
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
+            [onyx.scheduling.naive-task-scheduler]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 
