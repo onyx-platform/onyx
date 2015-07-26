@@ -13,7 +13,11 @@
   (let [xs (p-ext/read-partition (:onyx.core/pipeline data) (:onyx.core/partition data))
         applied-partition (map (:onyx.core/fn data) xs)
         checkpoint-file (extensions/write-content (:onyx.core/checkpoint-storage data) applied-partition)]
-    (prn checkpoint-file)))
+    (>!! (:onyx.core/outbox-ch data)
+         (entry/create-log-entry :complete-partition {:job (:onyx.core/job-id data)
+                                                      :task (:onyx.core/task-id data)
+                                                      :partition (:onyx.core/partition data)
+                                                      :location checkpoint-file}))))
 
 (defrecord BatchTaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -28,7 +32,8 @@
             lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
 
-            _ (taoensso.timbre/info (format "[%s] Warming up Batch Task LifeCycle for job %s, task %s" id job-id (:name task)))
+            _ (taoensso.timbre/info (format "[%s] Warming up Batch Task LifeCycle for job %s, task %s, partition %s"
+                                            id job-id (:name task) partition))
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id

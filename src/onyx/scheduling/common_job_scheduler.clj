@@ -251,9 +251,14 @@
     (let [target-job (first jobs)
           target-task (first (get-in replica [:tasks target-job]))
           target-peer (first (:peers replica))]
-      (if (get-in replica [:partitions target-job target-task])
-        (-> replica
-            (update-in [:allocations target-job target-task] #(vec (conj % target-peer)))
-            (assoc-in [:assigned-partition target-job target-task target-peer] 0))
+      (if-let [parts (get-in replica [:partitions target-job target-task])]
+        (let [part (inc (get-in replica [:assigned-partition target-job target-task target-peer] -1))]
+          (if (< part parts)
+            (-> replica
+                (update-in [:allocations target-job target-task] #(vec (conj % target-peer)))
+                (assoc-in [:assigned-partition target-job target-task target-peer] part))
+            (-> replica
+                (update-in [:allocations target-job target-task] (constantly []))
+                (assoc-in [:assigned-partition target-job target-task target-peer] nil))))
         (update-in replica [:allocations target-job target-task] #(vec (conj % target-peer)))))
     replica))
