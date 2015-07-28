@@ -159,8 +159,8 @@ Flow Conditions give you leverage for handling exceptions without miring your co
 And the predicate might be:
 
 ```clojure
-(defn handle-error? [event exception-obj]
-  (= (type exception-obj) java.lang.NullPointerException))
+(defn handle-error? [event old ex-obj all-new]
+  (= (type ex-obj) java.lang.NullPointerException))
 ```
 
 ### Post-transform
