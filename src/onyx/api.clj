@@ -52,7 +52,7 @@
     :b #{:d}}
    to format:
    [[:a :b]
-    [:b :c]
+    [:a :c]
     [:b :d]]"
   [workflow]
   (vec
