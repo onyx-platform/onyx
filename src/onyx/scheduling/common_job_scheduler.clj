@@ -249,16 +249,56 @@
 
   (if-let [jobs (:jobs replica)]
     (let [target-job (first jobs)
-          target-task (first (get-in replica [:tasks target-job]))
+          [task-1 task-2 task-3] (get-in replica [:tasks target-job])
           target-peer (first (:peers replica))]
-      (if-let [parts (get-in replica [:partitions target-job target-task])]
-        (let [part (inc (get-in replica [:assigned-partition target-job target-task target-peer] -1))]
-          (if (< part parts)
+      
+      (cond (:done? replica)
+            replica
+
+            (and (nil? (:task (common/peer->allocated-job (:allocations replica) target-peer))) (not (:done? replica)))
             (-> replica
-                (update-in [:allocations target-job target-task] #(vec (conj % target-peer)))
-                (assoc-in [:assigned-partition target-job target-task target-peer] part))
-            (-> replica
-                (update-in [:allocations target-job target-task] (constantly []))
-                (assoc-in [:assigned-partition target-job target-task target-peer] nil))))
-        (update-in replica [:allocations target-job target-task] #(vec (conj % target-peer)))))
+                (update-in [:allocations target-job task-1] #(vec (conj % target-peer))))
+
+            (= task-1 (:task (common/peer->allocated-job (:allocations replica) target-peer)))
+            (do ;(prn (get-in replica [:partitions target-job]))
+                (if-let [parts (get-in replica [:partitions target-job task-1])]
+                  (let [part (inc (get-in replica [:assigned-partition target-job task-1 target-peer] -1))]
+                    (if (< part parts)
+                      (-> replica
+                          (update-in [:allocations target-job task-1] #(vec (conj % target-peer)))
+                          (assoc-in [:assigned-partition target-job task-1 target-peer] part))
+                      (-> replica
+                          (assoc-in [:allocations target-job task-1] [])
+                          (update-in [:allocations target-job task-2] #(vec (conj % target-peer)))
+                          (assoc-in [:assigned-partition target-job task-2 target-peer] 0))))
+                  (update-in replica [:allocations target-job task-1] #(vec (conj % target-peer)))))
+
+            (= task-2 (:task (common/peer->allocated-job (:allocations replica) target-peer)))
+            (if-let [parts (get-in replica [:partitions target-job task-2])]
+              (let [part (inc (get-in replica [:assigned-partition target-job task-2 target-peer] -1))]
+                (if (< part parts)
+                  (-> replica
+                      (update-in [:allocations target-job task-2] #(vec (conj % target-peer)))
+                      (assoc-in [:assigned-partition target-job task-2 target-peer] part))
+                  (-> replica
+                      (assoc-in [:allocations target-job task-2] [])
+                      (update-in [:allocations target-job task-3] #(vec (conj % target-peer)))
+                      (assoc-in [:assigned-partition target-job task-3 target-peer] 0))))
+              (update-in replica [:allocations target-job task-2] #(vec (conj % target-peer))))
+
+            (= task-3 (:task (common/peer->allocated-job (:allocations replica) target-peer)))
+            (if-let [parts (get-in replica [:partitions target-job task-3])]
+              (let [part (inc (get-in replica [:assigned-partition target-job task-3 target-peer] -1))]
+                (if (< part parts)
+                  (-> replica
+                      (update-in [:allocations target-job task-3] #(vec (conj % target-peer)))
+                      (assoc-in [:assigned-partition target-job task-3 target-peer] part))
+                  (-> replica
+                      (assoc :done? true)
+                      (assoc-in [:allocations target-job task-3] [])
+                      (update-in [:completed-jobs] #(vec (conj % target-job))))))
+              (update-in replica [:allocations target-job task-3] #(vec (conj % target-peer))))
+
+            :else
+            (throw (ex-info "Hit the bottom" {}))))
     replica))

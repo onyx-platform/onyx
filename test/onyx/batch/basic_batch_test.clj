@@ -18,18 +18,21 @@
 
 (def base-dir "target/")
 
-(def input-file-name (str base-dir (java.util.UUID/randomUUID) ".edn"))
+(def input-file-name (str base-dir (java.util.UUID/randomUUID)))
 
-(def output-file-name (str base-dir (java.util.UUID/randomUUID) ".edn"))
+(def output-file-name (str base-dir (java.util.UUID/randomUUID)))
 
 (def n-messages 100)
 
 (doseq [n (range n-messages)]
-  (spit input-file-name {:n n} :append true)
-  (spit input-file-name "\n" :append true))
+  (spit (str input-file-name ".edn") {:n n} :append true)
+  (spit (str input-file-name ".edn") "\n" :append true))
 
 (defn my-inc [segment]
   (update-in segment [:n] inc))
+
+(prn "Input file is:" input-file-name ".edn")
+(prn "Output file is:" output-file-name ".edn")
 
 (def catalog
   [{:onyx/name :in
@@ -37,6 +40,7 @@
     :onyx/type :input
     :onyx/medium :local-file
     :file/path input-file-name
+    :file/extension ".edn"
     :onyx/doc "Reads segments a local file"}
 
    {:onyx/name :inc
@@ -49,6 +53,7 @@
     :onyx/type :output
     :onyx/medium :local-file
     :file/path output-file-name
+    :file/extension ".edn"
     :onyx/doc "Writes segments to a local file"}])
 
 (def workflow
@@ -57,15 +62,20 @@
 
 (def v-peers (onyx.api/start-peers 1 peer-group))
 
-(onyx.api/submit-job
- peer-config
- {:mode :batch
-  :catalog catalog
-  :workflow workflow
-  :task-scheduler :onyx.task-scheduler/naive})
+(def job-id
+  (:job-id
+   (onyx.api/submit-job
+    peer-config
+    {:mode :batch
+     :catalog catalog
+     :workflow workflow
+     :task-scheduler :onyx.task-scheduler/naive})))
 
-#_(do
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-    (onyx.api/shutdown-peer-group peer-group)
-    (onyx.api/shutdown-env env))
+(onyx.api/await-job-completion peer-config job-id)
+
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
+
+(onyx.api/shutdown-peer-group peer-group)
+
+(onyx.api/shutdown-env env)

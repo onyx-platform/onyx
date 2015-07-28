@@ -42,4 +42,4 @@
 
 (defprotocol PipelineBatchOutput
   "Batch output pipeline protocol. All batch outputs must implement this protocol."
-  (write-content [this content] "Writes the content to storage."))
+  (write-partition [this part content] "Writes the content to storage."))

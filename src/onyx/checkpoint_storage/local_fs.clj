@@ -14,7 +14,8 @@
 
   extensions/ICheckpointStorage
   (read-content [this location]
-    (read-string (slurp (str root-path "/" location ".edn"))))
+    (let [lines (clojure.string/split (slurp (str root-path "/" location ".edn")) #"\n")]
+      (map read-string lines)))
   (write-content [this content]
     (let [location (java.util.UUID/randomUUID)]
       (doseq [c content]

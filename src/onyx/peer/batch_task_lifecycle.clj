@@ -9,16 +9,42 @@
               [onyx.static.default-vals :refer [arg-or-default]]
               [onyx.checkpoint-storage.local-fs :refer [local-fs-storage]]))
 
-(defn run-task-lifecycle [data]
-  (let [xs (p-ext/read-partition (:onyx.core/pipeline data) (:onyx.core/partition data))
-        applied-partition (map (:onyx.core/fn data) xs)
-        checkpoint-file (extensions/write-content (:onyx.core/checkpoint-storage data) applied-partition)]
-    (>!! (:onyx.core/outbox-ch data)
-         (entry/create-log-entry :complete-partition {:job (:onyx.core/job-id data)
-                                                      :task (:onyx.core/task-id data)
-                                                      :partition (:onyx.core/partition data)
-                                                      :location checkpoint-file}))))
+(defn run-task-lifecycle [event]
+  (cond (= :in (:onyx.core/task event))
+        (let [xs (p-ext/read-partition (:onyx.core/pipeline event) (:onyx.core/partition event))
+              applied-partition (map (:onyx.core/fn event) xs)
+              checkpoint-file (extensions/write-content (:onyx.core/checkpoint-storage event) applied-partition)]
+          (>!! (:onyx.core/outbox-ch event)
+               (entry/create-log-entry :complete-partition {:job (:onyx.core/job-id event)
+                                                            :task (:onyx.core/task-id event)
+                                                            :partition (:onyx.core/partition event)
+                                                            :location checkpoint-file})))
 
+        (= :inc (:onyx.core/task event))
+        (let [replica @(:onyx.core/replica event)
+              location (get-in replica [:completed-partitions (:onyx.core/job-id event)
+                                        (get-in replica [:tasks (:onyx.core/job-id event) 0])
+                                        (:onyx.core/partition event)])
+              xs (extensions/read-content (:onyx.core/checkpoint-storage event) location)
+              results (map (:onyx.core/fn event) xs)
+              checkpoint-file (extensions/write-content (:onyx.core/checkpoint-storage event) results)]
+          (>!! (:onyx.core/outbox-ch event)
+               (entry/create-log-entry :complete-partition {:job (:onyx.core/job-id event)
+                                                            :task (:onyx.core/task-id event)
+                                                            :partition (:onyx.core/partition event)
+                                                            :location checkpoint-file})))
+        (= :out (:onyx.core/task event))
+        (let [replica @(:onyx.core/replica event)
+              location (get-in replica [:completed-partitions (:onyx.core/job-id event)
+                                        (get-in replica [:tasks (:onyx.core/job-id event) 1])
+                                        (:onyx.core/partition event)])
+              xs (extensions/read-content (:onyx.core/checkpoint-storage event) location)
+              results (map (:onyx.core/fn event) xs)]
+          (p-ext/write-partition (:onyx.core/pipeline event) (:onyx.core/partition event) results)
+          (>!! (:onyx.core/outbox-ch event)
+               (entry/create-log-entry :complete-partition {:job (:onyx.core/job-id event)
+                                                            :task (:onyx.core/task-id event)
+                                                            :partition (:onyx.core/partition event)})))))
 (defrecord BatchTaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring partition]

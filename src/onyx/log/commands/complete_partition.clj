@@ -6,7 +6,7 @@
 (defmethod extensions/apply-log-entry :complete-partition
   [{:keys [args]} replica]
   (-> replica
-      (assoc-in [:completed-partitions (:jobs args) (:task args) (:partition args)] (:location args))
+      (assoc-in [:completed-partitions (:job args) (:task args) (:partition args)] (:location args))
       (reconfigure-cluster-workload)))
 
 (defmethod extensions/replica-diff :complete-partition

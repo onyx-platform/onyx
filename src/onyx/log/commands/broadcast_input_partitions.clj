@@ -5,9 +5,11 @@
 
 (defmethod extensions/apply-log-entry :broadcast-input-partitions
   [{:keys [args]} replica]
-  (-> replica
-      (assoc-in [:partitions (:job args) (:task args)] (:n-partitions args))
-      (reconfigure-cluster-workload)))
+  (let [tasks (get-in replica [:tasks (:job args)])
+        partitions (zipmap tasks (repeat (:n-partitions args)))]
+    (-> replica
+        (assoc-in [:partitions (:job args)] partitions)
+        (reconfigure-cluster-workload))))
 
 (defmethod extensions/replica-diff :broadcast-input-partitions
   [entry old new]
