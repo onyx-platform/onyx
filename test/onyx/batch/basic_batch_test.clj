@@ -1,4 +1,4 @@
-(ns onyx.batch.batch-test
+(ns onyx.batch.basic-batch-test
   (:require [midje.sweet :refer :all]
             [onyx.test-helper :refer [load-batch-config]]
             [onyx.plugin.local-file]
@@ -44,7 +44,7 @@
     :onyx/doc "Reads segments a local file"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.batch.batch-test/my-inc
+    :onyx/fn :onyx.batch.basic-batch-test/my-inc
     :onyx/type :function
     :onyx/batch "Maps over the segments, incrementing :n"}
 
