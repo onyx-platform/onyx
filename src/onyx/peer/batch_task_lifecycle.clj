@@ -10,7 +10,7 @@
               [onyx.checkpoint-storage.local-fs :refer [local-fs-storage]]))
 
 (defn run-task-lifecycle [event]
-  (cond (= :in (:onyx.core/task event))
+  (cond (= :input (:onyx/type (:onyx.core/task-map event)))
         (let [xs (p-ext/read-partition (:onyx.core/pipeline event) (:onyx.core/partition event))
               applied-partition (map (:onyx.core/fn event) xs)
               checkpoint-file (extensions/write-content (:onyx.core/checkpoint-storage event) applied-partition)]
@@ -20,7 +20,7 @@
                                                             :partition (:onyx.core/partition event)
                                                             :location checkpoint-file})))
 
-        (= :inc (:onyx.core/task event))
+        (= :function (:onyx/type (:onyx.core/task-map event)))
         (let [replica @(:onyx.core/replica event)
               location (get-in replica [:completed-partitions (:onyx.core/job-id event)
                                         (get-in replica [:tasks (:onyx.core/job-id event) 0])
@@ -33,7 +33,7 @@
                                                             :task (:onyx.core/task-id event)
                                                             :partition (:onyx.core/partition event)
                                                             :location checkpoint-file})))
-        (= :out (:onyx.core/task event))
+        (= :output (:onyx/type (:onyx.core/task-map event)))
         (let [replica @(:onyx.core/replica event)
               location (get-in replica [:completed-partitions (:onyx.core/job-id event)
                                         (get-in replica [:tasks (:onyx.core/job-id event) 1])
