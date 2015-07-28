@@ -72,17 +72,17 @@ A predicate function is a Clojure function that takes at least four parameters -
 Predicates for the above examples can be seen below:
 
 ```clojure
-(defn child? [event segment max-age]
-  (<= (:age segment) max-age))
+(defn child? [event old-segment new-segment all-new max-age]
+  (<= (:age new-segment) max-age))
 
-(defn adult? [event segment]
-  (>= (:age segment) 18))
+(defn adult? [event old-segment new-segment all-new]
+  (>= (:age new-segment) 18))
 
-(defn female? [event segment]
-  (= (:gender segment) "Female"))
+(defn female? [event old-segment new-segment all-new]
+  (= (:gender new-segment) "Female"))
 
-(defn athlete? [event segment]
-  (= (:job segment) "athlete"))
+(defn athlete? [event old-segment new-segment all-new]
+  (= (:job new-segment) "athlete"))
 
 (def constantly-true (constantly true))
 ```
