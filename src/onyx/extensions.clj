@@ -24,6 +24,8 @@
 
 (defmulti register-pulse (fn [log id] (type log)))
 
+(defmulti peer-exists? (fn [log id] (type log)))
+
 (defmulti on-delete (fn [log id ch] (type log)))
 
 (defmulti subscribe-to-log (fn [log ch] (type log)))

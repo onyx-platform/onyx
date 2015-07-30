@@ -86,6 +86,14 @@
                   {:fn :leave-cluster :args {:id (:subject diff)}}))
                (close! ch))
            (assoc state :watch-ch ch))
+         ;; Handles the cases where a peer tries to attach to a dead
+         ;; peer that hasn't been evicted for whatever reason.
+         (= (:id state) (:subject diff))
+         (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+           (extensions/write-log-entry
+            (:log state)
+            {:fn :leave-cluster :args {:id (:subject diff)}})
+           state)
          (= (:id state) (:instant-join diff))
          (do (extensions/open-peer-site (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))
