@@ -90,9 +90,11 @@
          ;; peer that hasn't been evicted for whatever reason.
          (= (:id state) (:subject diff))
          (if (not (extensions/peer-exists? (:log state) (:observer diff)))
-           (extensions/write-log-entry
-            (:log state)
-            {:fn :leave-cluster :args {:id (:subject diff)}})
+           (do
+             (extensions/write-log-entry
+              (:log state)
+              {:fn :leave-cluster :args {:id (:subject diff)}})
+             state)
            state)
          (= (:id state) (:instant-join diff))
          (do (extensions/open-peer-site (:messenger state)
