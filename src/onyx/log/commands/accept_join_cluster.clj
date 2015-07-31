@@ -62,4 +62,5 @@
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new) 
     (let [next-state (unbuffer-messages state diff new)]
-      (common/start-new-lifecycle old new diff next-state))))
+      (common/start-new-lifecycle old new diff next-state))
+    state))
