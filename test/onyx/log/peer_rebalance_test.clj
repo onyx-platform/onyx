@@ -24,14 +24,14 @@
 
 (def catalog-1
   [{:onyx/name :a
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size 20
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :b
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 20
@@ -39,14 +39,14 @@
 
 (def catalog-2
   [{:onyx/name :c
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size 20
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :d
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 20
@@ -127,7 +127,7 @@
 (def ch (chan 10000))
 
 (def replica-1
-  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 8000))
 
 (fact "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
 
@@ -141,9 +141,7 @@
 
 (zk/close conn)
 
-(def replica-2
-  (playback-log (:log env) replica-1 ch 2000))
-
+(def replica-2 (playback-log (:log env) replica-1 ch 8000))
 
 (fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 2] [3 3]])
 

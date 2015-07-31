@@ -71,10 +71,13 @@
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
+(defn replica->job-peers [replica job-id]
+  (apply concat (vals (get-in replica [:allocations job-id]))))
+
 (defn current-job-allocations [replica]
   (into {}
         (map (fn [j]
-               {j (count (remove nil? (apply concat (vals (get-in replica [:allocations j])))))})
+               {j (count (remove nil? (replica->job-peers replica j)))})
              (:jobs replica))))
 
 (defn current-task-allocations [replica]
@@ -83,7 +86,7 @@
    (map (fn [j]
           {j (into {}
                    (map (fn [t]
-                          {t (count (filter identity (get-in replica [:allocations j t])))})
+                          {t (count (remove nil? (get-in replica [:allocations j t])))})
                         (get-in replica [:tasks j])))})
         (:jobs replica))))
 
@@ -114,17 +117,14 @@
                            (sort-job-priority replica (:jobs replica))))]
       (if (and (seq peer-pool) (seq candidate-jobs))
         (recur (rest peer-pool)
-               (let [removed (common/remove-peers replica (first peer-pool))
-                     reset-state (assoc-in removed [:peer-state (first peer-pool)] :warming-up)]
-                 (-> reset-state
-                     (update-in [:allocations
-                                 (ffirst candidate-jobs)
-                                 (second (first candidate-jobs))]
-                                conj (first peer-pool))
-                     (update-in [:allocations
-                                 (ffirst candidate-jobs)
-                                 (second (first candidate-jobs))]
-                                vec))))
+               (let [peer (first peer-pool)
+                     [job-id task-id] (first candidate-jobs)]
+                 (-> replica
+                     (common/remove-peers peer)
+                     (assoc-in [:peer-state peer] :idle)
+                     (update-in [:allocations job-id task-id] 
+                                (fn [allocation]
+                                  (vec (conj allocation peer)))))))
         replica))))
 
 (defn find-unused-peers [replica]
@@ -190,13 +190,23 @@
 (defn choose-ackers [replica]
   (reduce
    (fn [result job]
-     (let [peers (sort (apply concat (vals (get-in result [:allocations job]))))
+     (let [peers (sort (replica->job-peers replica job))
            pct (or (get-in result [:acker-percentage job]) 10)
            n (int (Math/ceil (* 0.01 pct (count peers))))
            candidates (choose-acker-candidates result peers)]
        (assoc-in result [:ackers job] (vec (take n candidates)))))
    replica
    (:jobs replica)))
+
+(defn remove-job [replica job]
+  (let [peers (sort (replica->job-peers replica job))] 
+    (-> replica
+        (update-in [:allocations] dissoc job)
+        (update-in [:peer-state] (fn [peer-state]
+                                   (reduce (fn [ps peer] 
+                                             (assoc ps peer :idle)) 
+                                           peer-state 
+                                           peers))))))
 
 (defn deallocate-starved-jobs
   "Strips out allocations from jobs that no longer meet the minimum number
@@ -210,7 +220,7 @@
                          (get-in result [:min-required-peers job t] 1)))
                    tasks)
          result
-         (update-in result [:allocations] dissoc job))))
+         (remove-job result job))))
    replica
    (:jobs replica)))
 

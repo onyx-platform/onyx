@@ -42,7 +42,7 @@
 
 (def catalog
   [{:onyx/name :colors-in
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -68,7 +68,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :red-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -76,7 +76,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :blue-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -84,7 +84,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :green-out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -171,9 +171,19 @@
 (def green-out-calls
   {:lifecycle/before-task-start inject-green-out-ch})
 
+(def retry-counter
+  (atom (long 0)))
+
+(def retry-calls
+  {:lifecycle/after-retry-segment (fn retry-count-inc [event message-id rets lifecycle]
+                                    (swap! retry-counter inc))})
+
+
 (def lifecycles
   [{:lifecycle/task :colors-in
     :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
+   {:lifecycle/task :colors-in
+    :lifecycle/calls :onyx.peer.colors-flow-test/retry-calls}
    {:lifecycle/task :colors-in
     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
    {:lifecycle/task :red-out
@@ -256,6 +266,7 @@
 (fact (into #{} green) => green-expectatations)
 (fact (into #{} red) => red-expectatations)
 (fact (into #{} blue) => blue-expectatations)
+(fact @retry-counter => 1)
 
 (close! colors-in-chan)
 

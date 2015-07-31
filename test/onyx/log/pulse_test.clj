@@ -3,6 +3,7 @@
             [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger]
+            [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
@@ -60,7 +61,10 @@
 
 (def reactions (rep-reactions old-replica new-replica diff {:id d-id}))
 
-(extensions/fire-side-effects! read-entry old-replica new-replica diff {:log (:log env) :id a-id})
+(def state {:log (:log env) :id a-id
+            :monitoring (no-op-monitoring-agent)})
+
+(extensions/fire-side-effects! read-entry old-replica new-replica diff state)
 
 (def conn (zk/connect (:zookeeper/address (:env-config config))))
 

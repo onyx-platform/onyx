@@ -15,11 +15,12 @@ This chapter details a few tips for getting your Onyx cluster to run as fast as 
 
 - Use Clojure 1.7. This version of Clojure has some dramatic performance enhancements compared to 1.6.
 - Start roughly 1 virtual peer per core per machine.
-- Set your batch size per task to roughly 100 bytes of segments.
+- Set your batch size per task to roughly 2000 bytes of segments.
 - For small segments, batch multiple segments into a single segment, and treat each new segment as a rolled up batch.
 - Tweak the batch timeout in each catalog entry to trade off increased latency for higher throughput.
 - Use a custom compression scheme, rather than Nippy. You can configure custom compression/decompression functions via the peer configuration.
 - Increase the number of acker peers through the peer configuration as your cluster gets larger
+- Tune the number of Aeron subscriber threads, if serialization is a large proportion of work performed in tasks.
 
 ### ZooKeeper
 

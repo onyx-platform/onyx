@@ -4,6 +4,7 @@
             [clojure.set :refer [map-invert]]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
+            [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
 (defn job->peers [replica]
@@ -24,19 +25,34 @@
    id))
 
 (defn allocations->peers [allocations]
-  (reduce-kv
-   (fn [all job tasks]
-     (merge all
-            (reduce-kv
-             (fn [all task allocations]
-               (->> allocations
-                    (map (fn [peer] {peer {:job job :task task}}))
-                    (into {})
-                    (merge all)))
-             {}
-             tasks)))
-   {}
-   allocations))
+   (reduce-kv
+     (fn [all job tasks]
+       (merge all
+              (reduce-kv
+                (fn [all task allocations]
+                  (->> allocations
+                       (map (fn [peer] {peer {:job job :task task}}))
+                       (into {})
+                       (merge all)))
+                {}
+                tasks)))
+     {}
+     allocations))
+
+(defn job-allocations->peer-ids 
+  [allocations job-id]
+  (->> job-id
+       allocations
+       vals
+       (reduce into (t/vector))))
+
+(defn backpressure? [replica job-id]
+  (let [peers (job-allocations->peer-ids (:allocations replica) job-id)]
+    (boolean 
+      (first 
+        (filter #(= % :backpressure) 
+                (map (:peer-state replica) 
+                     peers))))))
 
 (defn remove-peers [replica id]
   (let [prev (get (allocations->peers (:allocations replica)) id)]
@@ -65,6 +81,32 @@
   (and (all-inputs-exhausted? replica (:job args))
        (executing-output-task? replica (:id state))
        (elected-sealer? replica message-id (:id state))))
+
+(defn at-least-one-active? [replica peers]
+  (->> peers
+       (map #(get-in replica [:peer-state %]))
+       (filter (partial = :active))
+       (seq)))
+
+(defn any-ackers? [replica job-id]
+  (> (count (get-in replica [:ackers job-id])) 0))
+
+(defn job-covered? [replica job]
+  (let [tasks (get-in replica [:tasks job])
+        active? (partial at-least-one-active? replica)]
+    (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
+
+(defn job-receivable-peers [peer-state allocations job-id]
+  (into (t/hash-map) 
+        (map (fn [[task-id peers]]
+               (t/vector task-id
+                         (into (t/vector) 
+                               (filter (fn [peer] 
+                                         (let [ps (peer-state peer)] 
+                                           (or (= ps :active)
+                                               (= ps :backpressure)))) 
+                                       peers))))
+             (allocations job-id))))
 
 (defn start-new-lifecycle [old new diff state]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))

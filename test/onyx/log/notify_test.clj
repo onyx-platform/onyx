@@ -6,6 +6,7 @@
             [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config]]
             [onyx.extensions :as extensions]
+            [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.api]
             [midje.sweet :refer :all]
             [onyx.log.curator :as zk]))
@@ -56,7 +57,8 @@
                   :job-scheduler :onyx.job-scheduler/greedy})
 
 (def old-local-state {:messenger :dummy-messenger
-                      :log (:log env) :id a-id})
+                      :log (:log env) :id a-id
+                      :monitoring (no-op-monitoring-agent)})
 
 (def new-replica (f old-replica))
 
@@ -84,7 +86,8 @@
 
 (def old-replica new-replica)
 
-(def old-local-state {:log (:log env) :id d-id :watch-ch (chan)})
+(def old-local-state {:log (:log env) :id d-id :watch-ch (chan)
+                      :monitoring (no-op-monitoring-agent)})
 
 (def new-replica (f old-replica))
 

@@ -9,21 +9,22 @@
             [taoensso.timbre :refer [info] :as timbre]))
 
 (defn add-site [replica {:keys [joiner peer-site]}]
+  (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
   (-> replica 
       (assoc-in [:peer-sites joiner]
                 (merge
                   peer-site
-                  (extensions/assign-site-resources (:messaging replica)
+                  (extensions/assign-site-resources replica
                                                     peer-site
                                                     (:peer-sites replica))))))
 
 (defmethod extensions/apply-log-entry :prepare-join-cluster
   [{:keys [args message-id]} replica]
-  (let [n (count (:peers replica))]
+  (let [peers (:peers replica)
+        n (count peers)]
     (if (> n 0)
       (let [joining-peer (:joiner args)
-            cluster (:peers replica)
-            all-joined-peers (set (concat (keys (:pairs replica)) cluster))
+            all-joined-peers (set (concat (keys (:pairs replica)) peers))
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))
@@ -72,11 +73,12 @@
           :immediate? true}]))
 
 (defmethod extensions/fire-side-effects! :prepare-join-cluster
-  [{:keys [args]} old new diff state]
+  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
    (cond (= (:id state) (:observer diff))
          (let [ch (chan 1)]
+           (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
            (extensions/on-delete (:log state) (:subject diff) ch)
            (go (when (<! ch)
                  (extensions/write-log-entry
@@ -84,15 +86,16 @@
                   {:fn :leave-cluster :args {:id (:subject diff)}}))
                (close! ch))
            (assoc state :watch-ch ch))
+         ;; Handles the cases where a peer tries to attach to a dead
+         ;; peer that hasn't been evicted for whatever reason.
          (= (:id state) (:subject diff))
-         (let [ch (chan 1)]
-           (extensions/on-delete (:log state) (:observer diff) ch)
-           (go (when (<! ch)
-                 (extensions/write-log-entry
-                  (:log state)
-                  {:fn :leave-cluster :args {:id (:observer diff)}}))
-               (close! ch))
-           (assoc state :watch-ch ch))
+         (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+           (do
+             (extensions/write-log-entry
+              (:log state)
+              {:fn :leave-cluster :args {:id (:subject diff)}})
+             state)
+           state)
          (= (:id state) (:instant-join diff))
          (do (extensions/open-peer-site (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))
