@@ -15,7 +15,7 @@
         accepted? (get-in replica [:accepted accepted-observer])
         already-joined? (some #{accepted-joiner} (:peers replica))
         no-observer? (not (some #{target} (:peers replica)))]
-    (if (or already-joined? no-observer? (not accepted?)) 
+    (if (or already-joined? no-observer? (not accepted?))
       replica
       (-> replica
           (update-in [:pairs] merge {accepted-observer accepted-joiner})
@@ -38,9 +38,9 @@
 (defmethod extensions/reactions :accept-join-cluster
   [{:keys [args] :as entry} old new diff state]
   (let [accepted-joiner (:accepted-joiner args)
-        already-joined? (some #{accepted-joiner} (:peers old))] 
-    (if (and (not already-joined?) 
-             (nil? diff) 
+        already-joined? (some #{accepted-joiner} (:peers old))]
+    (if (and (not already-joined?)
+             (nil? diff)
              (= (:id state) accepted-joiner))
       [{:fn :abort-join-cluster
         :args {:id accepted-joiner}

@@ -9,7 +9,7 @@
             [taoensso.timbre :refer [info] :as timbre]))
 
 (defn add-site [replica {:keys [joiner peer-site]}]
-  (assert (:messaging replica))
+  (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
   (-> replica 
       (assoc-in [:peer-sites joiner]
                 (merge

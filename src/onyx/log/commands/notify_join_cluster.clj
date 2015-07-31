@@ -24,11 +24,11 @@
 
 (defmethod extensions/reactions :notify-join-cluster
   [entry old new diff peer-args]
-  (cond (and (= (vals diff) (remove nil? (vals diff))) 
+  (cond (and (= (vals diff) (remove nil? (vals diff)))
              (= (:id peer-args) (:observer diff)))
         [{:fn :accept-join-cluster
           :args diff
-          :immediate? true}]  
+          :immediate? true}]
         (= (:id peer-args) (:observer (:args entry)))
         [{:fn :abort-join-cluster
           :args {:id (:observer (:args entry))}
