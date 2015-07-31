@@ -73,7 +73,7 @@
 
 (def catalog
   [{:onyx/name :A
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -81,7 +81,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :B
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -89,7 +89,7 @@
     :onyx/doc "Reads segments from a core.async channel"}
 
    {:onyx/name :C
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -127,7 +127,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :J
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -135,7 +135,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :K
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
@@ -143,7 +143,7 @@
     :onyx/doc "Writes segments to a core.async channel"}
 
    {:onyx/name :L
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size

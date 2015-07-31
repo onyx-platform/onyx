@@ -72,17 +72,17 @@ A predicate function is a Clojure function that takes at least four parameters -
 Predicates for the above examples can be seen below:
 
 ```clojure
-(defn child? [event segment max-age]
-  (<= (:age segment) max-age))
+(defn child? [event old-segment new-segment all-new max-age]
+  (<= (:age new-segment) max-age))
 
-(defn adult? [event segment]
-  (>= (:age segment) 18))
+(defn adult? [event old-segment new-segment all-new]
+  (>= (:age new-segment) 18))
 
-(defn female? [event segment]
-  (= (:gender segment) "Female"))
+(defn female? [event old-segment new-segment all-new]
+  (= (:gender new-segment) "Female"))
 
-(defn athlete? [event segment]
-  (= (:job segment) "athlete"))
+(defn athlete? [event old-segment new-segment all-new]
+  (= (:job new-segment) "athlete"))
 
 (def constantly-true (constantly true))
 ```
@@ -159,13 +159,13 @@ Flow Conditions give you leverage for handling exceptions without miring your co
 And the predicate might be:
 
 ```clojure
-(defn handle-error? [event exception-obj]
-  (= (type exception-obj) java.lang.NullPointerException))
+(defn handle-error? [event old ex-obj all-new]
+  (= (type ex-obj) java.lang.NullPointerException))
 ```
 
 ### Post-transform
 
-Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with two parameters: the event map and the exception object. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
+Post-transformations are extension provided to handle segments that cause exceptions to arise. If a flow condition has `:flow/thrown-exception?` set to `true`, it can also set `:flow/post-transform` to a keyword. This keyword must have the value of a fully namespace qualified function on the classpath. This function will be invoked with three parameters: the event map, the segment that caused the exception, and the exception object. The result of this function, which must be a segment, will be passed to the downstream tasks. This allows you to come up with a reasonable value to pass downstream when you encounter an exception, since exceptions don't serialize anyway. `:flow/exclude-keys` will be called on the resulting transformed segment.
 
 Example:
 
@@ -181,7 +181,7 @@ Example:
 And an example post-transform function might be:
 
 ```clojure
-(defn post-transform [event exception-obj]
+(defn post-transform [event segment exception-obj]
   {:error :my-exception-value})
 ```
 

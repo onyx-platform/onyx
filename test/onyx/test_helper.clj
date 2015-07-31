@@ -1,6 +1,6 @@
 (ns onyx.test-helper
   (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
-            [yeller-timbre-appender]
+            [yeller.timbre-appender]
             [taoensso.timbre :refer  [info warn trace fatal error] :as timbre]
             [onyx.extensions :as extensions]))
 
@@ -52,7 +52,7 @@
      (cond-> (read-string (slurp (clojure.java.io/resource filename)))
        (not-empty yeller-token) 
        (assoc-in [:peer-config :onyx.log/config :appenders :yeller] 
-                 (yeller-timbre-appender/make-yeller-appender
+                 (yeller.timbre-appender/make-yeller-appender
                    {:token yeller-token
                     :environment "citests"}))
        (= impl "aeron")

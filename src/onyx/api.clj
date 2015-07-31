@@ -52,7 +52,7 @@
     :b #{:d}}
    to format:
    [[:a :b]
-    [:b :c]
+    [:a :c]
     [:b :d]]"
   [workflow]
   (vec
@@ -126,45 +126,52 @@
         args (add-percentages-to-log-entry config job args tasks (:catalog job) id)]
     (create-log-entry :submit-job args)))
 
-(defn ^{:added "0.6.0"} submit-job [config job]
-  (try (validator/validate-peer-config config)
-       (validator/validate-job (assoc job :workflow (:workflow job)))
-       (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-       (validator/validate-lifecycles (:lifecycles job) (:catalog job))
-       (catch Throwable t 
-         (println t)
-         (error t) 
-         (throw t)))
-  (let [id (java.util.UUID/randomUUID)
-        tasks (planning/discover-tasks (:catalog job) (:workflow job))
-        entry (create-submit-job-entry id config job tasks)
-        client (component/start (system/onyx-client config))]
-    (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-    (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-    (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-    (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
+(defn ^{:added "0.6.0"} submit-job
+  "Takes a peer configuration, job map, and optional monitoring config,
+   sending the job to the cluster for eventual execution."
+  ([peer-config job]
+     (submit-job peer-config job {:monitoring :no-op}))
+  ([peer-config job monitoring-config]
+     (try (validator/validate-peer-config peer-config)
+          (validator/validate-job (assoc job :workflow (:workflow job)))
+          (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+          (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+          (catch Throwable t 
+            (println t)
+            (error t) 
+            (throw t)))
+     (let [id (java.util.UUID/randomUUID)
+           tasks (planning/discover-tasks (:catalog job) (:workflow job))
+           entry (create-submit-job-entry id peer-config job tasks)
+           client (component/start (system/onyx-client peer-config monitoring-config))]
+       (extensions/write-chunk (:log client) :catalog (:catalog job) id)
+       (extensions/write-chunk (:log client) :workflow (:workflow job) id)
+       (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
+       (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
 
-    (doseq [task tasks]
-      (extensions/write-chunk (:log client) :task task id))
+       (doseq [task tasks]
+         (extensions/write-chunk (:log client) :task task id))
 
-    (extensions/write-log-entry (:log client) entry)
-    (component/stop client)
-    {:job-id id
-     :task-ids tasks}))
+       (extensions/write-log-entry (:log client) entry)
+       (component/stop client)
+       {:job-id id
+        :task-ids tasks})))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
    tasks for this job cleanly stop executing and volunteer to work on other jobs.
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
    for execution."
-  [config job-id]
-  (when (nil? job-id)
-    (throw (ex-info {:error "Invalid job id" :job-id job-id})))
-  (let [client (component/start (system/onyx-client config))
-        entry (create-log-entry :kill-job {:job job-id})]
-    (extensions/write-log-entry (:log client) entry)
-    (component/stop client)
-    true))
+  ([peer-config job-id]
+     (kill-job peer-config job-id {:monitoring :no-op}))
+  ([peer-config job-id monitoring-config]
+     (when (nil? job-id)
+       (throw (ex-info {:error "Invalid job id" :job-id job-id})))
+     (let [client (component/start (system/onyx-client peer-config monitoring-config))
+           entry (create-log-entry :kill-job {:job job-id})]
+       (extensions/write-log-entry (:log client) entry)
+       (component/stop client)
+       true)))
 
 (defn ^{:added "0.6.0"} subscribe-to-log
   "Sends all events from the log to the provided core.async channel.
@@ -174,10 +181,12 @@
    replica. :env contains an Component with a :log connection to ZooKeeper,
    convenient for directly querying the znodes. :env can be shutdown with
    the onyx.api/shutdown-env function"
-  [config ch]
-  (let [env (component/start (system/onyx-client config))]
-    {:replica (extensions/subscribe-to-log (:log env) ch)
-     :env env}))
+  ([peer-config ch]
+     (subscribe-to-log peer-config ch {:monitoring :no-op}))
+  ([peer-config ch monitoring-config]
+     (let [env (component/start (system/onyx-client peer-config monitoring-config))]
+       {:replica (extensions/subscribe-to-log (:log env) ch)
+        :env env})))
 
 (defn ^{:added "0.6.0"} gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
@@ -185,36 +194,40 @@
    ZooKeeper, freeing up disk space.
 
    Local replicas clear out all data about completed and killed jobs -
-   as if they never existed. "
-  [config]
-  (let [id (java.util.UUID/randomUUID)
-        client (component/start (system/onyx-client config))
-        entry (create-log-entry :gc {:id id})
-        ch (chan 1000)]
-    (extensions/write-log-entry (:log client) entry)
-    
-    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-      (let [entry (<!! ch)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-          (let [diff (extensions/replica-diff entry replica new-replica)]
-            (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
-          (recur new-replica))))
-    (component/stop client)
-    true))
+   as if they never existed."
+  ([peer-config]
+     (gc peer-config {:monitoring :no-op}))
+  ([peer-config monitoring-config]
+     (let [id (java.util.UUID/randomUUID)
+           client (component/start (system/onyx-client peer-config monitoring-config))
+           entry (create-log-entry :gc {:id id})
+           ch (chan 1000)]
+       (extensions/write-log-entry (:log client) entry)
+        
+       (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+         (let [entry (<!! ch)
+               new-replica (extensions/apply-log-entry entry replica)]
+           (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
+             (let [diff (extensions/replica-diff entry replica new-replica)]
+               (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+             (recur new-replica))))
+       (component/stop client)
+       true)))
 
 (defn ^{:added "0.6.0"} await-job-completion
   "Blocks until job-id has had all of its tasks completed."
-  [config job-id]
-  (let [client (component/start (system/onyx-client config))
-        ch (chan 100)]
-    (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-      (let [entry (<!! ch)
-            new-replica (extensions/apply-log-entry entry replica)]
-        (if-not (some #{job-id} (:completed-jobs new-replica))
-          (recur new-replica)
-          (do (component/stop client)
-              true))))))
+  ([peer-config job-id]
+     (await-job-completion peer-config job-id {:monitoring :no-op}))
+  ([peer-config job-id monitoring-config]
+     (let [client (component/start (system/onyx-client peer-config monitoring-config))
+           ch (chan 100)]
+       (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+         (let [entry (<!! ch)
+               new-replica (extensions/apply-log-entry entry replica)]
+           (if-not (some #{job-id} (:completed-jobs new-replica))
+             (recur new-replica)
+             (do (component/stop client)
+                 true)))))))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
@@ -238,24 +251,27 @@
 
 (defn ^{:added "0.6.0"} start-peers
   "Launches n virtual peers. Each peer may be stopped
-   by passing it to the shutdown-peer function."
-  [n {:keys [config] :as peer-group}]
-  (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
-    (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
-
-  (doall
-   (map
-    (fn [_]
-      (let [v-peer (system/onyx-peer peer-group)
-            live (component/start v-peer)
-            shutdown-ch (chan 1)
-            ack-ch (chan)
-            started-peer (atom live)]
-        {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
-         :started-peer started-peer
-         :shutdown-ch shutdown-ch
-         :ack-ch ack-ch}))
-    (range n))))
+   by passing it to the shutdown-peer function. Optionally takes
+   a 3rd argument - a monitoring configuration map. See the User Guide
+   for details."
+  ([n peer-group]
+     (start-peers n peer-group {:monitoring :no-op}))
+  ([n {:keys [config] :as peer-group} monitoring-config]
+     (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+       (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+     (doall
+      (map
+       (fn [_]
+         (let [v-peer (system/onyx-peer peer-group monitoring-config)
+               live (component/start v-peer)
+               shutdown-ch (chan 1)
+               ack-ch (chan)
+               started-peer (atom live)]
+           {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
+            :started-peer started-peer
+            :shutdown-ch shutdown-ch
+            :ack-ch ack-ch}))
+       (range n)))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
@@ -269,9 +285,11 @@
 
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
-  [env-config]
-  (validator/validate-env-config env-config)
-  (component/start (system/onyx-development-env env-config)))
+  ([env-config]
+     (start-env env-config {:monitoring :no-op}))
+  ([env-config monitoring-config]
+     (validator/validate-env-config env-config)
+     (component/start (system/onyx-development-env env-config monitoring-config))))
 
 (defn ^{:added "0.6.0"} shutdown-env
   "Shuts down the given development environment."

@@ -43,6 +43,15 @@ A function that takes two arguments - an event map, and the matching lifecycle m
 
 A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called before the peer relinquishes its task. No more segments will be received.
 
+#### After ack message
+
+A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been fully acked.
+
+#### After retry message
+
+A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried.
+
+
 ### Example
 
 Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 5 functions for the 5 hooks:
@@ -69,6 +78,13 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 (defn after-batch [event lifecycle]
   (println "Executing once after each batch.")
   {})
+
+(defn after-ack-segment [event message-id rets lifecycle]
+  (println "Message " message-id " is fully acked"))
+
+(defn after-retry-segment [event message-id rets lifecycle]
+  (println "Retrying message " message-id))
+
 ```
 
 Notice that all lifecycle functions return maps exception `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task-start`.
@@ -81,7 +97,9 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/before-task-start before-task
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task-stop after-task})
+   :lifecycle/after-task-stop after-task
+   :lifecycle/after-ack-segment after-ack-segment
+   :lifecycle/after-retry-segment after-retry-segment})
 ```
 
 Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.

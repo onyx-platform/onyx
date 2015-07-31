@@ -9,10 +9,11 @@
     (:onyx/type element)))
 
 (defn only [coll]
-  (assert (not (next coll)))
+  (when (next coll)
+    (throw (ex-info "More than one element in collection, expected count of 1" {:coll coll})))
   (if-let [result (first coll)]
     result
-    (assert false)))
+    (throw (ex-info "Zero elements in collection, expected exactly one" {:coll coll}))))
 
 (defn find-task [catalog task-name]
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
