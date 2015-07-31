@@ -127,7 +127,7 @@
 (def ch (chan 10000))
 
 (def replica-1
-  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
+  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 8000))
 
 (fact "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
 
@@ -141,9 +141,7 @@
 
 (zk/close conn)
 
-(def replica-2
-  (playback-log (:log env) replica-1 ch 2000))
-
+(def replica-2 (playback-log (:log env) replica-1 ch 8000))
 
 (fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 2] [3 3]])
 
