@@ -9,7 +9,7 @@
             [taoensso.timbre :refer [info] :as timbre]))
 
 (defn add-site [replica {:keys [joiner peer-site]}]
-  (assert (:messaging replica))
+  (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
   (-> replica 
       (assoc-in [:peer-sites joiner]
                 (merge
@@ -86,6 +86,16 @@
                   {:fn :leave-cluster :args {:id (:subject diff)}}))
                (close! ch))
            (assoc state :watch-ch ch))
+         ;; Handles the cases where a peer tries to attach to a dead
+         ;; peer that hasn't been evicted for whatever reason.
+         (= (:id state) (:subject diff))
+         (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+           (do
+             (extensions/write-log-entry
+              (:log state)
+              {:fn :leave-cluster :args {:id (:subject diff)}})
+             state)
+           state)
          (= (:id state) (:instant-join diff))
          (do (extensions/open-peer-site (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))

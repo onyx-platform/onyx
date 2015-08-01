@@ -7,7 +7,7 @@
 
 (defmethod extensions/apply-log-entry :signal-ready
   [{:keys [args]} replica]
-  (let [id (:id args)] 
+  (let [id (:id args)]
     (if (and (common/peer->allocated-job (:allocations replica) id)
              (= :idle (get-in replica [:peer-state id])))
       (assoc-in replica [:peer-state id] :active)
