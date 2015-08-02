@@ -394,6 +394,8 @@
 
 (defn run-task-lifecycle 
   "The main task run loop, read batch, ack messages, etc."
+  ;; For performance, pre lookup event values that will not change between batches.
+  ;; These should be passed in to the event loop calls where possible
   [{:keys [onyx.core/task-map
            onyx.core/pipeline
            onyx.core/replica
