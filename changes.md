@@ -2,6 +2,7 @@
 
 - API: :onyx/ident has been renamed :onyx/plugin, and now takes a keyword path to a fn that instantiates the plugin e.g. :onyx.plugin.core-async/input. (**Breaking change**)
 - API: plugins are now implemented by the Pipeline and PipelineInput protocols. (**Breaking change**)
+- API: output plugins may now find leaf segments in (:leaves (:tree (:onyx.core/results event))) instead of (:leaves (:onyx.core/results event)) (**Breaking change**)
 - API: New lifecycle functions "after-ack-message" and "after-retry-message" are now available.
 - API: `:onyx/group-by-key` can now group can now take a vector of keywords, or just a keyword.
 - API: `:onyx/restart-pred-fn` catalog entry points to a boolean function that permits a task to hot restart on an exception.
