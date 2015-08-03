@@ -13,6 +13,8 @@
 - New documentation: Use GitBook for documentation. [#119](https://github.com/onyx-platform/onyx/issues/119)
 - New feature: Onyx Monitoring. Onyx emits a vast amount of metrics about its internal health.
 - New feature: Aeron messaging transport layer. Requires Java 8. Use the `:aeron` key for `:onyx.messaging/impl`.
+- New feature: Messaging short circuiting. When virtual peers are co-located on the same peer, the network and serialization will be bypassed completely. Note, this feature is currently only available when using Aeron messaging.
+- New feature: Connection multiplexing. Onyx's scalability has been improved by [multiplexing connections](doc/user-guide/messaging.md#subscription-connection-multiplexing). Note, this feature is currently only available when using Aeron messaging.
 - New feature: Java integration via catalog entry `:onyx/language` set to `:java`.
 
 #### 0.6.0
