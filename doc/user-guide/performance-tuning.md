@@ -33,6 +33,11 @@ Zookeeper tends to not get a huge amount of traffic, so this probably won't offe
 
 ### Messaging
 
+#### Aeron
+
+Ensure you disable the embedded media driver, and instead use an independent
+media driver (see [Media Driver](messaging.md#media-driver).
+
 When testing performance with a single node using the Aeron messaging layer,
 connection short circuiting may cause very misleading results.
 

@@ -9,7 +9,7 @@ peers. The messaging layer design document can be found at
 
 ### Messaging Implementations
 
-The Onyx messaging implementation is pluggable and alternative implementatins
+The Onyx messaging implementation is pluggable and alternative implementations
 can be selected via the `:onyx.messaging/impl` [peer-config](peer-config.md).
 
 #### Aeron Messaging
@@ -40,7 +40,7 @@ each node will only choose one subscription to communicate through. These are
 chosen via a hash of the combined IPs of the nodes, in order to consistently
 spread the use of subscribers over the cluster.
 
-Clusters which perfom a large proportion of the time serializing should
+Clusters which perform a large proportion of the time serializing should
 consider increasing the subscriber count. As a general guide, `# cores = #
 virtual peers + # subscribers`.
 
@@ -51,7 +51,7 @@ use of Aeron and directly communicate the message without any use of the
 network and without any serialization. Therefore, performance benchmarks
 performed on a single node can be very misleading.
 
-The [peer-config](peer-config) option, `:onyx.messaging/allow-short-circuit?`
+The [peer-config](peer-config.md) option, `:onyx.messaging/allow-short-circuit?`
 is provided for the purposes of more realistic performance testing on a single node.
 
 ##### Port Use
@@ -60,25 +60,58 @@ The Aeron messaging implementation will use the first port configured via
 `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. UDP ports
 coinciding with these options must be open.
 
+##### Media Driver
+
+Aeron requires a media driver to be used on each node. Onyx provides an
+embedded media driver for local testing, however use of the embedded driver is
+not recommended in production. The embedded driver can be configured via the
+`:onyx.messaging.aeron/embedded-driver?` [peer-config](peer-config.md) option.
+
+When using Aeron messaging in production, a media driver should be created in
+another java process. You can do this via the following code snippet, or by using the [Aeron distribution](https://github.com/real-logic/Aeron#media-driver-packaging).
+
+```clojure
+(ns your-app.aeron-media-driver
+  (:require [clojure.core.async :refer [chan <!!]])
+  (:import [uk.co.real_logic.aeron Aeron$Context]
+           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
+
+(defn -main [& args]
+  (let [ctx (doto (MediaDriver$Context.))
+        media-driver (MediaDriver/launch ctx)]
+    (println "Launched the Media Driver. Blocking forever...")
+    (<!! (chan))))
+```
+
+##### Configuration Options
+
+Aeron is independently configurable via Java properties (e.g.  `JAVA_OPTS="-Daeron.mtu.length=16384"`). 
+Configuration of these may cause different performance characteristics, and
+certain options may need to be configured in order to communicate large segments between peers.
+
+Documentation for these configuration options can be found in 
+(Aeron's documentation)[https://github.com/real-logic/Aeron/wiki/Configuration-Options].
+
 #### Netty Messaging
 
 The Netty messaging implementation does not currently perform connection
-multiplexing. The performance/reliability behaviour of a cluster using netty
+multiplexing. The performance/reliability behavior of a cluster using Netty
 with many virtual peers is unknown. Future work will allow connections to be
 multiplexed as with Aeron. The Netty implementation does not currently perform
 any connection short circuiting.
 
 ##### Port Use
 
-The netty messaging implementation assigns a port for each virtual peer from
+The Netty messaging implementation assigns a port for each virtual peer from
 `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. TCP ports
 coinciding with these options must be open.
 
 
 ####  Core-Async Messaging
 
-Core-async messaging has been provided for local testing. This messaging layer
-communicates via core-async channels, and does not perform any networking or
-serialization. Note, with the advent of connection short circuiting in the
-Aeron implementation, the performance characterstics are now very similar to
-Aeron. As such, this layer may be deprecated in the future.
+A core-async messaging implementation is available for single node onyx
+clusters. This messaging layer communicates directly via core-async channels,
+and does not perform any networking or serialization. Note, with the advent of
+connection short circuiting in the Aeron messaging  implementation, the performance
+characteristics are now very similar to Aeron. As such, this layer may be
+deprecated in the future.
