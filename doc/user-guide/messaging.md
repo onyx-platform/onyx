@@ -32,13 +32,13 @@ cluster to scale better as the number of nodes to increase.
 It is worth noting that Aeron subscribers (receivers) must also generally
 perform deserialization.  Therefore, subscribers may become CPU bound by the
 amount of deserializaton work that needs to be performed. In order to reduce
-this effect, we allow multiple subscribers to be created per node (i.e. peer
-group). This can be tuned via `:onyx.messaging.aeron/subscriber-count` in
-[peer-config](peer-config.md#onyxmessagingaeronsubscriber-count). As increasing the number of subscribers, may
-lead back to an undesirable growth in the number of connections between nodes,
-each node will only choose one subscription to communicate through. These are
-chosen via a hash of the combined IPs of the nodes, in order to consistently
-spread the use of subscribers over the cluster.
+this effect, multiple subscribers can be instantiated per node.  This can be
+tuned via `:onyx.messaging.aeron/subscriber-count` in
+[peer-config](peer-config.md#onyxmessagingaeronsubscriber-count). As increasing
+the number of subscribers may lead back to an undesirable growth in the number
+of connections between nodes, each node will only choose one subscription to
+communicate through. The choice of subscriber is calculated via a hash of the combined IPs of the
+communicating nodes, in order to consistently spread the use of subscribers over the cluster.
 
 Clusters which perform a large proportion of the time serializing should
 consider increasing the subscriber count. As a general guide, `# cores = #
