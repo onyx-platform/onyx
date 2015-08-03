@@ -36,5 +36,5 @@ Zookeeper tends to not get a huge amount of traffic, so this probably won't offe
 When testing performance with a single node using the Aeron messaging layer,
 connection short circuiting may cause very misleading results.
 
-The [peer-config](peer-config) option, `:onyx.messaging/allow-short-circuit?`
-is provided for the purpose of more realistic performance testing on a single node.
+The [peer-config](peer-config) option, `:onyx.messaging/allow-short-circuit?`, can be set to false
+for the purpose of more realistic performance testing on a single node.
