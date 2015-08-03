@@ -22,12 +22,12 @@ relevant considerations when using the Aeron implementation.
 
 One issue when scaling Onyx to a many node cluster, is that every virtual peer
 may require a communications channel to any other virtual peer. As a result, a
-naive implementation will require m<sup>2</sup>, where m is the number of
-virtual peers, connections to be established for the cluster. By sharing Aeron
-subscribers (multiplexing), between virtual peers on a node, this can be
-reduced to n<sup>2</sup>, where n is the number of nodes. This reduces the
-amount of overhead that is required to maintain connections between peers,
-allowing the cluster to better scale.
+naive implementation will require up to m<sup>2</sup> connections over the
+cluster, where m is the number of virtual peers. By sharing Aeron subscribers
+between virtual peers on a node, this can be reduced to n<sup>2</sup>
+connections, where n is the number of nodes. This reduces the amount of
+overhead required to maintain connections between peers, allowing the
+cluster to scale better as the number of nodes to increase.
 
 It is worth noting that Aeron subscribers (receivers) must also generally
 perform deserialization.  Therefore, subscribers may become CPU bound by the
