@@ -46,5 +46,5 @@ should be be set to false for realistic performance testing when only a single
 node is available for testing. Ensure this option is set to true when operating
 in production.
 
-Please see the Aeron [messaging section](messaging#aeron-messaging) for general
-discussion of the Aeron messaging implementation.
+Please refer to the [Aeron messaging section](messaging.md#aeron-messaging) for general
+discussion of the Aeron messaging implementation and its characterstics.
