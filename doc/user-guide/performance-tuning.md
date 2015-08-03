@@ -36,10 +36,15 @@ Zookeeper tends to not get a huge amount of traffic, so this probably won't offe
 #### Aeron
 
 Ensure you disable the embedded media driver, and instead use an independent
-media driver (see [Media Driver](messaging.md#media-driver).
+media driver (see [Media Driver](messaging.md#media-driver)).
 
 When testing performance with a single node using the Aeron messaging layer,
 connection short circuiting may cause very misleading results.
 
-The [peer-config](peer-config) option, `:onyx.messaging/allow-short-circuit?`, can be set to false
-for the purpose of more realistic performance testing on a single node.
+The [peer-config](peer-config) option, `:onyx.messaging/allow-short-circuit?`,
+should be be set to false for realistic performance testing when only a single
+node is available for testing. Ensure this option is set to true when operating
+in production.
+
+Please see the Aeron [messaging section](messaging#aeron-messaging) for general
+discussion of the Aeron messaging implementation.
