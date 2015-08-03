@@ -41,7 +41,7 @@ media driver (see [Media Driver](messaging.md#media-driver)).
 When testing performance with a single node using the Aeron messaging layer,
 connection short circuiting may cause very misleading results.
 
-The peer-config option  option, [`:onyx.messaging/allow-short-circuit?`](peer-config#onyxmessagingallow-short-circuit),
+The peer-config option [`:onyx.messaging/allow-short-circuit?`](peer-config#onyxmessagingallow-short-circuit),
 should be be set to false for realistic performance testing when only a single
 node is available for testing. Ensure this option is set to true when operating
 in production.
