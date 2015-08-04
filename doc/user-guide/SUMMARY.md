@@ -12,6 +12,7 @@
 * [Peer Configuration](doc/user-guide/peer-config.md)
 * [Information Model](doc/user-guide/information-model.md)
 * [Scheduling Jobs and Tasks](doc/user-guide/scheduling.md)
+* [Messaging](doc/user-guide/messaging.md)
 * [Event Subscription](doc/user-guide/subscription.md)
 * [Plugins](doc/user-guide/plugins.md)
 * [core.async Internal Plugin](doc/user-guide/core-async-plugin.md)
