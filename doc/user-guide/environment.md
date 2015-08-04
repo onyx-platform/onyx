@@ -64,6 +64,15 @@ Here's an example of using ZooKeeper in-memory, with some non-ZooKeeper required
 
 Running a good production Onyx cluster requires a multi-node ZooKeeper cluster. Otherwise, your configuration will remain exactly the same.
 
+### Networking / Firewall
+
+Messaging requires TCP or UDP ports to be open for
+`:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. The Aeron
+messaging implementation requires UDP ports to be open, while the Netty
+implementation requires TCP ports to be open.
+
+All peers require the ability to connect to the ZooKeeper instances over TCP.
+
 #### Dependencies
 
 - Java 7+
