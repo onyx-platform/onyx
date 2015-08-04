@@ -20,14 +20,17 @@ relevant considerations when using the Aeron implementation.
 
 ##### Subscription (Connection) Multiplexing
 
-One issue when scaling Onyx to a many node cluster, is that every virtual peer
+One issue when scaling Onyx to a many node cluster is that every virtual peer
 may require a communications channel to any other virtual peer. As a result, a
 naive implementation will require up to m<sup>2</sup> connections over the
 cluster, where m is the number of virtual peers. By sharing Aeron subscribers
 between virtual peers on a node, this can be reduced to n<sup>2</sup>
 connections, where n is the number of nodes. This reduces the amount of
 overhead required to maintain connections between peers, allowing the
-cluster to scale better as the number of nodes to increase.
+cluster to scale better as the number of nodes to increase. Indepedently of
+any messaging implementation, Onyx also provides a peer configuration named
+`:onyx.messaging/max-downstream-links` to limit the number of connections
+to other virtual peers that a single peer will make.
 
 It is worth noting that Aeron subscribers (receivers) must also generally
 perform deserialization.  Therefore, subscribers may become CPU bound by the
