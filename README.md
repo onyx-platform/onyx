@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.6.0"]
+[org.onyxplatform/onyx "0.7.0"]
 ```
 
 ### Build Status
@@ -39,21 +39,21 @@ onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dur
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.6.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.7.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.6.0
+### User Guide 0.7.0
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 
-### API Docs 0.6.0
+### API Docs 0.7.0
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.6.0).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.0).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.6.0` goes with `onyx` version `0.6.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.6.0.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.0` goes with `onyx` version `0.7.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.0.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
@@ -70,7 +70,7 @@ You can run a dashboard to monitor Onyx cluster activity, found [here](https://g
 
 ### Release Notes
 
-You can find [the latest major release notes here](doc/release-notes/0.6.0.md).
+You can find [the latest major release notes here](doc/release-notes/0.7.0.md).
 
 ### Need help?
 
@@ -78,7 +78,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.6.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.7.x/resources/logo).
 
 ### Running the tests
 
