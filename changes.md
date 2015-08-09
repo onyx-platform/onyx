@@ -1,3 +1,7 @@
+#### 0.7.1
+- :onyx.core/params is initialised as a vector
+- Greatly improved lifecyle and keyword validation
+
 #### 0.7.0
 
 - API: :onyx/ident has been renamed :onyx/plugin, and now takes a keyword path to a fn that instantiates the plugin e.g. :onyx.plugin.core-async/input. (**Breaking change**)

@@ -19,8 +19,8 @@
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn resolve-calling-params [catalog-entry opts]
-  (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
-          (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
+  (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
+        (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
