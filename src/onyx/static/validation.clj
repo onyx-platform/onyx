@@ -148,7 +148,8 @@
       (select-keys lifecycle [:lifecycle/task :lifecycle/calls :lifecycle/doc]))))
 
 (defn validate-lifecycle-map [m]
-  (schema/validate {(schema/optional-key :lifecycle/start-task?) Function
+  (schema/validate {(schema/optional-key :lifecycle/doc) schema/Str
+                    (schema/optional-key :lifecycle/start-task?) Function
                     (schema/optional-key :lifecycle/before-task-start) Function
                     (schema/optional-key :lifecycle/before-batch) Function
                     (schema/optional-key :lifecycle/after-batch) Function
