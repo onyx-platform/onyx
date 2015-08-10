@@ -471,7 +471,7 @@
 (defn resolve-lifecycle-calls [calls]
   (let [calls-map (var-get (operation/kw->fn calls))]
     (try 
-      (validation/validate-lifecycle-map calls-map)
+      (validation/validate-lifecycle-calls calls-map)
       (catch Throwable t
         (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
           (error e)
