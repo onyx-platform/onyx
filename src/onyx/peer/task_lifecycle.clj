@@ -1,12 +1,13 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
     (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
+              [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
               [onyx.static.rotating-seq :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]
               [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
+              [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -467,6 +468,16 @@
           (fatal e)))
       (recur))))
 
+(defn resolve-lifecycle-calls [calls]
+  (let [calls-map (var-get (operation/kw->fn calls))]
+    (try 
+      (validation/validate-lifecycle-map calls-map)
+      (catch Throwable t
+        (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
+          (error e)
+          (throw e))))
+    calls-map))
+
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
         fs
@@ -474,7 +485,7 @@
          nil?
          (map
           (fn [lifecycle]
-            (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+            (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
               (when-let [g (:lifecycle/start-task? calls-map)]
                 (fn [x] (g x lifecycle)))))
           matched))]
@@ -487,7 +498,7 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+       (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
          (if-let [g (get calls-map kw)]
            (comp (fn [x] (merge x (g x lifecycle))) f)
            f)))
@@ -497,7 +508,7 @@
 (defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
         fns (keep (fn [lifecycle] 
-                    (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+                    (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
                       (if-let [g (get calls-map kw)]
                         (vector lifecycle g)))) 
                   matched)]

@@ -10,6 +10,9 @@
                       (namespace kw))) 
                'keyword-namespaced?))
 
+(def Function
+  (schema/pred fn? 'fn?))
+
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
@@ -143,6 +146,16 @@
        :lifecycle/calls NamespacedKeyword
        (schema/optional-key :lifecycle/doc) String}
       (select-keys lifecycle [:lifecycle/task :lifecycle/calls :lifecycle/doc]))))
+
+(defn validate-lifecycle-map [m]
+  (schema/validate {(schema/optional-key :lifecycle/start-task?) Function
+                    (schema/optional-key :lifecycle/before-task-start) Function
+                    (schema/optional-key :lifecycle/before-batch) Function
+                    (schema/optional-key :lifecycle/after-batch) Function
+                    (schema/optional-key :lifecycle/after-task-stop) Function
+                    (schema/optional-key :lifecycle/after-ack-segment) Function
+                    (schema/optional-key :lifecycle/after-retry-segment) Function}
+                    m))
 
 (def deployment-id-schema
   (schema/either schema/Uuid schema/Str))
