@@ -164,6 +164,10 @@
         ;; Node doesn't exist.
         (>!! ch true)))))
 
+(defmethod extensions/peer-exists? ZooKeeper
+  [{:keys [conn opts prefix] :as log} id]
+  (zk/exists conn (str (pulse-path prefix) "/" id)))
+
 (defn find-job-scheduler [log]
   (loop []
     (if-let [chunk
