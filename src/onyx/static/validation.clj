@@ -284,3 +284,8 @@
   (validate-none-position flow-conditions-schema)
   (validate-short-circuit flow-conditions-schema)
   (validate-auto-short-circuit flow-conditions-schema))
+
+(defn coerce-uuid [uuid]
+  (if (instance? java.util.UUID uuid)
+    uuid
+    (java.util.UUID/fromString uuid)))
