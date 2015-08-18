@@ -215,7 +215,8 @@
        true)))
 
 (defn ^{:added "0.6.0"} await-job-completion
-  "Blocks until job-id has had all of its tasks completed."
+  "Blocks until job-id has had all of its tasks completed or the job is killed.
+   Returns true if the job completed successfully, false if the job was killed."
   ([peer-config job-id]
      (await-job-completion peer-config job-id {:monitoring :no-op}))
   ([peer-config job-id monitoring-config]
