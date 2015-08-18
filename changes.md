@@ -3,6 +3,7 @@
 - Greatly improved lifecyle and keyword validation
 - await-job-completion additionally returns when a job is killed. Return code now denotes whether the job completed successfully (true) or was killed (false).
 - Throw exceptions from tasks, even if Nippy can serialize them.
+- Fix typo'ed monitoring calls.
 
 #### 0.7.0
 
