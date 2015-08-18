@@ -225,10 +225,14 @@
        (loop [replica (extensions/subscribe-to-log (:log client) ch)]
          (let [entry (<!! ch)
                new-replica (extensions/apply-log-entry entry replica)]
-           (if-not (some #{job-id} (:completed-jobs new-replica))
-             (recur new-replica)
-             (do (component/stop client)
-                 true)))))))
+           (cond (some #{job-id} (:completed-jobs new-replica))
+                 (do (component/stop client)
+                     true)
+                 (some #{job-id} (:killed-jobs new-replica))
+                 (do (component/stop client)
+                     false)
+                 :else 
+                 (recur new-replica)))))))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
