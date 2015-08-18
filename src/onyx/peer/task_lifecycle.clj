@@ -74,7 +74,9 @@
 (defn route-data
   [event result message flow-conditions downstream]
   (if (nil? flow-conditions)
-    (->Route downstream nil nil nil)
+    (if (operation/exception? message)
+      (throw (:exception (ex-data message)))
+      (->Route downstream nil nil nil))
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
@@ -432,6 +434,17 @@
              (close-batch-resources)))
       (catch Throwable e
         (ex-f e)))))
+
+(defn resolve-compression-fn-impls [opts]
+  (assoc opts
+    :onyx.peer-decompress-fn-impl
+    (if-let [f (:onyx.peer-decompress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/decompress)
+    :onyx.peer-compress-fn-impl
+    (if-let [f (:onyx.peer-compress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/compress)))
 
 (defn gc-peer-links [event state opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
