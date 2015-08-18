@@ -1,6 +1,7 @@
 #### 0.7.1
 - :onyx.core/params is initialised as a vector
 - Greatly improved lifecyle and keyword validation
+- await-job-completion additionally returns when a job is killed. Return code now denotes whether the job completed successfully (true) or was killed (false).
 
 #### 0.7.0
 
