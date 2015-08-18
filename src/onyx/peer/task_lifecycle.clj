@@ -435,6 +435,17 @@
       (catch Throwable e
         (ex-f e)))))
 
+(defn resolve-compression-fn-impls [opts]
+  (assoc opts
+    :onyx.peer-decompress-fn-impl
+    (if-let [f (:onyx.peer-decompress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/decompress)
+    :onyx.peer-compress-fn-impl
+    (if-let [f (:onyx.peer-compress-fn opts)]
+      (operation/resolve-fn f)
+      onyx.compression.nippy/compress)))
+
 (defn gc-peer-links [event state opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
         idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)
