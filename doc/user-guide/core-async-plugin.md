@@ -63,7 +63,7 @@ Make sure that `my.ns/in-calls` is a map that references a function to inject th
   {:core.async/chan in-chan})
 
 (def in-calls
-  {:lifecycle/before-task inject-in-ch})
+  {:lifecycle/before-task-start inject-in-ch})
 ```
 
 ##### write-to-chan
@@ -98,7 +98,7 @@ Again, as with `read-from-chan`, there's a little extra to do since core.async h
   {:core.async/chan out-chan})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 ```
 
 #### Utility Functions

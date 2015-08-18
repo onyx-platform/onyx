@@ -270,7 +270,7 @@
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
-    (f segments)
+    (when (seq segments) (f segments))
     (assoc
       event
       :onyx.core/results

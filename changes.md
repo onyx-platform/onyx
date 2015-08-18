@@ -11,8 +11,6 @@
 - API: `:onyx/group-by-key` can now group can now take a vector of keywords, or just a keyword.
 - API: `:onyx/restart-pred-fn` catalog entry points to a boolean function that permits a task to hot restart on an exception.
 - API: Peer configuration can now be instructed to short-circuit and skip network I/O if downstream peers are on the same machine.
-- Bug fix: Several log / replica edge cases were fixed.
-- Bug fix: Peers not picking up new job after current job was killed.
 - New feature: Jobs will now enter an automatic backpressure mode when internal peer buffers fill up past a high water mark, and will be turned off after reaching a low water mark. See [Backpressure](doc/user-guide/backpressure.md) for more details.
 - New documentation: Use GitBook for documentation. [#119](https://github.com/onyx-platform/onyx/issues/119)
 - New feature: Onyx Monitoring. Onyx emits a vast amount of metrics about its internal health.
@@ -20,6 +18,10 @@
 - New feature: Messaging short circuiting. When virtual peers are co-located on the same peer, the network and serialization will be bypassed completely. Note, this feature is currently only available when using Aeron messaging.
 - New feature: Connection multiplexing. Onyx's scalability has been improved by [multiplexing connections](doc/user-guide/messaging.md#subscription-connection-multiplexing). Note, this feature is currently only available when using Aeron messaging.
 - New feature: Java integration via catalog entry `:onyx/language` set to `:java`.
+- Bug fix: Several log / replica edge cases were fixed.
+- Bug fix: Peers not picking up new job after current job was killed.
+- Bug fix: Bulk functions are no longer invoked when the batch is empty. [#260](https://github.com/onyx-platform/onyx/issues/260)
+
 
 #### 0.6.0
 
