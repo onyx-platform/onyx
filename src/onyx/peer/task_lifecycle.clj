@@ -74,7 +74,9 @@
 (defn route-data
   [event result message flow-conditions downstream]
   (if (nil? flow-conditions)
-    (->Route downstream nil nil nil)
+    (if (operation/exception? message)
+      (throw (:exception (ex-data message)))
+      (->Route downstream nil nil nil))
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
