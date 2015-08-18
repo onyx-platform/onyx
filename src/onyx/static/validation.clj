@@ -4,6 +4,15 @@
             [onyx.static.planning :as planning]
             [schema.core :as schema]))
 
+(def NamespacedKeyword
+  (schema/pred (fn [kw]
+                 (and (keyword? kw)
+                      (namespace kw))) 
+               'keyword-namespaced?))
+
+(def Function
+  (schema/pred fn? 'fn?))
+
 (def base-catalog-entry-validator
   {:onyx/name schema/Keyword
    :onyx/type (schema/enum :input :output :function)
@@ -29,11 +38,11 @@
 (def catalog-entry-validator
   (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
                       (merge base-catalog-entry-validator 
-                             {:onyx/plugin schema/Keyword
+                             {:onyx/plugin NamespacedKeyword
                               :onyx/medium schema/Keyword
-                              (schema/optional-key :onyx/fn) schema/Keyword})
+                              (schema/optional-key :onyx/fn) NamespacedKeyword})
                       :else
-                      (merge base-catalog-entry-validator {:onyx/fn schema/Keyword})))
+                      (merge base-catalog-entry-validator {:onyx/fn NamespacedKeyword})))
 
 (def group-entry-validator
   {(schema/optional-key :onyx/group-by-key) schema/Any
@@ -51,8 +60,14 @@
   (when (= (:onyx/name entry) (:onyx/type entry))
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
 
+(defn no-duplicate-entries [catalog]
+  (let [tasks (map :onyx/name catalog)] 
+    (when-not (= (distinct tasks) tasks)
+      (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
+
 (defn validate-catalog
   [catalog]
+  (no-duplicate-entries catalog)
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
     (when (and (= (:onyx/type entry) :function)
@@ -133,19 +148,21 @@
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))
     (schema/validate
-     {:lifecycle/task schema/Keyword
-      (schema/optional-key :lifecycle/pre) schema/Keyword
-      (schema/optional-key :lifecycle/pre-batch) schema/Keyword
-      (schema/optional-key :lifecycle/post-batch) schema/Keyword
-      (schema/optional-key :lifecycle/post) schema/Keyword
-      (schema/optional-key :lifecycle/doc) String}
-     (select-keys lifecycle
-                  [:lifecycle/task
-                   :lifecycle/pre
-                   :lifecycle/pre-batch
-                   :lifecycle/post-batch
-                   :lifecycle/post
-                   :lifecycle/doc]))))
+      {:lifecycle/task schema/Keyword
+       :lifecycle/calls NamespacedKeyword
+       (schema/optional-key :lifecycle/doc) String}
+      (select-keys lifecycle [:lifecycle/task :lifecycle/calls :lifecycle/doc]))))
+
+(defn validate-lifecycle-calls [m]
+  (schema/validate {(schema/optional-key :lifecycle/doc) schema/Str
+                    (schema/optional-key :lifecycle/start-task?) Function
+                    (schema/optional-key :lifecycle/before-task-start) Function
+                    (schema/optional-key :lifecycle/before-batch) Function
+                    (schema/optional-key :lifecycle/after-batch) Function
+                    (schema/optional-key :lifecycle/after-task-stop) Function
+                    (schema/optional-key :lifecycle/after-ack-segment) Function
+                    (schema/optional-key :lifecycle/after-retry-segment) Function}
+                    m))
 
 (def deployment-id-schema
   (schema/either schema/Uuid schema/Str))
@@ -273,3 +290,8 @@
   (validate-none-position flow-conditions-schema)
   (validate-short-circuit flow-conditions-schema)
   (validate-auto-short-circuit flow-conditions-schema))
+
+(defn coerce-uuid [uuid]
+  (if (instance? java.util.UUID uuid)
+    uuid
+    (java.util.UUID/fromString uuid)))

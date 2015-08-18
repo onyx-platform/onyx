@@ -58,6 +58,8 @@
     :onyx/bootstrap? true
     :onyx/batch-size 2}])
 
+
+
 (fact (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 
@@ -132,7 +134,38 @@
 (fact (onyx.api/submit-job peer-config {:catalog workflow-tests-catalog
                                         :workflow dupes-workflow
                                         :task-scheduler :onyx.task-scheduler/balanced})
-      => (throws clojure.lang.ExceptionInfo))
+      => (throws Exception))
+
+(def invalid-lifecycles 
+  [{:lifecycle/task :in
+    :lifecycle/calls :non-namespaced-calls}])
+
+(def correct-catalog
+  [{:onyx/name :in
+    :onyx/plugin :a/b
+    :onyx/medium :some-medium
+    :onyx/type :input
+    :onyx/bootstrap? true
+    :onyx/batch-size 2}
+   {:onyx/name :intermediate
+    :onyx/fn :a/fn-path
+    :onyx/type :function
+    :onyx/batch-size 2}
+   {:onyx/name :out
+    :onyx/plugin :a/b
+    :onyx/medium :some-medium
+    :onyx/type :output
+    :onyx/batch-size 2}])
+
+(def correct-workflow
+  [[:in :intermediate]
+   [:intermediate :out]])
+
+(fact (onyx.api/submit-job peer-config {:catalog correct-catalog
+                                        :workflow correct-workflow
+                                        :lifecycles invalid-lifecycles
+                                        :task-scheduler :onyx.task-scheduler/balanced})
+      => (throws Exception))
 
 (onyx.api/shutdown-env env)
 
@@ -186,3 +219,5 @@
   (fact (:e (:egress-ids d)) => (:id e))
   (fact (:f (:egress-ids e)) => (:id f))
   (fact (:g (:egress-ids f)) => (:id g)))
+
+
