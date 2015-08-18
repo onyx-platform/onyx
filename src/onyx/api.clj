@@ -1,6 +1,6 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan alts!! >!! <!! close!]]
+            [clojure.core.async :refer [chan alts!! >!! <!! close! alts!! timeout go]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
@@ -195,9 +195,9 @@
    Local replicas clear out all data about completed and killed jobs -
    as if they never existed."
   ([peer-config]
-     (gc peer-config {:monitoring :no-op}))
+   (gc peer-config {:monitoring :no-op}))
   ([peer-config monitoring-config]
-     (let [id (java.util.UUID/randomUUID)
+   (let [id (java.util.UUID/randomUUID)
            client (component/start (system/onyx-client peer-config monitoring-config))
            entry (create-log-entry :gc {:id id})
            ch (chan 1000)]
@@ -216,29 +216,32 @@
 (defn ^{:added "0.6.0"} await-job-completion
   "Blocks until job-id has had all of its tasks completed or the job is killed.
    Returns true if the job completed successfully, false if the job was killed."
-  ([peer-config job-id]
-     (await-job-completion peer-config job-id {:monitoring :no-op}))
-  ([peer-config job-id monitoring-config]
-     (let [job-id (validator/coerce-uuid job-id)
-           client (component/start (system/onyx-client peer-config monitoring-config))
-           ch (chan 100)]
-       (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-         (let [entry (<!! ch)
-               new-replica (extensions/apply-log-entry entry replica)]
-           (cond (some #{job-id} (:completed-jobs new-replica))
-                 (do (component/stop client)
-                     true)
-                 (some #{job-id} (:killed-jobs new-replica))
-                 (do (component/stop client)
-                     false)
-                 :else
-                 (recur new-replica)))))))
+  ([peer-config job-id monitoring-config timeout-ms]
+   (let [job-id (validator/coerce-uuid job-id)
+         client (component/start (system/onyx-client peer-config monitoring-config))
+         ch (chan 100)
+         tmt (timeout timeout-ms)]
+     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+       (let [[v c] (alts!! [(go (extensions/apply-log-entry (<!! ch) replica))
+                            tmt]
+                           :priority true)]
+         (cond (some #{job-id} (:completed-jobs v))
+               (do (component/stop client)
+                   true)
+               (some #{job-id} (:killed-jobs v))
+               (do (component/stop client)
+                   false)
+               (= c tmt)
+               (do (component/stop client)
+                   :timeout)
+               :else
+               (recur v)))))))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
     (loop [live @started-peer]
       (let [restart-ch (:restart-ch (:virtual-peer live))
-            [v ch] (alts!! [shutdown-ch restart-ch] :priority? true)]
+            [v ch] (alts!! [shutdown-ch restart-ch] :priority true)]
         (cond (= ch shutdown-ch)
               (do (component/stop live)
                   (reset! started-peer nil)

@@ -1,5 +1,6 @@
 (ns onyx.plugin.core-async
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <!]]
+  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close!]]
+            [clojure.core.async.lab]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
@@ -122,10 +123,15 @@
 (defn take-segments!
   "Takes segments off the channel until :done is found.
    Returns a seq of segments, including :done."
-  [ch]
-  (loop [x []]
-    (let [segment (<!! ch)]
-      (let [stack (conj x segment)]
-        (if-not (= segment :done)
-          (recur stack)
-          stack)))))
+  ([ch] (take-segments! ch nil))
+  ([ch timeout-ms]
+   (when-let [tmt (if timeout-ms
+                    (timeout timeout-ms)
+                    (chan))]
+     (loop [ret []]
+       (let [[v c] (alts!! [ch tmt] :priority true)]
+         (if (= c tmt)
+           ret
+           (if (and v (not= v :done))
+             (recur (conj ret v))
+             (conj ret :done))))))))
