@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.7.0"]
+[org.onyxplatform/onyx "0.7.1"]
 ```
 
 ### Build Status
@@ -36,24 +36,25 @@ onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.
 onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
 onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
+onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
 
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.7.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.7.0
+### User Guide 0.7.1
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 
-### API Docs 0.7.0
+### API Docs 0.7.1
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.0).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.1).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.0` goes with `onyx` version `0.7.0`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.0.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.1` goes with `onyx` version `0.7.1`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.1.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)

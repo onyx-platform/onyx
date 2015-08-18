@@ -84,8 +84,6 @@ Event name                         | Keys                             |
 `:zookeeper-gc-log-entry`          | `:event`, `:latency`, `:position`|
 `:peer-ack-segments`               | `:event`, `:latency`             |
 `:peer-retry-segment`              | `:event`, `:latency`             |
-`:peer-try-complete-job`           | `:event`                         |
-`:peer-strip-sentinel`             | `:event`                         |
 `:peer-complete-message`           | `:event`, `:latency`             |
 `:peer-gc-peer-link`               | `:event`                         |
 `:peer-backpressure-on`            | `:event`, `:id`                  |

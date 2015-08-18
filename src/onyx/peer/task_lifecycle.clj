@@ -1,12 +1,13 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
     (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info warn trace fatal] :as timbre]
+              [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
               [onyx.static.rotating-seq :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]
               [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
+              [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
@@ -19,8 +20,8 @@
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn resolve-calling-params [catalog-entry opts]
-  (concat (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry))
-          (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
+  (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
+        (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
@@ -73,7 +74,9 @@
 (defn route-data
   [event result message flow-conditions downstream]
   (if (nil? flow-conditions)
-    (->Route downstream nil nil nil)
+    (if (operation/exception? message)
+      (throw (:exception (ex-data message)))
+      (->Route downstream nil nil nil))
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
@@ -467,6 +470,17 @@
           (fatal e)))
       (recur))))
 
+(defn resolve-lifecycle-calls [calls]
+  (let [calls-map (var-get (operation/kw->fn calls))]
+    (try 
+      (validation/validate-lifecycle-calls calls-map)
+      (catch Throwable t
+        ;; FIXME: job should be killed here
+        (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
+          (error e)
+          (throw e))))
+    calls-map))
+
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
         fs
@@ -474,7 +488,7 @@
          nil?
          (map
           (fn [lifecycle]
-            (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+            (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
               (when-let [g (:lifecycle/start-task? calls-map)]
                 (fn [x] (g x lifecycle)))))
           matched))]
@@ -487,7 +501,7 @@
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
     (reduce
      (fn [f lifecycle]
-       (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+       (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
          (if-let [g (get calls-map kw)]
            (comp (fn [x] (merge x (g x lifecycle))) f)
            f)))
@@ -497,7 +511,7 @@
 (defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
   (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
         fns (keep (fn [lifecycle] 
-                    (let [calls-map (var-get (operation/kw->fn (:lifecycle/calls lifecycle)))]
+                    (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
                       (if-let [g (get calls-map kw)]
                         (vector lifecycle g)))) 
                   matched)]
