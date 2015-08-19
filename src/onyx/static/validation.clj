@@ -60,7 +60,13 @@
   (when (= (:onyx/name entry) (:onyx/type entry))
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
 
+(defn no-duplicate-entries [catalog]
+  (let [tasks (map :onyx/name catalog)] 
+    (when-not (= (distinct tasks) tasks)
+      (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
+
 (defn validate-streaming-catalog [catalog]
+  (no-duplicate-entries catalog)
   (doseq [entry catalog]
     (schema/validate catalog-entry-validator entry)
     (when (and (= (:onyx/type entry) :function)
@@ -295,3 +301,8 @@
   (validate-none-position flow-conditions-schema)
   (validate-short-circuit flow-conditions-schema)
   (validate-auto-short-circuit flow-conditions-schema))
+
+(defn coerce-uuid [uuid]
+  (if (instance? java.util.UUID uuid)
+    uuid
+    (java.util.UUID/fromString uuid)))

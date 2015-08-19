@@ -169,7 +169,7 @@
      (when (nil? job-id)
        (throw (ex-info {:error "Invalid job id" :job-id job-id})))
      (let [client (component/start (system/onyx-client peer-config monitoring-config))
-           entry (create-log-entry :kill-job {:job job-id})]
+           entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
        (extensions/write-log-entry (:log client) entry)
        (component/stop client)
        true)))
@@ -216,19 +216,25 @@
        true)))
 
 (defn ^{:added "0.6.0"} await-job-completion
-  "Blocks until job-id has had all of its tasks completed."
+  "Blocks until job-id has had all of its tasks completed or the job is killed.
+   Returns true if the job completed successfully, false if the job was killed."
   ([peer-config job-id]
      (await-job-completion peer-config job-id {:monitoring :no-op}))
   ([peer-config job-id monitoring-config]
-     (let [client (component/start (system/onyx-client peer-config monitoring-config))
+     (let [job-id (validator/coerce-uuid job-id)
+           client (component/start (system/onyx-client peer-config monitoring-config))
            ch (chan 100)]
        (loop [replica (extensions/subscribe-to-log (:log client) ch)]
          (let [entry (<!! ch)
                new-replica (extensions/apply-log-entry entry replica)]
-           (if-not (some #{job-id} (:completed-jobs new-replica))
-             (recur new-replica)
-             (do (component/stop client)
-                 true)))))))
+           (cond (some #{job-id} (:completed-jobs new-replica))
+                 (do (component/stop client)
+                     true)
+                 (some #{job-id} (:killed-jobs new-replica))
+                 (do (component/stop client)
+                     false)
+                 :else 
+                 (recur new-replica)))))))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try

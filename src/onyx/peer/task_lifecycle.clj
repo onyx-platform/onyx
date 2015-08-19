@@ -74,7 +74,9 @@
 (defn route-data
   [event result message flow-conditions downstream]
   (if (nil? flow-conditions)
-    (->Route downstream nil nil nil)
+    (if (operation/exception? message)
+      (throw (:exception (ex-data message)))
+      (->Route downstream nil nil nil))
     (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
       (if (operation/exception? message)
         (if (seq compiled-ex-fcs)
@@ -270,7 +272,7 @@
 (defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
   ;; Bulk functions intentionally ignore their outputs.
   (let [segments (map :message batch)]
-    (f segments)
+    (when (seq segments) (f segments))
     (assoc
       event
       :onyx.core/results
@@ -432,17 +434,6 @@
              (close-batch-resources)))
       (catch Throwable e
         (ex-f e)))))
-
-(defn resolve-compression-fn-impls [opts]
-  (assoc opts
-    :onyx.peer-decompress-fn-impl
-    (if-let [f (:onyx.peer-decompress-fn opts)]
-      (operation/resolve-fn f)
-      onyx.compression.nippy/decompress)
-    :onyx.peer-compress-fn-impl
-    (if-let [f (:onyx.peer-compress-fn opts)]
-      (operation/resolve-fn f)
-      onyx.compression.nippy/compress)))
 
 (defn gc-peer-links [event state opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
@@ -667,7 +658,7 @@
                            :onyx.core/monitoring monitoring
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
-                           :onyx.core/peer-opts (resolve-compression-fn-impls opts)
+                           :onyx.core/peer-opts opts
                            :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
                            :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (resolve-task-fn catalog-entry)
