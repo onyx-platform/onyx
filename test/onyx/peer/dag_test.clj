@@ -15,7 +15,7 @@
 
 (def env (onyx.api/start-env env-config))
 
-(def peer-group 
+(def peer-group
   (onyx.api/start-peer-group peer-config))
 
 (def n-messages 15000)

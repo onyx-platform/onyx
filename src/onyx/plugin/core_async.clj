@@ -11,8 +11,8 @@
   (when-not (:core.async/chan event)
     (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle"
                     {:event-map-keys (keys event)})))
-  (let [pipeline (:onyx.core/pipeline event)] 
-    {:core.async/pending-messages (:pending-messages pipeline) 
+  (let [pipeline (:onyx.core/pipeline event)]
+    {:core.async/pending-messages (:pending-messages pipeline)
      :core.async/drained (:drained pipeline)
      :core.async/retry-ch (:retry-ch pipeline)
      :core.async/retry-count (:retry-count pipeline)}))
@@ -36,10 +36,10 @@
 (def writer-calls
   {:lifecycle/before-task-start inject-writer})
 
-(defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages 
+(defrecord CoreAsyncInput [max-pending batch-size batch-timeout pending-messages
                            drained retry-ch retry-count]
   p-ext/Pipeline
-  (write-batch 
+  (write-batch
     [this event]
     (function/write-batch event))
 
@@ -56,8 +56,8 @@
                   (loop [segments [] cnt 0]
                     (if (= cnt max-segments)
                       segments
-                      (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))] 
-                        (recur (conj segments 
+                      (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))]
+                        (recur (conj segments
                                      (t/input (java.util.UUID/randomUUID)
                                               message))
                                (inc cnt))
@@ -76,7 +76,7 @@
   (ack-segment [_ _ message-id]
     (swap! pending-messages dissoc message-id))
 
-  (retry-segment 
+  (retry-segment
     [_ _ message-id]
     (when-let [msg (get @pending-messages message-id)]
       (swap! pending-messages dissoc message-id)
@@ -88,7 +88,7 @@
     [_ _ message-id]
     (get @pending-messages message-id))
 
-  (drained? 
+  (drained?
     [_ _]
     @drained))
 
@@ -96,23 +96,23 @@
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         max-pending (or (:onyx/max-pending catalog-entry) (:onyx/max-pending defaults))
         batch-size (:onyx/batch-size catalog-entry)
-        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout defaults))] 
-    (->CoreAsyncInput max-pending batch-size batch-timeout 
+        batch-timeout (or (:onyx/batch-timeout catalog-entry) (:onyx/batch-timeout defaults))]
+    (->CoreAsyncInput max-pending batch-size batch-timeout
                       (atom {}) (atom false) (chan 10000) (atom 0))))
 
 (defrecord CoreAsyncOutput []
   p-ext/Pipeline
-  (read-batch 
+  (read-batch
     [_ event]
     (function/read-batch event))
 
-  (write-batch 
+  (write-batch
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
       (>!! chan (:message msg)))
     {})
 
-  (seal-resource 
+  (seal-resource
     [_ {:keys [core.async/chan]}]
     (>!! chan :done)))
 

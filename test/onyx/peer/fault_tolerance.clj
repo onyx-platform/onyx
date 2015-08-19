@@ -50,8 +50,8 @@
     :onyx/batch-size batch-size
     :onyx/doc "Writes segments to a core.async channel"}])
 
-(def workflow [[:in :intermediate-1] 
-               [:intermediate-1 :intermediate-2] 
+(def workflow [[:in :intermediate-1]
+               [:intermediate-1 :intermediate-2]
                [:intermediate-2 :out]])
 
 (def chan-size 10000)
@@ -82,7 +82,7 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(def incomplete 
+(def incomplete
   (atom #{}))
 
 (def bad-values
@@ -91,13 +91,13 @@
 (def n-messages-total 100000)
 
 (when false
-  (def test-env (component/start (->TestEnv (:env-config config) 
+  (def test-env (component/start (->TestEnv (:env-config config)
                                             (:peer-config config))))
 
 
   (try
     (helper-env/add-peers test-env 9)
-    (let [load-data-ch (thread 
+    (let [load-data-ch (thread
                          (loop [ls (repeatedly n-messages-total (fn [] {:id (java.util.UUID/randomUUID)}))]
                            (when-let [segment (first ls)]
                              (swap! incomplete conj (int-2 (int-1 segment)))
@@ -106,7 +106,7 @@
                          (>!! in-chan :done)
                          (close! in-chan))
 
-          job-id (:job-id (helper-env/run-job test-env 
+          job-id (:job-id (helper-env/run-job test-env
                                               {:catalog catalog
                                                :workflow workflow
                                                :lifecycles lifecycles
@@ -129,7 +129,7 @@
           remove-completed-ch (go-loop []
                                        (let [v (<!! out-chan)]
                                          (println "got " v)
-                                         (when (and v (not= v :done)) 
+                                         (when (and v (not= v :done))
                                            (swap! incomplete disj v)
                                            (when (or (nil? (:a v))
                                                      (nil? (:b v)))
@@ -140,8 +140,8 @@
                             (let [; average the the full circuit worth of timeouts
                                   chaos-kill-ms (rand-int (* 3 batch-timeout 2))
                                   [v ch] (alts!! [(timeout chaos-kill-ms) kill-ch])]
-                              (when-not (and (= ch kill-ch) v) 
-                                (try 
+                              (when-not (and (= ch kill-ch) v)
+                                (try
                                   (when-let [non-input-peers (->> (get (:allocations @(:replica test-env)) job-id)
                                                                   (filter (fn [[task-id peers]]
                                                                             (and (> (count peers) 1)
@@ -149,7 +149,7 @@
                                                                   vals
                                                                   flatten
                                                                   seq)]
-                                    (when-let [peer-val (helper-env/lookup-peer test-env (rand-nth non-input-peers))] 
+                                    (when-let [peer-val (helper-env/lookup-peer test-env (rand-nth non-input-peers))]
                                       (println "Killing a peer")
                                       (helper-env/remove-peer test-env peer-val)
                                       (helper-env/add-peers test-env 1)))
@@ -161,12 +161,12 @@
       (fact @incomplete => #{})
       (let [after-done (loop [after-done #{}]
                          (let [[v ch] (alts!! [out-chan (timeout 10000)])]
-                           (if v 
+                           (if v
                              (recur (conj after-done v))
                              after-done)))]
         (fact after-done => #{}))
       (fact @bad-values => #{})
       (close! kill-ch)
       #_(<!! mess-with-peers-ch))
-    (finally 
+    (finally
       (component/stop test-env))))

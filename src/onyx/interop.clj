@@ -5,11 +5,11 @@
   (:require [onyx.peer.function :refer [write-batch read-batch]]
             [onyx.peer.pipeline-extensions :refer [PipelineInput Pipeline]]))
 
-(defn -write_batch 
+(defn -write_batch
   [event]
   (write-batch event))
 
-(defn -read_batch 
+(defn -read_batch
   [event]
   (read-batch event))
 

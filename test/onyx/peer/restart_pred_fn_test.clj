@@ -83,7 +83,7 @@
    :lifecycle/before-batch (fn [_ _]
                              (when (= (swap! batch-counter inc) 2)
                                (throw (ex-info "Oops, I died." {:restartable? true})))
-                             {})}) 
+                             {})})
 
 (def lifecycles
   [{:lifecycle/task :in

@@ -13,11 +13,11 @@
 
 (defn allowable-ports [peer-config]
   (let [port-range (if-let [port-range (:onyx.messaging/peer-port-range peer-config)]
-                     (range (first port-range) 
+                     (range (first port-range)
                             (inc (second port-range)))
                      [])
         ports-static (:onyx.messaging/peer-ports peer-config)]
-    (into (set port-range) 
+    (into (set port-range)
           ports-static)))
 
 (defmulti messaging-require :onyx.messaging/impl)

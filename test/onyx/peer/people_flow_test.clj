@@ -231,7 +231,7 @@
 
 (def children-expectatations
   #{{:age 17 :job "programmer" :location "Washington"}
-    {:age 13 :job "student" :location "Maine"}        
+    {:age 13 :job "student" :location "Maine"}
     :done})
 
 (def adults-expectatations

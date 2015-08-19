@@ -33,16 +33,16 @@
           ack-state
           (fn [as]
             (let [state (:state as)
-                  ack (get state message-id)] 
+                  ack (get state message-id)]
               (if ack
                 (let [updated-ack-val (bit-xor ^long (:ack-val ack) ^long ack-val)]
                   (if (zero? updated-ack-val)
                     (->AckState (dissoc state message-id) true)
                     (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) false)))
-                (if (zero? ^long ack-val) 
+                (if (zero? ^long ack-val)
                   (->AckState state true)
                   (->AckState (assoc state message-id (->Ack nil completion-id ack-val (now))) false))))))]
-    (when (:completed? rets) 
+    (when (:completed? rets)
       (>!! completion-ch
            {:id message-id :peer-id completion-id}))))
 
@@ -77,7 +77,7 @@
     (taoensso.timbre/info "Stopping Acking Daemon")
     (close! (:completion-ch component))
     (close! (:acking-ch component))
-    (future-cancel (:timeout-fut component)) 
+    (future-cancel (:timeout-fut component))
     (assoc component :ack-state nil :completion-ch nil :timeout-fut nil :ack-segments-fut nil)))
 
 (defn acking-daemon [config]

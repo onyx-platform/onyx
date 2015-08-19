@@ -111,7 +111,7 @@
 
 (defmethod extensions/internal-ack-segments CoreAsync
   [messenger event peer-link acks]
-  (doseq [{:keys [id completion-id ack-val]} acks] 
+  (doseq [{:keys [id completion-id ack-val]} acks]
     (>!! peer-link {:type :ack :id id :completion-id completion-id :ack-val ack-val})))
 
 (defmethod extensions/internal-complete-message CoreAsync

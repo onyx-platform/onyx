@@ -147,7 +147,7 @@
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
-    
+
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)

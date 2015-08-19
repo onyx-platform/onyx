@@ -13,26 +13,26 @@
 
 (def config (load-config))
 
-(def env-config 
+(def env-config
   (assoc (:env-config config) :onyx/id onyx-id))
 
 (def base-path (str "/" onyx-id "/ab"))
 
 (def base-path2 (str "/" onyx-id "/ab2"))
 
-(let [env (onyx.api/start-env env-config)] 
-  (try 
+(let [env (onyx.api/start-env env-config)]
+  (try
     (let [client (cu/connect (:zookeeper/address env-config) "onyx")
           value [1 3 48]]
 
       (cu/create client base-path :data (into-array Byte/TYPE value))
 
-      (facts "Value is written and can be read" 
+      (facts "Value is written and can be read"
              (fact (into [] (:data (cu/data client base-path))) => value))
       (cu/close client)
 
       (let [client2 (cu/connect (:zookeeper/address env-config) "onyx")
-            watcher-sentinel (atom 0)] 
+            watcher-sentinel (atom 0)]
         (facts "Test default ephemerality from previous test"
                (fact (into [] (:data (cu/data client2 base-path))) => (throws Exception)))
 
@@ -43,8 +43,8 @@
         (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true)
 
         (facts "Check sequential children can be found"
-               (fact 
-                (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc)))) 
+               (fact
+                (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc))))
                 =>
                 (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"])))
 
@@ -61,8 +61,8 @@
 
         (let [client3 (cu/connect (:zookeeper/address env-config) "onyx")]
           (facts "Check only sequential persistent children remain"
-                 (fact 
-                  (sort (cu/children client3 (str base-path "/zd/hi"))) => 
+                 (fact
+                  (sort (cu/children client3 (str base-path "/zd/hi"))) =>
                   (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"])))
 
           (cu/create client3 base-path2 :data (into-array Byte/TYPE value) :persistent? true)
@@ -73,7 +73,7 @@
           (cu/delete client3 base-path2)
 
           (facts "Deleted value"
-                 (fact 
+                 (fact
                   (cu/data client3 base-path2) => (throws Exception)))
 
           (facts "Check exists after delete"

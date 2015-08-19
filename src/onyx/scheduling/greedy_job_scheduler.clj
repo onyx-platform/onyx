@@ -20,7 +20,7 @@
   ;; all the peers to the first available job. If there are extra peers,
   ;; they would simply be offered back to the same job, which would refuse
   ;; them. Return the same job claims since nothing will change.
-  ;; 
+  ;;
   jobs)
 
 (defmethod cjs/sort-job-priority :onyx.job-scheduler/greedy

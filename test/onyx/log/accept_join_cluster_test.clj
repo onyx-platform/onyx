@@ -33,8 +33,8 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:pairs {} 
-                   :accepted {:a :d} 
+      old-replica {:pairs {}
+                   :accepted {:a :d}
                    :peers [:a]
                    :job-scheduler :onyx.job-scheduler/greedy}
       new-replica (f old-replica)

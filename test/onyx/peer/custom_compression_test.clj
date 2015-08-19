@@ -100,7 +100,7 @@
     (fact (set (butlast results)) => expected)
     (fact (last results) => :done))
 
-  (finally 
+  (finally
    (doseq [v-peer v-peers]
      (onyx.api/shutdown-peer v-peer))
 

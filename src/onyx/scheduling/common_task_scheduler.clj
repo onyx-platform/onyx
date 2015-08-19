@@ -36,8 +36,8 @@
 (defmethod drop-peers :default
   [replica job n]
   (let [scheduler (get-in replica [:task-schedulers job])]
-    (throw (ex-info 
-             (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead." 
+    (throw (ex-info
+             (format "Task scheduler %s not recognized. Check that you have not supplied a job scheduler instead."
                      scheduler)
              {:replica replica}))))
 

@@ -202,7 +202,7 @@
            entry (create-log-entry :gc {:id id})
            ch (chan 1000)]
        (extensions/write-log-entry (:log client) entry)
-        
+
        (loop [replica (extensions/subscribe-to-log (:log client) ch)]
          (let [entry (<!! ch)
                new-replica (extensions/apply-log-entry entry replica)]
@@ -231,7 +231,7 @@
                  (some #{job-id} (:killed-jobs new-replica))
                  (do (component/stop client)
                      false)
-                 :else 
+                 :else
                  (recur new-replica)))))))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]

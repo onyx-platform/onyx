@@ -28,7 +28,7 @@
 
 (defmethod extensions/replica-diff :accept-join-cluster
   [entry old new]
-  (if-not (= old new) 
+  (if-not (= old new)
     (let [rets (first (diff (:accepted old) (:accepted new)))]
       (assert (<= (count rets) 1))
       (when (seq rets)
@@ -49,7 +49,7 @@
 
 (defn unbuffer-messages [state diff new]
   (if (= (:id state) (:subject diff))
-    (do (extensions/open-peer-site (:messenger state) 
+    (do (extensions/open-peer-site (:messenger state)
                                    (get-in new [:peer-sites (:id state)]))
         (doseq [entry (:buffered-outbox state)]
           (>!! (:outbox-ch state) entry))
@@ -60,7 +60,7 @@
   [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
-  (if-not (= old new) 
+  (if-not (= old new)
     (let [next-state (unbuffer-messages state diff new)]
       (common/start-new-lifecycle old new diff next-state))
     state))

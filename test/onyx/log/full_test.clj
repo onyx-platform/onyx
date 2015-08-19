@@ -13,7 +13,7 @@
              onyx-id (java.util.UUID/randomUUID)
              env-config (assoc (:env-config config) :onyx/id onyx-id)
              peer-config (assoc (:peer-config config) :onyx/id onyx-id)
-             n-peers 20] 
+             n-peers 20]
          (with-env [env env-config]
            (with-peer-group [peer-group peer-config]
              (with-peers [v-peers n-peers peer-group]

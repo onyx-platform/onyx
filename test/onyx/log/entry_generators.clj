@@ -19,7 +19,7 @@
 (def new-replica-spec
   {:next-state (fn [state args result]
                  {:replica-real result
-                  :peers #{} 
+                  :peers #{}
                   :peer-counter 0})
    :real/command #'new-replica})
 
@@ -31,7 +31,7 @@
 (defn active-peers [replica entry]
   (cond-> (set (concat (:peers replica)
                        ; might not need these with the below entries
-                       (vals (or (:prepared replica) {})) 
+                       (vals (or (:prepared replica) {}))
                        (vals (or (:accepted replica) {}))))
 
     ;; if peer is joining, immediately count them as part of the peers that can generate reactions
@@ -48,19 +48,19 @@
         updated-replica (ext/apply-log-entry entry replica)
         diff (ext/replica-diff entry replica updated-replica)
         peers (active-peers updated-replica entry)
-        peer-reactions (mapcat (fn [peer-id] 
-                                 (ext/reactions entry 
-                                                replica 
-                                                updated-replica 
-                                                diff 
+        peer-reactions (mapcat (fn [peer-id]
+                                 (ext/reactions entry
+                                                replica
+                                                updated-replica
+                                                diff
                                                 {:messenger messenger
                                                  :id peer-id
                                                  :opts {:onyx.peer/try-join-once?
                                                         (:onyx.peer/try-join-once? (:opts messenger) true)}}))
                                peers)]
-    (reduce apply-entry 
+    (reduce apply-entry
             {:message-id (inc message-id)
-             :replica updated-replica} 
+             :replica updated-replica}
             peer-reactions)))
 
 (defn apply-join-entry [replica-real peer-id]
@@ -74,14 +74,14 @@
                  (gen/tuple
                    (gen/return (:replica-real state))
                    (gen/return (:peer-counter state))))
-   :model/precondition (fn [state _] 
+   :model/precondition (fn [state _]
                          (:peer-counter state))
    :real/postcondition (fn [state next-state args updated-real]
                          (= (count (:peers (:replica updated-real)))
                             (count (:peers next-state))))
    :real/command #'apply-join-entry
    :next-state (fn [state [_ peer-counter] _]
-                 (-> state 
+                 (-> state
                      (update-in [:peers] conj peer-counter)
                      (update-in [:peer-counter] inc)))})
 
@@ -90,7 +90,7 @@
                  (gen/tuple
                    (gen/return (:replica-real state))
                    (gen/elements (:peers state))))
-   :model/precondition (fn [state _] 
+   :model/precondition (fn [state _]
                          (not-empty (:peers state)))
    :real/postcondition (fn [state next-state args updated-real]
                          (= (count (:peers (:replica updated-real)))
@@ -108,7 +108,7 @@
                                    (gen/return :new-replica)
                                    (not-empty (:peers state))
                                    (gen/elements [:add-peer :remove-peer])
-                                   :else 
+                                   :else
                                    (gen/elements [:add-peer])))})
 
 #_(defspec run-replica-spec 5 (reality-matches-model? replica-spec))

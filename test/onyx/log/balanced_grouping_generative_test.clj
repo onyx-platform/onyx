@@ -16,7 +16,7 @@
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def peer-config 
+(def peer-config
   {:onyx/id onyx-id
    :onyx.messaging/impl :dummy-messenger
    :onyx.peer/try-join-once? true})
@@ -135,8 +135,8 @@
 (deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
               job-1-id
-              peer-config 
-              job-1 
+              peer-config
+              job-1
               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
      "Checking that exactly 4 peers are assigned to task B."
@@ -147,7 +147,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) 
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
                          :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -159,7 +159,7 @@
 (deftest min-peers-one-job-no-upper-bound
   (let [rets (api/create-submit-job-entry
               job-4-id
-              peer-config 
+              peer-config
               job-4
               (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
@@ -171,7 +171,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14)) 
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14))
                          :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
@@ -203,7 +203,7 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6)) 
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
                          :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]

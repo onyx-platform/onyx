@@ -19,8 +19,8 @@
   (fact (:pairs new-replica) => {:a :b :b :c :c :a})
   (fact (:peers new-replica) => [:a :b :c])
   (fact diff => {:aborted :d})
-  (fact reactions => [{:fn :prepare-join-cluster 
+  (fact reactions => [{:fn :prepare-join-cluster
                        :args {:joiner :d
-                              :peer-site {:address 1}} 
+                              :peer-site {:address 1}}
                        :immediate? true}]))
 

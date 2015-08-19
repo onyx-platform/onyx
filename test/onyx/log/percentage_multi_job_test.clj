@@ -131,8 +131,8 @@
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 10000))
 
-(fact "70/30% split for percentage job scheduler succeeded" 
-      (map (partial apply +) 
+(fact "70/30% split for percentage job scheduler succeeded"
+      (map (partial apply +)
            (get-counts replica [j1 j2])) => [7 3])
 
 (def v-peers-2 (onyx.api/start-peers n-peers peer-group))
@@ -140,8 +140,8 @@
 (def replica-2
   (playback-log (:log env) replica ch 10000))
 
-(fact "70/30% split for percentage job scheduler succeeded after rebalance" 
-      (map (partial apply +) 
+(fact "70/30% split for percentage job scheduler succeeded after rebalance"
+      (map (partial apply +)
            (get-counts replica-2 [j1 j2])) => [14 6])
 
 (doseq [v-peer v-peers-1]

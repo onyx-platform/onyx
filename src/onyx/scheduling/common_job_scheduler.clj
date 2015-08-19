@@ -122,7 +122,7 @@
                  (-> replica
                      (common/remove-peers peer)
                      (assoc-in [:peer-state peer] :idle)
-                     (update-in [:allocations job-id task-id] 
+                     (update-in [:allocations job-id task-id]
                                 (fn [allocation]
                                   (vec (conj allocation peer)))))))
         replica))))
@@ -199,13 +199,13 @@
    (:jobs replica)))
 
 (defn remove-job [replica job]
-  (let [peers (sort (replica->job-peers replica job))] 
+  (let [peers (sort (replica->job-peers replica job))]
     (-> replica
         (update-in [:allocations] dissoc job)
         (update-in [:peer-state] (fn [peer-state]
-                                   (reduce (fn [ps peer] 
-                                             (assoc ps peer :idle)) 
-                                           peer-state 
+                                   (reduce (fn [ps peer]
+                                             (assoc ps peer :idle))
+                                           peer-state
                                            peers))))))
 
 (defn deallocate-starved-jobs

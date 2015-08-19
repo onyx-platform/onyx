@@ -10,7 +10,7 @@
 
 (defn add-site [replica {:keys [joiner peer-site]}]
   (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
-  (-> replica 
+  (-> replica
       (assoc-in [:peer-sites joiner]
                 (merge
                   peer-site

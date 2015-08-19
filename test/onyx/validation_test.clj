@@ -9,8 +9,8 @@
 
 (def config (load-config))
 
-(def env-config 
-  (assoc (:env-config config) 
+(def env-config
+  (assoc (:env-config config)
          :onyx/id id
          :onyx.log/config {:appenders {:standard-out {:enabled? false}
                                        :spit {:enabled? false}}}))
@@ -136,7 +136,7 @@
                                         :task-scheduler :onyx.task-scheduler/balanced})
       => (throws Exception))
 
-(def invalid-lifecycles 
+(def invalid-lifecycles
   [{:lifecycle/task :in
     :lifecycle/calls :non-namespaced-calls}])
 

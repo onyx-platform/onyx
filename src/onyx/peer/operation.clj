@@ -3,15 +3,15 @@
             [onyx.types :refer [->Link]]
             [taoensso.timbre :refer [info]]))
 
-(defn get-method-java [class-name method-name] 
-  (let [ms (filter #(= (.getName %) method-name) 
+(defn get-method-java [class-name method-name]
+  (let [ms (filter #(= (.getName %) method-name)
                    (.getMethods (Class/forName class-name)))]
-    (if (= 1 (count ms)) 
-      (first ms)   
+    (if (= 1 (count ms))
+      (first ms)
       (throw (Exception. (format "Multiple methods found for %s/%s. Only one method may be defined." class-name method-name))))))
 
-(defn build-fn-java 
-  "Builds a clojure fn from a static java method. 
+(defn build-fn-java
+  "Builds a clojure fn from a static java method.
   Note, may be slower than it should be because of varargs, and the many
   (unnecessary) calls to partial in apply-function above."
   [kw]
@@ -20,8 +20,8 @@
   (let [path (clojure.string/split (name kw) #"[.]")
         class-name (clojure.string/join "." (butlast path))
         method-name (last path)
-        method (get-method-java class-name method-name)] 
-    (fn [& args] 
+        method (get-method-java class-name method-name)]
+    (fn [& args]
     (.invoke ^java.lang.reflect.Method method nil #^"[Ljava.lang.Object;" (into-array Object args)))))
 
 (defn kw->fn [kw]
@@ -44,31 +44,31 @@
   true)
 
 ;; TODO: can be precalculated for peer in replica-view
-(defn select-n-peers 
+(defn select-n-peers
   "Stably select n peers using our id and the downstream task ids.
   If a peer is added or removed, the set can only change by one value at max"
   [id all-peers n]
   (if (<= (count all-peers) n)
     all-peers
-    (take n 
-          (sort-by (fn [peer-id] (hash-combine (.hashCode ^java.util.UUID id) 
+    (take n
+          (sort-by (fn [peer-id] (hash-combine (.hashCode ^java.util.UUID id)
                                                (.hashCode ^java.util.UUID peer-id)))
                    all-peers))))
 
 (defn peer-link
   [replica-val state event peer-id]
   (if-let [link (get (:links @state) peer-id)]
-    (do 
+    (do
       (reset! (:timestamp link) (System/currentTimeMillis))
       (:link link))
     (let [site (-> replica-val
                    :peer-sites
                    (get peer-id))]
-      (-> state 
-          (swap! update-in 
-                 [:links peer-id] 
+      (-> state
+          (swap! update-in
+                 [:links peer-id]
                  (fn [link]
-                   (or link 
+                   (or link
                        (->Link (extensions/connect-to-peer (:onyx.core/messenger event) peer-id event site)
                                (atom (System/currentTimeMillis))))))
           :links
