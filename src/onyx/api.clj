@@ -136,9 +136,8 @@
           (validator/validate-job (assoc job :workflow (:workflow job)))
           (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
           (validator/validate-lifecycles (:lifecycles job) (:catalog job))
-          (catch Throwable t 
-            (println t)
-            (error t) 
+          (catch Throwable t
+            (error t)
             (throw t)))
      (let [id (java.util.UUID/randomUUID)
            tasks (planning/discover-tasks (:catalog job) (:workflow job))
