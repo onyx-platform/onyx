@@ -113,7 +113,6 @@
     :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-
    {:lifecycle/task :all
     :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}])
 
