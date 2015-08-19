@@ -26,8 +26,8 @@
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
-                           (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
+      (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
+                           (:onyx.core/id event))))
     rets))
 
 (defn add-acker-id [id m]
