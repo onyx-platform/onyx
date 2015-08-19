@@ -482,7 +482,8 @@
     calls-map))
 
 (defn compile-start-task-functions [lifecycles task-name]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
+  (let [matched (filter #(or (= (:lifecycle/task %) :all)
+                          (= (:lifecycle/task %) task-name)) lifecycles)
         fs
         (remove
          nil?
@@ -498,7 +499,8 @@
         true))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
+  (let [matched (filter #(or (= (:lifecycle/task %) :all)
+                          (= (:lifecycle/task %) task-name)) lifecycles)]
     (reduce
      (fn [f lifecycle]
        (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
@@ -509,14 +511,15 @@
      matched)))
 
 (defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
-        fns (keep (fn [lifecycle] 
+  (let [matched (filter #(or (= (:lifecycle/task %) :all)
+                             (= (:lifecycle/task %) task-name)) lifecycles)
+        fns (keep (fn [lifecycle]
                     (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
                       (if-let [g (get calls-map kw)]
-                        (vector lifecycle g)))) 
+                        (vector lifecycle g))))
                   matched)]
-    (reduce (fn [g [lifecycle f]] 
-              (fn [event message-id rets] 
+    (reduce (fn [g [lifecycle f]]
+              (fn [event message-id rets]
                 (g event message-id rets)
                 (f event message-id rets lifecycle)))
             (fn [event message-id rets])

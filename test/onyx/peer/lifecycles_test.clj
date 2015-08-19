@@ -25,6 +25,7 @@
   (assoc segment :n (inc n)))
 
 (def counter (atom []))
+(def started-task-counter (atom 0))
 
 (defn start-task? [event lifecycle]
   (swap! counter (fn [counter] (conj counter :task-started)))
@@ -44,6 +45,10 @@
 
 (defn after-batch [event lifecycle]
   (swap! counter (fn [counter] (conj counter :batch-after)))
+  {})
+
+(defn signal-started [event lifecycle]
+  (swap! started-task-counter inc)
   {})
 
 (def catalog
@@ -87,6 +92,9 @@
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop})
 
+(def all-calls
+  {:lifecycle/before-task-start signal-started})
+
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
 
@@ -104,7 +112,10 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+
+   {:lifecycle/task :all
+    :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}])
 
 (doseq [n (range n-messages)]
   (>!! in-chan {:n n}))
@@ -145,12 +156,13 @@
    :task-after])
 
 
-;; shutdown-peer ensure peers are fully shutdown so that 
+;; shutdown-peer ensure peers are fully shutdown so that
 ;; :task-after will have been set
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
 
 (fact @counter => expected-order)
+(fact @started-task-counter => 3)
 
 (onyx.api/shutdown-peer-group peer-group)
 
