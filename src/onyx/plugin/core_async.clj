@@ -1,6 +1,5 @@
 (ns onyx.plugin.core-async
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close!]]
-            [clojure.core.async.lab]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
