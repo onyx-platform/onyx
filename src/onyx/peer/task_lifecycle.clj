@@ -481,9 +481,12 @@
           (throw e))))
     calls-map))
 
+(defn select-applicable-lifecycles [lifecycles task-name]
+  (filter #(or (= (:lifecycle/task %) :all)
+               (= (:lifecycle/task %) task-name)) lifecycles))
+
 (defn compile-start-task-functions [lifecycles task-name]
-  (let [matched (filter #(or (= (:lifecycle/task %) :all)
-                          (= (:lifecycle/task %) task-name)) lifecycles)
+  (let [matched (select-applicable-lifecycles lifecycles task-name)
         fs
         (remove
          nil?
@@ -499,8 +502,7 @@
         true))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(or (= (:lifecycle/task %) :all)
-                          (= (:lifecycle/task %) task-name)) lifecycles)]
+  (let [matched (select-applicable-lifecycles lifecycles task-name)]
     (reduce
      (fn [f lifecycle]
        (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
@@ -511,8 +513,7 @@
      matched)))
 
 (defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(or (= (:lifecycle/task %) :all)
-                             (= (:lifecycle/task %) task-name)) lifecycles)
+  (let [matched (select-applicable-lifecycles lifecycles task-name)
         fns (keep (fn [lifecycle]
                     (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
                       (if-let [g (get calls-map kw)]
