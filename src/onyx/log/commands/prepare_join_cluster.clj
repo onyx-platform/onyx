@@ -93,7 +93,7 @@
            (do
              (extensions/write-log-entry
               (:log state)
-              {:fn :leave-cluster :args {:id (:subject diff)}})
+              {:fn :leave-cluster :args {:id (:observer diff)}})
              state)
            state)
          (= (:id state) (:instant-join diff))

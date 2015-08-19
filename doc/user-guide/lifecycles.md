@@ -121,4 +121,13 @@ Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the
   }
 ```
 
+It is also possible to have a lifecycle apply to every task in a workflow by specifying `:lifecycle/task :all`. This is useful for instrumenting your tasks with metrics, error handling, or debugging information.
+
+```clojure
+(def lifecycles
+  [{:lifecycle/task :all
+    :lifecycle/calls :my.ns/add-metrics
+    :lifecycle/doc "Instruments all tasks in a workflow with the example function 'add-metrics'"}])
+
+```
 You can supply as many sets of lifecycles as you want. They are invoked in the order that they are supplied in the vector, giving you a predictable sequence of calls. Be sure that all the keyword symbols and functions are required onto the classpath for the peer that will be executing them.

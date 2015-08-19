@@ -26,8 +26,8 @@
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (timbre/info (format "[%s / %s] Lifecycle chose not to start the task yet. Backing off and retrying..."
-                           (:onyx.core/id rets) (:onyx.core/lifecycle-id rets))))
+      (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
+                           (:onyx.core/id event))))
     rets))
 
 (defn add-acker-id [id m]
@@ -470,8 +470,12 @@
           (throw e))))
     calls-map))
 
+(defn select-applicable-lifecycles [lifecycles task-name]
+  (filter #(or (= (:lifecycle/task %) :all)
+               (= (:lifecycle/task %) task-name)) lifecycles))
+
 (defn compile-start-task-functions [lifecycles task-name]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
+  (let [matched (select-applicable-lifecycles lifecycles task-name)
         fs
         (remove
          nil?
@@ -487,7 +491,7 @@
         true))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)]
+  (let [matched (select-applicable-lifecycles lifecycles task-name)]
     (reduce
      (fn [f lifecycle]
        (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
@@ -498,14 +502,14 @@
      matched)))
 
 (defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (filter #(= (:lifecycle/task %) task-name) lifecycles)
-        fns (keep (fn [lifecycle] 
+  (let [matched (select-applicable-lifecycles lifecycles task-name)
+        fns (keep (fn [lifecycle]
                     (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
                       (if-let [g (get calls-map kw)]
-                        (vector lifecycle g)))) 
+                        (vector lifecycle g))))
                   matched)]
-    (reduce (fn [g [lifecycle f]] 
-              (fn [event message-id rets] 
+    (reduce (fn [g [lifecycle f]]
+              (fn [event message-id rets]
                 (g event message-id rets)
                 (f event message-id rets lifecycle)))
             (fn [event message-id rets])
