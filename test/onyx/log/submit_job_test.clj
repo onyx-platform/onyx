@@ -50,4 +50,3 @@
       diff (rep-diff old-replica new-replica)]
   (fact (rep-reactions old-replica new-replica diff {:id :p1}) => [])
   (fact (rep-reactions old-replica new-replica diff {:id :p2}) => []))
-

@@ -13,13 +13,13 @@
       {:task t :pct (get-in replica [:task-percentages job t])})
     tasks)))
 
-(defn rescale-task-percentages 
+(defn rescale-task-percentages
   "Rescale task percentages after saturated tasks were removed"
   [tasks]
   (let [total (/ (apply + (map :pct tasks)) 100)]
     (map (fn [task]
            (update-in task [:pct] / total))
-         tasks))) 
+         tasks)))
 
 (defn largest-remainder-allocations
   "Allocates remaining peers to the tasks with the largest remainder.
@@ -34,12 +34,12 @@
                                     (* 0.01 (:pct task) n-peers))
                                :else (* 0.01 (:pct task) n-peers)))
                        tasks*)
-        full (map int unrounded) 
+        full (map int unrounded)
         taken (apply + full)
         remaining (- n-peers taken)
         full-allocated (zipmap tasks* full)
-        remainders (->> (map (fn [task v] 
-                               (vector task (- v (int v)))) 
+        remainders (->> (map (fn [task v]
+                               (vector task (- v (int v))))
                              tasks*
                              unrounded)
                         (sort-by
@@ -51,7 +51,7 @@
                         (map (juxt first (constantly 1)))
                         (into {}))
         final-allocations (merge-with + full-allocated remainders)]
-    (mapv (fn [[task allocation]] 
+    (mapv (fn [[task allocation]]
             (assoc task :allocation (int allocation)))
           final-allocations)))
 
@@ -71,7 +71,7 @@
       (into {} (map (fn [t] {(:task t) t}) allocations))
       (let [n-peers-fully-saturated (apply + (map :allocation (vals cutoff-oversaturated)))
             n-remaining-peers (- n-peers n-peers-fully-saturated)
-            unallocated-tasks (remove cutoff-oversaturated candidate-tasks)] 
+            unallocated-tasks (remove cutoff-oversaturated candidate-tasks)]
         (merge (percentage-balanced-taskload replica job unallocated-tasks n-remaining-peers)
                cutoff-oversaturated)))))
 

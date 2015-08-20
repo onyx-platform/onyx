@@ -39,7 +39,7 @@
      {}
      allocations))
 
-(defn job-allocations->peer-ids 
+(defn job-allocations->peer-ids
   [allocations job-id]
   (->> job-id
        allocations
@@ -48,10 +48,10 @@
 
 (defn backpressure? [replica job-id]
   (let [peers (job-allocations->peer-ids (:allocations replica) job-id)]
-    (boolean 
-      (first 
-        (filter #(= % :backpressure) 
-                (map (:peer-state replica) 
+    (boolean
+      (first
+        (filter #(= % :backpressure)
+                (map (:peer-state replica)
                      peers))))))
 
 (defn remove-peers [replica id]
@@ -97,14 +97,14 @@
     (every? identity (map #(active? (get-in replica [:allocations job %])) tasks))))
 
 (defn job-receivable-peers [peer-state allocations job-id]
-  (into (t/hash-map) 
+  (into (t/hash-map)
         (map (fn [[task-id peers]]
                (t/vector task-id
-                         (into (t/vector) 
-                               (filter (fn [peer] 
-                                         (let [ps (peer-state peer)] 
+                         (into (t/vector)
+                               (filter (fn [peer]
+                                         (let [ps (peer-state peer)]
                                            (or (= ps :active)
-                                               (= ps :backpressure)))) 
+                                               (= ps :backpressure))))
                                        peers))))
              (allocations job-id))))
 

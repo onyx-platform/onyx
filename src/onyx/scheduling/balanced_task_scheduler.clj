@@ -25,7 +25,7 @@
          results tasks
          capacity spare-peers]
     (let [least-allocated-task (first (sort-by
-                                       (juxt 
+                                       (juxt
                                         #(get results %)
                                         #(.indexOf ^clojure.lang.PersistentVector (vec (get-in replica [:tasks job])) %))
                                        task-seq))]

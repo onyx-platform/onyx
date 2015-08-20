@@ -9,7 +9,7 @@
 ;;;;;;
 ;; Constants
 
-;; id uuid 
+;; id uuid
 (def ^:const completion-msg-length (long 33))
 
 ;; id uuid
@@ -75,15 +75,15 @@
 (defn read-retry [^UnsafeBuffer buf ^long offset]
   (get-uuid buf offset))
 
-(defn build-completion-msg-buf [peer-id id] 
-  (let [buf (UnsafeBuffer. (byte-array completion-msg-length))] 
+(defn build-completion-msg-buf [peer-id id]
+  (let [buf (UnsafeBuffer. (byte-array completion-msg-length))]
     (.putByte buf 0 completion-msg-id)
     (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 id)
     buf))
 
 (defn build-retry-msg-buf [peer-id id]
-  (let [buf (UnsafeBuffer. (byte-array retry-msg-length))] 
+  (let [buf (UnsafeBuffer. (byte-array retry-msg-length))]
     (.putByte buf 0 retry-msg-id)
     (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 id)
@@ -110,7 +110,7 @@
         message-payloads ^bytes (compress-f (map :message messages))
         payload-size (alength message-payloads)
         buf-size (unchecked-add messages-header-size
-                                (unchecked-add payload-size 
+                                (unchecked-add payload-size
                                                (* message-count message-base-length)))
         buf (UnsafeBuffer. (byte-array buf-size))
         _ (.putByte buf 0 messages-msg-id)
@@ -120,10 +120,10 @@
         _ (.putBytes buf messages-header-size message-payloads)
         offset (unchecked-add messages-header-size payload-size)
         buf-size (reduce (fn [offset msg]
-                           (write-message-meta buf offset msg) 
+                           (write-message-meta buf offset msg)
                            (unchecked-add message-base-length ^long offset))
                          offset
-                         messages)] 
+                         messages)]
     (list buf-size buf)))
 
 (defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset length]
@@ -138,10 +138,10 @@
         _ (.getBytes buf offset message-payload-bytes)
         message-payloads (decompress-f message-payload-bytes)
         offset (unchecked-add offset payload-size)
-        segments (loop [messages (transient []) 
-                        payloads (seq message-payloads) 
+        segments (loop [messages (transient [])
+                        payloads (seq message-payloads)
                         offset offset]
-                   (if-let [v (first payloads)] 
+                   (if-let [v (first payloads)]
                      (recur (conj! messages (read-message buf offset v))
                             (next payloads)
                             (unchecked-add offset message-base-length))

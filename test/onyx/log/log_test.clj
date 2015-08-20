@@ -18,8 +18,8 @@
 
 (def scheduler :onyx.job-scheduler/balanced)
 
-(let [env (onyx.api/start-env env-config)] 
-  (try 
+(let [env (onyx.api/start-env env-config)]
+  (try
     (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
     (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
@@ -34,8 +34,8 @@
 
 (let [env (onyx.api/start-env env-config)
       entries 10000
-      ch (chan entries)] 
-  (try 
+      ch (chan entries)]
+  (try
     (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler scheduler} nil)
     (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
@@ -54,5 +54,5 @@
               => entries))
 
       (deref write-fut))
-    (finally 
+    (finally
       (onyx.api/shutdown-env env))))

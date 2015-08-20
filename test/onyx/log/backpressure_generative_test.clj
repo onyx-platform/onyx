@@ -15,7 +15,7 @@
 
 (def onyx-id (java.util.UUID/randomUUID))
 
-(def peer-config 
+(def peer-config
   {:onyx/id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
@@ -97,16 +97,16 @@
   (checking
     "Checking backpressure handled correctly"
     (times 50)
-    [{:keys [entries replica log peer-choices]} 
-     (log-gen/apply-entries-gen 
+    [{:keys [entries replica log peer-choices]}
+     (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
                        (assoc :job-1 {:queue [(api/create-submit-job-entry job-1-id
-                                                                   peer-config 
-                                                                   job-1 
+                                                                   peer-config
+                                                                   job-1
                                                                    (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :p1}}
                                             {:fn :backpressure-off :args {:peer :p1}}]})
@@ -126,33 +126,33 @@
   (checking
     "Checking balanced allocation causes peers to be evenly split"
     (times 50)
-    [{:keys [replica log peer-choices]} 
-     (log-gen/apply-entries-gen 
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
-                       (assoc :job-1 {:queue [(api/create-submit-job-entry 
+                       (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
-                                                peer-config 
-                                                job-1 
+                                                peer-config
+                                                job-1
                                                 (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]}
-                              :job-2 {:queue [(api/create-submit-job-entry 
+                              :job-2 {:queue [(api/create-submit-job-entry
                                                 job-2-id
-                                                peer-config 
-                                                job-2 
+                                                peer-config
+                                                job-2
                                                 (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]}
                               :job-3 {:predicate (fn [replica entry]
                                                    (some #{:p2} (:peers replica)))
-                                      :queue [(api/create-submit-job-entry 
+                                      :queue [(api/create-submit-job-entry
                                                 job-3-id
-                                                peer-config 
-                                                job-3 
+                                                peer-config
+                                                job-3
                                                 (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]})
 
                        (assoc :peer-backpressure-then-kill {:predicate (fn [replica entry]
-                                                                         (some #{:p3} (:peers replica))) 
+                                                                         (some #{:p3} (:peers replica)))
                                                             :queue [{:fn :backpressure-on :args {:peer :p3}}
                                                                     {:fn :kill-job :args {:job job-3-id}}]})
                        (assoc :bp1 {:queue [{:fn :backpressure-on :args {:peer :p1}}
@@ -170,17 +170,17 @@
   (checking
     "Checking backpressure off handled when peer has already left"
     (times 50)
-    [{:keys [replica log peer-choices]} 
-     (log-gen/apply-entries-gen 
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
-                       (assoc :job-1 {:queue [(api/create-submit-job-entry 
+                       (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
-                                                peer-config 
-                                                job-1 
+                                                peer-config
+                                                job-1
                                                 (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp1 {:predicate (fn [replica entry]
                                                  (or (some #{:p1} (:peers replica))
@@ -190,24 +190,24 @@
                                             {:fn :backpressure-off :args {:peer :p1}}]}))
           :log []
           :peer-choices []}))]
-    (is (= {:p3 :active :p4 :active :p5 :active :p6 :active :p2 :active} 
+    (is (= {:p3 :active :p4 :active :p5 :active :p6 :active :p2 :active}
            (:peer-state replica)))))
 
 (deftest backpressure-on-already-left
   (checking
     "Checking balanced allocation causes peers to be evenly split"
     (times 50)
-    [{:keys [replica log peer-choices]} 
-     (log-gen/apply-entries-gen 
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
        (gen/return
          {:replica {:job-scheduler :onyx.job-scheduler/balanced
                     :messaging {:onyx.messaging/impl :dummy-messenger}}
           :message-id 0
           :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 3))
-                       (assoc :job-1 {:queue [(api/create-submit-job-entry 
+                       (assoc :job-1 {:queue [(api/create-submit-job-entry
                                                 job-1-id
-                                                peer-config 
-                                                job-1 
+                                                peer-config
+                                                job-1
                                                 (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
                        (assoc :bp2 {:predicate (fn [replica entry]
                                                  (or (some #{:p2} (:peers replica))

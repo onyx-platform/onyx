@@ -22,4 +22,3 @@
 
 (defn messenger-buffer [opts]
   (map->MessengerBuffer {:opts opts}))
-

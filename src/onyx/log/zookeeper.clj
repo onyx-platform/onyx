@@ -219,7 +219,7 @@
              messaging (find-messaging log)
              origin (extensions/read-chunk log :origin nil)
              starting-position (inc (:message-id origin))]
-         (>!! rets (assoc (:replica origin) 
+         (>!! rets (assoc (:replica origin)
                           :job-scheduler job-scheduler
                           :messaging messaging))
          (close! rets)

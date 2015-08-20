@@ -6,32 +6,32 @@
 
 (defn read-buf [buf]
   (let [msg-type (protocol/read-message-type buf 0)
-        peer-id (protocol/read-vpeer-id buf 1)] 
+        peer-id (protocol/read-vpeer-id buf 1)]
     (vector peer-id
             (cond (= msg-type protocol/ack-msg-id)
                   (protocol/read-acker-message buf 3)
-                  (= msg-type protocol/messages-msg-id) 
+                  (= msg-type protocol/messages-msg-id)
                   (protocol/read-messages-buf decompress buf 3 (- (.capacity buf) 3))
-                  (= msg-type protocol/completion-msg-id) 
+                  (= msg-type protocol/completion-msg-id)
                   (protocol/read-completion buf 3)
                   (= msg-type protocol/retry-msg-id)
                   (protocol/read-retry buf 3)))))
 
 (let [peer-id 3834
-      message #uuid "11837bd7-2de5-4b62-888d-171c4c47845c"] 
+      message #uuid "11837bd7-2de5-4b62-888d-171c4c47845c"]
   (fact (vector peer-id message) =>
         (read-buf (protocol/build-completion-msg-buf peer-id message))))
 
 (let [peer-id -342
-      message #uuid "806b9b15-cd18-4558-ae64-73c00923c906"] 
+      message #uuid "806b9b15-cd18-4558-ae64-73c00923c906"]
   (fact (vector peer-id message) =>
         (read-buf (protocol/build-retry-msg-buf peer-id message))))
 
 
 (let [peer-id 32000
-      ack (map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a" 
+      ack (map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"
                      :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                     :ack-val 3323130347050513529})] 
+                     :ack-val 3323130347050513529})]
   (fact (vector peer-id ack) =>
         (read-buf (protocol/build-acker-message peer-id (:id ack) (:completion-id ack) (:ack-val ack)))))
 
@@ -47,13 +47,13 @@
                            :message {:n 2}
                            :ack-val 729233382010058362})]]
   (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
-    (fact (vector peer-id message) => 
+    (fact (vector peer-id message) =>
           (read-buf buf))))
 
 (let [peer-id -32767
       message []]
   (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
-    (fact (vector peer-id message) => 
+    (fact (vector peer-id message) =>
           (read-buf buf))))
 
 (let [peer-id 0
@@ -63,5 +63,5 @@
                            :message {}
                            :ack-val 729233382010058362})]]
   (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
-    (fact (vector peer-id message) => 
+    (fact (vector peer-id message) =>
           (read-buf buf))))

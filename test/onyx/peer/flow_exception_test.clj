@@ -133,7 +133,7 @@
    {:error? true :value "abc"}
    {:error? true :value 6}
    {:n 7}
-   {:error? true :value 8} 
+   {:error? true :value 8}
    {:n 9}
    {:error? true :value 10}
    {:n 11}

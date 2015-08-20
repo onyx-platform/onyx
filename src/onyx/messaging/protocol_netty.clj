@@ -16,7 +16,7 @@
 
 (defn take-uuid [^ByteBuf buf]
   (let [msb (.readLong buf)
-        lsb (.readLong buf)] 
+        lsb (.readLong buf)]
     (java.util.UUID. msb lsb)))
 
 ;;;;;;
@@ -28,10 +28,10 @@
 
 (def ^:const type-header-length (int 1))
 
-; id uuid 
+; id uuid
 (def ^:const completion-msg-length (int 16))
 
-; id uuid 
+; id uuid
 (def ^:const retry-msg-length (int 16))
 
 (def ^:const acks-base-length (int 4))
@@ -50,14 +50,14 @@
 
 (def ^:const retry-payload-length (int (+ retry-msg-length type-header-length)))
 
-(defn build-completion-msg-buf [id] 
-  (let [buf ^ByteBuf (byte-buffer completion-payload-length)] 
+(defn build-completion-msg-buf [id]
+  (let [buf ^ByteBuf (byte-buffer completion-payload-length)]
     (.writeByte buf completion-type-id)
     (write-uuid buf id)
     buf))
 
-(defn build-retry-msg-buf [id] 
-  (let [buf ^ByteBuf (byte-buffer retry-payload-length)] 
+(defn build-retry-msg-buf [id]
+  (let [buf ^ByteBuf (byte-buffer retry-payload-length)]
     (.writeByte buf retry-type-id)
     (write-uuid buf id)
     buf))
@@ -68,9 +68,9 @@
 (defn read-retry-buf [^ByteBuf buf]
   (take-uuid buf))
 
-(defn build-acks-msg-buf [acks] 
+(defn build-acks-msg-buf [acks]
   (let [cnt (int (count acks))
-        ^ByteBuf buf (byte-buffer (+ acks-header-length (* cnt ack-base-length)))] 
+        ^ByteBuf buf (byte-buffer (+ acks-header-length (* cnt ack-base-length)))]
     (.writeByte buf ack-type-id)
     (.writeInt buf cnt)
     (doseq [ack acks]
@@ -80,13 +80,13 @@
     buf))
 
 (defn read-acks-buf [^ByteBuf buf]
-  (let [cnt (.readInt buf)] 
+  (let [cnt (.readInt buf)]
     (loop [n cnt
            acks (list)]
       (if (zero? n)
         acks
-        (recur (dec n) 
-               (conj acks  
+        (recur (dec n)
+               (conj acks
                      (let [id (take-uuid buf)
                            completion-id (take-uuid buf)
                            ack-val (.readLong buf)]
@@ -105,14 +105,14 @@
         ack-val (.readLong buf)]
     (->Leaf message id acker-id completion-id ack-val nil nil)))
 
-(defn build-messages-msg-buf [compress-f messages] 
+(defn build-messages-msg-buf [compress-f messages]
   (let [message-bytes ^bytes (compress-f (map :message messages))
         message-count (int (count messages))
         buf-size (+ type-header-length
                     (+ 4 ; message count int
                        (alength message-bytes)
                        (* message-base-length message-count)))
-        buf ^ByteBuf (byte-buffer buf-size)] 
+        buf ^ByteBuf (byte-buffer buf-size)]
     (.writeByte buf messages-type-id) ; message type header
     (.writeInt buf message-count) ; number of messages
     (.writeInt buf (alength message-bytes)) ; nippy compressed data size
@@ -127,8 +127,8 @@
         arr (byte-array messages-payload-size)
         _ (.readBytes buf arr)
         messages (decompress-f arr)]
-    (doall (map (fn [msg] 
-                  (read-message-buf buf msg)) 
+    (doall (map (fn [msg]
+                  (read-message-buf buf msg))
                 messages))))
 
 (defn read-msg-type [^ByteBuf buf]

@@ -21,4 +21,3 @@
   (when (common/should-seal? new args state message-id)
     (>!! (:seal-ch state) true))
   state)
-

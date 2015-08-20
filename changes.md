@@ -1,3 +1,8 @@
+#### 0.7.2
+
+- Fixed issue where cluster jammed when all peers left and joined [#273](https://github.com/onyx-platform/onyx/issues/273)
+- Allow `:all` in task lifecycle names to match all tasks. [#209](https://github.com/onyx-platform/onyx/issues/209)
+
 #### 0.7.1
 - :onyx.core/params is initialised as a vector
 - Greatly improved lifecyle and keyword validation

@@ -39,11 +39,11 @@
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
       old-replica {:job-scheduler :onyx.job-scheduler/balanced
-                   :pairs {:a :b :b :c :c :d :d :a} 
+                   :pairs {:a :b :b :c :c :d :d :a}
                    :peers [:a :b :c :d]
                    :jobs [:j1 :j2]
                    :task-schedulers {:j1 :onyx.task-scheduler/balanced
-                                     :j2 :onyx.task-scheduler/balanced} 
+                                     :j2 :onyx.task-scheduler/balanced}
                    :tasks {:j1 [:t1] :j2 [:t2]}
                    :allocations {:j1 {:t1 [:a :b]}
                                  :j2 {:t2 [:c :d]}}
@@ -61,11 +61,11 @@
       rep-reactions (partial extensions/reactions entry)
       old-replica {:job-scheduler :onyx.job-scheduler/balanced
                    :messaging {:onyx.messaging/impl :dummy-messenger}
-                   :pairs {:a :b :b :c :c :a} 
+                   :pairs {:a :b :b :c :c :a}
                    :peers [:a :b :c]
                    :jobs [:j1 :j2]
                    :task-schedulers {:j1 :onyx.task-scheduler/balanced
-                                     :j2 :onyx.task-scheduler/balanced} 
+                                     :j2 :onyx.task-scheduler/balanced}
                    :tasks {:j1 [:t1] :j2 [:t2]}
                    :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}}
       new-replica (f old-replica)

@@ -44,7 +44,7 @@ This workflow takes some input in (presumably a stream of people), and directs s
   :my/max-child-age 17
   :flow/predicate [:my.ns/child? :my/max-child-age]
   :flow/doc "Emits segment if this segment is a child."}
-  
+
  {:flow/from :input-stream
   :flow/to [:process-adults]
   :flow/predicate :my.ns/adult?
@@ -54,7 +54,7 @@ This workflow takes some input in (presumably a stream of people), and directs s
   :flow/to [:process-female-athletes]
   :flow/predicate [:and :my.ns/female? :my.ns/athlete?]
   :flow/doc "Emits segment if this segment is a female athlete."}
-  
+
  {:flow/from :input-stream
   :flow/to [:process-everyone]
   :flow/predicate :my.ns/constantly-true

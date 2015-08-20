@@ -19,7 +19,7 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn find-task-fast 
+(defn find-task-fast
   "find-task fast version - task must be in catalog
    (this should fail validation anyway."
   [catalog task-name]
@@ -30,8 +30,8 @@
         (recur (rest vs))))))
 
 (defn egress-ids-from-children [task-ids elements]
-  (into {} 
-        (map (juxt identity task-ids) 
+  (into {}
+        (map (juxt identity task-ids)
              (map :onyx/name elements))))
 
 (defmulti create-task
@@ -74,7 +74,7 @@
 (defmethod create-io-task :output
   [task-ids element parents children]
   (let [task-name (:onyx/name element)]
-    {:id (task-ids task-name) 
+    {:id (task-ids task-name)
      :name task-name}))
 
 (defn to-dependency-graph [workflow]
@@ -86,7 +86,7 @@
   (map last (vals (group-by :name coll))))
 
 (defn gen-task-ids [nodes]
-  (into {} 
+  (into {}
         (map (juxt identity (fn [_] (java.util.UUID/randomUUID)))
              nodes)))
 
@@ -132,4 +132,3 @@
             :else
             (fn [xs]
               (apply (kw->fn op) (concat xs (map (fn [arg] (get entry arg)) more))))))))
-

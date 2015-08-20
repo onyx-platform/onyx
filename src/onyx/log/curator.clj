@@ -7,7 +7,7 @@
            [org.apache.curator.test TestingServer]
            [org.apache.zookeeper.data Stat]
            [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]
-           [org.apache.curator.framework.api CuratorWatcher PathAndBytesable Versionable GetDataBuilder 
+           [org.apache.curator.framework.api CuratorWatcher PathAndBytesable Versionable GetDataBuilder
             SetDataBuilder DeleteBuilder ExistsBuilder GetChildrenBuilder Pathable Watchable]
            [org.apache.curator.framework.state ConnectionStateListener ConnectionState]
            [org.apache.curator.framework.imps CuratorFrameworkState]
@@ -50,9 +50,9 @@
   ([connection-string]
    (connect connection-string ""))
   ([connection-string ns]
-   (connect connection-string ns 
-            (BoundedExponentialBackoffRetry. 
-              (:onyx.zookeeper/backoff-base-sleep-time-ms defaults) 
+   (connect connection-string ns
+            (BoundedExponentialBackoffRetry.
+              (:onyx.zookeeper/backoff-base-sleep-time-ms defaults)
               (:onyx.zookeeper/backoff-max-sleep-time-ms defaults)
               (:onyx.zookeeper/backoff-max-retries defaults))))
   ([connection-string ns ^RetryPolicy retry-policy]
@@ -66,7 +66,7 @@
 
 (defn close
   "Closes the connection to the ZooKeeper server."
-  [^CuratorFramework client] 
+  [^CuratorFramework client]
   (.close client))
 
 (defn create-mode [opts]
@@ -81,11 +81,11 @@
 
 (defn create
   [^CuratorFramework client path & {:keys [data] :as opts}]
-  (try 
-    (let [cr ^SetDataBuilder (.. client 
-                 create 
+  (try
+    (let [cr ^SetDataBuilder (.. client
+                 create
                  (withMode (create-mode opts)))]
-      (if data 
+      (if data
         (.forPath ^SetDataBuilder cr path data)
         (.forPath ^SetDataBuilder cr path)))
     (catch org.apache.zookeeper.KeeperException$NodeExistsException e
@@ -93,12 +93,12 @@
 
 (defn create-all
   [^CuratorFramework client path & {:keys [data] :as opts}]
-  (try 
-    (let [cr (.. client 
-                 create 
-                 creatingParentsIfNeeded 
+  (try
+    (let [cr (.. client
+                 create
+                 creatingParentsIfNeeded
                  (withMode (create-mode opts)))]
-      (if data 
+      (if data
         (.forPath ^SetDataBuilder cr path data)
         (.forPath ^SetDataBuilder cr path)))
     (catch org.apache.zookeeper.KeeperException$NodeExistsException e
@@ -111,28 +111,28 @@
     (.forPath ^DeleteBuilder (.delete client) path )
     (catch KeeperException$NoNodeException e false)))
 
-(defn children 
+(defn children
   ([^CuratorFramework client path & {:keys [watcher]}]
    (let [children-builder ^GetChildrenBuilder (.getChildren client)]
-     (if watcher 
+     (if watcher
        (.forPath ^GetChildrenBuilder (.usingWatcher children-builder ^Watcher (make-watcher watcher)) path)
        (.forPath ^GetChildrenBuilder children-builder path)))))
 
 (defn data [^CuratorFramework client path]
   (let [stat ^Stat (Stat.)
-        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder (.getData client) stat) path)] 
+        data (.forPath ^GetDataBuilder (.storingStatIn ^GetDataBuilder (.getData client) stat) path)]
     {:data data
      :stat (stat-to-map stat)}))
 
 (defn set-data [^CuratorFramework client path data version]
-  (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client) 
-                                          version) 
-            path 
+  (.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.setData client)
+                                          version)
+            path
             data))
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]
-  (stat-to-map 
+  (stat-to-map
     (let [builder ^ExistsBuilder (.. client checkExists)]
       (if watcher
         (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
-        (.forPath builder path))))) 
+        (.forPath builder path)))))

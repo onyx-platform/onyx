@@ -1,7 +1,7 @@
 (ns onyx.peer.pipeline-extensions
   "Public API extensions for the virtual peer data pipeline.")
 
-(defprotocol PipelineInput 
+(defprotocol PipelineInput
   "Input pipeline protocol. All input pipelines must implement this protocol."
   (ack-segment [this event message-id]
                "Acknowledges a message at the native level for a batch of message ids.
@@ -13,7 +13,7 @@
   (drained? [this event]
             "Returns true if this input resource has been exhausted."))
 
-(defprotocol Pipeline 
+(defprotocol Pipeline
   "Pipeline protocol. All pipelines must implement this protocols i.e. input, output, functions"
   (read-batch [this event]
               "Reads :onyx/batch-size segments off the incoming data source.

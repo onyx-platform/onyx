@@ -73,9 +73,9 @@
   (let [on? (atom false)
         buf (.buf (:inbound-ch messenger-buffer))
         low-water-ratio (/ low-water-pct 100)
-        high-water-ratio (/ high-water-pct 100)] 
+        high-water-ratio (/ high-water-pct 100)]
     (while (not (Thread/interrupted))
-      (let [ratio (/ (count buf) (.n buf))] 
+      (let [ratio (/ (count buf) (.n buf))]
         (cond (and (not @on?) (> ratio high-water-ratio))
               (do (reset! on? true)
                   (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
@@ -114,7 +114,7 @@
                                                                    (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
                                                                    (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
                                                                    (arg-or-default :onyx.peer/backpressure-check-interval opts)))]
-            (assoc component 
+            (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
                    :track-backpressure-fut track-backpressure-fut
@@ -136,7 +136,7 @@
     (<!! (:outbox-loop-ch component))
     (<!! (:processing-loop-ch component))
 
-    (assoc component :track-backpressure-fut nil :inbox-ch nil 
+    (assoc component :track-backpressure-fut nil :inbox-ch nil
            :outbox-loop-ch nil :kill-ch nil :restart-ch nil
            :outbox-loop-ch nil :processing-loop-ch nil)))
 

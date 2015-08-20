@@ -17,7 +17,7 @@
                 (count active-peers)))
       (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
 
-(defn read-batch 
+(defn read-batch
   ([event]
    (read-batch event (:onyx.core/messenger event)))
   ([event messenger]
@@ -36,20 +36,20 @@
                (let [link (operation/peer-link replica-val state event target)]
                  (onyx.extensions/send-messages messenger event link segs)))))))))
 
-  ([{:keys [onyx.core/id onyx.core/results 
-            onyx.core/messenger onyx.core/job-id 
-            onyx.core/state onyx.core/replica 
-            onyx.core/peer-replica-view onyx.core/serialized-task 
+  ([{:keys [onyx.core/id onyx.core/results
+            onyx.core/messenger onyx.core/job-id
+            onyx.core/state onyx.core/replica
+            onyx.core/peer-replica-view onyx.core/serialized-task
             onyx.core/max-downstream-links] :as event}]
    (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links (:egress-ids serialized-task))))
 
 (defrecord Function [replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
   p-ext/Pipeline
-  (read-batch 
+  (read-batch
     [_ event]
     (read-batch event messenger))
 
-  (write-batch 
+  (write-batch
     [_ event]
     (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks))
 
@@ -59,9 +59,9 @@
 (defn function [{:keys [onyx.core/replica
                         onyx.core/peer-replica-view
                         onyx.core/state
-                        onyx.core/id 
-                        onyx.core/messenger 
-                        onyx.core/job-id 
+                        onyx.core/id
+                        onyx.core/messenger
+                        onyx.core/job-id
                         onyx.core/max-downstream-links
                         onyx.core/serialized-task] :as pipeline-data}]
   (->Function replica

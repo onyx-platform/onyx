@@ -107,11 +107,11 @@ another java process. You can do this via the following code snippet, or by usin
 
 ##### Configuration Options
 
-Aeron is independently configurable via Java properties (e.g.  `JAVA_OPTS="-Daeron.mtu.length=16384"`). 
+Aeron is independently configurable via Java properties (e.g.  `JAVA_OPTS="-Daeron.mtu.length=16384"`).
 Configuration of these may cause different performance characteristics, and
 certain options may need to be configured in order to communicate large segments between peers.
 
-Documentation for these configuration options can be found in 
+Documentation for these configuration options can be found in
 [Aeron's documentation](https://github.com/real-logic/Aeron/wiki/Configuration-Options).
 
 #### Netty Messaging

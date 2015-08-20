@@ -310,7 +310,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Submitter: Client, via public facing API
 - Purpose: Send a catalog and workflow to be scheduled for execution by the cluster
 - Arguments: The job ID (`:id`), the task scheduler for this job (`:task-scheduler`), a topologically sorted sequence of tasks (`:tasks`), the catalog (`:catalog`), and the saturation level for this job (`:saturation`). Saturation denotes the number of peers this job can use, at most. This is typically Infinity, unless all catalog entries set `:onyx/max-peers` to an integer value. Saturation is then the sum of those numbers, since it creates an upper bound on the total number of peers that can be allocated to this task.
-- Replica update: 
+- Replica update:
 - Side effects: None
 - Reactions: If the job scheduler dictates that this peer should be reallocated to this job or another job, sends `:volunteer-for-task` to the log
 

@@ -125,7 +125,7 @@ If a job is completed or otherwise canceled while this scheduler is running, the
 
 ##### Percentage Rebalancing Strategy
 
-When a job or peer are added or removed, the Percentage job scheduler needs to dynamically adjust which peers are allocated to which jobs. 
+When a job or peer are added or removed, the Percentage job scheduler needs to dynamically adjust which peers are allocated to which jobs.
 
 The algorithm works as follows:
 

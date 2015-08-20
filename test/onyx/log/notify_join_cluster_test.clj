@@ -6,7 +6,7 @@
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(def peer-config 
+(def peer-config
   (:peer-config (load-config)))
 
 (let [entry (create-log-entry :notify-join-cluster {:observer :d :subject :a})

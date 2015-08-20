@@ -7,7 +7,7 @@
             [onyx.system]
             [midje.sweet :refer :all]))
 
-(def entry 
+(def entry
   (create-log-entry :prepare-join-cluster {:joiner :d
                                            :peer-site {:address 1}}))
 

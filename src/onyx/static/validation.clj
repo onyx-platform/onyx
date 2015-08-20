@@ -7,7 +7,7 @@
 (def NamespacedKeyword
   (schema/pred (fn [kw]
                  (and (keyword? kw)
-                      (namespace kw))) 
+                      (namespace kw)))
                'keyword-namespaced?))
 
 (def Function
@@ -37,7 +37,7 @@
 
 (def catalog-entry-validator
   (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
-                      (merge base-catalog-entry-validator 
+                      (merge base-catalog-entry-validator
                              {:onyx/plugin NamespacedKeyword
                               :onyx/medium schema/Keyword
                               (schema/optional-key :onyx/fn) NamespacedKeyword})
@@ -61,7 +61,7 @@
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
 
 (defn no-duplicate-entries [catalog]
-  (let [tasks (map :onyx/name catalog)] 
+  (let [tasks (map :onyx/name catalog)]
     (when-not (= (distinct tasks) tasks)
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
@@ -173,7 +173,7 @@
      :onyx/id deployment-id-schema
      (schema/optional-key :zookeeper/server?) schema/Bool
      (schema/optional-key :zookeeper.server/port) schema/Int}
-    (select-keys env-config 
+    (select-keys env-config
                  [:zookeeper/address :onyx/id :zookeeper/server? :zookeeper.server/port])))
 
 (defn validate-peer-config [peer-config]
@@ -187,10 +187,10 @@
      (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
      (schema/optional-key :onyx.messaging/external-addr) schema/Str
      (schema/optional-key :onyx.messaging/backpressure-strategy) schema/Keyword}
-    (select-keys peer-config 
+    (select-keys peer-config
                  [:onyx/id
                   :zookeeper/address
-                  :onyx.peer/job-scheduler 
+                  :onyx.peer/job-scheduler
                   :onyx.messaging/impl
                   :onyx.messaging/peer-port-range
                   :onyx.messaging/peer-ports

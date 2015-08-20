@@ -78,4 +78,3 @@
 (fact (:args entry) => {:id "d"})
 
 (onyx.api/shutdown-env env)
-

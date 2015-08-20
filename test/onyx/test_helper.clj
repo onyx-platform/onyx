@@ -43,15 +43,15 @@
 (defn get-counts [replica job-infos]
   (mapv (partial job-allocation-counts replica) job-infos))
 
-(defn load-config 
+(defn load-config
   ([]
    (load-config "test-config.edn"))
   ([filename]
    (let [yeller-token (System/getenv "YELLER_TOKEN")
-         impl (System/getenv "TEST_TRANSPORT_IMPL")] 
+         impl (System/getenv "TEST_TRANSPORT_IMPL")]
      (cond-> (read-string (slurp (clojure.java.io/resource filename)))
-       (not-empty yeller-token) 
-       (assoc-in [:peer-config :onyx.log/config :appenders :yeller] 
+       (not-empty yeller-token)
+       (assoc-in [:peer-config :onyx.log/config :appenders :yeller]
                  (yeller.timbre-appender/make-yeller-appender
                    {:token yeller-token
                     :environment "citests"}))

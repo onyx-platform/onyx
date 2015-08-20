@@ -71,52 +71,52 @@
 
   (run-job [component {:keys [workflow catalog task-scheduler] :as job} inputs]
     (let [n-peers-required (count (distinct (flatten workflow)))
-          n-peers (count @(:v-peers component))] 
+          n-peers (count @(:v-peers component))]
       (when (< n-peers n-peers-required)
-        (throw (Exception. (format "%s peers required to run this job and only %s peers are available." 
-                                   n-peers-required 
+        (throw (Exception. (format "%s peers required to run this job and only %s peers are available."
+                                   n-peers-required
                                    n-peers)))))
 
                                         ; Convert all input and output tasks to core.async input and output tasks
                                         ; This code should be made into a helper function like add-debug-output-tasks
-    (let [in-names (set (input-names catalog)) 
+    (let [in-names (set (input-names catalog))
           out-names (set (output-names catalog))
-          alt-name->name (into {} 
-                               (map (fn [k] [(name->alt-name k) k]) 
+          alt-name->name (into {}
+                               (map (fn [k] [(name->alt-name k) k])
                                     (concat in-names out-names)))
           in-names-alt (map name->alt-name in-names)
-          in-chans (names->chans-map in-names-alt) 
+          in-chans (names->chans-map in-names-alt)
           out-names-alt (map name->alt-name out-names)
-          out-chans (names->chans-map out-names-alt) 
-          in-entries (map (fn [n] 
+          out-chans (names->chans-map out-names-alt)
+          in-entries (map (fn [n]
                             {:onyx/name n
                              :onyx/plugin :onyx.plugin.core-async/input
                              :onyx/type :input
                              :onyx/medium :core.async
                              :onyx/batch-size 20
-                             :onyx/max-peers 1}) 
+                             :onyx/max-peers 1})
                           in-names-alt)
-          out-entries (map (fn [n] 
+          out-entries (map (fn [n]
                              {:onyx/name n
                               :onyx/plugin :onyx.plugin.core-async/output
                               :onyx/type :output
                               :onyx/medium :core.async
                               :onyx/batch-size 20
-                              :onyx/max-peers 1}) 
+                              :onyx/max-peers 1})
                            out-names-alt)
           lifecycles (map (fn [n]
                             {:lifecycle/name n
                              :lifecycle/calls (keyword (str "onyx.test-job/" n "-calls"))})
                           (concat in-names-alt out-names-alt))
           workflow-alt (mapv (fn [edge]
-                               (mapv (fn [task] 
+                               (mapv (fn [task]
                                        (if (or (in-names task) (out-names task))
                                          (name->alt-name task)
-                                         task)) 
+                                         task))
                                      edge))
                              workflow)
 
-          _ (doall 
+          _ (doall
              (map (fn [[k c]]
                     (let [f-sym (symbol (str "inject-" (name k)))]
                       (intern *ns* f-sym (eval `(fn ~k ~[] {:core.async/chan c})))
@@ -124,13 +124,13 @@
                               {:lifecycle/before-task-start f-sym})))
                   (merge in-chans out-chans)))
 
-          job (onyx.api/submit-job (:peer-config component) 
+          job (onyx.api/submit-job (:peer-config component)
                                    {:workflow workflow-alt
                                     :catalog (concat catalog in-entries out-entries)
                                     :lifecycles lifecycles
                                     :task-scheduler task-scheduler})
 
-          _ (doall 
+          _ (doall
              (map (fn [[k in-ch]]
                     (doseq [v (inputs (alt-name->name k))]
                       (>!! in-ch v))
@@ -138,9 +138,9 @@
                     (close! in-ch))
                   in-chans))]
       (future
-        (let [results (into {} 
+        (let [results (into {}
                             (map (fn [[k out-ch]]
-                                   [(alt-name->name k) 
+                                   [(alt-name->name k)
                                     (take-segments! out-ch)])
                                  out-chans))]
           (doall (map (comp close! val) out-chans))
@@ -152,7 +152,7 @@
           env-config (assoc env-config :onyx/id id)
           peer-config (assoc peer-config :onyx/id id)
           env (onyx.api/start-env env-config)]
-      (try 
+      (try
         (let [peer-group (onyx.api/start-peer-group peer-config)
               ch (chan)
               !replica (atom {})
@@ -160,11 +160,11 @@
                          (let [entry (<!! ch)
                                new-replica (extensions/apply-log-entry entry replica)]
                            (reset! !replica new-replica)
-                           (recur new-replica)))] 
-          (assoc component 
+                           (recur new-replica)))]
+          (assoc component
             :env-config env-config
             :peer-config peer-config
-            :env env 
+            :env env
             :peer-group peer-group
             :replica !replica
             :v-peers (atom [])
@@ -175,29 +175,29 @@
   (component/stop [component]
     (close! (:log-ch component))
     (doseq [v-peer @(:v-peers component)]
-      (try 
+      (try
         (onyx.api/shutdown-peer v-peer)
         (catch Exception e
           (fatal e "Could not shutdown v-peer " v-peer))))
-    (try 
+    (try
       (onyx.api/shutdown-peer-group (:peer-group component))
       (catch Exception e
         (fatal e "Could not stop peer-group")))
-    (try 
+    (try
       (onyx.api/shutdown-env (:env component))
       (catch Exception e
         (fatal e "Could not stop environment")))
     (assoc component :env nil :peer-group nil :replica nil :v-peers nil)))
 
 (comment
-  (deftest test-test-env 
+  (deftest test-test-env
   (testing "Test env runs job with debug tasks"
-    (let [env-t (component/start (map->TestEnv config))] 
+    (let [env-t (component/start (map->TestEnv config))]
       (try
-        (add-peers env-t 4)         
+        (add-peers env-t 4)
         (is (= {:out [{:n 2} :done]
                 :inc_out [{:n 2} :done]}
-               @(run-job env-t (add-debug-output-tasks 
+               @(run-job env-t (add-debug-output-tasks
                                 {:catalog [{:onyx/name :in
                                             :onyx/plugin :onyx.plugin.core-async/input
                                             :onyx/type :input

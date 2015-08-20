@@ -3,7 +3,7 @@
   (:refer-clojure :exclude [assoc dissoc])
   (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap]))
 
-(defprotocol PeerManager 
+(defprotocol PeerManager
   (clone [this])
   (assoc [this k v])
   (dissoc [this k])
@@ -12,17 +12,17 @@
 (deftype VPeerManager [^Int2ObjectHashMap m]
   PeerManager
   (assoc [this k v]
-    (let [vp ^VPeerManager (clone this)] 
+    (let [vp ^VPeerManager (clone this)]
       (.put (.m vp) (int k) v)
       vp))
   (dissoc [this k]
-    (let [vp ^VPeerManager (clone this)] 
+    (let [vp ^VPeerManager (clone this)]
       (.remove (.m vp) (int k))
       vp))
   (peer-channels [this k]
     (.get m (int k)))
   (clone [this]
-    (VPeerManager. 
+    (VPeerManager.
       (let [iterator (.iterator (.entrySet m))
             new-hm (Int2ObjectHashMap.)]
         (while (.hasNext iterator)

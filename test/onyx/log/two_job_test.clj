@@ -121,7 +121,7 @@
    {:lifecycle/task :f
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(def j1 
+(def j1
   (onyx.api/submit-job
     peer-config
     {:workflow [[:a :b] [:b :c]]
@@ -129,7 +129,7 @@
      :lifecycles lifecycles-1
      :task-scheduler :onyx.task-scheduler/balanced}))
 
-(def j2 
+(def j2
   (onyx.api/submit-job
     peer-config
     {:workflow [[:d :e] [:e :f]]

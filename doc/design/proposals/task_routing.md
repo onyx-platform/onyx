@@ -12,9 +12,9 @@ one of two output tasks (:out1, :out2) one can currently define a workflow:
 
 ##### Workflow
 ```
-[[:in :filter-even] 
- [:in :filter-odd] 
- [:filter-odd :odd-out] 
+[[:in :filter-even]
+ [:in :filter-odd]
+ [:filter-odd :odd-out]
  [:filter-even :even-out]]
 ```
 
@@ -90,7 +90,7 @@ is separated into the filter-even and filter-odd function.
 Task entries in catalogs can additionally define a :onyx/route-filter-fn
 with the following definition:
 
-example-router-fn (input-segment, output-segment, catalog, task, output-tasks) 
+example-router-fn (input-segment, output-segment, catalog, task, output-tasks)
 
 and which returns a list of the tasks that the segment should be routed to.
 These tasks must be all be  tasks with incoming edges from the task, hence the
@@ -101,7 +101,7 @@ Alternative definition under this format:
 
 #### Workflow
 ```
-[[:in :odd-out] 
+[[:in :odd-out]
  [:in :even-out]]
 ```
 
@@ -146,7 +146,7 @@ and the required routing function:
 Note that in this case, as :in is an input task, input-segment will be nil. One
 open question: it may not be necessary to pass in the input segment to the
 routing tasks. It may also come at the cost of some complexity so this should
-be considered. 
+be considered.
 
 You can also define routing functions that do not return any output tasks, e.g.
 a routing function that randomly drops segments.
@@ -161,7 +161,7 @@ a routing function that randomly drops segments.
 
 The default behaviour (i.e. without a routing-fn defined) would essentially be
 a function that returned all tasks with incoming edges from the task, i.e.
-``` #{:even-out :odd-out} ``` 
+``` #{:even-out :odd-out} ```
 in this example.
 
 ### Additional proposals
