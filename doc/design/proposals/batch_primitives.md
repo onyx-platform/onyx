@@ -89,7 +89,7 @@ Catalog:
   :onyx/type :batch-function
   :onyx/batch-size batch-size
   :onyx/batch-timeout batch-timeout}
-  
+
  {:onyx/name :sample-students
   :onyx/fn :onyx.batch/sample
   :sample/fraction 0.01

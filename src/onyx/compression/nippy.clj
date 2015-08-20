@@ -6,4 +6,3 @@
 
 (defn decompress [x]
   (nippy/thaw x {:v1-compatibility? false}))
-

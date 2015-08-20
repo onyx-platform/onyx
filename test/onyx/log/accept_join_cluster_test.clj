@@ -45,4 +45,3 @@
   (fact (last (get-in new-replica [:peers])) => :d)
   (fact diff => {:observer :a :subject :d})
   (fact (rep-reactions old-replica new-replica diff {}) => []))
-

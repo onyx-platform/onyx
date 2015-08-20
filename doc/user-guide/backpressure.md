@@ -12,7 +12,7 @@ One important form of backpressure, is the
 [:onyx/max-pending](https://github.com/onyx-platform/onyx/blob/master/doc/user-guide/information-model.md#maps-with-onyxtype-set-to-input-may-optionally-have-these-keys),
 task parameter, which may be configured on input tasks. Input tasks will only
 produce new segments if there are fewer than max-pending pending (i.e. not
-fully acked) input segments. 
+fully acked) input segments.
 
 One problem with max-pending as a form of backpressure, is that it doesn't take
 into account the number of segments produced by the intermediate tasks, nor

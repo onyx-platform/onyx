@@ -35,7 +35,7 @@
                              [lein-jammin "0.1.1"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx2500M"
-                                    "-XX:+UnlockCommercialFeatures"  
-                                    "-XX:+FlightRecorder"  
+                                    "-XX:+UnlockCommercialFeatures"
+                                    "-XX:+FlightRecorder"
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}}
   :codox {:output-dir "doc/api"})

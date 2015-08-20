@@ -219,5 +219,3 @@
   (fact (:e (:egress-ids d)) => (:id e))
   (fact (:f (:egress-ids e)) => (:id f))
   (fact (:g (:egress-ids f)) => (:id g)))
-
-

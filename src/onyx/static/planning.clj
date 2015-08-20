@@ -132,4 +132,3 @@
             :else
             (fn [xs]
               (apply (kw->fn op) (concat xs (map (fn [arg] (get entry arg)) more))))))))
-

@@ -8,4 +8,3 @@
         media-driver (MediaDriver/launch ctx)]
     (println "Launched the Media Driver. Blocking forever...")
     (<!! (chan))))
-

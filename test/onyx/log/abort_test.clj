@@ -23,4 +23,3 @@
                        :args {:joiner :d
                               :peer-site {:address 1}}
                        :immediate? true}]))
-

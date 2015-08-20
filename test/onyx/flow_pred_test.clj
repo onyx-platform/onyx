@@ -51,4 +51,3 @@
 (fact ((build-pred-fn [:and :onyx.flow-pred-test/true-pred
                        [:and :onyx.flow-pred-test/true-pred
                         :onyx.flow-pred-test/true-pred]] {}) [1 2 3]) => true)
-
