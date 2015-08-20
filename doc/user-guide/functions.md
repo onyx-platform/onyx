@@ -43,11 +43,11 @@ A function can be parameterized before a job is submitted to Onyx. The segment i
 
 The function is then invoked with `(partial f :my-args-here)`.
 
-- Via the `:onyx.peer-fn-params` in the `before-task-start` lifecycle hook
+- Via the `:onyx.core/params` in the `before-task-start` lifecycle hook
 
 ```clojure
 (defn before-task-start-hook [event lifecycle]
-  {:onyx.core/fn-params [:my-args-here]})
+  {:onyx.core/params [:my-args-here]})
 ```
 
 The function is then invoked with `(partial f :my-args-here)`.
