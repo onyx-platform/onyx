@@ -313,7 +313,7 @@
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)))
-    rets))
+    (merge event rets)))
 
 (defn launch-aux-threads!
   [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
@@ -430,8 +430,8 @@
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
-             (ack-segments task-map replica state messenger monitoring)
-             (close-batch-resources)))
+             (close-batch-resources)
+             (ack-segments task-map replica state messenger monitoring)))
       (catch Throwable e
         (ex-f e)))))
 
