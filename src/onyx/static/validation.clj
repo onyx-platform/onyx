@@ -13,8 +13,15 @@
 (def Function
   (schema/pred fn? 'fn?))
 
+(def TaskName
+  (schema/pred (fn [v]
+                 (and (not= :all v)
+                      (not= :none v)
+                      (keyword? v)))
+               'task-name?))
+
 (def base-catalog-entry-validator
-  {:onyx/name schema/Keyword
+  {:onyx/name TaskName
    :onyx/type (schema/enum :input :output :function)
    :onyx/batch-size (schema/pred pos? 'pos?)
    (schema/optional-key :onyx/restart-pred-fn) schema/Keyword
@@ -29,7 +36,7 @@
 (def edge-validator
   (schema/->Both [(schema/pred vector? 'vector?)
                   (schema/pred edge-two-nodes? 'edge-two-nodes?)
-                  [schema/Keyword]]))
+                  [TaskName]]))
 
 (def workflow-validator
   (schema/->Both [(schema/pred vector? 'vector?)
