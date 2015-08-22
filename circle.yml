@@ -17,6 +17,8 @@ machine:
 dependencies:
   pre:
     - sudo pip install awscli
+    - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
+    - lein voom build-deps
 
 notify:
   webhooks:
