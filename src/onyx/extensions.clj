@@ -34,6 +34,8 @@
 
 (defmulti force-write-chunk (fn [log kw chunk id] [(type log) kw]))
 
+(defmulti swap-chunk (fn [log kw f id] [(type log) kw]))
+
 (defmulti read-chunk (fn [log kw id & args] [(type log) kw]))
 
 (defmulti update-origin! (fn [log replica message-id] (type log)))
