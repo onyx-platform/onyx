@@ -9,4 +9,5 @@ git clone $1 && \
     git checkout master && \
     lein voom freshen && \
     git commit -am "CircleCI automatic commit: Freshening dependencies to latest." && \
-    git push origin master
+    git push origin master && \
+    cd ..
