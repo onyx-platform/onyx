@@ -76,11 +76,11 @@
         high-water-ratio (/ high-water-pct 100)]
     (while (not (Thread/interrupted))
       (let [ratio (/ (count buf) (.n buf))
-            on-val? @on?]
+            on-val @on?]
         (cond (and (not on-val) (> ratio high-water-ratio))
-              (do (reset! on-val? true)
+              (do (reset! on-val true)
                   (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
-              (and on-val? (< ratio low-water-ratio))
+              (and on-val (< ratio low-water-ratio))
               (do (reset! on? false)
                   (>!! outbox-ch (create-log-entry :backpressure-off {:peer id})))))
       (Thread/sleep check-interval))))
