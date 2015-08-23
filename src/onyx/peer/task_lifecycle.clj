@@ -464,7 +464,6 @@
     (try
       (validation/validate-lifecycle-calls calls-map)
       (catch Throwable t
-        ;; FIXME: job should be killed here
         (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
           (error e)
           (throw e))))
