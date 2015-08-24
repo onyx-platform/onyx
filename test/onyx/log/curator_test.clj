@@ -22,7 +22,7 @@
 
 (def base-path2 (str "/" onyx-id "/ab2"))
 
-#_(let [env (onyx.api/start-env env-config)]
+(let [env (onyx.api/start-env env-config)]
   (try
     (let [client (cu/connect (:zookeeper/address env-config) "onyx")
           value [1 3 48]]
@@ -85,6 +85,23 @@
     (finally
      (onyx.api/shutdown-env env))))
 
+(let [env (onyx.api/start-env env-config)]
+  (try
+    (let [client (cu/connect (:zookeeper/address env-config) "onyx")]
+      (cu/create-all client (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
+      (println "Version is " (cu/data client (str base-path "/zd/hi")))
+      (cu/create-all client (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
+      (println "Version is " (cu/data client (str base-path "/zd/hi")))
+      (println "Version is " (cu/data client (str base-path "/zd/hi")))
+      (println "Version is " (cu/data client (str base-path "/zd/hi")))
+
+
+      (cu/check-version client base-path 0)
+
+      )
+    (finally
+     (onyx.api/shutdown-env env))))
+
 
 (let [env (onyx.api/start-env env-config)]
   (try
@@ -92,7 +109,8 @@
       (cu/create client base-path :data (compress {:v 0}))
       (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))
       (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))
-      (let [last-val (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))]
+      (let [last-val (:value (cu/swap-data client base-path compress decompress 
+                                           (fn [v] (update v :v inc))))]
         (fact {:v 3} => last-val)))
     (finally
      (onyx.api/shutdown-env env))))
@@ -101,14 +119,15 @@
   (try
     (let [client (cu/connect (:zookeeper/address env-config) "onyx")]
       (cu/create client base-path :data (compress {:v 0}))
-      (facts "Concurrency test" 
+      (facts "chunk swap concurrency test" 
              (let [n-updates 1000
-                   updates (pmap 
-                             (fn [_]
-                               (cu/swap-data client base-path compress decompress 
-                                             (fn [v] (update v :v inc))))
-                             
-                             (range n-updates))
+                   updates (map :value 
+                                (pmap 
+                                  (fn [_]
+                                    (cu/swap-data client base-path compress decompress 
+                                                  (fn [v] (update v :v inc))))
+
+                                  (range n-updates)))
                    max-val (apply max (map :v updates))]
                (fact max-val => n-updates))))
     (finally

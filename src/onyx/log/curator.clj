@@ -11,6 +11,7 @@
            [org.apache.curator.test TestingServer]
            [org.apache.zookeeper.data Stat]
            [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]
+           [org.apache.curator.framework.api.transaction CuratorTransaction TransactionCheckBuilder]
            [org.apache.curator.framework.api CuratorWatcher PathAndBytesable Versionable GetDataBuilder
             SetDataBuilder DeleteBuilder ExistsBuilder GetChildrenBuilder Pathable Watchable]
            [org.apache.curator.framework.state ConnectionStateListener ConnectionState]
@@ -134,6 +135,26 @@
             path
             data))
 
+(defn check-version [^CuratorFramework client path version]
+  (let [builder ^ExistsBuilder (.. client checkExists)]
+    (if watcher
+      (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
+      (.forPath builder path)))
+
+  (.forPath ^SetDataBuilder (.withVersion (.getData client)
+                                          version)
+            path
+            data))
+
+; (defn check-version [^CuratorFramework client path version]
+;   (.commit (.check (.withVersion (.forPath (.inTransaction client) path) version)))
+
+
+  
+;   #_(.forPath ^SetDataBuilder (.withVersion ^SetDataBuilder (.ĸkkkkkkkk) version)
+;             path
+;             data))
+
 (defn swap-data [^CuratorFramework client path compress-fn decompress-fn f]
     (loop [v (data client path)]
       (let [new-val (f (decompress-fn (:data v)))
@@ -146,7 +167,7 @@
                                  :version-failure
                                  (throw ke)))))]
         (if success?
-          new-val
+          {:compressed compressed :value new-val}
           (recur (data client path))))))
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]

@@ -27,7 +27,6 @@
       "We can write to the log and read the entries back out"
       (doseq [n (range 10)]
         (extensions/write-log-entry (:log env) {:n n}))
-
       (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
     (finally
       (onyx.api/shutdown-env env))))
@@ -54,5 +53,14 @@
               => entries))
 
       (deref write-fut))
+    (finally
+      (onyx.api/shutdown-env env))))
+
+(let [env (onyx.api/start-env env-config)]
+  (try
+    (let [id #uuid "ada530cf-3e0a-4043-b041-33212b7ebfa8"] 
+      (extensions/write-chunk (:log env) :chunk {:v 0} id)
+      (fact (extensions/swap-chunk (:log env) :chunk (fn [v] (update v :v inc)) id)
+            => {:v 1}))
     (finally
       (onyx.api/shutdown-env env))))

@@ -371,14 +371,16 @@
 
 (defmethod extensions/swap-chunk [ZooKeeper :chunk]
   [{:keys [conn opts prefix monitoring] :as log} kw f id]
-  (measure-latency
-    #(clean-up-broken-connections
-       (fn []
-         (let [node (str (chunk-path prefix) "/" id "/chunk")]
-           (zk/swap-data conn node compress decompress f))))
-    #(let [args {:event :zookeeper-swap-chunk :id id
-                 :latency %}]
-       (extensions/emit monitoring args))))
+  (let [start (System/currentTimeMillis)
+        node (str (chunk-path prefix) "/" id "/chunk")
+        set-value (zk/swap-data conn node compress decompress f)
+        end (- (System/currentTimeMillis) start)]
+    (extensions/emit monitoring 
+                     {:event :zookeeper-swap-chunk 
+                      :id id
+                      :bytes (count (:compressed set-value))
+                      :latency end})
+    (:value set-value)))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]
