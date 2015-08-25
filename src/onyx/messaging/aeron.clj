@@ -281,13 +281,17 @@
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 
+(def possible-ids
+  (set (map short (range -32768 32768))))
+
+(defn available-ids [used]
+  (->> (clojure.set/difference possible-ids used)
+       (into [])
+       not-empty))
+
 (defn choose-id [peer-id used]
-  (when-not (= 65536 (count used))
-    (loop [next-hash (hash peer-id)]
-      (let [next-id (- 32768 (mod next-hash 65536))]
-        (if (contains? used next-id)
-          (recur (hash next-hash))
-          next-id)))))
+  (when-let [available (available-ids used)]
+    (nth available (mod (hash peer-id) (count available)))))
 
 (defmethod extensions/assign-site-resources :aeron
   [replica peer-id peer-site peer-sites]
