@@ -15,6 +15,7 @@
                 (merge
                   peer-site
                   (extensions/assign-site-resources replica
+                                                    joiner
                                                     peer-site
                                                     (:peer-sites replica))))))
 
