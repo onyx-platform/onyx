@@ -179,7 +179,8 @@
         (ex-info "Couldn't assign port - ran out of available ports.
                  Available ports can be configured in the peer-config.
                  e.g. {:onyx.messaging/peer-ports [40000, 40002],
-                 :onyx.messaging/peer-port-range [40200 40260]}"))))
+                 :onyx.messaging/peer-port-range [40200 40260]}"
+                 {:opts opts}))))
 
 
 ;; FIXME: gc'ing publications could be racy if a publication is grabbed
@@ -300,7 +301,8 @@
                       set)
         id (choose-id used-ids)]
     (when-not id
-      (throw (ex-info "Couldn't assign id. Ran out of aeron ids. This should only happen if more than 65356 virtual peers have been started up on a single external addr")))
+      (throw (ex-info "Couldn't assign id. Ran out of aeron ids. This should only happen if more than 65356 virtual peers have been started up on a single external addr"
+                      peer-site)))
     {:aeron/id id}))
 
 (defmethod extensions/get-peer-site :aeron
