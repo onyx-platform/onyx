@@ -24,11 +24,11 @@ notify:
   webhooks:
     - url: https://webhooks.gitter.im/e/7f6cadb429def50c94a2
 
-deployment:
-  freshen-onyx-plugins:
-    branch: master
-    commands:
-      - ./freshen-repository.sh git@github.com:onyx-platform/onyx-kafka.git onyx-kafka
-      - ./freshen-repository.sh git@github.com:onyx-platform/onyx-datomic.git onyx-datomic
-      - ./freshen-repository.sh git@github.com:onyx-platform/onyx-sql.git onyx-sql
-      - ./freshen-repository.sh git@github.com:onyx-platform/onyx-dashboard.git onyx-dashboard
+# deployment:
+#   freshen-onyx-plugins:
+#     branch: master
+#     commands:
+#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-kafka.git onyx-kafka
+#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-datomic.git onyx-datomic
+#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-sql.git onyx-sql
+#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-dashboard.git onyx-dashboard
