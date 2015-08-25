@@ -42,7 +42,7 @@
 
 ;; Messaging interface
 
-(defmulti assign-site-resources (fn [replica peer-site peer-sites]
+(defmulti assign-site-resources (fn [replica peer-id peer-site peer-sites]
                                   (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
