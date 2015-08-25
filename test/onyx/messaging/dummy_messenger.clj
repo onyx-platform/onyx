@@ -2,7 +2,7 @@
   (:require [onyx.extensions :as extensions]))
 
 (defmethod extensions/assign-site-resources :dummy-messenger
-  [config peer-site peer-sites]
+  [config peer-id peer-site peer-sites]
   {:port 1})
 
 (defmethod extensions/get-peer-site :dummy-messenger

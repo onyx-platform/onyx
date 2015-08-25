@@ -281,14 +281,16 @@
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 
-(def possible-ids
-  (set (map short (range -32768 32768))))
-
-(defn choose-id [used]
-  (first (clojure.set/difference possible-ids used)))
+(defn choose-id [peer-id used]
+  (when-not (= 65536 (count used))
+    (loop [next-hash (hash peer-id)]
+      (let [next-id (- 32768 (mod next-hash 65536))]
+        (if (contains? used next-id)
+          (recur (hash next-hash))
+          next-id)))))
 
 (defmethod extensions/assign-site-resources :aeron
-  [replica peer-site peer-sites]
+  [replica peer-id peer-site peer-sites]
   ;;; Assigns a unique id to each peer so that messages do not need
   ;;; to send the entire peer-id in a payload, saving 14 bytes per
   ;;; message
@@ -299,7 +301,7 @@
                              (:aeron/external-addr s))))
                       (map :aeron/id)
                       set)
-        id (choose-id used-ids)]
+        id (choose-id peer-id used-ids)]
     (when-not id
       (throw (ex-info "Couldn't assign id. Ran out of aeron ids. This should only happen if more than 65356 virtual peers have been started up on a single external addr"
                       peer-site)))
