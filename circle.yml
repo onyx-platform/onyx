@@ -19,16 +19,38 @@ dependencies:
     - sudo pip install awscli
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
+    - |
+Host onyx-kafka
+    HostName github.com
+    User git
+    IdentityFile /home/ubuntu/.ssh/id_onyx-kafka
+    IdentitiesOnly yes
+Host onyx-datomic
+    Hostname github.com
+    User git
+    IdentityFile /home/ubuntu/.ssh/id_onyx-datomic\n
+    IdentitiesOnly yes
+Host onyx-sql
+    Hostname github.com
+    User git
+    IdentityFile /home/ubuntu/.ssh/id_onyx-sql
+    IdentitiesOnly yes
+Host onyx-dashboard
+    Hostname github.com
+    User git
+    IdentityFile /home/ubuntu/.ssh/id_onyx-dashboard
+    IdentitiesOnly yes
+>> ~/.ssh/config
 
 notify:
   webhooks:
     - url: https://webhooks.gitter.im/e/7f6cadb429def50c94a2
 
-# deployment:
-#   freshen-onyx-plugins:
-#     branch: master
-#     commands:
-#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-kafka.git onyx-kafka
-#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-datomic.git onyx-datomic
-#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-sql.git onyx-sql
-#       - ./freshen-repository.sh git@github.com:onyx-platform/onyx-dashboard.git onyx-dashboard
+deployment:
+  freshen-onyx-plugins:
+    branch: master
+    commands:
+      - ./freshen-repository.sh git@onyx-kafka:onyx-platform/onyx-kafka.git onyx-kafka
+      - ./freshen-repository.sh git@onyx-datomic:onyx-platform/onyx-datomic.git onyx-datomic
+      - ./freshen-repository.sh git@onyx-sql:onyx-platform/onyx-sql.git onyx-sql
+      - ./freshen-repository.sh git@onyx-dashboard:onyx-platform/onyx-dashboard.git onyx-dashboard
