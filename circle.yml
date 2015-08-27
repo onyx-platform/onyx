@@ -19,28 +19,7 @@ dependencies:
     - sudo pip install awscli
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
-    - |
-Host onyx-kafka
-    HostName github.com
-    User git
-    IdentityFile /home/ubuntu/.ssh/id_onyx-kafka
-    IdentitiesOnly yes
-Host onyx-datomic
-    Hostname github.com
-    User git
-    IdentityFile /home/ubuntu/.ssh/id_onyx-datomic\n
-    IdentitiesOnly yes
-Host onyx-sql
-    Hostname github.com
-    User git
-    IdentityFile /home/ubuntu/.ssh/id_onyx-sql
-    IdentitiesOnly yes
-Host onyx-dashboard
-    Hostname github.com
-    User git
-    IdentityFile /home/ubuntu/.ssh/id_onyx-dashboard
-    IdentitiesOnly yes
->> ~/.ssh/config
+    - curl https://gist.githubusercontent.com/MichaelDrogalis/3ea0fc6b3414f919d1c7/raw/201d0823dcec2940355f5741cec9e1e38058eaec/gistfile1.txt >> ~/.ssh/config
 
 notify:
   webhooks:
