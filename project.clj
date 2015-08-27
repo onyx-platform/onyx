@@ -41,7 +41,7 @@
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}}
   :unison
   {:repos
-   [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git" :branch "compatibility"}
-    {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git" :branch "compatibility"}
-    {:git "git@onyx-sql:onyx-platform/onyx-sql.git" :branch "compatibility"}]}
+   [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git" :branch "master"}
+    {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git" :branch "master"}
+    {:git "git@onyx-sql:onyx-platform/onyx-sql.git" :branch "master"}]}
   :codox {:output-dir "doc/api"})
