@@ -29,7 +29,6 @@ deployment:
   freshen-onyx-plugins:
     branch: master
     commands:
-      - ./freshen-repository.sh git@onyx-kafka:onyx-platform/onyx-kafka.git onyx-kafka
-      - ./freshen-repository.sh git@onyx-datomic:onyx-platform/onyx-datomic.git onyx-datomic
-      - ./freshen-repository.sh git@onyx-sql:onyx-platform/onyx-sql.git onyx-sql
-      - ./freshen-repository.sh git@onyx-dashboard:onyx-platform/onyx-dashboard.git onyx-dashboard
+      - git config --global user.email "michael.drogalis@onyxplatform.org"
+      - git config --global user.name "OnyxBot"
+      - lein unison update-projects
