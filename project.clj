@@ -33,9 +33,15 @@
                                   [org.clojure/tools.nrepl "0.2.10"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-jammin "0.1.1"]
+                             [lonocloud/lein-unison "0.1.0"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
                                     "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}}
+  :unison
+  {:repos
+   [{:git "git@github.com:onyx-platform/onyx-kafka.git" :branch "compatability"}
+    {:git "git@github.com:onyx-platform/onyx-datomic.git" :branch "compatability"}
+    {:git "git@github.com:onyx-platform/onyx-sql.git" :branch "compatability"}]}
   :codox {:output-dir "doc/api"})
