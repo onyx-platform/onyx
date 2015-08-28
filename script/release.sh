@@ -3,15 +3,15 @@
 # Update to release version.
 git checkout master
 lein set-version $2
-sed -i '' "s/$1/$2/g" README.md 
-sed -i '' "s/$3/$4/g" README.md 
+sed -i '' "s/$1/$2/g" README.md
+sed -i '' "s/$3/$4/g" README.md
 sed -i '' "s/$3/$4/g" circle.yml
 git rm -rf doc/api
 lein doc
 
 # Push and deploy release.
-git tag $2
 git commit -am "Release version $2."
+git tag $2
 git push origin $2
 git push origin master
 
