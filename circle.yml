@@ -32,3 +32,4 @@ deployment:
       - git config --global user.email "michael.drogalis@onyxplatform.org"
       - git config --global user.name "OnyxBot"
       - lein unison update-projects
+      - lein unison release-projects 0.7.x
