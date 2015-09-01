@@ -2,10 +2,12 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica]]
             [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]))
 
-(defmethod extensions/apply-log-entry :abort-join-cluster
+(s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
   [{:keys [args message-id]} replica]
   (-> replica
       (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))

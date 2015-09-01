@@ -125,10 +125,13 @@
 (def AeronIdleStrategy
   (schema/enum :busy-spin :low-restart-latency :high-restart-latency))
 
+(def JobScheduler
+  schema/Keyword)
+
 (def PeerConfig
   {:zookeeper/address schema/Str
    :onyx/id ClusterId
-   :onyx.peer/job-scheduler schema/Keyword
+   :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
    :onyx.messaging/bind-addr schema/Str
    (schema/optional-key :onyx.messaging/peer-port-range) PortRange
@@ -166,3 +169,22 @@
    (schema/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (schema/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    schema/Keyword schema/Any})
+
+(def PeerId
+  (schema/either schema/Uuid schema/Keyword))
+
+(def PeerState
+  (schema/enum :idle :backpressure :active))
+
+(def PeerSite 
+  {schema/Any schema/Any})
+
+(def Replica
+  {:job-scheduler JobScheduler
+   :messaging schema/Any
+   :peers [PeerId]
+   :peer-state {PeerId PeerState}
+   :peer-sites {PeerId PeerSite}
+   :prepared {PeerId PeerId}
+   :accepted {PeerId PeerId}
+   :pairs {PeerId PeerId}})
