@@ -36,7 +36,7 @@
                                   [org.clojure/tools.nrepl "0.2.10"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-jammin "0.1.1"]
-                             [lonocloud/lein-unison "0.1.6"]
+                             [lonocloud/lein-unison "0.1.8"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
@@ -46,11 +46,14 @@
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
      :release-script "script/release.sh"
-     :branch "master"}
+     :branch "compatability"
+     :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
      :release-script "script/release.sh"
-     :branch "master"}
+     :branch "compatability"
+     :merge "master"}
     {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
      :release-script "script/release.sh"
-     :branch "master"}]}
+     :branch "compatability"
+     :merge "master"}]}
   :codox {:output-dir "doc/api"})
