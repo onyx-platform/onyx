@@ -2,60 +2,9 @@
   (:require [clojure.walk :refer [prewalk]]
             [com.stuartsierra.dependency :as dep]
             [onyx.static.planning :as planning]
-            [schema.core :as schema]))
-
-(def NamespacedKeyword
-  (schema/pred (fn [kw]
-                 (and (keyword? kw)
-                      (namespace kw)))
-               'keyword-namespaced?))
-
-(def Function
-  (schema/pred fn? 'fn?))
-
-(def TaskName
-  (schema/pred (fn [v]
-                 (and (not= :all v)
-                      (not= :none v)
-                      (keyword? v)))
-               'task-name?))
-
-(def base-catalog-entry-validator
-  {:onyx/name TaskName
-   :onyx/type (schema/enum :input :output :function)
-   :onyx/batch-size (schema/pred pos? 'pos?)
-   (schema/optional-key :onyx/restart-pred-fn) schema/Keyword
-   (schema/optional-key :onyx/language) (schema/enum :java :clojure)
-   (schema/optional-key :onyx/batch-timeout) (schema/pred pos? 'pos?)
-   (schema/optional-key :onyx/doc) schema/Str
-   schema/Keyword schema/Any})
-
-(defn edge-two-nodes? [edge]
-  (= (count edge) 2))
-
-(def edge-validator
-  (schema/->Both [(schema/pred vector? 'vector?)
-                  (schema/pred edge-two-nodes? 'edge-two-nodes?)
-                  [TaskName]]))
-
-(def workflow-validator
-  (schema/->Both [(schema/pred vector? 'vector?)
-                  [edge-validator]]))
-
-(def catalog-entry-validator
-  (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
-                      (merge base-catalog-entry-validator
-                             {:onyx/plugin NamespacedKeyword
-                              :onyx/medium schema/Keyword
-                              (schema/optional-key :onyx/fn) NamespacedKeyword})
-                      :else
-                      (merge base-catalog-entry-validator {:onyx/fn NamespacedKeyword})))
-
-(def group-entry-validator
-  {(schema/optional-key :onyx/group-by-key) schema/Any
-   (schema/optional-key :onyx/group-by-fn) schema/Keyword
-   :onyx/min-peers schema/Int
-   :onyx/flux-policy (schema/enum :continue :kill)})
+            [schema.core :as schema]
+            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall 
+                                 Lifecycle EnvConfig PeerConfig Flow]]))
 
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
@@ -75,14 +24,8 @@
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
+  (schema/validate Catalog catalog)
   (doseq [entry catalog]
-    (schema/validate catalog-entry-validator entry)
-    (when (and (= (:onyx/type entry) :function)
-               (or (not (nil? (:onyx/group-by-key entry)))
-                   (not (nil? (:onyx/group-by-fn entry)))))
-      (let [kws (select-keys entry [:onyx/group-by-fn :onyx/group-by-key
-                                    :onyx/min-peers :onyx/flux-policy])]
-        (schema/validate group-entry-validator kws)))
     (name-and-type-not-equal entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
@@ -136,96 +79,23 @@
   (validate-workflow-names job)
   (validate-workflow-no-dupes job))
 
-(def job-validator
-  {:catalog [(schema/pred map? 'map?)]
-   :workflow workflow-validator
-   :task-scheduler schema/Keyword
-   (schema/optional-key :percentage) schema/Int
-   (schema/optional-key :flow-conditions) schema/Any
-   (schema/optional-key :lifecycles) schema/Any
-   (schema/optional-key :acker/percentage) schema/Int
-   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
-
 (defn validate-lifecycles [lifecycles catalog]
   (doseq [lifecycle lifecycles]
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))
-    (schema/validate
-      {:lifecycle/task schema/Keyword
-       :lifecycle/calls NamespacedKeyword
-       (schema/optional-key :lifecycle/doc) String}
-      (select-keys lifecycle [:lifecycle/task :lifecycle/calls :lifecycle/doc]))))
+    (schema/validate Lifecycle lifecycle)))
 
 (defn validate-lifecycle-calls [m]
-  (schema/validate {(schema/optional-key :lifecycle/doc) schema/Str
-                    (schema/optional-key :lifecycle/start-task?) Function
-                    (schema/optional-key :lifecycle/before-task-start) Function
-                    (schema/optional-key :lifecycle/before-batch) Function
-                    (schema/optional-key :lifecycle/after-batch) Function
-                    (schema/optional-key :lifecycle/after-task-stop) Function
-                    (schema/optional-key :lifecycle/after-ack-segment) Function
-                    (schema/optional-key :lifecycle/after-retry-segment) Function}
-                    m))
-
-(def deployment-id-schema
-  (schema/either schema/Uuid schema/Str))
+  (schema/validate LifecycleCall m))
 
 (defn validate-env-config [env-config]
-  (schema/validate
-    {:zookeeper/address schema/Str
-     :onyx/id deployment-id-schema
-     (schema/optional-key :zookeeper/server?) schema/Bool
-     (schema/optional-key :zookeeper.server/port) schema/Int}
-    (select-keys env-config
-                 [:zookeeper/address :onyx/id :zookeeper/server? :zookeeper.server/port])))
+  (schema/validate EnvConfig env-config))
 
-(defn validate-peer-config [peer-config]
-  (schema/validate
-    {:zookeeper/address schema/Str
-     :onyx/id deployment-id-schema
-     :onyx.peer/job-scheduler schema/Keyword
-     :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
-     :onyx.messaging/bind-addr schema/Str
-     (schema/optional-key :onyx.messaging/peer-port-range) [schema/Int]
-     (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
-     (schema/optional-key :onyx.messaging/external-addr) schema/Str
-     (schema/optional-key :onyx.messaging/backpressure-strategy) schema/Keyword}
-    (select-keys peer-config
-                 [:onyx/id
-                  :zookeeper/address
-                  :onyx.peer/job-scheduler
-                  :onyx.messaging/impl
-                  :onyx.messaging/peer-port-range
-                  :onyx.messaging/peer-ports
-                  :onyx.messaging/bind-addr
-                  :onyx.messaging/external-addr
-                  :onyx.messaging/backpressure-strategy])))
-
-(defn validate-job
-  [job]
-  (schema/validate job-validator job)
-  (validate-catalog (:catalog job))
-  (validate-workflow job))
-
-(defn validate-flow-structure [flow-schema]
-  (doseq [entry flow-schema]
-    (let [entry (select-keys entry
-                             [:flow/from :flow/to :flow/short-circuit?
-                              :flow/exclude-keys :flow/doc :flow/params
-                              :flow/predicate])]
-      (schema/validate
-       {:flow/from schema/Keyword
-        :flow/to (schema/either schema/Keyword [schema/Keyword])
-        (schema/optional-key :flow/short-circuit?) schema/Bool
-        (schema/optional-key :flow/exclude-keys) [schema/Keyword]
-        (schema/optional-key :flow/doc) schema/Str
-        (schema/optional-key :flow/params) [schema/Keyword]
-        :flow/predicate (schema/either schema/Keyword [schema/Any])}
-       entry))))
+(defn validate-flow-structure [flow-conditions]
+  (doseq [entry flow-conditions]
+    (schema/validate Flow entry)))
 
 (defn validate-flow-connections [flow-schema workflow]
   (let [all (into #{} (concat (map first workflow) (map second workflow)))]
@@ -241,6 +111,15 @@
                       (clojure.set/subset? to all))
           (throw (ex-info ":flow/to value doesn't name a node in the workflow, :all, or :none"
                           {:entry entry})))))))
+
+(defn validate-peer-config [peer-config]
+  (schema/validate PeerConfig peer-config))
+
+(defn validate-job
+  [job]
+  (schema/validate Job job)
+  (validate-catalog (:catalog job))
+  (validate-workflow job))
 
 (defn validate-flow-pred-all-kws [flow-schema]
   (prewalk
@@ -289,14 +168,14 @@
       (throw (ex-info ":flow/to :all and :none require :flow/short-circuit? to be true"
                       {:entry entry})))))
 
-(defn validate-flow-conditions [flow-conditions-schema workflow]
-  (validate-flow-structure flow-conditions-schema)
-  (validate-flow-connections flow-conditions-schema workflow)
-  (validate-flow-pred-all-kws flow-conditions-schema)
-  (validate-all-position flow-conditions-schema)
-  (validate-none-position flow-conditions-schema)
-  (validate-short-circuit flow-conditions-schema)
-  (validate-auto-short-circuit flow-conditions-schema))
+(defn validate-flow-conditions [flow-conditions workflow]
+  (validate-flow-structure flow-conditions)
+  (validate-flow-connections flow-conditions workflow)
+  (validate-flow-pred-all-kws flow-conditions)
+  (validate-all-position flow-conditions)
+  (validate-none-position flow-conditions)
+  (validate-short-circuit flow-conditions)
+  (validate-auto-short-circuit flow-conditions))
 
 (defn coerce-uuid [uuid]
   (if (instance? java.util.UUID uuid)
