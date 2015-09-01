@@ -26,14 +26,11 @@ notify:
     - url: https://webhooks.gitter.im/e/7f6cadb429def50c94a2
 
 deployment:
-  freshen-onyx-plugins:
+  update-projects:
     branch: master
     commands:
       - git config --global user.email "michael.drogalis@onyxplatform.org"
       - git config --global user.name "OnyxBot"
+      - lein deploy
       - lein unison update-projects
       - lein unison release-projects 0.7.x
-  clojars:
-    branch: master
-    commands:
-      - lein deploy
