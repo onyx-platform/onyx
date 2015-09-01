@@ -1,8 +1,8 @@
 (ns ^:no-doc onyx.peer.virtual-peer
     (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
+              [taoensso.timbre :as timbre]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
               [onyx.log.entry :refer [create-log-entry]]

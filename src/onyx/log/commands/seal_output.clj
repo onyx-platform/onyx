@@ -5,6 +5,8 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [taoensso.timbre :refer [warn fatal info]]))
 
 (defn all-outputs-sealed? [replica job]
@@ -12,8 +14,8 @@
         sealed (get-in replica [:sealed-outputs job])]
     (= (into #{} all) (into #{} sealed))))
 
-(defmethod extensions/apply-log-entry :seal-output
-  [{:keys [args]} replica]
+(s/defmethod extensions/apply-log-entry :seal-output :- Replica
+  [{:keys [args]} :- LogEntry replica]
   (let [new (update-in replica [:sealed-outputs (:job args)] union #{(:task args)})]
     (if (all-outputs-sealed? new (:job args))
       (let [peers (apply concat (vals (get-in replica [:allocations (:job args)])))]
@@ -35,7 +37,7 @@
                          (get-in new [:allocations (:job args)]))
    :job (:job args)})
 
-(defmethod extensions/reactions :seal-output
+(s/defmethod extensions/reactions :seal-output :- Reactions
   [{:keys [args]} old new diff state]
   [])
 

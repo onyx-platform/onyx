@@ -128,11 +128,14 @@
 (def JobScheduler
   schema/Keyword)
 
+(def Messaging
+  (schema/enum :aeron :netty :core.async :dummy-messenger))
+
 (def PeerConfig
   {:zookeeper/address schema/Str
    :onyx/id ClusterId
    :onyx.peer/job-scheduler JobScheduler
-   :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
+   :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr schema/Str
    (schema/optional-key :onyx.messaging/peer-port-range) PortRange
    (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
@@ -179,12 +182,51 @@
 (def PeerSite 
   {schema/Any schema/Any})
 
+(def JobId
+  (schema/either schema/Uuid schema/Keyword))
+
+(def TaskId
+  (schema/either schema/Uuid schema/Keyword))
+
+(def TaskScheduler 
+  schema/Keyword)
+
 (def Replica
   {:job-scheduler JobScheduler
-   :messaging schema/Any
-   :peers [PeerId]
-   :peer-state {PeerId PeerState}
-   :peer-sites {PeerId PeerSite}
-   :prepared {PeerId PeerId}
-   :accepted {PeerId PeerId}
-   :pairs {PeerId PeerId}})
+   :messaging {:onyx.messaging/impl Messaging
+               schema/Keyword schema/Any}
+   (schema/optional-key :peers) [PeerId]
+   (schema/optional-key :peer-state) {PeerId PeerState}
+   (schema/optional-key :peer-sites) {PeerId PeerSite}
+   (schema/optional-key :prepared) {PeerId PeerId}
+   (schema/optional-key :accepted) {PeerId PeerId}
+   (schema/optional-key :pairs) {PeerId PeerId}
+   (schema/optional-key :jobs) [JobId]
+   (schema/optional-key :task-schedulers) {JobId TaskScheduler}
+   (schema/optional-key :tasks) {JobId [TaskId]}
+   (schema/optional-key :allocations) {JobId {TaskId [PeerId]}}
+   (schema/optional-key :saturation) {JobId schema/Num}
+   (schema/optional-key :task-saturation) {JobId {TaskId schema/Num}}
+   (schema/optional-key :flux-policies) {JobId {TaskId schema/Any}}
+   (schema/optional-key :min-required-peers) {JobId {TaskId schema/Num}}
+   (schema/optional-key :input-tasks) {JobId [TaskId]}
+   (schema/optional-key :output-tasks) {JobId [TaskId]}
+   (schema/optional-key :exempt-tasks)  {JobId [TaskId]}
+   (schema/optional-key :sealed-outputs) {JobId [TaskId]}
+   (schema/optional-key :ackers) {JobId [PeerId]} 
+   (schema/optional-key :acker-percentage) {JobId schema/Int}
+   (schema/optional-key :acker-exclude-inputs) {TaskId schema/Bool}
+   (schema/optional-key :acker-exclude-outputs) {TaskId schema/Bool}
+   (schema/optional-key :completed-jobs) [JobId] 
+   (schema/optional-key :killed-jobs) [JobId] 
+   (schema/optional-key :exhausted-inputs) {JobId #{TaskId}}})
+
+(def LogEntry
+  {:fn schema/Keyword
+   :args {schema/Any schema/Any}
+   (schema/optional-key :immediate?) schema/Bool
+   (schema/optional-key :message-id) schema/Int
+   (schema/optional-key :created-at) schema/Int})
+
+(def Reactions 
+  (schema/maybe [LogEntry]))

@@ -5,10 +5,12 @@
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
-(defmethod extensions/apply-log-entry :accept-join-cluster
-  [{:keys [args]} replica]
+(s/defmethod extensions/apply-log-entry :accept-join-cluster :- Replica
+  [{:keys [args]} :- LogEntry replica]
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)
@@ -35,7 +37,7 @@
         {:observer (first (keys rets))
          :subject (first (vals rets))}))))
 
-(defmethod extensions/reactions :accept-join-cluster
+(s/defmethod extensions/reactions :accept-join-cluster :- Reactions
   [{:keys [args] :as entry} old new diff state]
   (let [accepted-joiner (:accepted-joiner args)
         already-joined? (some #{accepted-joiner} (:peers old))]

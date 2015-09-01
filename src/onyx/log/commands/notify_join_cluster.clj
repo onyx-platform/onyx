@@ -2,11 +2,13 @@
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
             [taoensso.timbre :refer [info] :as timbre]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
-(defmethod extensions/apply-log-entry :notify-join-cluster
-  [{:keys [args]} replica]
+(s/defmethod extensions/apply-log-entry :notify-join-cluster :- Replica
+  [{:keys [args]} :- LogEntry replica]
   (let [prepared (get (map-invert (:prepared replica)) (:observer args))]
     (-> replica
         (update-in [:accepted] merge {prepared (:observer args)})
@@ -22,7 +24,7 @@
        :accepted-observer (first (keys rets))
        :accepted-joiner (first (vals rets))})))
 
-(defmethod extensions/reactions :notify-join-cluster
+(s/defmethod extensions/reactions :notify-join-cluster :- Reactions
   [entry old new diff peer-args]
   (cond (and (= (vals diff) (remove nil? (vals diff)))
              (= (:id peer-args) (:observer diff)))

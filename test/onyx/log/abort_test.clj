@@ -6,7 +6,9 @@
             [midje.sweet :refer :all]
             [schema.core :as s]))
 
-(s/with-fn-validation 
+(namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
+
+(facts 
   (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
@@ -14,7 +16,7 @@
         rep-reactions (partial extensions/reactions entry)
 
         old-replica {:job-scheduler :onyx.job-scheduler/balanced
-                     :messaging {:onyx.messaging/impl :dummy-messaging}
+                     :messaging {:onyx.messaging/impl :dummy-messenger}
                      :peer-sites {}
                      :peer-state {}
                      :accepted {}
