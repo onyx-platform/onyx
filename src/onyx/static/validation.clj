@@ -4,7 +4,7 @@
             [onyx.static.planning :as planning]
             [schema.core :as schema]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall 
-                                 Lifecycle EnvConfig PeerConfig Flow]]))
+                                 Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
@@ -95,7 +95,7 @@
 
 (defn validate-flow-structure [flow-conditions]
   (doseq [entry flow-conditions]
-    (schema/validate Flow entry)))
+    (schema/validate FlowCondition entry)))
 
 (defn validate-flow-connections [flow-schema workflow]
   (let [all (into #{} (concat (map first workflow) (map second workflow)))]

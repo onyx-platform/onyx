@@ -69,22 +69,10 @@
 (def Catalog
   [TaskMap])
 
-(def Job
-  {:catalog [TaskMap]
-   :workflow Workflow
-   :task-scheduler schema/Keyword
-   (schema/optional-key :percentage) schema/Int
-   (schema/optional-key :flow-conditions) schema/Any
-   (schema/optional-key :lifecycles) schema/Any
-   (schema/optional-key :acker/percentage) schema/Int
-   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
-
 (def Lifecycle
   {:lifecycle/task schema/Keyword
    :lifecycle/calls NamespacedKeyword
-   (schema/optional-key :lifecycle/doc) String
+   (schema/optional-key :lifecycle/doc) schema/Str
    schema/Any schema/Any})
 
 (def LifecycleCall
@@ -97,29 +85,7 @@
    (schema/optional-key :lifecycle/after-ack-segment) Function
    (schema/optional-key :lifecycle/after-retry-segment) Function})
 
-(def DeploymentId
-  (schema/either schema/Uuid schema/Str))
-
-(def EnvConfig
-  {:zookeeper/address schema/Str
-   :onyx/id DeploymentId
-   (schema/optional-key :zookeeper/server?) schema/Bool
-   (schema/optional-key :zookeeper.server/port) schema/Int
-   schema/Keyword schema/Any})
-
-(def PeerConfig
-  {:zookeeper/address schema/Str
-   :onyx/id DeploymentId
-   :onyx.peer/job-scheduler schema/Keyword
-   :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
-   :onyx.messaging/bind-addr schema/Str
-   (schema/optional-key :onyx.messaging/peer-port-range) [schema/Int]
-   (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
-   (schema/optional-key :onyx.messaging/external-addr) schema/Str
-   (schema/optional-key :onyx.messaging/backpressure-strategy) schema/Keyword
-   schema/Keyword schema/Any})
-
-(def Flow
+(def FlowCondition
   {:flow/from schema/Keyword
    :flow/to (schema/either schema/Keyword [schema/Keyword])
    (schema/optional-key :flow/short-circuit?) schema/Bool
@@ -127,4 +93,76 @@
    (schema/optional-key :flow/doc) schema/Str
    (schema/optional-key :flow/params) [schema/Keyword]
    :flow/predicate (schema/either schema/Keyword [schema/Any])
+   schema/Keyword schema/Any})
+
+(def Job
+  {:catalog Catalog
+   :workflow Workflow
+   :task-scheduler schema/Keyword
+   (schema/optional-key :percentage) schema/Int
+   (schema/optional-key :flow-conditions) [FlowCondition]
+   (schema/optional-key :lifecycles) [Lifecycle]
+   (schema/optional-key :acker/percentage) schema/Int
+   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
+   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
+
+(def ClusterId
+  (schema/either schema/Uuid schema/Str))
+
+(def EnvConfig
+  {:zookeeper/address schema/Str
+   :onyx/id ClusterId
+   (schema/optional-key :zookeeper/server?) schema/Bool
+   (schema/optional-key :zookeeper.server/port) schema/Int
+   schema/Keyword schema/Any})
+
+
+(def ^{:private true} PortRange
+  [(schema/one schema/Int "port-range-start") 
+   (schema/one schema/Int "port-range-end")])
+
+(def AeronIdleStrategy
+  (schema/enum :busy-spin :low-restart-latency :high-restart-latency))
+
+(def PeerConfig
+  {:zookeeper/address schema/Str
+   :onyx/id ClusterId
+   :onyx.peer/job-scheduler schema/Keyword
+   :onyx.messaging/impl (schema/enum :aeron :netty :core.async :dummy-messenger)
+   :onyx.messaging/bind-addr schema/Str
+   (schema/optional-key :onyx.messaging/peer-port-range) PortRange
+   (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
+   (schema/optional-key :onyx.messaging/external-addr) schema/Str
+   (schema/optional-key :onyx.peer/inbox-capacity) schema/Int
+   (schema/optional-key :onyx.peer/outbox-capacity) schema/Int
+   (schema/optional-key :onyx.peer/retry-start-interval) schema/Int
+   (schema/optional-key :onyx.peer/join-failure-back-off) schema/Int
+   (schema/optional-key :onyx.peer/drained-back-off) schema/Int
+   (schema/optional-key :onyx.peer/peer-not-ready-back-off) schema/Int
+   (schema/optional-key :onyx.peer/job-not-ready-back-off) schema/Int
+   (schema/optional-key :onyx.peer/fn-params) schema/Any
+   (schema/optional-key :onyx.peer/backpressure-check-interval) schema/Int
+   (schema/optional-key :onyx.peer/backpressure-low-water-pct) schema/Int
+   (schema/optional-key :onyx.peer/backpressure-high-water-pct) schema/Int
+   (schema/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) schema/Int
+   (schema/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) schema/Int
+   (schema/optional-key :onyx.zookeeper/backoff-max-retries) schema/Int
+   (schema/optional-key :onyx.messaging/inbound-buffer-size) schema/Int
+   (schema/optional-key :onyx.messaging/completion-buffer-size) schema/Int
+   (schema/optional-key :onyx.messaging/release-ch-buffer-size) schema/Int
+   (schema/optional-key :onyx.messaging/retry-ch-buffer-size) schema/Int
+   (schema/optional-key :onyx.messaging/max-downstream-links) schema/Int
+   (schema/optional-key :onyx.messaging/max-acker-links) schema/Int
+   (schema/optional-key :onyx.messaging/peer-link-gc-interval) schema/Int
+   (schema/optional-key :onyx.messaging/peer-link-idle-timeout) schema/Int
+   (schema/optional-key :onyx.messaging/ack-daemon-timeout) schema/Int
+   (schema/optional-key :onyx.messaging/ack-daemon-clear-interval) schema/Int
+   (schema/optional-key :onyx.messaging/decompress-fn) Function
+   (schema/optional-key :onyx.messaging/compress-fn) Function
+   (schema/optional-key :onyx.messaging/allow-short-circuit?) schema/Bool
+   (schema/optional-key :onyx.messaging.aeron/embedded-driver?) schema/Bool
+   (schema/optional-key :onyx.messaging.aeron/subscriber-count) schema/Int
+   (schema/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
+   (schema/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    schema/Keyword schema/Any})
