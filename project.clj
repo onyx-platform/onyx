@@ -3,7 +3,9 @@
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :jvm-opts ["-Xmx4g"]
+  :repositories {"snapshots" {:url "https://clojars.org/repo"
+                              :username :env
+                              :password :env}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.apache.curator/curator-framework "2.8.0"]
@@ -23,6 +25,7 @@
                  [org.slf4j/slf4j-nop "1.7.12"]
                  [io.netty/netty-all "4.0.26.Final"]]
   :aot [onyx.interop]
+  :jvm-opts ["-Xmx4g"]
   :profiles {:dev {:aot ^:replace []
                    :dependencies [[midje "1.7.0"]
                                   [yeller-timbre-appender "2.0.0"]
