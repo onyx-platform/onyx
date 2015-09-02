@@ -8,7 +8,7 @@
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 
-(facts 
+(facts
   (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
@@ -20,8 +20,8 @@
                      :peer-sites {}
                      :peer-state {}
                      :accepted {}
-                     :pairs {:a :b :b :c :c :a} 
-                     :prepared {:a :d} 
+                     :pairs {:a :b :b :c :c :a}
+                     :prepared {:a :d}
                      :peers [:a :b :c]}
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)

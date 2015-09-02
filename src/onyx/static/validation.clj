@@ -3,7 +3,7 @@
             [com.stuartsierra.dependency :as dep]
             [onyx.static.planning :as planning]
             [schema.core :as schema]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall 
+            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
 (defn task-dispatch-validator [task]

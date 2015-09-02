@@ -119,7 +119,7 @@
 
 
 (def ^{:private true} PortRange
-  [(schema/one schema/Int "port-range-start") 
+  [(schema/one schema/Int "port-range-start")
    (schema/one schema/Int "port-range-end")])
 
 (def AeronIdleStrategy
@@ -169,7 +169,7 @@
    (schema/optional-key :onyx.messaging/allow-short-circuit?) schema/Bool
    (schema/optional-key :onyx.messaging.aeron/embedded-driver?) schema/Bool
    (schema/optional-key :onyx.messaging.aeron/subscriber-count) schema/Int
-   (schema/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
+   (schema/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy
    (schema/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    schema/Keyword schema/Any})
 
@@ -179,7 +179,7 @@
 (def PeerState
   (schema/enum :idle :backpressure :active))
 
-(def PeerSite 
+(def PeerSite
   {schema/Any schema/Any})
 
 (def JobId
@@ -188,7 +188,7 @@
 (def TaskId
   (schema/either schema/Uuid schema/Keyword))
 
-(def TaskScheduler 
+(def TaskScheduler
   schema/Keyword)
 
 (def Replica
@@ -213,12 +213,12 @@
    (schema/optional-key :output-tasks) {JobId [TaskId]}
    (schema/optional-key :exempt-tasks)  {JobId [TaskId]}
    (schema/optional-key :sealed-outputs) {JobId [TaskId]}
-   (schema/optional-key :ackers) {JobId [PeerId]} 
+   (schema/optional-key :ackers) {JobId [PeerId]}
    (schema/optional-key :acker-percentage) {JobId schema/Int}
    (schema/optional-key :acker-exclude-inputs) {TaskId schema/Bool}
    (schema/optional-key :acker-exclude-outputs) {TaskId schema/Bool}
    (schema/optional-key :completed-jobs) [JobId] 
-   (schema/optional-key :killed-jobs) [JobId] 
+   (schema/optional-key :killed-jobs) [JobId]
    (schema/optional-key :exhausted-inputs) {JobId #{TaskId}}})
 
 (def LogEntry
@@ -228,5 +228,5 @@
    (schema/optional-key :message-id) schema/Int
    (schema/optional-key :created-at) schema/Int})
 
-(def Reactions 
+(def Reactions
   (schema/maybe [LogEntry]))
