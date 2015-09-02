@@ -313,7 +313,7 @@
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)))
-    rets))
+    (merge event rets)))
 
 (defn launch-aux-threads!
   [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
@@ -430,21 +430,10 @@
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
-             (ack-segments task-map replica state messenger monitoring)
-             (close-batch-resources)))
+             (close-batch-resources)
+             (ack-segments task-map replica state messenger monitoring)))
       (catch Throwable e
         (ex-f e)))))
-
-(defn resolve-compression-fn-impls [opts]
-  (assoc opts
-    :onyx.peer-decompress-fn-impl
-    (if-let [f (:onyx.peer-decompress-fn opts)]
-      (operation/resolve-fn f)
-      onyx.compression.nippy/decompress)
-    :onyx.peer-compress-fn-impl
-    (if-let [f (:onyx.peer-compress-fn opts)]
-      (operation/resolve-fn f)
-      onyx.compression.nippy/compress)))
 
 (defn gc-peer-links [event state opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
@@ -475,7 +464,6 @@
     (try
       (validation/validate-lifecycle-calls calls-map)
       (catch Throwable t
-        ;; FIXME: job should be killed here
         (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
           (error e)
           (throw e))))
@@ -673,7 +661,7 @@
                            :onyx.core/monitoring monitoring
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
-                           :onyx.core/peer-opts (resolve-compression-fn-impls opts)
+                           :onyx.core/peer-opts opts
                            :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
                            :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (resolve-task-fn catalog-entry)

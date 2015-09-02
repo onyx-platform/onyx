@@ -5,6 +5,8 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [taoensso.timbre :refer [warn]]))
 
 ;; Pulled this out of the defmethod because it's reused across other log entries.
@@ -22,8 +24,8 @@
           (reconfigure-cluster-workload)))
     replica))
 
-(defmethod extensions/apply-log-entry :kill-job
-  [{:keys [args]} replica]
+(s/defmethod extensions/apply-log-entry :kill-job :- Replica
+  [{:keys [args]} :- LogEntry replica :- Replica]
   (try
     (apply-kill-job replica (:job args))
     (catch Throwable e
@@ -34,7 +36,7 @@
   [entry old new]
   (second (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new)))))
 
-(defmethod extensions/reactions :kill-job
+(s/defmethod extensions/reactions :kill-job :- Reactions
   [{:keys [args]} old new diff state]
   [])
 

@@ -5,6 +5,8 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.peer.operation :as operation]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [taoensso.timbre :refer [info] :as timbre]))
 
@@ -15,11 +17,12 @@
                 (merge
                   peer-site
                   (extensions/assign-site-resources replica
+                                                    joiner
                                                     peer-site
                                                     (:peer-sites replica))))))
 
-(defmethod extensions/apply-log-entry :prepare-join-cluster
-  [{:keys [args message-id]} replica]
+(s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
+  [{:keys [args message-id]} :- LogEntry replica]
   (let [peers (:peers replica)
         n (count peers)]
     (if (> n 0)
@@ -45,8 +48,8 @@
           (add-site args)
           (reconfigure-cluster-workload)))))
 
-(defmethod extensions/replica-diff :prepare-join-cluster
-  [entry old new]
+(s/defmethod extensions/replica-diff :prepare-join-cluster
+  [entry :- LogEntry old new]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
     (cond (seq rets)
@@ -58,8 +61,8 @@
             (assert (= (count (:peers new)) 1))
             {:instant-join lone-peer}))))
 
-(defmethod extensions/reactions :prepare-join-cluster
-  [entry old new diff peer-args]
+(s/defmethod extensions/reactions :prepare-join-cluster :- Reactions
+  [entry :- LogEntry old new diff peer-args]
   (cond (and (= (:id peer-args) (:joiner (:args entry)))
              (nil? diff))
         [{:fn :abort-join-cluster
@@ -72,8 +75,8 @@
                               (:observer diff))}
           :immediate? true}]))
 
-(defmethod extensions/fire-side-effects! :prepare-join-cluster
-  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
+(s/defmethod extensions/fire-side-effects! :prepare-join-cluster
+  [{:keys [args]} :- LogEntry old new diff {:keys [monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
    (cond (= (:id state) (:observer diff))

@@ -1,12 +1,14 @@
 (ns onyx.log.commands.gc
   (:require [clojure.set :refer [difference]]
             [clojure.data :refer [diff]]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [warn]]))
 
-(defmethod extensions/apply-log-entry :gc
-  [{:keys [args message-id]} replica]
+(s/defmethod extensions/apply-log-entry :gc :- Replica
+  [{:keys [args message-id]} :- LogEntry replica]
   (try
     (let [completed (:completed-jobs replica)
           killed (:killed-jobs replica)
@@ -26,18 +28,18 @@
       (warn e)
       replica)))
 
-(defmethod extensions/replica-diff :gc
+(s/defmethod extensions/replica-diff :gc
   [entry old new]
   {:killed-jobs (first (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new))))
    :completed-jobs (first (diff (into #{} (:completed-jobs old)) (into #{} (:completed-jobs new))))
    :tasks (first (diff (:tasks old) (:tasks new)))
    :allocations (first (diff (:allocations old) (:allocations new)))})
 
-(defmethod extensions/reactions :gc
-  [{:keys [args]} old new diff peer-args]
+(s/defmethod extensions/reactions :gc :- Reactions
+  [{:keys [args]} :- LogEntry old new diff peer-args]
   [])
 
-(defmethod extensions/fire-side-effects! :gc
+(s/defmethod extensions/fire-side-effects! :gc
   [{:keys [args message-id]} old new diff state]
   (when (= (:id args) (:id state))
     (when (extensions/update-origin! (:log state) new message-id)

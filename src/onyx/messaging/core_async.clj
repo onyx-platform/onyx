@@ -21,7 +21,7 @@
   (map->CoreAsyncPeerGroup {}))
 
 (defmethod extensions/assign-site-resources :core.async
-  [replica peer-site peer-sites]
+  [replica peer-id peer-site peer-sites]
   peer-site)
 
 (defmethod extensions/get-peer-site :core.async

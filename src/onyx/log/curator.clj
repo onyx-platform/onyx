@@ -1,9 +1,13 @@
 (ns onyx.log.curator
-  (:require ;[clojure.core.async :refer [chan >!! <!! close! thread]]
-            [taoensso.timbre :refer [fatal warn trace]]
+  (:require [taoensso.timbre :refer [fatal warn trace info]]
             [onyx.static.default-vals :refer [defaults]])
   (:import [org.apache.zookeeper CreateMode]
-           [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException Watcher]
+           [org.apache.zookeeper
+            KeeperException
+            KeeperException$NoNodeException
+            KeeperException$NodeExistsException
+            KeeperException$Code
+            Watcher]
            [org.apache.curator.test TestingServer]
            [org.apache.zookeeper.data Stat]
            [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]

@@ -206,9 +206,9 @@
     (let [entry (extensions/read-log-entry log position)]
       (>!! ch entry))
     (catch KeeperException$NoNodeException e
-      (seek-to-new-origin!))
+      (seek-to-new-origin! log ch))
     (catch KeeperException$NodeExistsException e
-      (seek-to-new-origin!))))
+      (seek-to-new-origin! log ch))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]

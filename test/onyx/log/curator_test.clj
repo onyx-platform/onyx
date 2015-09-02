@@ -6,6 +6,8 @@
             [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config]]
             [onyx.log.curator :as cu]
+            [onyx.compression.nippy :refer [compress decompress]]
+            [taoensso.timbre :refer [fatal error warn trace info]]
             [midje.sweet :refer :all]
             [onyx.api]))
 
@@ -20,7 +22,7 @@
 
 (def base-path2 (str "/" onyx-id "/ab2"))
 
-(let [env (onyx.api/start-env env-config)]
+#_(let [env (onyx.api/start-env env-config)]
   (try
     (let [client (cu/connect (:zookeeper/address env-config) "onyx")
           value [1 3 48]]

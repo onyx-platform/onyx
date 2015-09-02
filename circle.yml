@@ -17,9 +17,20 @@ machine:
 dependencies:
   pre:
     - sudo pip install awscli
+    - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
+    - lein voom build-deps
+    - curl https://gist.githubusercontent.com/MichaelDrogalis/3ea0fc6b3414f919d1c7/raw/201d0823dcec2940355f5741cec9e1e38058eaec/gistfile1.txt >> ~/.ssh/config
 
 notify:
   webhooks:
-    # A list of hook hashes, containing the url field
-    # gitter hook
     - url: https://webhooks.gitter.im/e/7f6cadb429def50c94a2
+
+deployment:
+  update-projects:
+    branch: master
+    commands:
+      - git config --global user.email "michael.drogalis@onyxplatform.org"
+      - git config --global user.name "OnyxBot"
+      - lein deploy
+      - lein unison update-projects
+      - lein unison release-projects 0.7.x
