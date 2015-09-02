@@ -8,6 +8,8 @@
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 
+(facts
+
 (def id (java.util.UUID/randomUUID))
 
 (def config (load-config))
@@ -188,3 +190,4 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
+)
