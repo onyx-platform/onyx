@@ -58,8 +58,6 @@
     :onyx/bootstrap? true
     :onyx/batch-size 2}])
 
-
-
 (fact (onyx.api/submit-job peer-config {:catalog illegal-catalog :workflow workflow
                                         :task-scheduler :onyx.task-scheduler/balanced}) => (throws Exception))
 

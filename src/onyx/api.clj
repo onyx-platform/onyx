@@ -2,7 +2,7 @@
   (:require [clojure.string :refer [split]]
             [clojure.core.async :refer [chan alts!! >!! <!! close!]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [warn fatal error]]
+            [taoensso.timbre :refer [info warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system :as system]
             [onyx.extensions :as extensions]

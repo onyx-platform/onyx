@@ -1,8 +1,8 @@
 (ns ^:no-doc onyx.peer.virtual-peer
     (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
               [com.stuartsierra.component :as component]
-              [taoensso.timbre :as timbre]
               [onyx.extensions :as extensions]
+              [taoensso.timbre :as timbre]
               [onyx.peer.operation :as operation]
               [onyx.peer.task-lifecycle :refer [task-lifecycle]]
               [onyx.log.entry :refer [create-log-entry]]
@@ -54,7 +54,7 @@
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
     (catch Throwable e
-      (taoensso.timbre/error e))
+      (taoensso.timbre/error "Error in processing loop:" e))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
 
@@ -76,9 +76,9 @@
         high-water-ratio (/ high-water-pct 100)]
     (while (not (Thread/interrupted))
       (let [ratio (/ (count buf) (.n buf))
-            on-val @on]
+            on-val @on?]
         (cond (and (not on-val) (> ratio high-water-ratio))
-              (do (reset! on? true)
+              (do (reset! on-val true)
                   (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
               (and on-val (< ratio low-water-ratio))
               (do (reset! on? false)

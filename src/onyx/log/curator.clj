@@ -1,9 +1,13 @@
 (ns onyx.log.curator
-  (:require ;[clojure.core.async :refer [chan >!! <!! close! thread]]
-            [taoensso.timbre :refer [fatal warn trace]]
+  (:require [taoensso.timbre :refer [fatal warn trace info]]
             [onyx.static.default-vals :refer [defaults]])
   (:import [org.apache.zookeeper CreateMode]
-           [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException Watcher]
+           [org.apache.zookeeper 
+            KeeperException
+            KeeperException$NoNodeException 
+            KeeperException$NodeExistsException 
+            KeeperException$Code
+            Watcher]
            [org.apache.curator.test TestingServer]
            [org.apache.zookeeper.data Stat]
            [org.apache.curator.framework CuratorFrameworkFactory CuratorFramework]
@@ -129,6 +133,21 @@
                                           version)
             path
             data))
+
+(defn swap-data [^CuratorFramework client path compress-fn decompress-fn f]
+    (loop [v (data client path)]
+      (let [new-val (f (decompress-fn (:data v)))
+            compressed (compress-fn new-val)
+            success? (not= :version-failure
+                           (try
+                             (set-data client path compressed (:version (:stat v)))
+                             (catch KeeperException ke
+                               (if (= KeeperException$Code/BADVERSION (.code ke))
+                                 :version-failure
+                                 (throw ke)))))]
+        (if success?
+          new-val
+          (recur (data client path))))))
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]
   (stat-to-map

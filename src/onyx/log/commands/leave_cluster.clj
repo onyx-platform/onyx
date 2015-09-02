@@ -3,6 +3,8 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.log.commands.kill-job :refer [apply-kill-job]]
@@ -14,8 +16,8 @@
       (apply-kill-job replica (:job allocation))
       replica)))
 
-(defmethod extensions/apply-log-entry :leave-cluster
-  [{:keys [args]} replica]
+(s/defmethod extensions/apply-log-entry :leave-cluster :- Replica
+  [{:keys [args]} :- LogEntry replica]
   (let [{:keys [id]} args
         observer (get (map-invert (:pairs replica)) id)
         transitive (get (:pairs replica) id)
@@ -38,7 +40,7 @@
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
 
-(defmethod extensions/replica-diff :leave-cluster
+(s/defmethod extensions/replica-diff :leave-cluster
   [{:keys [args]} old new]
   (let [observer (get (map-invert (:pairs old)) (:id args))
         subject (get (:pairs old) (:id args))]
@@ -46,7 +48,7 @@
      :updated-watch {:observer observer
                      :subject subject}}))
 
-(defmethod extensions/reactions :leave-cluster
+(s/defmethod extensions/reactions :leave-cluster :- Reactions
   [{:keys [args]} old new diff state]
   (when (or (= (:id state) (get (:prepared old) (:id args)))
             (= (:id state) (get (:accepted old) (:id args))))
@@ -54,7 +56,7 @@
       :args {:id (:id state)}
       :immediate? true}]))
 
-(defmethod extensions/fire-side-effects! :leave-cluster
+(s/defmethod extensions/fire-side-effects! :leave-cluster
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (common/start-new-lifecycle

@@ -7,6 +7,8 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
+            [schema.core :as s]
+            [onyx.schema :refer [Replica LogEntry Reactions]]
             [taoensso.timbre :refer [warn]]))
 
 (defmulti job-scheduler-replica-update
@@ -33,8 +35,8 @@
   [replica entry]
   replica)
 
-(defmethod extensions/apply-log-entry :submit-job
-  [{:keys [args] :as entry} replica]
+(s/defmethod extensions/apply-log-entry :submit-job :- Replica
+  [{:keys [args] :as entry} :- LogEntry replica]
   (try
     (-> replica
         (update-in [:jobs] conj (:id args))
@@ -63,7 +65,7 @@
   [{:keys [args]} old new]
   {:job (:id args)})
 
-(defmethod extensions/reactions :submit-job
+(s/defmethod extensions/reactions :submit-job :- Reactions
   [{:keys [args] :as entry} old new diff state]
   [])
 
