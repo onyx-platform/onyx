@@ -8,7 +8,7 @@
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [taoensso.timbre :refer [warn]]))
 
 (defmulti job-scheduler-replica-update
@@ -61,7 +61,7 @@
       (warn e)
       replica)))
 
-(defmethod extensions/replica-diff :submit-job
+(s/defmethod extensions/replica-diff :submit-job :- ReplicaDiff
   [{:keys [args]} old new]
   {:job (:id args)})
 
@@ -69,6 +69,6 @@
   [{:keys [args] :as entry} old new diff state]
   [])
 
-(defmethod extensions/fire-side-effects! :submit-job
+(s/defmethod extensions/fire-side-effects! :submit-job :- State
   [entry old new diff state]
   (common/start-new-lifecycle old new diff state))

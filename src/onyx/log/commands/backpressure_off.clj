@@ -3,7 +3,7 @@
             [clojure.core.async :refer [>!!]]
             [clojure.data :refer [diff]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.extensions :as extensions]))
@@ -14,7 +14,7 @@
     (assoc-in replica [:peer-state (:peer args)] :active)
     replica))
 
-(defmethod extensions/replica-diff :backpressure-off
+(s/defmethod extensions/replica-diff :backpressure-off :- ReplicaDiff
   [{:keys [args]} old new]
   (second (diff (:peer-state old) (:peer-state new))))
 
@@ -22,7 +22,7 @@
   [{:keys [args]} old new diff peer-args]
   [])
 
-(defmethod extensions/fire-side-effects! :backpressure-off
+(s/defmethod extensions/fire-side-effects! :backpressure-off :- State
   [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (if (= (:peer args) (:id state))
     (do (extensions/emit monitoring {:event :peer-backpressure-off :id (:id state)})

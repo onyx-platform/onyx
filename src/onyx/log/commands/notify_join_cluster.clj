@@ -3,7 +3,7 @@
             [clojure.set :refer [union difference map-invert]]
             [taoensso.timbre :refer [info] :as timbre]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [clojure.data :refer [diff]]
             [onyx.extensions :as extensions]))
 
@@ -14,7 +14,7 @@
         (update-in [:accepted] merge {prepared (:observer args)})
         (update-in [:prepared] dissoc prepared))))
 
-(defmethod extensions/replica-diff :notify-join-cluster
+(s/defmethod extensions/replica-diff :notify-join-cluster :- ReplicaDiff
   [entry old new]
   (let [rets (second (diff (:accepted old) (:accepted new)))]
     (assert (<= (count rets) 1))
@@ -36,7 +36,7 @@
           :args {:id (:observer (:args entry))}
           :immediate? true}]))
 
-(defmethod extensions/fire-side-effects! :notify-join-cluster
+(s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
   [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]

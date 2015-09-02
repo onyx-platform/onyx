@@ -8,8 +8,6 @@
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 
-(facts
-
 (def id (java.util.UUID/randomUUID))
 
 (def config (load-config))
@@ -164,10 +162,10 @@
 (def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+  peer-config
+  {:catalog catalog :workflow workflow
+   :lifecycles lifecycles
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))
 
@@ -189,4 +187,4 @@
 
 (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env))
+(onyx.api/shutdown-env env)

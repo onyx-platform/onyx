@@ -1,17 +1,17 @@
 (ns onyx.schema
-  (:require [schema.core :as schema]))
+  (:require [schema.core :as s]))
 
 (def NamespacedKeyword
-  (schema/pred (fn [kw]
+  (s/pred (fn [kw]
                  (and (keyword? kw)
                       (namespace kw)))
                'keyword-namespaced?))
 
 (def Function
-  (schema/pred fn? 'fn?))
+  (s/pred fn? 'fn?))
 
 (def TaskName
-  (schema/pred (fn [v]
+  (s/pred (fn [v]
                  (and (not= :all v)
                       (not= :none v)
                       (keyword? v)))
@@ -21,215 +21,224 @@
   (= (count edge) 2))
 
 (def ^{:private true} edge-validator
-  (schema/->Both [(schema/pred vector? 'vector?)
-                  (schema/pred edge-two-nodes? 'edge-two-nodes?)
+  (s/->Both [(s/pred vector? 'vector?)
+                  (s/pred edge-two-nodes? 'edge-two-nodes?)
                   [TaskName]]))
 
 (def Workflow
-  (schema/->Both [(schema/pred vector? 'vector?)
+  (s/->Both [(s/pred vector? 'vector?)
                   [edge-validator]]))
+
+(def Language
+  (s/enum :java :clojure))
 
 (def ^{:private true} base-task-map
   {:onyx/name TaskName
-   :onyx/type (schema/enum :input :output :function)
-   :onyx/batch-size (schema/pred pos? 'pos?)
-   (schema/optional-key :onyx/restart-pred-fn) schema/Keyword
-   (schema/optional-key :onyx/language) (schema/enum :java :clojure)
-   (schema/optional-key :onyx/batch-timeout) (schema/pred pos? 'pos?)
-   (schema/optional-key :onyx/doc) schema/Str
-   schema/Keyword schema/Any})
+   :onyx/type (s/enum :input :output :function)
+   :onyx/batch-size (s/pred pos? 'pos?)
+   (s/optional-key :onyx/restart-pred-fn) s/Keyword
+   (s/optional-key :onyx/language) Language
+   (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
+   (s/optional-key :onyx/doc) s/Str
+   s/Keyword s/Any})
 
 (def FluxPolicy 
-  (schema/enum :continue :kill))
+  (s/enum :continue :kill))
 
 (def ^{:private true} partial-grouping-task
-  {(schema/optional-key :onyx/group-by-key) schema/Any
-   (schema/optional-key :onyx/group-by-fn) Function
-   :onyx/min-peers schema/Int
+  {(s/optional-key :onyx/group-by-key) s/Any
+   (s/optional-key :onyx/group-by-fn) NamespacedKeyword
+   :onyx/min-peers s/Int
    :onyx/flux-policy FluxPolicy})
 
 (defn grouping-task? [task-map]
-  (and (= (:onyx/type task-map) :function)
+  (and (#{:function :output} (:onyx/type task-map))
        (or (not (nil? (:onyx/group-by-key task-map)))
            (not (nil? (:onyx/group-by-fn task-map))))))
 
 (def ^{:private true} partial-input-output-task
   {:onyx/plugin NamespacedKeyword
-   :onyx/medium schema/Keyword
-   (schema/optional-key :onyx/fn) NamespacedKeyword})
+   :onyx/medium s/Keyword
+   (s/optional-key :onyx/fn) NamespacedKeyword})
 
 (def ^{:private true} partial-fn-task
   {:onyx/fn NamespacedKeyword})
 
 (def TaskMap
-  (schema/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
+  (s/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
                       (merge base-task-map partial-input-output-task)
                       grouping-task?
                       (merge base-task-map partial-fn-task partial-grouping-task)
-                      :else
+                      #(= (:onyx/type %) :function)
                       (merge base-task-map partial-fn-task)))
 
 (def Catalog
   [TaskMap])
 
 (def Lifecycle
-  {:lifecycle/task schema/Keyword
+  {:lifecycle/task s/Keyword
    :lifecycle/calls NamespacedKeyword
-   (schema/optional-key :lifecycle/doc) schema/Str
-   schema/Any schema/Any})
+   (s/optional-key :lifecycle/doc) s/Str
+   s/Any s/Any})
 
 (def LifecycleCall
-  {(schema/optional-key :lifecycle/doc) schema/Str
-   (schema/optional-key :lifecycle/start-task?) Function
-   (schema/optional-key :lifecycle/before-task-start) Function
-   (schema/optional-key :lifecycle/before-batch) Function
-   (schema/optional-key :lifecycle/after-batch) Function
-   (schema/optional-key :lifecycle/after-task-stop) Function
-   (schema/optional-key :lifecycle/after-ack-segment) Function
-   (schema/optional-key :lifecycle/after-retry-segment) Function})
+  {(s/optional-key :lifecycle/doc) s/Str
+   (s/optional-key :lifecycle/start-task?) Function
+   (s/optional-key :lifecycle/before-task-start) Function
+   (s/optional-key :lifecycle/before-batch) Function
+   (s/optional-key :lifecycle/after-batch) Function
+   (s/optional-key :lifecycle/after-task-stop) Function
+   (s/optional-key :lifecycle/after-ack-segment) Function
+   (s/optional-key :lifecycle/after-retry-segment) Function})
 
 (def FlowCondition
-  {:flow/from schema/Keyword
-   :flow/to (schema/either schema/Keyword [schema/Keyword])
-   (schema/optional-key :flow/short-circuit?) schema/Bool
-   (schema/optional-key :flow/exclude-keys) [schema/Keyword]
-   (schema/optional-key :flow/doc) schema/Str
-   (schema/optional-key :flow/params) [schema/Keyword]
-   :flow/predicate (schema/either schema/Keyword [schema/Any])
-   schema/Keyword schema/Any})
+  {:flow/from s/Keyword
+   :flow/to (s/either s/Keyword [s/Keyword])
+   (s/optional-key :flow/short-circuit?) s/Bool
+   (s/optional-key :flow/exclude-keys) [s/Keyword]
+   (s/optional-key :flow/doc) s/Str
+   (s/optional-key :flow/params) [s/Keyword]
+   :flow/predicate (s/either s/Keyword [s/Any])
+   s/Keyword s/Any})
 
 (def Job
   {:catalog Catalog
    :workflow Workflow
-   :task-scheduler schema/Keyword
-   (schema/optional-key :percentage) schema/Int
-   (schema/optional-key :flow-conditions) [FlowCondition]
-   (schema/optional-key :lifecycles) [Lifecycle]
-   (schema/optional-key :acker/percentage) schema/Int
-   (schema/optional-key :acker/exempt-input-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-output-tasks?) schema/Bool
-   (schema/optional-key :acker/exempt-tasks) [schema/Keyword]})
+   :task-scheduler s/Keyword
+   (s/optional-key :percentage) s/Int
+   (s/optional-key :flow-conditions) [FlowCondition]
+   (s/optional-key :lifecycles) [Lifecycle]
+   (s/optional-key :acker/percentage) s/Int
+   (s/optional-key :acker/exempt-input-tasks?) s/Bool
+   (s/optional-key :acker/exempt-output-tasks?) s/Bool
+   (s/optional-key :acker/exempt-tasks) [s/Keyword]})
 
 (def ClusterId
-  (schema/either schema/Uuid schema/Str))
+  (s/either s/Uuid s/Str))
 
 (def EnvConfig
-  {:zookeeper/address schema/Str
+  {:zookeeper/address s/Str
    :onyx/id ClusterId
-   (schema/optional-key :zookeeper/server?) schema/Bool
-   (schema/optional-key :zookeeper.server/port) schema/Int
-   schema/Keyword schema/Any})
+   (s/optional-key :zookeeper/server?) s/Bool
+   (s/optional-key :zookeeper.server/port) s/Int
+   s/Keyword s/Any})
 
 
 (def ^{:private true} PortRange
-  [(schema/one schema/Int "port-range-start") 
-   (schema/one schema/Int "port-range-end")])
+  [(s/one s/Int "port-range-start") 
+   (s/one s/Int "port-range-end")])
 
 (def AeronIdleStrategy
-  (schema/enum :busy-spin :low-restart-latency :high-restart-latency))
+  (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
 (def JobScheduler
-  schema/Keyword)
+  s/Keyword)
 
 (def Messaging
-  (schema/enum :aeron :netty :core.async :dummy-messenger))
+  (s/enum :aeron :netty :core.async :dummy-messenger))
 
 (def PeerConfig
-  {:zookeeper/address schema/Str
+  {:zookeeper/address s/Str
    :onyx/id ClusterId
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
-   :onyx.messaging/bind-addr schema/Str
-   (schema/optional-key :onyx.messaging/peer-port-range) PortRange
-   (schema/optional-key :onyx.messaging/peer-ports) [schema/Int]
-   (schema/optional-key :onyx.messaging/external-addr) schema/Str
-   (schema/optional-key :onyx.peer/inbox-capacity) schema/Int
-   (schema/optional-key :onyx.peer/outbox-capacity) schema/Int
-   (schema/optional-key :onyx.peer/retry-start-interval) schema/Int
-   (schema/optional-key :onyx.peer/join-failure-back-off) schema/Int
-   (schema/optional-key :onyx.peer/drained-back-off) schema/Int
-   (schema/optional-key :onyx.peer/peer-not-ready-back-off) schema/Int
-   (schema/optional-key :onyx.peer/job-not-ready-back-off) schema/Int
-   (schema/optional-key :onyx.peer/fn-params) schema/Any
-   (schema/optional-key :onyx.peer/backpressure-check-interval) schema/Int
-   (schema/optional-key :onyx.peer/backpressure-low-water-pct) schema/Int
-   (schema/optional-key :onyx.peer/backpressure-high-water-pct) schema/Int
-   (schema/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) schema/Int
-   (schema/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) schema/Int
-   (schema/optional-key :onyx.zookeeper/backoff-max-retries) schema/Int
-   (schema/optional-key :onyx.messaging/inbound-buffer-size) schema/Int
-   (schema/optional-key :onyx.messaging/completion-buffer-size) schema/Int
-   (schema/optional-key :onyx.messaging/release-ch-buffer-size) schema/Int
-   (schema/optional-key :onyx.messaging/retry-ch-buffer-size) schema/Int
-   (schema/optional-key :onyx.messaging/max-downstream-links) schema/Int
-   (schema/optional-key :onyx.messaging/max-acker-links) schema/Int
-   (schema/optional-key :onyx.messaging/peer-link-gc-interval) schema/Int
-   (schema/optional-key :onyx.messaging/peer-link-idle-timeout) schema/Int
-   (schema/optional-key :onyx.messaging/ack-daemon-timeout) schema/Int
-   (schema/optional-key :onyx.messaging/ack-daemon-clear-interval) schema/Int
-   (schema/optional-key :onyx.messaging/decompress-fn) Function
-   (schema/optional-key :onyx.messaging/compress-fn) Function
-   (schema/optional-key :onyx.messaging/allow-short-circuit?) schema/Bool
-   (schema/optional-key :onyx.messaging.aeron/embedded-driver?) schema/Bool
-   (schema/optional-key :onyx.messaging.aeron/subscriber-count) schema/Int
-   (schema/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
-   (schema/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
-   schema/Keyword schema/Any})
+   :onyx.messaging/bind-addr s/Str
+   (s/optional-key :onyx.messaging/peer-port-range) PortRange
+   (s/optional-key :onyx.messaging/peer-ports) [s/Int]
+   (s/optional-key :onyx.messaging/external-addr) s/Str
+   (s/optional-key :onyx.peer/inbox-capacity) s/Int
+   (s/optional-key :onyx.peer/outbox-capacity) s/Int
+   (s/optional-key :onyx.peer/retry-start-interval) s/Int
+   (s/optional-key :onyx.peer/join-failure-back-off) s/Int
+   (s/optional-key :onyx.peer/drained-back-off) s/Int
+   (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
+   (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
+   (s/optional-key :onyx.peer/fn-params) s/Any
+   (s/optional-key :onyx.peer/backpressure-check-interval) s/Int
+   (s/optional-key :onyx.peer/backpressure-low-water-pct) s/Int
+   (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
+   (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
+   (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
+   (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
+   (s/optional-key :onyx.messaging/inbound-buffer-size) s/Int
+   (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
+   (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
+   (s/optional-key :onyx.messaging/retry-ch-buffer-size) s/Int
+   (s/optional-key :onyx.messaging/max-downstream-links) s/Int
+   (s/optional-key :onyx.messaging/max-acker-links) s/Int
+   (s/optional-key :onyx.messaging/peer-link-gc-interval) s/Int
+   (s/optional-key :onyx.messaging/peer-link-idle-timeout) s/Int
+   (s/optional-key :onyx.messaging/ack-daemon-timeout) s/Int
+   (s/optional-key :onyx.messaging/ack-daemon-clear-interval) s/Int
+   (s/optional-key :onyx.messaging/decompress-fn) Function
+   (s/optional-key :onyx.messaging/compress-fn) Function
+   (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
+   (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
+   (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
+   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
+   (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
+   s/Keyword s/Any})
 
 (def PeerId
-  (schema/either schema/Uuid schema/Keyword))
+  (s/either s/Uuid s/Keyword))
 
 (def PeerState
-  (schema/enum :idle :backpressure :active))
+  (s/enum :idle :backpressure :active))
 
 (def PeerSite 
-  {schema/Any schema/Any})
+  {s/Any s/Any})
 
 (def JobId
-  (schema/either schema/Uuid schema/Keyword))
+  (s/either s/Uuid s/Keyword))
 
 (def TaskId
-  (schema/either schema/Uuid schema/Keyword))
+  (s/either s/Uuid s/Keyword))
 
 (def TaskScheduler 
-  schema/Keyword)
+  s/Keyword)
 
 (def Replica
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging
-               schema/Keyword schema/Any}
-   (schema/optional-key :peers) [PeerId]
-   (schema/optional-key :peer-state) {PeerId PeerState}
-   (schema/optional-key :peer-sites) {PeerId PeerSite}
-   (schema/optional-key :prepared) {PeerId PeerId}
-   (schema/optional-key :accepted) {PeerId PeerId}
-   (schema/optional-key :pairs) {PeerId PeerId}
-   (schema/optional-key :jobs) [JobId]
-   (schema/optional-key :task-schedulers) {JobId TaskScheduler}
-   (schema/optional-key :tasks) {JobId [TaskId]}
-   (schema/optional-key :allocations) {JobId {TaskId [PeerId]}}
-   (schema/optional-key :saturation) {JobId schema/Num}
-   (schema/optional-key :task-saturation) {JobId {TaskId schema/Num}}
-   (schema/optional-key :flux-policies) {JobId {TaskId schema/Any}}
-   (schema/optional-key :min-required-peers) {JobId {TaskId schema/Num}}
-   (schema/optional-key :input-tasks) {JobId [TaskId]}
-   (schema/optional-key :output-tasks) {JobId [TaskId]}
-   (schema/optional-key :exempt-tasks)  {JobId [TaskId]}
-   (schema/optional-key :sealed-outputs) {JobId [TaskId]}
-   (schema/optional-key :ackers) {JobId [PeerId]} 
-   (schema/optional-key :acker-percentage) {JobId schema/Int}
-   (schema/optional-key :acker-exclude-inputs) {TaskId schema/Bool}
-   (schema/optional-key :acker-exclude-outputs) {TaskId schema/Bool}
-   (schema/optional-key :completed-jobs) [JobId] 
-   (schema/optional-key :killed-jobs) [JobId] 
-   (schema/optional-key :exhausted-inputs) {JobId #{TaskId}}})
+               s/Keyword s/Any}
+   (s/optional-key :peers) [PeerId]
+   (s/optional-key :peer-state) {PeerId PeerState}
+   (s/optional-key :peer-sites) {PeerId PeerSite}
+   (s/optional-key :prepared) {PeerId PeerId}
+   (s/optional-key :accepted) {PeerId PeerId}
+   (s/optional-key :pairs) {PeerId PeerId}
+   (s/optional-key :jobs) [JobId]
+   (s/optional-key :task-schedulers) {JobId TaskScheduler}
+   (s/optional-key :tasks) {JobId [TaskId]}
+   (s/optional-key :allocations) {JobId {TaskId [PeerId]}}
+   (s/optional-key :saturation) {JobId s/Num}
+   (s/optional-key :task-saturation) {JobId {TaskId s/Num}}
+   (s/optional-key :flux-policies) {JobId {TaskId s/Any}}
+   (s/optional-key :min-required-peers) {JobId {TaskId s/Num}}
+   (s/optional-key :input-tasks) {JobId [TaskId]}
+   (s/optional-key :output-tasks) {JobId [TaskId]}
+   (s/optional-key :exempt-tasks)  {JobId [TaskId]}
+   (s/optional-key :sealed-outputs) {JobId [TaskId]}
+   (s/optional-key :ackers) {JobId [PeerId]} 
+   (s/optional-key :acker-percentage) {JobId s/Int}
+   (s/optional-key :acker-exclude-inputs) {TaskId s/Bool}
+   (s/optional-key :acker-exclude-outputs) {TaskId s/Bool}
+   (s/optional-key :completed-jobs) [JobId] 
+   (s/optional-key :killed-jobs) [JobId] 
+   (s/optional-key :exhausted-inputs) {JobId #{TaskId}}})
 
 (def LogEntry
-  {:fn schema/Keyword
-   :args {schema/Any schema/Any}
-   (schema/optional-key :immediate?) schema/Bool
-   (schema/optional-key :message-id) schema/Int
-   (schema/optional-key :created-at) schema/Int})
+  {:fn s/Keyword
+   :args {s/Any s/Any}
+   (s/optional-key :immediate?) s/Bool
+   (s/optional-key :message-id) s/Int
+   (s/optional-key :created-at) s/Int})
 
 (def Reactions 
-  (schema/maybe [LogEntry]))
+  (s/maybe [LogEntry]))
+
+(def ReplicaDiff
+  (s/maybe {s/Any s/Any}))
+
+(def State
+  {s/Any s/Any})
