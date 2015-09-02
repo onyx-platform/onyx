@@ -45,15 +45,15 @@
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
-     :release-script "script/release.sh"
+     :release-script "scripts/release.sh"
      :branch "compatibility"
      :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
-     :release-script "script/release.sh"
+     :release-script "scripts/release.sh"
      :branch "compatibility"
      :merge "master"}
     {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-     :release-script "script/release.sh"
+     :release-script "scripts/release.sh"
      :branch "compatibility"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})
