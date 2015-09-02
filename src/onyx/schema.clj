@@ -41,7 +41,7 @@
 
 (def ^{:private true} partial-grouping-task
   {(schema/optional-key :onyx/group-by-key) schema/Any
-   (schema/optional-key :onyx/group-by-fn) schema/Keyword
+   (schema/optional-key :onyx/group-by-fn) Function
    :onyx/min-peers schema/Int
    :onyx/flux-policy (schema/enum :continue :kill)})
 
