@@ -30,6 +30,6 @@ else
   git checkout master
   lein set-version
   git add .
-  git commit am "Prepare for next release cycle."
+  git commit -m "Prepare for next release cycle."
   git push origin master
 fi
