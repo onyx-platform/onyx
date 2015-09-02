@@ -111,6 +111,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [David Leatherman](https://github.com/leathekd)
 - [Daniel Compton](https://github.com/danielcompton)
 - [Jeff Rose](https://github.com/rosejn)
+- [Ole Krüger](https://github.com/dignati)
 
 #### Acknowledgements
 
