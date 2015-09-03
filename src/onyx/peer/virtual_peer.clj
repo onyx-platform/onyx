@@ -21,7 +21,7 @@
 
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
   (try
-    (let [replica-atom (atom {})
+    (let [replica-atom (atom nil)
           peer-view-atom (atom {})]
       (reset! replica-atom origin)
       (loop [state (merge {:id id
@@ -54,7 +54,7 @@
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
     (catch Throwable e
-      (taoensso.timbre/error "Error in processing loop:" e))
+      (taoensso.timbre/error e (str e) "Error in processing loop"))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
 

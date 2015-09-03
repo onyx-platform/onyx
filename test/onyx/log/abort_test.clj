@@ -3,6 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
+            [onyx.log.replica :as replica]
             [midje.sweet :refer :all]
             [schema.core :as s]))
 
@@ -15,14 +16,12 @@
         rep-diff (partial extensions/replica-diff entry)
         rep-reactions (partial extensions/reactions entry)
 
-        old-replica {:job-scheduler :onyx.job-scheduler/balanced
-                     :messaging {:onyx.messaging/impl :dummy-messenger}
-                     :peer-sites {}
-                     :peer-state {}
-                     :accepted {}
-                     :pairs {:a :b :b :c :c :a} 
-                     :prepared {:a :d} 
-                     :peers [:a :b :c]}
+        old-replica (merge replica/base-replica 
+                           {:job-scheduler :onyx.job-scheduler/balanced
+                            :messaging {:onyx.messaging/impl :dummy-messenger}
+                            :pairs {:a :b :b :c :c :a} 
+                            :prepared {:a :d} 
+                            :peers [:a :b :c]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff peer-state)]
