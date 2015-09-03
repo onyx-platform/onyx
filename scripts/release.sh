@@ -23,7 +23,7 @@ else
 
   # Merge artifacts into release branch.
   git checkout $4
-  git merge master
+  git merge --no-edit master
   git push origin $4
 
   # Prepare next release cycle.
