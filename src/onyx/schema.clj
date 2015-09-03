@@ -211,6 +211,7 @@
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
    :allocations {JobId {TaskId [PeerId]}}
+   :task-metadata {JobId {TaskId s/Any}}
    :saturation {JobId s/Num}
    :task-saturation {JobId {TaskId s/Num}}
    :flux-policies {JobId {TaskId s/Any}}

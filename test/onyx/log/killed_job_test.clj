@@ -16,6 +16,7 @@
                   :jobs [:j1]
                   :tasks {:j1 [:t1 :t2]}
                   :allocations {:j1 {:t1 [:a :b] :t2 [:c]}}
+                  :task-metadata {:j1 {:t1 [:task-data]}}
                   :task-schedulers {:j1 :onyx.task-scheduler/balanced}
                   :peer-state {:a :active :b :active :c :active}
                   :peers [:a :b :c]})
@@ -25,6 +26,7 @@
       a-reactions (rep-reactions old-replica new-replica diff {:id :a})
       d-reactions (rep-reactions old-replica new-replica diff {:id :d})]
   (fact (:killed-jobs new-replica) => [:j1])
+  (fact (:task-metadata new-replica) => {})
   (fact (get-in new-replica [:allocations :j1]) => nil)
   (fact (get-in new-replica [:peer-state :a]) => :idle)
   (fact (get-in new-replica [:peer-state :b]) => :idle)

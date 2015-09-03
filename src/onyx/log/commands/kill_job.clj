@@ -19,6 +19,7 @@
           (update-in [:killed-jobs] conj job-id)
           (update-in [:killed-jobs] vec)
           (update-in [:allocations] dissoc job-id)
+          (update-in [:task-metadata] dissoc job-id)
           (update-in [:ackers] dissoc job-id)
           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
           (reconfigure-cluster-workload)))

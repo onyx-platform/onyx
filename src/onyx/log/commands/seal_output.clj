@@ -26,6 +26,7 @@
             (update-in [:jobs] vec)
             (update-in [:completed-jobs] conj (:job args))
             (update-in [:completed-jobs] vec)
+            (update-in [:task-metadata] dissoc (:job args))
             (update-in [:allocations] dissoc (:job args))
             (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
             (reconfigure-cluster-workload)))

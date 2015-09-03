@@ -24,6 +24,7 @@
    :acker-exclude-inputs {}
    :acker-exclude-outputs {}
    :task-percentages {}
+   :task-metadata {}
    :percentages {}
    :completed-jobs []
    :killed-jobs []
