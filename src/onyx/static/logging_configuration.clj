@@ -7,6 +7,10 @@
 (def MAX-LOG-SIZE (* 512 102400))
 (def MAX-LOG-FILES 5)
 
+;; temporary workaround to prevent timbre from crashing under some circumstances
+;; e.g. java.lang.IllegalArgumentException: Multiple methods in multimethod 'exception-dispatch' match dispatch value: class schema.core.Either 
+;; -> interface clojure.lang.IPersistentMap and interface clojure.lang.IRecord, and neither is preferred]
+
 (defmethod pretty/exception-dispatch clojure.lang.IPersistentMap [m]
   (pr-str m))
 
