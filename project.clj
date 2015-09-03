@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.7.3-beta6"
+(defproject org.onyxplatform/onyx "0.7.3-beta7"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -42,7 +42,7 @@
                    :plugins [[lein-midje "3.1.3"]
                              [lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [lonocloud/lein-unison "0.1.8"]
+                             [lonocloud/lein-unison "0.1.9"]
                              [codox "0.8.8"]]}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
@@ -51,15 +51,18 @@
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
-     :release-script "scripts/release.sh"
      :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-datomic:onyx-platform/onyx-datomic.git"
-     :release-script "scripts/release.sh"
      :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-sql:onyx-platform/onyx-sql.git"
-     :release-script "scripts/release.sh"
      :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})
