@@ -6,6 +6,7 @@
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
             [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.log.replica :as replica]
             [onyx.monitoring.measurements :refer [measure-latency]]
             [onyx.log.entry :refer [create-log-entry]])
   (:import [org.apache.curator.test TestingServer]
@@ -69,7 +70,7 @@
   (clean-up-broken-connections
    (fn []
      (let [node (str (origin-path prefix) "/origin")
-           bytes (compress {:message-id -1 :replica {}})]
+           bytes (compress {:message-id -1 :replica replica/base-replica})]
        (zk/create conn node :data bytes :persistent? true)))))
 
 (defrecord ZooKeeper [config]

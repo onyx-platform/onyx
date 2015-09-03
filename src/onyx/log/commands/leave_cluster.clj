@@ -4,7 +4,7 @@
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.log.commands.kill-job :refer [apply-kill-job]]
@@ -40,7 +40,7 @@
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
 
-(s/defmethod extensions/replica-diff :leave-cluster
+(s/defmethod extensions/replica-diff :leave-cluster :- ReplicaDiff
   [{:keys [args]} old new]
   (let [observer (get (map-invert (:pairs old)) (:id args))
         subject (get (:pairs old) (:id args))]
@@ -56,7 +56,7 @@
       :args {:id (:id state)}
       :immediate? true}]))
 
-(s/defmethod extensions/fire-side-effects! :leave-cluster
+(s/defmethod extensions/fire-side-effects! :leave-cluster :- State
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (common/start-new-lifecycle

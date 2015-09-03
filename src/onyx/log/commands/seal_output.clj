@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [taoensso.timbre :refer [warn fatal info]]))
 
 (defn all-outputs-sealed? [replica job]
@@ -26,12 +26,13 @@
             (update-in [:jobs] vec)
             (update-in [:completed-jobs] conj (:job args))
             (update-in [:completed-jobs] vec)
+            (update-in [:task-metadata] dissoc (:job args))
             (update-in [:allocations] dissoc (:job args))
             (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
             (reconfigure-cluster-workload)))
       new)))
 
-(defmethod extensions/replica-diff :seal-output
+(s/defmethod extensions/replica-diff :seal-output :- ReplicaDiff
   [{:keys [args]} old new]
   {:job-completed? (not= (get-in old [:allocations (:job args)])
                          (get-in new [:allocations (:job args)]))
@@ -41,6 +42,6 @@
   [{:keys [args]} old new diff state]
   [])
 
-(defmethod extensions/fire-side-effects! :seal-output
+(s/defmethod extensions/fire-side-effects! :seal-output :- State
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle old new diff state))

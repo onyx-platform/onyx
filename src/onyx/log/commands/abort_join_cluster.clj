@@ -3,19 +3,19 @@
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [taoensso.timbre :as timbre]
             [onyx.extensions :as extensions]))
 
 (s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
-  [{:keys [args message-id]} :- LogEntry replica :- Replica]
+  [{:keys [args message-id]} :- LogEntry replica]
   (-> replica
       (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
       (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
       (update-in [:peer-sites] dissoc (:id args))))
 
-(s/defmethod extensions/replica-diff :abort-join-cluster
-  [entry old :- Replica new :- Replica]
+(s/defmethod extensions/replica-diff :abort-join-cluster :- ReplicaDiff
+  [entry :- LogEntry old new]
   (let [prepared (vals (first (diff (:prepared old) (:prepared new))))
         accepted (vals (first (diff (:accepted old) (:accepted new))))]
     (assert (<= (count prepared) 1))
@@ -24,7 +24,7 @@
       {:aborted (or (first prepared) (first accepted))})))
 
 (s/defmethod extensions/reactions :abort-join-cluster :- Reactions
-  [{:keys [args]} old :- Replica new :- Replica diff peer-args]
+  [{:keys [args]} old new diff peer-args]
   (when (and (= (:id args) (:id peer-args))
              (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
     [{:fn :prepare-join-cluster
@@ -32,8 +32,8 @@
              :peer-site (extensions/peer-site (:messenger peer-args))}
       :immediate? true}]))
 
-(s/defmethod extensions/fire-side-effects! :abort-join-cluster
-  [{:keys [args]} :- LogEntry old :- Replica new :- Replica diff state]
+(s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
+  [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
     (Thread/sleep (or (:onyx.peer/join-failure-back-off (:opts state)) 250)))
