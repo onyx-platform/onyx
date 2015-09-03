@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.7.3-beta8"]
+[org.onyxplatform/onyx "0.7.3-beta9"]
 ```
 
 ### Build Status
@@ -42,19 +42,19 @@ onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.7.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.7.3-beta8
+### User Guide 0.7.3-beta9
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 
-### API Docs 0.7.3-beta8
+### API Docs 0.7.3-beta9
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.3-beta8).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.3-beta9).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.3-beta8` goes with `onyx` version `0.7.3-beta8`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.3-beta8.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.3-beta9` goes with `onyx` version `0.7.3-beta9`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.3-beta9.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
