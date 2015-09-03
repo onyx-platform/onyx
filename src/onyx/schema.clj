@@ -201,31 +201,33 @@
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging
                s/Keyword s/Any}
-   (s/optional-key :peers) [PeerId]
-   (s/optional-key :peer-state) {PeerId PeerState}
-   (s/optional-key :peer-sites) {PeerId PeerSite}
-   (s/optional-key :prepared) {PeerId PeerId}
-   (s/optional-key :accepted) {PeerId PeerId}
-   (s/optional-key :pairs) {PeerId PeerId}
-   (s/optional-key :jobs) [JobId]
-   (s/optional-key :task-schedulers) {JobId TaskScheduler}
-   (s/optional-key :tasks) {JobId [TaskId]}
-   (s/optional-key :allocations) {JobId {TaskId [PeerId]}}
-   (s/optional-key :saturation) {JobId s/Num}
-   (s/optional-key :task-saturation) {JobId {TaskId s/Num}}
-   (s/optional-key :flux-policies) {JobId {TaskId s/Any}}
-   (s/optional-key :min-required-peers) {JobId {TaskId s/Num}}
-   (s/optional-key :input-tasks) {JobId [TaskId]}
-   (s/optional-key :output-tasks) {JobId [TaskId]}
-   (s/optional-key :exempt-tasks)  {JobId [TaskId]}
-   (s/optional-key :sealed-outputs) {JobId [TaskId]}
-   (s/optional-key :ackers) {JobId [PeerId]} 
-   (s/optional-key :acker-percentage) {JobId s/Int}
-   (s/optional-key :acker-exclude-inputs) {TaskId s/Bool}
-   (s/optional-key :acker-exclude-outputs) {TaskId s/Bool}
-   (s/optional-key :completed-jobs) [JobId] 
-   (s/optional-key :killed-jobs) [JobId] 
-   (s/optional-key :exhausted-inputs) {JobId #{TaskId}}})
+   :peers [PeerId]
+   :peer-state {PeerId PeerState}
+   :peer-sites {PeerId PeerSite}
+   :prepared {PeerId PeerId}
+   :accepted {PeerId PeerId}
+   :pairs {PeerId PeerId}
+   :jobs [JobId]
+   :task-schedulers {JobId TaskScheduler}
+   :tasks {JobId [TaskId]}
+   :allocations {JobId {TaskId [PeerId]}}
+   :saturation {JobId s/Num}
+   :task-saturation {JobId {TaskId s/Num}}
+   :flux-policies {JobId {TaskId s/Any}}
+   :min-required-peers {JobId {TaskId s/Num}}
+   :input-tasks {JobId [TaskId]}
+   :output-tasks {JobId [TaskId]}
+   :exempt-tasks  {JobId [TaskId]}
+   :sealed-outputs {JobId [TaskId]}
+   :ackers {JobId [PeerId]} 
+   :acker-percentage {JobId s/Int}
+   :acker-exclude-inputs {TaskId s/Bool}
+   :acker-exclude-outputs {TaskId s/Bool}
+   :task-percentages {JobId {TaskId s/Num}}
+   :percentages {JobId s/Num}
+   :completed-jobs [JobId] 
+   :killed-jobs [JobId] 
+   :exhausted-inputs {JobId #{TaskId}}})
 
 (def LogEntry
   {:fn s/Keyword
@@ -238,7 +240,7 @@
   (s/maybe [LogEntry]))
 
 (def ReplicaDiff
-  (s/maybe {s/Any s/Any}))
+  (s/maybe (s/either {s/Any s/Any} #{s/Any})))
 
 (def State
   {s/Any s/Any})

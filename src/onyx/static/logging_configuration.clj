@@ -1,10 +1,14 @@
 (ns ^:no-doc onyx.static.logging-configuration
   (:require [com.stuartsierra.component :as component]
+            [io.aviso.exception :as pretty]
             [taoensso.timbre :refer [info] :as timbre]
             [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
 (def MAX-LOG-SIZE (* 512 102400))
 (def MAX-LOG-FILES 5)
+
+(defmethod pretty/exception-dispatch clojure.lang.IPersistentMap [m]
+  (pr-str m))
 
 (defrecord LoggingConfiguration [file config]
   component/Lifecycle
