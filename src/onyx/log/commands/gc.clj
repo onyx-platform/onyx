@@ -18,6 +18,7 @@
             (assoc x :completed-jobs [])
             (reduce (fn [new job] (update-in new [:tasks] dissoc job)) x jobs)
             (reduce (fn [new job] (update-in new [:allocations] dissoc job)) x jobs)
+            (reduce (fn [new job] (update-in new [:task-metadata] dissoc job)) x jobs)
             (reduce (fn [new job] (update-in new [:task-schedulers] dissoc job)) x jobs)
             (reduce (fn [new job] (update-in new [:percentages] dissoc job)) x jobs)
             (reduce (fn [new job] (update-in new [:task-percentages] dissoc job)) x jobs)
