@@ -1,13 +1,13 @@
 test:
   override:
     - ./circle-runner.sh core.async:
-        timeout: 360
+        timeout: 480
         parallel: true
     - ./circle-runner.sh netty:
-        timeout: 360
+        timeout: 480
         parallel: true
     - ./circle-runner.sh aeron:
-        timeout: 360
+        timeout: 480
         parallel: true
 
 machine:
