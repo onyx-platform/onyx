@@ -219,7 +219,7 @@
    :input-tasks {JobId [TaskId]}
    :output-tasks {JobId [TaskId]}
    :exempt-tasks  {JobId [TaskId]}
-   :sealed-outputs {JobId [TaskId]}
+   :sealed-outputs {JobId #{TaskId}}
    :ackers {JobId [PeerId]} 
    :acker-percentage {JobId s/Int}
    :acker-exclude-inputs {TaskId s/Bool}
