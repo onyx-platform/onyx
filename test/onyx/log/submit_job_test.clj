@@ -2,6 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
+            [onyx.log.replica :as replica]
             [midje.sweet :refer :all]))
 
 (def entry (create-log-entry :submit-job {:id :a :tasks [:t1]
@@ -14,8 +15,10 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/greedy
-                  :peers [:p1]})
+(def old-replica (merge replica/base-replica
+                        {:messaging {:onyx.messaging/impl :dummy-messenger}
+                         :job-scheduler :onyx.job-scheduler/greedy
+                         :peers [:p1]}))
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -23,9 +26,11 @@
   (fact (:jobs new-replica) => [:a])
   (fact diff => {:job :a}))
 
-(let [old-replica {:job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
-                   :task-schedulers {:b :onyx.task-scheduler/balanced}
-                   :tasks {:b [:t1 :t2]}}
+(let [old-replica (merge replica/base-replica 
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
+                          :task-schedulers {:b :onyx.task-scheduler/balanced}
+                          :tasks {:b [:t1 :t2]}})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :x})]
@@ -43,8 +48,10 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:job-scheduler :onyx.job-scheduler/balanced
-                  :peers [:p1 :p2]})
+(def old-replica (merge replica/base-replica
+                        {:messaging {:onyx.messaging/impl :dummy-messenger}
+                         :job-scheduler :onyx.job-scheduler/balanced
+                         :peers [:p1 :p2]}))
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]

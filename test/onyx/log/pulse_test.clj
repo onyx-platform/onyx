@@ -6,6 +6,7 @@
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
+            [onyx.log.replica :as replica]
             [onyx.api :as api]
             [midje.sweet :refer :all]
             [onyx.log.curator :as zk]))
@@ -21,13 +22,13 @@
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/balanced} nil)
 (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messenger} nil)
 
-(def a-id "a")
+(def a-id :a)
 
-(def b-id "b")
+(def b-id :b)
 
-(def c-id "c")
+(def c-id :c)
 
-(def d-id "d")
+(def d-id :d)
 
 (def entry (create-log-entry :prepare-join-cluster {:joiner d-id
                                                     :peer-site {:address 1}}))
@@ -51,9 +52,10 @@
 (extensions/register-pulse (:log env) c-id)
 (extensions/register-pulse (:log env) d-id)
 
-(def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                  :job-scheduler :onyx.job-scheduler/greedy
-                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]})
+(def old-replica (merge replica/base-replica 
+                        {:messaging {:onyx.messaging/impl :dummy-messenger}
+                         :job-scheduler :onyx.job-scheduler/greedy
+                         :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]}))
 
 (def new-replica (f old-replica))
 
@@ -75,6 +77,6 @@
 (def entry (<!! ch))
 
 (fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id "d"})
+(fact (:args entry) => {:id :d})
 
 (onyx.api/shutdown-env env)
