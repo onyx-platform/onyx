@@ -5,7 +5,8 @@
 - Documentation: Fixed Aeron docstring for port allocation
 - Added schema type-checking to all replica updates in the log.
 - Allow Aeron to use short virtual peer ID when hashing. [#250](https://github.com/onyx-platform/onyx/issues/250)
-- Exposed all schemas used for internal validation through `schema.clj` namespace, meant for use in 3rd party tooling.
+- Exposed all schemas used for internal validation through `onyx.schema` namespace, meant for use in 3rd party tooling.
+- Allow plugins to write task-metadata to the replica, which will be cleaned up when jobs are completed or killed [#287](https://github.com/onyx-platform/onyx/pull/287)
 
 #### 0.7.2
 
