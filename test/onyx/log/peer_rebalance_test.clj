@@ -5,7 +5,12 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [midje.sweet :refer :all]
+            [schema.core :as s]
             [onyx.log.curator :as zk]))
+
+(namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
+
+(facts
 
 (def onyx-id (java.util.UUID/randomUUID))
 
@@ -151,3 +156,4 @@
 (onyx.api/shutdown-env env)
 
 (onyx.api/shutdown-peer-group peer-group)
+)

@@ -5,7 +5,12 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
+            [schema.core :as s]
             [midje.sweet :refer :all]))
+
+(namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
+
+(facts
 
 (def config (load-config))
 
@@ -97,3 +102,4 @@
 (onyx.api/shutdown-env env)
 
 (onyx.api/shutdown-peer-group peer-group)
+)

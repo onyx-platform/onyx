@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.operation :as operation]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [taoensso.timbre :refer [info] :as timbre]))
 
@@ -48,7 +48,7 @@
           (add-site args)
           (reconfigure-cluster-workload)))))
 
-(s/defmethod extensions/replica-diff :prepare-join-cluster
+(s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]
   (let [rets (second (diff (:prepared old) (:prepared new)))]
     (assert (<= (count rets) 1))
@@ -75,7 +75,7 @@
                               (:observer diff))}
           :immediate? true}]))
 
-(s/defmethod extensions/fire-side-effects! :prepare-join-cluster
+(s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args]} :- LogEntry old new diff {:keys [monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff

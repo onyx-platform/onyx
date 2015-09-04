@@ -3,6 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [com.stuartsierra.component :as component]
+            [onyx.log.replica :as replica]
             [onyx.messaging.dummy-messenger]
             [onyx.system]
             [midje.sweet :refer :all]))
@@ -17,10 +18,11 @@
 
 (def rep-reactions (partial extensions/reactions entry))
 
-(def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                  :pairs {:a :b :b :c :c :a} :peers [:a :b :c]
-                  :peer-sites {}
-                  :job-scheduler :onyx.job-scheduler/balanced})
+(def old-replica (merge replica/base-replica
+                        {:messaging {:onyx.messaging/impl :dummy-messenger}
+                         :pairs {:a :b :b :c :c :a} :peers [:a :b :c]
+                         :peer-sites {}
+                         :job-scheduler :onyx.job-scheduler/balanced}))
 
 (let [new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
@@ -54,9 +56,10 @@
                        :args {:id :d}
                        :immediate? true}]))
 
-(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                   :peers []
-                   :job-scheduler :onyx.job-scheduler/balanced}
+(let [old-replica (merge replica/base-replica 
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :peers []
+                          :job-scheduler :onyx.job-scheduler/balanced})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
@@ -65,9 +68,10 @@
   (fact diff => {:instant-join :d})
   (fact reactions => nil))
 
-(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                   :job-scheduler :onyx.job-scheduler/greedy
-                   :peers [:a]}
+(let [old-replica (merge replica/base-replica
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :job-scheduler :onyx.job-scheduler/greedy
+                          :peers [:a]})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (dummy-messenger {})})]
@@ -78,12 +82,13 @@
                        :args {:observer :d :subject :a}
                        :immediate? true}]))
 
-(let [old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                   :pairs {:a :b :b :a}
-                   :accepted {}
-                   :prepared {:a :c}
-                   :peers [:a :b]
-                   :job-scheduler :onyx.job-scheduler/balanced}
+(let [old-replica (merge replica/base-replica
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :pairs {:a :b :b :a}
+                          :accepted {}
+                          :prepared {:a :c}
+                          :peers [:a :b]
+                          :job-scheduler :onyx.job-scheduler/balanced})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]

@@ -1,0 +1,31 @@
+(ns onyx.log.replica)
+
+(def base-replica 
+  {:peers []
+   :peer-state {}
+   :peer-sites {}
+   :prepared {}
+   :accepted {}
+   :pairs {}
+   :jobs []
+   :task-schedulers {}
+   :tasks {}
+   :allocations {}
+   :task-saturation {}
+   :saturation {}
+   :flux-policies {}
+   :min-required-peers {}
+   :input-tasks {}
+   :output-tasks {}
+   :exempt-tasks {}
+   :sealed-outputs {}
+   :ackers {}
+   :acker-percentage {}
+   :acker-exclude-inputs {}
+   :acker-exclude-outputs {}
+   :task-percentages {}
+   :task-metadata {}
+   :percentages {}
+   :completed-jobs []
+   :killed-jobs []
+   :exhausted-inputs {}})

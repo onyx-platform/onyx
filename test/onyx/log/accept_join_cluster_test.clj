@@ -2,6 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
+            [onyx.log.replica :as replica]
             [midje.sweet :refer :all]))
 
 (let [entry (create-log-entry :accept-join-cluster
@@ -12,10 +13,12 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:pairs {:a :b :b :c :c :a}
-                   :accepted {:a :d}
-                   :peers [:a :b :c]
-                   :job-scheduler :onyx.job-scheduler/greedy}
+      old-replica (merge replica/base-replica 
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :pairs {:a :b :b :c :c :a}
+                          :accepted {:a :d}
+                          :peers [:a :b :c]
+                          :job-scheduler :onyx.job-scheduler/greedy})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :a]) => :d)
@@ -33,10 +36,12 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:pairs {}
-                   :accepted {:a :d}
-                   :peers [:a]
-                   :job-scheduler :onyx.job-scheduler/greedy}
+      old-replica (merge replica/base-replica 
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :pairs {}
+                          :accepted {:a :d}
+                          :peers [:a]
+                          :job-scheduler :onyx.job-scheduler/greedy})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
   (fact (get-in new-replica [:pairs :d]) => :a)

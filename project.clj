@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.7.3-beta9"
+(defproject org.onyxplatform/onyx "0.7.3"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -18,12 +18,12 @@
                  [clj-tuple "0.2.2"]
                  [com.stuartsierra/dependency "0.1.1"]
                  [com.stuartsierra/component "0.2.3"]
-                 [com.taoensso/timbre "4.0.2"]
+                 [com.taoensso/timbre "4.1.1"]
                  [com.taoensso/nippy "2.9.0"]
                  [uk.co.real-logic/Agrona "0.4.1"]
                  [uk.co.real-logic/aeron-client "0.1.1"]
                  [uk.co.real-logic/aeron-driver "0.1.1"]
-                 [prismatic/schema "0.4.3"]
+                 [prismatic/schema "1.0.1"]
                  [org.apache.zookeeper/zookeeper "3.4.1" :exclusions [org.slf4j/slf4j-log4j12 io.netty/netty]]
                  [log4j/log4j "1.2.17"]
                  [org.slf4j/slf4j-api "1.7.12"]
@@ -34,9 +34,9 @@
   :profiles {:dev {:aot ^:replace []
                    :dependencies [[midje "1.7.0"]
                                   [yeller-timbre-appender "2.0.0"]
-                                  [org.clojars.czan/stateful-check "0.3.0-20150522.062325-1"]
-                                  [org.clojure/test.check "0.7.0"]
-                                  [com.gfredericks/test.chuck "0.1.19"]
+                                  [org.clojars.czan/stateful-check "0.3.1"]
+                                  [org.clojure/test.check "0.8.1"]
+                                  [com.gfredericks/test.chuck "0.1.21"]
                                   [org.clojure/data.generators "0.1.2"]
                                   [org.clojure/tools.nrepl "0.2.10"]]
                    :plugins [[lein-midje "3.1.3"]

@@ -6,16 +6,16 @@
             [onyx.log.commands.common :as common]
             [onyx.log.entry :refer [create-log-entry]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]))
 
 (s/defmethod extensions/apply-log-entry :backpressure-on :- Replica
-  [{:keys [args]} :- LogEntry replica]
+  [{:keys [args]} :- LogEntry replica :- Replica]
   (if (= :active (get-in replica [:peer-state (:peer args)]))
     (assoc-in replica [:peer-state (:peer args)] :backpressure)
     replica))
 
-(s/defmethod extensions/replica-diff :backpressure-on
+(s/defmethod extensions/replica-diff :backpressure-on :- ReplicaDiff
   [{:keys [args]} old new]
   (second (diff (:peer-state old) (:peer-state new))))
 
@@ -23,7 +23,7 @@
   [{:keys [args]} old new diff peer-args]
   [])
 
-(s/defmethod extensions/fire-side-effects! :backpressure-on
+(s/defmethod extensions/fire-side-effects! :backpressure-on :- State
   [{:keys [args]} old new diff {:keys [monitoring] :as state}]
   (if (= (:peer args) (:id state))
     (do (extensions/emit monitoring {:event :peer-backpressure-on :id (:id state)})

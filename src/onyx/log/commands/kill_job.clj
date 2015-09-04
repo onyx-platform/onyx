@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [taoensso.timbre :refer [warn]]))
 
 ;; Pulled this out of the defmethod because it's reused across other log entries.
@@ -19,6 +19,7 @@
           (update-in [:killed-jobs] conj job-id)
           (update-in [:killed-jobs] vec)
           (update-in [:allocations] dissoc job-id)
+          (update-in [:task-metadata] dissoc job-id)
           (update-in [:ackers] dissoc job-id)
           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
           (reconfigure-cluster-workload)))
@@ -32,7 +33,7 @@
       (warn e)
       replica)))
 
-(defmethod extensions/replica-diff :kill-job
+(s/defmethod extensions/replica-diff :kill-job :- ReplicaDiff
   [entry old new]
   (second (diff (into #{} (:killed-jobs old)) (into #{} (:killed-jobs new)))))
 
@@ -40,6 +41,6 @@
   [{:keys [args]} old new diff state]
   [])
 
-(defmethod extensions/fire-side-effects! :kill-job
+(s/defmethod extensions/fire-side-effects! :kill-job :- State
   [{:keys [args]} old new diff state]
   (common/start-new-lifecycle old new diff state))

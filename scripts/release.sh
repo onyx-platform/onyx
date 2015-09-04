@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+set -o xtrace
 
 if [[ "$#" -ne 4 ]]; then
     echo "Usage: $0 old-version new-version old-release-branch new-release-branch"

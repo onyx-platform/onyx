@@ -4,6 +4,7 @@
             [onyx.system :as system]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger]
+            [onyx.log.replica :as replica]
             [onyx.test-helper :refer [load-config]]
             [onyx.extensions :as extensions]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
@@ -22,13 +23,13 @@
 (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
 (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)
 
-(def a-id "a")
+(def a-id :a)
 
-(def b-id "b")
+(def b-id :b)
 
-(def c-id "c")
+(def c-id :c)
 
-(def d-id "d")
+(def d-id :d)
 
 (extensions/register-pulse (:log env) a-id)
 (extensions/register-pulse (:log env) b-id)
@@ -52,9 +53,10 @@
 
 (def rep-reactions (partial extensions/reactions read-entry))
 
-(def old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                  :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]
-                  :job-scheduler :onyx.job-scheduler/greedy})
+(def old-replica (merge replica/base-replica 
+                        {:messaging {:onyx.messaging/impl :dummy-messenger}
+                         :pairs {a-id b-id b-id c-id c-id a-id} :peers [a-id b-id c-id]
+                         :job-scheduler :onyx.job-scheduler/greedy}))
 
 (def old-local-state {:messenger :dummy-messenger
                       :log (:log env) :id a-id
@@ -105,10 +107,10 @@
 (def read-entry (<!! ch))
 
 (fact (:fn read-entry) => :accept-join-cluster)
-(fact (:args read-entry) => {:accepted-joiner "d"
-                             :accepted-observer "a"
-                             :subject "b"
-                             :observer "d"})
+(fact (:args read-entry) => {:accepted-joiner :d
+                             :accepted-observer :a
+                             :subject :b
+                             :observer :d})
 
 (def conn (zk/connect (:zookeeper/address (:env-config config))))
 
@@ -119,6 +121,7 @@
 (def entry (<!! ch))
 
 (fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id "d"})
+(fact (:args entry) => {:id :d})
 
 (onyx.api/shutdown-env env)
+

@@ -6,11 +6,11 @@
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [schema.core :as s]
-            [onyx.schema :refer [Replica LogEntry Reactions]]
+            [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]))
 
 (s/defmethod extensions/apply-log-entry :accept-join-cluster :- Replica
-  [{:keys [args]} :- LogEntry replica]
+  [{:keys [args]} :- LogEntry replica :- Replica]
   (let [{:keys [accepted-joiner accepted-observer]} args
         target (or (get-in replica [:pairs accepted-observer])
                    accepted-observer)
@@ -28,8 +28,8 @@
           (assoc-in [:peer-state accepted-joiner] :idle)
           (reconfigure-cluster-workload)))))
 
-(defmethod extensions/replica-diff :accept-join-cluster
-  [entry old new]
+(s/defmethod extensions/replica-diff :accept-join-cluster :- ReplicaDiff
+  [entry :- LogEntry old :- Replica new :- Replica]
   (if-not (= old new)
     (let [rets (first (diff (:accepted old) (:accepted new)))]
       (assert (<= (count rets) 1))
@@ -38,7 +38,8 @@
          :subject (first (vals rets))}))))
 
 (s/defmethod extensions/reactions :accept-join-cluster :- Reactions
-  [{:keys [args] :as entry} old new diff state]
+  [{:keys [args] :as entry} :- LogEntry 
+   old new diff :- ReplicaDiff state :- State]
   (let [accepted-joiner (:accepted-joiner args)
         already-joined? (some #{accepted-joiner} (:peers old))]
     (if (and (not already-joined?)
@@ -58,8 +59,12 @@
         (assoc (dissoc state :buffered-outbox) :stall-output? false))
     state))
 
-(defmethod extensions/fire-side-effects! :accept-join-cluster
-  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
+(s/defmethod extensions/fire-side-effects! :accept-join-cluster :- State
+  [{:keys [args]} :- LogEntry 
+   old :- Replica 
+   new :- Replica 
+   diff :- ReplicaDiff 
+   {:keys [monitoring] :as state} :- State]
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new)

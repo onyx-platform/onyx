@@ -3,6 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.test-helper :refer [load-config]]
+            [onyx.log.replica :as replica]
             [onyx.system]
             [midje.sweet :refer :all]))
 
@@ -13,8 +14,10 @@
       f (partial extensions/apply-log-entry entry)
       rep-diff (partial extensions/replica-diff entry)
       rep-reactions (partial extensions/reactions entry)
-      old-replica {:messaging {:onyx.messaging/impl :dummy-messenger}
-                   :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]}
+      old-replica (merge replica/base-replica 
+                         {:messaging {:onyx.messaging/impl :dummy-messenger}
+                          :job-scheduler :onyx.job-scheduler/greedy
+                          :pairs {:a :b :b :c :c :a} :prepared {:a :d} :peers [:a :b :c]})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
