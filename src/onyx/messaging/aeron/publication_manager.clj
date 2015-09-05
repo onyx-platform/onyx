@@ -13,16 +13,18 @@
 (def ^:const publication-not-connected (long -1))
 
 (defprotocol PPublicationManager
-  (connect [_ channel stream-id])
-  (send-pub [this buf start end])
+  (write [this buf start end])
+  (connect [_])
   (close [_])
   (reset [_]))
 
-(defrecord PublicationManager [messenger connection publication pending-ch]
+(defrecord PublicationManager [messenger channel stream-id connection publication pending-ch]
   PPublicationManager
-  (reset [this]) 
+  (reset [this]
+    (close this)
+    (connect this))
 
-  (send-pub [this buf start end]
+  (write [this buf start end]
     (let [pub ^Publication @publication
           offer-f (fn [] (.offer pub buf start end))]
       (while (let [result ^long (offer-f)]
@@ -37,12 +39,12 @@
     (reset! connection nil)
     this)
 
-  (connect [this channel stream-id]
+  (connect [this]
     (let [conn (Aeron/connect (.errorHandler (Aeron$Context.) no-op-error-handler))
           pub (.addPublication conn channel stream-id)]
       (reset! publication pub)
       (reset! connection conn)
       this)))
 
-(defn new-publication-manager [messenger]
-  (->PublicationManager messenger (atom nil) (atom nil) nil #_(chan 1000)))
+(defn new-publication-manager [messenger channel stream-id]
+  (->PublicationManager messenger channel stream-id (atom nil) (atom nil) nil #_(chan 1000)))
