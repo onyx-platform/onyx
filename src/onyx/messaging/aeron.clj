@@ -8,15 +8,12 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron FragmentAssembler]
-           [uk.co.real_logic.aeron Aeron$Context]
-           [uk.co.real_logic.aeron Publication]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-           [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
-           [uk.co.real_logic.agrona CloseHelper]
-           [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.concurrent IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
+           [uk.co.real_logic.agrona ErrorHandler CloseHelper]
+           [uk.co.real_logic.agrona.concurrent 
+            UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
@@ -112,7 +109,7 @@
   (reify Consumer
     (accept [this subscription]
       (while (not (Thread/interrupted))
-        (let [fragments-read (.poll ^uk.co.real_logic.aeron.Subscription subscription ^FragmentHandler handler ^int limit)]
+        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
 (defn handle-message [decompress-f virtual-peers buffer offset length header]
@@ -260,7 +257,7 @@
     (future-cancel (:pub-gc-thread component))
     (doseq [subscriber subscribers]
       (future-cancel (:subscriber-fut subscriber))
-      (.close ^uk.co.real_logic.aeron.Subscription (:subscription subscriber))
+      (.close ^Subscription (:subscription subscriber))
       (.close ^Aeron (:conn subscriber)))
     (doseq [pub (vals @publications)]
       (.close ^Publication (:publication pub)))
