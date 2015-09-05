@@ -1,50 +1,73 @@
 (ns onyx.messaging.aeron.publication-manager
-  (:require [taoensso.timbre :refer [fatal info] :as timbre])
+  (:require [taoensso.timbre :refer [fatal info] :as timbre]
+            [clojure.core.async :refer [chan >!! <!! close! sliding-buffer thread]])
   (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
            [uk.co.real_logic.agrona ErrorHandler CloseHelper]
            [uk.co.real_logic.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]))
 
-(def no-op-error-handler
-  (reify ErrorHandler
-    (onError [this x] (taoensso.timbre/warn x))))
-
-(def ^:const publication-backpressured (long -2))
-(def ^:const publication-not-connected (long -1))
+(def ^:const backpressured (long -2))
+(def ^:const not-connected (long -1))
 
 (defprotocol PPublicationManager
   (write [this buf start end])
   (connect [_])
-  (close [_])
-  (reset [_]))
+  (disconnect [_])
+  (reset-connection [_])
+  (start [_])
+  (stop [_]))
 
-(defrecord PublicationManager [messenger channel stream-id connection publication pending-ch]
+(def write-buffer-size 1000)
+
+(defrecord Message [buf start end])
+
+(defn write-from-buffer [pending-ch publication send-idle-strategy]
+  (loop [] 
+    (when-let [msg (<!! pending-ch)]
+      (while (let [result ^long (.offer @publication (:buf msg) (:start msg) (:end msg))]
+               (or (= result backpressured)
+                   (= result not-connected)))
+        ;; idle for different amounts of time depending on whether backpressuring or not?
+        (.idle ^IdleStrategy send-idle-strategy 0))
+      (recur))))
+
+(defrecord PublicationManager [send-idle-strategy channel stream-id connection publication pending-ch write-fut]
   PPublicationManager
-  (reset [this]
-    (close this)
-    (connect this))
+  (start [this]
+    (assoc this :write-fut (future (write-from-buffer pending-ch publication send-idle-strategy))))
+
+  (reset-connection [this]
+    (connect (disconnect this)))
 
   (write [this buf start end]
-    (let [pub ^Publication @publication
-          offer-f (fn [] (.offer pub buf start end))]
-      (while (let [result ^long (offer-f)]
-               (or (= result publication-backpressured)
-                   (= result publication-not-connected)))
-        (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+    ;; should possibly use core-async offer here and print out message if going to block
+    (>!! pending-ch (->Message buf start end)))
 
-  (close [this]
+  (disconnect [this]
     (.close ^Publication @publication)
     (.close ^Aeron @connection)
     (reset! publication nil)
     (reset! connection nil)
     this)
 
+  (stop [this]
+    (disconnect this)
+    (future-cancel (:write-fut this))
+    (close! pending-ch)
+    this)
+
   (connect [this]
-    (let [conn (Aeron/connect (.errorHandler (Aeron$Context.) no-op-error-handler))
+    (let [error-handler (reify ErrorHandler
+                          (onError [this x] 
+                            (taoensso.timbre/warn "Aeron messaging publication error:" x)
+                            (taoensso.timbre/warn "Resetting Aeron publication.")
+                            (reset-connection this)))
+
+          conn (Aeron/connect (.errorHandler (Aeron$Context.) error-handler))
           pub (.addPublication conn channel stream-id)]
       (reset! publication pub)
-      (reset! connection conn)
+      (reset! connection conn) 
       this)))
 
-(defn new-publication-manager [messenger channel stream-id]
-  (->PublicationManager messenger channel stream-id (atom nil) (atom nil) nil #_(chan 1000)))
+(defn new-publication-manager [send-idle-strategy channel stream-id]
+  (->PublicationManager send-idle-strategy channel stream-id (atom nil) (atom nil) (chan write-buffer-size) nil))

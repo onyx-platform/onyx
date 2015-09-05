@@ -162,8 +162,11 @@
     (do
       (reset! (:last-used pub) (System/currentTimeMillis))
       (:publication pub))
-    (let [pub-manager (-> (pubm/new-publication-manager messenger)
-                          (pubm/connect channel (:stream-id conn-info)))]
+    (let [stream-id (:stream-id conn-info)
+          idle-strategy (:send-idle-strategy messenger)
+          pub-manager (-> (pubm/new-publication-manager idle-strategy channel stream-id)
+                          (pubm/connect) 
+                          (pubm/start))]
       (swap! (:publications messenger) 
              assoc 
              channel 
@@ -260,7 +263,7 @@
       (.close ^Subscription (:subscription subscriber))
       (.close ^Aeron (:conn subscriber)))
     (doseq [pub (vals @publications)]
-      (pubm/close (:publication pub))) 
+      (pubm/stop (:publication pub))) 
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
@@ -379,7 +382,7 @@
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
     (let [pub-man (get-publication messenger conn-info)
           [len buf] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
-      (pubm/send-pub pub-man buf 0 len))))
+      (pubm/write pub-man buf 0 len))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
@@ -388,7 +391,7 @@
     (let [pub-man (get-publication messenger conn-info)]
       (doseq [ack acks]
         (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
-          (pubm/send-pub pub-man buf 0 protocol/ack-msg-length))))))
+          (pubm/write pub-man buf 0 protocol/ack-msg-length))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
@@ -396,7 +399,7 @@
     (complete-message-short-circuit (short-circuit-ch messenger id :release-ch) completion-id)
     (let [pub-man (get-publication messenger conn-info)
           buf (protocol/build-completion-msg-buf id completion-id)]
-      (pubm/send-pub pub-man buf 0 protocol/completion-msg-length))))
+      (pubm/write pub-man buf 0 protocol/completion-msg-length))))
 
 (defmethod extensions/internal-retry-segment AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]
@@ -405,7 +408,7 @@
     (let [idle-strategy (:send-idle-strategy messenger)
           pub-man (get-publication messenger conn-info)
           buf (protocol/build-retry-msg-buf id retry-id)]
-      (pubm/send-pub pub-man buf 0 protocol/retry-msg-length))))
+      (pubm/write pub-man buf 0 protocol/retry-msg-length))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
