@@ -24,9 +24,10 @@
 (defn write-from-buffer [pending-ch publication send-idle-strategy]
   (loop [] 
     (when-let [msg (<!! pending-ch)]
-      (while (let [result ^long (.offer @publication (:buf msg) (:start msg) (:end msg))]
-               (or (= result backpressured)
-                   (= result not-connected)))
+      (while (if-let [pub @publication]
+               (let [result ^long (.offer pub (:buf msg) (:start msg) (:end msg))]
+                 (or (= result backpressured)
+                     (= result not-connected))))
         ;; idle for different amounts of time depending on whether backpressuring or not?
         (.idle ^IdleStrategy send-idle-strategy 0))
       (recur))))
@@ -70,4 +71,5 @@
       this)))
 
 (defn new-publication-manager [send-idle-strategy channel stream-id]
-  (->PublicationManager send-idle-strategy channel stream-id (atom nil) (atom nil) (chan write-buffer-size) nil))
+  (->PublicationManager send-idle-strategy channel stream-id 
+                        (atom nil) (atom nil) (chan write-buffer-size) nil))
