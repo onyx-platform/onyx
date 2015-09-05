@@ -1,7 +1,7 @@
 (ns ^:no-doc onyx.messaging.aeron
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal] :as timbre]
+            [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
@@ -360,23 +360,29 @@
       (pm/peer-channels id)
       ch-k))
 
+
+(def ^:const publication-backpressured (long -2))
+(def ^:const publication-not-connected (long -1))
+
+(defn send-pub [messenger ^Publication pub buf start end]
+  (let [offer-f (fn [] (.offer pub buf start end))]
+    (while (let [result ^long (offer-f)]
+             (or (= result publication-backpressured)
+                 (= result publication-not-connected)))
+      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
+
 (defn send-messages-short-circuit [ch batch]
   (when ch
     (doseq [segment batch]
       (>!! ch segment))))
-
-(def ^:const publication-backpressured? (long -2))
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
     (let [pub ^Publication (get-publication messenger conn-info)
-          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)
-          offer-f (fn [] (.offer pub unsafe-buffer 0 len))
-          idle-strategy (:send-idle-strategy messenger)]
-      (while (= ^long (offer-f) publication-backpressured?)
-        (.idle ^IdleStrategy idle-strategy 0)))))
+          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
+      (send-pub messenger pub unsafe-buffer 0 len))))
 
 (defn ack-segments-short-circuit [ch acks]
   (when ch
@@ -387,13 +393,10 @@
   [messenger event {:keys [id channel] :as conn-info} acks]
   (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
-    (let [pub ^Publication (get-publication messenger conn-info)
-          idle-strategy (:send-idle-strategy messenger)]
+    (let [pub ^Publication (get-publication messenger conn-info)]
       (doseq [ack acks]
-        (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))
-              offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/ack-msg-length))]
-      (while (= ^long (offer-f) publication-backpressured?)
-        (.idle ^IdleStrategy idle-strategy 0)))))))
+        (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
+          (send-pub messenger pub unsafe-buffer 0 protocol/ack-msg-length))))))
 
 (defn complete-message-short-circuit [ch completion-id]
   (when ch
@@ -403,12 +406,9 @@
   [messenger event completion-id {:keys [id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (short-circuit-ch messenger id :release-ch) completion-id)
-    (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^Publication (get-publication messenger conn-info)
-          unsafe-buffer (protocol/build-completion-msg-buf id completion-id)
-          offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/completion-msg-length))]
-      (while (= ^long (offer-f) publication-backpressured?)
-        (.idle ^IdleStrategy idle-strategy 0)))))
+    (let [pub ^Publication (get-publication messenger conn-info)
+          unsafe-buffer (protocol/build-completion-msg-buf id completion-id)]
+      (send-pub messenger pub unsafe-buffer 0 protocol/completion-msg-length))))
 
 (defn retry-segment-short-circuit [ch retry-id]
   (when ch
@@ -420,10 +420,8 @@
     (retry-segment-short-circuit (short-circuit-ch messenger id :retry-ch) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
           pub ^Publication (get-publication messenger conn-info)
-          unsafe-buffer (protocol/build-retry-msg-buf id retry-id)
-          offer-f (fn [] (.offer pub unsafe-buffer 0 protocol/retry-msg-length))]
-      (while (= ^long (offer-f) publication-backpressured?)
-        (.idle ^IdleStrategy idle-strategy 0)))))
+          unsafe-buffer (protocol/build-retry-msg-buf id retry-id)]
+      (send-pub messenger pub unsafe-buffer 0 protocol/retry-msg-length))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
