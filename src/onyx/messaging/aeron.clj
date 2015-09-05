@@ -3,12 +3,13 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
+            [onyx.messaging.aeron.publication-manager :as pubm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.agrona ErrorHandler CloseHelper]
@@ -23,7 +24,7 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronConnection
-  [peer-group messaging-group short-circuitable? publications connections virtual-peers acking-daemon acking-ch
+  [peer-group messaging-group short-circuitable? publications virtual-peers acking-daemon acking-ch
    send-idle-strategy compress-f inbound-ch release-ch retry-ch]
   component/Lifecycle
   (start [component]
@@ -31,7 +32,6 @@
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
           publications (:publications messaging-group)
-          connections (:connections messaging-group)
           virtual-peers (:virtual-peers messaging-group)
           inbound-ch (:inbound-ch (:messenger-buffer component))
           external-channel (:external-channel messaging-group)
@@ -48,7 +48,6 @@
              :messaging-group messaging-group
              :short-circuitable? short-circuitable?
              :publications publications
-             :connections connections
              :multiplex-id multiplex-id
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
@@ -70,7 +69,6 @@
            :send-idle-strategy nil
            :short-circuitable? nil
            :publications nil
-           :connections nil
            :virtual-peers nil
            :multiplex-id nil
            :compress-f nil :decompress-f nil
@@ -164,11 +162,13 @@
     (do
       (reset! (:last-used pub) (System/currentTimeMillis))
       (:publication pub))
-    (let [conn (Aeron/connect (.errorHandler (Aeron$Context.) no-op-error-handler))
-          pub (.addPublication conn channel (:stream-id conn-info))]
-      (do (swap! (:publications messenger) assoc channel (->TrackedPublication pub (atom (System/currentTimeMillis))))
-          (swap! (:connections messenger) assoc channel conn)
-          pub))))
+    (let [pub-manager (-> (pubm/new-publication-manager messenger)
+                          (pubm/connect channel (:stream-id conn-info)))]
+      (swap! (:publications messenger) 
+             assoc 
+             channel 
+             (->TrackedPublication pub-manager (atom (System/currentTimeMillis))))
+      pub-manager)))
 
 (defn opts->port [opts]
   (or (first (common/allowable-ports opts))
@@ -260,9 +260,7 @@
       (.close ^Subscription (:subscription subscriber))
       (.close ^Aeron (:conn subscriber)))
     (doseq [pub (vals @publications)]
-      (.close ^Publication (:publication pub)))
-    (doseq [conn (vals @connections)]
-      (.close ^Aeron conn))
+      (pubm/close (:publication pub))) 
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
@@ -375,50 +373,39 @@
   (when ch
     (>!! ch retry-id)))
 
-(def ^:const publication-backpressured (long -2))
-(def ^:const publication-not-connected (long -1))
-
-(defn send-pub [messenger ^Publication pub buf start end]
-  (let [offer-f (fn [] (.offer pub buf start end))]
-    (while (let [result ^long (offer-f)]
-             (or (= result publication-backpressured)
-                 (= result publication-not-connected)))
-      (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
-
-
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
-    (let [pub ^Publication (get-publication messenger conn-info)
-          [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
-      (send-pub messenger pub unsafe-buffer 0 len))))
+    (let [pub-man (get-publication messenger conn-info)
+          [len buf] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
+      (pubm/send-pub pub-man buf 0 len))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
   (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
-    (let [pub ^Publication (get-publication messenger conn-info)]
+    (let [pub-man (get-publication messenger conn-info)]
       (doseq [ack acks]
-        (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
-          (send-pub messenger pub unsafe-buffer 0 protocol/ack-msg-length))))))
+        (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
+          (pubm/send-pub pub-man buf 0 protocol/ack-msg-length))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (short-circuit-ch messenger id :release-ch) completion-id)
-    (let [pub ^Publication (get-publication messenger conn-info)
-          unsafe-buffer (protocol/build-completion-msg-buf id completion-id)]
-      (send-pub messenger pub unsafe-buffer 0 protocol/completion-msg-length))))
+    (let [pub-man (get-publication messenger conn-info)
+          buf (protocol/build-completion-msg-buf id completion-id)]
+      (pubm/send-pub pub-man buf 0 protocol/completion-msg-length))))
 
 (defmethod extensions/internal-retry-segment AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
     (retry-segment-short-circuit (short-circuit-ch messenger id :retry-ch) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub ^Publication (get-publication messenger conn-info)
-          unsafe-buffer (protocol/build-retry-msg-buf id retry-id)]
-      (send-pub messenger pub unsafe-buffer 0 protocol/retry-msg-length))))
+          pub-man (get-publication messenger conn-info)
+          buf (protocol/build-retry-msg-buf id retry-id)]
+      (pubm/send-pub pub-man buf 0 protocol/retry-msg-length))))
 
 (defmethod extensions/close-peer-connection AeronConnection
   [messenger event peer-link]
