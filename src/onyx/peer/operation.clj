@@ -43,6 +43,24 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
+(defn resolve-task-fn [entry]
+  (let [f (if (or (:onyx/fn entry)
+                  (= (:onyx/type entry) :function))
+            (case (:onyx/language entry)
+              :java (build-fn-java (:onyx/fn entry))
+              (kw->fn (:onyx/fn entry))))]
+    (or f identity)))
+
+(defn resolve-restart-pred-fn [entry]
+  (if-let [kw (:onyx/restart-pred-fn entry)]
+    (kw->fn kw)
+    (constantly false)))
+
+(defn instantiate-plugin-instance [class-name pipeline-data]
+  (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
+                                         (into-array Class [clojure.lang.IPersistentMap]))
+                (into-array [pipeline-data])))
+
 ;; TODO: can be precalculated for peer in replica-view
 (defn select-n-peers
   "Stably select n peers using our id and the downstream task ids.

@@ -6,9 +6,10 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]
-              [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
+              [onyx.static.planning :refer [find-task find-task-fast]]
               [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
+              [onyx.peer.task-compile :as c]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
@@ -379,21 +380,6 @@
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
 
-(defn only-relevant-branches [flow task]
-  (filter #(= (:flow/from %) task) flow))
-
-(defn compile-flow-conditions [flow-conditions task-name f]
-  (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
-    (map
-     (fn [condition]
-       (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
-     conditions)))
-
-(defn compile-fc-norms [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
-
-(defn compile-fc-exs [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -459,103 +445,25 @@
           (fatal e)))
       (recur))))
 
-(defn resolve-lifecycle-calls [calls]
-  (let [calls-map (var-get (operation/kw->fn calls))]
-    (try
-      (validation/validate-lifecycle-calls calls-map)
-      (catch Throwable t
-        (let [e (ex-info (str "Error validating lifecycle map. " (.getCause t)) calls-map )]
-          (error e)
-          (throw e))))
-    calls-map))
+(defn validate-pending-timeout [pending-timeout opts]
+  (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
+    (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
+                    {:opts opts :pending-timeout pending-timeout}))))
 
-(defn select-applicable-lifecycles [lifecycles task-name]
-  (filter #(or (= (:lifecycle/task %) :all)
-               (= (:lifecycle/task %) task-name)) lifecycles))
+(defn clear-messenger-buffer!
+  "Clears the messenger buffer of all messages related to prevous task lifecycle.
+  In an ideal case, this might transfer messages over to another peer first as it help with retries."
+  [{:keys [inbound-ch] :as messenger-buffer}]
+  (while (first (alts!! [inbound-ch] :default false))))
 
-(defn compile-start-task-functions [lifecycles task-name]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs
-        (remove
-         nil?
-         (map
-          (fn [lifecycle]
-            (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-              (when-let [g (:lifecycle/start-task? calls-map)]
-                (fn [x] (g x lifecycle)))))
-          matched))]
-    (fn [event]
-      (if (seq fs)
-        (every? true? ((apply juxt fs) event))
-        true))))
-
-(defn compile-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)]
-    (reduce
-     (fn [f lifecycle]
-       (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-         (if-let [g (get calls-map kw)]
-           (comp (fn [x] (merge x (g x lifecycle))) f)
-           f)))
-     identity
-     matched)))
-
-(defn compile-ack-retry-lifecycle-functions [lifecycles task-name kw]
-  (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fns (keep (fn [lifecycle]
-                    (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-                      (if-let [g (get calls-map kw)]
-                        (vector lifecycle g))))
-                  matched)]
-    (reduce (fn [g [lifecycle f]]
-              (fn [event message-id rets]
-                (g event message-id rets)
-                (f event message-id rets lifecycle)))
-            (fn [event message-id rets])
-            fns)))
-
-(defn compile-before-task-start-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-task-start))
-
-(defn compile-before-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
-
-(defn compile-after-batch-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
-
-(defn compile-after-task-functions [lifecycles task-name]
-  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-task-stop))
-
-(defn compile-after-ack-segment-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-ack-segment))
-
-(defn compile-after-retry-segment-functions [lifecycles task-name]
-  (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
-
-(defn resolve-task-fn [entry]
-  (let [f (if (or (:onyx/fn entry)
-                  (= (:onyx/type entry) :function))
-            (case (:onyx/language entry)
-              :java (operation/build-fn-java (:onyx/fn entry))
-              (operation/kw->fn (:onyx/fn entry))))]
-    (or f identity)))
-
-(defn resolve-restart-pred-fn [entry]
-  (if-let [kw (:onyx/restart-pred-fn entry)]
-    (operation/kw->fn kw)
-    (constantly false)))
-
-(defn instantiate-plugin-instance [class-name pipeline-data]
-  (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
-                                         (into-array Class [clojure.lang.IPersistentMap]))
-                (into-array [pipeline-data])))
+(defrecord TaskState [timeout-pool links])
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
     (try
       (if (#{:input :output} (:onyx/type task-map))
         (case (:onyx/language task-map)
-          :java (instantiate-plugin-instance (name kw) pipeline-data)
+          :java (operation/instantiate-plugin-instance (name kw) pipeline-data)
           (let [user-ns (namespace kw)
                 user-fn (name kw)
                 pipeline (if (and user-ns user-fn)
@@ -567,48 +475,6 @@
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
-
-(defn validate-pending-timeout [pending-timeout opts]
-  (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
-    (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
-                    {:opts opts :pending-timeout pending-timeout}))))
-
-(defn compile-grouping-fn
-  "Compiles grouping outgoing grouping task info into a task->group-fn map
-  for quick lookup and group fn calls"
-  [catalog egress-ids]
-  (merge (->> catalog
-              (filter (fn [entry]
-                        (and (:onyx/group-by-key entry)
-                             egress-ids
-                             (egress-ids (:onyx/name entry)))))
-              (map (fn [entry]
-                     (let [group-key (:onyx/group-by-key entry)
-                           group-fn (cond (keyword? group-key)
-                                          group-key
-                                          (sequential? group-key)
-                                          #(select-keys % group-key)
-                                          :else
-                                          #(get % group-key))]
-                       [(:onyx/name entry) group-fn])))
-              (into (t/hash-map)))
-         (->> catalog
-              (filter (fn [entry]
-                        (and (:onyx/group-by-fn entry)
-                             egress-ids
-                             (egress-ids (:onyx/name entry)))))
-              (map (fn [entry]
-                     [(:onyx/name entry)
-                      (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
-              (into (t/hash-map)))))
-
-(defn clear-messenger-buffer!
-  "Clears the messenger buffer of all messages related to prevous task lifecycle.
-  In an ideal case, this might transfer messages over to another peer first as it help with retries."
-  [{:keys [inbound-ch] :as messenger-buffer}]
-  (while (first (alts!! [inbound-ch] :default false))))
-
-(defrecord TaskState [timeout-pool links])
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -641,16 +507,16 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/compiled-start-task-fn (compile-start-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-task-start-fn (compile-before-task-start-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-batch-fn (compile-before-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-batch-fn (compile-after-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-task-fn (compile-after-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-ack-segment-fn (compile-after-ack-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-retry-segment-fn (compile-after-retry-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-norm-fcs (compile-fc-norms flow-conditions (:name task))
-                           :onyx.core/compiled-ex-fcs (compile-fc-exs flow-conditions (:name task))
-                           :onyx.core/task->group-by-fn (compile-grouping-fn catalog (:egress-ids task))
+                           :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
+                           :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-batch-fn (c/compile-after-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-task-fn (c/compile-after-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-ack-segment-fn (c/compile-after-ack-segment-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
+                           :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
+                           :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
+                           :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params catalog-entry opts)
@@ -664,7 +530,7 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
                            :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
-                           :onyx.core/fn (resolve-task-fn catalog-entry)
+                           :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
@@ -672,7 +538,7 @@
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
-            restart-pred-fn (resolve-restart-pred-fn catalog-entry)
+            restart-pred-fn (operation/resolve-restart-pred-fn catalog-entry)
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
