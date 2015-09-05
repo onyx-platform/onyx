@@ -360,6 +360,23 @@
       (pm/peer-channels id)
       ch-k))
 
+(defn send-messages-short-circuit [ch batch]
+  (when ch
+    (doseq [segment batch]
+      (>!! ch segment))))
+
+(defn ack-segments-short-circuit [ch acks]
+  (when ch
+    (doseq [ack acks]
+      (>!! ch ack))))
+
+(defn complete-message-short-circuit [ch completion-id]
+  (when ch
+    (>!! ch completion-id)))
+
+(defn retry-segment-short-circuit [ch retry-id]
+  (when ch
+    (>!! ch retry-id)))
 
 (def ^:const publication-backpressured (long -2))
 (def ^:const publication-not-connected (long -1))
@@ -371,10 +388,6 @@
                  (= result publication-not-connected)))
       (.idle ^IdleStrategy (:send-idle-strategy messenger) 0))))
 
-(defn send-messages-short-circuit [ch batch]
-  (when ch
-    (doseq [segment batch]
-      (>!! ch segment))))
 
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [id channel] :as conn-info} batch]
@@ -383,11 +396,6 @@
     (let [pub ^Publication (get-publication messenger conn-info)
           [len unsafe-buffer] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
       (send-pub messenger pub unsafe-buffer 0 len))))
-
-(defn ack-segments-short-circuit [ch acks]
-  (when ch
-    (doseq [ack acks]
-      (>!! ch ack))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
@@ -398,10 +406,6 @@
         (let [unsafe-buffer (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
           (send-pub messenger pub unsafe-buffer 0 protocol/ack-msg-length))))))
 
-(defn complete-message-short-circuit [ch completion-id]
-  (when ch
-    (>!! ch completion-id)))
-
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
@@ -409,10 +413,6 @@
     (let [pub ^Publication (get-publication messenger conn-info)
           unsafe-buffer (protocol/build-completion-msg-buf id completion-id)]
       (send-pub messenger pub unsafe-buffer 0 protocol/completion-msg-length))))
-
-(defn retry-segment-short-circuit [ch retry-id]
-  (when ch
-    (>!! ch retry-id)))
 
 (defmethod extensions/internal-retry-segment AeronConnection
   [messenger event retry-id {:keys [id channel] :as conn-info}]
