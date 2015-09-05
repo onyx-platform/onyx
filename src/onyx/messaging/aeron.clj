@@ -179,7 +179,7 @@
         (ex-info "Couldn't assign port - ran out of available ports.
                  Available ports can be configured in the peer-config.
                  e.g. {:onyx.messaging/peer-ports [40000, 40002],
-                 :onyx.messaging/peer-port-range [40200 40260]}"
+                       :onyx.messaging/peer-port-range [40200 40260]}"
                  {:opts opts}))))
 
 
