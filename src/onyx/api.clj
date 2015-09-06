@@ -165,7 +165,7 @@
      (kill-job peer-config job-id {:monitoring :no-op}))
   ([peer-config job-id monitoring-config]
      (when (nil? job-id)
-       (throw (ex-info {:error "Invalid job id" :job-id job-id})))
+       (throw (ex-info "Invalid job id" {:job-id job-id})))
      (let [client (component/start (system/onyx-client peer-config monitoring-config))
            entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
        (extensions/write-log-entry (:log client) entry)

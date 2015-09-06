@@ -84,32 +84,3 @@
           (cu/close client3))))
     (finally
      (onyx.api/shutdown-env env))))
-
-
-(let [env (onyx.api/start-env env-config)]
-  (try
-    (let [client (cu/connect (:zookeeper/address env-config) "onyx")]
-      (cu/create client base-path :data (compress {:v 0}))
-      (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))
-      (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))
-      (let [last-val (cu/swap-data client base-path compress decompress (fn [v] (update v :v inc)))]
-        (fact {:v 3} => last-val)))
-    (finally
-     (onyx.api/shutdown-env env))))
-
-(let [env (onyx.api/start-env env-config)]
-  (try
-    (let [client (cu/connect (:zookeeper/address env-config) "onyx")]
-      (cu/create client base-path :data (compress {:v 0}))
-      (facts "Concurrency test" 
-             (let [n-updates 1000
-                   updates (pmap 
-                             (fn [_]
-                               (cu/swap-data client base-path compress decompress 
-                                             (fn [v] (update v :v inc))))
-                             
-                             (range n-updates))
-                   max-val (apply max (map :v updates))]
-               (fact max-val => n-updates))))
-    (finally
-      (onyx.api/shutdown-env env))))

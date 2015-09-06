@@ -207,9 +207,9 @@
     (let [entry (extensions/read-log-entry log position)]
       (>!! ch entry))
     (catch KeeperException$NoNodeException e
-      (seek-to-new-origin!))
+      (seek-to-new-origin! log ch))
     (catch KeeperException$NodeExistsException e
-      (seek-to-new-origin!))))
+      (seek-to-new-origin! log ch))))
 
 (defmethod extensions/subscribe-to-log ZooKeeper
   [{:keys [conn opts prefix] :as log} ch]
@@ -369,17 +369,6 @@
      #(let [args {:event :zookeeper-force-write-chunk :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
-
-(defmethod extensions/swap-chunk [ZooKeeper :chunk]
-  [{:keys [conn opts prefix monitoring] :as log} kw f id]
-  (measure-latency
-    #(clean-up-broken-connections
-       (fn []
-         (let [node (str (chunk-path prefix) "/" id "/chunk")]
-           (zk/swap-data conn node compress decompress f))))
-    #(let [args {:event :zookeeper-swap-chunk :id id
-                 :latency %}]
-       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :catalog]
   [{:keys [conn opts prefix monitoring] :as log} kw id & _]

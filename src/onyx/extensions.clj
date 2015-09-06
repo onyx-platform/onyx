@@ -34,8 +34,6 @@
 
 (defmulti force-write-chunk (fn [log kw chunk id] [(type log) kw]))
 
-(defmulti swap-chunk (fn [log kw f id] [(type log) kw]))
-
 (defmulti read-chunk (fn [log kw id & args] [(type log) kw]))
 
 (defmulti update-origin! (fn [log replica message-id] (type log)))
@@ -44,7 +42,7 @@
 
 ;; Messaging interface
 
-(defmulti assign-site-resources (fn [replica peer-site peer-sites]
+(defmulti assign-site-resources (fn [replica peer-id peer-site peer-sites]
                                   (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti peer-site (fn [messenger] (type messenger)))

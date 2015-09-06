@@ -1,3 +1,13 @@
+#### 0.7.3
+
+- Bug fix: Kill-job no longer throws a malformed exception with bad parameters.
+- Bug fix: Fixed arity in garbage collection to seek the next origin.
+- Documentation: Fixed Aeron docstring for port allocation
+- Added schema type-checking to all replica updates in the log.
+- Allow Aeron to use short virtual peer ID when hashing. [#250](https://github.com/onyx-platform/onyx/issues/250)
+- Exposed all schemas used for internal validation through `onyx.schema` namespace, meant for use in 3rd party tooling.
+- Allow plugins to write task-metadata to the replica, which will be cleaned up when jobs are completed or killed [#287](https://github.com/onyx-platform/onyx/pull/287)
+
 #### 0.7.2
 
 - Fixed issue where cluster jammed when all peers left and joined [#273](https://github.com/onyx-platform/onyx/issues/273)
@@ -29,7 +39,6 @@
 - Bug fix: Several log / replica edge cases were fixed.
 - Bug fix: Peers not picking up new job after current job was killed.
 - Bug fix: Bulk functions are no longer invoked when the batch is empty. [#260](https://github.com/onyx-platform/onyx/issues/260)
-
 
 #### 0.6.0
 
