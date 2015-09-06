@@ -40,6 +40,7 @@
                                (constantly false))
           release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
+          write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size config)
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
@@ -51,6 +52,7 @@
              :multiplex-id multiplex-id
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
+             :write-buffer-size write-buffer-size
              :compress-f compress-f
              :acking-ch acking-ch
              :inbound-ch inbound-ch
@@ -69,6 +71,7 @@
            :send-idle-strategy nil
            :short-circuitable? nil
            :publications nil
+           :write-buffer-size nil
            :virtual-peers nil
            :multiplex-id nil
            :compress-f nil :decompress-f nil
@@ -163,8 +166,10 @@
       (reset! (:last-used pub) (System/currentTimeMillis))
       (:publication pub))
     (let [stream-id (:stream-id conn-info)
-          idle-strategy (:send-idle-strategy messenger)
-          pub-manager (-> (pubm/new-publication-manager idle-strategy channel stream-id)
+          pub-manager (-> (pubm/new-publication-manager channel 
+                                                        stream-id 
+                                                        (:send-idle-strategy messenger) 
+                                                        (:write-buffer-size messenger))
                           (pubm/connect) 
                           (pubm/start))]
       (swap! (:publications messenger) 

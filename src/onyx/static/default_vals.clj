@@ -30,6 +30,7 @@
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/subscriber-count 2
+   :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging.netty/thread-pool-sizes 1
    :onyx.messaging.netty/connect-timeout-millis 1000
    :onyx.messaging.netty/pending-buffer-size 10000

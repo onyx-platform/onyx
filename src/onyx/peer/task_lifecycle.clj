@@ -115,7 +115,7 @@
 (defrecord AccumAckSegments [ack-val segments retries])
 
 (defn add-from-leaves
-  "Flattens root/leaves into an xor'd ack-val and accumulates new segments and retries"
+  "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
   [segments retries event result egress-ids task->group-by-fn flow-conditions]
   (let [root (:root result)
         leaves (:leaves result)
