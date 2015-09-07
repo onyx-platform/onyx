@@ -11,7 +11,7 @@ Research:
 
 #### No Pane, No Gain: Efficient Evaluation of Sliding-Window Aggregates over Data Streams
 
-This paper is mainly about an optimization that can be applied to windowing that helps computation and memory costs. Panes split windows into pieces, and those pieces can be shared across other windows. Directly from the paper, we see a good problem statement:
+This paper is mainly about an optimization that can be applied to windowing that helps computation and memory costs. Panes split windows into pieces, and those pieces can be shared across other windows to avoid recomputation. Directly from the paper, we see a good problem statement:
 
 > Current proposals for evaluating sliding-window aggregate
 > queries buffer each input tuple until it is no longer needed
@@ -35,3 +35,48 @@ The authors go on to say:
 > the large volume and fast arrival rate of streaming
 > data, reducing the amount of required buffer space (ideally
 > to a constant bound) and computation time is an important issue.
+
+##### Motivation
+
+A good example of where panes come in handy is derived from Query 4 of the
+paper:
+
+> Over the past 10 minutes, find the ids of the
+> auction items on which the number of bids is greater than
+> or equal to 5% of the total number of bids; update the result
+> every 1 minute.
+
+This is a relatively complex query that requires a lot of intermediate state
+to progressively update the answer every minute. This query's internal representation
+would get unwieldly without some form of optimization.
+
+##### Implementation
+
+When we use panes, we take the original query specification and split
+it into a Window Level Query (WLQ) and Pane Level Query (PLQ). The PLQ
+does *sub-aggregation*. The WLQ does *super-aggregation*. The number of
+panes, the range, and slide values of each query are determined programmatically.
+They are not tunable configuration values because the number of panes is
+used to determine windows can share panes.
+
+##### Types of Queries
+
+Not all queries with panes should behave the same way. Some queries can be
+even further optimized. This paper breaks queries down into:
+
+- holistic
+- bounded
+- fully differential
+- pseudo differential
+- none of the above
+
+Each of these have properties that allows varying levels of computational shortcuts,
+so we should figure out which we can handle most easily and plan for future
+implementations.
+
+##### Drawbacks
+
+Panes can fail to be useful and degrade performance when there aren't
+"enough" segments in each pane. We should provide a configuration
+switch to not use panes. This configuration option can be a secondary
+feature, though.
