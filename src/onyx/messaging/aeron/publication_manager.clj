@@ -71,6 +71,5 @@
       this)))
 
 (defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size]
-  (println "Write buffer size is " write-buffer-size)
   (->PublicationManager channel stream-id send-idle-strategy 
                         (atom nil) (atom nil) (chan write-buffer-size) nil))

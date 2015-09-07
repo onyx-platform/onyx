@@ -156,7 +156,7 @@
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
-(defrecord TrackedPublication [publication last-used])
+(defrecord TrackedPub [publication last-used])
 
 (defn get-publication [messenger {:keys [channel] :as conn-info}]
   ;; FIXME, race condition may cause two publications to be created
@@ -175,7 +175,7 @@
       (swap! (:publications messenger) 
              assoc 
              channel 
-             (->TrackedPublication pub-manager (atom (System/currentTimeMillis))))
+             (->TrackedPub pub-manager (atom (System/currentTimeMillis))))
       pub-manager)))
 
 (defn opts->port [opts]
