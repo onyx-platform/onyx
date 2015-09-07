@@ -96,6 +96,8 @@ Onyx's windowing API should:
 - Be internally optimized to use panes
 - Allow expression of predicates for when a segment should enter and exit a window
 - Allow triggers to be reused across different windows
+- Support different strategies to change data after trigger fires (e.g. discarding, accumulating, etc)
+- Support retraction (e.g. negative tuples)
 - Support incremental aggregation for things like sums
 - Support buffered aggregation for things like windowed joins where all the data for a window is needed
 - Provide *some* support for load shedding in the case of aggregation where data must be buffered
