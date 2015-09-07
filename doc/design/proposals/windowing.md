@@ -1,6 +1,8 @@
 ## Onyx Windowing
 
-Research:
+### Research
+
+We're actively looking over the following papers for ideas on how to best design windowing. We summarize the papers to some extent, and note which parts we want to use and what the drawbacks are.
 
 - [The Dataflow Model: A Practical Approach to Balancing Correctness, Latency, and Cost in Massive-Scale, Unbounded, Out-of-Order Data Processing](vldb.org/pvldb/vol8/p1792-Akidau.pdf)
 - [Semantics and Evaluation Techniques for Window Aggregates in Data Streams](http://web.cecs.pdx.edu/~tufte/papers/WindowAgg.pdf)
@@ -80,3 +82,20 @@ Panes can fail to be useful and degrade performance when there aren't
 "enough" segments in each pane. We should provide a configuration
 switch to not use panes. This configuration option can be a secondary
 feature, though.
+
+### Windowing API characteristics
+
+Onyx's windowing API should:
+
+- Be a low-level data structure that Continuous Query Language (CQL) can compile to
+- Support fixed (tumbling), sliding, session, and global windows.
+- Provide enough expressivity for the window to be created by features of the data itself
+- Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
+- Support punctuation, timer-based, external event, and watermark triggers
+- Allow triggers to compose
+- Be internally optimized to use panes
+- Allow expression of predicates for when a segment should enter and exit a window
+- Allow triggers to be reused across different windows
+- Support incremental aggregation for things like sums
+- Support buffered aggregation for things like windowed joins where all the data for a window is needed
+- Provide *some* support for load shedding in the case of aggregation where data must be buffered
