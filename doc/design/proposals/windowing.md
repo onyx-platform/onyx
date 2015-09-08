@@ -101,3 +101,4 @@ Onyx's windowing API should:
 - Support incremental aggregation for things like sums
 - Support buffered aggregation for things like windowed joins where all the data for a window is needed
 - Provide *some* support for load shedding in the case of aggregation where data must be buffered
+- Provide expressivity for merging windows back together.
