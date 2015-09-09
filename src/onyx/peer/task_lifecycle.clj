@@ -56,20 +56,27 @@
 (defn choose-output-paths
   [event compiled-flow-conditions result message downstream]
   (reduce
-    (fn [{:keys [flow exclusions] :as all} entry]
-      (if ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
-        (if (:flow/short-circuit? entry)
-          (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
-                            (into (set exclusions) (:flow/exclude-keys entry))
-                            (:flow/post-transform entry)
-                            (:flow/action entry)))
-          (->Route (join-output-paths flow (:flow/to entry) downstream)
-                   (into (set exclusions) (:flow/exclude-keys entry))
-                   nil
-                   nil))
-        all))
-    (->Route #{} #{} nil nil)
-    compiled-flow-conditions))
+   (fn [{:keys [flow exclusions] :as all} entry]
+     (cond ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
+           (if (:flow/short-circuit? entry)
+             (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
+                               (into (set exclusions) (:flow/exclude-keys entry))
+                               (:flow/post-transform entry)
+                               (:flow/action entry)))
+             (->Route (join-output-paths flow (:flow/to entry) downstream)
+                      (into (set exclusions) (:flow/exclude-keys entry))
+                      nil
+                      nil))
+
+           (= (:flow/action entry) :retry)
+           (->Route (join-output-paths flow (:flow/to entry) downstream)
+                    (into (set exclusions) (:flow/exclude-keys entry))
+                    nil
+                    nil)
+
+           :else all))
+   (->Route #{} #{} nil nil)
+   compiled-flow-conditions))
 
 (defn route-data
   [event result message flow-conditions downstream]
