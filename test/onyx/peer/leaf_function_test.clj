@@ -50,8 +50,7 @@
     :onyx/medium :function
     :onyx/type :output
     :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
+    :onyx/max-peers 1}])
 
 (def workflow [[:in :inc] [:inc :out]])
 

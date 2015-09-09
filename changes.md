@@ -1,3 +1,7 @@
+#### 0.7.4
+
+- Allow functions in leaf position of a workflow. [#198](https://github.com/onyx-platform/onyx/issues/198)
+
 #### 0.7.3
 
 - Bug fix: Kill-job no longer throws a malformed exception with bad parameters.
