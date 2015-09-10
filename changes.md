@@ -1,5 +1,6 @@
 #### 0.7.4
 
+- **API breaking change**: update signature of `onyx.api/await-job-completion` to take an opts map.
 - Allow functions in leaf position of a workflow. [#198](https://github.com/onyx-platform/onyx/issues/198)
 - Bug fix: flow-conditions retry default action should emit segments [#262](https://github.com/onyx-platform/onyx/issues/262)
 
