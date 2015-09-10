@@ -43,7 +43,7 @@ onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.
 
 <img src="doc/images/cognician.png" height"30%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="doc/images/indaba.png" height"30%" width="30%">
+<img src="doc/images/indaba.png" height"40%" width="40%">
 
 ### Quick Start Guide
 
