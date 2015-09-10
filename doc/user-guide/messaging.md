@@ -13,9 +13,6 @@
       - [Port Use](#port-use)
       - [Media Driver](#media-driver)
       - [Configuration Options](#configuration-options)
-    - [Netty Messaging](#netty-messaging)
-      - [Port Use](#port-use-1)
-    - [Core-Async Messaging](#core-async-messaging)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -113,27 +110,3 @@ certain options may need to be configured in order to communicate large segments
 
 Documentation for these configuration options can be found in
 [Aeron's documentation](https://github.com/real-logic/Aeron/wiki/Configuration-Options).
-
-#### Netty Messaging
-
-The Netty messaging implementation does not currently perform connection
-multiplexing. The performance/reliability behavior of a cluster using Netty
-with many virtual peers is unknown. Future work will allow connections to be
-multiplexed as with Aeron. The Netty implementation does not currently perform
-any connection short circuiting.
-
-##### Port Use
-
-The Netty messaging implementation assigns a port for each virtual peer from
-`:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. TCP ports
-coinciding with these options must be open.
-
-
-####  Core-Async Messaging
-
-A core-async messaging implementation is available for single node onyx
-clusters. This messaging layer communicates directly via core-async channels,
-and does not perform any networking or serialization. Note, with the advent of
-connection short circuiting in the Aeron messaging  implementation, the performance
-characteristics are now very similar to Aeron. As such, this layer may be
-deprecated in the future.

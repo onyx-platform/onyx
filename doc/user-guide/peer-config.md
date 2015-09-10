@@ -90,13 +90,14 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/ack-daemon-clear-interval` | `int`      | `15000`                            |
 |`:onyx.messaging/decompress-fn`             | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`               | `function` | `onyx.compression.nippy/compress`  |
-|`:onyx.messaging/impl`                      | `keyword`  | `:aeron`, `:netty`, `:core.async`  |
+|`:onyx.messaging/impl`                      | `keyword`  | `:aeron`                           |
 |`:onyx.messaging/bind-addr`                 | `string`   | `nil`                              |
 |`:onyx.messaging/peer-port-range`           | `vector`   | `[]`                               |
 |`:onyx.messaging/peer-ports`                | `vector`   | `[]`                               |
 |`:onyx.messaging/allow-short-circuit?`      | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/embedded-driver?`    | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/subscriber-count`    | `int`      | `2`                                |
+|`:onyx.messaging.aeron/write-buffer-size`   | `int`      | `1000`                             |
 |`:onyx.messaging.aeron/poll-idle-strategy`  | `keyword`  | `:high-restart-latency`            |
 |`:onyx.messaging.aeron/offer-idle-strategy` | `keyword`  | `:high-restart-latency`            |
 
@@ -249,6 +250,11 @@ per-node, or are receiving and/or de-serializing large volumes of data. A good
 guidline is is `num cores = num virtual peers + num subscribers`, assuming
 virtual peers are generally being fully utilised.
 
+##### `:onyx.messaging.aeron/write-buffer-size`
+
+Size of the write queue for the Aeron publication. Writes to this queue will
+currently block once full.
+
 ##### `:onyx.messaging.aeron/poll-idle-strategy`
 
 The Aeron idle strategy to use between when polling for new messages. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput.
@@ -280,7 +286,7 @@ The Aeron idle strategy to use between when offering messages to another peer. C
    :onyx.messaging/ack-daemon-clear-interval 15000
    :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
-   :onyx.messaging/impl :netty
+   :onyx.messaging/impl :aeron
    :onyx.messaging/bind-addr "localhost"
    :onyx.messaging/peer-port-range [50000 60000]
    :onyx.messaging/peer-ports [45000 45002 42008]})

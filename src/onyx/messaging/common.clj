@@ -42,21 +42,3 @@
 
 (defmethod messaging-peer-group :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))
-
-(defmethod messaging-require :netty [_]
-  (safe-require 'onyx.messaging.netty-tcp))
-
-(defmethod messenger :netty [_]
-  (ns-resolve 'onyx.messaging.netty-tcp 'netty-tcp-sockets))
-
-(defmethod messaging-peer-group :netty [_]
-  (ns-resolve 'onyx.messaging.netty-tcp 'netty-peer-group))
-
-(defmethod messaging-require :core.async [_]
-  (safe-require 'onyx.messaging.core-async))
-
-(defmethod messenger :core.async [_]
-  (ns-resolve 'onyx.messaging.core-async 'core-async))
-
-(defmethod messaging-peer-group :core.async [_]
-  (ns-resolve 'onyx.messaging.core-async 'core-async-peer-group))

@@ -56,8 +56,4 @@
                    {:token yeller-token
                     :environment "citests"}))
        (= impl "aeron")
-       (assoc-in [:peer-config :onyx.messaging/impl] :aeron)
-       (= impl "netty")
-       (assoc-in [:peer-config :onyx.messaging/impl] :netty)
-       (= impl "core.async")
-       (assoc-in [:peer-config :onyx.messaging/impl] :core.async)))))
+       (assoc-in [:peer-config :onyx.messaging/impl] :aeron)))))

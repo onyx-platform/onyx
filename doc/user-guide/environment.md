@@ -68,8 +68,7 @@ Running a good production Onyx cluster requires a multi-node ZooKeeper cluster. 
 
 Messaging requires TCP or UDP ports to be open for
 `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. The Aeron
-messaging implementation requires UDP ports to be open, while the Netty
-implementation requires TCP ports to be open.
+messaging implementation requires UDP ports to be open.
 
 All peers require the ability to connect to the ZooKeeper instances over TCP.
 
