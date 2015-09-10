@@ -100,8 +100,17 @@
         exempt-tasks (filter (fn [task] (some #{(:name task)} exempt-set)) tasks)]
     (map :id exempt-tasks)))
 
+(defn ^{:no-doc true} expand-n-peers [catalog]
+  (mapv
+   (fn [entry]
+     (if-let [n (:onyx/n-peers entry)]
+       (assoc entry :onyx/min-peers n :onyx/max-peers n)
+       entry))
+   catalog))
+
 (defn ^{:no-doc true} create-submit-job-entry [id config job tasks]
   (let [task-ids (map :id tasks)
+        job (update job :catalog expand-n-peers)
         scheduler (:task-scheduler job)
         sat (saturation (:catalog job))
         task-saturation (task-saturation (:catalog job) tasks)

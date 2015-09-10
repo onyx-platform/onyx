@@ -28,13 +28,19 @@
                   (:onyx/max-peers entry))
       (throw (ex-info ":onyx/min-peers must be <= :onyx/max-peers" {:entry entry})))))
 
+(defn min-max-n-peers-mutually-exclusive [entry]
+  (when (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
+            (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
+    (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
+
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
   (schema/validate Catalog catalog)
   (doseq [entry catalog]
     (name-and-type-not-equal entry)
-    (min-and-max-peers-sane entry)))
+    (min-and-max-peers-sane entry)
+    (min-max-n-peers-mutually-exclusive entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
