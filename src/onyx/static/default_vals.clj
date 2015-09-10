@@ -30,6 +30,7 @@
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/subscriber-count 2
+   :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging/allow-short-circuit? true
    :onyx.messaging/inbound-buffer-size 200000
    :onyx.messaging/completion-buffer-size 50000

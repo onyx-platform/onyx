@@ -97,6 +97,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/allow-short-circuit?`      | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/embedded-driver?`    | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/subscriber-count`    | `int`      | `2`                                |
+|`:onyx.messaging.aeron/write-buffer-size`   | `int`      | `1000`                             |
 |`:onyx.messaging.aeron/poll-idle-strategy`  | `keyword`  | `:high-restart-latency`            |
 |`:onyx.messaging.aeron/offer-idle-strategy` | `keyword`  | `:high-restart-latency`            |
 
@@ -248,6 +249,11 @@ setting can bottleneck receive performance if many virtual peers are used
 per-node, or are receiving and/or de-serializing large volumes of data. A good
 guidline is is `num cores = num virtual peers + num subscribers`, assuming
 virtual peers are generally being fully utilised.
+
+##### `:onyx.messaging.aeron/write-buffer-size`
+
+Size of the write queue for the Aeron publication. Writes to this queue will
+currently block once full.
 
 ##### `:onyx.messaging.aeron/poll-idle-strategy`
 

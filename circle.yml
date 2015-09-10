@@ -1,6 +1,6 @@
 test:
   override:
-    - ./circle-runner.sh aeron:
+    - ./scripts/circle-runner.sh aeron:
         timeout: 480
         parallel: true
 
@@ -13,7 +13,7 @@ dependencies:
     - sudo pip install awscli
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
-    - curl https://gist.githubusercontent.com/MichaelDrogalis/3ea0fc6b3414f919d1c7/raw/201d0823dcec2940355f5741cec9e1e38058eaec/gistfile1.txt >> ~/.ssh/config
+    - curl https://gist.githubusercontent.com/lbradstreet/214b10e00aea56efc445/raw/8efe0a3ecc90844861c3c97154afb5d501cbef9e/gistfile1.txt >> ~/.ssh/config
 
 notify:
   webhooks:
