@@ -5,7 +5,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 

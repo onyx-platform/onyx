@@ -4,7 +4,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [onyx.api :as api]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))

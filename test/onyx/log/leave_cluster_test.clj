@@ -4,7 +4,7 @@
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (let [entry (create-log-entry :leave-cluster {:id :c})
       f (partial extensions/apply-log-entry entry)

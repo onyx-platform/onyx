@@ -3,7 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (def entry (create-log-entry :submit-job {:id :a :tasks [:t1]
                                           :task-scheduler :onyx.task-scheduler/balanced

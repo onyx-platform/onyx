@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.api :as api]
             [onyx.test-helper :refer [with-env with-peer-group with-peers load-config]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.log.curator :as zk]))
 
 (facts "peers all join and watch each other"

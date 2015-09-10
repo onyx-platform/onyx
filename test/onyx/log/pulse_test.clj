@@ -8,7 +8,7 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.log.replica :as replica]
             [onyx.api :as api]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))

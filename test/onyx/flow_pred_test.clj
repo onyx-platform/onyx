@@ -1,5 +1,5 @@
 (ns onyx.flow-pred-test
-  (:require [midje.sweet :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [onyx.static.planning :refer [build-pred-fn]]))
 
 (def true-pred (constantly true))

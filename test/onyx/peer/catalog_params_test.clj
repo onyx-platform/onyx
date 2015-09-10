@@ -1,6 +1,6 @@
 (ns onyx.peer.catalog-params-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))

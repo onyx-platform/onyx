@@ -1,6 +1,6 @@
 (ns onyx.peer.flow-retry-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]
             [onyx.test-helper :refer [load-config]]

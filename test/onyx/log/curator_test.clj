@@ -8,7 +8,7 @@
             [onyx.log.curator :as cu]
             [onyx.compression.nippy :refer [compress decompress]]
             [taoensso.timbre :refer [fatal error warn trace info]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))

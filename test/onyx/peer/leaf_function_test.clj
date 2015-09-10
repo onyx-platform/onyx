@@ -1,6 +1,6 @@
 (ns onyx.peer.leaf-function-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]

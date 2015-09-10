@@ -5,7 +5,7 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.log.replica :as replica]
             [onyx.system]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (def peer-config
   (:peer-config (load-config)))

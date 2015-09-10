@@ -6,7 +6,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [schema.core :as s]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 

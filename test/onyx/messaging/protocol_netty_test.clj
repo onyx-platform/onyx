@@ -2,7 +2,7 @@
   (:require [onyx.messaging.protocol-netty :as protocol]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.types :refer [map->Leaf map->Ack]]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (defn read-buf [decompress-f buf]
   (let [msg-type ^byte (protocol/read-msg-type buf)]

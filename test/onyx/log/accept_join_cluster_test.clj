@@ -3,7 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [midje.sweet :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 (let [entry (create-log-entry :accept-join-cluster
                               {:observer :d

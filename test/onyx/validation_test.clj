@@ -2,7 +2,7 @@
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.test-helper :refer [load-config]]
             [taoensso.timbre :refer [info] :as timbre]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))

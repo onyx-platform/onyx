@@ -1,6 +1,6 @@
 (ns onyx.peer.restart-pred-fn-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [load-config playback-log get-counts]]
