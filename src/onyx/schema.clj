@@ -40,7 +40,6 @@
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
    (s/optional-key :onyx/doc) s/Str
-   (s/optional-key :onyx/min-peers) (s/pred pos? 'pos?)
    (s/optional-key :onyx/max-peers) (s/pred pos? 'pos?)
    s/Keyword s/Any})
 

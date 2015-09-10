@@ -226,7 +226,7 @@
   "Blocks until job-id has had all of its tasks completed or the job is killed.
    Returns true if the job completed successfully, false if the job was killed."
   ([peer-config job-id]
-     (await-job-completion peer-config job-id {:monitoring :no-op}))
+     (await-job-completion peer-config job-id {:monitoring-config {:monitoring :no-op}}))
   ([peer-config job-id {:keys [monitoring-config timeout-ms]}]
    (let [job-id (validator/coerce-uuid job-id)
          client (component/start (system/onyx-client peer-config monitoring-config))
