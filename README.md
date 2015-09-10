@@ -39,6 +39,12 @@ onyx-redis| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/
 onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
 
+### Companies Running Onyx in Production
+
+<img src="doc/images/cognician.png" height"30%" width="30%">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="doc/images/indaba.png" height"40%" width="40%">
+
 ### Quick Start Guide
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.7.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
@@ -61,7 +67,6 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
-- [`onyx-s3`](https://github.com/onyx-platform/onyx-s3)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
