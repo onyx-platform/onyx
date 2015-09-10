@@ -5,6 +5,22 @@
             [onyx.plugin.core-async]
             [onyx.api]))
 
+(def n-messages 1000)
+
+(def in-chan (chan (inc n-messages)))
+
+(def out-chan (chan (sliding-buffer (inc n-messages))))
+
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def in-calls {:lifecycle/before-task-start inject-in-ch})
+
+(def out-calls {:lifecycle/before-task-start inject-out-ch})
+
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
@@ -18,7 +34,6 @@
         peer-config (assoc (:peer-config config) :onyx/id id)
         env (onyx.api/start-env env-config)
         peer-group (onyx.api/start-peer-group peer-config)
-        n-messages 1000
         batch-size 40
         catalog
         [{:onyx/name :in
@@ -59,13 +74,6 @@
           :lifecycle/calls ::out-calls}
          {:lifecycle/task :out
           :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-        in-chan (chan (inc n-messages))
-        out-chan (chan (sliding-buffer (inc n-messages)))
-        inject-in-ch (fn [event lifecycle] {:core.async/chan in-chan})
-        inject-out-ch (fn [event lifecycle] {:core.async/chan out-chan})
-        in-calls {:lifecycle/before-task-start inject-in-ch}
-        out-calls {:lifecycle/before-task-start inject-out-ch}
-        
         v-peers (onyx.api/start-peers 4 peer-group)]
     (doseq [n (range n-messages)]
       (>!! in-chan {:n n}))
