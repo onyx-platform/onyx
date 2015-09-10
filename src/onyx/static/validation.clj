@@ -21,12 +21,20 @@
     (when-not (= (distinct tasks) tasks)
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
+(defn min-and-max-peers-sane [entry]
+  (when (and (:onyx/min-peers entry)
+             (:onyx/max-peers entry))
+    (when-not (<= (:onyx/min-peers entry)
+                  (:onyx/max-peers entry))
+      (throw (ex-info ":onyx/min-peers must be <= :onyx/max-peers" {:entry entry})))))
+
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
   (schema/validate Catalog catalog)
   (doseq [entry catalog]
-    (name-and-type-not-equal entry)))
+    (name-and-type-not-equal entry)
+    (min-and-max-peers-sane entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
