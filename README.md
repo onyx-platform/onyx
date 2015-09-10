@@ -32,12 +32,12 @@ Available on Clojars:
 Component | `0.7.x`| `master`
 ----------|--------|--------
 onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master)
-onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
-onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
+onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-redis| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master)
-onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
+onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
 onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
+onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 
 ### Companies Running Onyx in Production
 
@@ -64,9 +64,11 @@ Code level API documentation [can be found here](http://www.onyxplatform.org/api
 Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.4-SNAPSHOT` goes with `onyx` version `0.7.4-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.4-SNAPSHOT.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
-- [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
-- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
+- [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
+- [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
+- [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
+- [`onyx-seq`](https://github.com/onyx-platform/onyx-seq)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
