@@ -213,14 +213,16 @@
        (component/stop client)
        true)))
 
-(defn ^{:added "0.6.0"} await-job-completion
+(defn ^{:added "0.7.4"} await-job-completion
   "Blocks until job-id has had all of its tasks completed or the job is killed.
    Returns true if the job completed successfully, false if the job was killed."
-  ([peer-config job-id monitoring-config timeout-ms]
+  ([peer-config job-id]
+     (await-job-completion peer-config job-id {:monitoring :no-op}))
+  ([peer-config job-id {:keys [monitoring-config timeout-ms]}]
    (let [job-id (validator/coerce-uuid job-id)
          client (component/start (system/onyx-client peer-config monitoring-config))
          ch (chan 100)
-         tmt (timeout timeout-ms)]
+         tmt (if timeout-ms (timeout timeout-ms) (chan))]
      (loop [replica (extensions/subscribe-to-log (:log client) ch)]
        (let [[v c] (alts!! [(go (extensions/apply-log-entry (<!! ch) replica))
                             tmt]
