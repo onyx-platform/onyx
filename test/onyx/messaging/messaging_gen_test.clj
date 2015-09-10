@@ -1,7 +1,5 @@
 (ns onyx.messaging.messaging-gen-test
-  (:require [onyx.messaging.netty-tcp :as netty :refer [netty-tcp-sockets]]
-            [onyx.messaging.aeron :as aeron :refer [aeron]]
-            [onyx.messaging.protocol-netty :as protocol]
+  (:require [onyx.messaging.aeron :as aeron :refer [aeron]]
             [onyx.messaging.protocol-aeron :as protocol-aeron]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
@@ -15,70 +13,13 @@
             [com.stuartsierra.component :as component]
             [onyx.test-helper :refer [load-config]]
             [com.gfredericks.test.chuck :refer [times]]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]])
-  (:import [io.netty.buffer ByteBuf]
-             [io.netty.channel Channel ChannelOption ChannelFuture ChannelInitializer ChannelPipeline
-              MultithreadEventLoopGroup ChannelHandler ChannelHandlerContext ChannelInboundHandlerAdapter]))
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (comment (def id (java.util.UUID/randomUUID))
 
 (def config (load-config))
 
 (def peer-config (assoc (:peer-config config) :onyx/id id))
-
-(defn create-server-handler-mock
-  [received]
-  (fn [messenger _ _ _]
-    (fn [^ChannelHandlerContext ctx ^ByteBuf buf]
-      (try
-        (let [t ^byte (protocol/read-msg-type buf)]
-          (cond (= t protocol/messages-type-id)
-                (doseq [message (protocol/read-messages-buf (:decompress-f messenger) buf)]
-                  (swap! received update-in [:messages] conj message))
-
-                (= t protocol/ack-type-id)
-                (swap! received update-in [:acks] into (protocol/read-acks-buf buf))
-
-                (= t protocol/completion-type-id)
-                (swap! received update-in [:complete] conj (protocol/read-completion-buf buf))
-
-                (= t protocol/retry-type-id)
-                (swap! received update-in [:retry] conj (protocol/read-retry-buf buf))
-
-                :else
-                (throw (ex-info "Unexpected message received from Netty" {:type t}))))
-        (catch Throwable e
-          (taoensso.timbre/error e)
-          (throw e))))))
-
-
-(defn test-send-commands [peer-group commands]
-  (let [received (atom {})]
-    (with-redefs [netty/create-server-handler (create-server-handler-mock received)]
-
-      (let [server-port 53001
-            recv-messenger (component/start (netty-tcp-sockets peer-group))
-            send-messenger (component/start (netty-tcp-sockets peer-group))]
-
-        (try
-          (let [_ (ext/open-peer-site recv-messenger {:onyx.messaging/bind-addr "127.0.0.1"
-                                                      :netty/port server-port})
-                send-link (ext/connect-to-peer send-messenger nil {:netty/external-addr "127.0.0.1"
-                                                                   :netty/port server-port})]
-            (reduce (fn [_ command]
-                      (case (:command command)
-                        :messages (ext/send-messages send-messenger nil send-link (:payload command))
-                        :complete (ext/internal-complete-message send-messenger nil (:payload command) send-link)
-                        :retry (ext/internal-retry-segment send-messenger nil (:payload command) send-link)
-                        :acks (ext/internal-ack-segments send-messenger nil send-link (:payload command))))
-                    nil commands)
-
-            (Thread/sleep 1000)
-            (ext/close-peer-connection send-messenger nil send-link)
-            @received)
-          (finally
-            (component/stop recv-messenger)
-            (component/stop send-messenger)))))))
 
 (def gen-segment
   (gen/hash-map :some-key gen/any-printable))
@@ -149,7 +90,6 @@
 
       (finally (onyx.api/shutdown-peer-group peer-group)))))
 
-
 (defn handle-sent-message [received]
   (fn [inbound-ch decompress-f buffer offset length header]
     (let [messages (protocol-aeron/read-messages-buf decompress-f buffer offset length)]
@@ -170,7 +110,6 @@
             (= msg-type protocol-aeron/retry-msg-id)
             (let [retry-id (protocol-aeron/read-retry buffer offset-rest)]
               (swap! received update-in [:retry] conj retry-id))))))
-
 
 (defn test-send-commands-aeron [peer-group commands]
     (let [received (atom {})]

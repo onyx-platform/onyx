@@ -135,7 +135,7 @@
   s/Keyword)
 
 (def Messaging
-  (s/enum :aeron :netty :core.async :dummy-messenger))
+  (s/enum :aeron :dummy-messenger))
 
 (def PeerConfig
   {:zookeeper/address s/Str

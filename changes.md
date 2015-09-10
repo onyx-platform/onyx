@@ -2,6 +2,8 @@
 
 - Allow functions in leaf position of a workflow. [#198](https://github.com/onyx-platform/onyx/issues/198)
 - Bug fix: flow-conditions retry default action should emit segments [#262](https://github.com/onyx-platform/onyx/issues/262)
+- **API breaking change**: removed Netty and core.async messaging implementations.
+- Operations: Onyx now requires Java 8.
 
 #### 0.7.3
 

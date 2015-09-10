@@ -90,7 +90,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/ack-daemon-clear-interval` | `int`      | `15000`                            |
 |`:onyx.messaging/decompress-fn`             | `function` | `onyx.compression.nippy/decompress`|
 |`:onyx.messaging/compress-fn`               | `function` | `onyx.compression.nippy/compress`  |
-|`:onyx.messaging/impl`                      | `keyword`  | `:aeron`, `:netty`, `:core.async`  |
+|`:onyx.messaging/impl`                      | `keyword`  | `:aeron`                           |
 |`:onyx.messaging/bind-addr`                 | `string`   | `nil`                              |
 |`:onyx.messaging/peer-port-range`           | `vector`   | `[]`                               |
 |`:onyx.messaging/peer-ports`                | `vector`   | `[]`                               |
@@ -280,7 +280,7 @@ The Aeron idle strategy to use between when offering messages to another peer. C
    :onyx.messaging/ack-daemon-clear-interval 15000
    :onyx.messaging/decompress-fn onyx.compression.nippy/decompress
    :onyx.messaging/compress-fn onyx.compression.nippy/compress
-   :onyx.messaging/impl :netty
+   :onyx.messaging/impl :aeron
    :onyx.messaging/bind-addr "localhost"
    :onyx.messaging/peer-port-range [50000 60000]
    :onyx.messaging/peer-ports [45000 45002 42008]})
