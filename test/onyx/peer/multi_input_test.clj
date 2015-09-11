@@ -5,21 +5,7 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
-(def id (java.util.UUID/randomUUID))
-
-(def config (load-config))
-
-(def env-config (assoc (:env-config config) :onyx/id id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id id))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
 (def n-messages 15000)
-
-(def batch-size 20)
 
 (def in-chan-1 (chan (inc n-messages)))
 
@@ -51,59 +37,6 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(def catalog
-  [{:onyx/name :in-1
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :in-2
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :in-3
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :in-4
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :inc
-    :onyx/fn :onyx.peer.multi-input-test/my-inc
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-(def workflow
-  [[:in-1 :inc]
-   [:in-2 :inc]
-   [:in-3 :inc]
-   [:in-4 :inc]
-   [:inc :out]])
-
 (defn inject-in-1-ch [event lifecycle]
   {:core.async/chan in-chan-1})
 
@@ -134,45 +67,102 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(def lifecycles
-  [{:lifecycle/task :in-1
-    :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
-   {:lifecycle/task :in-1
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :in-2
-    :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
-   {:lifecycle/task :in-2
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :in-3
-    :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
-   {:lifecycle/task :in-3
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :in-4
-    :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
-   {:lifecycle/task :in-4
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+(deftest multi-input-test
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id id)
+        peer-config (assoc (:peer-config config) :onyx/id id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        batch-size 20
+        catalog [{:onyx/name :in-1
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(def v-peers (onyx.api/start-peers 6 peer-group))
+                 {:onyx/name :in-2
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+                 {:onyx/name :in-3
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(def results (take-segments! out-chan))
+                 {:onyx/name :in-4
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
+                 {:onyx/name :inc
+                  :onyx/fn :onyx.peer.multi-input-test/my-inc
+                  :onyx/type :function
+                  :onyx/batch-size batch-size}
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-(onyx.api/shutdown-peer-group peer-group)
+        workflow [[:in-1 :inc]
+                  [:in-2 :inc]
+                  [:in-3 :inc]
+                  [:in-4 :inc]
+                  [:inc :out]]
 
-(onyx.api/shutdown-env env)
+        lifecycles [{:lifecycle/task :in-1
+                     :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
+                    {:lifecycle/task :in-1
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :in-2
+                     :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
+                    {:lifecycle/task :in-2
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :in-3
+                     :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
+                    {:lifecycle/task :in-3
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :in-4
+                     :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
+                    {:lifecycle/task :in-4
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+
+        v-peers (onyx.api/start-peers 6 peer-group)
+
+        _ (onyx.api/submit-job peer-config
+                               {:catalog catalog :workflow workflow
+                                :lifecycles lifecycles
+                                :task-scheduler :onyx.task-scheduler/balanced})
+
+        results (take-segments! out-chan)]
+
+    (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+      (is (= (set (butlast results)) expected))
+      (is (= (last results) :done)))
+
+    (doseq [v-peer v-peers]
+      (onyx.api/shutdown-peer v-peer))
+
+    (onyx.api/shutdown-peer-group peer-group)
+
+    (onyx.api/shutdown-env env))) 

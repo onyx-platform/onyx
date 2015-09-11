@@ -6,52 +6,7 @@
             [onyx.test-helper :refer [load-config playback-log get-counts]]
             [onyx.api]))
 
-(def id (java.util.UUID/randomUUID))
-
-(def config (load-config))
-
-(def env-config (assoc (:env-config config) :onyx/id id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id id))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
 (def n-messages 100)
-
-(def batch-size 20)
-
-(defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
-
-(defn restartable? [e]
-  (:restartable? (ex-data e)))
-
-(def catalog
-  [{:onyx/name :in
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :inc
-    :onyx/fn :onyx.peer.restart-pred-fn-test/my-inc
-    :onyx/restart-pred-fn :onyx.peer.restart-pred-fn-test/restartable?
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-(def workflow [[:in :inc] [:inc :out]])
 
 (def in-chan (chan (inc n-messages)))
 
@@ -84,38 +39,66 @@
                              (when (= (swap! batch-counter inc) 2)
                                (throw (ex-info "Oops, I died." {:restartable? true})))
                              {})})
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
 
-(def lifecycles
-  [{:lifecycle/task :in
-    :lifecycle/calls :onyx.peer.restart-pred-fn-test/in-calls}
-   {:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :inc
-    :lifecycle/calls :onyx.peer.restart-pred-fn-test/check-restarted-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.restart-pred-fn-test/out-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+(defn restartable? [e]
+  (:restartable? (ex-data e)))
 
-(doseq [n (range n-messages)]
-  (>!! in-chan {:n n}))
+(deftest restart-pred-fn-test 
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id id)
+        peer-config (assoc (:peer-config config) :onyx/id id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        batch-size 20
+        catalog [{:onyx/name :in
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+                 {:onyx/name :inc
+                  :onyx/fn :onyx.peer.restart-pred-fn-test/my-inc
+                  :onyx/restart-pred-fn :onyx.peer.restart-pred-fn-test/restartable?
+                  :onyx/type :function
+                  :onyx/batch-size batch-size}
 
-(onyx.api/submit-job
- peer-config
- {:catalog catalog
-  :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
+        workflow [[:in :inc] [:inc :out]]
+        lifecycles [{:lifecycle/task :in
+                     :lifecycle/calls :onyx.peer.restart-pred-fn-test/in-calls}
+                    {:lifecycle/task :in
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :inc
+                     :lifecycle/calls :onyx.peer.restart-pred-fn-test/check-restarted-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.restart-pred-fn-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        v-peers (onyx.api/start-peers 3 peer-group)
+        _ (onyx.api/submit-job
+            peer-config
+            {:catalog catalog
+             :workflow workflow
+             :lifecycles lifecycles
+             :task-scheduler :onyx.task-scheduler/balanced})
+        _ (doseq [n (range n-messages)]
+            (>!! in-chan {:n n}))
+        results (take-segments! out-chan)]
 
-(def results (take-segments! out-chan))
+    (is (= @startup-counter 2))
 
-(fact @startup-counter => 2)
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
+    (doseq [v-peer v-peers]
+      (onyx.api/shutdown-peer v-peer))
+    (onyx.api/shutdown-peer-group peer-group)
+    (onyx.api/shutdown-env env)))
