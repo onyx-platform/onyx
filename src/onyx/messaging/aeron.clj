@@ -190,7 +190,7 @@
 
 ;; FIXME: gc'ing publications could be racy if a publication is grabbed
 ;; just as it is being gc'd - though it is unlikely
-(defn gc-publications [publications connections opts]
+(defn gc-publications [publications opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
         idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
     (loop []
@@ -202,10 +202,10 @@
                              (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle))
                                      snapshot))]
           (doseq [k to-remove]
-            (let [pub (:publication (snapshot k))
-                  conn (@connections k)]
+            (let [pub-manager (:publication (snapshot k))
+                  pub (:publication pub-manager)
+                  conn (:connection pub-manager)]
               (swap! publications dissoc k)
-              (swap! connections dissoc k)
               (.close ^Publication pub)
               (.close ^Aeron conn))))
         (catch InterruptedException e
@@ -214,7 +214,7 @@
           (fatal e)))
       (recur))))
 
-(defrecord AeronPeerGroup [opts publications connections subscribers subscriber-count compress-f decompress-f send-idle-strategy]
+(defrecord AeronPeerGroup [opts publications subscribers subscriber-count compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
@@ -236,12 +236,11 @@
           decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
           virtual-peers (atom (pm/vpeer-manager))
           publications (atom {})
-          connections (atom {})
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
           subscribers (mapv (fn [stream-id]
                               (start-subscriber! bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
                             (range subscriber-count))
-          pub-gc-thread (future (gc-publications publications connections opts))]
+          pub-gc-thread (future (gc-publications publications opts))]
       (assoc component
              :pub-gc-thread pub-gc-thread
              :bind-addr bind-addr
@@ -251,7 +250,6 @@
              :media-driver-context media-driver-context
              :media-driver media-driver
              :publications publications
-             :connections connections
              :virtual-peers virtual-peers
              :compress-f compress-f
              :decompress-f decompress-f
@@ -260,7 +258,7 @@
              :subscriber-count subscriber-count
              :subscribers subscribers)))
 
-  (stop [{:keys [media-driver media-driver-context subscribers publications connections] :as component}]
+  (stop [{:keys [media-driver media-driver-context subscribers publications] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
     (future-cancel (:pub-gc-thread component))
     (doseq [subscriber subscribers]
