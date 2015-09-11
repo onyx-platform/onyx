@@ -5,105 +5,95 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
-(def id (java.util.UUID/randomUUID))
+(def n-messages 100)
 
-(def config (load-config))
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def in-chan (chan (inc n-messages)))
 
-(def peer-config
-  (assoc (:peer-config config)
-    :onyx/id id
-    :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
-    :onyx.messaging/compress-fn #(.getBytes (pr-str %))))
+(def out-chan (chan (sliding-buffer (inc n-messages))))
 
-(def env (onyx.api/start-env env-config))
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
 
-(def peer-group (onyx.api/start-peer-group peer-config))
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
 
-(try
-  (def n-messages 100)
+(def in-calls
+  {:lifecycle/before-task-start inject-in-ch})
 
-  (def batch-size 20)
+(def out-calls
+  {:lifecycle/before-task-start inject-out-ch})
 
-  (defn my-inc [{:keys [n] :as segment}]
-    (assoc segment :n (inc n)))
+(deftest compression
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id id)
+        peer-config (assoc (:peer-config config)
+                      :onyx/id id
+                      :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
+                      :onyx.messaging/compress-fn #(.getBytes (pr-str %)))
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        batch-size 20
 
-  (def catalog
-    [{:onyx/name :in
-      :onyx/plugin :onyx.plugin.core-async/input
-      :onyx/type :input
-      :onyx/medium :core.async
-      :onyx/batch-size batch-size
-      :onyx/max-peers 1
-      :onyx/doc "Reads segments from a core.async channel"}
+        catalog
+        [{:onyx/name :in
+          :onyx/plugin :onyx.plugin.core-async/input
+          :onyx/type :input
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Reads segments from a core.async channel"}
 
-     {:onyx/name :inc
-      :onyx/fn :onyx.peer.custom-compression-test/my-inc
-      :onyx/type :function
-      :onyx/batch-size batch-size}
+         {:onyx/name :inc
+          :onyx/fn :onyx.peer.custom-compression-test/my-inc
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-     {:onyx/name :out
-      :onyx/plugin :onyx.plugin.core-async/output
-      :onyx/type :output
-      :onyx/medium :core.async
-      :onyx/batch-size batch-size
-      :onyx/max-peers 1
-      :onyx/doc "Writes segments to a core.async channel"}])
+         {:onyx/name :out
+          :onyx/plugin :onyx.plugin.core-async/output
+          :onyx/type :output
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Writes segments to a core.async channel"}]
 
-  (def workflow [[:in :inc] [:inc :out]])
+        workflow [[:in :inc] [:inc :out]]
 
-  (def in-chan (chan (inc n-messages)))
+        lifecycles
+        [{:lifecycle/task :in
+          :lifecycle/calls :onyx.peer.custom-compression-test/in-calls}
+         {:lifecycle/task :in
+          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+         {:lifecycle/task :out
+          :lifecycle/calls :onyx.peer.custom-compression-test/out-calls}
+         {:lifecycle/task :out
+          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-  (def out-chan (chan (sliding-buffer (inc n-messages))))
+        v-peers (onyx.api/start-peers 3 peer-group)]
+    (doseq [n (range n-messages)]
+      (>!! in-chan {:n n}))
 
-  (defn inject-in-ch [event lifecycle]
-    {:core.async/chan in-chan})
+    (>!! in-chan :done)
+    (close! in-chan)
 
-  (defn inject-out-ch [event lifecycle]
-    {:core.async/chan out-chan})
+    (onyx.api/submit-job
+     peer-config
+     {:catalog catalog
+      :workflow workflow
+      :lifecycles lifecycles
+      :task-scheduler :onyx.task-scheduler/balanced})
 
-  (def in-calls
-    {:lifecycle/before-task-start inject-in-ch})
+    (let [results (take-segments! out-chan)
+          expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+      (is (= expected (set (butlast results))))
+      (is (= :done (last results)))
 
-  (def out-calls
-    {:lifecycle/before-task-start inject-out-ch})
+      (doseq [v-peer v-peers]
+        (onyx.api/shutdown-peer v-peer))
 
-  (def lifecycles
-    [{:lifecycle/task :in
-      :lifecycle/calls :onyx.peer.custom-compression-test/in-calls}
-     {:lifecycle/task :in
-      :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-     {:lifecycle/task :out
-      :lifecycle/calls :onyx.peer.custom-compression-test/out-calls}
-     {:lifecycle/task :out
-      :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+      (onyx.api/shutdown-peer-group peer-group)
 
-  (doseq [n (range n-messages)]
-    (>!! in-chan {:n n}))
-
-  (>!! in-chan :done)
-  (close! in-chan)
-
-  (def v-peers (onyx.api/start-peers 3 peer-group))
-
-  (onyx.api/submit-job
-   peer-config
-   {:catalog catalog
-    :workflow workflow
-    :lifecycles lifecycles
-    :task-scheduler :onyx.task-scheduler/balanced})
-
-  (def results (take-segments! out-chan))
-
-  (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-    (fact (set (butlast results)) => expected)
-    (fact (last results) => :done))
-
-  (finally
-   (doseq [v-peer v-peers]
-     (onyx.api/shutdown-peer v-peer))
-
-   (onyx.api/shutdown-peer-group peer-group)
-
-   (onyx.api/shutdown-env env)))
+      (onyx.api/shutdown-env env))))
