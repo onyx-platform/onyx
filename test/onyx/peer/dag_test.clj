@@ -5,22 +5,7 @@
             [onyx.test-helper :refer [load-config]]
             [onyx.api]))
 
-(def id (java.util.UUID/randomUUID))
-
-(def config (load-config))
-
-(def env-config (assoc (:env-config config) :onyx/id id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id id))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group
-  (onyx.api/start-peer-group peer-config))
-
 (def n-messages 15000)
-
-(def batch-size 40)
 
 (def a-chan (chan (inc n-messages)))
 
@@ -28,36 +13,11 @@
 
 (def c-chan (chan (inc n-messages)))
 
-(def j-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
+(def j-chan (chan 500000))
 
-(def k-chan (chan 500000 #_(sliding-buffer (* 2 (inc n-messages)))))
+(def k-chan (chan 500000))
 
-(def l-chan (chan 500000 #_(sliding-buffer (* 3 (inc n-messages)))))
-
-(def a-segments
-  (map (fn [n] {:n n})
-       (range n-messages)))
-
-(def b-segments
-  (map (fn [n] {:n n})
-       (range n-messages (* 2 n-messages))))
-
-(def c-segments
-  (map (fn [n] {:n n})
-       (range (* 2 n-messages) (* 3 n-messages))))
-
-(doseq [x a-segments]
-  (>!! a-chan x))
-
-(doseq [x b-segments]
-  (>!! b-chan x))
-
-(doseq [x c-segments]
-  (>!! c-chan x))
-
-(>!! a-chan :done)
-(>!! b-chan :done)
-(>!! c-chan :done)
+(def l-chan (chan 500000))
 
 (def d identity)
 
@@ -70,108 +30,6 @@
 (def h identity)
 
 (def i identity)
-
-(def catalog
-  [{:onyx/name :A
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :B
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :C
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :D
-    :onyx/fn :onyx.peer.dag-test/d
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :E
-    :onyx/fn :onyx.peer.dag-test/e
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :F
-    :onyx/fn :onyx.peer.dag-test/f
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :G
-    :onyx/fn :onyx.peer.dag-test/g
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :H
-    :onyx/fn :onyx.peer.dag-test/h
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :I
-    :onyx/fn :onyx.peer.dag-test/i
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :J
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}
-
-   {:onyx/name :K
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}
-
-   {:onyx/name :L
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-;;; A    B       C
-;;;  \  /        |
-;;;   D- >       E
-;;;   |  \     / | \
-;;;   F   \-> G  H  I
-;;;  / \       \ | /
-;;; J   K        L
-
-(def workflow
-  [[:A :D]
-   [:B :D]
-   [:D :F]
-   [:F :J]
-   [:F :K]
-   [:C :E]
-   [:E :G]
-   [:E :H]
-   [:E :I]
-   [:G :L]
-   [:H :L]
-   [:I :L]
-   [:D :G]])
 
 (defn inject-a-ch [event lifecycle]
   {:core.async/chan a-chan})
@@ -209,64 +67,187 @@
 (def l-calls
   {:lifecycle/before-task-start inject-l-ch})
 
-(def lifecycles
-  [{:lifecycle/task :A
-    :lifecycle/calls :onyx.peer.dag-test/a-calls}
-   {:lifecycle/task :A
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :B
-    :lifecycle/calls :onyx.peer.dag-test/b-calls}
-   {:lifecycle/task :B
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :C
-    :lifecycle/calls :onyx.peer.dag-test/c-calls}
-   {:lifecycle/task :C
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :J
-    :lifecycle/calls :onyx.peer.dag-test/j-calls}
-   {:lifecycle/task :J
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-   {:lifecycle/task :K
-    :lifecycle/calls :onyx.peer.dag-test/k-calls}
-   {:lifecycle/task :K
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-   {:lifecycle/task :L
-    :lifecycle/calls :onyx.peer.dag-test/l-calls}
-   {:lifecycle/task :L
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+(deftest dag-workflow
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id id)
+        peer-config (assoc (:peer-config config) :onyx/id id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        batch-size 40
 
-(def v-peers (onyx.api/start-peers 12 peer-group))
+        a-segments (map (fn [n] {:n n}) (range n-messages))
+        b-segments (map (fn [n] {:n n}) (range n-messages (* 2 n-messages)))
+        c-segments (map (fn [n] {:n n}) (range (* 2 n-messages) (* 3 n-messages)))
 
-(onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+        catalog
+        [{:onyx/name :A
+          :onyx/plugin :onyx.plugin.core-async/input
+          :onyx/type :input
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Reads segments from a core.async channel"}
 
-(def j-results (take-segments! j-chan))
+         {:onyx/name :B
+          :onyx/plugin :onyx.plugin.core-async/input
+          :onyx/type :input
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Reads segments from a core.async channel"}
 
-(def k-results (take-segments! k-chan))
+         {:onyx/name :C
+          :onyx/plugin :onyx.plugin.core-async/input
+          :onyx/type :input
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Reads segments from a core.async channel"}
 
-(def l-results (take-segments! l-chan))
+         {:onyx/name :D
+          :onyx/fn :onyx.peer.dag-test/d
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (last j-results) => :done)
+         {:onyx/name :E
+          :onyx/fn :onyx.peer.dag-test/e
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (last k-results) => :done)
+         {:onyx/name :F
+          :onyx/fn :onyx.peer.dag-test/f
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (last l-results) => :done)
+         {:onyx/name :G
+          :onyx/fn :onyx.peer.dag-test/g
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (into #{} (butlast j-results))
-      => (into #{} (concat a-segments b-segments)))
+         {:onyx/name :H
+          :onyx/fn :onyx.peer.dag-test/h
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (into #{} (butlast k-results))
-      => (into #{} (concat a-segments b-segments)))
+         {:onyx/name :I
+          :onyx/fn :onyx.peer.dag-test/i
+          :onyx/type :function
+          :onyx/batch-size batch-size}
 
-(fact (into #{} (butlast l-results))
-      => (into #{} (concat a-segments b-segments c-segments)))
+         {:onyx/name :J
+          :onyx/plugin :onyx.plugin.core-async/output
+          :onyx/type :output
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Writes segments to a core.async channel"}
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+         {:onyx/name :K
+          :onyx/plugin :onyx.plugin.core-async/output
+          :onyx/type :output
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Writes segments to a core.async channel"}
 
-(onyx.api/shutdown-peer-group peer-group)
+         {:onyx/name :L
+          :onyx/plugin :onyx.plugin.core-async/output
+          :onyx/type :output
+          :onyx/medium :core.async
+          :onyx/batch-size batch-size
+          :onyx/max-peers 1
+          :onyx/doc "Writes segments to a core.async channel"}]
 
-(onyx.api/shutdown-env env)
+;;; A    B       C
+;;;  \  /        |
+;;;   D- >       E
+;;;   |  \     / | \
+;;;   F   \-> G  H  I
+;;;  / \       \ | /
+;;; J   K        L
+        workflow
+        [[:A :D]
+         [:B :D]
+         [:D :F]
+         [:F :J]
+         [:F :K]
+         [:C :E]
+         [:E :G]
+         [:E :H]
+         [:E :I]
+         [:G :L]
+         [:H :L]
+         [:I :L]
+         [:D :G]]
+
+        lifecycles
+        [{:lifecycle/task :A
+          :lifecycle/calls :onyx.peer.dag-test/a-calls}
+         {:lifecycle/task :A
+          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+         {:lifecycle/task :B
+          :lifecycle/calls :onyx.peer.dag-test/b-calls}
+         {:lifecycle/task :B
+          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+         {:lifecycle/task :C
+          :lifecycle/calls :onyx.peer.dag-test/c-calls}
+         {:lifecycle/task :C
+          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+         {:lifecycle/task :J
+          :lifecycle/calls :onyx.peer.dag-test/j-calls}
+         {:lifecycle/task :J
+          :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+         {:lifecycle/task :K
+          :lifecycle/calls :onyx.peer.dag-test/k-calls}
+         {:lifecycle/task :K
+          :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+         {:lifecycle/task :L
+          :lifecycle/calls :onyx.peer.dag-test/l-calls}
+         {:lifecycle/task :L
+          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+
+        v-peers (onyx.api/start-peers 12 peer-group)
+
+        ]
+
+    (doseq [x a-segments]
+      (>!! a-chan x))
+
+    (doseq [x b-segments]
+      (>!! b-chan x))
+
+    (doseq [x c-segments]
+      (>!! c-chan x))
+
+    (>!! a-chan :done)
+    (>!! b-chan :done)
+    (>!! c-chan :done)
+
+    (onyx.api/submit-job
+     peer-config
+     {:catalog catalog :workflow workflow
+      :lifecycles lifecycles
+      :task-scheduler :onyx.task-scheduler/balanced})
+
+    (let [j-results (take-segments! j-chan)
+          k-results (take-segments! k-chan)
+          l-results (take-segments! l-chan)]
+      (is (= :done (last j-results)))
+      (is (= :done (last k-results)))
+      (is (= :done (last l-results)))
+
+      (is (= (into #{} (concat a-segments b-segments))
+             (into #{} (butlast j-results))))
+
+      (is (= (into #{} (concat a-segments b-segments))
+             (into #{} (butlast k-results))))
+
+      (is (= (into #{} (concat a-segments b-segments c-segments)))
+          (into #{} (butlast l-results))))
+    (doseq [v-peer v-peers]
+      (onyx.api/shutdown-peer v-peer))
+
+    (onyx.api/shutdown-peer-group peer-group)
+
+    (onyx.api/shutdown-env env)))
