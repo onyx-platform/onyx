@@ -2,7 +2,7 @@
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.test-helper :refer [load-config]]
             [taoensso.timbre :refer [info] :as timbre]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -164,3 +164,53 @@
 
 (onyx.api/shutdown-env env)
 
+(deftest map-set-workflow
+  (is (= (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
+                                                     :b #{:d}
+                                                     :c #{:d :e}}))
+         (sort [[:a :b]
+                [:a :c]
+                [:b :d]
+                [:c :d]
+                [:c :e]]))))
+
+(deftest task-discovery
+  (let [catalog
+        [{:onyx/name :a
+          :onyx/type :input
+          :onyx/medium :core.async}
+
+         {:onyx/name :b
+          :onyx/type :input}
+
+         {:onyx/name :c
+          :onyx/type :function}
+
+         {:onyx/name :d
+          :onyx/type :function}
+
+         {:onyx/name :e
+          :onyx/type :function}
+
+         {:onyx/name :f
+          :onyx/type :function}
+
+         {:onyx/name :g
+          :onyx/type :output
+          :onyx/medium :core.async}]
+        workflow [[:a :f] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
+        tasks (onyx.static.planning/discover-tasks catalog workflow)
+
+        [a b c d e f g :as sorted-tasks]
+        (reduce (fn [all next]
+                  (conj all (first (filter #(= (:name %) next) tasks))))
+                [] [:a :b :c :d :e :f :g])]
+
+    (testing "There are 7 tasks"
+      (is (= (count tasks) 7))
+      (is (= (:f (:egress-ids a)) (:id f)))
+      (is (= (:c (:egress-ids b)) (:id c)))
+      (is (= (:d (:egress-ids c)) (:id d)))
+      (is (= (:e (:egress-ids d)) (:id e)))
+      (is (= (:f (:egress-ids e)) (:id f)))
+      (is (= (:g (:egress-ids f)) (:id g))))))
