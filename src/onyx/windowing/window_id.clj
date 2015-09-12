@@ -1,4 +1,10 @@
-(ns onyx.windowing.window-id)
+(ns onyx.windowing.window-id
+  (:require [clojure.test.check :as tc]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop]
+            [clojure.test :refer [deftest is]]
+            [com.gfredericks.test.chuck :refer [times]]
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 ;; An implementation of the Window-ID specification, as discussed
 ;; in http://web.cecs.pdx.edu/~tufte/papers/WindowAgg.pdf.
@@ -154,39 +160,33 @@
 ;; 28 => (5 6 7 8)
 ;; 29 => (5 6 7 8)
 
-;; Now we will tackle a more general case - where the range
-;; and slide values aren't defined on the same attribute.
-;; Instead of :window-attr, we now use :range-attr and :slide-attr.
-;; As noted by the paper, a common case of this is a timestamp range,
-;; and a slide-by-tuple of 1 for slide. This is back in section 3.3.
+(deftest fixed-windows
+  (checking
+   "one segment per fixed window" 100000
+   [w-range-and-slide gen/s-pos-int
+    w-attr gen/pos-int]
+   (let [segment {:window-attr w-attr}
+         buckets (wids 0 w-range-and-slide w-range-and-slide segment)]
+     (is (= 1 (count buckets))))))
 
-;;; WIP....
-;; (defn var-2-n-windows [t r-attr w-slide])
+(deftest sliding-windows
+  (checking
+   "a segment in a multiple sliding windows" 100000
+   [w-slide gen/s-pos-int
+    multiple gen/s-pos-int
+    w-attr gen/pos-int]
+   (let [segment {:window-attr w-attr}
+         buckets (wids 0 (* multiple w-slide) w-slide segment)]
+     (is (= multiple (count buckets))))))
 
-;; (defn var-2-extent-lower [w-range w]
-;;   (- w w-range))
-
-;; (defn var-2-extent-upper [w]
-;;   w)
-
-;; ;; Yields all values of :range-attr which belong to window w
-;; ;; with range of length w-range.
-;; (defn var-2-extents [w-range w]
-;;   (range (inc (var-2-extent-lower w-range w))
-;;          (inc (var-2-extent-upper w))))
-
-;; (var-2-extents 20 25)
-
-;; (defn var-wids-lower [t]
-;;   (get t (:range-attr t)))
-
-;; (defn var-wids-upper [t w-range]
-;;   (+ (get t (:range-attr t)) w-range))
-
-;; (defn var-2-wids [t]
-;;   (var-wids-lower t))
-
-;; (var-2-wids {:range-attr :ts :ts 30})
-
-
-;; (var-wids-upper {:range-attr :ts :ts 30} 10)
+(deftest inverse-functions
+  (checking
+   "values produced by extents are matched by wids" 10000
+   ;; Bound the window size to 10 to keep the each test iteration quick.
+   [w-slide (gen/resize 10 gen/s-pos-int)
+    multiple gen/s-pos-int
+    extent-id gen/pos-int]
+   (let [values (extents 0 (* multiple w-slide) w-slide extent-id)]
+     (is (every? #(some #{extent-id}
+                        (wids 0 (* multiple w-slide) w-slide {:window-attr %}))
+                 values)))))
