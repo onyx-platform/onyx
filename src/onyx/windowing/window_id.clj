@@ -14,6 +14,13 @@
 ;; `wids` is the inverse. `wids` takes a segment with a windowing
 ;; attribute and returns the window extent IDs to which it belongs.
 
+;; There are multiple variations of this algorithm depending on the
+;; style of windowing being performed. We're going to start by focusing
+;; on the case where the window is defined on the same attribute
+;; for both the range and slide values. The window ID values for this
+;; case are the natural numbers. We'll note which variation we're focusing
+;; on during every implementation.
+
 ;; Let's draw a picture to show how WID buckets segments, regardless
 ;; of what the windowing attribute is. Below is a table. On the left
 ;; hand side running vertically 0 - 14 the natural numbers - these
