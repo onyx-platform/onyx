@@ -74,7 +74,7 @@
 ;; WID requires that a strict lower-bound of the windowing attribute
 ;; be defined. In our example, this will be 0. We will use a window
 ;; range of 20, and a slide value of 5. `extents` tells of which values
-;; of `:window-attr` fall into their respect windows via:
+;; of `:window-key` fall into their respect windows via:
 ;;
 ;; (doseq [n (range 20)]
 ;;  (println n ": " (extents 0 20 5 n)))
@@ -109,12 +109,12 @@
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
 (defn wids-lower [min-windowing-attr w-slide t]
-  (dec (int (Math/floor (/ (- (:window-attr t)
-                              min-windowing-attr) w-slide)))))
+  (dec (long (Math/floor (/ (- (:window-key t)
+                               min-windowing-attr) w-slide)))))
 
 (defn wids-upper [min-windowing-attr w-range w-slide t]
-  (dec (int (Math/floor (/ (- (+ (:window-attr t) w-range)
-                              min-windowing-attr) w-slide)))))
+  (dec (long (Math/floor (/ (- (+ (:window-key t) w-range)
+                               min-windowing-attr) w-slide)))))
 
 (defn wids [min-windowing-attr w-range w-slide t]
   (let [lower (wids-lower min-windowing-attr w-slide t)
@@ -127,7 +127,7 @@
 ;; up with both tables we looked at above.
 ;;
 ;; (doseq [n (range 30)]
-;;   (println n "=>" (wids 0 20 5 {:window-attr n})))
+;;   (println n "=>" (wids 0 20 5 {:window-key n})))
 
 ;; 0 => (0 1 2 3)
 ;; 1 => (0 1 2 3)
@@ -165,7 +165,7 @@
    "one segment per fixed window" 100000
    [w-range-and-slide gen/s-pos-int
     w-attr gen/pos-int]
-   (let [segment {:window-attr w-attr}
+   (let [segment {:window-key w-attr}
          buckets (wids 0 w-range-and-slide w-range-and-slide segment)]
      (is (= 1 (count buckets))))))
 
@@ -175,7 +175,7 @@
    [w-slide gen/s-pos-int
     multiple gen/s-pos-int
     w-attr gen/pos-int]
-   (let [segment {:window-attr w-attr}
+   (let [segment {:window-key w-attr}
          buckets (wids 0 (* multiple w-slide) w-slide segment)]
      (is (= multiple (count buckets))))))
 
@@ -188,5 +188,90 @@
     extent-id gen/pos-int]
    (let [values (extents 0 (* multiple w-slide) w-slide extent-id)]
      (is (every? #(some #{extent-id}
-                        (wids 0 (* multiple w-slide) w-slide {:window-attr %}))
+                        (wids 0 (* multiple w-slide) w-slide {:window-key %}))
                  values)))))
+
+(def windows
+  [{:window/id :people
+    :window/type :sliding
+    :window/window-key :event-time
+    :window/range [1 :minute]
+    :window/slide [10 :seconds]}])
+
+
+(def people
+  [{:name "Mike"}
+   {:name "Dorrene"}
+   {:name "Benti"}
+   {:name "John"}
+   {:name "Shannon"}
+   {:name "Kristen"}
+   {:name "Benti"}
+   {:name "Mike"}
+   {:name "Steven"}
+   {:name "Dorrene"}
+   {:name "John"}
+   {:name "Shannon"}
+   {:name "Santana"}
+   {:name "Roselyn"}
+   {:name "Krista"}
+   {:name "Starla"}
+   {:name "Derick"}
+   {:name "Orlando"}
+   {:name "Rupert"}
+   {:name "Kareem"}
+   {:name "Lesli"}
+   {:name "Carol"}
+   {:name "Willie"}
+   {:name "Noriko"}
+   {:name "Corine"}
+   {:name "Leandra"}
+   {:name "Chadwick"}
+   {:name "Teressa"}
+   {:name "Tijuana"}
+   {:name "Verna"}
+   {:name "Alona"}
+   {:name "Wilson"}
+   {:name "Carly"}
+   {:name "Nubia"}
+   {:name "Hollie"}
+   {:name "Allison"}
+   {:name "Edwin"}
+   {:name "Zola"}
+   {:name "Britany"}
+   {:name "Courtney"}
+   {:name "Mathew"}
+   {:name "Luz"}
+   {:name "Tyesha"}
+   {:name "Eusebia"}
+   {:name "Fletcher"}])
+
+(def offset (.getTime (java.sql.Timestamp/valueOf "2012-01-01 00:00:00")))
+(def end (.getTime (java.sql.Timestamp/valueOf "2012-01-02 00:00:00")))
+(def diff (inc (- end offset)))
+
+(defn random-timestamp []
+  (java.sql.Timestamp. (+ offset (* diff (Math/random)))))
+
+(def state (atom {}))
+
+(def w-range (* 1000 60 60))
+
+(def w-slide (* 1000 60 20))
+
+(doseq [p people]
+  (let [segment (assoc p :window-key (.getTime (random-timestamp)))
+        assigned-extents (wids 0 w-range w-slide segment)]
+    (doseq [e assigned-extents]
+      (swap! state update e conj p))))
+
+(def state-val @state)
+
+(doseq [k (sort (keys state-val))]
+  (println "=== Extent" k "====")
+  (let [bounds (extents 0 w-range w-slide k)]
+    (prn (java.sql.Timestamp. (first bounds))
+         (java.sql.Timestamp. (last bounds)))
+    (doseq [x (get state-val k)]
+      (println x))
+    (println)))
