@@ -102,17 +102,17 @@
 ;; `wids` is defined in section 3.4 of the paper. This is the variant
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
-(defn wids-lower [min-windowing-attr t]
+(defn wids-lower [min-windowing-attr w-slide t]
   (dec (int (Math/floor (/ (- (:window-attr t)
                               min-windowing-attr) w-slide)))))
 
-(defn wids-upper [min-windowing-attr t]
+(defn wids-upper [min-windowing-attr w-range w-slide t]
   (dec (int (Math/floor (/ (- (+ (:window-attr t) w-range)
                               min-windowing-attr) w-slide)))))
 
-(defn wids [min-windowing-attr t]
-  (let [lower (wids-lower min-windowing-attr t)
-        upper (wids-upper min-windowing-attr t)]
+(defn wids [min-windowing-attr w-range w-slide t]
+  (let [lower (wids-lower min-windowing-attr w-slide t)
+        upper (wids-upper min-windowing-attr w-range w-slide t)]
     (range (inc lower) (inc upper))))
 
 ;; The follow code runs through 30 segments with
@@ -121,7 +121,7 @@
 ;; up with both tables we looked at above.
 ;;
 ;; (doseq [n (range 30)]
-;;   (println n "=>" (wids 0 {:window-attr n})))
+;;   (println n "=>" (wids 0 20 5 {:window-attr n})))
 
 ;; 0 => (0 1 2 3)
 ;; 1 => (0 1 2 3)
@@ -153,3 +153,40 @@
 ;; 27 => (5 6 7 8)
 ;; 28 => (5 6 7 8)
 ;; 29 => (5 6 7 8)
+
+;; Now we will tackle a more general case - where the range
+;; and slide values aren't defined on the same attribute.
+;; Instead of :window-attr, we now use :range-attr and :slide-attr.
+;; As noted by the paper, a common case of this is a timestamp range,
+;; and a slide-by-tuple of 1 for slide. This is back in section 3.3.
+
+;;; WIP....
+;; (defn var-2-n-windows [t r-attr w-slide])
+
+;; (defn var-2-extent-lower [w-range w]
+;;   (- w w-range))
+
+;; (defn var-2-extent-upper [w]
+;;   w)
+
+;; ;; Yields all values of :range-attr which belong to window w
+;; ;; with range of length w-range.
+;; (defn var-2-extents [w-range w]
+;;   (range (inc (var-2-extent-lower w-range w))
+;;          (inc (var-2-extent-upper w))))
+
+;; (var-2-extents 20 25)
+
+;; (defn var-wids-lower [t]
+;;   (get t (:range-attr t)))
+
+;; (defn var-wids-upper [t w-range]
+;;   (+ (get t (:range-attr t)) w-range))
+
+;; (defn var-2-wids [t]
+;;   (var-wids-lower t))
+
+;; (var-2-wids {:range-attr :ts :ts 30})
+
+
+;; (var-wids-upper {:range-attr :ts :ts 30} 10)
