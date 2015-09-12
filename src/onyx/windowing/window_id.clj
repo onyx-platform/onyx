@@ -44,7 +44,9 @@
 ;;13                                       |---------------|      [50 - 69]
 ;;14                                           |---------------|  [55 - 74]
 
-;; Now we implement the `extents` function from the paper in section 3.3.
+;; Let's do some implementation. We're first going to implement `extents`
+;; for queries whose range and slide values are the same. This is the
+;; first algorithm detailed in section 3.3.
 
 (defn extent-lower [min-windowing-attr w-range w-slide w]
   (max min-windowing-attr (- (+ min-windowing-attr (* w-slide (inc w))) w-range)))
@@ -90,7 +92,9 @@
 
 ;; Now we need to implement the inverse, `wids`. `wids` lets us take
 ;; segment and directly find the window IDs that it corresponds to.
-;; `wids` is defined in section 3.4 of the paper.
+;; `wids` is defined in section 3.4 of the paper. This is the variant
+;; of the algorithm that also covers the case where range and slide
+;; are defined on the same value.
 (defn wids-lower [min-windowing-attr t]
   (dec (int (Math/floor (/ (- (:window-attr t)
                               min-windowing-attr) w-slide)))))
