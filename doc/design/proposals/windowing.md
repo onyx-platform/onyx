@@ -87,18 +87,18 @@ feature, though.
 
 Onyx's windowing API should:
 
-- Be a low-level data structure that Continuous Query Language (CQL) can compile to
-- Support fixed (tumbling), sliding, session, and global windows.
-- Provide enough expressivity for the window to be created by features of the data itself
-- Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
-- Support punctuation, timer-based, external event, and watermark triggers
-- Allow triggers to compose
-- Be internally optimized to use panes
-- Allow expression of predicates for when a segment should enter and exit a window
-- Allow triggers to be reused across different windows
-- Support different strategies to change data after trigger fires (e.g. discarding, accumulating, etc)
-- Support retraction (e.g. negative tuples)
-- Support incremental aggregation for things like sums
-- Support buffered aggregation for things like windowed joins where all the data for a window is needed
-- Provide *some* support for load shedding in the case of aggregation where data must be buffered
-- Provide expressivity for merging windows back together.
+- [x] Be a low-level data structure that Continuous Query Language (CQL) can compile to
+- [ ] Support fixed (tumbling), sliding, session, and global windows.
+- [x] Provide enough expressivity for the window to be created by features of the data itself
+- [x] Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
+- [ ] Support punctuation, timer-based, external event, and watermark triggers
+- [ ] Allow triggers to compose
+- [ ] Be internally optimized to use panes
+- [ ] Allow expression of predicates for when a segment should enter and exit a window
+- [x] Allow triggers to be reused across different windows
+- [x] Support different strategies to change data after trigger fires (e.g. discarding, accumulating, etc)
+- [ ] Support retraction (e.g. negative tuples)
+- [x] Support incremental aggregation for things like sums
+- [ ] Support buffered aggregation for things like windowed joins where all the data for a window is needed
+- [ ] Provide *some* support for load shedding in the case of aggregation where data must be buffered
+- [ ] Provide expressivity for merging windows back together.
