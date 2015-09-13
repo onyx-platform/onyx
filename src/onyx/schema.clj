@@ -110,8 +110,9 @@
 (def Window
   {:window/id s/Keyword
    :window/task s/Keyword
-   :window/type (s/pred (fn [x] (some #{x} #{:fixed :sliding :landmark :global}) 'window-type))
+   :window/type (s/pred (fn [x] (some #{x} #{:fixed :sliding}) 'window-type))
    :window/window-key s/Any
+   :window/aggregation s/Keyword
    :window/range (s/pred valid-units 'valid-units)
    :window/slide (s/pred valid-units 'valid-units)
    (s/optional-key :window/doc) s/Str})

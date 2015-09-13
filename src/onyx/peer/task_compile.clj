@@ -125,3 +125,38 @@
 
 (defn filter-windows [windows task]
   (filter #(= (:window/task %) task) windows))
+
+(defmulti window-aggregation-function
+  (fn [operation] operation))
+
+(defmethod window-aggregation-function :conj
+  [operation]
+  (fn [window state segment]
+    (conj state segment)))
+
+(defmethod window-aggregation-function :count
+  [operation]
+  (fn [window state segment]
+    (inc state)))
+
+(defmethod window-aggregation-function :sum
+  [operation]
+  (fn [window state segment]
+    (+ state (get segment (:window/sum-key window)))))
+
+(defmethod window-aggregation-function :min
+  [operation]
+  (fn [window state segment]
+    (min state (get segment (:window/min-key window)))))
+
+(defmethod window-aggregation-function :max
+  [operation]
+  (fn [window state segment]
+    (max state (get segment (:window/max-key window)))))
+
+(defmethod window-aggregation-function :average
+  [operation]
+  (fn [window state segment]
+    (let [n (inc state)]
+      {:n n
+       :average (/ (+ state (get segment (:window/average-key window))) n)})))
