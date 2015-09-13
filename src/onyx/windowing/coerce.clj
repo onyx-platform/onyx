@@ -1,11 +1,11 @@
 (ns onyx.windowing.window-id)
 
-(def windows
-  [{:window/id :people
-    :window/type :sliding
-    :window/window-key :event-time
-    :window/range [1 :minute]
-    :window/slide [10 :seconds]}])
+(def window
+  {:window/id :people
+   :window/type :sliding
+   :window/window-key :event-time
+   :window/range [1 :minute]
+   :window/slide [10 :seconds]})
 
 (defmulti to-standard-units
   (fn [v unit] unit))
