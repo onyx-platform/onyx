@@ -318,7 +318,7 @@
       (doseq [w windows]
         (doseq [msg (mapcat :leaves (:tree results))]
           (let [w-range (apply w-coerce/to-standard-units (:window/range w))
-                w-slide (apply w-coerce/to-standard-units (:window/slide w))
+                w-slide (apply w-coerce/to-standard-units (or (:window/slide w) (:window/range w)))
                 units (w-coerce/standard-units-for (last (:window/range w)))
                 message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
                 extents (wid/wids 0 w-range w-slide (:window/window-key w) message)]

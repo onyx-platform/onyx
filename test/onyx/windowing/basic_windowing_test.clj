@@ -64,13 +64,10 @@
 (def windows
   [{:window/id :collect-segments
     :window/task :identity
-    :window/type :sliding
-    :window/aggregation :min
-    :window/min-key :age
-    :window/init Integer/MAX_VALUE
+    :window/type :fixed
+    :window/aggregation :conj
     :window/window-key :event-time
     :window/range [30 :minutes]
-    :window/slide [5 :minutes]
     :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
 
 (def in-chan (chan (inc (count input))))
