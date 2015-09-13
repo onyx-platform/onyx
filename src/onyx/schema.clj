@@ -110,12 +110,20 @@
 (def Window
   {:window/id s/Keyword
    :window/task s/Keyword
-   :window/type (s/pred (fn [x] (some #{x} #{:fixed :sliding}) 'window-type))
+   :window/type (s/pred #(some #{%} #{:fixed :sliding}) 'window-type)
    :window/window-key s/Any
    :window/aggregation s/Keyword
    :window/range (s/pred valid-units 'valid-units)
    (s/optional-key :window/slide) (s/pred valid-units 'valid-units)
    (s/optional-key :window/doc) s/Str
+   s/Keyword s/Any})
+
+(def Trigger
+  {:trigger/window-id s/Keyword
+   :trigger/refinement (s/pred #(some #{%} #{:accumulating :discarding}) 'refinement-type)
+   :trigger/type (s/pred #(some #{%} #{:periodically}) 'trigger-type)
+   :trigger/sync s/Keyword
+   (s/optional-key :trigger/doc) s/Str
    s/Keyword s/Any})
 
 (def Job
@@ -125,6 +133,7 @@
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
    (s/optional-key :windows) [Window]
+   (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) s/Bool

@@ -125,3 +125,8 @@
 
 (defn filter-windows [windows task]
   (filter #(= (:window/task %) task) windows))
+
+(defn filter-triggers [triggers windows]
+  (filter #(some #{(:trigger/window-id %)}
+                 (map :window/id windows))
+          triggers))

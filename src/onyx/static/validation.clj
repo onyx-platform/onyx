@@ -225,6 +225,15 @@
       (sliding-windows-define-range-and-slide w)
       (fixed-windows-dont-define-slide w))))
 
+(defn trigger-names-a-window [window-ids t]
+  (when-not (some #{(:trigger/window-id t)} window-ids)
+    (throw (ex-info "Trigger must name a window ID" {:trigger t :window-ids window-ids}))))
+
+(defn validate-triggers [triggers windows]
+  (let [window-names (map :window/id windows)]
+    (doseq [t triggers]
+      (trigger-names-a-window window-names t))))
+
 (defn coerce-uuid [uuid]
   (if (instance? java.util.UUID uuid)
     uuid

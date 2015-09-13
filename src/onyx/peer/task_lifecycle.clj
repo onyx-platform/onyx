@@ -16,6 +16,7 @@
               [onyx.windowing.window-id :as wid]
               [onyx.windowing.coerce :as w-coerce]
               [onyx.windowing.aggregation :as agg]
+              [onyx.windowing.triggers :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
@@ -400,13 +401,24 @@
               (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
               (recur))))))))
 
+(defn setup-triggers [event]
+  (reduce
+   #(triggers/trigger-setup %1 (first %2) (second %2))
+   event
+   (map vector (:onyx.core/triggers event) (range))))
+
+(defn teardown-triggers [event]
+  (reduce
+   #(triggers/trigger-teardown %1 (first %2) (second %2))
+   event
+   (map vector (:onyx.core/triggers event) (range))))
+
 (defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
   (warn e)
   (if (restart-pred-fn e)
     (>!! restart-ch true)
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
       (>!! outbox-ch entry))))
-
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -515,6 +527,8 @@
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             windows (extensions/read-chunk log :windows job-id)
+            filtered-windows (c/filter-windows windows (:name task))
+            triggers (extensions/read-chunk log :triggers job-id)
             lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
 
@@ -536,7 +550,8 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows (c/filter-windows windows (:name task))
+                           :onyx.core/windows filtered-windows
+                           :onyx.core/triggers (c/filter-triggers triggers filtered-windows)
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
@@ -575,7 +590,8 @@
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
-            pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)]
+            pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)
+            pipeline-data (setup-triggers pipeline-data)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -619,6 +635,7 @@
       (<!! (:aux-ch component))
 
       ((:onyx.core/compiled-after-task-fn event) event)
+      (teardown-triggers event)
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link-map] (:links state)]

@@ -64,11 +64,23 @@
 (def windows
   [{:window/id :collect-segments
     :window/task :identity
-    :window/type :fixed
-    :window/aggregation :conj
+    :window/type :sliding
+    :window/aggregation :count
     :window/window-key :event-time
     :window/range [30 :minutes]
+    :window/slide [5 :minutes]
     :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
+
+(def triggers
+  [{:trigger/window-id :collect-segments
+    :trigger/refinement :accumulating
+    :trigger/type :periodically
+    :trigger/period [1 :second]
+    :trigger/sync ::write-to-stdout
+    :trigger/doc "Writes the window contents to standard out every 5 seconds"}])
+
+(defn write-to-stdout [event state]
+  (println state))
 
 (def in-chan (chan (inc (count input))))
 
@@ -110,6 +122,7 @@
   :workflow workflow
   :lifecycles lifecycles
   :windows windows
+  :triggers triggers
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (take-segments! out-chan))
