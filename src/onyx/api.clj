@@ -157,6 +157,7 @@
        (extensions/write-chunk (:log client) :workflow (:workflow job) id)
        (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
        (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
+       (extensions/write-chunk (:log client) :windows (:windows job) id)
 
        (doseq [task tasks]
          (extensions/write-chunk (:log client) :task task id))
