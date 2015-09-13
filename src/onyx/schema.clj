@@ -102,12 +102,21 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
+(def Window
+  {:window/id s/Keyword
+   :window/type s/Keyword
+   :window/window-key s/Any
+   :window/range [s/Int s/Keyword]
+   :window/slide [s/Int s/Keyword]
+   (s/optional-key :window/doc) s/Str})
+
 (def Job
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler s/Keyword
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
+   (s/optional-key :windows) [Window]
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) s/Bool
