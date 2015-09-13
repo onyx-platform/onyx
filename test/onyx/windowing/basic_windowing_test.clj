@@ -73,11 +73,11 @@
 
 (def triggers
   [{:trigger/window-id :collect-segments
-    :trigger/refinement :accumulating
+    :trigger/refinement :discarding
     :trigger/type :periodically
-    :trigger/period [1 :second]
+    :trigger/period [5 :seconds]
     :trigger/sync ::write-to-stdout
-    :trigger/doc "Writes the window contents to standard out every 5 seconds"}])
+    :trigger/doc "Writes the window contents to standard out 5 seconds, discarding intermediate state"}])
 
 (defn write-to-stdout [event state]
   (println state))
