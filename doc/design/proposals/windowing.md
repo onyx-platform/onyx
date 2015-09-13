@@ -135,7 +135,10 @@ Onyx's windowing API should:
 - [ ] Support fixed (tumbling), sliding, session, and global windows.
 - [x] Provide enough expressivity for the window to be created by features of the data itself
 - [x] Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
-- [ ] Support punctuation, timer-based, external event, and watermark triggers
+- [ ] Support punctuation based triggers
+- [x] Support timer-based triggers
+- [ ] Support external event triggers
+- [ ] Support watermark triggers
 - [ ] Allow triggers to compose
 - [ ] Be internally optimized to use panes
 - [ ] Allow expression of predicates for when a segment should enter and exit a window
