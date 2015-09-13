@@ -68,3 +68,11 @@
 (defmethod refine-state :discarding
   [event trigger]
   (get-and-set! (:onyx.core/window-state event) nil))
+
+(defmethod trigger-setup :default
+  [event _ _]
+  event)
+
+(defmethod trigger-teardown :default
+  [event _ _]
+  event)
