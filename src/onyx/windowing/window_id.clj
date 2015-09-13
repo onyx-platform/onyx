@@ -194,14 +194,6 @@
                         (wids 0 (* multiple w-slide) w-slide w-key {:window-key %}))
                  values)))))
 
-(def windows
-  [{:window/id :people
-    :window/type :sliding
-    :window/window-key :event-time
-    :window/range [1 :minute]
-    :window/slide [10 :seconds]}])
-
-
 (def people
   [{:name "Mike"}
    {:name "Dorrene"}
