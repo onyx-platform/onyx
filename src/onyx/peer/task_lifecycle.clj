@@ -13,6 +13,8 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.windowing.window-id :as wid]
+              [onyx.windowing.coerce :as w-coerce]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
@@ -308,6 +310,23 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
+(defn populate-windows
+  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
+  (if (seq windows)
+    (do
+      (doseq [w windows]
+        (doseq [msg (mapcat :leaves (:tree results))]
+          (let [w-range (apply w-coerce/to-standard-units (:window/range w))
+                w-slide (apply w-coerce/to-standard-units (:window/slide w))
+                units (w-coerce/standard-units-for (last (:window/range w)))
+                message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
+                extents (wid/wids 0 w-range w-slide (:window/window-key w) message)]
+            (doseq [e extents]
+              (prn (:message msg) e)
+              (swap! window-state update e conj (:message msg))))))
+      event)
+    event))
+
 (defn write-batch [pipeline event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
     (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
@@ -420,6 +439,7 @@
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
+             (populate-windows)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
@@ -493,6 +513,7 @@
       (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
+            windows (extensions/read-chunk log :windows job-id)
             lifecycles (extensions/read-chunk log :lifecycles job-id)
             catalog-entry (find-task catalog (:name task))
 
@@ -514,6 +535,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
+                           :onyx.core/windows windows
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
@@ -540,7 +562,8 @@
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
-                           :onyx.core/state state}
+                           :onyx.core/state state
+                           :onyx.core/window-state (atom {})}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
