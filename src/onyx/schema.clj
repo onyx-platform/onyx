@@ -102,13 +102,18 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
+(defn valid-units [[a b :as x]]
+  (and (= 2 (count x))
+       (s/validate s/Int a)
+       (s/validate s/Keyword b)))
+
 (def Window
   {:window/id s/Keyword
    :window/task s/Keyword
-   :window/type (s/pred (fn [x] (some #{x} #{:fixed :sliding :landmark :global} 'window-type)))
+   :window/type (s/pred (fn [x] (prn x) (some #{x} #{:fixed :sliding :landmark :global}) 'window-type))
    :window/window-key s/Any
-   :window/range [s/Int s/Keyword]
-   :window/slide [s/Int s/Keyword]
+   :window/range (s/pred valid-units 'valid-units)
+   :window/slide (s/pred valid-units 'valid-units)
    (s/optional-key :window/doc) s/Str})
 
 (def Job
