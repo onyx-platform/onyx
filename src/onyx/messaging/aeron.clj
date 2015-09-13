@@ -203,8 +203,8 @@
                                      snapshot))]
           (doseq [k to-remove]
             (let [pub-manager (:publication (snapshot k))
-                  pub (:publication pub-manager)
-                  conn (:connection pub-manager)]
+                  pub @(:publication pub-manager)
+                  conn @(:connection pub-manager)]
               (swap! publications dissoc k)
               (.close ^Publication pub)
               (.close ^Aeron conn))))
