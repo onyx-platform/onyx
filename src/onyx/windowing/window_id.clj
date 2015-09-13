@@ -74,7 +74,7 @@
 ;; WID requires that a strict lower-bound of the windowing attribute
 ;; be defined. In our example, this will be 0. We will use a window
 ;; range of 20, and a slide value of 5. `extents` tells of which values
-;; of `:window-key` fall into their respect windows via:
+;; of the windowing key fall into their respect windows via:
 ;;
 ;; (doseq [n (range 20)]
 ;;  (println n ": " (extents 0 20 5 n)))
@@ -108,17 +108,17 @@
 ;; `wids` is defined in section 3.4 of the paper. This is the variant
 ;; of the algorithm that also covers the case where range and slide
 ;; are defined on the same value.
-(defn wids-lower [min-windowing-attr w-slide t]
-  (dec (long (Math/floor (/ (- (:window-key t)
+(defn wids-lower [min-windowing-attr w-slide w-key t]
+  (dec (long (Math/floor (/ (- (get t w-key)
                                min-windowing-attr) w-slide)))))
 
-(defn wids-upper [min-windowing-attr w-range w-slide t]
-  (dec (long (Math/floor (/ (- (+ (:window-key t) w-range)
+(defn wids-upper [min-windowing-attr w-range w-slide w-key t]
+  (dec (long (Math/floor (/ (- (+ (get t w-key) w-range)
                                min-windowing-attr) w-slide)))))
 
-(defn wids [min-windowing-attr w-range w-slide t]
-  (let [lower (wids-lower min-windowing-attr w-slide t)
-        upper (wids-upper min-windowing-attr w-range w-slide t)]
+(defn wids [min-windowing-attr w-range w-slide w-key t]
+  (let [lower (wids-lower min-windowing-attr w-slide w-key t)
+        upper (wids-upper min-windowing-attr w-range w-slide w-key t)]
     (range (inc lower) (inc upper))))
 
 ;; The follow code runs through 30 segments with
@@ -127,7 +127,7 @@
 ;; up with both tables we looked at above.
 ;;
 ;; (doseq [n (range 30)]
-;;   (println n "=>" (wids 0 20 5 {:window-key n})))
+;;   (println n "=>" (wids 0 20 5 :k {:k n})))
 
 ;; 0 => (0 1 2 3)
 ;; 1 => (0 1 2 3)
@@ -165,8 +165,9 @@
    "one segment per fixed window" 100000
    [w-range-and-slide gen/s-pos-int
     w-attr gen/pos-int]
-   (let [segment {:window-key w-attr}
-         buckets (wids 0 w-range-and-slide w-range-and-slide segment)]
+   (let [w-key :window-key
+         segment {:window-key w-attr}
+         buckets (wids 0 w-range-and-slide w-range-and-slide w-key segment)]
      (is (= 1 (count buckets))))))
 
 (deftest sliding-windows
@@ -175,8 +176,9 @@
    [w-slide gen/s-pos-int
     multiple gen/s-pos-int
     w-attr gen/pos-int]
-   (let [segment {:window-key w-attr}
-         buckets (wids 0 (* multiple w-slide) w-slide segment)]
+   (let [w-key :window-key
+         segment {:window-key w-attr}
+         buckets (wids 0 (* multiple w-slide) w-slide w-key segment)]
      (is (= multiple (count buckets))))))
 
 (deftest inverse-functions
@@ -186,9 +188,10 @@
    [w-slide (gen/resize 10 gen/s-pos-int)
     multiple gen/s-pos-int
     extent-id gen/pos-int]
-   (let [values (extents 0 (* multiple w-slide) w-slide extent-id)]
+   (let [w-key :window-key
+         values (extents 0 (* multiple w-slide) w-slide extent-id)]
      (is (every? #(some #{extent-id}
-                        (wids 0 (* multiple w-slide) w-slide {:window-key %}))
+                        (wids 0 (* multiple w-slide) w-slide w-key {:window-key %}))
                  values)))))
 
 (def windows
@@ -260,8 +263,9 @@
 (def w-slide (* 1000 60 20))
 
 (doseq [p people]
-  (let [segment (assoc p :window-key (.getTime (random-timestamp)))
-        assigned-extents (wids 0 w-range w-slide segment)]
+  (let [w-key :event-time
+        segment (assoc p w-key (.getTime (random-timestamp)))
+        assigned-extents (wids 0 w-range w-slide w-key segment)]
     (doseq [e assigned-extents]
       (swap! state update e conj p))))
 
