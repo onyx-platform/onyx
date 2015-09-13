@@ -191,6 +191,21 @@
   (validate-short-circuit flow-conditions)
   (validate-auto-short-circuit flow-conditions))
 
+(defn window-names-a-task [tasks w]
+  (when-not (some #{(:window/task w)} tasks)
+    (throw (ex-info ":window/task must name a task in the catalog" {:window w :tasks tasks}))))
+
+(defn window-ids-unique [windows]
+  (let [ids (map :window/id windows)]
+    (when-not (= (count ids) (count (into #{} ids)))
+      (throw (ex-info ":window/id must be unique across windows, found" {:ids ids})))))
+
+(defn validate-windows [windows catalog]
+  (let [task-names (map :onyx/name catalog)]
+    (doseq [w windows]
+      (window-names-a-task task-names w))
+    (window-ids-unique windows)))
+
 (defn coerce-uuid [uuid]
   (if (instance? java.util.UUID uuid)
     uuid

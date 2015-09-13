@@ -2,6 +2,7 @@
 
 (def window
   {:window/id :people
+   :window/task :workflow-task
    :window/type :sliding
    :window/window-key :event-time
    :window/range [1 :minute]

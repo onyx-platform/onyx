@@ -104,7 +104,8 @@
 
 (def Window
   {:window/id s/Keyword
-   :window/type s/Keyword
+   :window/task s/Keyword
+   :window/type (s/pred (fn [x] (some #{x} #{:fixed :sliding :landmark :global} 'window-type)))
    :window/window-key s/Any
    :window/range [s/Int s/Keyword]
    :window/slide [s/Int s/Keyword]
