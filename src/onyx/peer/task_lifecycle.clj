@@ -322,7 +322,6 @@
                 message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
                 extents (wid/wids 0 w-range w-slide (:window/window-key w) message)]
             (doseq [e extents]
-              (prn (:message msg) e)
               (swap! window-state update e conj (:message msg))))))
       event)
     event))
@@ -535,7 +534,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows windows
+                           :onyx.core/windows (c/filter-windows windows (:name task))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))

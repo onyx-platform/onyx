@@ -70,9 +70,9 @@
     :window/slide [5 :minutes]
     :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
 
-(def in-chan (chan (inc n-messages)))
+(def in-chan (chan (inc (count input))))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (chan (sliding-buffer (inc (count input)))))
 
 (defn inject-in-ch [event lifecycle]
   {:core.async/chan in-chan})
@@ -97,7 +97,7 @@
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (doseq [i input]
-  (>!! in-chan input))
+  (>!! in-chan i))
 
 (>!! in-chan :done)
 (close! in-chan)

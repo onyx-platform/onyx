@@ -122,3 +122,6 @@
                      [(:onyx/name entry)
                       (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
               (into (t/hash-map)))))
+
+(defn filter-windows [windows task]
+  (filter #(= (:window/task %) task) windows))
