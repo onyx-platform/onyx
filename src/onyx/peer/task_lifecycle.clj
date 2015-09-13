@@ -15,6 +15,7 @@
               [onyx.peer.operation :as operation]
               [onyx.windowing.window-id :as wid]
               [onyx.windowing.coerce :as w-coerce]
+              [onyx.windowing.aggregation :as agg]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
@@ -322,7 +323,8 @@
                 message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
                 extents (wid/wids 0 w-range w-slide (:window/window-key w) message)]
             (doseq [e extents]
-              (swap! window-state update e conj (:message msg))))))
+              (let [f (agg/aggregation-fn (:window/aggregation w))]
+                (swap! window-state update e f w (:message msg)))))))
       event)
     event))
 

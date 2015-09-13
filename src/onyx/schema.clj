@@ -115,7 +115,8 @@
    :window/aggregation s/Keyword
    :window/range (s/pred valid-units 'valid-units)
    :window/slide (s/pred valid-units 'valid-units)
-   (s/optional-key :window/doc) s/Str})
+   (s/optional-key :window/doc) s/Str
+   s/Keyword s/Any})
 
 (def Job
   {:catalog Catalog
