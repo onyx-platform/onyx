@@ -20,21 +20,21 @@
 (def batch-size 20)
 
 (def input
-  [{:id 1  :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-   {:id 2  :event-time #inst "2015-09-13T03:04:00.829-00:00"}
-   {:id 3  :event-time #inst "2015-09-13T03:05:00.829-00:00"}
-   {:id 4  :event-time #inst "2015-09-13T03:06:00.829-00:00"}
-   {:id 5  :event-time #inst "2015-09-13T03:07:00.829-00:00"}
-   {:id 6  :event-time #inst "2015-09-13T03:08:00.829-00:00"}
-   {:id 7  :event-time #inst "2015-09-13T03:09:00.829-00:00"}
-   {:id 8  :event-time #inst "2015-09-13T03:15:00.829-00:00"}
-   {:id 9  :event-time #inst "2015-09-13T03:25:00.829-00:00"}
-   {:id 10 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
-   {:id 11 :event-time #inst "2015-09-13T03:03:00.829-00:00"}
-   {:id 12 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
-   {:id 13 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
-   {:id 14 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
-   {:id 15 :event-time #inst "2015-09-13T03:16:00.829-00:00"}])
+  [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 3  :age 3 :event-time #inst "2015-09-13T03:05:00.829-00:00"}
+   {:id 4  :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"}
+   {:id 5  :age 53 :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+   {:id 6  :age 52 :event-time #inst "2015-09-13T03:08:00.829-00:00"}
+   {:id 7  :age 24 :event-time #inst "2015-09-13T03:09:00.829-00:00"}
+   {:id 8  :age 35 :event-time #inst "2015-09-13T03:15:00.829-00:00"}
+   {:id 9  :age 49 :event-time #inst "2015-09-13T03:25:00.829-00:00"}
+   {:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
+   {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"}
+   {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
+   {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
+   {:id 14 :age 60 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
+   {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}])
 
 (def workflow [[:in :identity] [:identity :out]])
 
@@ -65,7 +65,9 @@
   [{:window/id :collect-segments
     :window/task :identity
     :window/type :sliding
-    :window/aggregation :conj
+    :window/aggregation :min
+    :window/min-key :age
+    :window/init Integer/MAX_VALUE
     :window/window-key :event-time
     :window/range [30 :minutes]
     :window/slide [5 :minutes]
