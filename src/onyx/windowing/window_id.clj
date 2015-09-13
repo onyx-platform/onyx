@@ -1,10 +1,4 @@
-(ns onyx.windowing.window-id
-  (:require [clojure.test.check :as tc]
-            [clojure.test.check.generators :as gen]
-            [clojure.test.check.properties :as prop]
-            [clojure.test :refer [deftest is]]
-            [com.gfredericks.test.chuck :refer [times]]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
+(ns onyx.windowing.window-id)
 
 ;; An implementation of the Window-ID specification, as discussed
 ;; in http://web.cecs.pdx.edu/~tufte/papers/WindowAgg.pdf.
@@ -14,25 +8,32 @@
 ;; implementation are our own.
 
 ;; WID uses two main algorithms - `extents` and `wids`.
-;; `extents` takes a window extent ID and returns the windowing
-;; attribute values for which it accepts segments.
-;;
+;; `extents` takes a window ID and returns the windowing
+;; attribute upper and lower bounds for which it accepts values.
+;; WID is a powerful technique because it works over any totally
+;; ordered domain - not just timestamps. We can exploit this to
+;; create windows based of features of the incoming data.
+
 ;; `wids` is the inverse. `wids` takes a segment with a windowing
-;; attribute and returns the window extent IDs to which it belongs.
+;; attribute and returns the window IDs to which it belongs.
+
+;; `wids` is useful for bucketing segments. `extents` is useful for
+;; computing the user-readable upper and lower bounds that a window
+;; ID represents.
 
 ;; There are multiple variations of this algorithm depending on the
 ;; style of windowing being performed. We're going to start by focusing
 ;; on the case where the window is defined on the same attribute
 ;; for both the range and slide values. The window ID values for this
-;; case are the natural numbers. We'll note which variation we're focusing
-;; on during every implementation.
+;; case are the natural numbers (0, 1, 2 ...). We'll note which variation
+;; we're focusing on during each implementation.
 
 ;; Let's draw a picture to show how WID buckets segments, regardless
 ;; of what the windowing attribute is. Below is a table. On the left
-;; hand side running vertically 0 - 14 the natural numbers - these
+;; hand side running vertically 0 - 14 are the natural numbers - these
 ;; are window IDs. Running horizontally across the top are multiples of
-;; 5. Our window will slide by units of 5. The bars denotes |---| represent
-;; windows across the respective values. The span of the window is denoted
+;; 5. Our window will slide by units of 5. The bars |---| represent
+;; windows across the respective value range. The span of the window is denoted
 ;; on the right side of the table, running vertically. Notice that the WID
 ;; algorithms make "partial" windows for the minimum possible value. The first
 ;; 3 window IDs are of length 5, 10, and 15 respectively. You can imagine that
@@ -57,9 +58,9 @@
 ;;13                                       |---------------|      [50 - 69]
 ;;14                                           |---------------|  [55 - 74]
 
-;; Let's do some implementation. We're first going to implement `extents`
-;; for queries whose range and slide values are the same. This is the
-;; first algorithm detailed in section 3.3.
+;; We're first going to implement `extents` for queries whose range and
+;; slide values are the same. This is the first algorithm detailed in
+;; section 3.3.
 
 (defn extent-lower [min-windowing-attr w-range w-slide w]
   (max min-windowing-attr (- (+ min-windowing-attr (* w-slide (inc w))) w-range)))
@@ -103,7 +104,7 @@
 ;; 18 => (75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94)
 ;; 19 => (80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99)
 
-;; Now we need to implement the inverse, `wids`. `wids` lets us take
+;; Now we implement the inverse, `wids`. `wids` lets us take
 ;; segment and directly find the window IDs that it corresponds to.
 ;; `wids` is defined in section 3.4 of the paper. This is the variant
 ;; of the algorithm that also covers the case where range and slide
@@ -160,36 +161,4 @@
 ;; 28 => (5 6 7 8)
 ;; 29 => (5 6 7 8)
 
-(deftest fixed-windows
-  (checking
-   "one segment per fixed window" 100000
-   [w-range-and-slide gen/s-pos-int
-    w-attr gen/pos-int]
-   (let [w-key :window-key
-         segment {:window-key w-attr}
-         buckets (wids 0 w-range-and-slide w-range-and-slide w-key segment)]
-     (is (= 1 (count buckets))))))
-
-(deftest sliding-windows
-  (checking
-   "a segment in a multiple sliding windows" 100000
-   [w-slide gen/s-pos-int
-    multiple gen/s-pos-int
-    w-attr gen/pos-int]
-   (let [w-key :window-key
-         segment {:window-key w-attr}
-         buckets (wids 0 (* multiple w-slide) w-slide w-key segment)]
-     (is (= multiple (count buckets))))))
-
-(deftest inverse-functions
-  (checking
-   "values produced by extents are matched by wids" 10000
-   ;; Bound the window size to 10 to keep the each test iteration quick.
-   [w-slide (gen/resize 10 gen/s-pos-int)
-    multiple gen/s-pos-int
-    extent-id gen/pos-int]
-   (let [w-key :window-key
-         values (extents 0 (* multiple w-slide) w-slide extent-id)]
-     (is (every? #(some #{extent-id}
-                        (wids 0 (* multiple w-slide) w-slide w-key {:window-key %}))
-                 values)))))
+;; See the generative tests in onyx/windowing/wid_generative_test.clj for more.

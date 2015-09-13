@@ -65,7 +65,7 @@
   [{:window/id :collect-segments
     :window/task :identity
     :window/type :sliding
-    :window/aggregation :conj
+    :window/aggregation :count
     :window/window-key :event-time
     :window/range [30 :minutes]
     :window/slide [5 :minutes]
