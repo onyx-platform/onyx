@@ -17,6 +17,8 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
     - [Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys](#maps-with-onyxgroup-by-key-or-onyxgroup-by-fn-must-have-these-keys)
 - [Flow Conditions](#flow-conditions)
 - [Lifecycles](#lifecycles)
+- [Windows](#windows)
+- [Units](#units)
 - [Event Context](#event-context)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->

@@ -2,6 +2,27 @@
 
 This section discusses a feature called windowing. Windows allow you to group and accrue data into possibly overlapping buckets.  Windows are intimately related to the Triggers feature. When you're finished reading this section, head over to the Triggers chapter next.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
+
+- [Windowing and Aggregation](#windowing-and-aggregation)
+  - [Summary](#summary)
+  - [Window Types](#window-types)
+    - [Fixed Windows](#fixed-windows)
+    - [Sliding Windows](#sliding-windows)
+    - [Units](#units)
+    - [Aggregation](#aggregation)
+      - [`:conj`](#conj)
+      - [`:count`](#count)
+      - [`:sum`](#sum)
+      - [`:min`](#min)
+      - [`:max`](#max)
+      - [`:average`](#average)
+    - [Window Specifications](#window-specifications)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ### Summary
 
 Windowing splits up a possibly unbounded data set into finite, possibly overlapping portions. Windows allow us create aggregations over distinct portions of a stream, rather than stalling and waiting for the entire data data set to arrive. In Onyx, Windows strictly describe how data is accrued. When you want to *do* something with the windowed data, you use a Trigger. See the chapter on Triggers for more information. Onyx's windowing mechanisms are strong enough to handle stream disorder. If your data arrives in an order that isn't "logical" (for example, `:event-time` keys moving backwards in time), Onyx can sort out the appropriate buckets to put the data in.
