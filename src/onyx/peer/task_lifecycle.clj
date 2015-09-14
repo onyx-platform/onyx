@@ -322,7 +322,7 @@
                 w-slide (apply w-coerce/to-standard-units (or (:window/slide w) (:window/range w)))
                 units (w-coerce/standard-units-for (last (:window/range w)))
                 message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
-                extents (wid/wids 0 w-range w-slide (:window/window-key w) message)]
+                extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
             (doseq [e extents]
               (let [f (agg/aggregation-fn (:window/aggregation w))]
                 (swap! window-state update e f w (:message msg)))))))

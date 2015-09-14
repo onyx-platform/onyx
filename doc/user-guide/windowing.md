@@ -183,4 +183,5 @@ See the Information Model chapter for an exact specification of what values the 
 |`:window/range`       | The span of the window
 |`:window/slide`       | The delay to wait to start a new window after the previous window
 |`:window/init`        | The initial value required for some types of aggregation
+|`:window/min-value`   | A strict miminum value that `:window/window-key` can ever be, default is 0.
 |`:window/doc`         | An optional docstring explaining the window's purpose

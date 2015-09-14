@@ -131,6 +131,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:window/type`        |`string`   | no       |
 |`:window/aggregation` |`string`   | no       |
 |`:window/window-key`  |`string`   | no       |
+|`:window/min-value`   |`int`      | yes      |
 |`:window/range`       |`vector`   | no       |
 |`:window/slide`       |`vector`   | sometimes|
 |`:window/init`        |`string`   | sometimes|
