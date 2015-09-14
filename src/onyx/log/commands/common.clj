@@ -58,7 +58,9 @@
   (let [prev (get (allocations->peers (:allocations replica)) id)]
     (if (and (:job prev) (:task prev))
       (let [remove-f #(vec (remove (partial = id) %))]
-        (update-in replica [:allocations (:job prev) (:task prev)] remove-f))
+        (-> replica
+            (update-in [:allocations (:job prev) (:task prev)] remove-f)
+            (update-in [:task-slot-ids (:job prev) (:task prev)] dissoc id)))
       replica)))
 
 (defn all-inputs-exhausted? [replica job]

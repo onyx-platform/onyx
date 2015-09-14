@@ -230,6 +230,7 @@
    :percentages {JobId s/Num}
    :completed-jobs [JobId] 
    :killed-jobs [JobId] 
+   :task-slot-ids {JobId {TaskId {PeerId s/Int}}}
    :exhausted-inputs {JobId #{TaskId}}})
 
 (def LogEntry

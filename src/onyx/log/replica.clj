@@ -18,6 +18,7 @@
    :input-tasks {}
    :output-tasks {}
    :exempt-tasks {}
+   :exhausted-inputs {}
    :sealed-outputs {}
    :ackers {}
    :acker-percentage {}
@@ -28,4 +29,4 @@
    :percentages {}
    :completed-jobs []
    :killed-jobs []
-   :exhausted-inputs {}})
+   :task-slot-ids {}})
