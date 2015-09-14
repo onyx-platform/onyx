@@ -134,7 +134,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:window/init`        |`string`   | sometimes|
 |`:window/doc`         |`string`   | yes      |
 
-`:window/range` and `:window/slide` are vectors of two elements. The first element represents a value, and the second the unit (e.g. `[5 :minutes]`)
+`:window/range` and `:window/slide` are values that require Units. See below for a description of Units.
 
 ### Units
 
@@ -150,7 +150,6 @@ Several values in Onyx require units. Units are vectors of two elements. The fir
 |`:elements`
 
 Onyx also allows you to specify a single form (`:minute`) anywhere that it is needed for readability.
-
 
 ### Event Context
 

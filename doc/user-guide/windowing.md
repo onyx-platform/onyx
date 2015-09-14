@@ -160,5 +160,7 @@ See the Information Model chapter for an exact specification of what values the 
 |`:window/type`        | Which type of window this is (fixed, sliding, etc)
 |`:window/aggregation` | The aggregation function to apply, as described above
 |`:window/window-key`  | The key over which range 
-|`:window/init`        |
-|`:window/doc`         |
+|`:window/range`       | The span of the window
+|`:window/slide`       | The delay to wait to start a new window after the previous window
+|`:window/init`        | The initial value required for some types of aggregation
+|`:window/doc`         | An optional docstring explaining the window's purpose
