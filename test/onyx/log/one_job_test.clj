@@ -6,49 +6,10 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [schema.core :as s]
-            [clojure.test :refer [deftest is testing]]))
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]))
 
-(namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
-
-(facts
-
-(def config (load-config))
-
-(def onyx-id (java.util.UUID/randomUUID))
-
-(def env-config (assoc (:env-config config) :onyx/id onyx-id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def n-peers 5)
-
-(def batch-size 20)
-
-(def v-peers (onyx.api/start-peers n-peers peer-group))
-
-(def catalog
-  [{:onyx/name :a
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :b
-    :onyx/fn :onyx.log.one-job-test/my-inc
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :c
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/doc "Writes segments to a core.async channel"}])
+(use-fixtures :once schema.test/validate-schemas)
 
 (def in-chan (chan 100))
 
@@ -66,40 +27,62 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(def lifecycles
-  [{:lifecycle/task :a
-    :lifecycle/calls :onyx.log.one-job-test/in-calls}
-   {:lifecycle/task :a
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :c
-    :lifecycle/calls :onyx.log.one-job-test/out-calls}
-   {:lifecycle/task :c
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
-
 (defn my-inc [segment]
   {:n (inc (:n segment))})
 
-(onyx.api/submit-job
- peer-config
- {:workflow [[:a :b] [:b :c]]
-  :catalog catalog
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+(deftest log-one-job
+  (let [config (load-config)
+        onyx-id (java.util.UUID/randomUUID)
+        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        peer-config (assoc (:peer-config config) :onyx/id onyx-id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        n-peers 5
+        batch-size 20
+        v-peers (onyx.api/start-peers n-peers peer-group)
+        catalog [{:onyx/name :a
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(def ch (chan n-peers))
+                 {:onyx/name :b
+                  :onyx/fn :onyx.log.one-job-test/my-inc
+                  :onyx/type :function
+                  :onyx/batch-size batch-size}
 
-(def replica
-  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
+                 {:onyx/name :c
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-(is "peers balanced on 1 job"
-      (into #{} (map count (mapcat vals (vals (:allocations replica)))))
-      =>
-      #{1 2})
+        lifecycles [{:lifecycle/task :a
+                     :lifecycle/calls :onyx.log.one-job-test/in-calls}
+                    {:lifecycle/task :a
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :c
+                     :lifecycle/calls :onyx.log.one-job-test/out-calls}
+                    {:lifecycle/task :c
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+        _ (onyx.api/submit-job peer-config
+                               {:workflow [[:a :b] [:b :c]]
+                                :catalog catalog
+                                :lifecycles lifecycles
+                                :task-scheduler :onyx.task-scheduler/balanced})
+        ch (chan n-peers)
+        replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
-(onyx.api/shutdown-env env)
+    (testing "peers balanced on 1 job"
+      (is (= (into #{} (map count (mapcat vals (vals (:allocations replica)))))
+             #{1 2})))
 
-(onyx.api/shutdown-peer-group peer-group)
-)
+    (doseq [v-peer v-peers]
+      (onyx.api/shutdown-peer v-peer))
+
+    (onyx.api/shutdown-env env)
+
+    (onyx.api/shutdown-peer-group peer-group)))

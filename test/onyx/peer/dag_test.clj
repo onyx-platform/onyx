@@ -243,8 +243,8 @@
       (is (= (into #{} (concat a-segments b-segments))
              (into #{} (butlast k-results))))
 
-      (is (= (into #{} (concat a-segments b-segments c-segments)))
-          (into #{} (butlast l-results))))
+      (is (= (into #{} (concat a-segments b-segments c-segments))
+             (into #{} (butlast l-results)))))
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))
 

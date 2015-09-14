@@ -6,7 +6,7 @@
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
-(use-fixtures :once schema.test/validate-schemas)
+;(use-fixtures :once schema.test/validate-schemas)
 
 (deftest submit-job-log-test
   (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]

@@ -46,5 +46,5 @@
                               :peer-state {:a :active :b :active :c :active}
                               :peers [:a :b :c]})
           new-replica (f old-replica)]
-      (is (= (:killed-jobs new-replica) [:j1]))
-      (is (= (get-in new-replica [:killed-jobs]) [:j1])))))
+      (is (= (:jobs new-replica) [:j1]))
+      (is (= (get-in new-replica [:jobs]) [:j1])))))
