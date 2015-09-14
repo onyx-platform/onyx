@@ -12,7 +12,7 @@ The topic of windows has been widely explored in the literature. There are diffe
 
 #### Fixed Windows
 
-Fixed windows, sometimes called Tumbling windows, span a particular range and do not slide. That is, fixed windows never overlap one another. Consequently, a data point will fall into exactly one instance of a window (often called an *extent* in the literature). As it turns out, fixed windows are a special case of sliding windows where the range and slide values are equal. You can see a visual below of how this works, where the `|--|` drawings represent extents. Time runs horizontally, while the right-hand side features the extent bound running vertically. The first extent captures all values between 0 and 4.99999...
+Fixed windows, sometimes called Tumbling windows, span a particular range and do not slide. That is, fixed windows never overlap one another. Consequently, a data point will fall into exactly one instance of a window (often called an *extent* in the literature). As it turns out, fixed windows are a special case of sliding windows where the range and slide values are equal. You can see a visual below of how this works, where the `|--|` drawings represent extents. Each window is of range `5`. Time runs horizontally, while the right-hand side features the extent bound running vertically. The first extent captures all values between 0 and 4.99999...
 
 ```text
 1, 5, 10, 15, 20, 25, 30, 35, 40
@@ -55,8 +55,99 @@ Onyx is also capable of sliding by `:elements`. This is often referred to as "sl
 
 #### Aggregation
 
-Initial values.
+Windows allow you accrete data over time. Sometimes, you want to store all the data. Othertimes you want to incrementally compact the data. Window specifications must provide a `:window/aggregation` key. We'll go over an example of every type of aggregation that Onyx supports.
 
+##### `:conj`
+
+The `:conj` aggregation is the simplest. It collects segments for this window and retains them in a vector, unchanged.
+
+```clojure
+{:window/id :collect-segments
+ :window/task :identity
+ :window/type :sliding
+ :window/aggregation :conj
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/slide [5 :minutes]
+ :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}
+```
+
+##### `:count`
+
+The `:count` operation counts the number of segments in the window.
+
+```clojure
+{:window/id :count-segments
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :count
+ :window/window-key :event-time
+ :window/range [1 :hour]
+ :window/doc "Counts segments in one hour fixed windows"}
+```
+
+##### `:sum`
+
+The `:sum` operation adds the values of `:window/sum-key` for all segments in the window.
+
+```clojure
+{:window/id :sum-ages
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :sum
+ :window/sum-key :age
+ :window/window-key :event-time
+ :window/range [1 :hour]
+ :window/doc "Adds the :age key in all segments in 1 hour fixed windows"}
+```
+
+##### `:min`
+
+The `:min` operation retains the minimum value found for `:window/min-key`. An initial value must be supplied via `:window/init`.
+
+```clojure
+{:window/id :min-age
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :sum
+ :window/init 100
+ :window/min-key :age
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/doc "Finds the minimum :age in 30 minute fixed windows, default is 100"}
+```
+
+##### `:max`
+
+The `:max` operation retains the maximum value found for `:window/max-key`. An initial value must be supplied via `:window/init`.
+
+```clojure
+{:window/id :max-age
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :sum
+ :window/init 0
+ :window/max-key :age
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
+```
+
+##### `:average`
+
+The `:average` operation maintains an average over `:window/average-key`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
+
+```clojure
+{:window/id :max-age
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :sum
+ :window/init 0
+ :window/max-key :age
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
+```
 
 #### Window Specifications
 
