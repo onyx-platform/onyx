@@ -21,8 +21,8 @@
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)
       reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
-  (fact diff => {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a})
-  (fact reactions => [{:fn :accept-join-cluster :args diff :immediate? true}])
-  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil))
+  (is diff => {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a})
+  (is reactions => [{:fn :accept-join-cluster :args diff :immediate? true}])
+  (is (rep-reactions old-replica new-replica diff {:id :a}) => nil)
+  (is (rep-reactions old-replica new-replica diff {:id :b}) => nil)
+  (is (rep-reactions old-replica new-replica diff {:id :c}) => nil))

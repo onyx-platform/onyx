@@ -134,7 +134,7 @@
 (def replica-1
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 8000))
 
-(fact "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
+(is "the peers evenly balance" (get-counts replica-1 [j1 j2]) => [[3 3] [3 3]])
 
 (def conn (zk/connect (:zookeeper/address (:env-config config))))
 
@@ -148,7 +148,7 @@
 
 (def replica-2 (playback-log (:log env) replica-1 ch 8000))
 
-(fact "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 2] [3 3]])
+(is "the peers rebalance" (get-counts replica-2 [j1 j2]) => [[3 2] [3 3]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

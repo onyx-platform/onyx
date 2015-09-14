@@ -142,7 +142,7 @@
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "peers balanced on 2 jobs" (get-counts replica [j1 j2]) => [[2 2 2] [2 2 2]])
+(is "peers balanced on 2 jobs" (get-counts replica [j1 j2]) => [[2 2 2] [2 2 2]])
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

@@ -16,11 +16,11 @@
                           :job-scheduler :onyx.job-scheduler/greedy})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (get-in new-replica [:pairs :a]) => :b)
-  (fact (get-in new-replica [:pairs :b]) => :a)
-  (fact (get-in new-replica [:pairs :c]) => nil)
-  (fact diff => {:died :c :updated-watch {:observer :b :subject :a}})
-  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil))
+  (is (get-in new-replica [:pairs :a]) => :b)
+  (is (get-in new-replica [:pairs :b]) => :a)
+  (is (get-in new-replica [:pairs :c]) => nil)
+  (is diff => {:died :c :updated-watch {:observer :b :subject :a}})
+  (is (rep-reactions old-replica new-replica diff {:id :a}) => nil))
 
 (let [entry (create-log-entry :leave-cluster {:id :b})
       f (partial extensions/apply-log-entry entry)
@@ -32,10 +32,10 @@
                           :job-scheduler :onyx.job-scheduler/greedy})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (get-in new-replica [:pairs :a]) => nil)
-  (fact (get-in new-replica [:pairs :b]) => nil)
-  (fact diff => {:died :b :updated-watch {:observer :a :subject :a}})
-  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil))
+  (is (get-in new-replica [:pairs :a]) => nil)
+  (is (get-in new-replica [:pairs :b]) => nil)
+  (is diff => {:died :b :updated-watch {:observer :a :subject :a}})
+  (is (rep-reactions old-replica new-replica diff {:id :a}) => nil))
 
 (let [entry (create-log-entry :leave-cluster {:id :d})
       f (partial extensions/apply-log-entry entry)
@@ -54,10 +54,10 @@
                           :messaging {:onyx.messaging/impl :dummy-messenger}})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (:allocations (f old-replica)) => {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}})
-  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :c}) => nil))
+  (is (:allocations (f old-replica)) => {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}})
+  (is (rep-reactions old-replica new-replica diff {:id :a}) => nil)
+  (is (rep-reactions old-replica new-replica diff {:id :b}) => nil)
+  (is (rep-reactions old-replica new-replica diff {:id :c}) => nil))
 
 (let [entry (create-log-entry :leave-cluster {:id :c})
       f (partial extensions/apply-log-entry entry)
@@ -75,6 +75,6 @@
                           :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}})
       new-replica (f old-replica)
       diff (rep-diff old-replica new-replica)]
-  (fact (:allocations new-replica) => {:j1 {:t1 [:a]} :j2 {:t2 [:b]}})
-  (fact (rep-reactions old-replica new-replica diff {:id :a}) => nil)
-  (fact (rep-reactions old-replica new-replica diff {:id :b}) => nil))
+  (is (:allocations new-replica) => {:j1 {:t1 [:a]} :j2 {:t2 [:b]}})
+  (is (rep-reactions old-replica new-replica diff {:id :a}) => nil)
+  (is (rep-reactions old-replica new-replica diff {:id :b}) => nil))

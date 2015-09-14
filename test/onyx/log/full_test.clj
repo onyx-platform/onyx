@@ -24,8 +24,8 @@
                                  (if (< (count (:pairs new-replica)) n-peers)
                                    (recur new-replica)
                                    new-replica)))]
-                 (fact (:prepared replica) => {})
-                 (fact (:accepted replica) => {})
-                 (fact (set (keys (:pairs replica)))
+                 (is (:prepared replica) => {})
+                 (is (:accepted replica) => {})
+                 (is (set (keys (:pairs replica)))
                        => (set (vals (:pairs replica))))
-                 (fact (count (:peers replica)) => n-peers)))))))
+                 (is (count (:peers replica)) => n-peers)))))))

@@ -9,7 +9,7 @@
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 
-(facts
+(deftest log-abort-test
   (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
@@ -25,10 +25,10 @@
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff peer-state)]
-    (fact (:pairs new-replica) => {:a :b :b :c :c :a})
-    (fact (:peers new-replica) => [:a :b :c])
-    (fact diff => {:aborted :d})
-    (fact reactions => [{:fn :prepare-join-cluster
+    (is (= (:pairs new-replica) {:a :b :b :c :c :a}))
+    (is (= (:peers new-replica) [:a :b :c]))
+    (is (= diff {:aborted :d}))
+    (is (= reactions [{:fn :prepare-join-cluster
                          :args {:joiner :d
                                 :peer-site {:address 1}}
-                         :immediate? true}])))
+                         :immediate? true}]))))

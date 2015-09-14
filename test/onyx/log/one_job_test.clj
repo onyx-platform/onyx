@@ -91,7 +91,7 @@
 (def replica
   (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000))
 
-(fact "peers balanced on 1 job"
+(is "peers balanced on 1 job"
       (into #{} (map count (mapcat vals (vals (:allocations replica)))))
       =>
       #{1 2})

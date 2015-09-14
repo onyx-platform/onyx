@@ -28,14 +28,14 @@
       diff (rep-diff old-replica new-replica)
       a-reactions (rep-reactions old-replica new-replica diff {:id :a})
       d-reactions (rep-reactions old-replica new-replica diff {:id :d})]
-  (fact (:killed-jobs new-replica) => [:j1])
-  (fact (:task-metadata new-replica) => {})
-  (fact (get-in new-replica [:allocations :j1]) => nil)
-  (fact (get-in new-replica [:peer-state :a]) => :idle)
-  (fact (get-in new-replica [:peer-state :b]) => :idle)
-  (fact (get-in new-replica [:peer-state :c]) => :idle)
+  (is (:killed-jobs new-replica) => [:j1])
+  (is (:task-metadata new-replica) => {})
+  (is (get-in new-replica [:allocations :j1]) => nil)
+  (is (get-in new-replica [:peer-state :a]) => :idle)
+  (is (get-in new-replica [:peer-state :b]) => :idle)
+  (is (get-in new-replica [:peer-state :c]) => :idle)
 
-  (fact diff => #{:j1})
+  (is diff => #{:j1})
 
-  (fact a-reactions => [])
-  (fact d-reactions => []))
+  (is a-reactions => [])
+  (is d-reactions => []))

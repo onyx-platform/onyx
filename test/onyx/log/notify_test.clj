@@ -77,8 +77,8 @@
 
 (def read-entry (<!! ch))
 
-(fact (:fn read-entry) => :notify-join-cluster)
-(fact (:args read-entry) => {:observer d-id :subject b-id})
+(is (:fn read-entry) => :notify-join-cluster)
+(is (:args read-entry) => {:observer d-id :subject b-id})
 
 (def f (partial extensions/apply-log-entry read-entry))
 
@@ -106,8 +106,8 @@
 
 (def read-entry (<!! ch))
 
-(fact (:fn read-entry) => :accept-join-cluster)
-(fact (:args read-entry) => {:accepted-joiner :d
+(is (:fn read-entry) => :accept-join-cluster)
+(is (:args read-entry) => {:accepted-joiner :d
                              :accepted-observer :a
                              :subject :b
                              :observer :d})
@@ -120,8 +120,8 @@
 
 (def entry (<!! ch))
 
-(fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id :d})
+(is (:fn entry) => :leave-cluster)
+(is (:args entry) => {:id :d})
 
 (onyx.api/shutdown-env env)
 

@@ -76,7 +76,7 @@
 
 (def entry (<!! ch))
 
-(fact (:fn entry) => :leave-cluster)
-(fact (:args entry) => {:id :d})
+(is (:fn entry) => :leave-cluster)
+(is (:args entry) => {:id :d})
 
 (onyx.api/shutdown-env env)

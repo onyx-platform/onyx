@@ -28,7 +28,7 @@
       (doseq [n (range 10)]
         (extensions/write-log-entry (:log env) {:n n}))
 
-      (fact (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
+      (is (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) => 10))
     (finally
       (onyx.api/shutdown-env env))))
 
@@ -49,7 +49,7 @@
                           (.printStackTrace e))))]
       (facts
         "We can asynchronously write log entries and read them back in order"
-        (fact (count (map (fn [n] (<!! ch))
+        (is (count (map (fn [n] (<!! ch))
                           (range entries)))
               => entries))
 

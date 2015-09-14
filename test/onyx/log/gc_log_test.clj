@@ -36,7 +36,7 @@
     (when-not (= (count (:peers new-replica)) 10)
       (recur new-replica))))
 
-(fact "Starting peers after GC succeeded" true => true)
+(is "Starting peers after GC succeeded" true => true)
 
 (doseq [v-peer (concat v-peers v-peers2)]
   (onyx.api/shutdown-peer v-peer))
