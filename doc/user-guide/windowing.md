@@ -6,20 +6,19 @@ This section discusses a feature called windowing. Windows allow you to group an
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
-- [Windowing and Aggregation](#windowing-and-aggregation)
-  - [Summary](#summary)
-  - [Window Types](#window-types)
-    - [Fixed Windows](#fixed-windows)
-    - [Sliding Windows](#sliding-windows)
-    - [Units](#units)
-    - [Aggregation](#aggregation)
-      - [`:conj`](#conj)
-      - [`:count`](#count)
-      - [`:sum`](#sum)
-      - [`:min`](#min)
-      - [`:max`](#max)
-      - [`:average`](#average)
-    - [Window Specifications](#window-specifications)
+- [Summary](#summary)
+- [Window Types](#window-types)
+  - [Fixed Windows](#fixed-windows)
+  - [Sliding Windows](#sliding-windows)
+- [Units](#units)
+- [Aggregation](#aggregation)
+  - [`:conj`](#conj)
+  - [`:count`](#count)
+  - [`:sum`](#sum)
+  - [`:min`](#min)
+  - [`:max`](#max)
+  - [`:average`](#average)
+- [Window Specifications](#window-specifications)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -61,7 +60,7 @@ In contrast to fixed windows, sliding windows allow extents to overlap. When a s
                   |-----------|     [25 - 39]
 ```
 
-#### Units
+### Units
 
 Onyx allows you to specify range and slide values in different magnitudes of units, so long as the units can be coverted to the same unit in the end. For example, you can specify the range in minutes, and the slide in seconds. Any value that requires units takes a vector of two elemenets. The first element represents the value, and the second the unit. For example, window specifications denoting range and slide might look like:
 
@@ -74,11 +73,11 @@ See the information model for all supported units. You can use a singular form (
 
 Onyx is also capable of sliding by `:elements`. This is often referred to as "slide-by-tuple" in research. Onyx doesn't require a time-based range and slide value. Any totally ordered value will work equivalently.
 
-#### Aggregation
+### Aggregation
 
 Windows allow you accrete data over time. Sometimes, you want to store all the data. Othertimes you want to incrementally compact the data. Window specifications must provide a `:window/aggregation` key. We'll go over an example of every type of aggregation that Onyx supports.
 
-##### `:conj`
+#### `:conj`
 
 The `:conj` aggregation is the simplest. It collects segments for this window and retains them in a vector, unchanged.
 
@@ -93,7 +92,7 @@ The `:conj` aggregation is the simplest. It collects segments for this window an
  :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}
 ```
 
-##### `:count`
+#### `:count`
 
 The `:count` operation counts the number of segments in the window.
 
@@ -107,7 +106,7 @@ The `:count` operation counts the number of segments in the window.
  :window/doc "Counts segments in one hour fixed windows"}
 ```
 
-##### `:sum`
+#### `:sum`
 
 The `:sum` operation adds the values of `:window/sum-key` for all segments in the window.
 
@@ -122,7 +121,7 @@ The `:sum` operation adds the values of `:window/sum-key` for all segments in th
  :window/doc "Adds the :age key in all segments in 1 hour fixed windows"}
 ```
 
-##### `:min`
+#### `:min`
 
 The `:min` operation retains the minimum value found for `:window/min-key`. An initial value must be supplied via `:window/init`.
 
@@ -138,7 +137,7 @@ The `:min` operation retains the minimum value found for `:window/min-key`. An i
  :window/doc "Finds the minimum :age in 30 minute fixed windows, default is 100"}
 ```
 
-##### `:max`
+#### `:max`
 
 The `:max` operation retains the maximum value found for `:window/max-key`. An initial value must be supplied via `:window/init`.
 
@@ -154,7 +153,7 @@ The `:max` operation retains the maximum value found for `:window/max-key`. An i
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
 ```
 
-##### `:average`
+#### `:average`
 
 The `:average` operation maintains an average over `:window/average-key`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
 
@@ -170,7 +169,7 @@ The `:average` operation maintains an average over `:window/average-key`. An ini
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
 ```
 
-#### Window Specifications
+### Window Specifications
 
 See the Information Model chapter for an exact specification of what values the Window maps need to supply. Here we will describe what each of the keys mean.
 
