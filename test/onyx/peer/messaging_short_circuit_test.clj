@@ -70,14 +70,16 @@
             (>!! in-chan {:n n}))
         _ (>!! in-chan :done)
         _ (close! in-chan)
+
         v-peers (onyx.api/start-peers 3 peer-group)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog
-             :workflow workflow
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
+
+        _ (onyx.api/submit-job peer-config
+                               {:catalog catalog
+                                :workflow workflow
+                                :lifecycles lifecycles
+                                :task-scheduler :onyx.task-scheduler/balanced})
         results (take-segments! out-chan)]
+
     (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
       (is (= (set (butlast results)) expected))
       (is (= (last results) :done)))

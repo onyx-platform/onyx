@@ -77,6 +77,7 @@
              :task-scheduler :onyx.task-scheduler/balanced})
         ;;;;;;;;;;;;;;;;;;;; TODO: Verify only 3 peers were actually used ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         results (take-segments! out-chan)]
+
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))
 

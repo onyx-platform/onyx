@@ -86,8 +86,7 @@
         peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
 
-        catalog
-        [{:onyx/name :colors-in
+        catalog [{:onyx/name :colors-in
           :onyx/plugin :onyx.plugin.core-async/input
           :onyx/type :input
           :onyx/medium :core.async
@@ -137,8 +136,7 @@
           :onyx/max-peers 1
           :onyx/doc "Writes segments to a core.async channel"}]
 
-        workflow
-        [[:colors-in :process-red]
+        workflow [[:colors-in :process-red]
          [:colors-in :process-blue]
          [:colors-in :process-green]
 
@@ -146,8 +144,7 @@
          [:process-blue :blue-out]
          [:process-green :green-out]]
 
-        flow-conditions
-        [{:flow/from :colors-in
+        flow-conditions [{:flow/from :colors-in
           :flow/to :all
           :flow/short-circuit? true
           :flow/exclude-keys [:extra-key]
@@ -193,8 +190,7 @@
           :flow/exclude-keys [:extra-key]
           :flow/predicate :onyx.peer.colors-flow-test/orange?}]
 
-        lifecycles
-        [{:lifecycle/task :colors-in
+        lifecycles [{:lifecycle/task :colors-in
           :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
          {:lifecycle/task :colors-in
           :lifecycle/calls :onyx.peer.colors-flow-test/retry-calls}
@@ -214,6 +210,7 @@
           :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
         v-peers (onyx.api/start-peers 7 peer-group)]
+
     (doseq [x [{:color "red" :extra-key "Some extra context for the predicates"}
                {:color "blue" :extra-key "Some extra context for the predicates"}
                {:color "white" :extra-key "Some extra context for the predicates"}
@@ -226,11 +223,10 @@
       (>!! colors-in-chan x))
     (>!! colors-in-chan :done)
 
-    (onyx.api/submit-job
-     peer-config
-     {:catalog catalog :workflow workflow
-      :flow-conditions flow-conditions :lifecycles lifecycles
-      :task-scheduler :onyx.task-scheduler/balanced})
+    (onyx.api/submit-job peer-config
+                         {:catalog catalog :workflow workflow
+                          :flow-conditions flow-conditions :lifecycles lifecycles
+                          :task-scheduler :onyx.task-scheduler/balanced})
 
     (let [red (take-segments! red-out-chan)
           blue (take-segments! blue-out-chan)

@@ -23,8 +23,8 @@
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff {:id :x})]
 
-    (is (:jobs new-replica) [:a])
-    (is diff {:job :a}))
+    (is (= (:jobs new-replica) [:a]))
+    (is (= diff {:job :a})))
     
   (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]
                                              :task-scheduler :onyx.task-scheduler/balanced

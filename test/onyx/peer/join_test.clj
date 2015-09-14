@@ -66,59 +66,56 @@
         peer-group (onyx.api/start-peer-group peer-config)
         batch-size 2
 
-        catalog
-        [{:onyx/name :names
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog [{:onyx/name :names
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :ages
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+                 {:onyx/name :ages
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :join-person
-          :onyx/fn :onyx.peer.join-test/join-person
-          :onyx/type :function
-          :onyx/group-by-key :id
-          :onyx/min-peers 1
-          :onyx/flux-policy :kill
-          :onyx/batch-size batch-size}
+                 {:onyx/name :join-person
+                  :onyx/fn :onyx.peer.join-test/join-person
+                  :onyx/type :function
+                  :onyx/group-by-key :id
+                  :onyx/min-peers 1
+                  :onyx/flux-policy :kill
+                  :onyx/batch-size batch-size}
 
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-        workflow
-        [[:names :join-person]
-         [:ages :join-person]
-         [:join-person :out]]
+        workflow [[:names :join-person]
+                  [:ages :join-person]
+                  [:join-person :out]]
 
-        lifecycles
-        [{:lifecycle/task :names
-          :lifecycle/calls :onyx.peer.join-test/names-calls}
-         {:lifecycle/task :names
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :ages
-          :lifecycle/calls :onyx.peer.join-test/ages-calls}
-         {:lifecycle/task :ages
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.peer.join-test/out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-         {:lifecycle/task :join-person
-          :lifecycle/calls :onyx.peer.join-test/join-calls}]
+        lifecycles [{:lifecycle/task :names
+                     :lifecycle/calls :onyx.peer.join-test/names-calls}
+                    {:lifecycle/task :names
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :ages
+                     :lifecycle/calls :onyx.peer.join-test/ages-calls}
+                    {:lifecycle/task :ages
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.join-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+                    {:lifecycle/task :join-person
+                     :lifecycle/calls :onyx.peer.join-test/join-calls}]
 
         v-peers (onyx.api/start-peers 4 peer-group)]
     (doseq [name names]
@@ -131,10 +128,10 @@
     (>!! age-chan :done)
 
     (onyx.api/submit-job
-     peer-config
-     {:catalog catalog :workflow workflow
-      :lifecycles lifecycles
-      :task-scheduler :onyx.task-scheduler/balanced})
+      peer-config
+      {:catalog catalog :workflow workflow
+       :lifecycles lifecycles
+       :task-scheduler :onyx.task-scheduler/balanced})
 
     (let [results (take-segments! out-chan)]
       (is (= (set people)

@@ -54,7 +54,4 @@
     (is (= (:fn entry) :leave-cluster))
     (is (= (:args entry) {:id :d}))
 
-    (onyx.api/shutdown-env env))
-  
-  
-  )
+    (onyx.api/shutdown-env env)))

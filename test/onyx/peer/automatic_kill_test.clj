@@ -49,72 +49,68 @@
         env (onyx.api/start-env env-config)
         peer-group (onyx.api/start-peer-group peer-config)
         batch-size 20
-        catalog-1
-        [{:onyx/name :in-1
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog-1 [{:onyx/name :in-1
+                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/type :input
+                    :onyx/medium :core.async
+                    :onyx/batch-size batch-size
+                    :onyx/max-peers 1
+                    :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :inc
-          :onyx/fn :onyx.peer.automatic-kill-test/my-invalid-fn
-          :onyx/type :function
-          :onyx/batch-size batch-size}
+                   {:onyx/name :inc
+                    :onyx/fn :onyx.peer.automatic-kill-test/my-invalid-fn
+                    :onyx/type :function
+                    :onyx/batch-size batch-size}
 
-         {:onyx/name :out-1
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                   {:onyx/name :out-1
+                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/type :output
+                    :onyx/medium :core.async
+                    :onyx/batch-size batch-size
+                    :onyx/max-peers 1
+                    :onyx/doc "Writes segments to a core.async channel"}]
 
-        catalog-2
-        [{:onyx/name :in-2
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog-2 [{:onyx/name :in-2
+                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/type :input
+                    :onyx/medium :core.async
+                    :onyx/batch-size batch-size
+                    :onyx/max-peers 1
+                    :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :inc
-          :onyx/fn :onyx.peer.automatic-kill-test/my-inc
-          :onyx/type :function
-          :onyx/batch-size batch-size}
+                   {:onyx/name :inc
+                    :onyx/fn :onyx.peer.automatic-kill-test/my-inc
+                    :onyx/type :function
+                    :onyx/batch-size batch-size}
 
-         {:onyx/name :out-2
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                   {:onyx/name :out-2
+                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/type :output
+                    :onyx/medium :core.async
+                    :onyx/batch-size batch-size
+                    :onyx/max-peers 1
+                    :onyx/doc "Writes segments to a core.async channel"}]
 
         workflow-1 [[:in-1 :inc] [:inc :out-1]]
         workflow-2 [[:in-2 :inc] [:inc :out-2]]
 
-        lifecycles-1
-        [{:lifecycle/task :in-1
-          :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-1}
-         {:lifecycle/task :in-1
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out-1
-          :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-1}
-         {:lifecycle/task :out-1
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles-1 [{:lifecycle/task :in-1
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-1}
+                      {:lifecycle/task :in-1
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                      {:lifecycle/task :out-1
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-1}
+                      {:lifecycle/task :out-1
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        lifecycles-2
-        [{:lifecycle/task :in-2
-          :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-2}
-         {:lifecycle/task :in-2
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out-2
-          :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}
-         {:lifecycle/task :out-2
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles-2 [{:lifecycle/task :in-2
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-2}
+                      {:lifecycle/task :in-2
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                      {:lifecycle/task :out-2
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}
+                      {:lifecycle/task :out-2
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
         v-peers (onyx.api/start-peers 3 peer-group)]
 
@@ -126,15 +122,15 @@
     (>!! in-chan-2 :done)
 
     (let [j1 (:job-id (onyx.api/submit-job
-                       peer-config
-                       {:catalog catalog-1 :workflow workflow-1
-                        :lifecycles lifecycles-1
-                        :task-scheduler :onyx.task-scheduler/balanced}))
+                        peer-config
+                        {:catalog catalog-1 :workflow workflow-1
+                         :lifecycles lifecycles-1
+                         :task-scheduler :onyx.task-scheduler/balanced}))
           j2 (:job-id (onyx.api/submit-job
-                       peer-config
-                       {:catalog catalog-2 :workflow workflow-2
-                        :lifecycles lifecycles-2
-                        :task-scheduler :onyx.task-scheduler/balanced}))
+                        peer-config
+                        {:catalog catalog-2 :workflow workflow-2
+                         :lifecycles lifecycles-2
+                         :task-scheduler :onyx.task-scheduler/balanced}))
 
           ch (chan n-messages)]
       ;; Make sure we find the killed job in the replica, then bail

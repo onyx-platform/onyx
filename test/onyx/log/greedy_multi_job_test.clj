@@ -125,9 +125,7 @@
         replica-3 (playback-log (:log env) replica-2 ch 2000)
         counts-3 (get-counts replica-3 [j1 j2])
         _ (close! b-chan)
-        _ (close! d-chan)
-        ]
-
+        _ (close! d-chan)]
 
     (testing  "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B"
       (is (or (= (sort counts-1) [[0 0]] [5 5])

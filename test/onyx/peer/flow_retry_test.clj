@@ -45,63 +45,58 @@
         peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
 
-        catalog
-        [{:onyx/name :in
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog [{:onyx/name :in
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :inc
-          :onyx/fn ::my-inc
-          :onyx/type :function
-          :onyx/batch-size batch-size}
+                 {:onyx/name :inc
+                  :onyx/fn ::my-inc
+                  :onyx/type :function
+                  :onyx/batch-size batch-size}
 
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-        workflow
-        [[:in :inc]
-         [:inc :out]]
+        workflow [[:in :inc]
+                  [:inc :out]]
 
-        lifecycles
-        [{:lifecycle/task :in
-          :lifecycle/calls ::in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls ::out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles [{:lifecycle/task :in
+                     :lifecycle/calls ::in-calls}
+                    {:lifecycle/task :in
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls ::out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        flow-conditions
-        [{:flow/from :inc
-          :flow/to [:out]
-          :flow/short-circuit? true
-          :flow/action :retry
-          :flow/predicate ::retry?}]
+        flow-conditions [{:flow/from :inc
+                          :flow/to [:out]
+                          :flow/short-circuit? true
+                          :flow/action :retry
+                          :flow/predicate ::retry?}]
 
-        v-peers (onyx.api/start-peers 3 peer-group)
-        ]
+        v-peers (onyx.api/start-peers 3 peer-group)]
+
     (doseq [x (range 20)]
       (>!! in-chan {:n x}))
 
     (>!! in-chan :done)
     (close! in-chan)
 
-    (onyx.api/submit-job
-     peer-config
-     {:catalog catalog :workflow workflow
-      :flow-conditions flow-conditions
-      :lifecycles lifecycles
-      :task-scheduler :onyx.task-scheduler/balanced})
+    (onyx.api/submit-job peer-config
+                         {:catalog catalog :workflow workflow
+                          :flow-conditions flow-conditions
+                          :lifecycles lifecycles
+                          :task-scheduler :onyx.task-scheduler/balanced})
 
     (let [results (take-segments! out-chan)]
       (is @retried?)

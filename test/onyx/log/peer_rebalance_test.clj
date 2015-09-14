@@ -123,8 +123,8 @@
         replica-2 (playback-log (:log env) replica-1 ch 8000)]
 
     (testing "the peers evenly balance" 
-      (= (get-counts replica-1 [j1 j2]) 
-         [[3 3] [3 3]]))
+      (is (= (get-counts replica-1 [j1 j2]) 
+             [[3 3] [3 3]])))
 
     (testing "the peers rebalance" 
       (is (= (get-counts replica-2 [j1 j2]) 

@@ -71,11 +71,11 @@
         _ (doseq [n (range n-messages)]
             (>!! in-chan {:n n}))
         _ (>!! in-chan :done)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog :workflow workflow
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
+
+        _ (onyx.api/submit-job peer-config
+                               {:catalog catalog :workflow workflow
+                                :lifecycles lifecycles
+                                :task-scheduler :onyx.task-scheduler/balanced})
 
         results (take-segments! out-chan)]
 
@@ -88,5 +88,5 @@
       (onyx.api/shutdown-peer v-peer))
 
     (onyx.api/shutdown-peer-group peer-group)
-    
+
     (onyx.api/shutdown-env env))) 

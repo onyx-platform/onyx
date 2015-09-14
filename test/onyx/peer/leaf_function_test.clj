@@ -70,12 +70,11 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
         v-peers (onyx.api/start-peers 3 peer-group)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog
-             :workflow workflow
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
+        _ (onyx.api/submit-job peer-config
+                               {:catalog catalog
+                                :workflow workflow
+                                :lifecycles lifecycles
+                                :task-scheduler :onyx.task-scheduler/balanced})
 
         _ (doseq [n (range n-messages)]
             (>!! in-chan {:n n}))
@@ -85,6 +84,7 @@
         _ (while (not= n-messages (count @results)))
 
         expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+
     (is (= (set @results) expected))
 
     (doseq [v-peer v-peers]

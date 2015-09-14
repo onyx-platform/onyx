@@ -37,39 +37,37 @@
 
         workflow [[:in :add] [:add :out]]
 
-        catalog
-        [{:onyx/name :in
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog [{:onyx/name :in
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :add
-          :onyx/fn :onyx.peer.catalog-params-test/my-adder
-          :onyx/type :function
-          :onyx/factor 42
-          :onyx/params [:onyx/factor]
-          :onyx/batch-size batch-size}
+                 {:onyx/name :add
+                  :onyx/fn :onyx.peer.catalog-params-test/my-adder
+                  :onyx/type :function
+                  :onyx/factor 42
+                  :onyx/params [:onyx/factor]
+                  :onyx/batch-size batch-size}
 
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-        lifecycles
-        [{:lifecycle/task :in
-          :lifecycle/calls :onyx.peer.catalog-params-test/in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.peer.catalog-params-test/out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles [{:lifecycle/task :in
+                     :lifecycle/calls :onyx.peer.catalog-params-test/in-calls}
+                    {:lifecycle/task :in
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.catalog-params-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
         v-peers (onyx.api/start-peers 3 peer-group)]
 
@@ -77,12 +75,11 @@
       (>!! in-chan {:n n}))
     (>!! in-chan :done)
 
-    (onyx.api/submit-job
-     peer-config
-     {:catalog catalog
-      :workflow workflow
-      :lifecycles lifecycles
-      :task-scheduler :onyx.task-scheduler/balanced})
+    (onyx.api/submit-job peer-config
+                         {:catalog catalog
+                          :workflow workflow
+                          :lifecycles lifecycles
+                          :task-scheduler :onyx.task-scheduler/balanced})
 
     (let [results (take-segments! out-chan)
           expected (set (map (fn [x] {:n (+ x 42)}) (range n-messages)))]

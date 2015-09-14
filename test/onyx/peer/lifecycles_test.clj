@@ -122,11 +122,7 @@
         _ (>!! in-chan :done)
         _ (close! in-chan)
 
-        results (take-segments! out-chan)
-
-
-        ]
-
+        results (take-segments! out-chan)]
 
     (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
       (is (= (set (butlast results)) expected))

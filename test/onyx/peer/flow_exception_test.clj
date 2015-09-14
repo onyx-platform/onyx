@@ -50,56 +50,52 @@
         peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
 
-        catalog
-        [{:onyx/name :in
-          :onyx/plugin :onyx.plugin.core-async/input
-          :onyx/type :input
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Reads segments from a core.async channel"}
+        catalog [{:onyx/name :in
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-         {:onyx/name :inc
-          :onyx/fn :onyx.peer.flow-exception-test/my-inc
-          :onyx/type :function
-          :onyx/batch-size batch-size}
+                 {:onyx/name :inc
+                  :onyx/fn :onyx.peer.flow-exception-test/my-inc
+                  :onyx/type :function
+                  :onyx/batch-size batch-size}
 
-         {:onyx/name :out
-          :onyx/plugin :onyx.plugin.core-async/output
-          :onyx/type :output
-          :onyx/medium :core.async
-          :onyx/batch-size batch-size
-          :onyx/max-peers 1
-          :onyx/doc "Writes segments to a core.async channel"}]
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-        workflow
-        [[:in :inc]
-         [:inc :out]]
+        workflow [[:in :inc]
+                  [:inc :out]]
 
-        lifecycles
-        [{:lifecycle/task :in
-          :lifecycle/calls :onyx.peer.flow-exception-test/in-calls}
-         {:lifecycle/task :in
-          :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}
-         {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles [{:lifecycle/task :in
+                     :lifecycle/calls :onyx.peer.flow-exception-test/in-calls}
+                    {:lifecycle/task :in
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        flow-conditions
-        [{:flow/from :inc
-          :flow/to [:out]
-          :flow/short-circuit? true
-          :flow/thrown-exception? true
-          :flow/predicate [:onyx.peer.flow-exception-test/even-exception?]
-          :flow/post-transform :onyx.peer.flow-exception-test/transform-even}
+        flow-conditions [{:flow/from :inc
+                          :flow/to [:out]
+                          :flow/short-circuit? true
+                          :flow/thrown-exception? true
+                          :flow/predicate [:onyx.peer.flow-exception-test/even-exception?]
+                          :flow/post-transform :onyx.peer.flow-exception-test/transform-even}
 
-         {:flow/from :inc
-          :flow/to [:out]
-          :flow/short-circuit? true
-          :flow/thrown-exception? true
-          :flow/predicate [:onyx.peer.flow-exception-test/five-exception?]
-          :flow/post-transform :onyx.peer.flow-exception-test/transform-five}]
+                         {:flow/from :inc
+                          :flow/to [:out]
+                          :flow/short-circuit? true
+                          :flow/thrown-exception? true
+                          :flow/predicate [:onyx.peer.flow-exception-test/five-exception?]
+                          :flow/post-transform :onyx.peer.flow-exception-test/transform-five}]
 
         v-peers (onyx.api/start-peers 3 peer-group)]
 
@@ -109,11 +105,10 @@
     (>!! in-chan :done)
     (close! in-chan)
 
-    (onyx.api/submit-job
-     peer-config
-     {:catalog catalog :workflow workflow
-      :flow-conditions flow-conditions :lifecycles lifecycles
-      :task-scheduler :onyx.task-scheduler/balanced})
+    (onyx.api/submit-job peer-config
+                         {:catalog catalog :workflow workflow
+                          :flow-conditions flow-conditions :lifecycles lifecycles
+                          :task-scheduler :onyx.task-scheduler/balanced})
 
     (let [results (take-segments! out-chan)]
       (is (= #{{:error? true :value 0}
