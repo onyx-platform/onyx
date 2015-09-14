@@ -1,6 +1,6 @@
 (ns onyx.peer.acker-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.test-helper :refer [load-config]]
             [onyx.plugin.core-async]
             [onyx.api]))

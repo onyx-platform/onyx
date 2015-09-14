@@ -4,7 +4,7 @@
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [schema.core :as s]))
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])

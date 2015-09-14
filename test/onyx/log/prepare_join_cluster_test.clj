@@ -6,7 +6,7 @@
             [onyx.log.replica :as replica]
             [onyx.messaging.dummy-messenger]
             [onyx.system]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (def entry
   (create-log-entry :prepare-join-cluster {:joiner :d

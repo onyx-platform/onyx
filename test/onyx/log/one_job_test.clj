@@ -6,7 +6,7 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [schema.core :as s]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 

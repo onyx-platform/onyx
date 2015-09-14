@@ -6,7 +6,7 @@
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [com.stuartsierra.component :as component]
             [clojure.test :refer :all]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 

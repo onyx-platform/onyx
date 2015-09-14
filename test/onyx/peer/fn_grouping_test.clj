@@ -1,6 +1,6 @@
 (ns onyx.peer.fn-grouping-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [schema.core :as s]

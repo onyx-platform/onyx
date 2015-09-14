@@ -1,5 +1,5 @@
 (ns onyx.flow-pred-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [onyx.static.planning :refer [build-pred-fn]]))
 
 (def true-pred (constantly true))

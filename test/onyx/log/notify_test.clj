@@ -9,7 +9,7 @@
             [onyx.extensions :as extensions]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.api]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))

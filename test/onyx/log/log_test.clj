@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config]]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.api]))
 
 (def onyx-id (java.util.UUID/randomUUID))

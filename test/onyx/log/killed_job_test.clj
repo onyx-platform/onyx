@@ -3,7 +3,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.replica :as replica]
             [onyx.system]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (def entry (create-log-entry :kill-job {:job :j1}))
 

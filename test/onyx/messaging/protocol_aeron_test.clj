@@ -2,7 +2,7 @@
   (:require [onyx.messaging.protocol-aeron :as protocol]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.types :refer [map->Leaf map->Ack]]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (defn read-buf [buf]
   (let [msg-type (protocol/read-message-type buf 0)

@@ -5,7 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.log.curator :as zk]))
 
 (def onyx-id (java.util.UUID/randomUUID))

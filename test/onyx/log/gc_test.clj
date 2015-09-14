@@ -4,7 +4,7 @@
             [onyx.system]
             [schema.core :as s]
             [onyx.log.replica :as replica]
-            [clojure.test :refer [deftest is]]))
+            [clojure.test :refer [deftest is testing]]))
 
 (namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
 

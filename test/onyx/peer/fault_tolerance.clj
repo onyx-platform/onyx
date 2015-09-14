@@ -1,7 +1,7 @@
 (ns onyx.peer.fault-tolerance
   (:require [onyx.helper-env :as helper-env :refer [->TestEnv map->TestEnv]]
             [clojure.core.async :refer [chan >!! <!! close! go-loop timeout thread alts!! sliding-buffer]]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
             [onyx.plugin.core-async :refer [take-segments!]]

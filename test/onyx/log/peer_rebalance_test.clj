@@ -4,7 +4,7 @@
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [schema.core :as s]
             [onyx.log.curator :as zk]))
 
