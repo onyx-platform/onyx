@@ -116,6 +116,42 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:lifecycle/calls`       |`keyword`                     | no       |
 |`:lifecycle/doc`         |`string`                      | yes      |
 
+### Windows
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
+
+| key name             |type       | optional?|
+|----------------------|-----------|----------|
+|`:window/id`          |`keyword`  | no       |
+|`:window/task`        |`keyword`  | no       |
+|`:window/type`        |`string`   | no       |
+|`:window/aggregation` |`string`   | no       |
+|`:window/window-key`  |`string`   | no       |
+|`:window/range`       |`vector`   | no       |
+|`:window/slide`       |`vector`   | sometimes|
+|`:window/init`        |`string`   | sometimes|
+|`:window/doc`         |`string`   | yes      |
+
+`:window/range` and `:window/slide` are vectors of two elements. The first element represents a value, and the second the unit (e.g. `[5 :minutes]`)
+
+### Units
+
+Several values in Onyx require units. Units are vectors of two elements. The first element represents a value, and the second the unit (e.g. `[5 :minutes]`). Onyx supports the following units:
+
+| unit             
+|---------------
+|`:milliseconds`
+|`:seconds`
+|`:minutes`
+|`:hours`
+|`:days`
+|`:elements`
+
+Onyx also allows you to specify a single form (`:minute`) anywhere that it is needed for readability.
+
+
 ### Event Context
 
 Onyx exposes an "event context" through many of its APIs. This is a description of

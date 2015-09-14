@@ -4,7 +4,7 @@ This section discusses a feature called windowing. Windows allow you to group an
 
 ### Summary
 
-Windowing splits up a possibly unbounded data set into finite, possibly overlapping portions. Windows allow us create aggregations over distinct portions of a stream, rather than stalling and waiting for the entire data data set to arrive. In Onyx, Windows strictly describe how data is accrued. When you want to *do* something with the windowed data, you use a Trigger. See the chapter on Triggers for more information.
+Windowing splits up a possibly unbounded data set into finite, possibly overlapping portions. Windows allow us create aggregations over distinct portions of a stream, rather than stalling and waiting for the entire data data set to arrive. In Onyx, Windows strictly describe how data is accrued. When you want to *do* something with the windowed data, you use a Trigger. See the chapter on Triggers for more information. Onyx's windowing mechanisms are strong enough to handle stream disorder. If your data arrives in an order that isn't "logical" (for example, `:event-time` keys moving backwards in time), Onyx can sort out the appropriate buckets to put the data in.
 
 ### Window Types
 
@@ -151,3 +151,14 @@ The `:average` operation maintains an average over `:window/average-key`. An ini
 
 #### Window Specifications
 
+See the Information Model chapter for an exact specification of what values the Window maps need to supply. Here we will describe what each of the keys mean.
+
+| key name             |description
+|----------------------|-----------
+|`:window/id`          | A unique identifier per window
+|`:window/task`        | The workflow task over which the window operates
+|`:window/type`        | Which type of window this is (fixed, sliding, etc)
+|`:window/aggregation` | The aggregation function to apply, as described above
+|`:window/window-key`  | The key over which range 
+|`:window/init`        |
+|`:window/doc`         |
