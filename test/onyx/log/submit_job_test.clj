@@ -3,7 +3,10 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [clojure.test :refer [deftest is testing]]))
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]))
+
+(use-fixtures :once schema.test/validate-schemas)
 
 (deftest submit-job-log-test
   (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]

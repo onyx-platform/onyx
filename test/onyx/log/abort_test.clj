@@ -4,10 +4,11 @@
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [clojure.test :refer [deftest is testing]]
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [schema.core :as s]))
 
-(namespace-state-changes [(around :facts (s/with-fn-validation ?form))])
+(use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-abort-test
   (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}

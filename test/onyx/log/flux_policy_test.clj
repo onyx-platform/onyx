@@ -3,7 +3,10 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.replica :as replica]
             [onyx.system]
-            [clojure.test :refer [deftest is testing]]))
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]))
+
+(use-fixtures :once schema.test/validate-schemas)
 
 (deftest flux-policy-leave-tests
   (testing "Flux policy continue" 
