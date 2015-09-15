@@ -44,7 +44,7 @@
    s/Keyword s/Any})
 
 (def FluxPolicy 
-  (s/enum :continue :kill))
+  (s/enum :continue :kill :recover))
 
 (def ^{:private true} partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any

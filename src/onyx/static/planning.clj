@@ -24,13 +24,9 @@
         (map (juxt identity task-ids)
              (map :onyx/name elements))))
 
-(defn grouping-tasks [catalog]
-  (->> catalog
-       (filter (fn [task-map]
-                 (or (:onyx/group-by-fn task-map)
-                     (:onyx/group-by-key task-map))))
-       (map :onyx/name)
-       (set)))
+(defn grouping-task? [task-map]
+  (boolean (or (:onyx/group-by-fn task-map)
+               (:onyx/group-by-key task-map))))
 
 (defmulti create-task
   (fn [task-ids catalog task-name parents children-names]
