@@ -9,14 +9,6 @@
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
-(defn pick-peer [id active-peers hash-group max-downstream-links]
-  (when-not (empty? active-peers)
-    (if hash-group
-      (nth active-peers
-           (mod hash-group
-                (count active-peers)))
-      (rand-nth (operation/select-n-peers id active-peers max-downstream-links)))))
-
 (defn read-batch
   ([event]
    (read-batch event (:onyx.core/messenger event)))
@@ -28,10 +20,10 @@
    (let [segments (:segments (:onyx.core/results event))]
      (when-not (empty? segments)
        (let [replica-val @replica
-             active-peers (:active-peers @peer-replica-view)]
+             pick-peer-fns (:pick-peer-fns @peer-replica-view)]
          (doseq [[[route hash-group] segs] (group-by #(t/vector (:route %) (:hash-group %)) segments)]
-           (let [task-peers (get active-peers (get egress-tasks route))
-                 target (pick-peer id task-peers hash-group max-downstream-links)]
+           (let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))
+                 target (pick-peer-fn hash-group)]
              (when target
                (let [link (operation/peer-link replica-val state event target)]
                  (onyx.extensions/send-messages messenger event link segs)))))))))

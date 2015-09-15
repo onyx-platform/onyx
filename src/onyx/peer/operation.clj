@@ -61,18 +61,6 @@
                                          (into-array Class [clojure.lang.IPersistentMap]))
                 (into-array [pipeline-data])))
 
-;; TODO: can be precalculated for peer in replica-view
-(defn select-n-peers
-  "Stably select n peers using our id and the downstream task ids.
-  If a peer is added or removed, the set can only change by one value at max"
-  [id all-peers n]
-  (if (<= (count all-peers) n)
-    all-peers
-    (take n
-          (sort-by (fn [peer-id] (hash-combine (.hashCode ^java.util.UUID id)
-                                               (.hashCode ^java.util.UUID peer-id)))
-                   all-peers))))
-
 (defn peer-link
   [replica-val state event peer-id]
   (if-let [link (get (:links @state) peer-id)]
