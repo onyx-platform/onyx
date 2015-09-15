@@ -406,7 +406,6 @@
            onyx.core/id
            onyx.core/params
            onyx.core/fn
-           onyx.core/max-acker-links
            onyx.core/job-id] :as init-event} seal-ch kill-ch ex-f]
   (let [task-type (:onyx/type task-map)
         bulk? (:onyx/bulk? task-map)
@@ -535,8 +534,6 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts opts
-                           :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
-                           :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view

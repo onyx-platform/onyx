@@ -165,8 +165,6 @@
    (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
    (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
    (s/optional-key :onyx.messaging/retry-ch-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/max-downstream-links) s/Int
-   (s/optional-key :onyx.messaging/max-acker-links) s/Int
    (s/optional-key :onyx.messaging/peer-link-gc-interval) s/Int
    (s/optional-key :onyx.messaging/peer-link-idle-timeout) s/Int
    (s/optional-key :onyx.messaging/ack-daemon-timeout) s/Int

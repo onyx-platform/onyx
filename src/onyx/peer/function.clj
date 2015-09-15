@@ -16,7 +16,7 @@
    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
 
 (defn write-batch
-  ([event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
+  ([event replica peer-replica-view state id messenger job-id egress-tasks]
    (let [segments (:segments (:onyx.core/results event))]
      (when-not (empty? segments)
        (let [replica-val @replica
@@ -31,11 +31,10 @@
   ([{:keys [onyx.core/id onyx.core/results
             onyx.core/messenger onyx.core/job-id
             onyx.core/state onyx.core/replica
-            onyx.core/peer-replica-view onyx.core/serialized-task
-            onyx.core/max-downstream-links] :as event}]
-   (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links (:egress-ids serialized-task))))
+            onyx.core/peer-replica-view onyx.core/serialized-task] :as event}]
+   (write-batch event replica peer-replica-view state id messenger job-id (:egress-ids serialized-task))))
 
-(defrecord Function [replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks]
+(defrecord Function [replica peer-replica-view state id messenger job-id egress-tasks]
   p-ext/Pipeline
   (read-batch
     [_ event]
@@ -43,7 +42,7 @@
 
   (write-batch
     [_ event]
-    (write-batch event replica peer-replica-view state id messenger job-id max-downstream-links egress-tasks))
+    (write-batch event replica peer-replica-view state id messenger job-id egress-tasks))
 
   (seal-resource [_ _]
     nil))
@@ -54,7 +53,6 @@
                         onyx.core/id
                         onyx.core/messenger
                         onyx.core/job-id
-                        onyx.core/max-downstream-links
                         onyx.core/serialized-task] :as pipeline-data}]
   (->Function replica
               peer-replica-view
@@ -62,5 +60,4 @@
               id
               messenger
               job-id
-              max-downstream-links
               (:egress-ids serialized-task)))
