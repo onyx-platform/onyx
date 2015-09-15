@@ -5,17 +5,10 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
             [onyx.peer.operation :as operation]
+            [onyx.peer.planning :as planning]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates job-id task-id catalog task])
-
-(defn grouping-tasks [catalog]
-  (->> catalog
-       (filter (fn [task-map]
-                 (or (:onyx/group-by-fn task-map)
-                     (:onyx/group-by-key task-map))))
-       (map :onyx/name)
-       (set)))
 
 (defn build-pick-peer-fn [task-id egress-peers grouping?]
   (let [out-peers (egress-peers task-id)] 
@@ -43,7 +36,7 @@
             catalog (if (= job-id (:job-id old-view)) 
                       (:catalog old-view)
                       (extensions/read-chunk log :catalog job-id))
-            group-tasks (grouping-tasks catalog)
+            group-tasks (planning/grouping-tasks catalog)
             {:keys [peer-state ackers]} new-replica
             receivable-peers (common/job-receivable-peers peer-state allocations job-id)
             backpressure? (common/backpressure? new-replica job-id)

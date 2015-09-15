@@ -6,7 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]
-              [onyx.static.planning :refer [find-task find-task-fast]]
+              [onyx.static.planning :refer [find-task]]
               [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-compile :as c]
