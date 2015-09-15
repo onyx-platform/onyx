@@ -66,11 +66,11 @@
   (max min-windowing-attr (- (+ min-windowing-attr (* w-slide (inc w))) w-range)))
 
 (defn extent-upper [min-windowing-attr w-slide w]
-  (+ min-windowing-attr (* w-slide (inc w))))
+  (dec (+ min-windowing-attr (* w-slide (inc w)))))
 
 (defn extents [min-windowing-attr w-range w-slide w]
   (range (extent-lower min-windowing-attr w-range w-slide w)
-         (extent-upper min-windowing-attr w-slide w)))
+         (inc (extent-upper min-windowing-attr w-slide w))))
 
 ;; WID requires that a strict lower-bound of the windowing attribute
 ;; be defined. In our example, this will be 0. We will use a window

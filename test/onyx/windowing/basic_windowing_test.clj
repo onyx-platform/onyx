@@ -93,8 +93,8 @@
     :trigger/period [1 :seconds]
     :trigger/sync ::write-to-stdout}])
 
-(defn write-to-stdout [event state]
-  (println state))
+(defn write-to-stdout [event window-id lower-bound upper-bound state]
+  (println window-id (java.util.Date. lower-bound) (java.util.Date. upper-bound) state))
 
 (def in-chan (chan (inc (count input))))
 
