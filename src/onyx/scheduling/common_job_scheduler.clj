@@ -208,6 +208,7 @@
   (let [peers (sort (replica->job-peers replica job))]
     (-> replica
         (update-in [:allocations] dissoc job)
+        (update-in [:task-slot-ids] dissoc job)
         (update-in [:peer-state] (fn [peer-state]
                                    (reduce (fn [ps peer]
                                              (assoc ps peer :idle))
