@@ -18,6 +18,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - [Flow Conditions](#flow-conditions)
 - [Lifecycles](#lifecycles)
 - [Windows](#windows)
+- [Triggers](#triggers)
 - [Units](#units)
 - [Event Context](#event-context)
 

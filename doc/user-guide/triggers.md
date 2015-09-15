@@ -6,6 +6,14 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
 
+- [Summary](#summary)
+- [Trigger Types](#trigger-types)
+  - [`:periodically`](#periodically)
+- [Refinement Modes](#refinement-modes)
+  - [`:accumulating`](#accumulating)
+  - [`:discarding`](#discarding)
+- [Syncing](#syncing)
+- [Trigger Specification](#trigger-specification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
