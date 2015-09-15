@@ -16,7 +16,7 @@
    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
 
 (defn write-batch
-  ([event replica peer-replica-view state id messenger job-id egress-tasks]
+  ([event replica peer-replica-view state messenger egress-tasks]
    (let [segments (:segments (:onyx.core/results event))]
      (when-not (empty? segments)
        (let [replica-val @replica
@@ -28,13 +28,11 @@
                (let [link (operation/peer-link replica-val state event target)]
                  (onyx.extensions/send-messages messenger event link segs)))))))))
 
-  ([{:keys [onyx.core/id onyx.core/results
-            onyx.core/messenger onyx.core/job-id
-            onyx.core/state onyx.core/replica
-            onyx.core/peer-replica-view onyx.core/serialized-task] :as event}]
-   (write-batch event replica peer-replica-view state id messenger job-id (:egress-ids serialized-task))))
+  ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state 
+            onyx.core/replica onyx.core/peer-replica-view onyx.core/serialized-task] :as event}]
+   (write-batch event replica peer-replica-view state messenger (:egress-ids serialized-task))))
 
-(defrecord Function [replica peer-replica-view state id messenger job-id egress-tasks]
+(defrecord Function [replica peer-replica-view state messenger egress-tasks]
   p-ext/Pipeline
   (read-batch
     [_ event]
@@ -42,7 +40,7 @@
 
   (write-batch
     [_ event]
-    (write-batch event replica peer-replica-view state id messenger job-id egress-tasks))
+    (write-batch event replica peer-replica-view state messenger egress-tasks))
 
   (seal-resource [_ _]
     nil))
@@ -50,14 +48,10 @@
 (defn function [{:keys [onyx.core/replica
                         onyx.core/peer-replica-view
                         onyx.core/state
-                        onyx.core/id
                         onyx.core/messenger
-                        onyx.core/job-id
                         onyx.core/serialized-task] :as pipeline-data}]
   (->Function replica
               peer-replica-view
               state
-              id
               messenger
-              job-id
               (:egress-ids serialized-task)))
