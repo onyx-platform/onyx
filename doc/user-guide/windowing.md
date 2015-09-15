@@ -18,7 +18,7 @@ This section discusses a feature called windowing. Windows allow you to group an
   - [`:min`](#min)
   - [`:max`](#max)
   - [`:average`](#average)
-- [Window Specifications](#window-specifications)
+- [Window Specification](#window-specification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -169,7 +169,7 @@ The `:average` operation maintains an average over `:window/average-key`. An ini
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
 ```
 
-### Window Specifications
+### Window Specification
 
 See the Information Model chapter for an exact specification of what values the Window maps need to supply. Here we will describe what each of the keys mean.
 

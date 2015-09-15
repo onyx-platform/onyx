@@ -139,6 +139,20 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 `:window/range` and `:window/slide` are values that require Units. See below for a description of Units.
 
+### Triggers
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
+
+| key name             |type       | optional?|
+|----------------------|-----------|----------|
+|`:trigger/window-id`  |`keyword`  | no       |
+|`:trigger/refinement` |`keyword`  | no       |
+|`:trigger/type`       |`keyword`  | no       |
+|`:trigger/sync`       |`keyword`  | no       |
+|`:trigger/doc`        |`string`   | yes      |
+
 ### Units
 
 Several values in Onyx require units. Units are vectors of two elements. The first element represents a value, and the second the unit (e.g. `[5 :minutes]`). Onyx supports the following units:
