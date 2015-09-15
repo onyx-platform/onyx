@@ -69,7 +69,15 @@
     :window/window-key :event-time
     :window/range [30 :minutes]
     :window/slide [5 :minutes]
-    :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
+    :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}
+
+   {:window/id :sum-segments
+    :window/task :identity
+    :window/type :fixed
+    :window/aggregation :sum
+    :window/sum-key :age
+    :window/window-key :event-time
+    :window/range [30 :minutes]}])
 
 (def triggers
   [{:trigger/window-id :collect-segments
@@ -77,7 +85,13 @@
     :trigger/type :periodically
     :trigger/period [5 :seconds]
     :trigger/sync ::write-to-stdout
-    :trigger/doc "Writes the window contents to standard out 5 seconds, discarding intermediate state"}])
+    :trigger/doc "Writes the window contents to standard out 5 seconds, discarding intermediate state"}
+
+   {:trigger/window-id :sum-segments
+    :trigger/refinement :accumulating
+    :trigger/type :periodically
+    :trigger/period [1 :seconds]
+    :trigger/sync ::write-to-stdout}])
 
 (defn write-to-stdout [event state]
   (println state))
@@ -108,12 +122,6 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(doseq [i input]
-  (>!! in-chan i))
-
-(>!! in-chan :done)
-(close! in-chan)
-
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
 (onyx.api/submit-job
@@ -125,11 +133,18 @@
   :triggers triggers
   :task-scheduler :onyx.task-scheduler/balanced})
 
+(doseq [i input]
+  (>!! in-chan i))
+
+(>!! in-chan :done)
+(close! in-chan)
+
 (def results (take-segments! out-chan))
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(do
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
+  (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
+  (onyx.api/shutdown-env env))

@@ -325,7 +325,7 @@
                 extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
             (doseq [e extents]
               (let [f (agg/aggregation-fn (:window/aggregation w))]
-                (swap! window-state update e f w (:message msg)))))))
+                (swap! window-state update-in [(:window/id w) e] f w (:message msg)))))))
       event)
     event))
 
