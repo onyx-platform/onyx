@@ -33,7 +33,7 @@
                     (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
                           win-min (or (:window/min-value window) 0)
                           w-range (apply to-standard-units (:window/range window))
-                          w-slide (apply to-standard-units (:window/slide window))
+                          w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
                           lower (wid/extent-lower win-min w-range w-slide window-id)
                           upper (wid/extent-upper win-min w-slide window-id)]
                       (f event window-id lower upper state)))))
