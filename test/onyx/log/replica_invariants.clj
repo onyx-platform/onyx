@@ -20,13 +20,13 @@
         slot-id-peers (mapcat keys (vals (reduce merge (vals task-slot-ids))))]
     (mapv (fn [coll] 
             (is (empty? (remove (set peers) coll))))
-          (map keys [peer-state peer-sites prepared accepted pairs])))
+          (map keys [peer-state peer-sites prepared accepted pairs]))
 
-  (testing "slot ids only allocated once" 
-    (is (= slot-id-peers
-           (distinct slot-id-peers))))
-  (is (empty? (remove (set peers) slot-id-peers)))
-  (is (empty? (reduce dissoc peer-allocations peers))))
+    (testing "slot ids only allocated once" 
+      (is (= slot-id-peers
+             (distinct slot-id-peers))))
+    (is (empty? (remove (set peers) slot-id-peers)))
+    (is (empty? (reduce dissoc peer-allocations peers)))))
 
 (defn standard-invariants [replica]
   (job-id-invariants replica)
