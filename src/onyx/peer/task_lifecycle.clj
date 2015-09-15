@@ -178,7 +178,7 @@
 
 (defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
-    (let [link (operation/peer-link @replica state event acker-id)]
+    (when-let [link (operation/peer-link @replica state event acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
                     #(extensions/internal-ack-segments messenger event link acks))))
@@ -186,7 +186,7 @@
 
 (defn flow-retry-segments [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [root (:retries results)]
-    (let [link (operation/peer-link @replica state event (:completion-id root))]
+    (when-let [link (operation/peer-link @replica state event (:completion-id root))]
       (emit-latency :peer-retry-segment
                     monitoring
                     #(extensions/internal-retry-segment messenger event (:id root) link))))
@@ -343,9 +343,10 @@
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
                        peer-link (operation/peer-link @replica state event peer-id)]
-                   (emit-latency :peer-complete-message
-                                 monitoring
-                                 #(extensions/internal-complete-message messenger event id peer-link)))
+                   (when peer-link 
+                     (emit-latency :peer-complete-message
+                                   monitoring
+                                   #(extensions/internal-complete-message messenger event id peer-link))))
 
                  (= ch retry-ch)
                  (->> (p-ext/retry-segment pipeline event v)

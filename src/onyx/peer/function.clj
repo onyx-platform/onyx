@@ -25,7 +25,7 @@
            (let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))
                  target (pick-peer-fn hash-group)]
              (when target
-               (let [link (operation/peer-link replica-val state event target)]
+               (when-let [link (operation/peer-link replica-val state event target)]
                  (onyx.extensions/send-messages messenger event link segs)))))))))
 
   ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state 

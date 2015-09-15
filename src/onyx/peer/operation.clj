@@ -1,7 +1,7 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
-            [taoensso.timbre :refer [info]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defn get-method-java [class-name method-name]
   (let [ms (filter #(= (.getName %) method-name)
@@ -67,9 +67,9 @@
     (do
       (reset! (:timestamp link) (System/currentTimeMillis))
       (:link link))
-    (let [site (-> replica-val
-                   :peer-sites
-                   (get peer-id))]
+    (if-let [site (-> replica-val
+                      :peer-sites
+                      (get peer-id))]
       (-> state
           (swap! update-in
                  [:links peer-id]
@@ -79,4 +79,6 @@
                                (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)
-          :link))))
+          :link)
+      (do (warn "Could not obtain peer-site from replica" peer-id)
+          nil))))
