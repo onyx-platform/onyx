@@ -19,7 +19,6 @@
 
 (defn build-pick-peer-fn [task-id egress-peers grouping?]
   (let [out-peers (egress-peers task-id)] 
-    (info "OUTPEERS " out-peers egress-peers task-id)
     (cond (empty? out-peers)
           (fn [_] nil)
           grouping?
