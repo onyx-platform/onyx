@@ -6,7 +6,7 @@
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
               [onyx.monitoring.measurements :refer [emit-latency]]
-              [onyx.static.planning :refer [find-task find-task-fast]]
+              [onyx.static.planning :refer [find-task]]
               [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-compile :as c]
@@ -178,7 +178,7 @@
 
 (defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
-    (let [link (operation/peer-link @replica state event acker-id)]
+    (when-let [link (operation/peer-link @replica state event acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
                     #(extensions/internal-ack-segments messenger event link acks))))
@@ -186,7 +186,7 @@
 
 (defn flow-retry-segments [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [root (:retries results)]
-    (let [link (operation/peer-link @replica state event (:completion-id root))]
+    (when-let [link (operation/peer-link @replica state event (:completion-id root))]
       (emit-latency :peer-retry-segment
                     monitoring
                     #(extensions/internal-retry-segment messenger event (:id root) link))))
@@ -343,9 +343,10 @@
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
                        peer-link (operation/peer-link @replica state event peer-id)]
-                   (emit-latency :peer-complete-message
-                                 monitoring
-                                 #(extensions/internal-complete-message messenger event id peer-link)))
+                   (when peer-link 
+                     (emit-latency :peer-complete-message
+                                   monitoring
+                                   #(extensions/internal-complete-message messenger event id peer-link))))
 
                  (= ch retry-ch)
                  (->> (p-ext/retry-segment pipeline event v)
@@ -406,7 +407,6 @@
            onyx.core/id
            onyx.core/params
            onyx.core/fn
-           onyx.core/max-acker-links
            onyx.core/job-id] :as init-event} seal-ch kill-ch ex-f]
   (let [task-type (:onyx/type task-map)
         bulk? (:onyx/bulk? task-map)
@@ -535,8 +535,6 @@
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/peer-opts opts
-                           :onyx.core/max-downstream-links (arg-or-default :onyx.messaging/max-downstream-links opts)
-                           :onyx.core/max-acker-links (arg-or-default :onyx.messaging/max-acker-links opts)
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view

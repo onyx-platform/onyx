@@ -202,12 +202,9 @@
                              (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle))
                                      snapshot))]
           (doseq [k to-remove]
-            (let [pub-manager (:publication (snapshot k))
-                  pub @(:publication pub-manager)
-                  conn @(:connection pub-manager)]
+            (let [pub-manager (:publication (snapshot k))]
               (swap! publications dissoc k)
-              (.close ^Publication pub)
-              (.close ^Aeron conn))))
+              (pubm/disconnect pub-manager))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
@@ -327,7 +324,7 @@
 (defrecord AeronPeerConnection [channel stream-id id])
 
 (defmethod extensions/connect-to-peer AeronConnection
-  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id]}]
+  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
         ;; ensure that each machine spreads their use of a node/peer-group's
         ;; streams evenly over the cluster

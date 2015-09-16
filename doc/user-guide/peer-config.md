@@ -26,8 +26,6 @@ The chapter describes the all options available to configure the virtual peers a
     - [`:onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
     - [`:onyx.messaging/release-ch-buffer-size`](#onyxmessagingrelease-ch-buffer-size)
     - [`:onyx.messaging/retry-ch-buffer-size`](#onyxmessagingretry-ch-buffer-size)
-    - [`:onyx.messaging/max-downstream-links`](#onyxmessagingmax-downstream-links)
-    - [`:onyx.messaging/max-acker-links`](#onyxmessagingmax-acker-links)
     - [`:onyx.messaging/peer-link-gc-interval`](#onyxmessagingpeer-link-gc-interval)
     - [`:onyx.messaging/peer-link-idle-timeout`](#onyxmessagingpeer-link-idle-timeout)
     - [`:onyx.messaging/ack-daemon-timeout`](#onyxmessagingack-daemon-timeout)
@@ -82,8 +80,6 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/completion-buffer-size`    | `int`      | `1000`                             |
 |`:onyx.messaging/release-ch-buffer-size`    | `int`      | `10000`                            |
 |`:onyx.messaging/retry-ch-buffer-size`      | `int`      | `10000`                            |
-|`:onyx.messaging/max-downstream-links`      | `int`      | `10`                               |
-|`:onyx.messaging/max-acker-links`           | `int`      | `5`                                |
 |`:onyx.messaging/peer-link-gc-interval`     | `int`      | `90000`                            |
 |`:onyx.messaging/peer-link-idle-timeout`    | `int`      | `60000`                            |
 |`:onyx.messaging/ack-daemon-timeout`        | `int`      | `60000`                            |
@@ -176,14 +172,6 @@ Number of messages to buffer in the core.async channel for released completed me
 ##### `:onyx.messaging/retry-ch-buffer-size`
 
 Number of messages to buffer in the core.async channel for retrying timed-out messages.
-
-##### `:onyx.messaging/max-downstream-links`
-
-The maximum number of network connections that should be opened to downstream peers from a task. Useful for very large clusters.
-
-##### `:onyx.messaging/max-acker-links`
-
-The maximum number of network connections that should be opened to acking daemons from a peer. Useful for very large clusters.
 
 ##### `:onyx.messaging/peer-link-gc-interval`
 
