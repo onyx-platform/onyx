@@ -312,7 +312,7 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
-(defn populate-windows
+(defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
   (if (seq windows)
     (do
@@ -452,7 +452,7 @@
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
-             (populate-windows)
+             (assign-windows)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
