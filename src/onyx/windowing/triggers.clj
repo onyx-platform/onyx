@@ -1,5 +1,5 @@
 (ns onyx.windowing.triggers
-  (:require [onyx.windowing.coerce :refer [to-standard-units]]
+  (:require [onyx.windowing.coerce :refer [to-standard-units standard-units-for]]
             [onyx.windowing.window-id :as wid]
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.static.planning :refer [find-window]]
@@ -8,6 +8,10 @@
 (defmulti trigger-setup
   (fn [event trigger id]
     (:trigger/type trigger)))
+
+(defmulti trigger-fire
+  (fn [event trigger id invoker & args]
+    [(:trigger/type trigger) invoker]))
 
 (defmulti trigger-teardown
   (fn [event trigger id]
@@ -20,29 +24,35 @@
 (defmethod trigger-setup :periodically
   [event trigger id]
   ;; TODO: validate that :trigger/period is a time-based value.
-  (let [f (kw->fn (:trigger/sync trigger))
-        fut
-        (future
-          (loop []
-            (try
-              (let [ms (apply to-standard-units (:trigger/period trigger))]
+  (if (= (standard-units-for (second (:trigger/period trigger))) :milliseconds)
+    (let [ms (apply to-standard-units (:trigger/period trigger))
+          fut
+          (future
+            (loop []
+              (try
                 (Thread/sleep ms)
-                (let [state (refine-state event trigger)
-                      window-ids (get state (:trigger/window-id trigger))]
-                  (doseq [[window-id state] window-ids]
-                    (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
-                          win-min (or (:window/min-value window) 0)
-                          w-range (apply to-standard-units (:window/range window))
-                          w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
-                          lower (wid/extent-lower win-min w-range w-slide window-id)
-                          upper (wid/extent-upper win-min w-slide window-id)]
-                      (f event window-id lower upper state)))))
-              (catch InterruptedException e
-                (throw e))
-              (catch Throwable e
-                (fatal e)))
-            (recur)))]
-    (assoc-in event [:onyx.triggers/period-threads id] fut)))
+                (trigger-fire event trigger id :timer)
+                (catch InterruptedException e
+                  (throw e))
+                (catch Throwable e
+                  (fatal e)))
+              (recur)))]
+      (assoc-in event [:onyx.triggers/period-threads id] fut))
+    event))
+
+(defmethod trigger-fire [:periodically :timer]
+  [event trigger id invoker]
+  (let [f (kw->fn (:trigger/sync trigger))
+        state (refine-state event trigger)
+        window-ids (get state (:trigger/window-id trigger))]
+    (doseq [[window-id state] window-ids]
+      (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
+            win-min (or (:window/min-value window) 0)
+            w-range (apply to-standard-units (:window/range window))
+            w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
+            lower (wid/extent-lower win-min w-range w-slide window-id)
+            upper (wid/extent-upper win-min w-slide window-id)]
+        (f event window-id lower upper state)))))
 
 (defmethod trigger-teardown :periodically
   [event trigger id]
@@ -76,9 +86,12 @@
                      #(dissoc % (:trigger/window-id trigger)))))
 
 (defmethod trigger-setup :default
-  [event _ _]
+  [event trigger id]
   event)
 
+(defmethod trigger-fire :default
+  [event trigger id invoker])
+
 (defmethod trigger-teardown :default
-  [event _ _]
+  [event trigger id]
   event)
