@@ -57,8 +57,8 @@
         read-entry (<!! ch)]
 
     (testing "Log notify step 1"
-      (is (:fn read-entry) :notify-join-cluster)
-      (is (:args read-entry) {:observer d-id :subject b-id}))
+      (is :notify-join-cluster (:fn read-entry))
+      (is {:observer d-id :subject b-id} (:args read-entry)))
 
     (let [f (partial extensions/apply-log-entry read-entry)
           rep-diff (partial extensions/replica-diff read-entry)
@@ -78,18 +78,19 @@
           read-entry (<!! ch)]
 
       (testing "Log notify step 2"
-        (is (= (:fn read-entry) :accept-join-cluster))
-        (is (= (:args read-entry) {:accepted-joiner :d
-                                   :accepted-observer :a
-                                   :subject :b
-                                   :observer :d})))
+        (is (= :accept-join-cluster (:fn read-entry)))
+        (is (= {:accepted-joiner :d
+                :accepted-observer :a
+                :subject :b
+                :observer :d} 
+               (:args read-entry))))
       (let [conn (zk/connect (:zookeeper/address (:env-config config)))
             _ (zk/delete conn (str (onyx.log.zookeeper/pulse-path onyx-id) "/" d-id))
             _ (zk/close conn)
             entry (<!! ch)]
 
         (testing "Log notify step 3" 
-          (is (= (:fn entry) :leave-cluster))
-          (is (= (:args entry) {:id :d})))
+          (is (= :leave-cluster (:fn entry)))
+          (is (= {:id :d} (:args entry))))
 
         (onyx.api/shutdown-env env)))))

@@ -123,12 +123,12 @@
         replica-2 (playback-log (:log env) replica-1 ch 8000)]
 
     (testing "the peers evenly balance" 
-      (is (= (get-counts replica-1 [j1 j2]) 
-             [[3 3] [3 3]])))
+      (is (= [[3 3] [3 3]] 
+             (get-counts replica-1 [j1 j2]))))
 
     (testing "the peers rebalance" 
-      (is (= (get-counts replica-2 [j1 j2]) 
-             [[3 2] [3 3]])))
+      (is (= [[3 2] [3 3]] 
+             (get-counts replica-2 [j1 j2]))))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

@@ -77,8 +77,8 @@
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
     (testing "peers balanced on 1 job"
-      (is (= (into #{} (map count (mapcat vals (vals (:allocations replica)))))
-             #{1 2})))
+      (is (= #{1 2}
+             (into #{} (map count (mapcat vals (vals (:allocations replica))))))))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

@@ -26,7 +26,7 @@
         (doseq [n (range 10)]
           (extensions/write-log-entry (:log env) {:n n}))
 
-        (is (= (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))) 10)))
+        (is (= 10 (count (map (fn [n] (extensions/read-log-entry (:log env) n)) (range 10))))))
       (finally
         (onyx.api/shutdown-env env)))))
 
@@ -51,9 +51,9 @@
                           (catch Exception e
                             (.printStackTrace e))))]
         (testing "We can asynchronously write log entries and read them back in order"
-          (is (= (count (map (fn [n] (<!! ch))
-                             (range entries)))
-                 entries)))
+          (is (= entries
+                 (count (map (fn [n] (<!! ch))
+                             (range entries))))))
 
         (deref write-fut))
       (finally

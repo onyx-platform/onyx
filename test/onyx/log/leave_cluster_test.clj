@@ -20,11 +20,11 @@
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (get-in new-replica [:pairs :a]) :b))
-    (is (= (get-in new-replica [:pairs :b]) :a))
-    (is (= (get-in new-replica [:pairs :c]) nil))
-    (is (= diff {:died :c :updated-watch {:observer :b :subject :a}}))
-    (is (= (rep-reactions old-replica new-replica diff {:id :a}) nil))))
+    (is (= :b (get-in new-replica [:pairs :a])))
+    (is (= :a (get-in new-replica [:pairs :b])))
+    (is (= nil (get-in new-replica [:pairs :c])))
+    (is (= {:died :c :updated-watch {:observer :b :subject :a}} diff))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))))
 
 (deftest log-leave-cluster-2
   (let [entry (create-log-entry :leave-cluster {:id :b})
@@ -37,10 +37,10 @@
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (get-in new-replica [:pairs :a]) nil))
-    (is (= (get-in new-replica [:pairs :b]) nil))
-    (is (= diff {:died :b :updated-watch {:observer :a :subject :a}}))
-    (is (= (rep-reactions old-replica new-replica diff {:id :a}) nil))))
+    (is (= nil (get-in new-replica [:pairs :a])))
+    (is (= nil (get-in new-replica [:pairs :b])))
+    (is (= {:died :b :updated-watch {:observer :a :subject :a}} diff))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))))
 
 (deftest log-leave-cluster-3 
   (let [entry (create-log-entry :leave-cluster {:id :d})
@@ -54,16 +54,19 @@
                             :jobs [:j1 :j2]
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}
+                            :task-slot-ids {:j1 {:t1 {:a 1 :b 0}}
+                                            :j2 {:t2 {:c 0 :d 1}}}
                             :tasks {:j1 [:t1] :j2 [:t2]}
                             :allocations {:j1 {:t1 [:a :b]}
                                           :j2 {:t2 [:c :d]}}
                             :messaging {:onyx.messaging/impl :dummy-messenger}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (:allocations (f old-replica)) {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}))
-    (is (= (rep-reactions old-replica new-replica diff {:id :a}) nil))
-    (is (= (rep-reactions old-replica new-replica diff {:id :b}) nil))
-    (is (= (rep-reactions old-replica new-replica diff {:id :c}) nil))))
+    (is (= {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}} (:allocations (f old-replica))))
+    (is (= {:j1 {:t1 {:a 1 :b 0}} :j2 {:t2 {:c 0}}} (:task-slot-ids new-replica)))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :b})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :c})))))
 
 (deftest log-leave-cluster-4 
   (let [entry (create-log-entry :leave-cluster {:id :c})
@@ -79,9 +82,12 @@
                             :task-schedulers {:j1 :onyx.task-scheduler/balanced
                                               :j2 :onyx.task-scheduler/balanced}
                             :tasks {:j1 [:t1] :j2 [:t2]}
+                            :task-slot-ids {:j1 {:t1 {:a 1 :b 0}}
+                                            :j2 {:t2 {:c 0}}}
                             :allocations {:j1 {:t1 [:a :b]} :j2 {:t2 [:c]}}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (:allocations new-replica) {:j1 {:t1 [:a]} :j2 {:t2 [:b]}}))
-    (is (= (rep-reactions old-replica new-replica diff {:id :a}) nil))
-    (is (= (rep-reactions old-replica new-replica diff {:id :b}) nil))))
+    (is (= {:j1 {:t1 [:a]} :j2 {:t2 [:b]}} (:allocations new-replica)))
+    (is (= {:j1 {:t1 {:a 1}} :j2 {:t2 {:b 0}}} (:task-slot-ids new-replica)))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))
+    (is (= nil (rep-reactions old-replica new-replica diff {:id :b})))))

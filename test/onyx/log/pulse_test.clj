@@ -51,7 +51,7 @@
         _ (zk/close conn)
         entry (<!! ch)]
 
-    (is (= (:fn entry) :leave-cluster))
-    (is (= (:args entry) {:id :d}))
+    (is (= :leave-cluster (:fn entry)))
+    (is (= {:id :d} (:args entry)))
 
     (onyx.api/shutdown-env env)))

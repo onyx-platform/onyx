@@ -239,10 +239,10 @@
                                   {:age 25 :job "psychologist" :location "Washington"}
                                   :done}]
 
-    (is (= (into #{} children) children-expectatations))
-    (is (= (into #{} adults) adults-expectatations))
-    (is (= (into #{} athletes-wa) athletes-wa-expectatations))
-    (is (= (into #{} everyone) everyone-expectatations))
+    (is (= children-expectatations (into #{} children)))
+    (is (= adults-expectatations (into #{} adults)))
+    (is (= athletes-wa-expectatations (into #{} athletes-wa)))
+    (is (= everyone-expectatations (into #{} everyone)))
 
     (close! people-in-chan)
 

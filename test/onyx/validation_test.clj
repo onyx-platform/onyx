@@ -165,14 +165,14 @@
 (onyx.api/shutdown-env env)
 
 (deftest map-set-workflow
-  (is (= (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
-                                                     :b #{:d}
-                                                     :c #{:d :e}}))
-         (sort [[:a :b]
+  (is (= (sort [[:a :b]
                 [:a :c]
                 [:b :d]
                 [:c :d]
-                [:c :e]]))))
+                [:c :e]])
+         (sort (onyx.api/map-set-workflow->workflow {:a #{:b :c}
+                                                     :b #{:d}
+                                                     :c #{:d :e}})))))
 
 (deftest task-discovery
   (let [catalog
@@ -207,10 +207,10 @@
                 [] [:a :b :c :d :e :f :g])]
 
     (testing "There are 7 tasks"
-      (is (= (count tasks) 7))
-      (is (= (:f (:egress-ids a)) (:id f)))
-      (is (= (:c (:egress-ids b)) (:id c)))
-      (is (= (:d (:egress-ids c)) (:id d)))
-      (is (= (:e (:egress-ids d)) (:id e)))
-      (is (= (:f (:egress-ids e)) (:id f)))
-      (is (= (:g (:egress-ids f)) (:id g))))))
+      (is (= 7 (count tasks)))
+      (is (= (:id f) (:f (:egress-ids a))))
+      (is (= (:id c) (:c (:egress-ids b))))
+      (is (= (:id d) (:d (:egress-ids c))))
+      (is (= (:id e) (:e (:egress-ids d))))
+      (is (= (:id f) (:f (:egress-ids e))))
+      (is (= (:id g) (:g (:egress-ids f)))))))

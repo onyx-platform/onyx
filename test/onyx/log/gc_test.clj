@@ -39,8 +39,9 @@
                    :tasks {:j2 [:t3 :t4]}
                    :task-schedulers {:j2 :onyx.task-scheduler/balanced}
                    :allocations {:j2 {:t3 [:p1]}}})))
-    (is (= reactions []))
-    (is (= diff {:killed-jobs #{:j1}
-                 :completed-jobs #{:j3}
-                 :tasks {:j1 [:t1 :t2] :j3 [:t5 :t6]}
-                 :allocations {:j1 {:t2 []}}}))))
+    (is (= [] reactions))
+    (is (= {:killed-jobs #{:j1}
+            :completed-jobs #{:j3}
+            :tasks {:j1 [:t1 :t2] :j3 [:t5 :t6]}
+            :allocations {:j1 {:t2 []}}} 
+           diff))))

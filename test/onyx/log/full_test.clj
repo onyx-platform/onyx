@@ -28,8 +28,8 @@
                               (if (< (count (:pairs new-replica)) n-peers)
                                 (recur new-replica)
                                 new-replica)))]
-              (is (= (:prepared replica) {}))
-              (is (= (:accepted replica) {}))
+              (is (= {} (:prepared replica)))
+              (is (= {} (:accepted replica)))
               (is (= (set (keys (:pairs replica)))
                      (set (vals (:pairs replica)))))
-              (is (= (count (:peers replica)) n-peers)))))))))
+              (is (= n-peers (count (:peers replica)))))))))))

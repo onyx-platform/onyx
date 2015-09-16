@@ -26,7 +26,7 @@
         (cu/create client base-path :data (into-array Byte/TYPE value))
 
         (testing "Value is written and can be read"
-          (is (= (into [] (:data (cu/data client base-path))) value)))
+          (is (= value (into [] (:data (cu/data client base-path))))))
         (cu/close client)
 
         (let [client2 (cu/connect (:zookeeper/address env-config) "onyx")
@@ -41,8 +41,8 @@
           (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true)
 
           (testing "Check sequential children can be found"
-            (is (= (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc))))
-                   (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"]))))
+            (is (= (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"])
+                   (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc)))))))
 
           ;; add another child so watcher will be triggered
           (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
@@ -51,19 +51,19 @@
           (Thread/sleep 1000)
 
           (testing "Check watcher triggered"
-            (is (= @watcher-sentinel 1)))
+            (is (= 1 @watcher-sentinel)))
 
           (cu/close client2)
 
           (let [client3 (cu/connect (:zookeeper/address env-config) "onyx")]
             (testing "Check only sequential persistent children remain"
-              (is (= (sort (cu/children client3 (str base-path "/zd/hi"))) 
-                     (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"]))))
+              (is (= (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"]) 
+                     (sort (cu/children client3 (str base-path "/zd/hi"))))))
 
             (cu/create client3 base-path2 :data (into-array Byte/TYPE value) :persistent? true)
 
             (testing "Check exists after add"
-              (is (= (:aversion (cu/exists client3 base-path2)) 0)))
+              (is (= 0 (:aversion (cu/exists client3 base-path2)))))
 
             (cu/delete client3 base-path2)
 
@@ -72,7 +72,7 @@
                 (thrown? Exception (cu/data client3 base-path2))))
 
             (testing "Check exists after delete"
-              (is (= (cu/exists client3 base-path2) nil)))
+              (is (= nil (cu/exists client3 base-path2))))
 
             (cu/close client3))))
       (finally

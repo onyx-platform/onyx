@@ -152,8 +152,8 @@
           :peer-choices []}))]
     (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
-    (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
-    (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
+    (is (= 8 (apply + (map count (vals (get (:allocations replica) job-1-id))))))
+    (is (= 0 (apply + (map count (vals (get (:allocations replica) job-2-id))))))))
 
 (deftest balanced-task-balancing
   (checking
@@ -180,8 +180,8 @@
           :peer-choices []}))]
     (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
-    (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
-    (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
+    (is (= [1 1 1] (map count (vals (get (:allocations replica) job-1-id)))))
+    (is (= [1 1 1] (map count (vals (get (:allocations replica) job-2-id)))))))
 
 (deftest balanced-allocations-uneven
   (checking
@@ -211,8 +211,8 @@
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
       ;; Since job IDs are reused, we can't know which order they'll be in.
-      (is (= (set (map sort [(map count j1-allocations) (map count j2-allocations)]))
-             #{[1 1 2] [1 1 1]})))))
+      (is (= #{[1 1 2] [1 1 1]}
+             (set (map sort [(map count j1-allocations) (map count j2-allocations)])))))))
 
 (deftest balanced-allocations
   (checking
@@ -245,9 +245,9 @@
           :peer-choices []}))]
     (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
-    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
-    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
-    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+    (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
+    (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
+    (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
 
 (deftest job-percentages-balance
   (checking
@@ -286,12 +286,12 @@
             :peer-choices []})))]
     (standard-invariants replica)
     (let [peer-state-group (group-by val (:peer-state replica))]
-      (is (= (count (:active peer-state-group)) 12))
-      (is (= (count (:idle peer-state-group)) 8))
-      (is (= (count (:backpressure peer-state-group)) 0)))
-    (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
-    (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
-    (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+      (is (= 12 (count (:active peer-state-group))))
+      (is (= 8 (count (:idle peer-state-group))))
+      (is (= 0 (count (:backpressure peer-state-group)))))
+    (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
+    (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
+    (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
 
 (def job-1-pct-tasks
   {:workflow [[:a :b] [:b :c]]
@@ -401,20 +401,18 @@
     (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is
-      (=
-       (map
-         (fn [t]
-           (count (get-in replica [:allocations job-1-id t])))
-         (get-in replica [:tasks job-1-id]))
-       [1 4 3]))
+      (= [1 4 3]
+         (map
+           (fn [t]
+             (count (get-in replica [:allocations job-1-id t])))
+           (get-in replica [:tasks job-1-id]))))
    (is
-    (=
-     (map
-      (fn [t]
-        (count (get-in replica [:allocations job-2-id t])))
-      (get-in replica [:tasks job-2-id]))
-     [2 2 4]))
-   (is (= (map count (vals (get (:allocations replica) job-3-id))) []))))
+     (= [2 2 4]
+        (map
+          (fn [t]
+            (count (get-in replica [:allocations job-2-id t])))
+          (get-in replica [:tasks job-2-id]))))
+   (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
 
 (deftest peer-leave-4
   (checking

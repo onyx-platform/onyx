@@ -25,12 +25,12 @@
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (get-in new-replica [:pairs :a]) :d))
-    (is (= (get-in new-replica [:pairs :d]) :b))
-    (is (= (get-in new-replica [:accepted]) {}))
-    (is (= (last (get-in new-replica [:peers])) :d))
-    (is (= diff {:observer :a :subject :d}))
-    (is (= (rep-reactions old-replica new-replica diff {}) []))))
+    (is (= :d (get-in new-replica [:pairs :a])))
+    (is (= :b (get-in new-replica [:pairs :d])))
+    (is (= {} (get-in new-replica [:accepted])))
+    (is (= :d (last (get-in new-replica [:peers]))))
+    (is (= {:observer :a :subject :d} diff))
+    (is (= [] (rep-reactions old-replica new-replica diff {})))))
 
 (deftest log-accept-join-cluster-2 
   (let [entry (create-log-entry :accept-join-cluster
@@ -49,9 +49,9 @@
                             :job-scheduler :onyx.job-scheduler/greedy})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (get-in new-replica [:pairs :d]) :a))
-    (is (= (get-in new-replica [:pairs :a]) :d))
-    (is (= (get-in new-replica [:accepted]) {}))
-    (is (= (last (get-in new-replica [:peers])) :d))
-    (is (= diff {:observer :a :subject :d}))
-    (is (= (rep-reactions old-replica new-replica diff {}) []))))
+    (is (= :a (get-in new-replica [:pairs :d])))
+    (is (= :d (get-in new-replica [:pairs :a])))
+    (is (= {} (get-in new-replica [:accepted])))
+    (is (= :d (last (get-in new-replica [:peers]))))
+    (is (= {:observer :a :subject :d} diff))
+    (is (= [] (rep-reactions old-replica new-replica diff {})))))

@@ -26,10 +26,11 @@
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff peer-state)]
-    (is (= (:pairs new-replica) {:a :b :b :c :c :a}))
-    (is (= (:peers new-replica) [:a :b :c]))
-    (is (= diff {:aborted :d}))
-    (is (= reactions [{:fn :prepare-join-cluster
-                         :args {:joiner :d
-                                :peer-site {:address 1}}
-                         :immediate? true}]))))
+    (is (= {:a :b :b :c :c :a} (:pairs new-replica)))
+    (is (= [:a :b :c] (:peers new-replica)))
+    (is (= {:aborted :d} diff))
+    (is (= [{:fn :prepare-join-cluster
+             :args {:joiner :d
+                    :peer-site {:address 1}}
+             :immediate? true}] 
+           reactions))))

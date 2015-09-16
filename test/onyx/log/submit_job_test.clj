@@ -23,8 +23,8 @@
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff {:id :x})]
 
-    (is (= (:jobs new-replica) [:a]))
-    (is (= diff {:job :a})))
+    (is (= [:a] (:jobs new-replica)))
+    (is (= {:job :a} diff)))
     
   (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]
                                              :task-scheduler :onyx.task-scheduler/balanced
@@ -40,8 +40,8 @@
         diff (rep-diff old-replica new-replica)
         rep-reactions (partial extensions/reactions entry)
         reactions (rep-reactions old-replica new-replica diff {:id :x})]
-    (is (= (:jobs new-replica) [:b :a]))
-    (is (= diff {:job :a})))
+    (is (= [:b :a] (:jobs new-replica)))
+    (is (= {:job :a} diff)))
 
   (let [entry (create-log-entry :submit-job {:id :j1
                                              :task-scheduler :onyx.task-scheduler/balanced
@@ -56,8 +56,8 @@
                             :peers [:p1 :p2]})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
-    (is (= (rep-reactions old-replica new-replica diff {:id :p1}) []))
-    (is (= (rep-reactions old-replica new-replica diff {:id :p2}) []))))
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p1})))
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p2})))))
 
 
 

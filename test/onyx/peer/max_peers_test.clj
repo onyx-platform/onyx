@@ -82,8 +82,8 @@
       (onyx.api/shutdown-peer v-peer))
 
     (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= (set (butlast results)) expected))
-      (is (= (last results) :done)))
+      (is (= expected (set (butlast results))))
+      (is (= :done (last results))))
 
     (onyx.api/shutdown-peer-group peer-group)
     (onyx.api/shutdown-env env)))

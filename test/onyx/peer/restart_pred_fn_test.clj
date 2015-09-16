@@ -96,7 +96,7 @@
             (>!! in-chan {:n n}))
         results (take-segments! out-chan)]
 
-    (is (= @startup-counter 2))
+    (is (= 2 @startup-counter))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

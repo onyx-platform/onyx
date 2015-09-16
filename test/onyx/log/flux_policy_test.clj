@@ -27,8 +27,8 @@
                               :peer-state {:a :active :b :active :c :active}
                               :peers [:a :b :c]})
           new-replica (f old-replica)]
-      (is (= (:killed-jobs new-replica) [:j1]))
-      (is (= (get-in new-replica [:killed-jobs]) [:j1]))))
+      (is (= [:j1] (:killed-jobs new-replica)))
+      (is (= [:j1] (get-in new-replica [:killed-jobs])))))
 
   (testing "Flux policy kill" 
     (let [entry (create-log-entry :leave-cluster {:id :c})
@@ -46,5 +46,5 @@
                               :peer-state {:a :active :b :active :c :active}
                               :peers [:a :b :c]})
           new-replica (f old-replica)]
-      (is (= (:jobs new-replica) [:j1]))
-      (is (= (get-in new-replica [:jobs]) [:j1])))))
+      (is (= [:j1] (:jobs new-replica)))
+      (is (= [:j1] (get-in new-replica [:jobs]))))))

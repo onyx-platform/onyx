@@ -157,8 +157,8 @@
         results (take-segments! out-chan)]
 
     (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= (set (butlast results)) expected))
-      (is (= (last results) :done)))
+      (is (= expected (set (butlast results))))
+      (is (= :done (last results))))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

@@ -25,21 +25,23 @@
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)
         reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (dummy-messenger {})})]
-    (is (= (:prepared new-replica) {:a :d}))
-    (is (= diff {:observer :a :subject :d}))
-    (is (= reactions [{:fn :notify-join-cluster
-                       :args {:observer :d :subject :b}
-                       :immediate? true}]))
+    (is (= {:a :d} (:prepared new-replica)))
+    (is (= {:observer :a :subject :d} diff))
+    (is (= [{:fn :notify-join-cluster
+             :args {:observer :d :subject :b}
+             :immediate? true}] 
+           reactions))
 
     (let [old-replica (assoc-in old-replica [:prepared :a] :e)
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
           reactions (rep-reactions old-replica new-replica diff {:id :b :messenger (dummy-messenger {})})]
-      (is (= (:prepared new-replica) {:a :e :b :d}))
-      (is (= diff {:observer :b :subject :d}))
-      (is (= reactions [{:fn :notify-join-cluster
+      (is (= {:a :e :b :d} (:prepared new-replica)))
+      (is (= {:observer :b :subject :d} diff))
+      (is (= [{:fn :notify-join-cluster
                          :args {:observer :d :subject :c}
-                         :immediate? true}])))
+                         :immediate? true}] 
+             reactions)))
     (let [old-replica (-> old-replica
                           (assoc-in [:prepared :a] :e)
                           (assoc-in [:prepared :b] :f)
@@ -47,11 +49,12 @@
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
           reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
-      (is (= (:prepared new-replica) {:a :e :b :f :c :g}))
-      (is (= diff nil))
-      (is (= reactions [{:fn :abort-join-cluster
-                         :args {:id :d}
-                         :immediate? true}])))
+      (is (= {:a :e :b :f :c :g} (:prepared new-replica)))
+      (is (= nil diff))
+      (is (= [{:fn :abort-join-cluster
+               :args {:id :d}
+               :immediate? true}] 
+             reactions)))
 
     (let [old-replica (merge replica/base-replica 
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
@@ -60,10 +63,10 @@
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
           reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
-      (is (= (:peers new-replica) [:d]))
-      (is (= (:peer-state new-replica) {:d :idle}))
-      (is (= diff {:instant-join :d}))
-      (is (= reactions nil)))
+      (is (= [:d] (:peers new-replica)))
+      (is (= {:d :idle} (:peer-state new-replica)))
+      (is (= {:instant-join :d} diff))
+      (is (= nil reactions)))
 
     (let [old-replica (merge replica/base-replica
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
@@ -72,12 +75,13 @@
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
           reactions (rep-reactions old-replica new-replica diff {:id :a :messenger (dummy-messenger {})})]
-      (is (= (:peers new-replica) [:a]))
-      (is (= (:prepared new-replica) {:a :d}))
-      (is (= diff {:observer :a :subject :d}))
-      (is (= reactions [{:fn :notify-join-cluster
-                         :args {:observer :d :subject :a}
-                         :immediate? true}])))
+      (is (= [:a] (:peers new-replica)))
+      (is (= {:a :d} (:prepared new-replica)))
+      (is (= {:observer :a :subject :d} diff))
+      (is (= [{:fn :notify-join-cluster
+               :args {:observer :d :subject :a}
+               :immediate? true}] 
+             reactions)))
 
     (let [old-replica (merge replica/base-replica
                              {:messaging {:onyx.messaging/impl :dummy-messenger}
@@ -89,8 +93,9 @@
           new-replica (f old-replica)
           diff (rep-diff old-replica new-replica)
           reactions (rep-reactions old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
-      (is (= new-replica old-replica))
-      (is (= diff nil))
-      (is (= reactions [{:fn :abort-join-cluster
-                         :args {:id :d}
-                         :immediate? true}])))))
+      (is (= old-replica new-replica))
+      (is (= nil diff))
+      (is (= [{:fn :abort-join-cluster
+               :args {:id :d}
+               :immediate? true}] 
+             reactions)))))

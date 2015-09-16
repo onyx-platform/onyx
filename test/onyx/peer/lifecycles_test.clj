@@ -125,33 +125,32 @@
         results (take-segments! out-chan)]
 
     (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= (set (butlast results)) expected))
-      (is (= (last results) :done)))
+      (is (= expected (set (butlast results))))
+      (is (= :done (last results))))
 
     ;; shutdown-peer ensure peers are fully shutdown so that
     ;; :task-after will have been set
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))
 
-    (is (= @call-log [:task-started
-                      :task-before
-                      :batch-before
-                      :batch-after ; 1
-                      :batch-before
-                      :batch-after ; 2
-                      :batch-before
-                      :batch-after ; 3
-                      :batch-before
-                      :batch-after ; 4
-                      :batch-before
-                      :batch-after ; 5
-                      :batch-before
-                      :batch-after
-                      :task-after]))
-    (is (= @started-task-counter 3))
+    (is (= [:task-started
+            :task-before
+            :batch-before
+            :batch-after ; 1
+            :batch-before
+            :batch-after ; 2
+            :batch-before
+            :batch-after ; 3
+            :batch-before
+            :batch-after ; 4
+            :batch-before
+            :batch-after ; 5
+            :batch-before
+            :batch-after
+            :task-after] 
+           @call-log))
+    (is (= 3 @started-task-counter))
 
     (onyx.api/shutdown-peer-group peer-group)
 
     (onyx.api/shutdown-env env)))
-
-
