@@ -10,6 +10,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
@@ -117,6 +118,7 @@
           :log []
           :peer-choices []}))]
 
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
                          (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
@@ -148,6 +150,7 @@
                                           {:fn :kill-job :args {:job job-2-id}}]})
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 8))
     (is (= (apply + (map count (vals (get (:allocations replica) job-2-id)))) 0))))
@@ -175,6 +178,7 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= (map count (vals (get (:allocations replica) job-1-id))) [1 1 1]))
     (is (= (map count (vals (get (:allocations replica) job-2-id))) [1 1 1]))))
@@ -202,6 +206,7 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
@@ -238,6 +243,7 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= (map count (vals (get (:allocations replica) job-1-id))) [2 2 2]))
     (is (= (map count (vals (get (:allocations replica) job-2-id))) [2 2 2]))
@@ -278,6 +284,7 @@
                                             {:fn :kill-job :args {:job job-3-id}}]})
             :log []
             :peer-choices []})))]
+    (standard-invariants replica)
     (let [peer-state-group (group-by val (:peer-state replica))]
       (is (= (count (:active peer-state-group)) 12))
       (is (= (count (:idle peer-state-group)) 8))
@@ -391,6 +398,7 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is
       (=
@@ -426,6 +434,7 @@
                                       :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (= 3 (count (:peer-state replica))))
     (is (= 3 (count (:peers replica))))))
 
@@ -445,6 +454,7 @@
                                               :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     (is (or (= 2 (count (:peer-state replica)))
             (= 3 (count (:peer-state replica)))))
     (is (or (= 2 (count (:peers replica)))
@@ -472,6 +482,7 @@
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
+    (standard-invariants replica)
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
     ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
     ;; job must be able to go on

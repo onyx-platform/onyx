@@ -44,7 +44,7 @@
    s/Keyword s/Any})
 
 (def FluxPolicy 
-  (s/enum :continue :kill))
+  (s/enum :continue :kill :recover))
 
 (def ^{:private true} partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
@@ -165,8 +165,6 @@
    (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
    (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
    (s/optional-key :onyx.messaging/retry-ch-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/max-downstream-links) s/Int
-   (s/optional-key :onyx.messaging/max-acker-links) s/Int
    (s/optional-key :onyx.messaging/peer-link-gc-interval) s/Int
    (s/optional-key :onyx.messaging/peer-link-idle-timeout) s/Int
    (s/optional-key :onyx.messaging/ack-daemon-timeout) s/Int
@@ -230,6 +228,7 @@
    :percentages {JobId s/Num}
    :completed-jobs [JobId] 
    :killed-jobs [JobId] 
+   :task-slot-ids {JobId {TaskId {PeerId s/Int}}}
    :exhausted-inputs {JobId #{TaskId}}})
 
 (def LogEntry

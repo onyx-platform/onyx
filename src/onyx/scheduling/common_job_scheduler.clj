@@ -124,7 +124,13 @@
                      (assoc-in [:peer-state peer] :idle)
                      (update-in [:allocations job-id task-id]
                                 (fn [allocation]
-                                  (vec (conj allocation peer)))))))
+                                  (vec (conj allocation peer))))
+                     (update-in [:task-slot-ids job-id task-id]
+                                (fn [slot-ids]
+                                  (let [slot-id (first 
+                                                  (remove (set (vals slot-ids))
+                                                          (range)))]
+                                    (assoc slot-ids peer slot-id)))))))
         replica))))
 
 (defn find-unused-peers [replica]
@@ -202,6 +208,7 @@
   (let [peers (sort (replica->job-peers replica job))]
     (-> replica
         (update-in [:allocations] dissoc job)
+        (update-in [:task-slot-ids] dissoc job)
         (update-in [:peer-state] (fn [peer-state]
                                    (reduce (fn [ps peer]
                                              (assoc ps peer :idle))

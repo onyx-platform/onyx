@@ -1,6 +1,6 @@
 (ns ^:no-doc onyx.peer.task-compile
   (:require [onyx.peer.operation :as operation]
-            [onyx.static.planning :refer [find-task find-task-fast build-pred-fn]]
+            [onyx.static.planning :refer [find-task build-pred-fn]]
             [onyx.static.validation :as validation]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
