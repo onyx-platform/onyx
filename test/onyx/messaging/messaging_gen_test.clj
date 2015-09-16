@@ -83,10 +83,10 @@
                                             (map (fn [v] (set (flatten (map :payload v))))
                                                  (vals grouped-model)))]
                   (is
-                    (= model-results
-                       (into {}
+                    (= (into {}
                              (map (juxt key (comp set val))
-                                  (test-send-commands peer-group commands)))))))
+                                  (test-send-commands peer-group commands)))
+                       model-results))))
 
       (finally (onyx.api/shutdown-peer-group peer-group)))))
 
@@ -152,9 +152,9 @@
                                             (map (fn [v] (set (flatten (map :payload v))))
                                                  (vals grouped-model)))]
                   (is
-                    (= model-results
-                       (into {}
+                    (= (into {}
                              (map (juxt key (comp set val))
-                                  (test-send-commands-aeron peer-group commands)))))))
+                                  (test-send-commands-aeron peer-group commands)))
+                       model-results))))
 
       (finally (onyx.api/shutdown-peer-group peer-group))))))

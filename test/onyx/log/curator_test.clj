@@ -8,79 +8,72 @@
             [onyx.log.curator :as cu]
             [onyx.compression.nippy :refer [compress decompress]]
             [taoensso.timbre :refer [fatal error warn trace info]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is testing]]
             [onyx.api]))
 
-(def onyx-id (java.util.UUID/randomUUID))
 
-(def config (load-config))
+(deftest curator-tests 
+  (let [onyx-id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        base-path (str "/" onyx-id "/ab")
+        base-path2 (str "/" onyx-id "/ab2")
+        env (onyx.api/start-env env-config)]
+    (try
+      (let [client (cu/connect (:zookeeper/address env-config) "onyx")
+            value [1 3 48]]
 
-(def env-config
-  (assoc (:env-config config) :onyx/id onyx-id))
+        (cu/create client base-path :data (into-array Byte/TYPE value))
 
-(def base-path (str "/" onyx-id "/ab"))
+        (testing "Value is written and can be read"
+          (is (= value (into [] (:data (cu/data client base-path))))))
+        (cu/close client)
 
-(def base-path2 (str "/" onyx-id "/ab2"))
+        (let [client2 (cu/connect (:zookeeper/address env-config) "onyx")
+              watcher-sentinel (atom 0)]
+          (testing "Test default ephemerality from previous test"
+            (is (thrown? Exception (into [] (:data (cu/data client2 base-path))))))
 
-#_(let [env (onyx.api/start-env env-config)]
-  (try
-    (let [client (cu/connect (:zookeeper/address env-config) "onyx")
-          value [1 3 48]]
+          ;; write out some sequential values with parent
+          (cu/create-all client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
+          (cu/create-all client2 (str base-path "/zd/hi/entry-") :sequential? true)
+          (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
+          (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true)
 
-      (cu/create client base-path :data (into-array Byte/TYPE value))
+          (testing "Check sequential children can be found"
+            (is (= (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"])
+                   (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc)))))))
 
-      (facts "Value is written and can be read"
-             (fact (into [] (:data (cu/data client base-path))) => value))
-      (cu/close client)
+          ;; add another child so watcher will be triggered
+          (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
 
-      (let [client2 (cu/connect (:zookeeper/address env-config) "onyx")
-            watcher-sentinel (atom 0)]
-        (facts "Test default ephemerality from previous test"
-               (fact (into [] (:data (cu/data client2 base-path))) => (throws Exception)))
+          ;; Give it a second before checking watch
+          (Thread/sleep 1000)
 
-        ;; write out some sequential values with parent
-        (cu/create-all client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
-        (cu/create-all client2 (str base-path "/zd/hi/entry-") :sequential? true)
-        (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
-        (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true)
+          (testing "Check watcher triggered"
+            (is (= 1 @watcher-sentinel)))
 
-        (facts "Check sequential children can be found"
-               (fact
-                (sort (cu/children client2 (str base-path "/zd/hi") :watcher (fn [_] (swap! watcher-sentinel inc))))
-                =>
-                (sort ["entry-0000000000"  "entry-0000000001"  "entry-0000000002"  "entry-0000000003"])))
+          (cu/close client2)
 
-        ;; add another child so watcher will be triggered
-        (cu/create client2 (str base-path "/zd/hi/entry-") :sequential? true :persistent? true)
+          (let [client3 (cu/connect (:zookeeper/address env-config) "onyx")]
+            (testing "Check only sequential persistent children remain"
+              (is (= (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"]) 
+                     (sort (cu/children client3 (str base-path "/zd/hi"))))))
 
-        ;; Give it a second before checking watch
-        (Thread/sleep 1000)
+            (cu/create client3 base-path2 :data (into-array Byte/TYPE value) :persistent? true)
 
-        (facts "Check watcher triggered"
-               (fact @watcher-sentinel => 1))
+            (testing "Check exists after add"
+              (is (= 0 (:aversion (cu/exists client3 base-path2)))))
 
-        (cu/close client2)
+            (cu/delete client3 base-path2)
 
-        (let [client3 (cu/connect (:zookeeper/address env-config) "onyx")]
-          (facts "Check only sequential persistent children remain"
-                 (fact
-                  (sort (cu/children client3 (str base-path "/zd/hi"))) =>
-                  (sort ["entry-0000000000" "entry-0000000002" "entry-0000000004"])))
+            (testing "Deleted value"
+              (is
+                (thrown? Exception (cu/data client3 base-path2))))
 
-          (cu/create client3 base-path2 :data (into-array Byte/TYPE value) :persistent? true)
+            (testing "Check exists after delete"
+              (is (= nil (cu/exists client3 base-path2))))
 
-          (facts "Check exists after add"
-                 (fact (:aversion (cu/exists client3 base-path2)) => 0))
-
-          (cu/delete client3 base-path2)
-
-          (facts "Deleted value"
-                 (fact
-                  (cu/data client3 base-path2) => (throws Exception)))
-
-          (facts "Check exists after delete"
-                 (fact (cu/exists client3 base-path2) => nil))
-
-          (cu/close client3))))
-    (finally
-     (onyx.api/shutdown-env env))))
+            (cu/close client3))))
+      (finally
+        (onyx.api/shutdown-env env)))))

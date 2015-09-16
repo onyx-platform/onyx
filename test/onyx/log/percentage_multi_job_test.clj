@@ -4,53 +4,11 @@
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [onyx.api :as api]
-            [midje.sweet :refer :all]
+            [schema.test] 
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [onyx.log.curator :as zk]))
 
-(def onyx-id (java.util.UUID/randomUUID))
-
-(def config (load-config))
-
-(def env-config (assoc (:env-config config) :onyx/id onyx-id))
-
-(def peer-config
-  (assoc (:peer-config config)
-         :onyx/id onyx-id
-         :onyx.peer/job-scheduler :onyx.job-scheduler/percentage))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def catalog-1
-  [{:onyx/name :a
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size 20
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :b
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size 20
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-(def catalog-2
-  [{:onyx/name :c
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size 20
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :d
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size 20
-    :onyx/doc "Writes segments to a core.async channel"}])
+(use-fixtures :once schema.test/validate-schemas)
 
 (def a-chan (chan 100))
 
@@ -84,65 +42,86 @@
 (def d-calls
   {:lifecycle/before-task-start inject-d-ch})
 
-(def lifecycles-1
-  [{:lifecycle/task :a
-    :lifecycle/calls :onyx.log.percentage-multi-job-test/a-calls}
-   {:lifecycle/task :a
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :b
-    :lifecycle/calls :onyx.log.percentage-multi-job-test/b-calls}
-   {:lifecycle/task :b
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+(deftest log-percentage-multi-job
+  (let [onyx-id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        peer-config (assoc (:peer-config config)
+                           :onyx/id onyx-id
+                           :onyx.peer/job-scheduler :onyx.job-scheduler/percentage)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        catalog-1 [{:onyx/name :a
+                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/type :input
+                    :onyx/medium :core.async
+                    :onyx/batch-size 20
+                    :onyx/doc "Reads segments from a core.async channel"}
 
-(def lifecycles-2
-  [{:lifecycle/task :c
-    :lifecycle/calls :onyx.log.percentage-multi-job-test/c-calls}
-   {:lifecycle/task :c
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :d
-    :lifecycle/calls :onyx.log.percentage-multi-job-test/d-calls}
-   {:lifecycle/task :d
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
+                   {:onyx/name :b
+                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/type :output
+                    :onyx/medium :core.async
+                    :onyx/batch-size 20
+                    :onyx/doc "Writes segments to a core.async channel"}]
 
-(def j1
-  (onyx.api/submit-job
-   peer-config
-   {:workflow [[:a :b]]
-    :catalog catalog-1
-    :lifecycles lifecycles-1
-    :percentage 70
-    :task-scheduler :onyx.task-scheduler/balanced}))
+        catalog-2 [{:onyx/name :c
+                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/type :input
+                    :onyx/medium :core.async
+                    :onyx/batch-size 20
+                    :onyx/doc "Reads segments from a core.async channel"}
 
-(def j2
-  (onyx.api/submit-job
-   peer-config
-   {:workflow [[:c :d]]
-    :catalog catalog-2
-    :lifecycles lifecycles-2
-    :percentage 30
-    :task-scheduler :onyx.task-scheduler/balanced}))
+                   {:onyx/name :d
+                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/type :output
+                    :onyx/medium :core.async
+                    :onyx/batch-size 20
+                    :onyx/doc "Writes segments to a core.async channel"}]
+        lifecycles-1 [{:lifecycle/task :a
+                       :lifecycle/calls :onyx.log.percentage-multi-job-test/a-calls}
+                      {:lifecycle/task :a
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                      {:lifecycle/task :b
+                       :lifecycle/calls :onyx.log.percentage-multi-job-test/b-calls}
+                      {:lifecycle/task :b
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        lifecycles-2 [{:lifecycle/task :c
+                       :lifecycle/calls :onyx.log.percentage-multi-job-test/c-calls}
+                      {:lifecycle/task :c
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                      {:lifecycle/task :d
+                       :lifecycle/calls :onyx.log.percentage-multi-job-test/d-calls}
+                      {:lifecycle/task :d
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+        j1 (onyx.api/submit-job peer-config
+                                {:workflow [[:a :b]]
+                                 :catalog catalog-1
+                                 :lifecycles lifecycles-1
+                                 :percentage 70
+                                 :task-scheduler :onyx.task-scheduler/balanced})
+        j2 (onyx.api/submit-job peer-config
+                                {:workflow [[:c :d]]
+                                 :catalog catalog-2
+                                 :lifecycles lifecycles-2
+                                 :percentage 30
+                                 :task-scheduler :onyx.task-scheduler/balanced})
+        n-peers 10
+        v-peers-1 (onyx.api/start-peers n-peers peer-group)
+        ch (chan 10000)
+        replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 10000)
+        v-peers-2 (onyx.api/start-peers n-peers peer-group)
+        replica-2 (playback-log (:log env) replica ch 10000)]
 
-(def n-peers 10)
+    (testing "70/30% split for percentage job scheduler succeeded"
+      (is (= [7 3] 
+             (map (partial apply +)
+                  (get-counts replica [j1 j2])))))
 
-(def v-peers-1 (onyx.api/start-peers n-peers peer-group))
-
-(def ch (chan 10000))
-
-(def replica
-  (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 10000))
-
-(fact "70/30% split for percentage job scheduler succeeded"
-      (map (partial apply +)
-           (get-counts replica [j1 j2])) => [7 3])
-
-(def v-peers-2 (onyx.api/start-peers n-peers peer-group))
-
-(def replica-2
-  (playback-log (:log env) replica ch 10000))
-
-(fact "70/30% split for percentage job scheduler succeeded after rebalance"
-      (map (partial apply +)
-           (get-counts replica-2 [j1 j2])) => [14 6])
+    (testing "70/30% split for percentage job scheduler succeeded after rebalance"
+      (is (= [14 6] 
+             (map (partial apply +)
+                  (get-counts replica-2 [j1 j2])))))
 
 (doseq [v-peer v-peers-1]
   (onyx.api/shutdown-peer v-peer))
@@ -152,4 +131,4 @@
 
 (onyx.api/shutdown-env env)
 
-(onyx.api/shutdown-peer-group peer-group)
+(onyx.api/shutdown-peer-group peer-group))) 
