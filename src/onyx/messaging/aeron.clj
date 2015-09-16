@@ -169,7 +169,9 @@
           pub-manager (-> (pubm/new-publication-manager channel 
                                                         stream-id 
                                                         (:send-idle-strategy messenger) 
-                                                        (:write-buffer-size messenger))
+                                                        (:write-buffer-size messenger)
+                                                        (fn []
+                                                          (swap! (:publications messenger) dissoc channel))) 
                           (pubm/connect) 
                           (pubm/start))]
       (swap! (:publications messenger) 
@@ -202,9 +204,7 @@
                              (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle))
                                      snapshot))]
           (doseq [k to-remove]
-            (let [pub-manager (:publication (snapshot k))]
-              (swap! publications dissoc k)
-              (pubm/disconnect pub-manager))))
+            (pubm/stop (:publication (snapshot k)))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
