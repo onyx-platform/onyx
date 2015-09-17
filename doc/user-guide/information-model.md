@@ -150,7 +150,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |----------------------|-----------|----------|
 |`:trigger/window-id`  |`keyword`  | no       |
 |`:trigger/refinement` |`keyword`  | no       |
-|`:trigger/type`       |`keyword`  | no       |
+|`:trigger/on`         |`keyword`  | no       |
 |`:trigger/sync`       |`keyword`  | no       |
 |`:trigger/doc`        |`string`   | yes      |
 

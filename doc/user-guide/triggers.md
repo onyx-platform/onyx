@@ -38,6 +38,20 @@ This trigger sleeps for a duration of `:trigger/period`. When it is done sleepin
  :trigger/doc "Writes state to DynamoDB every 5 seconds, discarding intermediate state"}
 ```
 
+#### `:segment`
+
+Trigger fires in reaction to a new segment being processed on this task. Trigger only fires once every `:trigger/threshold` segments. When the threshold is exceeded, the count of new segments goes back to `0`, and the looping proceeds again in the same manner.
+
+
+```clojure
+{:trigger/window-id :collect-segments
+ :trigger/refinement :accumulating
+ :trigger/on :segment
+ :trigger/threshold [5 :elements]
+ :trigger/sync ::write-to-stdout
+ :trigger/doc "Writes the window contents to stdout every 5 segments"}
+```
+
 ### Refinement Modes
 
 A refinement mode allows you to articulate what should happen to the state of a window extent after a trigger has been invoked.
@@ -62,6 +76,6 @@ See the Information Model chapter for an exact specification of what values the 
 |----------------------|-----------
 |`:trigger/window-id`  | A `:window/id` specified in the collection of windows
 |`:trigger/refinement` | A mode of refinement, one of `:accumlating`, `:discarding`
-|`:trigger/type`       | The type of trigger to fire
+|`:trigger/on`         | The stimulus to fire the trigger as a reaction.
 |`:trigger/sync`       | Fully qualified namespaced keyword of a function to call with the state
 |`:trigger/doc`        | An optional docstring explaining the trigger's purpose
