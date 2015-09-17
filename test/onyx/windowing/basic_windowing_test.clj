@@ -64,11 +64,11 @@
 (def windows
   [{:window/id :collect-segments
     :window/task :identity
-    :window/type :sliding
+    :window/type :fixed
     :window/aggregation :count
     :window/window-key :event-time
-    :window/range [30 :minutes]
-    :window/slide [5 :minutes]
+    :window/range [5 :minutes]
+;;    :window/slide [5 :minutes]
     :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
 
 (defn trigger-pred [event window-id upper lower segment]
@@ -95,7 +95,8 @@
 
    {:trigger/window-id :collect-segments
     :trigger/refinement :discarding
-    :trigger/on :watermark
+    :trigger/on :percentile-watermark
+    :trigger/watermark-percentage 0.50
     :trigger/sync ::write-to-stdout}])
 
 (defn write-to-stdout [event window-id lower-bound upper-bound state]
@@ -141,7 +142,7 @@
 (doseq [i input]
   (>!! in-chan i))
 
-(>!! in-chan {:id 2 :age 12 :event-time #inst "2015-09-13T03:15:00.829-00:00"})
+(>!! in-chan {:id 2 :age 12 :event-time #inst "2015-09-13T03:02:30.829-00:00"})
 
 (>!! in-chan :done)
 (close! in-chan)

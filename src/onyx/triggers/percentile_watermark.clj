@@ -1,4 +1,4 @@
-(ns onyx.triggers.watermark
+(ns onyx.triggers.percentile-watermark
   (:require [onyx.windowing.coerce :refer [to-standard-units coerce-key]]
             [onyx.windowing.window-id :as wid]
             [onyx.triggers.triggers-api :as api]
@@ -6,19 +6,21 @@
             [onyx.static.planning :refer [find-window]]
             [taoensso.timbre :refer [fatal]]))
 
-(defmethod api/trigger-setup :watermark
+(defmethod api/trigger-setup :percentile-watermark
   [event trigger id]
   event)
 
-(defmethod api/trigger-notifications :watermark
+(defmethod api/trigger-notifications :percentile-watermark
   [event trigger id]
   #{:new-segment})
 
-(defn exceeds-watermark? [window upper-extent-bound segment]
-  (let [watermark (get segment (:window/window-key window))]
-    (>= (coerce-key watermark :milliseconds) upper-extent-bound)))
+(defn exceeds-watermark? [window trigger lower-extent-bound upper-extent-bound segment]
+  (let [watermark (get segment (:window/window-key window))
+        pct (:trigger/watermark-percentage trigger)
+        offset (* (- upper-extent-bound lower-extent-bound) pct)]
+    (>= (coerce-key watermark :milliseconds) (+ lower-extent-bound offset))))
 
-(defmethod api/trigger-fire :watermark
+(defmethod api/trigger-fire :percentile-watermark
   [{:keys [onyx.core/window-state] :as event} trigger id segment]
   (let [f (kw->fn (:trigger/sync trigger))
         window-ids (get @window-state (:trigger/window-id trigger))]
@@ -29,10 +31,10 @@
             w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
             lower (wid/extent-lower win-min w-range w-slide window-id)
             upper (wid/extent-upper win-min w-slide window-id)]
-        (when (exceeds-watermark? window upper segment)
+        (when (exceeds-watermark? window trigger lower upper segment)
           (api/refine-state event trigger)
           (f event window-id lower upper state))))))
 
-(defmethod api/trigger-teardown :watermark
+(defmethod api/trigger-teardown :percentile-watermark
   [event trigger id]
   event)

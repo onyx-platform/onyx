@@ -35,6 +35,7 @@
             [onyx.triggers.segment]
             [onyx.triggers.punctuation]
             [onyx.triggers.watermark]
+            [onyx.triggers.percentile-watermark]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 

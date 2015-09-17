@@ -12,6 +12,7 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
   - [`:segment`](#segment)
   - [`:punctuation`](#punctuation)
   - [`:watermark`](#watermark)
+  - [`:percentile-watermark`](#percentile-watermark)
 - [Refinement Modes](#refinement-modes)
   - [`:accumulating`](#accumulating)
   - [`:discarding`](#discarding)
@@ -78,6 +79,20 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
  :trigger/on :watermark
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout when this window's watermark has been exceeded"}
+```
+
+#### `:percentile-watermark`
+
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires if the value of `:window/window-key` in the segment exceeds the lower-bound plus the percentage of the range as indicated by `:trigger/perecentile`, a `double` greater than `0` and less than `1`. This is an alternative to `:watermark` that allows you to trigger on *most* of the data arriving, not necessarily every last bit.
+
+
+```clojure
+{:trigger/window-id :collect-segments
+ :trigger/refinement :discarding
+ :trigger/on :percentile-watermark
+ :trigger/watermark-percentage 0.95
+ :trigger/sync ::write-to-stdout
+ :trigger/doc "Writes the window contents to stdout when this window's watermark is exceeded by 95% of its range"}
 ```
 
 ### Refinement Modes
