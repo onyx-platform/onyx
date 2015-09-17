@@ -324,10 +324,10 @@
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
             (let [f (agg/aggregation-fn (:window/aggregation w))]
-              (swap! window-state update-in [(:window/id w) e] f w (:message msg)))
-            (doseq [t (:onyx.core/triggers event)]
-              (when (some #{:new-segment} (triggers/trigger-notifications event t nil))
-                (triggers/trigger-fire event t nil))))))))
+              (swap! window-state update-in [(:window/id w) e] f w (:message msg))))
+          (doseq [[t k] (map vector (:onyx.core/triggers event) (range))]
+            (when (some #{:new-segment} (triggers/trigger-notifications event t k))
+              (triggers/trigger-fire event t k)))))))
   event)
 
 (defn write-batch [pipeline event]

@@ -18,9 +18,10 @@
 
 (defmethod api/trigger-fire :segment
   [{:keys [onyx.core/window-state] :as event} trigger id]
-  (let [f (kw->fn (:trigger/sync trigger))
-        x (inc (or (get-in event [:onyx.triggers/segments id]) 0))]
-    (when (>= x (:trigger/threshold trigger))
+  (let [segment-state @(:onyx.triggers/segments event)
+        f (kw->fn (:trigger/sync trigger))
+        x ((fnil inc 0) (get segment-state id))]
+    (if (>= x (apply to-standard-units (:trigger/threshold trigger)))
       (let [state (api/refine-state event trigger)
             window-ids (get state (:trigger/window-id trigger))]
         (doseq [[window-id state] window-ids]
@@ -30,8 +31,9 @@
                 w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
                 lower (wid/extent-lower win-min w-range w-slide window-id)
                 upper (wid/extent-upper win-min w-slide window-id)]
-            (f event window-id lower upper state))))
-      (swap! (:onyx.triggers/segments event) update-in dissoc id))))
+            (f event window-id lower upper state)))
+        (swap! (:onyx.triggers/segments event) dissoc id))
+      (swap! (:onyx.triggers/segments event) update-in [id] (fnil inc 0)))))
 
 (defmethod api/trigger-teardown :segment
   [event trigger id]
