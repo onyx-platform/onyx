@@ -11,6 +11,7 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
   - [`:timer`](#timer)
   - [`:segment`](#segment)
   - [`:punctuation`](#punctuation)
+  - [`:watermark`](#watermark)
 - [Refinement Modes](#refinement-modes)
   - [`:accumulating`](#accumulating)
   - [`:discarding`](#discarding)
