@@ -74,9 +74,6 @@
 (defn trigger-pred [event window-id upper lower segment]
   (:trigger? segment))
 
-(defn trigger-done [event window-id upper lower segment]
-  (prn "done with " window-id))
-
 (def triggers
   [#_{:trigger/window-id :collect-segments
     :trigger/refinement :accumulating
@@ -84,17 +81,17 @@
     :trigger/period [5 :seconds]
     :trigger/sync ::write-to-stdout}
 
-   {:trigger/window-id :collect-segments
+   #_{:trigger/window-id :collect-segments
     :trigger/refinement :accumulating
     :trigger/on :segment
     :trigger/threshold [5 :elements]
     :trigger/sync ::write-to-stdout}
 
-   #_{:trigger/window-id :sum-segments
+   {:trigger/window-id :collect-segments
     :trigger/refinement :discarding
-    :trigger/type :predicate
+    :trigger/on :punctuation
     :trigger/pred ::trigger-pred
-    :trigger/sync ::trigger-done}])
+    :trigger/sync ::write-to-stdout}])
 
 (defn write-to-stdout [event window-id lower-bound upper-bound state]
   (println window-id (java.util.Date. lower-bound) (java.util.Date. upper-bound) state))

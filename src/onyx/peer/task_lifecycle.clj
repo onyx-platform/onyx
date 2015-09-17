@@ -327,7 +327,7 @@
               (swap! window-state update-in [(:window/id w) e] f w (:message msg))))
           (doseq [[t k] (map vector (:onyx.core/triggers event) (range))]
             (when (some #{:new-segment} (triggers/trigger-notifications event t k))
-              (triggers/trigger-fire event t k)))))))
+              (triggers/trigger-fire event t k (:message msg))))))))
   event)
 
 (defn write-batch [pipeline event]

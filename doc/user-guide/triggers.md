@@ -9,6 +9,8 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 - [Summary](#summary)
 - [Trigger Types](#trigger-types)
   - [`:timer`](#timer)
+  - [`:segment`](#segment)
+  - [`:punctuation`](#punctuation)
 - [Refinement Modes](#refinement-modes)
   - [`:accumulating`](#accumulating)
   - [`:discarding`](#discarding)
@@ -40,8 +42,7 @@ This trigger sleeps for a duration of `:trigger/period`. When it is done sleepin
 
 #### `:segment`
 
-Trigger fires in reaction to a new segment being processed on this task. Trigger only fires once every `:trigger/threshold` segments. When the threshold is exceeded, the count of new segments goes back to `0`, and the looping proceeds again in the same manner.
-
+Trigger wakes up in reaction to a new segment being processed on this task. Trigger only fires once every `:trigger/threshold` segments. When the threshold is exceeded, the count of new segments goes back to `0`, and the looping proceeds again in the same manner.
 
 ```clojure
 {:trigger/window-id :collect-segments
@@ -51,6 +52,10 @@ Trigger fires in reaction to a new segment being processed on this task. Trigger
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout every 5 segments"}
 ```
+
+#### `:punctuation`
+
+Trigger wakes up in reaction to a new segment being processed on this task. Trigger only fires if `:trigger/pred` evaluates to `true`. The signature of `:trigger/pred` is of arity-5: `event, window-id, upper, lower, segment`. Punctuation triggers are often useful to send signals through that indicate that no more data will be coming through for a particular window of time.
 
 ### Refinement Modes
 

@@ -33,6 +33,7 @@
             [onyx.triggers.triggers-api]
             [onyx.triggers.timer]
             [onyx.triggers.segment]
+            [onyx.triggers.punctuation]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 

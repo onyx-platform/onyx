@@ -121,7 +121,7 @@
 (def Trigger
   {:trigger/window-id s/Keyword
    :trigger/refinement (s/pred #(some #{%} #{:accumulating :discarding}) 'refinement-type)
-   :trigger/on (s/pred #(some #{%} #{:timer :segment}) 'trigger-type)
+   :trigger/on s/Keyword
    :trigger/sync s/Keyword
    (s/optional-key :trigger/doc) s/Str
    s/Keyword s/Any})
