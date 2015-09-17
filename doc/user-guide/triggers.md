@@ -42,7 +42,7 @@ This trigger sleeps for a duration of `:trigger/period`. When it is done sleepin
 
 #### `:segment`
 
-Trigger wakes up in reaction to a new segment being processed on this task. Trigger only fires once every `:trigger/threshold` segments. When the threshold is exceeded, the count of new segments goes back to `0`, and the looping proceeds again in the same manner.
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires once every `:trigger/threshold` segments. When the threshold is exceeded, the count of new segments goes back to `0`, and the looping proceeds again in the same manner.
 
 ```clojure
 {:trigger/window-id :collect-segments
@@ -55,7 +55,29 @@ Trigger wakes up in reaction to a new segment being processed on this task. Trig
 
 #### `:punctuation`
 
-Trigger wakes up in reaction to a new segment being processed on this task. Trigger only fires if `:trigger/pred` evaluates to `true`. The signature of `:trigger/pred` is of arity-5: `event, window-id, upper, lower, segment`. Punctuation triggers are often useful to send signals through that indicate that no more data will be coming through for a particular window of time.
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires if `:trigger/pred` evaluates to `true`. The signature of `:trigger/pred` is of arity-5: `event, window-id, upper, lower, segment`. Punctuation triggers are often useful to send signals through that indicate that no more data will be coming through for a particular window of time.
+
+```clojure
+{:trigger/window-id :collect-segments
+ :trigger/refinement :discarding
+ :trigger/on :punctuation
+ :trigger/pred ::trigger-pred
+ :trigger/sync ::write-to-stdout
+ :trigger/doc "Writes the window contents to std out :trigger/pred is true for this segment"}
+```
+
+#### `:watermark`
+
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires if the value of `:window/window-key` in the segment exceeds the upper-bound in the extent of an active window. This is a shortcut function for a punctuation trigger that fires when any piece of data has a time-based window key that above another extent, effectively declaring that no more data for earlier windows will be arriving.
+
+
+```clojure
+{:trigger/window-id :collect-segments
+ :trigger/refinement :discarding
+ :trigger/on :watermark
+ :trigger/sync ::write-to-stdout
+ :trigger/doc "Writes the window contents to stdout when this window's watermark has been exceeded"}
+```
 
 ### Refinement Modes
 

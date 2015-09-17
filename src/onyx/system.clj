@@ -34,6 +34,7 @@
             [onyx.triggers.timer]
             [onyx.triggers.segment]
             [onyx.triggers.punctuation]
+            [onyx.triggers.watermark]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 

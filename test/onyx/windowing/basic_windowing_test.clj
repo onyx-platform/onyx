@@ -87,10 +87,15 @@
     :trigger/threshold [5 :elements]
     :trigger/sync ::write-to-stdout}
 
-   {:trigger/window-id :collect-segments
+   #_{:trigger/window-id :collect-segments
     :trigger/refinement :discarding
     :trigger/on :punctuation
     :trigger/pred ::trigger-pred
+    :trigger/sync ::write-to-stdout}
+
+   {:trigger/window-id :collect-segments
+    :trigger/refinement :discarding
+    :trigger/on :watermark
     :trigger/sync ::write-to-stdout}])
 
 (defn write-to-stdout [event window-id lower-bound upper-bound state]
@@ -135,6 +140,8 @@
 
 (doseq [i input]
   (>!! in-chan i))
+
+(>!! in-chan {:id 2 :age 12 :event-time #inst "2015-09-13T03:15:00.829-00:00"})
 
 (>!! in-chan :done)
 (close! in-chan)
