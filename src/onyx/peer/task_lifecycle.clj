@@ -16,7 +16,7 @@
               [onyx.windowing.window-id :as wid]
               [onyx.windowing.coerce :as w-coerce]
               [onyx.windowing.aggregation :as agg]
-              [onyx.windowing.triggers :as triggers]
+              [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
@@ -314,20 +314,21 @@
 
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
-  (if (seq windows)
-    (do
-      (doseq [w windows]
-        (doseq [msg (mapcat :leaves (:tree results))]
-          (let [w-range (apply w-coerce/to-standard-units (:window/range w))
-                w-slide (apply w-coerce/to-standard-units (or (:window/slide w) (:window/range w)))
-                units (w-coerce/standard-units-for (last (:window/range w)))
-                message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
-                extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
-            (doseq [e extents]
-              (let [f (agg/aggregation-fn (:window/aggregation w))]
-                (swap! window-state update-in [(:window/id w) e] f w (:message msg)))))))
-      event)
-    event))
+  (when (seq windows)
+    (doseq [w windows]
+      (doseq [msg (mapcat :leaves (:tree results))]
+        (let [w-range (apply w-coerce/to-standard-units (:window/range w))
+              w-slide (apply w-coerce/to-standard-units (or (:window/slide w) (:window/range w)))
+              units (w-coerce/standard-units-for (last (:window/range w)))
+              message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
+              extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
+          (doseq [e extents]
+            (let [f (agg/aggregation-fn (:window/aggregation w))]
+              (swap! window-state update-in [(:window/id w) e] f w (:message msg)))
+            (doseq [t (:onyx.core/triggers event)]
+              (when (some #{:new-segment} (triggers/trigger-notifications event t nil))
+                (triggers/trigger-fire event t nil))))))))
+  event)
 
 (defn write-batch [pipeline event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]

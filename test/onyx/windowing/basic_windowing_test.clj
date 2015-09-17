@@ -69,29 +69,32 @@
     :window/window-key :event-time
     :window/range [30 :minutes]
     :window/slide [5 :minutes]
-    :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}
+    :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
 
-   {:window/id :sum-segments
-    :window/task :identity
-    :window/type :fixed
-    :window/aggregation :sum
-    :window/sum-key :age
-    :window/window-key :event-time
-    :window/range [30 :minutes]}])
+(defn trigger-pred [event window-id upper lower segment]
+  (:trigger? segment))
+
+(defn trigger-done [event window-id upper lower segment]
+  (prn "done with " window-id))
 
 (def triggers
-  [{:trigger/window-id :collect-segments
-    :trigger/refinement :discarding
-    :trigger/type :periodically
-    :trigger/period [5 :seconds]
-    :trigger/sync ::write-to-stdout
-    :trigger/doc "Writes the window contents to standard out 5 seconds, discarding intermediate state"}
-
-   {:trigger/window-id :sum-segments
+  [#_{:trigger/window-id :collect-segments
     :trigger/refinement :accumulating
-    :trigger/type :periodically
-    :trigger/period [1 :seconds]
-    :trigger/sync ::write-to-stdout}])
+    :trigger/on :timer
+    :trigger/period [5 :seconds]
+    :trigger/sync ::write-to-stdout}
+
+   {:trigger/window-id :collect-segments
+    :trigger/refinement :accumulating
+    :trigger/on :segment
+    :trigger/threshold [5 :elements]
+    :trigger/sync ::write-to-stdout}
+
+   #_{:trigger/window-id :sum-segments
+    :trigger/refinement :discarding
+    :trigger/type :predicate
+    :trigger/pred ::trigger-pred
+    :trigger/sync ::trigger-done}])
 
 (defn write-to-stdout [event window-id lower-bound upper-bound state]
   (println window-id (java.util.Date. lower-bound) (java.util.Date. upper-bound) state))
@@ -148,3 +151,4 @@
   (onyx.api/shutdown-peer-group peer-group)
 
   (onyx.api/shutdown-env env))
+

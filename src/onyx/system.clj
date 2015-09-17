@@ -30,6 +30,9 @@
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
             [onyx.windowing.coerce]
+            [onyx.triggers.triggers-api]
+            [onyx.triggers.timer]
+            [onyx.triggers.segment]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 

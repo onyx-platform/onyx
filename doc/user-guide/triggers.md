@@ -8,7 +8,7 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 
 - [Summary](#summary)
 - [Trigger Types](#trigger-types)
-  - [`:periodically`](#periodically)
+  - [`:timer`](#timer)
 - [Refinement Modes](#refinement-modes)
   - [`:accumulating`](#accumulating)
   - [`:discarding`](#discarding)
@@ -25,14 +25,14 @@ Windows capture data over time and place segments into discrete, possibly overla
 
 Onyx ships a number of trigger implementations that can be used out of the box. We outline each here and show an example of each in action.
 
-#### `:periodically`
+#### `:timer`
 
 This trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself.
 
 ```clojure
 {:trigger/window-id :collect-segments
  :trigger/refinement :discarding
- :trigger/type :periodically
+ :trigger/on :timer
  :trigger/period [3 :seconds]
  :trigger/sync ::write-to-dynamo
  :trigger/doc "Writes state to DynamoDB every 5 seconds, discarding intermediate state"}
