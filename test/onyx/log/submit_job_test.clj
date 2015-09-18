@@ -3,57 +3,63 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.system]
             [onyx.log.replica :as replica]
-            [midje.sweet :refer :all]))
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]))
 
-(def entry (create-log-entry :submit-job {:id :a :tasks [:t1]
-                                          :task-scheduler :onyx.task-scheduler/balanced
-                                          :saturation 42}))
+;(use-fixtures :once schema.test/validate-schemas)
 
-(def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
+(deftest submit-job-log-test
+  (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]
+                                             :task-scheduler :onyx.task-scheduler/balanced
+                                             :saturation 42})
+        f (partial extensions/apply-log-entry (assoc entry :message-id 0))
+        rep-diff (partial extensions/replica-diff entry)
+        rep-reactions (partial extensions/reactions entry)
+        old-replica (merge replica/base-replica
+                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            :job-scheduler :onyx.job-scheduler/greedy
+                            :peers [:p1]})
+        new-replica (f old-replica)
+        diff (rep-diff old-replica new-replica)
+        reactions (rep-reactions old-replica new-replica diff {:id :x})]
 
-(def rep-diff (partial extensions/replica-diff entry))
+    (is (= [:a] (:jobs new-replica)))
+    (is (= {:job :a} diff)))
+    
+  (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]
+                                             :task-scheduler :onyx.task-scheduler/balanced
+                                             :saturation 42})
+        old-replica (merge replica/base-replica 
+                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            :job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
+                            :task-schedulers {:b :onyx.task-scheduler/balanced}
+                            :tasks {:b [:t1 :t2]}})
+        f (partial extensions/apply-log-entry (assoc entry :message-id 0))
+        rep-diff (partial extensions/replica-diff entry)
+        new-replica (f old-replica)
+        diff (rep-diff old-replica new-replica)
+        rep-reactions (partial extensions/reactions entry)
+        reactions (rep-reactions old-replica new-replica diff {:id :x})]
+    (is (= [:b :a] (:jobs new-replica)))
+    (is (= {:job :a} diff)))
 
-(def rep-reactions (partial extensions/reactions entry))
+  (let [entry (create-log-entry :submit-job {:id :j1
+                                             :task-scheduler :onyx.task-scheduler/balanced
+                                             :saturation 42
+                                             :tasks [:t1 :t2 :t3]})
+        f (partial extensions/apply-log-entry (assoc entry :message-id 0))
+        rep-diff (partial extensions/replica-diff entry)
+        rep-reactions (partial extensions/reactions entry)
+        old-replica (merge replica/base-replica
+                           {:messaging {:onyx.messaging/impl :dummy-messenger}
+                            :job-scheduler :onyx.job-scheduler/balanced
+                            :peers [:p1 :p2]})
+        new-replica (f old-replica)
+        diff (rep-diff old-replica new-replica)]
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p1})))
+    (is (= [] (rep-reactions old-replica new-replica diff {:id :p2})))))
 
-(def old-replica (merge replica/base-replica
-                        {:messaging {:onyx.messaging/impl :dummy-messenger}
-                         :job-scheduler :onyx.job-scheduler/greedy
-                         :peers [:p1]}))
 
-(let [new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :x})]
-  (fact (:jobs new-replica) => [:a])
-  (fact diff => {:job :a}))
 
-(let [old-replica (merge replica/base-replica 
-                         {:messaging {:onyx.messaging/impl :dummy-messenger}
-                          :job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
-                          :task-schedulers {:b :onyx.task-scheduler/balanced}
-                          :tasks {:b [:t1 :t2]}})
-      new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)
-      reactions (rep-reactions old-replica new-replica diff {:id :x})]
-  (fact (:jobs new-replica) => [:b :a])
-  (fact diff => {:job :a}))
 
-(def entry (create-log-entry :submit-job {:id :j1
-                                          :task-scheduler :onyx.task-scheduler/balanced
-                                          :saturation 42
-                                          :tasks [:t1 :t2 :t3]}))
 
-(def f (partial extensions/apply-log-entry (assoc entry :message-id 0)))
-
-(def rep-diff (partial extensions/replica-diff entry))
-
-(def rep-reactions (partial extensions/reactions entry))
-
-(def old-replica (merge replica/base-replica
-                        {:messaging {:onyx.messaging/impl :dummy-messenger}
-                         :job-scheduler :onyx.job-scheduler/balanced
-                         :peers [:p1 :p2]}))
-
-(let [new-replica (f old-replica)
-      diff (rep-diff old-replica new-replica)]
-  (fact (rep-reactions old-replica new-replica diff {:id :p1}) => [])
-  (fact (rep-reactions old-replica new-replica diff {:id :p2}) => []))

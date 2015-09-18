@@ -21,6 +21,7 @@
           (update-in [:allocations] dissoc job-id)
           (update-in [:task-metadata] dissoc job-id)
           (update-in [:ackers] dissoc job-id)
+          (update-in [:task-slot-ids] dissoc job-id)
           (update-in [:peer-state] merge (into {} (map (fn [p] {p :idle}) peers)))
           (reconfigure-cluster-workload)))
     replica))

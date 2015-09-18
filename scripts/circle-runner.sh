@@ -41,7 +41,7 @@ ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
 #lein with-profile dev,circle-ci jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
-lein with-profile dev,circle-ci midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
+lein with-profile dev,circle-ci test $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
 
 EXIT_CODE=${PIPESTATUS[0]}
 

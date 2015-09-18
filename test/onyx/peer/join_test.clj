@@ -1,23 +1,10 @@
 (ns onyx.peer.join-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
-            [midje.sweet :refer :all]
+            [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config]]
             [onyx.api]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]))
-
-(def id (java.util.UUID/randomUUID))
-
-(def config (load-config))
-
-(def env-config (assoc (:env-config config) :onyx/id id))
-
-(def peer-config (assoc (:peer-config config) :onyx/id id))
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-(def batch-size 2)
 
 (def people
   [{:id 1 :name "Mike" :age 23}
@@ -35,63 +22,7 @@
 
 (def age-chan (chan (inc (count ages))))
 
-(def out-chan (chan 10000 #_(sliding-buffer (inc n-messages))))
-
-(doseq [name names]
-  (>!! name-chan name))
-
-(doseq [age ages]
-  (>!! age-chan age))
-
-(>!! name-chan :done)
-(>!! age-chan :done)
-
-(defn join-person [local-state segment]
-  (let [state @local-state]
-    (if-let [record (get state (:id segment))]
-      (let [result (merge record segment)]
-        (swap! local-state dissoc (:id segment))
-        result)
-      (do (swap! local-state assoc (:id segment) (dissoc segment :id))
-          []))))
-
-(def catalog
-  [{:onyx/name :names
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :ages
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments from a core.async channel"}
-
-   {:onyx/name :join-person
-    :onyx/fn :onyx.peer.join-test/join-person
-    :onyx/type :function
-    :onyx/group-by-key :id
-    :onyx/min-peers 1
-    :onyx/flux-policy :kill
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-(def workflow
-  [[:names :join-person]
-   [:ages :join-person]
-   [:join-person :out]])
+(def out-chan (chan 10000))
 
 (defn inject-names-ch [event lifecycle]
   {:core.async/chan name-chan})
@@ -117,37 +48,97 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(def lifecycles
-  [{:lifecycle/task :names
-    :lifecycle/calls :onyx.peer.join-test/names-calls}
-   {:lifecycle/task :names
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :ages
-    :lifecycle/calls :onyx.peer.join-test/ages-calls}
-   {:lifecycle/task :ages
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.peer.join-test/out-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}
-   {:lifecycle/task :join-person
-    :lifecycle/calls :onyx.peer.join-test/join-calls}])
+(defn join-person [local-state segment]
+  (let [state @local-state]
+    (if-let [record (get state (:id segment))]
+      (let [result (merge record segment)]
+        (swap! local-state dissoc (:id segment))
+        result)
+      (do (swap! local-state assoc (:id segment) (dissoc segment :id))
+          []))))
 
-(def v-peers (onyx.api/start-peers 4 peer-group))
+(deftest join-segments
+  (let [id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id id)
+        peer-config (assoc (:peer-config config) :onyx/id id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        batch-size 2
 
-(onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
+        catalog [{:onyx/name :names
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(def results (take-segments! out-chan))
+                 {:onyx/name :ages
+                  :onyx/plugin :onyx.plugin.core-async/input
+                  :onyx/type :input
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Reads segments from a core.async channel"}
 
-(fact (set (butlast results)) => (set people))
+                 {:onyx/name :join-person
+                  :onyx/fn :onyx.peer.join-test/join-person
+                  :onyx/type :function
+                  :onyx/group-by-key :id
+                  :onyx/min-peers 1
+                  :onyx/flux-policy :kill
+                  :onyx/batch-size batch-size}
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+                 {:onyx/name :out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}]
 
-(onyx.api/shutdown-peer-group peer-group)
+        workflow [[:names :join-person]
+                  [:ages :join-person]
+                  [:join-person :out]]
 
-(onyx.api/shutdown-env env)
+        lifecycles [{:lifecycle/task :names
+                     :lifecycle/calls :onyx.peer.join-test/names-calls}
+                    {:lifecycle/task :names
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :ages
+                     :lifecycle/calls :onyx.peer.join-test/ages-calls}
+                    {:lifecycle/task :ages
+                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.peer.join-test/out-calls}
+                    {:lifecycle/task :out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+                    {:lifecycle/task :join-person
+                     :lifecycle/calls :onyx.peer.join-test/join-calls}]
+
+        v-peers (onyx.api/start-peers 4 peer-group)]
+    (doseq [name names]
+      (>!! name-chan name))
+
+    (doseq [age ages]
+      (>!! age-chan age))
+
+    (>!! name-chan :done)
+    (>!! age-chan :done)
+
+    (onyx.api/submit-job
+      peer-config
+      {:catalog catalog :workflow workflow
+       :lifecycles lifecycles
+       :task-scheduler :onyx.task-scheduler/balanced})
+
+    (let [results (take-segments! out-chan)]
+      (is (= (set people)
+             (set (butlast results)))))
+    (doseq [v-peer v-peers]
+      (onyx.api/shutdown-peer v-peer))
+
+    (onyx.api/shutdown-peer-group peer-group)
+
+    (onyx.api/shutdown-env env)))

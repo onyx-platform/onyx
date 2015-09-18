@@ -5,42 +5,36 @@
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [load-config]]
             [onyx.api :as api]
-            [midje.sweet :refer :all]
+            [schema.test]
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [onyx.log.curator :as zk]))
 
-(def onyx-id (java.util.UUID/randomUUID))
+(use-fixtures :once schema.test/validate-schemas)
 
-(def config (load-config))
+(deftest gc-log-test
+  (let [onyx-id (java.util.UUID/randomUUID)
+        config (load-config)
+        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        peer-config (assoc (:peer-config config) :onyx/id onyx-id)
+        env (onyx.api/start-env env-config)
+        peer-group (onyx.api/start-peer-group peer-config)
+        n-peers 5
+        v-peers (onyx.api/start-peers n-peers peer-group)
+        _ (onyx.api/gc peer-config)
+        v-peers2 (onyx.api/start-peers n-peers peer-group)
+        ch (chan 100)]
 
-(def env-config (assoc (:env-config config) :onyx/id onyx-id))
+    (loop [replica (extensions/subscribe-to-log (:log env) ch)]
+      (let [entry (<!! ch)
+            new-replica (extensions/apply-log-entry entry replica)]
+        (when-not (= (count (:peers new-replica)) 10)
+          (recur new-replica))))
 
-(def peer-config (assoc (:peer-config config) :onyx/id onyx-id))
+    (testing "Starting peers after GC succeeded" (is true))
 
-(def env (onyx.api/start-env env-config))
+    (doseq [v-peer (concat v-peers v-peers2)]
+      (onyx.api/shutdown-peer v-peer))
 
-(def peer-group (onyx.api/start-peer-group peer-config))
+    (onyx.api/shutdown-peer-group peer-group)
 
-(def n-peers 5)
-
-(def v-peers (onyx.api/start-peers n-peers peer-group))
-
-(onyx.api/gc peer-config)
-
-(def v-peers2 (onyx.api/start-peers n-peers peer-group))
-
-(def ch (chan 100))
-
-(loop [replica (extensions/subscribe-to-log (:log env) ch)]
-  (let [entry (<!! ch)
-        new-replica (extensions/apply-log-entry entry replica)]
-    (when-not (= (count (:peers new-replica)) 10)
-      (recur new-replica))))
-
-(fact "Starting peers after GC succeeded" true => true)
-
-(doseq [v-peer (concat v-peers v-peers2)]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
+    (onyx.api/shutdown-env env)) )
