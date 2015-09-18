@@ -17,7 +17,7 @@
   #{:new-segment})
 
 (defmethod api/trigger-fire :segment
-  [{:keys [onyx.core/window-state] :as event} trigger id]
+  [{:keys [onyx.core/window-state] :as event} trigger id segment]
   (let [segment-state @(:onyx.triggers/segments event)
         f (kw->fn (:trigger/sync trigger))
         x ((fnil inc 0) (get segment-state id))]

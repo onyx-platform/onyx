@@ -67,40 +67,22 @@
     :window/type :fixed
     :window/aggregation :count
     :window/window-key :event-time
-    :window/range [5 :minutes]
-;;    :window/slide [5 :minutes]
-    :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}])
+    :window/range [5 :minutes]}])
 
 (defn trigger-pred [event window-id upper lower segment]
   (:trigger? segment))
 
 (def triggers
-  [#_{:trigger/window-id :collect-segments
-    :trigger/refinement :accumulating
-    :trigger/on :timer
-    :trigger/period [5 :seconds]
-    :trigger/sync ::write-to-stdout}
-
-   #_{:trigger/window-id :collect-segments
+  [{:trigger/window-id :collect-segments
     :trigger/refinement :accumulating
     :trigger/on :segment
     :trigger/threshold [5 :elements]
-    :trigger/sync ::write-to-stdout}
+    :trigger/sync ::update-atom!}])
 
-   #_{:trigger/window-id :collect-segments
-    :trigger/refinement :discarding
-    :trigger/on :punctuation
-    :trigger/pred ::trigger-pred
-    :trigger/sync ::write-to-stdout}
+(def test-state (atom []))
 
-   {:trigger/window-id :collect-segments
-    :trigger/refinement :discarding
-    :trigger/on :percentile-watermark
-    :trigger/watermark-percentage 0.50
-    :trigger/sync ::write-to-stdout}])
-
-(defn write-to-stdout [event window-id lower-bound upper-bound state]
-  (println window-id (java.util.Date. lower-bound) (java.util.Date. upper-bound) state))
+(defn update-atom! [event window-id lower-bound upper-bound state]
+  (swap! test-state conj [lower-bound upper-bound state]))
 
 (def in-chan (chan (inc (count input))))
 
@@ -142,12 +124,28 @@
 (doseq [i input]
   (>!! in-chan i))
 
-(>!! in-chan {:id 2 :age 12 :event-time #inst "2015-09-13T03:02:30.829-00:00"})
-
 (>!! in-chan :done)
 (close! in-chan)
 
 (def results (take-segments! out-chan))
+
+(def expected-windows
+  [[1442113200000 1442113499999 2]
+   [1442113500000 1442113799999 3]
+   [1442113200000 1442113499999 2]
+   [1442113500000 1442113799999 5]
+   [1442114100000 1442114399999 1]
+   [1442114700000 1442114999999 1]
+   [1442115900000 1442116199999 1]
+   [1442113200000 1442113499999 3]
+   [1442113500000 1442113799999 5]
+   [1442114100000 1442114399999 2]
+   [1442114700000 1442114999999 1]
+   [1442115900000 1442116199999 1]
+   [1442116500000 1442116799999 2]
+   [1442115000000 1442115299999 1]])
+
+(deftest fixed-windows-segment-trigger)
 
 (do
   (doseq [v-peer v-peers]
@@ -156,4 +154,3 @@
   (onyx.api/shutdown-peer-group peer-group)
 
   (onyx.api/shutdown-env env))
-
