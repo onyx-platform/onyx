@@ -37,7 +37,7 @@
           external-channel (:external-channel messaging-group)
           short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
                                (fn [channel] (= channel external-channel))
-                               (constantly false))
+                               (fn [_] false))
           release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size config)
