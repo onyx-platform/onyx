@@ -1,4 +1,4 @@
-(ns onyx.windowing.trigger-predicate-tests
+(ns onyx.windowing.trigger-predicate-test
   (:require [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test :refer [deftest is]]
