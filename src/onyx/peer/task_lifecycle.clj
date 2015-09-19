@@ -14,7 +14,7 @@
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
               [onyx.windowing.window-id :as wid]
-              [onyx.windowing.coerce :as w-coerce]
+              [onyx.windowing.units :as units]
               [onyx.windowing.aggregation :as agg]
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
@@ -317,17 +317,16 @@
   (when (seq windows)
     (doseq [w windows]
       (doseq [msg (mapcat :leaves (:tree results))]
-        (let [w-range (apply w-coerce/to-standard-units (:window/range w))
-              w-slide (apply w-coerce/to-standard-units (or (:window/slide w) (:window/range w)))
-              units (w-coerce/standard-units-for (last (:window/range w)))
-              message (update (:message msg) (:window/window-key w) w-coerce/coerce-key units)
+        (let [w-range (apply units/to-standard-units (:window/range w))
+              w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
+              units (units/standard-units-for (last (:window/range w)))
+              message (update (:message msg) (:window/window-key w) units/coerce-key units)
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
             (let [f (agg/aggregation-fn (:window/aggregation w))]
               (swap! window-state update-in [(:window/id w) e] f w (:message msg))))
-          (doseq [[t k] (map vector (:onyx.core/triggers event) (range))]
-            (when (some #{:new-segment} (triggers/trigger-notifications event t k))
-              (triggers/trigger-fire event t k (:message msg))))))))
+          (doseq [t (:onyx.core/triggers event)]
+            (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
   event)
 
 (defn write-batch [pipeline event]
@@ -405,15 +404,15 @@
 
 (defn setup-triggers [event]
   (reduce
-   #(triggers/trigger-setup %1 (first %2) (second %2))
+   #(triggers/trigger-setup %1 %2)
    event
-   (map vector (:onyx.core/triggers event) (range))))
+   (:onyx.core/triggers event)))
 
 (defn teardown-triggers [event]
   (reduce
-   #(triggers/trigger-teardown %1 (first %2) (second %2))
+   #(triggers/trigger-teardown %1 %2)
    event
-   (map vector (:onyx.core/triggers event) (range))))
+   (:onyx.core/triggers event)))
 
 (defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
   (warn e)
@@ -552,7 +551,7 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows filtered-windows
-                           :onyx.core/triggers (c/filter-triggers triggers filtered-windows)
+                           :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))

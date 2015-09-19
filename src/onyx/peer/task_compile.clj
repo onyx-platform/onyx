@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.peer.task-compile
-  (:require [onyx.peer.operation :as operation]
+  (:require [onyx.peer.operation :refer [kw->fn] :as operation]
             [onyx.static.planning :refer [find-task build-pred-fn]]
             [onyx.static.validation :as validation]
             [clj-tuple :as t]
@@ -22,7 +22,7 @@
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
 (defn resolve-lifecycle-calls [calls]
-  (let [calls-map (var-get (operation/kw->fn calls))]
+  (let [calls-map (var-get (kw->fn calls))]
     (try
       (validation/validate-lifecycle-calls calls-map)
       (catch Throwable t
@@ -130,3 +130,10 @@
   (filter #(some #{(:trigger/window-id %)}
                  (map :window/id windows))
           triggers))
+
+(defn resolve-triggers [triggers]
+  (map
+   #(assoc %
+      :trigger/id (java.util.UUID/randomUUID)
+      :trigger/sync-fn (kw->fn (:trigger/sync %)))
+   triggers))

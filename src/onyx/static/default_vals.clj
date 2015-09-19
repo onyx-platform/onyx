@@ -3,20 +3,20 @@
 (def default-pending-timeout 60000)
 
 (def defaults
-  {; input task defaults
+  {;; input task defaults
    :onyx/input-retry-timeout 1000
    :onyx/pending-timeout default-pending-timeout
    :onyx/max-pending 10000
 
-   ; task defaults
+   ;; task defaults
    :onyx/batch-timeout 1000
 
-   ; zookeeper defaults
+   ;; zookeeper defaults
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
    :onyx.zookeeper/backoff-max-retries 5
 
-   ; peer defaults
+   ;; peer defaults
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
@@ -25,7 +25,7 @@
    :onyx.peer/backpressure-low-water-pct 30
    :onyx.peer/backpressure-high-water-pct 60
 
-   ; messaging defaults
+   ;; messaging defaults
    :onyx.messaging.aeron/embedded-driver? true
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
@@ -39,7 +39,10 @@
    :onyx.messaging/peer-link-gc-interval 90000
    :onyx.messaging/peer-link-idle-timeout 60000
    :onyx.messaging/ack-daemon-timeout default-pending-timeout
-   :onyx.messaging/ack-daemon-clear-interval 15000})
+   :onyx.messaging/ack-daemon-clear-interval 15000
+
+   ;; windowing defaults
+   :onyx.windowing/min-value 0})
 
 (defn arg-or-default [k opts]
   (get opts k (get defaults k)))

@@ -146,13 +146,14 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - all elements in the vector must be Clojure maps
 - allows arbitrary key/values in the map as parameters
 
-| key name             |type       | optional?|
-|----------------------|-----------|----------|
-|`:trigger/window-id`  |`keyword`  | no       |
-|`:trigger/refinement` |`keyword`  | no       |
-|`:trigger/on`         |`keyword`  | no       |
-|`:trigger/sync`       |`keyword`  | no       |
-|`:trigger/doc`        |`string`   | yes      |
+| key name                   |type       | optional?|
+|----------------------------|-----------|----------|
+|`:trigger/window-id`        |`keyword`  | no       |
+|`:trigger/refinement`       |`keyword`  | no       |
+|`:trigger/on`               |`keyword`  | no       |
+|`:trigger/sync`             |`keyword`  | no       |
+|`:trigger/fire-all-extents?`|`boolean`  | yes      |
+|`:trigger/doc`              |`string`   | yes      |
 
 ### Units
 

@@ -38,9 +38,6 @@
    [1442116500000 1442116799999 2]
    [1442115000000 1442115299999 1]])
 
-(defn trigger-pred [event window-id upper lower segment]
-  (:trigger? segment))
-
 (def test-state (atom []))
 
 (defn update-atom! [event window-id lower-bound upper-bound state]
@@ -108,6 +105,7 @@
         [{:trigger/window-id :collect-segments
           :trigger/refinement :accumulating
           :trigger/on :segment
+          :trigger/fire-all-extents? true
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
 

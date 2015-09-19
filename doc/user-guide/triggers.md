@@ -50,6 +50,7 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 {:trigger/window-id :collect-segments
  :trigger/refinement :accumulating
  :trigger/on :segment
+ :trigger/fire-all-extents? true
  :trigger/threshold [5 :elements]
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout every 5 segments"}
@@ -115,10 +116,11 @@ Onyx offers you the ultimate flexibility on what to do with your state during a 
 
 See the Information Model chapter for an exact specification of what values the Trigger maps need to supply. Here we will describe what each of the keys mean.
 
-| key name             |description
-|----------------------|-----------
-|`:trigger/window-id`  | A `:window/id` specified in the collection of windows
-|`:trigger/refinement` | A mode of refinement, one of `:accumlating`, `:discarding`
-|`:trigger/on`         | The stimulus to fire the trigger as a reaction.
-|`:trigger/sync`       | Fully qualified namespaced keyword of a function to call with the state
-|`:trigger/doc`        | An optional docstring explaining the trigger's purpose
+| key name                   |description
+|----------------------------|-----------
+|`:trigger/window-id`        | A `:window/id` specified in the collection of windows
+|`:trigger/refinement`       | A mode of refinement, one of `:accumlating`, `:discarding`
+|`:trigger/on`               | The stimulus to fire the trigger as a reaction.
+|`:trigger/sync`             | Fully qualified namespaced keyword of a function to call with the state
+|`:trigger/fire-all-extents?`| When true, fires every extent of a window in response to a trigger.
+|`:trigger/doc`              | An optional docstring explaining the trigger's purpose

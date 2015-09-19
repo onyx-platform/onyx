@@ -1,4 +1,4 @@
-(ns onyx.windowing.coerce)
+(ns onyx.windowing.units)
 
 (defmulti standard-units-for
   (fn [unit] unit))

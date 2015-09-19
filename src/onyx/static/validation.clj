@@ -3,7 +3,7 @@
             [com.stuartsierra.dependency :as dep]
             [schema.core :as schema]
             [onyx.static.planning :as planning]
-            [onyx.windowing.coerce :as c]
+            [onyx.windowing.units :as u]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
@@ -213,8 +213,8 @@
 
 (defn range-and-slide-units-compatible [w]
   (when (and (:window/range w) (:window/slide w))
-    (when-not (= (c/standard-units-for (second (:window/range w)))
-                 (c/standard-units-for (second (:window/slide w))))
+    (when-not (= (u/standard-units-for (second (:window/range w)))
+                 (u/standard-units-for (second (:window/slide w))))
       (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
 
 (defn sliding-windows-define-range-and-slide [w]
