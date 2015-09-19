@@ -10,6 +10,50 @@ We're actively looking over the following papers for ideas on how to best design
 - [How Soccer Players Would do Stream Joins](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.362.2471&rep=rep1&type=pdf)
 - [No Pane, No Gain: Efficient Evaluation of Sliding-Window Aggregates over Data Streams](https://cs.brown.edu/courses/cs227/papers/opt-slidingwindowagg.pdf)
 
+#### Semantics and Evaluation Techniques for Window Aggregates in Data Streams
+
+This paper outlines a technique that efficiently bucket data into possibly overlapping windows. The approach, named "Window ID", aids in reducing memory usage and execution latency. The DataFlow paper refers back to this paper, noting that it uses a similiar "bucketing operator" for queries.
+
+More directly from the paper:
+
+> We see two major issues with current stream query systems that process
+> window queries. One is the lack of explicit window semantics. As a result,
+> the exact content of each window extent tends to be confused with window
+> operator implementation and physical stream properties. The other is
+> implementation efficiency, in particular memory usage and execution time.
+> To evaluate sliding window aggregate queries where consecutive window extents
+> overlap (i.e., each tuple belongs to multiple window extents), most current
+> proposals for window queries keep all active input tuples in an in-memory buffer.
+> In addition, each tuple is reprocessed multiple times—once for each window extent
+> to which it belongs. We will propose an approach that avoids intra-operator
+> buffering and tuple re-processing.
+
+WID is powerful because it can handle disorder for events defined on any totally ordered domain. The algorithms change depending on the generality of range and slide attributes. For our initial purposes, the range and slide values are presumed to be the same. This has been implemented and explained in the `window_id.clj` file, and generative tests have been written to confirm its implementation semantics.
+
+The authors note on extensibility:
+
+> Our window specification is quite expressive, and the semantic framework suggests
+> a general way to define window semantics. We have discussed existing types of
+> windows that we have seen.
+
+Another note on totally ordered domains:
+
+> Potentially, WATTR can be any tuple attribute with a totally ordered domain.
+> Having this option allows us to define windows over timestamps assigned by external
+> data sources or internally by the system; to handle a stream with a schema containing
+> multiple timestamp attributes; and to window over non-temporal tuple attributes.
+
+Why it's important to allow windows to be defined by features of the data itself:
+
+> SQL-99 defines a window clause for use on stored data. SQL-99 limits
+> windows to sliding by each tuple (i.e., each tuple defines a window extent),
+> thus tying each output tuple to an input tuple. We call such windows data-driven.
+> In comparison, stream queries often use domain-driven window semantics where users
+> specify how far the consecutive window extents are spaced from each other in
+> terms of domain values [15]. We believe domain-driven windows are more suitable
+> for applications with bursty or high- volume data. Consider a network monitoring
+> application—one possibly wants network statistics updated at regular intervals,
+> independent of surges or lulls in traffic.
 
 #### No Pane, No Gain: Efficient Evaluation of Sliding-Window Aggregates over Data Streams
 
@@ -87,18 +131,25 @@ feature, though.
 
 Onyx's windowing API should:
 
-- Be a low-level data structure that Continuous Query Language (CQL) can compile to
-- Support fixed (tumbling), sliding, session, and global windows.
-- Provide enough expressivity for the window to be created by features of the data itself
-- Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
-- Support punctuation, timer-based, external event, and watermark triggers
-- Allow triggers to compose
-- Be internally optimized to use panes
-- Allow expression of predicates for when a segment should enter and exit a window
-- Allow triggers to be reused across different windows
-- Support different strategies to change data after trigger fires (e.g. discarding, accumulating, etc)
-- Support retraction (e.g. negative tuples)
-- Support incremental aggregation for things like sums
-- Support buffered aggregation for things like windowed joins where all the data for a window is needed
-- Provide *some* support for load shedding in the case of aggregation where data must be buffered
-- Provide expressivity for merging windows back together.
+- [x] Be a low-level data structure that Continuous Query Language (CQL) can compile to
+- [x] Support fixed (tumbling) windows
+- [x] Support sliding windows
+- [ ] Support session windows
+- [ ] Support global windows
+- [x] Provide enough expressivity for the window to be created by features of the data itself
+- [x] Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
+- [x] Support punctuation based triggers
+- [x] Support timer-based triggers
+- [x] Support watermark triggers
+- [x] Support percentile triggers
+- [ ] Support external event triggers
+- [ ] Allow triggers to compose
+- [ ] Be internally optimized to use panes
+- [ ] Allow expression of predicates for when a segment should enter and exit a window
+- [x] Allow triggers to be reused across different windows
+- [x] Support different strategies to change data after trigger fires (e.g. discarding, accumulating, etc)
+- [ ] Support retraction (e.g. negative tuples)
+- [x] Support incremental aggregation for things like sums
+- [ ] Support buffered aggregation for things like windowed joins where all the data for a window is needed
+- [ ] Provide *some* support for load shedding in the case of aggregation where data must be buffered
+- [ ] Provide expressivity for merging windows back together.

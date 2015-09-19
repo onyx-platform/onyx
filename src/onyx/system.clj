@@ -29,6 +29,13 @@
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
+            [onyx.windowing.units]
+            [onyx.triggers.triggers-api]
+            [onyx.triggers.timer]
+            [onyx.triggers.segment]
+            [onyx.triggers.punctuation]
+            [onyx.triggers.watermark]
+            [onyx.triggers.percentile-watermark]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 
