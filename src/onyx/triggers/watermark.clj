@@ -19,7 +19,7 @@
     (>= (coerce-key watermark :milliseconds) upper-extent-bound)))
 
 (defmethod api/trigger-fire? :watermark
-  [{:keys [onyx.core/window-state] :as event} trigger args]
+  [event trigger args]
   (exceeds-watermark? (:window args) (:upper-extent args) (:segment args)))
 
 (defmethod api/trigger-teardown :watermark
