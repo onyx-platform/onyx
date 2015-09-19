@@ -132,13 +132,17 @@ feature, though.
 Onyx's windowing API should:
 
 - [x] Be a low-level data structure that Continuous Query Language (CQL) can compile to
-- [ ] Support fixed (tumbling), sliding, session, and global windows.
+- [x] Support fixed (tumbling) windows
+- [x] Support sliding windows
+- [ ] Support session windows
+- [ ] Support global windows
 - [x] Provide enough expressivity for the window to be created by features of the data itself
 - [x] Support time-based windows (event timestamps, processing timestamps) and "tuple-based" windows (e.g. window of n tuples)
-- [ ] Support punctuation based triggers
+- [x] Support punctuation based triggers
 - [x] Support timer-based triggers
+- [x] Support watermark triggers
+- [x] Support percentile triggers
 - [ ] Support external event triggers
-- [ ] Support watermark triggers
 - [ ] Allow triggers to compose
 - [ ] Be internally optimized to use panes
 - [ ] Allow expression of predicates for when a segment should enter and exit a window
