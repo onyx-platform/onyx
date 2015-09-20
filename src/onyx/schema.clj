@@ -103,7 +103,7 @@
    s/Keyword s/Any})
 
 (def Unit
-  [(s/one s/Int "number")
+  [(s/one s/Int "unit-count")
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
