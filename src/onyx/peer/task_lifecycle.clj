@@ -403,16 +403,14 @@
               (recur))))))))
 
 (defn setup-triggers [event]
-  (reduce
-   #(triggers/trigger-setup %1 %2)
-   event
-   (:onyx.core/triggers event)))
+  (reduce triggers/trigger-setup
+          event
+          (:onyx.core/triggers event)))
 
 (defn teardown-triggers [event]
-  (reduce
-   #(triggers/trigger-teardown %1 %2)
-   event
-   (:onyx.core/triggers event)))
+  (reduce triggers/trigger-teardown
+          event
+          (:onyx.core/triggers event)))
 
 (defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
   (warn e)
