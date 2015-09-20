@@ -1,7 +1,7 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
-            [taoensso.timbre :refer [info]]))
+            [taoensso.timbre :refer [info warn]]))
 
 (defn get-method-java [class-name method-name]
   (let [ms (filter #(= (.getName %) method-name)
@@ -43,17 +43,23 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
-;; TODO: can be precalculated for peer in replica-view
-(defn select-n-peers
-  "Stably select n peers using our id and the downstream task ids.
-  If a peer is added or removed, the set can only change by one value at max"
-  [id all-peers n]
-  (if (<= (count all-peers) n)
-    all-peers
-    (take n
-          (sort-by (fn [peer-id] (hash-combine (.hashCode ^java.util.UUID id)
-                                               (.hashCode ^java.util.UUID peer-id)))
-                   all-peers))))
+(defn resolve-task-fn [entry]
+  (let [f (if (or (:onyx/fn entry)
+                  (= (:onyx/type entry) :function))
+            (case (:onyx/language entry)
+              :java (build-fn-java (:onyx/fn entry))
+              (kw->fn (:onyx/fn entry))))]
+    (or f identity)))
+
+(defn resolve-restart-pred-fn [entry]
+  (if-let [kw (:onyx/restart-pred-fn entry)]
+    (kw->fn kw)
+    (constantly false)))
+
+(defn instantiate-plugin-instance [class-name pipeline-data]
+  (.newInstance (.getDeclaredConstructor ^Class (Class/forName class-name)
+                                         (into-array Class [clojure.lang.IPersistentMap]))
+                (into-array [pipeline-data])))
 
 (defn peer-link
   [replica-val state event peer-id]
@@ -61,9 +67,9 @@
     (do
       (reset! (:timestamp link) (System/currentTimeMillis))
       (:link link))
-    (let [site (-> replica-val
-                   :peer-sites
-                   (get peer-id))]
+    (if-let [site (-> replica-val
+                      :peer-sites
+                      (get peer-id))]
       (-> state
           (swap! update-in
                  [:links peer-id]
@@ -73,4 +79,6 @@
                                (atom (System/currentTimeMillis))))))
           :links
           (get peer-id)
-          :link))))
+          :link)
+      (do (warn "Could not obtain peer-site from replica" peer-id)
+          nil))))

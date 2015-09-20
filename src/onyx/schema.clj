@@ -40,10 +40,11 @@
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
    (s/optional-key :onyx/doc) s/Str
+   (s/optional-key :onyx/max-peers) (s/pred pos? 'pos?)
    s/Keyword s/Any})
 
 (def FluxPolicy 
-  (s/enum :continue :kill))
+  (s/enum :continue :kill :recover))
 
 (def ^{:private true} partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
@@ -135,7 +136,7 @@
   s/Keyword)
 
 (def Messaging
-  (s/enum :aeron :netty :core.async :dummy-messenger))
+  (s/enum :aeron :dummy-messenger))
 
 (def PeerConfig
   {:zookeeper/address s/Str
@@ -164,8 +165,6 @@
    (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
    (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
    (s/optional-key :onyx.messaging/retry-ch-buffer-size) s/Int
-   (s/optional-key :onyx.messaging/max-downstream-links) s/Int
-   (s/optional-key :onyx.messaging/max-acker-links) s/Int
    (s/optional-key :onyx.messaging/peer-link-gc-interval) s/Int
    (s/optional-key :onyx.messaging/peer-link-idle-timeout) s/Int
    (s/optional-key :onyx.messaging/ack-daemon-timeout) s/Int
@@ -175,6 +174,7 @@
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
+   (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    s/Keyword s/Any})
@@ -228,6 +228,7 @@
    :percentages {JobId s/Num}
    :completed-jobs [JobId] 
    :killed-jobs [JobId] 
+   :task-slot-ids {JobId {TaskId {PeerId s/Int}}}
    :exhausted-inputs {JobId #{TaskId}}})
 
 (def LogEntry

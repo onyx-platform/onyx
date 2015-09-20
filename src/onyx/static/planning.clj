@@ -19,20 +19,14 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
-(defn find-task-fast
-  "find-task fast version - task must be in catalog
-   (this should fail validation anyway."
-  [catalog task-name]
-  (loop [vs catalog]
-    (let [task (first vs)]
-      (if (= task-name (:onyx/name task))
-        task
-        (recur (rest vs))))))
-
 (defn egress-ids-from-children [task-ids elements]
   (into {}
         (map (juxt identity task-ids)
              (map :onyx/name elements))))
+
+(defn grouping-task? [task-map]
+  (boolean (or (:onyx/group-by-fn task-map)
+               (:onyx/group-by-key task-map))))
 
 (defmulti create-task
   (fn [task-ids catalog task-name parents children-names]

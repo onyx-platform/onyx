@@ -15,6 +15,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
   - [Continue Policy](#continue-policy)
   - [Kill Policy](#kill-policy)
 - [Bulk Functions](#bulk-functions)
+- [Leaf Functions](#leaf-functions)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -138,3 +139,16 @@ And an example catalog function to correspond to this entry:
 ```
 
 The default value for this option is `false`.
+
+#### Leaf Functions
+
+Sometimes you're going to want a node in your workflow with no outgoing connections that doesn't perform I/O against a database. You can do this by setting `:onyx/type` to `:output`, `:onyx/medium` to `:function`, and `:onyx/plugin` to `onyx.peer.function/function`. Then you can specify an `:onyx/fn` pointing to a regular Clojure function. For example:
+
+```clojure
+{:onyx/name :leaf-task
+ :onyx/fn ::add-to-results
+ :onyx/plugin :onyx.peer.function/function
+ :onyx/medium :function
+ :onyx/type :output
+ :onyx/batch-size 20}
+```

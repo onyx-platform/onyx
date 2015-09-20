@@ -21,12 +21,36 @@
     (when-not (= (distinct tasks) tasks)
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
+(defn flux-policy-check [entry]
+  (when (and (= :recover (:onyx/flux-policy entry))
+             (not (and (:onyx/max-peers entry)
+                       (:onyx/min-peers entry)
+                       (or (= (:onyx/max-peers entry) 1)
+                           (= (:onyx/max-peers entry) 
+                              (:onyx/min-peers entry))))))
+    (throw (ex-info ":onyx/flux-policy :recover must have :onyx/min-peers = :onyx/max-peers" {:entry entry}))))
+
+(defn min-and-max-peers-sane [entry]
+  (when (and (:onyx/min-peers entry)
+             (:onyx/max-peers entry))
+    (when-not (<= (:onyx/min-peers entry)
+                  (:onyx/max-peers entry))
+      (throw (ex-info ":onyx/min-peers must be <= :onyx/max-peers" {:entry entry})))))
+
+(defn min-max-n-peers-mutually-exclusive [entry]
+  (when (or (and (:onyx/min-peers entry) (:onyx/n-peers entry))
+            (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
+    (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
+
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
   (schema/validate Catalog catalog)
   (doseq [entry catalog]
-    (name-and-type-not-equal entry)))
+    (name-and-type-not-equal entry)
+    (flux-policy-check entry)
+    (min-and-max-peers-sane entry)
+    (min-max-n-peers-mutually-exclusive entry)))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow

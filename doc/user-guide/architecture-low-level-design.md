@@ -10,7 +10,7 @@ This chapter outlines how Onyx works on the inside to meet the required properti
     - [Peer](#peer)
     - [Virtual Peer](#virtual-peer)
     - [ZooKeeper](#zookeeper)
-    - [Netty](#netty)
+    - [Aeron](#aeron)
     - [The Log](#the-log)
     - [The Inbox and Outbox](#the-inbox-and-outbox)
   - [Applying Log Entries](#applying-log-entries)
@@ -43,9 +43,9 @@ A Virtual Peer refers to a single peer process running on a single physical mach
 
 Apache ZooKeeper is used as both storage and communication layer. ZooKeeper takes care of things like CAS, consensus, and atomic counting. ZooKeeper watches are at the heart of how Onyx virtual peers detect machine failure.
 
-#### Netty
+#### Aeron
 
-Netty is the primary messaging transport layer. The transport layer is pluggable, and you may use core.async instead for development on a single machine.
+Aeron is the primary messaging transport layer. The transport layer is pluggable, though we don't support any other transports at this time since Aeron can "short-circuit" networking and act as fast as core.async.
 
 #### The Log
 
