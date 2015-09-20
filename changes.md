@@ -6,6 +6,7 @@
 - API: New catalog entry option `:onyx/n-peers` to automatically expand to make `:onyx/min-peers` and `:onyx/max-peers` peers the same value. [#282](https://github.com/onyx-platform/onyx/issues/282)
 - API: Allow functions in leaf position of a workflow. [#198](https://github.com/onyx-platform/onyx/issues/198)
 - Bug fix: flow-conditions retry default action should emit segments [#262](https://github.com/onyx-platform/onyx/issues/262)
+- Bug fix: cleaned up publications on write failure
 
 #### 0.7.3
 
