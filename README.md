@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.7.3"]
+[org.onyxplatform/onyx "0.7.4"]
 ```
 
 ### Build Status
