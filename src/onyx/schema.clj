@@ -102,25 +102,30 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
-(defn valid-units [[a b :as x]]
-  (and (= 2 (count x))
-       (s/validate s/Int a)
-       (s/validate s/Keyword b)))
+(def Unit
+  [(s/one s/Int "number")
+   (s/one s/Keyword "unit-type")])
+
+(def WindowType
+  (s/enum :fixed :sliding))
 
 (def Window
   {:window/id s/Keyword
    :window/task s/Keyword
-   :window/type (s/pred #(some #{%} #{:fixed :sliding}) 'window-type)
+   :window/type WindowType
    :window/window-key s/Any
    :window/aggregation s/Keyword
-   :window/range (s/pred valid-units 'valid-units)
-   (s/optional-key :window/slide) (s/pred valid-units 'valid-units)
+   :window/range Unit
+   (s/optional-key :window/slide) Unit
    (s/optional-key :window/doc) s/Str
    s/Keyword s/Any})
 
+(def TriggerRefinement
+  (s/enum :accumulating :discarding))
+
 (def Trigger
   {:trigger/window-id s/Keyword
-   :trigger/refinement (s/pred #(some #{%} #{:accumulating :discarding}) 'refinement-type)
+   :trigger/refinement TriggerRefinement
    :trigger/on s/Keyword
    :trigger/sync s/Keyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
