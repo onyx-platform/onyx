@@ -12,7 +12,7 @@
 ;; attribute upper and lower bounds for which it accepts values.
 ;; WID is a powerful technique because it works over any totally
 ;; ordered domain - not just timestamps. We can exploit this to
-;; create windows based of features of the incoming data.
+;; create windows based on features of the incoming data.
 
 ;; `wids` is the inverse. `wids` takes a segment with a windowing
 ;; attribute and returns the window IDs to which it belongs.
