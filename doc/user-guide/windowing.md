@@ -179,7 +179,7 @@ See the Information Model chapter for an exact specification of what values the 
 |`:window/task`        | The workflow task over which the window operates
 |`:window/type`        | Which type of window this is (fixed, sliding, etc)
 |`:window/aggregation` | The aggregation function to apply, as described above
-|`:window/window-key`  | The key over which range 
+|`:window/window-key`  | The key over which the range will be calculated
 |`:window/range`       | The span of the window
 |`:window/slide`       | The delay to wait to start a new window after the previous window
 |`:window/init`        | The initial value required for some types of aggregation
