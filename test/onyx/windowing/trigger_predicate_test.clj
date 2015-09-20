@@ -12,7 +12,7 @@
 
 (def false-pred (constantly false))
 
-(deftest puncutation-true-pred
+(deftest punctuation-true-pred
   (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed
@@ -30,7 +30,7 @@
     (is
      (api/trigger-fire? event trigger {:window window :segment segment}))))
 
-(deftest puncutation-false-pred
+(deftest punctuation-false-pred
   (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed

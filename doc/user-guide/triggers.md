@@ -84,7 +84,7 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 #### `:percentile-watermark`
 
-Trigger wakes up in reaction to a new segment being processed. Trigger only fires if the value of `:window/window-key` in the segment exceeds the lower-bound plus the percentage of the range as indicated by `:trigger/perecentile`, a `double` greater than `0` and less than `1`. This is an alternative to `:watermark` that allows you to trigger on *most* of the data arriving, not necessarily every last bit.
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires if the value of `:window/window-key` in the segment exceeds the lower-bound plus the percentage of the range as indicated by `:trigger/percentile`, a `double` greater than `0` and less than `1`. This is an alternative to `:watermark` that allows you to trigger on *most* of the data arriving, not necessarily every last bit.
 
 
 ```clojure
