@@ -1,3 +1,7 @@
+#### 0.7.5
+
+- No functional changes in this release. We had a build problem that wasn't worth fixing across all 0.7.4 releases. Fixed build and trying again under alias 0.7.5
+
 #### 0.7.4
 
 - Operations: Onyx now requires Java 8.
