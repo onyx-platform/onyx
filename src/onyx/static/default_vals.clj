@@ -15,6 +15,8 @@
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
    :onyx.zookeeper/backoff-max-retries 5
+   ;; bookkeeper defaults
+   :onyx.bookkeeper/timeout 60000 
 
    ;; peer defaults
    :onyx.peer/inbox-capacity 1000
