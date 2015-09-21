@@ -59,6 +59,12 @@
 (defn messaging-path [prefix]
   (str (prefix-path prefix) "/messaging"))
 
+(defn ledgers-path [prefix]
+  (str (prefix-path prefix) "/ledgers"))
+
+(defn ledgers-available-path [prefix]
+  (str (prefix-path prefix) "/ledgers/available"))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
