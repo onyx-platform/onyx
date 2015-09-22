@@ -6,29 +6,6 @@
             [onyx.extensions :as extensions]
             [onyx.api]))
 
-;; Following with macros marked for deletion
-(defmacro with-env [[symbol-name env-config] & body]
-  `(let [~symbol-name (onyx.api/start-env ~env-config)]
-     (try
-       ~@body
-       (finally
-         (onyx.api/shutdown-env ~symbol-name)))))
-
-(defmacro with-peer-group [[symbol-name peer-config] & body]
-  `(let [~symbol-name (onyx.api/start-peer-group ~peer-config)]
-     (try
-       ~@body
-       (finally
-         (onyx.api/shutdown-peer-group ~symbol-name)))))
-
-(defmacro with-peers [[symbol-name n-peers peer-group] & body]
-  `(let [~symbol-name (onyx.api/start-peers ~n-peers ~peer-group)]
-     (try
-       ~@body
-       (finally
-         (doseq [v-peer# ~symbol-name]
-           (onyx.api/shutdown-peer v-peer#))))))
-
 (defn playback-log [log replica ch timeout-ms]
   (loop [replica replica]
     (if-let [entry (first (alts!! [ch (timeout timeout-ms)]))]
