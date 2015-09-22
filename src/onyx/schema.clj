@@ -154,8 +154,10 @@
    :onyx/id ClusterId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
+   (s/optional-key :bookkeeper/server?) s/Bool
+   (s/optional-key :bookkeeper/local-quorum?) s/Bool
+   (s/optional-key :bookkeeper/base-dir) s/Str
    s/Keyword s/Any})
-
 
 (def ^{:private true} PortRange
   [(s/one s/Int "port-range-start") 
