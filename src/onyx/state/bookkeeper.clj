@@ -27,7 +27,8 @@
       (if server?
         (let [ledgers-root-path (ozk/ledgers-path (:onyx/id env-config))
               ledgers-available-path (ozk/ledgers-available-path (:onyx/id env-config))
-              _ (zk/create-all (:conn log) ledgers-available-path :persistent? true) 
+              _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
+              _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
               server-count (if local-quorum? 3 1)
               base-port (:onyx.bookkeeper/starting-port defaults)
               ports (range base-port (+ base-port server-count))
