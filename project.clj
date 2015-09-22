@@ -24,8 +24,10 @@
                  [uk.co.real-logic/aeron-client "0.1.3"]
                  [uk.co.real-logic/aeron-driver "0.1.3"]
                  [prismatic/schema "1.0.1"]
-                 [org.apache.zookeeper/zookeeper "3.4.6" :exclusions [org.slf4j/slf4j-log4j12]]
-                 [org.apache.bookkeeper/bookkeeper-server "4.3.1"]
+                 [org.apache.zookeeper/zookeeper "3.4.6" 
+                  :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.apache.bookkeeper/bookkeeper-server "4.3.1" 
+                  :exclusions [org.slf4j/slf4j-log4j12]]
                  [log4j/log4j "1.2.17"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]]

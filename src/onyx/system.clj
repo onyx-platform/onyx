@@ -9,6 +9,7 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.state.bookkeeper :refer [new-bookie]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
@@ -39,7 +40,7 @@
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 
-(def development-components [:monitoring :logging-config :log])
+(def development-components [:monitoring :logging-config :log :bookkeeper])
 
 (def client-components [:monitoring :log :messaging-require])
 
@@ -119,6 +120,7 @@
      (map->OnyxDevelopmentEnv
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :logging-config (logging-config/logging-configuration peer-config)
+       :bookkeeper (component/using (new-bookie peer-config) [:log])
        :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client
