@@ -298,7 +298,7 @@
                  (transient (t/vector))))))
 
 (defn curry-params [f params]
-  (reduce #(partial %1 %2) f params))
+  (reduce partial f params))
 
 (defn apply-fn [f bulk? event]
   (let [g (curry-params f (:onyx.core/params event))
