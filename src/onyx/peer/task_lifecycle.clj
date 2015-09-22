@@ -324,10 +324,13 @@
               message (update (:message msg) (:window/window-key w) units/coerce-key units)
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
-            (let [f (agg/aggregation-fn (:window/aggregation w))
+            (let [;; should resolve this at task-start-time
+                  f (or (agg/aggregation-resolve (:window/aggregation w))
+                        (operation/kw->fn (:window/aggregation w)))
                   state  (get-in @window-state [window-id e])
                   entry (f state w (:message msg))
-                  updated-state (agg/aggregation-apply-log state entry)]
+                  apply-log-f (agg/apply-log-resolve (first entry))
+                  updated-state (apply-log-f state (second entry))]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
           (doseq [t (:onyx.core/triggers event)]
             (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
