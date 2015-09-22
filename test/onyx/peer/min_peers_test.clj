@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -26,62 +26,53 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-
 (deftest min-peers-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
-        batch-size 20
-        catalog [{:onyx/name :in
-                  :onyx/plugin :onyx.plugin.core-async/input
-                  :onyx/type :input
-                  :onyx/medium :core.async
-                  :onyx/batch-size batch-size
-                  :onyx/max-peers 1
-                  :onyx/doc "Reads segments from a core.async channel"}
+        peer-config (assoc (:peer-config config) :onyx/id id)]
+    (with-test-env [test-env [3 env-config peer-config]]
+      (let [batch-size 20
+            catalog [{:onyx/name :in
+                      :onyx/plugin :onyx.plugin.core-async/input
+                      :onyx/type :input
+                      :onyx/medium :core.async
+                      :onyx/batch-size batch-size
+                      :onyx/max-peers 1
+                      :onyx/doc "Reads segments from a core.async channel"}
 
-                 {:onyx/name :inc
-                  :onyx/fn :onyx.peer.min-peers-test/my-inc
-                  :onyx/type :function
-                  :onyx/batch-size batch-size}
+                     {:onyx/name :inc
+                      :onyx/fn :onyx.peer.min-peers-test/my-inc
+                      :onyx/type :function
+                      :onyx/batch-size batch-size}
 
-                 {:onyx/name :out
-                  :onyx/plugin :onyx.plugin.core-async/output
-                  :onyx/type :output
-                  :onyx/medium :core.async
-                  :onyx/batch-size batch-size
-                  :onyx/max-peers 1
-                  :onyx/doc "Writes segments to a core.async channel"}]
-        workflow [[:in :inc] [:inc :out]]
-        lifecycles [{:lifecycle/task :in
-                     :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-        v-peers (onyx.api/start-peers 3 peer-group)
+                     {:onyx/name :out
+                      :onyx/plugin :onyx.plugin.core-async/output
+                      :onyx/type :output
+                      :onyx/medium :core.async
+                      :onyx/batch-size batch-size
+                      :onyx/max-peers 1
+                      :onyx/doc "Writes segments to a core.async channel"}]
+            workflow [[:in :inc] [:inc :out]]
+            lifecycles [{:lifecycle/task :in
+                         :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
+                        {:lifecycle/task :in
+                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                        {:lifecycle/task :out
+                         :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
+                        {:lifecycle/task :out
+                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+            _ (doseq [n (range n-messages)]
+                (>!! in-chan {:n n}))
+            _ (>!! in-chan :done)
+            _ (close! in-chan)
+            _ (onyx.api/submit-job peer-config
+                                   {:catalog catalog
+                                    :workflow workflow
+                                    :lifecycles lifecycles
+                                    :task-scheduler :onyx.task-scheduler/balanced})
+            results (take-segments! out-chan)]
 
-        _ (doseq [n (range n-messages)]
-            (>!! in-chan {:n n}))
-        _ (>!! in-chan :done)
-        _ (close! in-chan)
-        _ (onyx.api/submit-job peer-config
-                               {:catalog catalog
-                                :workflow workflow
-                                :lifecycles lifecycles
-                                :task-scheduler :onyx.task-scheduler/balanced})
-        results (take-segments! out-chan)]
-
-    (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= expected (set (butlast results))))
-      (is (= :done (last results))))
-
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-    (onyx.api/shutdown-peer-group peer-group) 
-    (onyx.api/shutdown-env env)))
+        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+          (is (= expected (set (butlast results))))
+          (is (= :done (last results))))))))

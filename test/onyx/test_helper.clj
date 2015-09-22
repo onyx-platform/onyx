@@ -78,24 +78,25 @@
     (catch Throwable e
       nil)))
 
-(defrecord OnyxTestEnv [n-peers]
+(defn add-test-env-peers! 
+  "Add peers to an OnyxTestEnv component"
+  [{:keys [peer-group peers] :as component} n-peers]
+  (swap! peers into (try-start-peers n-peers peer-group)))
+
+(defrecord OnyxTestEnv [env-config peer-config n-peers]
   component/Lifecycle
 
   (start [component]
     (println "Starting Onyx test environment")
-    (let [onyx-id (java.util.UUID/randomUUID)
-          {:keys [env-config peer-config]} (load-config)
-          env (try-start-env env-config)
+    (let [env (try-start-env env-config)
           peer-group (try-start-group peer-config)
           peers (try-start-peers n-peers peer-group)]
-      (assoc component
-        :env env :peer-group peer-group
-        :peers peers :onyx-id onyx-id)))
+      (assoc component :env env :peer-group peer-group :peers (atom peers))))
 
   (stop [component]
     (println "Stopping Onyx test environment")
 
-    (doseq [v-peer (:peers component)]
+    (doseq [v-peer @(:peers component)]
       (try
         (onyx.api/shutdown-peer v-peer)
         (catch InterruptedException e)))
@@ -111,3 +112,18 @@
         (catch InterruptedException e)))
 
     (assoc component :env nil :peer-group nil :peers nil)))
+
+(defmacro with-test-env 
+  "Start a test env in a way that shuts down after body is completed. 
+   Useful for running tests that can be killed, and re-run without bouncing the repl."
+  [[symbol-name [n-peers env-config peer-config]] & body]
+  `(let [~symbol-name (component/start (map->OnyxTestEnv {:n-peers ~n-peers 
+                                                          :env-config ~env-config 
+                                                          :peer-config ~peer-config}))]
+     (try
+       ~@body
+       (catch InterruptedException e#
+         (Thread/interrupted))
+       (finally
+         (println "Stopping env now")
+         (component/stop ~symbol-name)))))
