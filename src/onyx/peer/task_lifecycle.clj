@@ -317,14 +317,18 @@
   (when (seq windows)
     (doseq [w windows]
       (doseq [msg (mapcat :leaves (:tree results))]
-        (let [w-range (apply units/to-standard-units (:window/range w))
+        (let [window-id (:window/id w)
+              w-range (apply units/to-standard-units (:window/range w))
               w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
               units (units/standard-units-for (last (:window/range w)))
               message (update (:message msg) (:window/window-key w) units/coerce-key units)
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
-            (let [f (agg/aggregation-fn (:window/aggregation w))]
-              (swap! window-state update-in [(:window/id w) e] f w (:message msg))))
+            (let [f (agg/aggregation-fn (:window/aggregation w))
+                  state  (get-in @window-state [window-id e])
+                  entry (f state w (:message msg))
+                  updated-state (agg/aggregation-apply-log state entry)]
+              (swap! window-state assoc-in [(:window/id w) e] updated-state)))
           (doseq [t (:onyx.core/triggers event)]
             (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
   event)

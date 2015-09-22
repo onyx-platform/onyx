@@ -1,10 +1,21 @@
 (ns onyx.windowing.aggregation)
 
+(defmulti aggregation-apply-log
+  (fn [state entry] (first entry)))
+
 (defmulti aggregation-fn-init
   (fn [operation] operation))
 
 (defmulti aggregation-fn
   (fn [operation] operation))
+
+(defmethod aggregation-apply-log :set
+  [state entry]
+  (second entry))
+
+(defmethod aggregation-apply-log :conj
+  [state entry]
+  (conj state (second entry)))
 
 (defmethod aggregation-fn-init :conj
   [operation]
@@ -29,39 +40,39 @@
   [operation]
   (fn [state window segment]
     (let [state (or state (aggregation-fn-init operation))]
-      (conj state segment))))
+      [:conj segment])))
 
 (defmethod aggregation-fn :count
   [operation]
   (fn [state window segment]
     (let [state (or state (aggregation-fn-init operation))]
-      (inc state))))
+      [:set (inc state)])))
 
 (defmethod aggregation-fn :sum
   [operation]
   (fn [state window segment]
     (let [state (or state (aggregation-fn-init operation))]
-      (+ state (get segment (:window/sum-key window))))))
+      [:set (+ state (get segment (:window/sum-key window)))])))
 
 (defmethod aggregation-fn :min
   [operation]
   (fn [state window segment]
     (let [state (or state (:window/init window))]
-      (min state (get segment (:window/min-key window))))))
+      [:set (min state (get segment (:window/min-key window)))])))
 
 (defmethod aggregation-fn :max
   [operation]
   (fn [state window segment]
     (let [state (or state (:window/init window))]
-      (max state (get segment (:window/max-key window))))))
+      [:set (max state (get segment (:window/max-key window)))])))
 
 (defmethod aggregation-fn :average
   [operation]
   (fn [state window segment]
     (let [state (or state (:window/init window))
           n (inc state)]
-      {:n n
-       :average (/ (+ state (get segment (:window/average-key window))) n)})))
+      [:set {:n n
+             :average (/ (+ state (get segment (:window/average-key window))) n)}])))
 
 (defmethod aggregation-fn :default
   [operation]
