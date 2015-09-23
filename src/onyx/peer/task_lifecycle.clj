@@ -312,6 +312,18 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
+(defn window-state-value [window-state window]
+  (or window-state
+      ;; TODO: resolve aot when task starts up
+      ((agg/init-resolve (:window/aggregation window) 
+                         (constantly (:window/init window))))
+      (throw (ex-info "No initialisation function or :window/init found for window." window))))
+
+(defn window-agg-fn [window]
+  ;; TODO: resolve aot when task starts up
+  (or (agg/aggregation-resolve (:window/aggregation window))
+      (operation/kw->fn (:window/aggregation window))))
+
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
   (when (seq windows)
@@ -325,9 +337,8 @@
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
             (let [;; should resolve this at task-start-time
-                  f (or (agg/aggregation-resolve (:window/aggregation w))
-                        (operation/kw->fn (:window/aggregation w)))
-                  state  (get-in @window-state [window-id e])
+                  f (window-agg-fn w)
+                  state (window-state-value (get-in @window-state [window-id e]) w)
                   entry (f state w (:message msg))
                   apply-log-f (agg/apply-log-resolve (first entry))
                   updated-state (apply-log-f state (second entry))]
