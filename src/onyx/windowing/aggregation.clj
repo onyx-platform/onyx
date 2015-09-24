@@ -10,31 +10,31 @@
   [])
 
 (defn conj-aggregation-fn [state window segment]
-  [:conj segment])
+  [[:conj segment]])
 
 (defn count-aggregation-fn-init []
   0)
 
 (defn count-aggregation-fn [state window segment]
-  [:set-value (inc state)])
+  [[:set-value (inc state)]])
 
 (defn sum-aggregation-fn-init []
   0)
 
 (defn sum-aggregation-fn [state window segment]
-  [:set-value (+ state (get segment (:window/sum-key window)))])
+  [[:set-value (+ state (get segment (:window/sum-key window)))]])
 
 (defn min-aggregation-fn [state window segment]
-  [:set-value (min state (get segment (:window/min-key window)))])
+  [[:set-value (min state (get segment (:window/min-key window)))]])
 
 (defn max-aggregation-fn [state window segment]
-  [:set-value (max state (get segment (:window/max-key window)))])
+  [[:set-value (max state (get segment (:window/max-key window)))]])
 
 (defn average-aggregation-fn [state window segment]
   (let [sum (+ (:sum state)
                (get segment (:window/average-key window)))
         n (inc (:n state))]
-    [:set-value {:n n :sum sum :average (/ sum n)}]))
+    [[:set-value {:n n :sum sum :average (/ sum n)}]]))
 
 (def init-resolve 
   {:conj conj-aggregation-fn-init

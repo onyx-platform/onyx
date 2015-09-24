@@ -339,9 +339,11 @@
             (let [;; should resolve this at task-start-time
                   f (window-agg-fn w)
                   state (window-state-value (get-in @window-state [window-id e]) w)
-                  entry (f state w (:message msg))
-                  apply-log-f (agg/apply-log-resolve (first entry))
-                  updated-state (apply-log-f state (second entry))]
+                  entries (f state w (:message msg))
+                  updated-state (reduce (fn [state' [entry-type entry-value]]
+                                          ((agg/apply-log-resolve entry-type)  state' entry-value))
+                                        state
+                                        entries)]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
           (doseq [t (:onyx.core/triggers event)]
             (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
