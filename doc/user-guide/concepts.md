@@ -14,6 +14,7 @@ We'll take a quick overview of some terms you'll see in the rest of this user gu
   - [Flow Conditions](#flow-conditions)
   - [Function](#function)
   - [Lifecycle](#lifecycle)
+  - [Windows](#windows)
   - [Plugin](#plugin)
   - [Sentinel](#sentinel)
   - [Peer](#peer)
@@ -122,6 +123,10 @@ A function is a construct that receives segments and emits segments for further 
 #### Lifecycle
 
 A lifecycle is a construct that describes the lifetime of a task. There is an entire chapter devoted to lifecycles, but to be brief, a lifecycle allows you to hook in and execute arbitrary code at critical points during a task. A lifecycle carries a context map that you can merge results back into for use later.
+
+#### Windows
+
+Windows are a construct that partitions a possible unbounded sequence of data into finite pieces, allowing aggregations to be specified. This lets you treat an infinite sequence of data as if it were finite over a given period of time.
 
 #### Plugin
 

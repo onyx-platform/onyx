@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api :as api]
             [schema.core :as s]

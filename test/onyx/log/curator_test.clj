@@ -4,7 +4,7 @@
             [onyx.system :as system]
             [onyx.extensions :as extensions]
             [onyx.messaging.dummy-messenger]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.log.curator :as cu]
             [onyx.compression.nippy :refer [compress decompress]]
             [taoensso.timbre :refer [fatal error warn trace info]]

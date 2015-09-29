@@ -5,7 +5,7 @@
             [onyx.messaging.dummy-messenger]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.log.replica :as replica]
             [onyx.api :as api]
             [schema.test] 

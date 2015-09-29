@@ -102,12 +102,44 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
+(def Unit
+  [(s/one s/Int "unit-count")
+   (s/one s/Keyword "unit-type")])
+
+(def WindowType
+  (s/enum :fixed :sliding))
+
+(def Window
+  {:window/id s/Keyword
+   :window/task s/Keyword
+   :window/type WindowType
+   :window/window-key s/Any
+   :window/aggregation s/Keyword
+   :window/range Unit
+   (s/optional-key :window/slide) Unit
+   (s/optional-key :window/doc) s/Str
+   s/Keyword s/Any})
+
+(def TriggerRefinement
+  (s/enum :accumulating :discarding))
+
+(def Trigger
+  {:trigger/window-id s/Keyword
+   :trigger/refinement TriggerRefinement
+   :trigger/on s/Keyword
+   :trigger/sync s/Keyword
+   (s/optional-key :trigger/fire-all-extents?) s/Bool
+   (s/optional-key :trigger/doc) s/Str
+   s/Keyword s/Any})
+
 (def Job
   {:catalog Catalog
    :workflow Workflow
    :task-scheduler s/Keyword
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
+   (s/optional-key :windows) [Window]
+   (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) s/Bool

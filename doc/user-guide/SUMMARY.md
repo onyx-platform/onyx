@@ -7,6 +7,8 @@
 * [Functions](doc/user-guide/functions.md)
 * [Flow Conditions](doc/user-guide/flow-conditions.md)
 * [Lifecycles](doc/user-guide/lifecycles.md)
+* [Windowing and Aggregation](doc/user-guide/windowing.md)
+* [Triggers](doc/user-guide/triggers.md)
 * [Deployment](doc/user-guide/deployment.md)
 * [Environment](doc/user-guide/environment.md)
 * [Peer Configuration](doc/user-guide/peer-config.md)

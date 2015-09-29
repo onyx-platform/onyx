@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def n-messages 15000)
@@ -72,8 +72,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 40
 
         a-segments (map (fn [n] {:n n}) (range n-messages))
@@ -203,46 +201,39 @@
                     {:lifecycle/task :L
                      :lifecycle/calls :onyx.peer.dag-test/l-calls}
                     {:lifecycle/task :L
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
-        v-peers (onyx.api/start-peers 12 peer-group)]
+    (with-test-env [test-env [12 env-config peer-config]]
+      (doseq [x a-segments]
+        (>!! a-chan x))
 
-    (doseq [x a-segments]
-      (>!! a-chan x))
+      (doseq [x b-segments]
+        (>!! b-chan x))
 
-    (doseq [x b-segments]
-      (>!! b-chan x))
+      (doseq [x c-segments]
+        (>!! c-chan x))
 
-    (doseq [x c-segments]
-      (>!! c-chan x))
+      (>!! a-chan :done)
+      (>!! b-chan :done)
+      (>!! c-chan :done)
 
-    (>!! a-chan :done)
-    (>!! b-chan :done)
-    (>!! c-chan :done)
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog :workflow workflow
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
 
-    (onyx.api/submit-job peer-config
-                         {:catalog catalog :workflow workflow
-                          :lifecycles lifecycles
-                          :task-scheduler :onyx.task-scheduler/balanced})
+      (let [j-results (take-segments! j-chan)
+            k-results (take-segments! k-chan)
+            l-results (take-segments! l-chan)]
+        (is (= :done (last j-results)))
+        (is (= :done (last k-results)))
+        (is (= :done (last l-results)))
 
-    (let [j-results (take-segments! j-chan)
-          k-results (take-segments! k-chan)
-          l-results (take-segments! l-chan)]
-      (is (= :done (last j-results)))
-      (is (= :done (last k-results)))
-      (is (= :done (last l-results)))
+        (is (= (into #{} (concat a-segments b-segments))
+               (into #{} (butlast j-results))))
 
-      (is (= (into #{} (concat a-segments b-segments))
-             (into #{} (butlast j-results))))
+        (is (= (into #{} (concat a-segments b-segments))
+               (into #{} (butlast k-results))))
 
-      (is (= (into #{} (concat a-segments b-segments))
-             (into #{} (butlast k-results))))
-
-      (is (= (into #{} (concat a-segments b-segments c-segments))
-             (into #{} (butlast l-results)))))
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+        (is (= (into #{} (concat a-segments b-segments c-segments))
+               (into #{} (butlast l-results))))))))

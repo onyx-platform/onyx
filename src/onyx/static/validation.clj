@@ -1,8 +1,9 @@
 (ns onyx.static.validation
   (:require [clojure.walk :refer [prewalk]]
             [com.stuartsierra.dependency :as dep]
-            [onyx.static.planning :as planning]
             [schema.core :as schema]
+            [onyx.static.planning :as planning]
+            [onyx.windowing.units :as u]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
@@ -200,6 +201,48 @@
   (validate-none-position flow-conditions)
   (validate-short-circuit flow-conditions)
   (validate-auto-short-circuit flow-conditions))
+
+(defn window-names-a-task [tasks w]
+  (when-not (some #{(:window/task w)} tasks)
+    (throw (ex-info ":window/task must name a task in the catalog" {:window w :tasks tasks}))))
+
+(defn window-ids-unique [windows]
+  (let [ids (map :window/id windows)]
+    (when-not (= (count ids) (count (into #{} ids)))
+      (throw (ex-info ":window/id must be unique across windows, found" {:ids ids})))))
+
+(defn range-and-slide-units-compatible [w]
+  (when (and (:window/range w) (:window/slide w))
+    (when-not (= (u/standard-units-for (second (:window/range w)))
+                 (u/standard-units-for (second (:window/slide w))))
+      (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
+
+(defn sliding-windows-define-range-and-slide [w]
+  (when (= (:window/type w) :sliding)
+    (when (or (not (:window/range w)) (not (:window/slide w)))
+      (throw (ex-info ":sliding windows must define both :window/range and :window/slide" {:window w})))))
+
+(defn fixed-windows-dont-define-slide [w]
+  (when (and (= (:window/type w) :fixed) (:window/slide w))
+    (throw (ex-info ":fixed windows do not define a :window/slide value" {:window w}))))
+
+(defn validate-windows [windows catalog]
+  (let [task-names (map :onyx/name catalog)]
+    (window-ids-unique windows)
+    (doseq [w windows]
+      (window-names-a-task task-names w)
+      (range-and-slide-units-compatible w)
+      (sliding-windows-define-range-and-slide w)
+      (fixed-windows-dont-define-slide w))))
+
+(defn trigger-names-a-window [window-ids t]
+  (when-not (some #{(:trigger/window-id t)} window-ids)
+    (throw (ex-info "Trigger must name a window ID" {:trigger t :window-ids window-ids}))))
+
+(defn validate-triggers [triggers windows]
+  (let [window-names (map :window/id windows)]
+    (doseq [t triggers]
+      (trigger-names-a-window window-names t))))
 
 (defn coerce-uuid [uuid]
   (if (instance? java.util.UUID uuid)

@@ -145,6 +145,8 @@
           (validator/validate-job (assoc job :workflow (:workflow job)))
           (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
           (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+          (validator/validate-windows (:windows job) (:catalog job))
+          (validator/validate-triggers (:triggers job) (:windows job))
           (catch Throwable t
             (error t)
             (throw t)))
@@ -156,6 +158,8 @@
        (extensions/write-chunk (:log client) :workflow (:workflow job) id)
        (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
        (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
+       (extensions/write-chunk (:log client) :windows (:windows job) id)
+       (extensions/write-chunk (:log client) :triggers (:triggers job) id)
 
        (doseq [task tasks]
          (extensions/write-chunk (:log client) :task task id))

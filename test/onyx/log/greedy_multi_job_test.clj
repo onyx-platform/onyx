@@ -3,7 +3,7 @@
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log get-counts]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api :as api]
             [schema.test]
             [clojure.test :refer [deftest is testing use-fixtures]]))

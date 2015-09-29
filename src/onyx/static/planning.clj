@@ -19,6 +19,10 @@
   (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
     (only matches)))
 
+(defn find-window [windows window-id]
+  (let [matches (filter #(= window-id (:window/id %)) windows)]
+    (only matches)))
+
 (defn egress-ids-from-children [task-ids elements]
   (into {}
         (map (juxt identity task-ids)

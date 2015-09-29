@@ -5,7 +5,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger]
             [onyx.log.replica :as replica]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.extensions :as extensions]
             [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.api]

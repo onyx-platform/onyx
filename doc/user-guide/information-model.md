@@ -17,6 +17,9 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
     - [Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys](#maps-with-onyxgroup-by-key-or-onyxgroup-by-fn-must-have-these-keys)
 - [Flow Conditions](#flow-conditions)
 - [Lifecycles](#lifecycles)
+- [Windows](#windows)
+- [Triggers](#triggers)
+- [Units](#units)
 - [Event Context](#event-context)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -115,6 +118,57 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:lifecycle/name`        |`keyword`                     | no       |
 |`:lifecycle/calls`       |`keyword`                     | no       |
 |`:lifecycle/doc`         |`string`                      | yes      |
+
+### Windows
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
+
+| key name             |type       | optional?|
+|----------------------|-----------|----------|
+|`:window/id`          |`keyword`  | no       |
+|`:window/task`        |`keyword`  | no       |
+|`:window/type`        |`string`   | no       |
+|`:window/aggregation` |`string`   | no       |
+|`:window/window-key`  |`string`   | no       |
+|`:window/min-value`   |`int`      | yes      |
+|`:window/range`       |`vector`   | no       |
+|`:window/slide`       |`vector`   | sometimes|
+|`:window/init`        |`string`   | sometimes|
+|`:window/doc`         |`string`   | yes      |
+
+`:window/range` and `:window/slide` are values that require Units. See below for a description of Units.
+
+### Triggers
+
+- a single Clojure vector which is EDN serializable/deserializable
+- all elements in the vector must be Clojure maps
+- allows arbitrary key/values in the map as parameters
+
+| key name                   |type       | optional?|
+|----------------------------|-----------|----------|
+|`:trigger/window-id`        |`keyword`  | no       |
+|`:trigger/refinement`       |`keyword`  | no       |
+|`:trigger/on`               |`keyword`  | no       |
+|`:trigger/sync`             |`keyword`  | no       |
+|`:trigger/fire-all-extents?`|`boolean`  | yes      |
+|`:trigger/doc`              |`string`   | yes      |
+
+### Units
+
+Several values in Onyx require units. Units are vectors of two elements. The first element represents a value, and the second the unit (e.g. `[5 :minutes]`). Onyx supports the following units:
+
+| unit             
+|---------------
+|`:milliseconds`
+|`:seconds`
+|`:minutes`
+|`:hours`
+|`:days`
+|`:elements`
+
+Onyx also allows you to specify a single form (`:minute`) anywhere that it is needed for readability.
 
 ### Event Context
 

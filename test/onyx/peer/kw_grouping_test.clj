@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def output (atom {}))
@@ -50,8 +50,6 @@
         peer-config (assoc (:peer-config config)
                            :onyx/id id
                            :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         workflow [[:in :sum-balance]
                   [:sum-balance :out]]
 
@@ -91,7 +89,6 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        v-peers (onyx.api/start-peers 4 peer-group)
         size 3000
         data (shuffle
                (concat
@@ -144,32 +141,28 @@
                  (map (fn [_] {:first-name "Jon" :amount 10}) (range size))
                  (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size))))]
 
-    (doseq [x data]
-      (>!! in-chan x))
+    (with-test-env [test-env [4 env-config peer-config]]
+      (doseq [x data]
+        (>!! in-chan x))
 
-    (>!! in-chan :done)
-    (close! in-chan)
+      (>!! in-chan :done)
+      (close! in-chan)
 
-    (onyx.api/submit-job peer-config
-                         {:catalog catalog :workflow workflow
-                          :lifecycles lifecycles
-                          :task-scheduler :onyx.task-scheduler/balanced})
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog :workflow workflow
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
 
-    (let [results (take-segments! out-chan)]
-      (doseq [v-peer v-peers]
-        (onyx.api/shutdown-peer v-peer))
+      (let [results (take-segments! out-chan)]
+        (is (= [:done] results))))
 
-      (let [out-val @output]
-        (is (not (empty? out-val)))
+    ;; check outside the peer shutdown so that we can ensure task is fully stopped
+    (let [out-val @output]
+      (is (not (empty? out-val)))
 
-        ;; We flush out each result set based on the peer id, then we do a diff. If the
-        ;; last collection is empty, we know that each map is mutually exclusive.
+      ;; We flush out each result set based on the peer id, then we do a diff. If the
+      ;; last collection is empty, we know that each map is mutually exclusive.
+      (let [l (first (vals out-val))
+            r (second (vals out-val))]
 
-        (let [l (first (vals out-val))
-              r (second (vals out-val))]
-          (is (empty? (last (clojure.data/diff l r)))))
-
-        (is (= [:done] results))
-
-        (onyx.api/shutdown-peer-group peer-group)
-        (onyx.api/shutdown-env env)))))
+        (is (empty? (last (clojure.data/diff l r))))))))
