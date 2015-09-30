@@ -18,7 +18,6 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
-(defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -82,7 +81,7 @@
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger}
    {:keys [aeron/id]}]
   (reset! multiplex-id id)
-  (swap! virtual-peers pm/assoc id (->PeerChannels acking-ch inbound-ch release-ch retry-ch)))
+  (swap! virtual-peers pm/assoc id (pm/->PeerChannels acking-ch inbound-ch release-ch retry-ch)))
 
 (def no-op-error-handler
   (reify ErrorHandler
@@ -194,7 +193,7 @@
 ;; just as it is being gc'd - though it is unlikely
 (defn gc-publications [publications opts]
   (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
-        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
+        idle ^long (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
     (loop []
       (try
         (Thread/sleep interval)
