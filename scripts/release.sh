@@ -28,6 +28,7 @@ else
   lein doc
 
   # Push and deploy release.
+  git add doc
   git commit -m "Release version $NEW_VERSION." project.clj README.md
   git tag $NEW_VERSION
   git push origin $NEW_VERSION
@@ -42,7 +43,7 @@ else
   git checkout master
   lein set-version
 
-  SNAPSHOT_VERSION=`lein pprint :version`
+  SNAPSHOT_VERSION=`lein pprint :version|sed s/\"//g`
   sed -i '' "s/$NEW_VERSION/$SNAPSHOT_VERSION/g" README.md
 
   git commit -m "Prepare for next release cycle." project.clj README.md
