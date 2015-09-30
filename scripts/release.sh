@@ -22,8 +22,8 @@ else
 
   lein set-version $NEW_VERSION
   sed -i '' "s/$OLD_VERSION/$NEW_VERSION/g" README.md
-  sed -i '' "s/$3/$4/g" README.md
-  sed -i '' "s/$3/$4/g" circle.yml
+  sed -i '' "s/$OLD_BRANCH/$NEW_BRANCH/g" README.md
+  sed -i '' "s/$OLD_BRANCH/$NEW_BRANCH/g" circle.yml
   git rm -rf doc/api
   lein doc
 
