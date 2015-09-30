@@ -1,3 +1,7 @@
+#### 0.7.8
+
+- No functional changes in this release. Fixing build issue.
+
 #### 0.7.7
 
 - Improve fault tolerance aeron connection reaping (GC)
