@@ -28,8 +28,7 @@ else
   lein doc
 
   # Push and deploy release.
-  git add .
-  git commit -m "Release version $NEW_VERSION."
+  git commit -m "Release version $NEW_VERSION." project.clj README.md
   git tag $NEW_VERSION
   git push origin $NEW_VERSION
   git push origin master
@@ -42,7 +41,6 @@ else
   # Prepare next release cycle.
   git checkout master
   lein set-version
-  git add .
-  git commit -m "Prepare for next release cycle."
+  git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
 fi
