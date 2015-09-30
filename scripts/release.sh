@@ -5,18 +5,18 @@ set -o pipefail
 set -o nounset
 set -o xtrace
 
-if [[ "$#" -ne 4 ]]; then
-    echo "Usage: $0 old-version new-version old-release-branch new-release-branch"
-    echo "Example: $0 0.7.1 0.8.0 0.7.x 0.8.x"
+if [[ "$#" -ne 3 ]]; then
+    echo "Usage: $0 new-version old-release-branch new-release-branch"
+    echo "Example: $0 0.8.0 0.7.x 0.8.x"
 else
   # Update to release version.
   git checkout master
   git pull --rebase
 
-  OLD_VERSION=$1
-  NEW_VERSION=$2
-  OLD_BRANCH=$3
-  NEW_BRANCH=$4
+  OLD_VERSION=`lein pprint :version|sed s/\"//g`
+  NEW_VERSION=$1
+  OLD_BRANCH=$2
+  NEW_BRANCH=$3
 
   grep "$OLD_VERSION" README.MD || (echo "Version string $1 was not found in README" && exit 1)
 
