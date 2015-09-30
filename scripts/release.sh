@@ -41,6 +41,10 @@ else
   # Prepare next release cycle.
   git checkout master
   lein set-version
+
+  SNAPSHOT_VERSION=`lein pprint :version`
+  sed -i '' "s/$NEW_VERSION/$SNAPSHOT_VERSION/g" README.md
+
   git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
 fi
