@@ -29,7 +29,7 @@ else
 
   # Push and deploy release.
   git add doc
-  git commit -m "Release version $NEW_VERSION." project.clj README.md
+  git commit -m "Release version $NEW_VERSION." project.clj README.md doc
   git tag $NEW_VERSION
   git push origin $NEW_VERSION
   git push origin master
