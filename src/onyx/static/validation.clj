@@ -7,6 +7,12 @@
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
+(defn validate-java-version []
+  (let [version (System/getProperty "java.runtime.version")] 
+    (when-not (pos? (.compareTo version "1.8.0"))
+      (throw (ex-info "Onyx is only supported when running on Java 8 or later." 
+                      {:version version})))))
+
 (defn task-dispatch-validator [task]
   (when (= (:onyx/name task)
            (:onyx/type task))

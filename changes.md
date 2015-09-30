@@ -1,3 +1,27 @@
+#### 0.7.10
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.9
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.8
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.7
+
+- Improve fault tolerance aeron connection reaping (GC)
+
+#### 0.7.6
+
+- Fixed performance regression caused by reflection in Aeron messaging layer.
+
+#### 0.7.5
+
+- No functional changes in this release. We had a build problem that wasn't worth fixing across all 0.7.4 releases. Fixed build and trying again under alias 0.7.5
+
 #### 0.7.4
 
 - Operations: Onyx now requires Java 8.
@@ -6,6 +30,7 @@
 - API: New catalog entry option `:onyx/n-peers` to automatically expand to make `:onyx/min-peers` and `:onyx/max-peers` peers the same value. [#282](https://github.com/onyx-platform/onyx/issues/282)
 - API: Allow functions in leaf position of a workflow. [#198](https://github.com/onyx-platform/onyx/issues/198)
 - Bug fix: flow-conditions retry default action should emit segments [#262](https://github.com/onyx-platform/onyx/issues/262)
+- Bug fix: cleaned up publications on write failure
 
 #### 0.7.3
 

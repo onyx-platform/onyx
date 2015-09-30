@@ -322,6 +322,7 @@
 (defn ^{:added "0.6.0"} start-peer-group
   "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
   [peer-config]
+  (validator/validate-java-version)
   (validator/validate-peer-config peer-config)
   (component/start (system/onyx-peer-group peer-config)))
 
