@@ -50,9 +50,13 @@
   (stop [this]
     (cleanup-fn)
     (future-cancel (:write-fut this))
-    (.close ^Publication publication)
-    (.close ^Aeron connection)
     (close! pending-ch)
+    (try (.close ^Publication publication)
+         (catch Throwable t 
+           (info "Could not close publication:" t)))
+    (try (.close ^Aeron connection)
+         (catch Throwable t 
+           (info "Could not close connection" t)))
     this)
 
   (connect [this]
