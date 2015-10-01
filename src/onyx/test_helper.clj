@@ -103,5 +103,4 @@
        (catch InterruptedException e#
          (Thread/interrupted))
        (finally
-         (println "Stopping env now")
          (component/stop ~symbol-name)))))
