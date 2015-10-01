@@ -2,8 +2,9 @@
   (:require [onyx.peer.operation :refer [kw->fn] :as operation]
             [onyx.static.planning :refer [find-task build-pred-fn]]
             [onyx.static.validation :as validation]
-            [clj-tuple :as t]
-            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
+            [onyx.windowing.aggregation :as agg]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [clj-tuple :as t]))
 
 (defn only-relevant-branches [flow task]
   (filter #(= (:flow/from %) task) flow))
@@ -130,6 +131,11 @@
   (filter #(some #{(:trigger/window-id %)}
                  (map :window/id windows))
           triggers))
+
+(defn resolve-aggregations [windows]
+  (map
+   #(assoc % :window/agg-fn (agg/aggregation-fn (:window/aggregation %)))
+   windows))
 
 (defn resolve-triggers [triggers]
   (map

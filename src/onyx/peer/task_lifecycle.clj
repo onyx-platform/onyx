@@ -324,7 +324,7 @@
               message (update (:message msg) (:window/window-key w) units/coerce-key units)
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
-            (let [f (agg/aggregation-fn (:window/aggregation w))
+            (let [f (:window/agg-fn w)
                   state  (get-in @window-state [window-id e])
                   entry (f state w (:message msg))
                   updated-state (agg/aggregation-apply-log state entry)]
@@ -552,7 +552,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows filtered-windows
+                           :onyx.core/windows (c/resolve-aggregations filtered-windows)
                            :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
