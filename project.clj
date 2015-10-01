@@ -18,8 +18,8 @@
                  [clj-tuple "0.2.2"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.0"]
-                 [com.taoensso/timbre "4.1.2"]
-                 [com.taoensso/nippy "2.9.1"]
+                 [com.taoensso/timbre "4.1.4"]
+                 [com.taoensso/nippy "2.10.0"]
                  [uk.co.real-logic/Agrona "0.4.4"]
                  [uk.co.real-logic/aeron-client "0.1.4"]
                  [uk.co.real-logic/aeron-driver "0.1.4"]
@@ -31,8 +31,7 @@
   :aot [onyx.interop]
   :jvm-opts ["-Xmx4g"]
   :profiles {:dev {:aot ^:replace []
-                   :dependencies [[yeller-timbre-appender "2.0.0"]
-                                  [org.clojure/tools.nrepl "0.2.11"]
+                   :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/test.check "0.8.2"]
                                   [org.clojars.czan/stateful-check "0.3.1"]
                                   [com.gfredericks/test.chuck "0.2.0"]
@@ -41,6 +40,9 @@
                              [lein-set-version "0.4.1"]
                              [lonocloud/lein-unison "0.1.11"]
                              [codox "0.8.8"]]}
+	     :reflection-check {:global-vars  {*warn-on-reflection* true
+					       *assert* false
+					       *unchecked-math* :warn-on-boxed}}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
