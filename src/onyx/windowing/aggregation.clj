@@ -40,7 +40,7 @@
 (def conj
   {:aggregation/init conj-aggregation-fn-init
    :aggregation/fn conj-aggregation-fn
-   :aggregation/log-resolve conj-aggregation-fn})
+   :aggregation/log-resolve conj-aggregation-apply-log})
 
 (def sum
   {:aggregation/init sum-aggregation-fn-init

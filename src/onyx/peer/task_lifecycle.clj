@@ -333,7 +333,7 @@
                   state (init-window-state w (get-in @window-state [window-id e]))
                   entries (f state w (:message msg))
                   updated-state (reduce (fn [state' [entry-type entry-value]]
-                                          ((:window/log-resolve w)  state' entry-value))
+                                          ((:window/log-resolve w) state' entry-value))
                                         state
                                         entries)]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
