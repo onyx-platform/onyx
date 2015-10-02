@@ -312,6 +312,10 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
+(defn init-window-state [w window-state]
+  (or window-state
+      ((:window/agg-init w) w)))
+
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
   (when (seq windows)
@@ -325,9 +329,12 @@
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
             (let [f (:window/agg-fn w)
-                  state  (get-in @window-state [window-id e])
-                  entry (f state w (:message msg))
-                  updated-state (agg/aggregation-apply-log state entry)]
+                  state (init-window-state w (get-in @window-state [window-id e]))
+                  entries (f state w (:message msg))
+                  updated-state (reduce (fn [state' [entry-type entry-value]]
+                                          ((:window/log-resolve w) state' entry-value))
+                                        state
+                                        entries)]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
           (doseq [t (:onyx.core/triggers event)]
             (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
@@ -552,7 +559,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows (c/resolve-aggregations filtered-windows)
+                           :onyx.core/windows (c/resolve-windows filtered-windows)
                            :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))

@@ -77,7 +77,7 @@ Onyx is also capable of sliding by `:elements`. This is often referred to as "sl
 
 Windows allow you accrete data over time. Sometimes, you want to store all the data. Othertimes you want to incrementally compact the data. Window specifications must provide a `:window/aggregation` key. We'll go over an example of every type of aggregation that Onyx supports.
 
-#### `:conj`
+#### `:onyx.windowing.aggregation/conj`
 
 The `:conj` aggregation is the simplest. It collects segments for this window and retains them in a vector, unchanged.
 
@@ -85,16 +85,16 @@ The `:conj` aggregation is the simplest. It collects segments for this window an
 {:window/id :collect-segments
  :window/task :identity
  :window/type :sliding
- :window/aggregation :conj
+ :window/aggregation :onyx.windowing.aggregation/conj
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/slide [5 :minutes]
  :window/doc "Collects segments on a 30 minute window sliding every 5 minutes"}
 ```
 
-#### `:count`
+#### `:onyx.windowing.aggregation/count`
 
-The `:count` operation counts the number of segments in the window.
+The `:onyx.windowing.aggregation/count` operation counts the number of segments in the window.
 
 ```clojure
 {:window/id :count-segments
@@ -106,7 +106,7 @@ The `:count` operation counts the number of segments in the window.
  :window/doc "Counts segments in one hour fixed windows"}
 ```
 
-#### `:sum`
+#### `:onyx.windowing.aggregation/sum`
 
 The `:sum` operation adds the values of `:window/sum-key` for all segments in the window.
 
@@ -121,7 +121,7 @@ The `:sum` operation adds the values of `:window/sum-key` for all segments in th
  :window/doc "Adds the :age key in all segments in 1 hour fixed windows"}
 ```
 
-#### `:min`
+#### `:onyx.windowing.aggregation/min`
 
 The `:min` operation retains the minimum value found for `:window/min-key`. An initial value must be supplied via `:window/init`.
 
@@ -137,7 +137,7 @@ The `:min` operation retains the minimum value found for `:window/min-key`. An i
  :window/doc "Finds the minimum :age in 30 minute fixed windows, default is 100"}
 ```
 
-#### `:max`
+#### `:onyx.windowing.aggregation/max`
 
 The `:max` operation retains the maximum value found for `:window/max-key`. An initial value must be supplied via `:window/init`.
 
@@ -153,7 +153,7 @@ The `:max` operation retains the maximum value found for `:window/max-key`. An i
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
 ```
 
-#### `:average`
+#### `:onyx.windowing.aggregation/average`
 
 The `:average` operation maintains an average over `:window/average-key`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
 

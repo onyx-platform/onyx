@@ -16,7 +16,7 @@
   (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed
-                :window/aggregation :count
+                :window/aggregation :onyx.windowing.aggregation/count
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
@@ -34,7 +34,7 @@
   (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed
-                :window/aggregation :count
+                :window/aggregation :onyx.windowing.aggregation/count
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments

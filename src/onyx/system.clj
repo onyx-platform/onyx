@@ -30,6 +30,7 @@
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
             [onyx.windowing.units]
+            [onyx.windowing.aggregation]
             [onyx.triggers.triggers-api]
             [onyx.triggers.timer]
             [onyx.triggers.segment]

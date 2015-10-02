@@ -132,9 +132,22 @@
                  (map :window/id windows))
           triggers))
 
-(defn resolve-aggregations [windows]
+(defn resolve-window-init [window calls]
+  (if-not (:aggregation/init calls)
+    (let [init (:window/init calls)]
+      (when-not init
+        (throw (ex-info "No :window/init supplied, this is required for this aggregation" {:window window})))
+      (constantly (:window/init window)))
+    (:aggregation/init calls)))
+
+(defn resolve-windows [windows]
   (map
-   #(assoc % :window/agg-fn (agg/aggregation-fn (:window/aggregation %)))
+   (fn [window]
+     (let [calls (var-get (kw->fn (:window/aggregation window)))]
+       (assoc window
+              :window/agg-init (resolve-window-init window calls)
+              :window/agg-fn (:aggregation/fn calls)
+              :window/log-resolve (:aggregation/log-resolve calls))))
    windows))
 
 (defn resolve-triggers [triggers]
