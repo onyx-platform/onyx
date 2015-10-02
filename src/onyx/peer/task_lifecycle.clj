@@ -235,7 +235,7 @@
 
 (defn add-messages-to-timeout-pool [task-type state event]
   (when (= task-type :input)
-    (swap! state update-in [:timeout-pool] rsc/add-to-head
+    (swap! state update :timeout-pool rsc/add-to-head
            (map :id (:onyx.core/batch event))))
   event)
 
@@ -247,11 +247,11 @@
       (if (p-ext/drained? pipeline event)
           (complete-job event)
           (p-ext/retry-segment pipeline event (sentinel-id event)))
-        (update-in event
-                   [:onyx.core/batch]
-                   (fn [batch]
-                     (remove (fn [v] (= :done (:message v)))
-                             batch))))
+      (update event
+              :onyx.core/batch
+              (fn [batch]
+                (remove (fn [v] (= :done (:message v)))
+                        batch))))
     event))
 
 (defn collect-next-segments [f input]
@@ -410,7 +410,7 @@
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
                        (compiled-after-retry-segment-fn event m))))
-              (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
+              (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
 (defn setup-triggers [event]

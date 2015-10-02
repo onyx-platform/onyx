@@ -18,7 +18,7 @@
               snapshot (:state @state)
               dead (map first (filter (fn [[k v]] (>= (- t (:timestamp v)) timeout)) snapshot))]
           (doseq [k dead]
-            (swap! state update-in [:state] dissoc k)))
+            (swap! state update :state dissoc k)))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
