@@ -225,12 +225,13 @@
   (if (= task-type :input)
     (let [candidates (:acker-candidates @peer-replica-view)
           _ (validate-ackable! candidates event)]
-      (assoc event
-             :onyx.core/batch
-             (map (fn [segment]
-                    (add-acker-id (rand-nth candidates)
-                                  (add-completion-id id segment)))
-                  (:onyx.core/batch event))))
+      (update event
+              :onyx.core/batch
+              (fn [batch] 
+                (map (fn [segment]
+                       (add-acker-id (rand-nth candidates)
+                                     (add-completion-id id segment)))
+                     batch))))
     event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
