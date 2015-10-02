@@ -1,4 +1,4 @@
-(ns onyx.state-extensions)
+(ns onyx.state.state-extensions)
 
 (defmulti initialise-log 
   (fn [log-type event]

@@ -22,6 +22,9 @@
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
               [clj-tuple :as t]
               [onyx.interop]
+              [onyx.state.log.atom]
+              [onyx.state.core :as state]
+              [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn resolve-calling-params [catalog-entry opts]
@@ -317,6 +320,18 @@
   (or window-state
       ((:window/agg-init w) w)))
 
+(defn replay-windows-from-log
+  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
+  (when (seq windows)
+    (let [id->log-resolve (into {} 
+                                (map (juxt :window/id :window/log-resolve) 
+                                     windows))]
+      (reset! window-state (state-extensions/playback-log-entries state-log 
+                                                                  event
+                                                                  @window-state
+                                                                  id->log-resolve))))
+  event)
+
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
   (when (seq windows)
@@ -332,8 +347,8 @@
             (let [f (:window/agg-fn w)
                   state (init-window-state w (get-in @window-state [window-id e]))
                   entries (f state w (:message msg))
-                  updated-state (reduce (fn [state' [entry-type entry-value]]
-                                          ((:window/log-resolve w) state' entry-value))
+                  updated-state (reduce (fn [state' entry]
+                                          ((:window/log-resolve w) state' entry))
                                         state
                                         entries)]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
@@ -526,6 +541,10 @@
       (catch Throwable e
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
 
+
+(def test-full-log 
+  (atom (into {} (map vector (range 20) (repeat [])))))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring]
@@ -587,6 +606,7 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state
+                           :onyx.core/test-entries-log test-full-log 
                            :onyx.core/window-state (atom {})}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
@@ -599,7 +619,32 @@
                 (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
             pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)
-            pipeline-data (setup-triggers pipeline-data)]
+            pipeline-data (setup-triggers pipeline-data)
+            
+            ; _ (info "WINDOW " (vec (:onyx.core/windows pipeline-data)))
+            ; first-window (first (:onyx.core/windows pipeline-data))
+            
+            ; state-state (let [event pipeline-data
+            ;                   log-id (state/peer-log-id event)
+            ;                   _ (info "LOG " log-id " taskid " (:onyx.core/task-id event))
+            ;                   {:keys [window/agg-init
+            ;                           window/agg-fn
+            ;                           window/log-resolve]} first-window
+            ;                   peer-seen-log []
+            ;                   log (state-extensions/initialise-log :atom pipeline-data)
+            ;                   state (state-extensions/playback-log-entries log
+            ;                                                                pipeline-data 
+            ;                                                                {}
+            ;                                                                log-resolve)
+            ;                   initial-buckets {:blooms [] :sets [#{}]}
+            ;                   seen-buckets initial-buckets #_(state-extensions/playback-seen-ids peer-seen-log event initial-buckets apply-seen-id)] 
+            ;               (info "After replay: " state)
+            ;               {:state/log-id log-id
+            ;                :state/log log
+            ;                :state/state (atom state)
+            ;                :state/seen-buckets (atom seen-buckets)})
+            
+            ]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
