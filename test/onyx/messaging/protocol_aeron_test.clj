@@ -9,7 +9,7 @@
         peer-id (protocol/read-vpeer-id buf 1)]
     (vector peer-id
             (cond (= msg-type protocol/ack-msg-id)
-                  (protocol/read-acker-message buf 3)
+                  (protocol/read-acker-messages buf 3)
                   (= msg-type protocol/messages-msg-id)
                   (protocol/read-messages-buf decompress buf 3 (- (.capacity buf) 3))
                   (= msg-type protocol/completion-msg-id)
@@ -29,11 +29,14 @@
 
 
 (let [peer-id 32000
-      ack (map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"
-                     :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
-                     :ack-val 3323130347050513529})]
-  (is (= (vector peer-id ack)
-         (read-buf (protocol/build-acker-message peer-id (:id ack) (:completion-id ack) (:ack-val ack))))))
+      acks [(map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"
+                       :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
+                       :ack-val 3323130347050513529})
+            (map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"
+                       :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
+                       :ack-val 3323130347050513529})]]
+  (is (= (vector peer-id (reverse acks))
+         (read-buf (protocol/build-acker-messages peer-id acks)))))
 
 (let [peer-id 32765
       message [(map->Leaf {:id #uuid "ac39bc62-8f06-46a0-945e-3a17642a619f"

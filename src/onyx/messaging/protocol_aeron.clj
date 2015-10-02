@@ -16,7 +16,7 @@
 (def ^:const retry-msg-length (long 33))
 
 ;; id uuid, completion-id uuid, ack-val long
-(def ^:const ack-msg-length (long 43))
+(def ^:const ack-msg-length (long 40))
 
 (def ^:const completion-msg-id (byte 0))
 (def ^:const retry-msg-id (byte 1))
@@ -51,23 +51,38 @@
         lsb (.getLong buf (unchecked-add 8 offset))]
     (java.util.UUID. msb lsb)))
 
-(defn build-acker-message [peer-id ^UUID id ^UUID completion-id ^long ack-val]
-  (let [buf (UnsafeBuffer. (byte-array ack-msg-length))]
+(defn build-acker-messages [peer-id messages]
+  (let [message-count (count messages)
+        buffer-size (+ 7 (* message-count ack-msg-length))
+        buf (UnsafeBuffer. (byte-array buffer-size))] 
     (.putByte buf 0 ack-msg-id)
     (write-vpeer-id buf 1 peer-id)
-    (write-uuid buf 3 id)
-    (write-uuid buf 19 completion-id)
-    (.putLong buf 35 ack-val)
-    buf))
+    (.putInt buf 3 message-count)
+    (reduce (fn [offset msg]
+              (write-uuid buf offset (:id msg))
+              (write-uuid buf (unchecked-add offset 16) (:completion-id msg))
+              (.putLong buf (unchecked-add offset 32) (:ack-val msg))
+              (unchecked-add offset ack-msg-length)) 
+            7
+            messages)
+    (list buffer-size buf)))
 
 (defn read-message-type [buf offset]
   (.getByte ^UnsafeBuffer buf ^long offset))
 
-(defn read-acker-message [^UnsafeBuffer buf ^long offset]
-  (let [id (get-uuid buf offset)
-        completion-id (get-uuid buf (unchecked-add offset 16))
-        ack-val (.getLong buf (unchecked-add offset 32))]
-    (->Ack id completion-id ack-val nil)))
+(defn read-acker-messages [^UnsafeBuffer buf ^long offset]
+  (let [message-count (.getInt buf offset)]
+    (loop [messages (list)
+           cnt 0
+           offset (unchecked-add offset 4)]
+      (if (= cnt message-count)
+        messages
+        (let [id (get-uuid buf offset)
+              completion-id (get-uuid buf (unchecked-add offset 16))
+              ack-val (.getLong buf (unchecked-add offset 32))]
+          (recur (conj messages (->Ack id completion-id ack-val nil))
+                 (inc cnt)
+                 (unchecked-add offset 40))))))) 
 
 (defn read-completion [^UnsafeBuffer buf ^long offset]
   (get-uuid buf offset))

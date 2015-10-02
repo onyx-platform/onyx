@@ -119,18 +119,22 @@
   (let [msg-type (protocol/read-message-type buffer offset)
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
-        offset (+ offset protocol/short-size)]
+        offset (unchecked-add offset protocol/short-size)]
     (cond (= msg-type protocol/ack-msg-id)
-          (let [ack (protocol/read-acker-message buffer offset)]
+          (let [acks (protocol/read-acker-messages buffer offset)]
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
-              (>!! (:acking-ch chs) ack)))
+              (let [acking-ch (:acking-ch chs)]
+                (run! (fn [ack]
+                        (>!! acking-ch ack))
+                    acks)))) 
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset length)]
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
               (let [inbound-ch (:inbound-ch chs)]
-                (doseq [segment segments]
-                  (>!! inbound-ch segment)))))
+                (run! (fn [segment]
+                        (>!! inbound-ch segment))
+                      segments))))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
@@ -138,9 +142,9 @@
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
-            (let [retry-id (protocol/read-retry buffer offset)]
-              (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
-                (>!! (:retry-ch chs) retry-id))))))
+          (let [retry-id (protocol/read-retry buffer offset)]
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+              (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
@@ -359,13 +363,15 @@
 
 (defn send-messages-short-circuit [ch batch]
   (when ch
-    (doseq [segment batch]
-      (>!! ch segment))))
+    (run! (fn [segment]
+            (>!! ch segment))
+          batch)))
 
 (defn ack-segments-short-circuit [ch acks]
   (when ch
-    (doseq [ack acks]
-      (>!! ch ack))))
+    (run! (fn [ack]
+            (>!! ch ack))
+          acks))) 
 
 (defn complete-message-short-circuit [ch completion-id]
   (when ch
@@ -387,10 +393,9 @@
   [messenger event {:keys [id channel] :as conn-info} acks]
   (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
-    (let [pub-man (get-publication messenger conn-info)]
-      (doseq [ack acks]
-        (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
-          (pubm/write pub-man buf 0 protocol/ack-msg-length))))))
+    (let [pub-man (get-publication messenger conn-info)
+          [len buf] (protocol/build-acker-messages id acks)]
+      (pubm/write pub-man buf 0 len))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]
