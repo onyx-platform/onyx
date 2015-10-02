@@ -128,7 +128,7 @@
         [{:window/id :collect-segments
           :window/task :identity
           :window/type :fixed
-          :window/aggregation :conj
+          :window/aggregation :onyx.windowing.aggregation/conj
           :window/window-key :event-time
           :window/range [5 :minutes]}]
 
