@@ -65,7 +65,7 @@
               (unchecked-add offset ack-msg-length)) 
             7
             messages)
-    (list buffer-size buf)))
+    buf))
 
 (defn read-message-type [buf offset]
   (.getByte ^UnsafeBuffer buf ^long offset))
@@ -139,9 +139,9 @@
                            (unchecked-add message-base-length ^long offset))
                          offset
                          messages)]
-    (list buf-size buf)))
+    buf))
 
-(defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset length]
+(defn read-messages-buf [decompress-f ^UnsafeBuffer buf ^long offset]
   (let [message-count (.getInt buf offset)
         offset (unchecked-add offset message-count-size)
         payload-size (.getInt buf offset)

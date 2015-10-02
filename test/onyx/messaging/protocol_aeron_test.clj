@@ -11,7 +11,7 @@
             (cond (= msg-type protocol/ack-msg-id)
                   (protocol/read-acker-messages buf 3)
                   (= msg-type protocol/messages-msg-id)
-                  (protocol/read-messages-buf decompress buf 3 (- (.capacity buf) 3))
+                  (protocol/read-messages-buf decompress buf 3)
                   (= msg-type protocol/completion-msg-id)
                   (protocol/read-completion buf 3)
                   (= msg-type protocol/retry-msg-id)
@@ -49,13 +49,13 @@
                            :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
                            :message {:n 2}
                            :ack-val 729233382010058362})]]
-  (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
+  (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
     (is (= (vector peer-id message) 
            (read-buf buf)))))
 
 (let [peer-id -32767
       message []]
-  (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
+  (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
     (is (= (vector peer-id message) 
            (read-buf buf)))))
 
@@ -65,6 +65,6 @@
                            :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
                            :message {}
                            :ack-val 729233382010058362})]]
-  (let [[size buf] (protocol/build-messages-msg-buf compress peer-id message)]
+  (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
     (is (= (vector peer-id message) 
            (read-buf buf)))))
