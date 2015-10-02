@@ -312,17 +312,9 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
-(defn window-state-value [window-state window]
+(defn init-window-state [w window-state]
   (or window-state
-      ;; TODO: resolve aot when task starts up
-      ((agg/init-resolve (:window/aggregation window) 
-                         (constantly (:window/init window))))
-      (throw (ex-info "No initialisation function or :window/init found for window." window))))
-
-(defn window-agg-fn [window]
-  ;; TODO: resolve aot when task starts up
-  (or (agg/aggregation-resolve (:window/aggregation window))
-      (operation/kw->fn (:window/aggregation window))))
+      ((:window/agg-init w) w)))
 
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
@@ -337,11 +329,11 @@
               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
           (doseq [e extents]
             (let [;; should resolve this at task-start-time
-                  f (window-agg-fn w)
-                  state (window-state-value (get-in @window-state [window-id e]) w)
+                  f (:window/agg-fn w)
+                  state (init-window-state w (get-in @window-state [window-id e]))
                   entries (f state w (:message msg))
                   updated-state (reduce (fn [state' [entry-type entry-value]]
-                                          ((agg/apply-log-resolve entry-type)  state' entry-value))
+                                          ((:window/log-resolve w)  state' entry-value))
                                         state
                                         entries)]
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
@@ -568,7 +560,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows filtered-windows
+                           :onyx.core/windows (c/resolve-windows filtered-windows)
                            :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
