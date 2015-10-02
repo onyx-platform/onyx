@@ -53,15 +53,15 @@
                                  :journal-dir journal-dir 
                                  :ledger-dir ledger-dir}))
                             ports)]
-              (.addShutdownHook (Runtime/getRuntime) 
-                                (Thread. (fn []
-                                           (cleanup-dirs servers))))
-              (assoc component :servers servers))) 
-      component))
+          (.addShutdownHook (Runtime/getRuntime) 
+                            (Thread. (fn []
+                                       (cleanup-dirs servers))))
+          (assoc component :servers servers)) 
+        component)))
   (component/stop [{:keys [servers] :as component}]
     (doseq [server servers]
       (info "Stopping BookKeeper server")
-      (.stop server))
+      (.shutdown (:server server)))
     (cleanup-dirs servers)
     (assoc component :servers nil)))
 
