@@ -324,9 +324,9 @@
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
   (when (seq windows)
     (swap! window-state 
-           (fn [state] 
-             (let [replayed-state (state-extensions/playback-log-entries state-log event state)]
-               (info "REPLAYED STATE:" replayed-state)
+           (fn [wstate] 
+             (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
+               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
   event)
 
