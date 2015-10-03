@@ -1,16 +1,22 @@
 (ns onyx.state.log.atom
   (:require [onyx.state.state-extensions :as state-extensions]
-            [onyx.state.core :as state])) 
+            [onyx.state.core :as state]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre])) 
 
 (defmethod state-extensions/initialise-log :atom [_ event] 
-  (get (:onyx.core/test-entries-log event) (state/peer-log-id event)))
+  (let [test-entries-log (:onyx.core/test-entries-log event) 
+        path [(:onyx.core/task-id event) (state/peer-slot-id event)]
+        rets (swap! test-entries-log
+                    update-in 
+                    path
+                    (fn [log]
+                      (or log (atom []))))]
+    (get-in rets path)))
 
 (defmethod state-extensions/store-log-entry clojure.lang.Atom [log _ entry]
   (swap! log conj entry))
 
 (defmethod state-extensions/playback-log-entries clojure.lang.Atom [log {:keys [onyx.core/windows :as event]} state]
-  ;; Extract some of this. 
-  ;; Main requirement is to apply without reading entire log before application
   (let [id->window (into {} 
                          (map (juxt :window/id identity) 
                               windows))
@@ -37,3 +43,6 @@
 (defmethod state-extensions/playback-seen-ids clojure.lang.Atom [seen-log _ bucket-state apply-fn]
   bucket-state
   #_(reduce apply-fn bucket-state @seen-log))
+
+(defmethod state-extensions/close-log clojure.lang.Atom
+  [log event])
