@@ -46,7 +46,7 @@
                                                   (.setLedgerDirNames (into-array String [ledger-dir]))
                                                   (.setAllowLoopback true))
                                     server (BookieServer. server-conf)] 
-                                (info "Starting BookKeeper server on port " port)
+                                (info "Starting BookKeeper server on port" port)
                                 (.start server)
                                 {:server server 
                                  :port port 
