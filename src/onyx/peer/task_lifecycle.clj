@@ -637,7 +637,7 @@
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
-            (Thread/sleep 500)
+            (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
