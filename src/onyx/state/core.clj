@@ -31,7 +31,7 @@
         task-id (:onyx.core/task-id event)] 
     (get-in @replica [:task-slot-ids job-id task-id peer-id])))
 
-(def state-fn-calls
+#_(def state-fn-calls
   ;; allocate log-id (will be group-id in the future) and initialise state and seen buckets from logs
   {:lifecycle/before-task-start (fn inject-state [ 
                                                   lifecycle]

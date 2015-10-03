@@ -323,13 +323,8 @@
 (defn replay-windows-from-log
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
   (when (seq windows)
-    (let [id->log-resolve (into {} 
-                                (map (juxt :window/id :window/log-resolve) 
-                                     windows))]
-      (reset! window-state (state-extensions/playback-log-entries state-log 
-                                                                  event
-                                                                  @window-state
-                                                                  id->log-resolve))))
+    (swap! window-state 
+           (fn [state] (state-extensions/playback-log-entries state-log event state))))
   event)
 
 (defn assign-windows
@@ -543,7 +538,10 @@
 
 
 (def test-full-log 
-  (atom (into {} (map vector (range 20) (repeat [])))))
+  (into {} 
+        (map (fn [id]
+               [id (atom [])]) 
+             (range 20))))
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -612,6 +610,7 @@
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
+
             restart-pred-fn (operation/resolve-restart-pred-fn catalog-entry)
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
@@ -620,31 +619,7 @@
 
             pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)
             pipeline-data (setup-triggers pipeline-data)
-            
-            ; _ (info "WINDOW " (vec (:onyx.core/windows pipeline-data)))
-            ; first-window (first (:onyx.core/windows pipeline-data))
-            
-            ; state-state (let [event pipeline-data
-            ;                   log-id (state/peer-log-id event)
-            ;                   _ (info "LOG " log-id " taskid " (:onyx.core/task-id event))
-            ;                   {:keys [window/agg-init
-            ;                           window/agg-fn
-            ;                           window/log-resolve]} first-window
-            ;                   peer-seen-log []
-            ;                   log (state-extensions/initialise-log :atom pipeline-data)
-            ;                   state (state-extensions/playback-log-entries log
-            ;                                                                pipeline-data 
-            ;                                                                {}
-            ;                                                                log-resolve)
-            ;                   initial-buckets {:blooms [] :sets [#{}]}
-            ;                   seen-buckets initial-buckets #_(state-extensions/playback-seen-ids peer-seen-log event initial-buckets apply-seen-id)] 
-            ;               (info "After replay: " state)
-            ;               {:state/log-id log-id
-            ;                :state/log log
-            ;                :state/state (atom state)
-            ;                :state/seen-buckets (atom seen-buckets)})
-            
-            ]
+            pipeline-data (replay-windows-from-log pipeline-data)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))

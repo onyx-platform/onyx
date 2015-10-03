@@ -10,14 +10,14 @@
 
 ;; For onyx to implement
 ;; We can implement log storage for Kafka and maybe ZK (if small data is used and we gc)
-(defmulti store-log-entries 
+(defmulti store-log-entry 
   "Store state update [op k v] entries in a log"
-  (fn [log event entries]
+  (fn [log event entry]
     (type log)))
 
 (defmulti playback-log-entries 
   "Read state update [op k v] entries from log"
-  (fn [log event state apply-fn]
+  (fn [log event state]
     (type log)))
 
 (defmulti store-seen-ids 
