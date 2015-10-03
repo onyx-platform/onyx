@@ -4,7 +4,7 @@
             [onyx.peer.task-lifecycle :as task-lifecycle]))
 
 (deftest initialise-log-test
-  (let [event {:onyx.core/job-id :job0
+  (let [event {:onyx.core/job-id :job2
                :onyx.core/id :peer-id-1
                :onyx.core/task-id :task-id-1
                :onyx.core/replica (atom {:task-slot-ids {:job-1 {:task-id-1 {:peer-id-1 :slot-0}}}})
