@@ -23,6 +23,7 @@
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.state.log.atom]
+              [onyx.state.log.bookkeeper]
               [onyx.state.core :as state]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
@@ -323,11 +324,14 @@
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
   (when (seq windows)
     (swap! window-state 
-           (fn [state] (state-extensions/playback-log-entries state-log event state))))
+           (fn [state] 
+             (let [replayed-state (state-extensions/playback-log-entries state-log event state)]
+               (info "REPLAYED STATE:" replayed-state)
+               replayed-state))))
   event)
 
 (defn assign-windows
-  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
+  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
   (when (seq windows)
     (doseq [w windows]
       (doseq [msg (mapcat :leaves (:tree results))]
@@ -340,11 +344,10 @@
           (doseq [e extents]
             (let [f (:window/agg-fn w)
                   state (init-window-state w (get-in @window-state [window-id e]))
-                  entries (f state w (:message msg))
-                  updated-state (reduce (fn [state' entry]
-                                          ((:window/log-resolve w) state' entry))
-                                        state
-                                        entries)]
+                  entry (f state w (:message msg))
+                  updated-state ((:window/log-resolve w) state entry)]
+              ;; Need to modify acking for the log storing
+              (state-extensions/store-log-entry state-log event [(:window/id w) e entry])
               (swap! window-state assoc-in [(:window/id w) e] updated-state)))
           (doseq [t (:onyx.core/triggers event)]
             (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
@@ -536,14 +539,10 @@
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
 
 
-(def test-full-log 
-  (into {} 
-        (map (fn [id]
-               [id (atom [])]) 
-             (range 20))))
-
 (defn resolve-log [pipeline]
   (assoc pipeline :onyx.core/state-log (state-extensions/initialise-log :atom pipeline)))
+;; place outside of task-lifecycle for testing persistence
+(def test-entries-log (atom {})) 
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -601,12 +600,14 @@
                            :onyx.core/monitoring monitoring
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
+                           :onyx.core/task-kill-ch task-kill-ch
+                           :onyx.core/kill-ch kill-ch
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state
-                           :onyx.core/test-entries-log test-full-log 
+                           :onyx.core/test-entries-log test-entries-log
                            :onyx.core/window-state (atom {})}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
