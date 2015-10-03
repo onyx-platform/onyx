@@ -137,8 +137,7 @@
         start-ack-val (or (:ack-val root) 0)]
     (reduce (fn process-leaf [accum {:keys [message] :as leaf}]
               (let [routes (route-data event result message flow-conditions egress-ids)
-                    message* (flow-conditions-transform message routes egress-ids
-                                                        flow-conditions event)
+                    message* (flow-conditions-transform message routes egress-ids flow-conditions event)
                     hash-group (hash-groups message* egress-ids task->group-by-fn)
                     leaf* (if (= message message*)
                             leaf
