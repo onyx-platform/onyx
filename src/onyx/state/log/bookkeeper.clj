@@ -33,11 +33,11 @@
                 (.setZkLedgersRootPath zk-root-path))]
      (BookKeeper. conf))))
 
-(def password 
-  (.getBytes "somepass"))
-
 (def digest-type 
   (BookKeeper$DigestType/MAC))
+
+(defn password [peer-opts]
+  (.getBytes (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
 
 ;; TODO: add zk-timeout for bookkeeper
 (defmethod state-extensions/initialise-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
@@ -47,7 +47,7 @@
   (let [bk-client (bookkeeper peer-opts)
         ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
         quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)
-        ledger (create-ledger bk-client ensemble-size quorum-size digest-type password)
+        ledger (create-ledger bk-client ensemble-size quorum-size digest-type (password peer-opts))
         slot-id (state/peer-slot-id event)
         new-ledger-id (.getId ledger)] 
     (>!! outbox-ch
@@ -73,14 +73,15 @@
     (let [w (first (filter #(= window-id (:window/id %)) windows))] 
       ((:window/agg-init w) w))))
 
-(defn playback-ledgers [bk-client state ledger-ids windows]
-  (let [id->log-resolve (into {} 
+(defn playback-ledgers [bk-client peer-opts state ledger-ids windows]
+  (let [pwd (password peer-opts)
+        id->log-resolve (into {} 
                               (map (juxt :window/id :window/log-resolve) 
                                    windows))] 
     (reduce (fn [st ledger-id]
               ;; TODO: Do I need to deal with recovery exception in here?
               ;; It may be better to just let the thing crash and retry
-              (let [lh (open-ledger bk-client ledger-id digest-type password)]
+              (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                 (try
                   (let [last-confirmed (.getLastAddConfirmed lh)
                         _ (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)]
@@ -115,7 +116,7 @@
         bk-client (bookkeeper peer-opts)
         _ (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)]
     (try
-      (playback-ledgers bk-client state previous-ledger-ids windows)
+      (playback-ledgers bk-client peer-opts state previous-ledger-ids windows)
       (finally
         (.close bk-client)))))
 

@@ -195,6 +195,7 @@
    (s/optional-key :onyx.bookkeeper/starting-port) s/Int
    (s/optional-key :onyx.bookkeeper/base-dir) s/Str
    (s/optional-key :onyx.bookkeeper/timeout) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
    (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) s/Int
    (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) s/Int
    (s/optional-key :onyx.bookkeeper/ledger-quorum-size) s/Int

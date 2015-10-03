@@ -19,6 +19,7 @@
    :onyx.bookkeeper/starting-port 3196
    :onyx.bookkeeper/base-dir "/tmp/bookkeeper/"
    :onyx.bookkeeper/timeout 60000 
+   :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
    :onyx.bookkeeper/ledger-id-written-back-off 500
    :onyx.bookkeeper/ledger-ensemble-size 3
    :onyx.bookkeeper/ledger-quorum-size 3
