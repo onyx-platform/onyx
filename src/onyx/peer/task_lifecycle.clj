@@ -617,7 +617,7 @@
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
-                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
+                (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             before-task-start-fn (:onyx.core/compiled-before-task-start-fn pipeline-data)
             pipeline-data (-> pipeline-data
