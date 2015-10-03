@@ -540,7 +540,10 @@
 
 
 (defn resolve-log [pipeline]
-  (assoc pipeline :onyx.core/state-log (state-extensions/initialise-log :atom pipeline)))
+  (assoc pipeline :onyx.core/state-log (if (or (not-empty (:onyx.core/windows pipeline))
+                                               (not-empty (:onyx.core/triggers pipeline))) 
+                                         (state-extensions/initialise-log :bookkeeper pipeline))))
+
 ;; place outside of task-lifecycle for testing persistence
 (def test-entries-log (atom {})) 
 
@@ -660,6 +663,8 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
+      (when-let [state-log (:onyx.core/state-log event)] 
+        (state-extensions/close-log state-log event))
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
