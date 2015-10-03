@@ -542,6 +542,9 @@
                [id (atom [])]) 
              (range 20))))
 
+(defn resolve-log [pipeline]
+  (assoc pipeline :onyx.core/state-log (state-extensions/initialise-log :atom pipeline)))
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring]
@@ -616,9 +619,12 @@
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
 
-            pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)
-            pipeline-data (setup-triggers pipeline-data)
-            pipeline-data (replay-windows-from-log pipeline-data)]
+            before-task-start-fn (:onyx.core/compiled-before-task-start-fn pipeline-data)
+            pipeline-data (-> pipeline-data
+                              before-task-start-fn
+                              setup-triggers
+                              resolve-log
+                              replay-windows-from-log)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
