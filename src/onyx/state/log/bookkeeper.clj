@@ -39,6 +39,8 @@
 (defn password [peer-opts]
   (.getBytes (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
 
+(defrecord BookKeeperLog [client ledger-handle])
+
 ;; TODO: add zk-timeout for bookkeeper
 (defmethod state-extensions/initialise-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
                                                                          onyx.core/job-id onyx.core/task-id
@@ -47,9 +49,9 @@
   (let [bk-client (bookkeeper peer-opts)
         ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
         quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)
-        ledger (create-ledger bk-client ensemble-size quorum-size digest-type (password peer-opts))
+        ledger-handle (create-ledger bk-client ensemble-size quorum-size digest-type (password peer-opts))
         slot-id (state/peer-slot-id event)
-        new-ledger-id (.getId ledger)] 
+        new-ledger-id (.getId ledger-handle)] 
     (>!! outbox-ch
          {:fn :assign-bookkeeper-log-id
           :args {:job-id job-id
@@ -62,7 +64,7 @@
       (info "New ledger id has not been published yet. Backing off.")
       (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))) 
     (info "Ledger id published.")
-    ledger))
+    (->BookKeeperLog bk-client ledger-handle)))
 
 
 (defn default-state 
@@ -108,28 +110,30 @@
             state
             ledger-ids))) 
 
-(defmethod state-extensions/playback-log-entries org.apache.bookkeeper.client.LedgerHandle 
-  [log {:keys [onyx.core/windows onyx.core/replica onyx.core/peer-opts onyx.core/job-id onyx.core/task-id] :as event} state]
+(defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [client] :as log} {:keys [onyx.core/windows onyx.core/replica onyx.core/peer-opts onyx.core/job-id onyx.core/task-id] :as event} state]
   (let [slot-id (state/peer-slot-id event)
         ;; Don't play back the final ledger id because we just created it
         previous-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))
-        bk-client (bookkeeper peer-opts)
-        _ (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)]
-    (try
-      (playback-ledgers bk-client peer-opts state previous-ledger-ids windows)
-      (finally
-        (.close bk-client)))))
+        _ (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)
+        start-time (System/currentTimeMillis)
+        restored-state (playback-ledgers client peer-opts state previous-ledger-ids windows)]
+    (info task-id "restore took:" (float (/ (- (System/currentTimeMillis) start-time) 1000)))
+    restored-state))
 
-(defmethod state-extensions/close-log org.apache.bookkeeper.client.LedgerHandle
-  [log event] 
-  (.close ^LedgerHandle log))
+(defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [client ledger-handle]} event] 
+  (.close ^LedgerHandle ledger-handle)
+  (.close client))
 
-(defmethod state-extensions/store-log-entry org.apache.bookkeeper.client.LedgerHandle 
-  [log event entry]
+(defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [ledger-handle]} event entry]
   (let [start-time (System/currentTimeMillis)]
     (info "Writing entry " entry)
     ;; TODO: make add entry async and use acking
-    (.addEntry ^LedgerHandle log (nippy/freeze entry {}))
+    ;; Interesting post on latency in bookkeeper
+    ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
+    (.addEntry ^LedgerHandle ledger-handle (nippy/freeze entry {}))
     (info "TOOK: " (- (System/currentTimeMillis) start-time)))
   ;; TODO: write out batch end (don't apply until batch end found in others)
   )
