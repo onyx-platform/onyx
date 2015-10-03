@@ -5,7 +5,7 @@
     log-type))
 
 (defmulti close-log 
-  (fn [log]
+  (fn [log event]
     (type log)))
 
 ;; For onyx to implement
