@@ -186,12 +186,18 @@
    (s/optional-key :onyx.peer/retry-start-interval) s/Int
    (s/optional-key :onyx.peer/join-failure-back-off) s/Int
    (s/optional-key :onyx.peer/drained-back-off) s/Int
-   (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
+   (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
    (s/optional-key :onyx.peer/backpressure-check-interval) s/Int
    (s/optional-key :onyx.peer/backpressure-low-water-pct) s/Int
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
+   (s/optional-key :onyx.bookkeeper/starting-port) s/Int
+   (s/optional-key :onyx.bookkeeper/base-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/timeout) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-quorum-size) s/Int
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
