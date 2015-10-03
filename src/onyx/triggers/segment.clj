@@ -24,7 +24,7 @@
         fire? (>= x (apply to-standard-units (:trigger/threshold trigger)))]
     (if fire?
       (swap! (:onyx.triggers/segments event) dissoc id)
-      (swap! (:onyx.triggers/segments event) update-in [id] (fnil inc 0)))
+      (swap! (:onyx.triggers/segments event) update id (fnil inc 0)))
     fire?))
 
 (defmethod api/trigger-teardown :segment
