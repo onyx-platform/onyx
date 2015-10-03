@@ -8,7 +8,7 @@
                :onyx.core/id :peer-id-1
                :onyx.core/task-id :task-id-1
                :onyx.core/replica (atom {:task-slot-ids {:job-1 {:task-id-1 {:peer-id-1 :slot-0}}}})
-               :onyx.core/test-entries-log {:slot-0 (atom [])}}
+               :onyx.core/test-entries-log (atom {:slot-0 (atom [])})}
         log (state-extensions/initialise-log :atom event)]
     (is (= @log [])))) 
 
