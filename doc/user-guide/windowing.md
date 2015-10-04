@@ -163,7 +163,7 @@ The `:average` operation maintains an average over `:window/average-key`. An ini
  :window/type :fixed
  :window/aggregation :onyx.windowing.aggregation/average
  :window/init 0
- :window/max-key :age
+ :window/average-key :age
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
