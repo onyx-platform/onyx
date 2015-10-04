@@ -5,6 +5,7 @@
             [clojure.core.async :refer  [chan go >! <! <!! >!! alts!! close!]]
             [taoensso.nippy :as nippy]
             [onyx.extensions :as extensions]
+            [onyx.monitoring.measurements :refer [emit-latency-value emit-latency]]
             [onyx.state.core :as state]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.log.replica]
@@ -66,20 +67,39 @@
     (info "Ledger id published.")
     (->BookKeeperLog bk-client ledger-handle)))
 
+(defn compress [entry]
+  (nippy/freeze entry {}))
+
+(defn decompress [entry]
+  (nippy/thaw entry))
 
 (defn default-state 
   "Default state function. Resolves window late for perf."
-  [state windows window-id]
+  [state window]
   (if state
     state
-    (let [w (first (filter #(= window-id (:window/id %)) windows))] 
-      ((:window/agg-init w) w))))
+    ((:window/agg-init window) window)))
 
-(defn playback-ledgers [bk-client peer-opts state ledger-ids windows]
-  (let [pwd (password peer-opts)
-        id->log-resolve (into {} 
+(defn playback-windows-extents [state entry windows]
+  (let [id->log-resolve (into {} 
                               (map (juxt :window/id :window/log-resolve) 
                                    windows))] 
+    (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
+              (reduce (fn [state'' [extent entry message-id]]
+                        (update-in state'' 
+                                   [id extent]
+                                   (fn [ext-state] 
+                                     (let [ext-state' (default-state ext-state window)
+                                           apply-fn (id->log-resolve id)] 
+                                       (assert apply-fn (str "Apply fn does not exist for window-id " id))
+                                       (apply-fn ext-state' entry)))))
+                      state'
+                      window-entries)) 
+            state
+            (map list (rest entry) windows))))
+
+(defn playback-ledgers [bk-client peer-opts state ledger-ids windows]
+  (let [pwd (password peer-opts)] 
     (reduce (fn [st ledger-id]
               ;; TODO: Do I need to deal with recovery exception in here?
               ;; It may be better to just let the thing crash and retry
@@ -91,15 +111,9 @@
                       (let [entries (.readEntries lh 0 last-confirmed)] 
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element (.nextElement entries)]
-                            (let [[window-id extent entry] (nippy/thaw (.getEntry element))
-                                  _ (info "Read entry" window-id extent entry)
-                                  st-loop' (update-in st-loop 
-                                                      [window-id extent]
-                                                      (fn [ext-state] 
-                                                        (let [ext-state' (default-state ext-state windows window-id)
-                                                              apply-fn (id->log-resolve window-id)] 
-                                                          (assert apply-fn (str "Apply fn does not exist for window-id " window-id))
-                                                          (apply-fn ext-state' entry))))]
+                            (let [entry-val (decompress (.getEntry element))
+                                  st-loop' (playback-windows-extents st-loop entry-val windows)]
+                              (info "Played back entries for message with id: " (first entry-val))
                               (if (.hasMoreElements entries) 
                                 (recur st-loop' (.nextElement entries))
                                 st-loop')))
@@ -111,15 +125,18 @@
             ledger-ids))) 
 
 (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [client] :as log} {:keys [onyx.core/windows onyx.core/replica onyx.core/peer-opts onyx.core/job-id onyx.core/task-id] :as event} state]
-  (let [slot-id (state/peer-slot-id event)
-        ;; Don't play back the final ledger id because we just created it
-        previous-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))
-        _ (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)
-        start-time (System/currentTimeMillis)
-        restored-state (playback-ledgers client peer-opts state previous-ledger-ids windows)]
-    (info task-id "restore took:" (float (/ (- (System/currentTimeMillis) start-time) 1000)))
-    restored-state))
+  [{:keys [client] :as log} 
+   {:keys [onyx.core/monitoring onyx.core/windows onyx.core/replica 
+           onyx.core/peer-opts onyx.core/job-id onyx.core/task-id] :as event} 
+   state]
+  (emit-latency :window-log-playback 
+                monitoring
+                (fn [] 
+                  (let [slot-id (state/peer-slot-id event)
+                        ;; Don't play back the final ledger id because we just created it
+                        previous-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))]
+                    (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)
+                    (playback-ledgers client peer-opts state previous-ledger-ids windows)))))
 
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle]} event] 
@@ -127,13 +144,13 @@
   (.close client))
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [ledger-handle]} event entry]
+  [{:keys [ledger-handle]} {:keys [onyx.core/monitoring] :as event} entry]
   (let [start-time (System/currentTimeMillis)]
     (info "Writing entry " entry)
     ;; TODO: make add entry async and use acking
     ;; Interesting post on latency in bookkeeper
     ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
-    (.addEntry ^LedgerHandle ledger-handle (nippy/freeze entry {}))
-    (info "TOOK: " (- (System/currentTimeMillis) start-time)))
-  ;; TODO: write out batch end (don't apply until batch end found in others)
-  )
+
+    (.addEntry ^LedgerHandle ledger-handle (compress entry))
+    ;; emit via value so that we can put this call in the call back once we use .addEntryAsync
+    (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time))))

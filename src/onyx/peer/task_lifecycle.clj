@@ -326,31 +326,42 @@
     (swap! window-state 
            (fn [wstate] 
              (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
-               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
+               (info (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
   event)
+
+(defrecord WindowLogEntry [id windows-updates])
 
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
   (when (seq windows)
-    (doseq [w windows]
-      (doseq [msg (mapcat :leaves (:tree results))]
-        (let [window-id (:window/id w)
-              w-range (apply units/to-standard-units (:window/range w))
-              w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-              units (units/standard-units-for (last (:window/range w)))
-              message (update (:message msg) (:window/window-key w) units/coerce-key units)
-              extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
-          (doseq [e extents]
-            (let [f (:window/agg-fn w)
-                  state (init-window-state w (get-in @window-state [window-id e]))
-                  entry (f state w (:message msg))
-                  updated-state ((:window/log-resolve w) state entry)]
-              ;; Need to modify acking for the log storing
-              (state-extensions/store-log-entry state-log event [(:window/id w) e entry])
-              (swap! window-state assoc-in [(:window/id w) e] updated-state)))
-          (doseq [t (:onyx.core/triggers event)]
-            (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
+    (doseq [msg (mapcat :leaves (:tree results))]
+      (let [entry (doall 
+                    (map (fn [w]
+                           (let [window-id (:window/id w)
+                                 w-range (apply units/to-standard-units (:window/range w))
+                                 w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
+                                 units (units/standard-units-for (last (:window/range w)))
+                                 message (:message msg)
+                                 message-coerced (update message (:window/window-key w) units/coerce-key units)
+                                 extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message-coerced)
+                                 extents-entries (doall 
+                                                   (map (fn [e]
+                                                          (let [f (:window/agg-fn w)
+                                                                state (init-window-state w (get-in @window-state [window-id e]))
+                                                                state-transition-entry (f state w message)
+                                                                updated-state ((:window/log-resolve w) state state-transition-entry)]
+                                                            (swap! window-state assoc-in [(:window/id w) e] updated-state)
+                                                            ;; return window extent playback entry
+                                                            [e state-transition-entry]))
+                                                        extents))]
+                             (doseq [t (:onyx.core/triggers event)]
+                               (triggers/fire-trigger! event window-state t {:segment message :context :new-segment}))
+                             extents-entries))
+                         windows))]
+        (info "All entries now " (vec entry))
+        ;; Need to modify acking so it's fully acked only after async stores
+        (state-extensions/store-log-entry state-log event (cons (:id (:message msg)) entry)))))
   event)
 
 (defn write-batch [pipeline event]
