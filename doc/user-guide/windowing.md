@@ -100,7 +100,7 @@ The `:onyx.windowing.aggregation/count` operation counts the number of segments 
 {:window/id :count-segments
  :window/task :identity
  :window/type :fixed
- :window/aggregation :count
+ :window/aggregation :onyx.windowing.aggregation/count
  :window/window-key :event-time
  :window/range [1 :hour]
  :window/doc "Counts segments in one hour fixed windows"}
@@ -114,7 +114,7 @@ The `:sum` operation adds the values of `:window/sum-key` for all segments in th
 {:window/id :sum-ages
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation :onyx.windowing.aggregation/sum
  :window/sum-key :age
  :window/window-key :event-time
  :window/range [1 :hour]
@@ -129,7 +129,7 @@ The `:min` operation retains the minimum value found for `:window/min-key`. An i
 {:window/id :min-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation :onyx.windowing.aggregation/min
  :window/init 100
  :window/min-key :age
  :window/window-key :event-time
@@ -145,7 +145,7 @@ The `:max` operation retains the maximum value found for `:window/max-key`. An i
 {:window/id :max-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation :onyx.windowing.aggregation/max
  :window/init 0
  :window/max-key :age
  :window/window-key :event-time
@@ -161,7 +161,7 @@ The `:average` operation maintains an average over `:window/average-key`. An ini
 {:window/id :max-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation :onyx.windowing.aggregation/average
  :window/init 0
  :window/max-key :age
  :window/window-key :event-time
