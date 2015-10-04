@@ -35,7 +35,8 @@
      peer-backpressure-off
      peer-prepare-join
      peer-notify-join
-     peer-accept-join]
+     peer-accept-join
+     peer-send-bytes]
   extensions/IEmitEvent
   (extensions/registered? [this event-type]
     (get this event-type))
@@ -81,6 +82,7 @@
            :peer-backpressure-off
            :peer-prepare-join
            :peer-notify-join
-           :peer-accept-join)
+           :peer-accept-join
+           :peer-send-bytes)
           monitoring-config))]
     (apply ->CustomMonitoringAgent args)))

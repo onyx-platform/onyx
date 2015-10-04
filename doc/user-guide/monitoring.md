@@ -95,3 +95,4 @@ Event name                         | Keys                             |
 `:peer-prepare-join`               | `:event`, `:id`                  |
 `:peer-notify-join`                | `:event`, `:id`                  |
 `:peer-accept-join`                | `:event`, `:id`                  |
+`:peer-send-bytes`                 | `:event`, `:id`, `:bytes`        |

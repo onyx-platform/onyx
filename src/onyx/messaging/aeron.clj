@@ -382,11 +382,13 @@
     (>!! ch retry-id)))
 
 (defmethod extensions/send-messages AeronConnection
-  [messenger event {:keys [id channel] :as conn-info} batch]
+  [messenger {:keys [onyx.core/task-id onyx.core/monitoring] :as event}
+   {:keys [id channel] :as conn-info} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
     (let [pub-man (get-publication messenger conn-info)
           [len buf] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
+      (extensions/emit monitoring {:event :peer-send-bytes :id task-id :bytes len})
       (pubm/write pub-man buf 0 len))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
