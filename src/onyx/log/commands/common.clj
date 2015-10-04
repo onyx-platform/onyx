@@ -10,7 +10,7 @@
 (defn job->peers [replica]
   (reduce-kv
    (fn [all job tasks]
-     (assoc all job (apply concat (vals tasks))))
+     (assoc all job (reduce into [] (vals tasks))))
    {} (:allocations replica)))
 
 (defn peer->allocated-job [allocations id]
