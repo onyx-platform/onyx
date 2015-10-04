@@ -13,7 +13,7 @@
     (do
       (doseq [reaction (filter :immediate? reactions)]
         (clojure.core.async/>!! outbox-ch reaction))
-      (update-in state [:buffered-outbox] concat (remove :immediate? reactions)))
+      (update state :buffered-outbox into (remove :immediate? reactions)))
     (do
       (doseq [reaction reactions]
         (clojure.core.async/>!! outbox-ch reaction))
@@ -28,6 +28,7 @@
                            :replica replica-atom
                            :peer-replica-view peer-view-atom
                            :log log
+                           :buffered-outbox []
                            :messenger-buffer buffer
                            :messenger messenger
                            :monitoring monitoring
