@@ -125,18 +125,18 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 - all elements in the vector must be Clojure maps
 - allows arbitrary key/values in the map as parameters
 
-| key name             |type       | optional?|
-|----------------------|-----------|----------|
-|`:window/id`          |`keyword`  | no       |
-|`:window/task`        |`keyword`  | no       |
-|`:window/type`        |`string`   | no       |
-|`:window/aggregation` |`string`   | no       |
-|`:window/window-key`  |`string`   | no       |
-|`:window/min-value`   |`int`      | yes      |
-|`:window/range`       |`vector`   | no       |
-|`:window/slide`       |`vector`   | sometimes|
-|`:window/init`        |`string`   | sometimes|
-|`:window/doc`         |`string`   | yes      |
+| key name             |type                 | optional?|
+|----------------------|---------------------|----------|
+|`:window/id`          |`keyword`            | no       |
+|`:window/task`        |`keyword`            | no       |
+|`:window/type`        |`keyword`            | no       |
+|`:window/aggregation` |`vector` or `keyword`| no       |
+|`:window/window-key`  |`keyword`            | no       |
+|`:window/min-value`   |`int`                | yes      |
+|`:window/range`       |`vector`             | no       |
+|`:window/slide`       |`vector`             | sometimes|
+|`:window/init`        |`any`                | sometimes|
+|`:window/doc`         |`string`             | yes      |
 
 `:window/range` and `:window/slide` are values that require Units. See below for a description of Units.
 
