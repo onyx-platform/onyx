@@ -27,7 +27,6 @@
   (is (= (vector peer-id message)
          (read-buf (protocol/build-retry-msg-buf peer-id message)))))
 
-
 (let [peer-id 32000
       acks [(map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"
                        :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
@@ -36,7 +35,7 @@
                        :completion-id #uuid "b57f7be1-f2f9-4d0f-aa02-939b3d48dc23"
                        :ack-val 3323130347050513529})]]
   (is (= (vector peer-id (reverse acks))
-         (read-buf (protocol/build-acker-messages peer-id acks)))))
+         (read-buf (second (protocol/build-acker-messages peer-id acks))))))
 
 (let [peer-id 32765
       message [(map->Leaf {:id #uuid "ac39bc62-8f06-46a0-945e-3a17642a619f"
