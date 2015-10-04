@@ -115,8 +115,8 @@
                     {:lifecycle/task :join-person
                      :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
-    (reset! name-chan (chan (inc names)))
-    (reset! age-chan (chan (inc ages)))
+    (reset! name-chan (chan (inc (count names))))
+    (reset! age-chan (chan (inc (count ages))))
     (reset! out-chan (chan 10000))
 
     (with-test-env [test-env [4 env-config peer-config]]

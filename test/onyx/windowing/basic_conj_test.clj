@@ -153,7 +153,7 @@
         v-peers (onyx.api/start-peers 3 peer-group)]
 
     (reset! in-chan (chan (inc (count input))))
-    (reset! in-chan (chan (sliding-buffer (inc (count input)))))
+    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
     
     (onyx.api/submit-job
      peer-config
