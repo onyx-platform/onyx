@@ -7,15 +7,15 @@
 
 (def n-messages 100)
 
-(def in-chan (chan (inc n-messages)))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -65,10 +65,13 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
+    (reset! in-chan (chan (inc n-messages)))
+    (reset! out-chan (chan (sliding-buffer (inc n-messages))))
+
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
-        (>!! in-chan {:n n}))
-      (>!! in-chan :done)
+        (>!! @in-chan {:n n}))
+      (>!! @in-chan :done)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog
@@ -76,7 +79,7 @@
                             :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [results (take-segments! out-chan)
+      (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n x}) (range n-messages)))]
         (is (= expected (set (butlast results))))
         (is (= :done (last results)))))))

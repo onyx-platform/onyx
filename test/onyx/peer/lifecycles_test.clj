@@ -37,15 +37,15 @@
   (swap! started-task-counter inc)
   {})
 
-(def in-chan (chan (inc n-messages)))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def calls
   {:lifecycle/start-task? start-task?
@@ -102,11 +102,10 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :all
-                     :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]
+                     :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]]
 
-
-    ]
-
+    (reset! in-chan (chan (inc n-messages)))
+    (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
     (with-test-env [test-env [3 env-config peer-config]]
       (onyx.api/submit-job peer-config
@@ -116,12 +115,12 @@
                             :task-scheduler :onyx.task-scheduler/balanced})
 
       (doseq [n (range n-messages)]
-        (>!! in-chan {:n n}))
+        (>!! @in-chan {:n n}))
 
-      (>!! in-chan :done)
-      (close! in-chan)
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
-      (let [results (take-segments! out-chan)
+      (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set (butlast results))))
         (is (= :done (last results)))))

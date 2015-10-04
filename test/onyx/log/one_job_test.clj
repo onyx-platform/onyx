@@ -11,15 +11,15 @@
 
 (use-fixtures :once schema.test/validate-schemas)
 
-(def in-chan (chan 100))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer 100)))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -67,6 +67,9 @@
                      :lifecycle/calls :onyx.log.one-job-test/out-calls}
                     {:lifecycle/task :c
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+
+        _ (reset! in-chan (chan 100))
+        _ (reset! out-chan (chan (sliding-buffer 100)))
 
         _ (onyx.api/submit-job peer-config
                                {:workflow [[:a :b] [:b :c]]

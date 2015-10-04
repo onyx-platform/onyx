@@ -7,15 +7,15 @@
 
 (def n-messages 1000)
 
-(def in-chan (chan (inc n-messages)))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls {:lifecycle/before-task-start inject-in-ch})
 
@@ -25,7 +25,7 @@
   (assoc segment :n (inc n)))
 
 (defn my-identity [segment]
-    segment)
+  segment)
 
 (deftest test-multiple-ackers
   (let [id (java.util.UUID/randomUUID)
@@ -71,9 +71,12 @@
                         {:lifecycle/task :out
                          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
+        (reset! in-chan (chan (inc n-messages)))
+        (reset! out-chan (chan (sliding-buffer (inc n-messages))))
+
         (doseq [n (range n-messages)]
-          (>!! in-chan {:n n}))
-        (>!! in-chan :done)
+          (>!! @in-chan {:n n}))
+        (>!! @in-chan :done)
 
         (onyx.api/submit-job
           peer-config
@@ -86,7 +89,7 @@
            :acker/exempt-output-tasks? true
            :acker/exempt-tasks [:inc]})
 
-        (let [results (doall (repeatedly (inc n-messages) (fn [] (<!! out-chan))))
+        (let [results (doall (repeatedly (inc n-messages) (fn [] (<!! @out-chan))))
               expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
           (is (= expected (set (butlast results))))
           (is (= :done (last results))))))))

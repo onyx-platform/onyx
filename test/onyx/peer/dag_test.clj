@@ -7,17 +7,17 @@
 
 (def n-messages 15000)
 
-(def a-chan (chan (inc n-messages)))
+(def a-chan (atom nil))
 
-(def b-chan (chan (inc n-messages)))
+(def b-chan (atom nil))
 
-(def c-chan (chan (inc n-messages)))
+(def c-chan (atom nil))
 
-(def j-chan (chan 500000))
+(def j-chan (atom nil))
 
-(def k-chan (chan 500000))
+(def k-chan (atom nil))
 
-(def l-chan (chan 500000))
+(def l-chan (atom nil))
 
 (def d identity)
 
@@ -32,22 +32,22 @@
 (def i identity)
 
 (defn inject-a-ch [event lifecycle]
-  {:core.async/chan a-chan})
+  {:core.async/chan @a-chan})
 
 (defn inject-b-ch [event lifecycle]
-  {:core.async/chan b-chan})
+  {:core.async/chan @b-chan})
 
 (defn inject-c-ch [event lifecycle]
-  {:core.async/chan c-chan})
+  {:core.async/chan @c-chan})
 
 (defn inject-j-ch [event lifecycle]
-  {:core.async/chan j-chan})
+  {:core.async/chan @j-chan})
 
 (defn inject-k-ch [event lifecycle]
-  {:core.async/chan k-chan})
+  {:core.async/chan @k-chan})
 
 (defn inject-l-ch [event lifecycle]
-  {:core.async/chan l-chan})
+  {:core.async/chan @l-chan})
 
 (def a-calls
   {:lifecycle/before-task-start inject-a-ch})
@@ -203,28 +203,36 @@
                     {:lifecycle/task :L
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
+    (reset! a-chan (chan (inc n-messages)))
+    (reset! b-chan (chan (inc n-messages)))
+    (reset! c-chan (chan (inc n-messages)))
+
+    (reset! j-chan (chan 500000))
+    (reset! k-chan (chan 500000))
+    (reset! l-chan (chan 500000))
+
     (with-test-env [test-env [12 env-config peer-config]]
       (doseq [x a-segments]
-        (>!! a-chan x))
+        (>!! @a-chan x))
 
       (doseq [x b-segments]
-        (>!! b-chan x))
+        (>!! @b-chan x))
 
       (doseq [x c-segments]
-        (>!! c-chan x))
+        (>!! @c-chan x))
 
-      (>!! a-chan :done)
-      (>!! b-chan :done)
-      (>!! c-chan :done)
+      (>!! @a-chan :done)
+      (>!! @b-chan :done)
+      (>!! @c-chan :done)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
                             :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [j-results (take-segments! j-chan)
-            k-results (take-segments! k-chan)
-            l-results (take-segments! l-chan)]
+      (let [j-results (take-segments! @j-chan)
+            k-results (take-segments! @k-chan)
+            l-results (take-segments! @l-chan)]
         (is (= :done (last j-results)))
         (is (= :done (last k-results)))
         (is (= :done (last l-results)))
