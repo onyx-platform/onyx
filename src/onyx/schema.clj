@@ -267,7 +267,6 @@
 (def LogEntry
   {:fn s/Keyword
    :args {s/Any s/Any}
-   (s/optional-key :immediate?) s/Bool
    (s/optional-key :message-id) s/Int
    (s/optional-key :created-at) s/Int})
 

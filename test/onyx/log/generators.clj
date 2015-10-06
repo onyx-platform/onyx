@@ -13,15 +13,6 @@
 
 (def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
-(defn bump-forward-immediates
-  "If peer hasn't finished joining yet, bump all their
-  log entries to the head of their queue. Order is otherwise stable."
-  [entries peers peer-id]
-  (if ((set peers) peer-id)
-    entries
-    (vec (concat (filter :immediate? entries)
-                 (remove :immediate? entries)))))
-
 (defn peerless-entry? [log-entry]
   (#{:submit-job :kill-job :gc} (:fn log-entry)))
 
@@ -83,8 +74,7 @@
                                            (fn [queue]
                                              (-> queue
                                                  vec
-                                                 (into reactions)
-                                                 (bump-forward-immediates (:peers replica) peer-id))))))
+                                                 (into reactions))))))
                           entries
                           new)]
     (vector new-replica diff unapplied)))
@@ -113,9 +103,7 @@
   [replica-state-gen]
   (gen/bind replica-state-gen
             (fn [state]
-              ; we only play back log messages from peers who have
-              ; joined, or whose entry is :prepare-join-cluster
-              ; because non-immediate reactions are buffered til join
+              ;; we only play back log messages from peers who have joined
               (let [replica (:replica state)
                     peerless-queues (->> (:entries state)
                                          (filter (fn [[queue-id {:keys [predicate queue]}]]
@@ -128,8 +116,7 @@
                     selectable-peers (->> (:entries state)
                                           (filter (fn [[peer {:keys [queue]}]]
                                                     (let [entry (first queue)]
-                                                      (or (:immediate? entry)
-                                                          (contains? joined-peers peer)))))
+                                                      (contains? joined-peers peer))))
                                           (map key)
                                           set)
                     selectable-queues (into selectable-peers peerless-queues)]
@@ -166,7 +153,6 @@
 
 (defn build-join-entry [peer-id]
   {:fn :prepare-join-cluster
-   :immediate? true
    :args {:peer-site (extensions/peer-site messenger)
           :joiner peer-id}})
 

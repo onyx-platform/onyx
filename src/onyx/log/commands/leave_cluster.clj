@@ -53,8 +53,7 @@
   (when (or (= (:id state) (get (:prepared old) (:id args)))
             (= (:id state) (get (:accepted old) (:id args))))
     [{:fn :abort-join-cluster
-      :args {:id (:id state)}
-      :immediate? true}]))
+      :args {:id (:id state)}}]))
 
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
   [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
