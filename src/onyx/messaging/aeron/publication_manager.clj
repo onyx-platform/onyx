@@ -20,7 +20,7 @@
     (let [pub (:publication publication-manager)] 
       (loop [] 
         (when-let [msg (<!! pending-ch)]
-          (while (let [result ^long (.offer pub (:buf msg) (:start msg) (:end msg))]
+          (while (let [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
                    (or (= result Publication/BACK_PRESSURED)
                        (= result Publication/NOT_CONNECTED)))
             ;; idle for different amounts of time depending on whether backpressuring or not?
@@ -50,9 +50,13 @@
   (stop [this]
     (cleanup-fn)
     (future-cancel (:write-fut this))
-    (.close ^Publication publication)
-    (.close ^Aeron connection)
     (close! pending-ch)
+    (try (.close ^Publication publication)
+         (catch Throwable t 
+           (info "Could not close publication:" t)))
+    (try (.close ^Aeron connection)
+         (catch Throwable t 
+           (info "Could not close connection" t)))
     this)
 
   (connect [this]

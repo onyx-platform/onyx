@@ -1,3 +1,23 @@
+#### 0.7.10
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.9
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.8
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.7
+
+- Improve fault tolerance aeron connection reaping (GC)
+
+#### 0.7.6
+
+- Fixed performance regression caused by reflection in Aeron messaging layer.
+
 #### 0.7.5
 
 - No functional changes in this release. We had a build problem that wasn't worth fixing across all 0.7.4 releases. Fixed build and trying again under alias 0.7.5

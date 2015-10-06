@@ -87,17 +87,17 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 
 ```
 
-Notice that all lifecycle functions return maps exception `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task-start`.
+Notice that all lifecycle functions return maps except `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task-start`.
 
 Next, define a map that wires all these functions together by mapping predefined keywords to the functions:
 
 ```clojure
 (def calls
   {:lifecycle/start-task? start-task?
-   :lifecycle/before-task-start before-task
+   :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
    :lifecycle/after-batch after-batch
-   :lifecycle/after-task-stop after-task
+   :lifecycle/after-task-stop after-task-stop
    :lifecycle/after-ack-segment after-ack-segment
    :lifecycle/after-retry-segment after-retry-segment})
 ```
