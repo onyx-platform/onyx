@@ -132,7 +132,7 @@
   (let [all (into #{} (concat (map first workflow) (map second workflow)))]
     (doseq [entry flow-schema]
       (let [from (:flow/from entry)]
-        (when-not (some #{from} all)
+        (when-not (or (some #{from} all) (= from :all))
           (throw (ex-info ":flow/from value doesn't name a node in the workflow"
                           {:entry entry}))))
 
