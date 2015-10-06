@@ -83,6 +83,9 @@
 (defn compile-before-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
 
+(defn compile-after-read-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-read-batch))
+
 (defn compile-after-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 

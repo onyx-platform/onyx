@@ -11,6 +11,7 @@ Lifecycles are a feature that allow you to control code that executes at particu
   - [Before task set up](#before-task-set-up)
   - [Before task execution](#before-task-execution)
   - [Before segment batch start](#before-segment-batch-start)
+  - [After read segment batch](#after-read-segment-batch)
   - [After segment batch start](#after-segment-batch-start)
   - [After task execution](#after-task-execution)
 - [Example](#example)
@@ -35,6 +36,10 @@ A function that takes two arguments - an event map, and the matching lifecycle m
 
 A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called prior to receiving a batch of segments from the reading function.
 
+#### After read segment batch
+
+A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been read by the peer. The segments are available in the event map by the key `:onyx.core/batch`.
+
 #### After segment batch start
 
 A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called after all messages have been written and acknowledged.
@@ -54,7 +59,7 @@ A function that takes four arguments - an event map, a message id, the return of
 
 ### Example
 
-Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 5 functions for the 5 hooks:
+Let's work with an example to show how lifecycles work. Suppose you want to print out a message at all the possible lifecycle hooks. You'd start by defining 6 functions for the 6 hooks:
 
 ```clojure
 (ns my.ns)
@@ -73,6 +78,10 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 
 (defn before-batch [event lifecycle]
   (println "Executing once before each batch.")
+  {})
+
+(defn after-read-batch [event lifecycle]
+  (printn "Executing once after this batch has been read.")
   {})
 
 (defn after-batch [event lifecycle]
@@ -102,7 +111,7 @@ Next, define a map that wires all these functions together by mapping predefined
    :lifecycle/after-retry-segment after-retry-segment})
 ```
 
-Each of these 5 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
+Each of these 6 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
 
 Finally, create a lifecycle data structure by pointing `:lifecycle/calls` to the fully qualified namespaced keyword that represents the calls map that we just defined. Pass it to your `onyx.api/submit-job` call:
 

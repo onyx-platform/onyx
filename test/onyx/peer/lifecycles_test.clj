@@ -29,6 +29,10 @@
   (swap! call-log (fn [call-log] (conj call-log :batch-before)))
   {})
 
+(defn after-read-batch [event lifecycle]
+  (swap! call-log (fn [call-log] (conj call-log :batch-after-read)))
+  {})
+
 (defn after-batch [event lifecycle]
   (swap! call-log (fn [call-log] (conj call-log :batch-after)))
   {})
@@ -51,6 +55,7 @@
   {:lifecycle/start-task? start-task?
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
+   :lifecycle/after-read-batch after-read-batch
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop})
 
@@ -130,16 +135,22 @@
     (is (= [:task-started
             :task-before
             :batch-before
+            :batch-after-read
             :batch-after ; 1
             :batch-before
+            :batch-after-read
             :batch-after ; 2
             :batch-before
+            :batch-after-read
             :batch-after ; 3
             :batch-before
+            :batch-after-read
             :batch-after ; 4
             :batch-before
+            :batch-after-read
             :batch-after ; 5
             :batch-before
+            :batch-after-read
             :batch-after
             :task-after] 
            @call-log))

@@ -87,6 +87,7 @@
    (s/optional-key :lifecycle/start-task?) Function
    (s/optional-key :lifecycle/before-task-start) Function
    (s/optional-key :lifecycle/before-batch) Function
+   (s/optional-key :lifecycle/after-read-batch) Function
    (s/optional-key :lifecycle/after-batch) Function
    (s/optional-key :lifecycle/after-task-stop) Function
    (s/optional-key :lifecycle/after-ack-segment) Function
