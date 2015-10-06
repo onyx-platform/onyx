@@ -44,6 +44,7 @@ onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dur
 <img src="doc/images/cognician.png" height"30%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <img src="doc/images/indaba.png" height"40%" width="40%">
+<img src="doc/images/think-topic.png" height="40%" width="30%">
 
 ### Quick Start Guide
 
