@@ -6,6 +6,7 @@
             [onyx.messaging.aeron.publication-manager :as pubm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
+            [onyx.types :refer [->MonitorEventBytes]]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
@@ -387,14 +388,15 @@
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
     (let [pub-man (get-publication messenger conn-info)
           [len buf] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
+      (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes len))
       (pubm/write pub-man buf 0 len))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
-  [messenger event {:keys [id channel] :as conn-info} acks]
-  (if ((:short-circuitable? messenger) channel)
-    (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
+  [messenger event conn-info acks]
+  (if ((:short-circuitable? messenger) (:channel conn-info))
+    (ack-segments-short-circuit (short-circuit-ch messenger (:id conn-info) :acking-ch) acks)
     (let [pub-man (get-publication messenger conn-info)
-          [len buf] (protocol/build-acker-messages id acks)]
+          [len buf] (protocol/build-acker-messages (:id conn-info) acks)]
       (pubm/write pub-man buf 0 len))))
 
 (defmethod extensions/internal-complete-message AeronConnection
