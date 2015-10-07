@@ -16,6 +16,9 @@
    {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
 
 (defn write-batch
+  ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state
+            onyx.core/replica onyx.core/peer-replica-view onyx.core/serialized-task] :as event}]
+   (write-batch event replica peer-replica-view state messenger (:egress-ids serialized-task)))
   ([event replica peer-replica-view state messenger egress-tasks]
    (let [segments (:segments (:onyx.core/results event))]
      (when-not (empty? segments)
@@ -29,11 +32,7 @@
                      (when-let [link (operation/peer-link replica-val state event target)]
                        (onyx.extensions/send-messages messenger event link segs)))))
                grouped))))
-   {}) 
-
-  ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state 
-            onyx.core/replica onyx.core/peer-replica-view onyx.core/serialized-task] :as event}]
-   (write-batch event replica peer-replica-view state messenger (:egress-ids serialized-task))))
+   {}))
 
 (defrecord Function [replica peer-replica-view state messenger egress-tasks]
   p-ext/Pipeline

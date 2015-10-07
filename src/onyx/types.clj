@@ -1,5 +1,8 @@
 (ns onyx.types)
 
+
+(defrecord Event [monitoring metrics])
+
 (defrecord Leaf [message id acker-id completion-id ack-val hash-group route])
 
 (defn input [id message]
@@ -27,5 +30,7 @@
 (defrecord MonitorEvent [event])
 
 (defrecord MonitorEventLatency [event latency])
+
+(defrecord MonitorEventBytes [event bytes])
 
 (defrecord MonitorEventLatencyBytes [event latency bytes])

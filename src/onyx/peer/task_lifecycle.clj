@@ -19,7 +19,7 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count!]]
+              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.state.log.atom]
@@ -644,7 +644,7 @@
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
-                           :onyx.core/monitoring monitoring
+                           :onyx.core/monitoring (assoc monitoring :task-id task-id :job-id job-id :id id :task task)
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
                            :onyx.core/task-kill-ch task-kill-ch
