@@ -83,7 +83,7 @@
         (let [id (get-uuid buf offset)
               completion-id (get-uuid buf (unchecked-add offset 16))
               ack-val (.getLong buf (unchecked-add offset 32))]
-          (recur (conj messages (->Ack id completion-id ack-val (atom 1) nil))
+          (recur (conj messages (->Ack id completion-id ack-val nil nil))
                  (inc cnt)
                  (unchecked-add offset 40))))))) 
 
@@ -100,7 +100,7 @@
   (let [id (get-uuid buf offset)
         completion-id (get-uuid buf (unchecked-add offset 16))
         ack-val (.getLong buf (unchecked-add offset 32))]
-    (->Ack id completion-id ack-val (atom 1) nil)))
+    (->Ack id completion-id ack-val nil nil)))
 
 (defn read-completion [^UnsafeBuffer buf ^long offset]
   (get-uuid buf offset))
