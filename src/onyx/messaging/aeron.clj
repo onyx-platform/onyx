@@ -121,12 +121,17 @@
         peer-id (protocol/read-vpeer-id buffer offset)
         offset (unchecked-add offset protocol/short-size)]
     (cond (= msg-type protocol/ack-msg-id)
+          (let [ack (protocol/read-acker-message buffer offset)]
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+              (>!! (:acking-ch chs) ack)))
+
+          (= msg-type protocol/batched-ack-msg-id)
           (let [acks (protocol/read-acker-messages buffer offset)]
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
               (let [acking-ch (:acking-ch chs)]
                 (run! (fn [ack]
                         (>!! acking-ch ack))
-                    acks)))) 
+                      acks)))) 
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset)]
@@ -367,11 +372,14 @@
             (>!! ch segment))
           batch)))
 
+(defn ack-segment-short-circuit [ch ack]
+  (when ch
+    (>!! ch ack))) 
+
 (defn ack-segments-short-circuit [ch acks]
   (when ch
-    (run! (fn [ack]
-            (>!! ch ack))
-          acks))) 
+    (doseq [ack acks]
+      (>!! ch ack))))
 
 (defn complete-message-short-circuit [ch completion-id]
   (when ch
@@ -389,13 +397,22 @@
           buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
       (pubm/write pub-man buf 0 (.capacity buf)))))
 
+(defmethod extensions/internal-ack-segment AeronConnection
+  [messenger event {:keys [id channel] :as conn-info} ack]
+  (if ((:short-circuitable? messenger) channel)
+    (ack-segment-short-circuit (short-circuit-ch messenger id :acking-ch) ack)
+    (let [pub-man (get-publication messenger conn-info)]
+      (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
+        (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
+
 (defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [id channel] :as conn-info} acks]
   (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
-    (let [pub-man (get-publication messenger conn-info)
-          buf ^UnsafeBuffer (protocol/build-acker-messages id acks)]
-      (pubm/write pub-man buf 0 (.capacity buf)))))
+    (let [pub-man (get-publication messenger conn-info)]
+      (doseq [ack acks]
+        (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
+          (pubm/write pub-man buf 0 protocol/ack-msg-length))))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]

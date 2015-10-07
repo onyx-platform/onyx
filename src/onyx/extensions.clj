@@ -62,6 +62,9 @@
 
 (defmulti close-peer-connection (fn [messenger event link] (type messenger)))
 
+(defmulti internal-ack-segment (fn [messenger event peer-link ack]
+                                  (type messenger)))
+
 (defmulti internal-ack-segments (fn [messenger event peer-link acks]
                                   (type messenger)))
 
