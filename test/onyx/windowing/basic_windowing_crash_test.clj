@@ -177,7 +177,7 @@
           :onyx/fn ::identity-mod-id
           :onyx/group-by-key :age ;; irrelevant because only one peer
           :onyx/restart-pred-fn ::restartable?
-          :window/unique-key :id
+          :onyx/uniqueness-key :id
           :onyx/min-peers 1
           :onyx/max-peers 1
           :onyx/flux-policy :recover ;; should only recover if possible?

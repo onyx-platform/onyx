@@ -36,6 +36,7 @@
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size (s/pred pos? 'pos?)
+   (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
