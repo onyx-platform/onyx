@@ -20,12 +20,22 @@
   (fn [log event state]
     (type log)))
 
-(defmulti store-seen-ids 
-  "Store seen ids in a log. Ideally these will be timestamped for auto expiry"
-  (fn [log event seen-ids]
-    (type log)))
+(defmulti initialise-filter 
+  "Initialises a filter"
+  (fn [filter-type event]
+    filter-type))
 
-(defmulti playback-seen-ids 
-  "Read seen ids from a log"
-  (fn [log event bucket-state apply-fn]
-    (type log)))
+(defmulti apply-filter-id 
+  "Read applies a filter id to a filter state"
+  (fn [filter-state event id]
+    (type filter-state)))
+
+(defmulti filter?
+  "Has an id been seen before?"
+  (fn [filter-state event id]
+    (type filter-state)))
+
+(defmulti close-filter
+  "Closes a filter"
+  (fn [filter-state event]
+    (type filter-state)))

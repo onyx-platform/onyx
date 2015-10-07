@@ -330,38 +330,43 @@
                replayed-state))))
   event)
 
-(defrecord WindowLogEntry [id windows-updates])
-
 (defn assign-windows
-  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
-  (when (seq windows)
-    (doseq [msg (mapcat :leaves (:tree results))]
-      (let [entry (doall 
-                    (map (fn [w]
-                           (let [window-id (:window/id w)
-                                 w-range (apply units/to-standard-units (:window/range w))
-                                 w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-                                 units (units/standard-units-for (last (:window/range w)))
-                                 message (:message msg)
-                                 message-coerced (update message (:window/window-key w) units/coerce-key units)
-                                 extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message-coerced)
-                                 extents-entries (doall 
-                                                   (map (fn [e]
-                                                          (let [f (:window/agg-fn w)
-                                                                state (init-window-state w (get-in @window-state [window-id e]))
-                                                                state-transition-entry (f state w message)
-                                                                updated-state ((:window/log-resolve w) state state-transition-entry)]
-                                                            (swap! window-state assoc-in [(:window/id w) e] updated-state)
-                                                            ;; return window extent playback entry
-                                                            [e state-transition-entry]))
-                                                        extents))]
-                             (doseq [t (:onyx.core/triggers event)]
-                               (triggers/fire-trigger! event window-state t {:segment message :context :new-segment}))
-                             extents-entries))
-                         windows))]
-        (info "All entries now " (vec entry))
-        ;; Need to modify acking so it's fully acked only after async stores
-        (state-extensions/store-log-entry state-log event (cons (:id (:message msg)) entry)))))
+  [{:keys [onyx.core/windows onyx.core/task-map onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
+  (let [id-key (:window/uniqueness-key task-map)] 
+    (when (seq windows)
+      (doseq [msg (mapcat :leaves (:tree results))]
+        (let [message (:message msg)
+              unique-id (if id-key 
+                          (get message id-key))] 
+          (if (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))
+            (info "Nothing to be done. Seen" unique-id "previously")
+            (let [entry (doall 
+                          (map (fn [w]
+                                 (let [window-id (:window/id w)
+                                       w-range (apply units/to-standard-units (:window/range w))
+                                       w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
+                                       units (units/standard-units-for (last (:window/range w)))
+                                       message (:message msg)
+                                       message-coerced (update message (:window/window-key w) units/coerce-key units)
+                                       extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message-coerced)
+                                       extents-entries (doall 
+                                                         (map (fn [e]
+                                                                (let [f (:window/agg-fn w)
+                                                                      state (init-window-state w (get-in @window-state [window-id e]))
+                                                                      state-transition-entry (f state w message)
+                                                                      new-state ((:window/log-resolve w) state state-transition-entry)]
+                                                                  (swap! window-state assoc-in [(:window/id w) e] new-state)
+                                                                  ;; return window extent playback entry
+                                                                  [e state-transition-entry]))
+                                                              extents))]
+                                   (doseq [t (:onyx.core/triggers event)]
+                                     (triggers/fire-trigger! event window-state t {:segment message :context :new-segment}))
+                                   extents-entries))
+                               windows))]
+              (info "All entries now " (vec entry))
+              ;; Need to modify acking so it's fully acked only after async stores
+              (state-extensions/store-log-entry state-log event (cons unique-id entry))
+              (swap! window-state update :filter state-extensions/apply-filter-id event unique-id)))))))
   event)
 
 (defn write-batch [pipeline event]
@@ -529,7 +534,6 @@
   [{:keys [inbound-ch] :as messenger-buffer}]
   (while (first (alts!! [inbound-ch] :default false))))
 
-(defrecord TaskState [timeout-pool links])
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -550,13 +554,23 @@
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
 
 
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
+
 (defn resolve-log [pipeline]
-  (assoc pipeline :onyx.core/state-log (if (or (not-empty (:onyx.core/windows pipeline))
-                                               (not-empty (:onyx.core/triggers pipeline))) 
+  (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
                                          (state-extensions/initialise-log :bookkeeper pipeline))))
 
-;; place outside of task-lifecycle for testing persistence
-(def test-entries-log (atom {})) 
+
+(defrecord TaskState [timeout-pool links])
+(defrecord WindowState [filter state])
+
+(defn resolve-window-state [pipeline]
+  (assoc pipeline :onyx.core/window-state (if (windowed-task? pipeline) 
+                                            (atom (->WindowState (state-extensions/initialise-filter :set pipeline) 
+                                                                 {})))))
+
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -620,9 +634,7 @@
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
-                           :onyx.core/state state
-                           :onyx.core/test-entries-log test-entries-log
-                           :onyx.core/window-state (atom {})}
+                           :onyx.core/state state}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
@@ -634,9 +646,11 @@
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             before-task-start-fn (:onyx.core/compiled-before-task-start-fn pipeline-data)
+
             pipeline-data (-> pipeline-data
                               before-task-start-fn
                               setup-triggers
+                              resolve-window-state
                               resolve-log
                               replay-windows-from-log)]
 
@@ -675,6 +689,10 @@
     (when-let [event (:pipeline-data component)]
       (when-let [state-log (:onyx.core/state-log event)] 
         (state-extensions/close-log state-log event))
+
+      (when-let [window-state (:onyx.core/window-state event)] 
+        (state-extensions/close-filter (:filter @window-state) event))
+
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))

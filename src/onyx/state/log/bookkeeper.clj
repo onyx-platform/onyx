@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [com.stuartsierra.component :as component]
             [clojure.core.async :refer  [chan go >! <! <!! >!! alts!! close!]]
-            [taoensso.nippy :as nippy]
+            [onyx.compression.nippy :as nippy]
             [onyx.extensions :as extensions]
             [onyx.monitoring.measurements :refer [emit-latency-value emit-latency]]
             [onyx.state.core :as state]
@@ -67,12 +67,6 @@
     (info "Ledger id published.")
     (->BookKeeperLog bk-client ledger-handle)))
 
-(defn compress [entry]
-  (nippy/freeze entry {}))
-
-(defn decompress [entry]
-  (nippy/thaw entry))
-
 (defn default-state 
   "Default state function. Resolves window late for perf."
   [state window]
@@ -98,7 +92,7 @@
             state
             (map list (rest entry) windows))))
 
-(defn playback-ledgers [bk-client peer-opts state ledger-ids windows]
+(defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
   (let [pwd (password peer-opts)] 
     (reduce (fn [st ledger-id]
               ;; TODO: Do I need to deal with recovery exception in here?
@@ -111,9 +105,13 @@
                       (let [entries (.readEntries lh 0 last-confirmed)] 
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element (.nextElement entries)]
-                            (let [entry-val (decompress (.getEntry element))
-                                  st-loop' (playback-windows-extents st-loop entry-val windows)]
-                              (info "Played back entries for message with id: " (first entry-val))
+                            (let [entry-val (nippy/window-log-decompress (.getEntry element))
+                                  unique-id (first entry-val)
+                                  st-loop' (let [st (playback-windows-extents st-loop entry-val windows)]
+                                             (if unique-id
+                                               (update st :filter state-extensions/apply-filter-id event unique-id)
+                                               st))] 
+                              (info "Played back entries for message with id: " unique-id)
                               (if (.hasMoreElements entries) 
                                 (recur st-loop' (.nextElement entries))
                                 st-loop')))
@@ -126,7 +124,7 @@
 
 (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client] :as log} 
-   {:keys [onyx.core/monitoring onyx.core/windows onyx.core/replica 
+   {:keys [onyx.core/monitoring onyx.core/replica 
            onyx.core/peer-opts onyx.core/job-id onyx.core/task-id] :as event} 
    state]
   (emit-latency :window-log-playback 
@@ -134,9 +132,9 @@
                 (fn [] 
                   (let [slot-id (state/peer-slot-id event)
                         ;; Don't play back the final ledger id because we just created it
-                        previous-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))]
-                    (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" previous-ledger-ids)
-                    (playback-ledgers client peer-opts state previous-ledger-ids windows)))))
+                        prev-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))]
+                    (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" prev-ledger-ids)
+                    (playback-ledgers client peer-opts state prev-ledger-ids event)))))
 
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle]} event] 
@@ -151,6 +149,6 @@
     ;; Interesting post on latency in bookkeeper
     ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
 
-    (.addEntry ^LedgerHandle ledger-handle (compress entry))
+    (.addEntry ^LedgerHandle ledger-handle (nippy/window-log-compress entry))
     ;; emit via value so that we can put this call in the call back once we use .addEntryAsync
     (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time))))

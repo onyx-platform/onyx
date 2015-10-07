@@ -37,12 +37,5 @@
             state 
             @log)))
 
-(defmethod state-extensions/store-seen-ids clojure.lang.Atom [log _ seen-ids]
-  (swap! log into seen-ids))
-
-(defmethod state-extensions/playback-seen-ids clojure.lang.Atom [seen-log _ bucket-state apply-fn]
-  bucket-state
-  #_(reduce apply-fn bucket-state @seen-log))
-
 (defmethod state-extensions/close-log clojure.lang.Atom
   [log event])
