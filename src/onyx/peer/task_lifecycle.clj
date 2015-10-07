@@ -24,6 +24,7 @@
               [onyx.interop]
               [onyx.state.log.atom]
               [onyx.state.log.bookkeeper]
+              [onyx.state.filter.set]
               [onyx.state.core :as state]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
