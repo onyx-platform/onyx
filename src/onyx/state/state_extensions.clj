@@ -12,7 +12,7 @@
 ;; We can implement log storage for Kafka and maybe ZK (if small data is used and we gc)
 (defmulti store-log-entry 
   "Store state update [op k v] entries in a log"
-  (fn [log event entry]
+  (fn [log event ack entry]
     (type log)))
 
 (defmulti playback-log-entries 

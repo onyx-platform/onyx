@@ -7,12 +7,14 @@
             [onyx.extensions :as extensions]
             [onyx.monitoring.measurements :refer [emit-latency-value emit-latency]]
             [onyx.state.core :as state]
+            [onyx.peer.operation :as operation]
             [onyx.state.state-extensions :as state-extensions]
+            [onyx.types :refer [inc-count! dec-count!]]
             [onyx.log.replica]
             [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default defaults]])
-  (:import [org.apache.bookkeeper.client LedgerHandle BookKeeper BookKeeper$DigestType]
+  (:import [org.apache.bookkeeper.client LedgerHandle BookKeeper BookKeeper$DigestType AsyncCallback$AddCallback]
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
@@ -141,14 +143,26 @@
   (.close ^LedgerHandle ledger-handle)
   (.close client))
 
-(defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [ledger-handle]} {:keys [onyx.core/monitoring] :as event} entry]
-  (let [start-time (System/currentTimeMillis)]
-    (info "Writing entry " entry)
-    ;; TODO: make add entry async and use acking
-    ;; Interesting post on latency in bookkeeper
-    ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
+(def HandleWriteCallback
+  (reify AsyncCallback$AddCallback
+    (addComplete [this rc lh entry-id {:keys [event ack start-time]}]
+      (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger]} event] 
+        (when (dec-count! ack)
+          (let [link (operation/peer-link @replica state event (:completion-id ack))]
+            (info "Write call back ack")
+            (extensions/internal-ack-segment messenger event link ack)))
+        (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time))))))
 
-    (.addEntry ^LedgerHandle ledger-handle (nippy/window-log-compress entry))
-    ;; emit via value so that we can put this call in the call back once we use .addEntryAsync
-    (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time))))
+(defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [ledger-handle]} event ack entry]
+  (info "Writing entry " entry)
+  ;; Interesting post on latency in bookkeeper
+  ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
+  (inc-count! ack)
+  (.asyncAddEntry ^LedgerHandle ledger-handle 
+                  (nippy/window-log-compress entry)
+                  HandleWriteCallback
+                  {:event event :ack ack :start-time (System/currentTimeMillis)})
+  
+  (info "Made async call")
+  )

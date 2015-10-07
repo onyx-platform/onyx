@@ -19,7 +19,7 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent]]
+              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count!]]
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.state.log.atom]
@@ -176,7 +176,7 @@
                                 retries (:retries accumulated)
                                 ret (add-from-leaves segments retries event result egress-ids
                                                      task->group-by-fn flow-conditions)
-                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)
+                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) (atom 1) nil)
                                 acks (conj! (:acks accumulated) new-ack)]
                             (->Results (:tree results) acks (:segments ret) (:retries ret))))
                         results
@@ -184,7 +184,9 @@
     (assoc event :onyx.core/results (persistent-results! results))))
 
 (defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
-  (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
+  (doseq [[acker-id acks] (->> (:acks results)
+                               (filter dec-count!)
+                               (group-by :completion-id))]
     (when-let [link (operation/peer-link @replica state event acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
@@ -332,41 +334,46 @@
 
 (defn assign-windows
   [{:keys [onyx.core/windows onyx.core/task-map onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
-  (let [id-key (:window/uniqueness-key task-map)] 
+  (let [id-key (:window/unique-key task-map)] 
     (when (seq windows)
-      (doseq [msg (mapcat :leaves (:tree results))]
-        (let [message (:message msg)
-              unique-id (if id-key 
-                          (get message id-key))] 
-          (if (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))
-            (info "Nothing to be done. Seen" unique-id "previously")
-            (let [entry (doall 
-                          (map (fn [w]
-                                 (let [window-id (:window/id w)
-                                       w-range (apply units/to-standard-units (:window/range w))
-                                       w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-                                       units (units/standard-units-for (last (:window/range w)))
-                                       message (:message msg)
-                                       message-coerced (update message (:window/window-key w) units/coerce-key units)
-                                       extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message-coerced)
-                                       extents-entries (doall 
-                                                         (map (fn [e]
-                                                                (let [f (:window/agg-fn w)
-                                                                      state (init-window-state w (get-in @window-state [window-id e]))
-                                                                      state-transition-entry (f state w message)
-                                                                      new-state ((:window/log-resolve w) state state-transition-entry)]
-                                                                  (swap! window-state assoc-in [(:window/id w) e] new-state)
-                                                                  ;; return window extent playback entry
-                                                                  [e state-transition-entry]))
-                                                              extents))]
-                                   (doseq [t (:onyx.core/triggers event)]
-                                     (triggers/fire-trigger! event window-state t {:segment message :context :new-segment}))
-                                   extents-entries))
-                               windows))]
-              (info "All entries now " (vec entry))
-              ;; Need to modify acking so it's fully acked only after async stores
-              (state-extensions/store-log-entry state-log event (cons unique-id entry))
-              (swap! window-state update :filter state-extensions/apply-filter-id event unique-id)))))))
+      (doall
+        (map 
+          (fn [leaf fused-ack]
+            (run! 
+              (fn [message]
+                (let [segment (:message message)
+                      unique-id (if id-key (get segment id-key))]
+                  (if (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))
+                    (info "Nothing to be done. Saw" unique-id "previously")
+                    (let [entry (doall 
+                                  (map (fn [w]
+                                         (let [window-id (:window/id w)
+                                               w-range (apply units/to-standard-units (:window/range w))
+                                               w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
+                                               units (units/standard-units-for (last (:window/range w)))
+                                               segment-coerced (update segment (:window/window-key w) units/coerce-key units)
+                                               extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) segment-coerced)
+                                               extents-entries (doall 
+                                                                 (map (fn [e]
+                                                                        (let [f (:window/agg-fn w)
+                                                                              state (init-window-state w (get-in @window-state [window-id e]))
+                                                                              state-transition-entry (f state w segment)
+                                                                              new-state ((:window/log-resolve w) state state-transition-entry)]
+                                                                          (swap! window-state assoc-in [(:window/id w) e] new-state)
+                                                                          ;; return window extent playback entry
+                                                                          (list e state-transition-entry)))
+                                                                      extents))]
+                                           (doseq [t (:onyx.core/triggers event)]
+                                             (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
+                                           extents-entries))
+                                       windows))]
+                      (info "All entries now " (vec entry))
+                      ;; Need to modify acking so it's fully acked only after async stores
+                      (state-extensions/store-log-entry state-log event fused-ack (cons unique-id entry))
+                      (swap! window-state update :filter state-extensions/apply-filter-id event unique-id)))))
+              (:leaves leaf)))
+          (:tree results)
+          (:acks results)))))
   event)
 
 (defn write-batch [pipeline event]
@@ -490,8 +497,8 @@
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
-             (assign-windows)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
+             (assign-windows)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
              (close-batch-resources)

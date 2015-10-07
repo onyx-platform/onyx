@@ -7,7 +7,16 @@
 
 (defrecord Route [flow exclusions post-transformation action])
 
-(defrecord Ack [id completion-id ack-val timestamp])
+(defprotocol RefCounted 
+  (inc-count! [this])
+  (dec-count! [this]))
+
+(defrecord Ack [id completion-id ack-val ref-count timestamp]
+  RefCounted
+  (inc-count! [this]
+    (swap! (:ref-count this) inc))
+  (dec-count! [this]
+    (zero? (swap! (:ref-count this) dec))))
 
 (defrecord Results [tree acks segments retries])
 

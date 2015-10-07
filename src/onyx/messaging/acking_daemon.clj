@@ -41,7 +41,7 @@
                     (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) false)))
                 (if (zero? ^long ack-val)
                   (->AckState state true)
-                  (->AckState (assoc state message-id (->Ack nil completion-id ack-val (now))) false))))))]
+                  (->AckState (assoc state message-id (->Ack nil completion-id ack-val nil (now))) false))))))]
     (when (:completed? rets)
       (>!! completion-ch
            {:id message-id :peer-id completion-id}))))
