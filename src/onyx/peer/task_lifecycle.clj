@@ -335,23 +335,25 @@
 (defn assign-windows
   [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger
            onyx.core/windows onyx.core/task-map onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
-  (let [id-key (:window/unique-key task-map)] 
-    (when (seq windows)
+  (when (seq windows)
+    (let [id-key (:onyx/uniqueness-key task-map)] 
       (doall
         (map 
           (fn [leaf fused-ack]
             (let [start-time (System/currentTimeMillis)
+                  ;; Message should only be acked when all log updates have been written
+                  ;; As we filter out messages seen before, some replay can be accepted
                   ack-fn (fn [] 
                            (when (dec-count! fused-ack)
                              (let [link (operation/peer-link @replica state event (:completion-id fused-ack))]
                                (extensions/internal-ack-segment messenger event link fused-ack)))
                            (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time)))]
-
               (run! 
                 (fn [message]
                   (let [segment (:message message)
-                        unique-id (if id-key (get segment id-key))]
-                    (when-not (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))
+                        unique-id (if id-key (get segment id-key))
+                        seen? (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))]
+                    (when-not seen?
                       (inc-count! fused-ack)
                       (->> windows
                            (map (fn [w]
