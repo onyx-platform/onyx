@@ -27,7 +27,7 @@
         n (count peers)]
     (if (> n 0)
       (let [joining-peer (:joiner args)
-            all-joined-peers (set (concat (keys (:pairs replica)) peers))
+            all-joined-peers (set (into (keys (:pairs replica)) peers))
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))

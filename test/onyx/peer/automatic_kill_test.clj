@@ -8,23 +8,23 @@
 
 (def n-messages 5000)
 
-(def in-chan-1 (chan (inc n-messages)))
-(def in-chan-2 (chan (inc n-messages)))
+(def in-chan-1 (atom nil))
+(def in-chan-2 (atom nil))
 
-(def out-chan-1 (chan (sliding-buffer (inc n-messages))))
-(def out-chan-2 (chan (sliding-buffer (inc n-messages))))
+(def out-chan-1 (atom nil))
+(def out-chan-2 (atom nil))
 
 (defn inject-in-ch-1 [event lifecycle]
-  {:core.async/chan in-chan-1})
+  {:core.async/chan @in-chan-1})
 
 (defn inject-out-ch-1 [event lifecycle]
-  {:core.async/chan out-chan-1})
+  {:core.async/chan @out-chan-1})
 
 (defn inject-in-ch-2 [event lifecycle]
-  {:core.async/chan in-chan-2})
+  {:core.async/chan @in-chan-2})
 
 (defn inject-out-ch-2 [event lifecycle]
-  {:core.async/chan out-chan-2})
+  {:core.async/chan @out-chan-2})
 
 (def in-calls-1
   {:lifecycle/before-task-start inject-in-ch-1})
@@ -109,13 +109,18 @@
                        :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}
                       {:lifecycle/task :out-2
                        :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+    (reset! in-chan-1 (chan (inc n-messages)))
+    (reset! in-chan-2 (chan (inc n-messages)))
+    (reset! out-chan-1 (chan (sliding-buffer (inc n-messages))))
+    (reset! out-chan-2 (chan (sliding-buffer (inc n-messages))))
+
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [n (range n-messages)]
         ;; Using + 50,000 on the first job to make sure messages don't cross jobs.
-        (>!! in-chan-1 {:n (+ n 50000)})
-        (>!! in-chan-2 {:n n}))
-        (>!! in-chan-1 :done)
-        (>!! in-chan-2 :done)
+        (>!! @in-chan-1 {:n (+ n 50000)})
+        (>!! @in-chan-2 {:n n}))
+        (>!! @in-chan-1 :done)
+        (>!! @in-chan-2 :done)
 
         (let [j1 (:job-id (onyx.api/submit-job
                             peer-config
@@ -136,9 +141,9 @@
               (when-not (= (:killed-jobs new-replica) [j1])
                 (recur new-replica))))
 
-          (let [results (take-segments! out-chan-2)
+          (let [results (take-segments! @out-chan-2)
                 expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
             (is (= expected (set (butlast results))))
             (is (= :done (last results))))
-          (close! in-chan-1)
-          (close! in-chan-2)))))
+          (close! @in-chan-1)
+          (close! @in-chan-2)))))

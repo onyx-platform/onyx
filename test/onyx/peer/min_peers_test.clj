@@ -62,9 +62,7 @@
                          :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
                         {:lifecycle/task :out
                          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-
             _ (reset! in-chan (chan (inc n-messages)))
-
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
             _ (>!! @in-chan :done)
@@ -74,9 +72,7 @@
                                     :workflow workflow
                                     :lifecycles lifecycles
                                     :task-scheduler :onyx.task-scheduler/balanced})
-
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
-
             results (take-segments! @out-chan)]
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]

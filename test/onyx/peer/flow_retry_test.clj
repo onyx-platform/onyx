@@ -6,15 +6,15 @@
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
-(def in-chan (chan 100))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer 100)))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -82,12 +82,15 @@
                           :flow/action :retry
                           :flow/predicate ::retry?}]]
 
+    (reset! in-chan (chan 100))
+    (reset! out-chan (chan (sliding-buffer 100)))
+
     (with-test-env [test-env [3 env-config peer-config]]
       (doseq [x (range 20)]
-        (>!! in-chan {:n x}))
+        (>!! @in-chan {:n x}))
 
-      (>!! in-chan :done)
-      (close! in-chan)
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
@@ -95,6 +98,6 @@
                             :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [results (take-segments! out-chan)]
+      (let [results (take-segments! @out-chan)]
         (is @retried?)
         (is (= 21 (count results)))))))

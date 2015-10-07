@@ -31,8 +31,6 @@
     (is (= (vector peer-id message)
            (read-buf (protocol/build-retry-msg-buf peer-id message))))))
 
-
-
 (deftest acker-protocol-test 
   (let [peer-id 32000
         acks [(map->Ack {:id #uuid "e2ba38dd-b523-4e63-ba74-645fb91c231a"

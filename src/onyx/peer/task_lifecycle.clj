@@ -217,7 +217,8 @@
 (defn read-batch [task-type replica peer-replica-view job-id pipeline event]
   (if (and (= task-type :input) (:backpressure? peer-replica-view))
     (assoc event :onyx.core/batch '())
-    (let [rets (p-ext/read-batch pipeline event)]
+    (let [rets (p-ext/read-batch pipeline event)
+          rets ((:onyx.core/compiled-after-read-batch-fn event) rets)]
       (handle-backoff! event)
       (merge event rets))))
 
@@ -627,6 +628,7 @@
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
+                           :onyx.core/compiled-after-read-batch-fn (c/compile-after-read-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-batch-fn (c/compile-after-batch-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-task-fn (c/compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-ack-segment-fn (c/compile-after-ack-segment-functions lifecycles (:name task))

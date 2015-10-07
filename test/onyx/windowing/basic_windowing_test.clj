@@ -43,15 +43,15 @@
 (defn update-atom! [event window-id lower-bound upper-bound state]
   (swap! test-state conj [lower-bound upper-bound state]))
 
-(def in-chan (chan (inc (count input))))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer (inc (count input)))))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -116,6 +116,10 @@
           :lifecycle/calls ::out-calls}
          {:lifecycle/task :out
           :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+
+    (reset! in-chan (chan (inc (count input))))
+    (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+
     (with-test-env [test-env [3 env-config peer-config]]
       (onyx.api/submit-job peer-config
                            {:catalog catalog
@@ -125,12 +129,12 @@
                             :triggers triggers
                             :task-scheduler :onyx.task-scheduler/balanced})
       (doseq [i input]
-        (>!! in-chan i))
-      (>!! in-chan :done)
+        (>!! @in-chan i))
+      (>!! @in-chan :done)
 
-      (close! in-chan)
+      (close! @in-chan)
 
-      (let [results (take-segments! out-chan)]
+      (let [results (take-segments! @out-chan)]
         (is (= (into #{} input) (into #{} (butlast results))))
         (is (= :done (last results)))
         (is (= expected-windows @test-state))))))

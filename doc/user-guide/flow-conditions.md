@@ -140,6 +140,8 @@ If a flow condition specifies `:all` as its `:flow/to`, it must come before any 
 
 `:flow/to` set to `:all` or `:none` must always set `:flow/short-circuit?` to `true`.
 
+`:flow/from` may be set to `:all`. This directs all immediate upstream links to pass segments to this task's flow condition. `:flow/from` as `:all` does not impose order constraints as `:flow/to` set to `:all` does.
+
 ### Short Circuiting
 
 If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are unioned (duplicates aren't acknowledged), as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.

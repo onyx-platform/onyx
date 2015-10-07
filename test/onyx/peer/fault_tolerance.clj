@@ -58,15 +58,15 @@
 
     (def chan-size 10000)
 
-    (def in-chan (chan (inc chan-size)))
+    (def in-chan (atom nil))
 
-    (def out-chan (chan (inc chan-size)))
+    (def out-chan (atom nil))
 
     (defn inject-in-ch [event lifecycle]
-      {:core.async/chan in-chan})
+      {:core.async/chan @in-chan})
 
     (defn inject-out-ch [event lifecycle]
-      {:core.async/chan out-chan})
+      {:core.async/chan @out-chan})
 
     (def in-calls
       {:lifecycle/before-task-start :onyx.peer.fault-tolerance/inject-in-ch})

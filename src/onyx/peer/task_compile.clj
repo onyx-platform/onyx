@@ -7,7 +7,7 @@
             [clj-tuple :as t]))
 
 (defn only-relevant-branches [flow task]
-  (filter #(= (:flow/from %) task) flow))
+  (filter #(or (= (:flow/from %) task) (= :all %)) flow))
 
 (defn compile-flow-conditions [flow-conditions task-name f]
   (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
@@ -83,6 +83,9 @@
 (defn compile-before-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/before-batch))
 
+(defn compile-after-read-batch-task-functions [lifecycles task-name]
+  (compile-lifecycle-functions lifecycles task-name :lifecycle/after-read-batch))
+
 (defn compile-after-batch-task-functions [lifecycles task-name]
   (compile-lifecycle-functions lifecycles task-name :lifecycle/after-batch))
 
@@ -134,7 +137,7 @@
 
 (defn resolve-window-init [window calls]
   (if-not (:aggregation/init calls)
-    (let [init (:window/init calls)]
+    (let [init (:window/init window)]
       (when-not init
         (throw (ex-info "No :window/init supplied, this is required for this aggregation" {:window window})))
       (constantly (:window/init window)))
@@ -143,7 +146,9 @@
 (defn resolve-windows [windows]
   (map
    (fn [window]
-     (let [calls (var-get (kw->fn (:window/aggregation window)))]
+     (let [agg (:window/aggregation window)
+           agg-var (if (sequential? agg) (first agg) agg)
+           calls (var-get (kw->fn agg-var))]
        (assoc window
               :window/agg-init (resolve-window-init window calls)
               :window/agg-fn (:aggregation/fn calls)

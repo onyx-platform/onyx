@@ -7,9 +7,9 @@
 
 (def output (atom {}))
 
-(def in-chan (chan 1000000))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer 1000000)))
+(def out-chan (atom nil))
 
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
@@ -28,10 +28,10 @@
     []))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -141,19 +141,22 @@
                  (map (fn [_] {:first-name "Jon" :amount 10}) (range size))
                  (map (fn [_] {[:first-name :first_name] "JimBob" :amount 10}) (range size))))]
 
+    (reset! in-chan (chan 1000000))
+    (reset! out-chan (chan (sliding-buffer 1000000)))
+
     (with-test-env [test-env [4 env-config peer-config]]
       (doseq [x data]
-        (>!! in-chan x))
+        (>!! @in-chan x))
 
-      (>!! in-chan :done)
-      (close! in-chan)
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
                             :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [results (take-segments! out-chan)]
+      (let [results (take-segments! @out-chan)]
         (is (= [:done] results))))
 
     ;; check outside the peer shutdown so that we can ensure task is fully stopped

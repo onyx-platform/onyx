@@ -12,7 +12,7 @@
   (try
     (let [completed (:completed-jobs replica)
           killed (:killed-jobs replica)
-          jobs (concat completed killed)]
+          jobs (into completed killed)]
       (as-> replica x
             (assoc x :killed-jobs [])
             (assoc x :completed-jobs [])

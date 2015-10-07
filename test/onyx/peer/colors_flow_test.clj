@@ -5,25 +5,30 @@
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
-(def colors-in-chan (chan 100))
+(def colors-in-chan (atom nil))
 
-(def red-out-chan (chan (sliding-buffer 100)))
+(def red-out-chan (atom nil))
 
-(def blue-out-chan (chan (sliding-buffer 100)))
+(def blue-out-chan (atom nil))
 
-(def green-out-chan (chan (sliding-buffer 100)))
+(def green-out-chan (atom nil))
+
+(def all-out-chan (atom nil))
 
 (defn inject-colors-in-ch [event lifecycle]
-  {:core.async/chan colors-in-chan})
+  {:core.async/chan @colors-in-chan})
 
 (defn inject-red-out-ch [event lifecycle]
-  {:core.async/chan red-out-chan})
+  {:core.async/chan @red-out-chan})
 
 (defn inject-blue-out-ch [event lifecycle]
-  {:core.async/chan blue-out-chan})
+  {:core.async/chan @blue-out-chan})
 
 (defn inject-green-out-ch [event lifecycle]
-  {:core.async/chan green-out-chan})
+  {:core.async/chan @green-out-chan})
+
+(defn inject-all-out-ch [event lifecycle]
+  {:core.async/chan @all-out-chan})
 
 (def colors-in-calls
   {:lifecycle/before-task-start inject-colors-in-ch})
@@ -36,6 +41,9 @@
 
 (def green-out-calls
   {:lifecycle/before-task-start inject-green-out-ch})
+
+(def all-out-calls
+  {:lifecycle/before-task-start inject-all-out-ch})
 
 (def seen-before? (atom false))
 
@@ -132,6 +140,14 @@
                   :onyx/medium :core.async
                   :onyx/batch-size batch-size
                   :onyx/max-peers 1
+                  :onyx/doc "Writes segments to a core.async channel"}
+
+                 {:onyx/name :all-out
+                  :onyx/plugin :onyx.plugin.core-async/output
+                  :onyx/type :output
+                  :onyx/medium :core.async
+                  :onyx/batch-size batch-size
+                  :onyx/max-peers 1
                   :onyx/doc "Writes segments to a core.async channel"}]
 
         workflow [[:colors-in :process-red]
@@ -140,7 +156,11 @@
 
                   [:process-red :red-out]
                   [:process-blue :blue-out]
-                  [:process-green :green-out]]
+                  [:process-green :green-out]
+
+                  [:process-red :all-out]
+                  [:process-blue :all-out]
+                  [:process-green :all-out]]
 
         flow-conditions [{:flow/from :colors-in
                           :flow/to :all
@@ -186,7 +206,11 @@
                          {:flow/from :colors-in
                           :flow/to [:process-green]
                           :flow/exclude-keys [:extra-key]
-                          :flow/predicate :onyx.peer.colors-flow-test/orange?}]
+                          :flow/predicate :onyx.peer.colors-flow-test/orange?}
+
+                         {:flow/from :all
+                          :flow/to [:all-out]
+                          :flow/predicate :onyx.peer.colors-flow-test/constantly-true}]
 
         lifecycles [{:lifecycle/task :colors-in
                      :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
@@ -205,9 +229,19 @@
                     {:lifecycle/task :green-out
                      :lifecycle/calls :onyx.peer.colors-flow-test/green-out-calls}
                     {:lifecycle/task :green-out
+                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
+                    {:lifecycle/task :all-out
+                     :lifecycle/calls :onyx.peer.colors-flow-test/all-out-calls}
+                    {:lifecycle/task :all-out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
-    (with-test-env [test-env [7 env-config peer-config]]
+    (reset! colors-in-chan (chan 100))
+    (reset! red-out-chan (chan (sliding-buffer 100)))
+    (reset! blue-out-chan (chan (sliding-buffer 100)))
+    (reset! green-out-chan (chan (sliding-buffer 100)))
+    (reset! all-out-chan (chan (sliding-buffer 100)))
+
+    (with-test-env [test-env [8 env-config peer-config]]
       (doseq [x [{:color "red" :extra-key "Some extra context for the predicates"}
                  {:color "blue" :extra-key "Some extra context for the predicates"}
                  {:color "white" :extra-key "Some extra context for the predicates"}
@@ -217,17 +251,18 @@
                  {:color "purple" :extra-key "Some extra context for the predicates"}
                  {:color "cyan" :extra-key "Some extra context for the predicates"}
                  {:color "yellow" :extra-key "Some extra context for the predicates"}]]
-        (>!! colors-in-chan x))
-      (>!! colors-in-chan :done)
+        (>!! @colors-in-chan x))
+      (>!! @colors-in-chan :done)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
                             :flow-conditions flow-conditions :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [red (take-segments! red-out-chan)
-            blue (take-segments! blue-out-chan)
-            green (take-segments! green-out-chan)
+      (let [red (take-segments! @red-out-chan)
+            blue (take-segments! @blue-out-chan)
+            green (take-segments! @green-out-chan)
+            all (take-segments! @all-out-chan)
             red-expectations #{{:color "white"}
                                {:color "red"}
                                {:color "orange"}
@@ -239,11 +274,18 @@
             green-expectations #{{:color "white"}
                                  {:color "green"}
                                  {:color "orange"}
-                                 :done}]
+                                 :done}
+            all-expectations #{{:color "blue"}
+                               {:color "white"}
+                               {:color "orange"}
+                               {:color "green"}
+                               {:color "red"}
+                               :done}]
 
         (is (= green-expectations (into #{} green)))
         (is (= red-expectations (into #{} red)))
         (is (= blue-expectations (into #{} blue)))
+        (is (= all-expectations (into #{} all)))
         (is (= 1 @retry-counter)))
 
-      (close! colors-in-chan))))
+      (close! @colors-in-chan))))

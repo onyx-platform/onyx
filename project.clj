@@ -21,8 +21,7 @@
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.10.0"]
                  [uk.co.real-logic/Agrona "0.4.4"]
-                 [uk.co.real-logic/aeron-client "0.1.4"]
-                 [uk.co.real-logic/aeron-driver "0.1.4"]
+                 [uk.co.real-logic/aeron-all "0.1.4"]
                  [prismatic/schema "1.0.1"]
                  [org.apache.zookeeper/zookeeper "3.4.6" 
                   :exclusions [org.slf4j/slf4j-log4j12]]

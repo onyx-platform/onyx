@@ -18,20 +18,20 @@
 
 (def ages (map #(select-keys % [:id :age]) people))
 
-(def name-chan (chan (inc (count names))))
+(def name-chan (atom nil))
 
-(def age-chan (chan (inc (count ages))))
+(def age-chan (atom nil))
 
-(def out-chan (chan 10000))
+(def out-chan (atom nil))
 
 (defn inject-names-ch [event lifecycle]
-  {:core.async/chan name-chan})
+  {:core.async/chan @name-chan})
 
 (defn inject-ages-ch [event lifecycle]
-  {:core.async/chan age-chan})
+  {:core.async/chan @age-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (defn inject-join-state [event lifecycle]
   {:onyx.core/params [(atom {})]})
@@ -115,15 +115,19 @@
                     {:lifecycle/task :join-person
                      :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
+    (reset! name-chan (chan (inc (count names))))
+    (reset! age-chan (chan (inc (count ages))))
+    (reset! out-chan (chan 10000))
+
     (with-test-env [test-env [4 env-config peer-config]]
       (doseq [name names]
-        (>!! name-chan name))
+        (>!! @name-chan name))
 
       (doseq [age ages]
-        (>!! age-chan age))
+        (>!! @age-chan age))
 
-      (>!! name-chan :done)
-      (>!! age-chan :done)
+      (>!! @name-chan :done)
+      (>!! @age-chan :done)
 
       (onyx.api/submit-job
         peer-config
@@ -131,6 +135,6 @@
          :lifecycles lifecycles
          :task-scheduler :onyx.task-scheduler/balanced})
 
-      (let [results (take-segments! out-chan)]
+      (let [results (take-segments! @out-chan)]
         (is (= (set people)
                (set (butlast results))))))))

@@ -100,7 +100,7 @@ The `:onyx.windowing.aggregation/count` operation counts the number of segments 
 {:window/id :count-segments
  :window/task :identity
  :window/type :fixed
- :window/aggregation :count
+ :window/aggregation :onyx.windowing.aggregation/count
  :window/window-key :event-time
  :window/range [1 :hour]
  :window/doc "Counts segments in one hour fixed windows"}
@@ -108,14 +108,13 @@ The `:onyx.windowing.aggregation/count` operation counts the number of segments 
 
 #### `:onyx.windowing.aggregation/sum`
 
-The `:sum` operation adds the values of `:window/sum-key` for all segments in the window.
+The `:sum` operation adds the values of `:age` for all segments in the window.
 
 ```clojure
 {:window/id :sum-ages
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
- :window/sum-key :age
+ :window/aggregation [:onyx.windowing.aggregation/sum :age]
  :window/window-key :event-time
  :window/range [1 :hour]
  :window/doc "Adds the :age key in all segments in 1 hour fixed windows"}
@@ -123,15 +122,14 @@ The `:sum` operation adds the values of `:window/sum-key` for all segments in th
 
 #### `:onyx.windowing.aggregation/min`
 
-The `:min` operation retains the minimum value found for `:window/min-key`. An initial value must be supplied via `:window/init`.
+The `:min` operation retains the minimum value found for `:age`. An initial value must be supplied via `:window/init`.
 
 ```clojure
 {:window/id :min-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation [:onyx.windowing.aggregation/min :age]
  :window/init 100
- :window/min-key :age
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/doc "Finds the minimum :age in 30 minute fixed windows, default is 100"}
@@ -139,13 +137,13 @@ The `:min` operation retains the minimum value found for `:window/min-key`. An i
 
 #### `:onyx.windowing.aggregation/max`
 
-The `:max` operation retains the maximum value found for `:window/max-key`. An initial value must be supplied via `:window/init`.
+The `:max` operation retains the maximum value found for `:age`. An initial value must be supplied via `:window/init`.
 
 ```clojure
 {:window/id :max-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation [:onyx.windowing.aggregation/max :age]
  :window/init 0
  :window/max-key :age
  :window/window-key :event-time
@@ -155,15 +153,14 @@ The `:max` operation retains the maximum value found for `:window/max-key`. An i
 
 #### `:onyx.windowing.aggregation/average`
 
-The `:average` operation maintains an average over `:window/average-key`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
+The `:average` operation maintains an average over `:age`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
 
 ```clojure
 {:window/id :max-age
  :window/task :identity
  :window/type :fixed
- :window/aggregation :sum
+ :window/aggregation [:onyx.windowing.aggregation/average :age]
  :window/init 0
- :window/max-key :age
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/doc "Finds the maximum :age in 30 minute fixed windows, default is 0"}
@@ -178,7 +175,7 @@ See the Information Model chapter for an exact specification of what values the 
 |`:window/id`          | A unique identifier per window
 |`:window/task`        | The workflow task over which the window operates
 |`:window/type`        | Which type of window this is (fixed, sliding, etc)
-|`:window/aggregation` | The aggregation function to apply, as described above
+|`:window/aggregation` | The aggregation function to apply, as described above. If this operation is over a key, this is a vector, with the second element being the key.
 |`:window/window-key`  | The key over which the range will be calculated
 |`:window/range`       | The span of the window
 |`:window/slide`       | The delay to wait to start a new window after the previous window
