@@ -145,24 +145,14 @@
 
 (def HandleWriteCallback
   (reify AsyncCallback$AddCallback
-    (addComplete [this rc lh entry-id {:keys [event ack start-time]}]
-      (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger]} event] 
-        (when (dec-count! ack)
-          (let [link (operation/peer-link @replica state event (:completion-id ack))]
-            (info "Write call back ack")
-            (extensions/internal-ack-segment messenger event link ack)))
-        (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time))))))
+    (addComplete [this rc lh entry-id ack-fn]
+      (ack-fn))))
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [ledger-handle]} event ack entry]
-  (info "Writing entry " entry)
+  [{:keys [ledger-handle]} event ack-fn entry]
   ;; Interesting post on latency in bookkeeper
   ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
-  (inc-count! ack)
   (.asyncAddEntry ^LedgerHandle ledger-handle 
                   (nippy/window-log-compress entry)
                   HandleWriteCallback
-                  {:event event :ack ack :start-time (System/currentTimeMillis)})
-  
-  (info "Made async call")
-  )
+                  ack-fn))
