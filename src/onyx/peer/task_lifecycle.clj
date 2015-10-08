@@ -330,7 +330,7 @@
     (swap! window-state 
            (fn [wstate] 
              (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
-               (info (:onyx.core/task-id event) "replayed state:" replayed-state)
+               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
   event)
 
