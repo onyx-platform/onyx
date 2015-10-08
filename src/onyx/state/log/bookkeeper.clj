@@ -77,8 +77,8 @@
     ((:window/agg-init window) window)))
 
 (defn playback-windows-extents [state entry windows]
-  (let [id->log-resolve (into {} 
-                              (map (juxt :window/id :window/log-resolve) 
+  (let [id->apply-state-update (into {} 
+                              (map (juxt :window/id :window/apply-state-update) 
                                    windows))] 
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
               (reduce (fn [state'' [extent entry message-id]]
@@ -86,7 +86,7 @@
                                    [id extent]
                                    (fn [ext-state] 
                                      (let [ext-state' (default-state ext-state window)
-                                           apply-fn (id->log-resolve id)] 
+                                           apply-fn (id->apply-state-update id)] 
                                        (assert apply-fn (str "Apply fn does not exist for window-id " id))
                                        (apply-fn ext-state' entry)))))
                       state'

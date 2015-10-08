@@ -345,7 +345,7 @@
              (let [f (:window/agg-fn w)
                    state (init-window-state w (get-in @window-state [window-id e]))
                    state-transition-entry (f state w segment)
-                   new-state ((:window/log-resolve w) state state-transition-entry)]
+                   new-state ((:window/apply-state-update w) state state-transition-entry)]
                (swap! window-state assoc-in [window-id e] new-state)
                (list e state-transition-entry)))
            extents))))

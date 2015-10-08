@@ -46,26 +46,26 @@
 (def conj
   {:aggregation/init conj-aggregation-fn-init
    :aggregation/fn conj-aggregation-fn
-   :aggregation/log-resolve conj-aggregation-apply-log})
+   :aggregation/apply-state-update conj-aggregation-apply-log})
 
 (def sum
   {:aggregation/init sum-aggregation-fn-init
    :aggregation/fn sum-aggregation-fn
-   :aggregation/log-resolve set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log})
 
 (def count
   {:aggregation/init count-aggregation-fn-init
    :aggregation/fn count-aggregation-fn
-   :aggregation/log-resolve set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log})
 
 (def min
   {:aggregation/fn min-aggregation-fn
-   :aggregation/log-resolve set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log})
 
 (def max
   {:aggregation/fn max-aggregation-fn
-   :aggregation/log-resolve set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log})
 
 (def average
   {:aggregation/fn average-aggregation-fn
-   :aggregation/log-resolve set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log})
