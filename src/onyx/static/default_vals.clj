@@ -33,6 +33,8 @@
    :onyx.peer/backpressure-check-interval 10
    :onyx.peer/backpressure-low-water-pct 30
    :onyx.peer/backpressure-high-water-pct 60
+   :onyx.peer/state-log-impl :bookkeeper
+   :onyx.peer/state-filter-impl :set
 
    ;; messaging defaults
    :onyx.messaging.aeron/embedded-driver? true

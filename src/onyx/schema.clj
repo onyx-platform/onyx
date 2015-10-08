@@ -174,6 +174,13 @@
 (def Messaging
   (s/enum :aeron :dummy-messenger))
 
+(def StateLogImpl
+  (s/enum :bookkeeper))
+
+
+(def StateFilterImpl
+  (s/enum :set :bloom))
+
 (def PeerConfig
   {:zookeeper/address s/Str
    :onyx/id ClusterId
@@ -194,6 +201,8 @@
    (s/optional-key :onyx.peer/backpressure-check-interval) s/Int
    (s/optional-key :onyx.peer/backpressure-low-water-pct) s/Int
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
+   (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
+   (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.bookkeeper/starting-port) s/Int
    (s/optional-key :onyx.bookkeeper/base-dir) s/Str
    (s/optional-key :onyx.bookkeeper/timeout) s/Int
