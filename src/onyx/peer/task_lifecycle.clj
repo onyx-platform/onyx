@@ -23,7 +23,6 @@
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
               [clj-tuple :as t]
               [onyx.interop]
-              [onyx.state.log.atom]
               [onyx.state.log.bookkeeper]
               [onyx.state.filter.set]
               [onyx.state.core :as state]
@@ -335,11 +334,30 @@
                replayed-state))))
   event)
 
+(defn assign-window [segment window-state w]
+  (let [window-id (:window/id w)
+        w-range (apply units/to-standard-units (:window/range w))
+        w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
+        units (units/standard-units-for (last (:window/range w)))
+        segment-coerced (we/uniform-units (:window/record w) segment)
+        extents (we/extents (:window/record w) segment-coerced)]
+    (doall 
+      (map (fn [e]
+             (let [f (:window/agg-fn w)
+                   state (init-window-state w (get-in @window-state [window-id e]))
+                   state-transition-entry (f state w segment)
+                   new-state ((:window/log-resolve w) state state-transition-entry)]
+               (swap! window-state assoc-in [window-id e] new-state)
+               (list e state-transition-entry)))
+           extents))))
+
 (defn assign-windows
-  [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger
-           onyx.core/windows onyx.core/task-map onyx.core/window-state onyx.core/state-log onyx.core/results] :as event}]
+  [{:keys [onyx.core/windows] :as event}]
   (when (seq windows)
-    (let [id-key (:onyx/uniqueness-key task-map)] 
+    (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger 
+                  onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
+                  onyx.core/state-log onyx.core/results]} event
+          id-key (:onyx/uniqueness-key task-map)] 
       (doall
         (map 
           (fn [leaf fused-ack]
@@ -359,30 +377,12 @@
                     (when-not seen?
                       (inc-count! fused-ack)
                       (->> windows
-                           (map (fn [w]
-                                  (let [window-id (:window/id w)
-                                        w-range (apply units/to-standard-units (:window/range w))
-                                        w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-                                        units (units/standard-units-for (last (:window/range w)))
-                                        ;; switch we calls to take segments
-                                        segment-coerced (we/uniform-units (:window/record w) segment)
-                                        extents (we/extents (:window/record w) segment-coerced)
-                                        extents-entries (doall 
-                                                          (map (fn [e]
-                                                                 (let [f (:window/agg-fn w)
-                                                                       state (init-window-state w (get-in @window-state [window-id e]))
-                                                                       state-transition-entry (f state w segment)
-                                                                       new-state ((:window/log-resolve w) state state-transition-entry)]
-                                                                   (swap! window-state assoc-in [(:window/id w) e] new-state)
-                                                                   ;; return window extent playback entry
-                                                                   (list e state-transition-entry)))
-                                                               extents))]
-                                    (doseq [t (:onyx.core/triggers event)]
-                                      (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
-                                    extents-entries)))
+                           (map (partial assign-window segment window-state))
                            doall
                            (cons unique-id) ;; store the id at the head of the log entry
                            (state-extensions/store-log-entry state-log event ack-fn))
+                      (doseq [t triggers]
+                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
                 (:leaves leaf))))
           (:tree results)
