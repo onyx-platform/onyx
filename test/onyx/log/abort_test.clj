@@ -31,6 +31,5 @@
     (is (= {:aborted :d} diff))
     (is (= [{:fn :prepare-join-cluster
              :args {:joiner :d
-                    :peer-site {:address 1}}
-             :immediate? true}] 
+                    :peer-site {:address 1}}}] 
            reactions))))

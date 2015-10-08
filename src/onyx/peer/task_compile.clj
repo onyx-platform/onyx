@@ -3,6 +3,7 @@
             [onyx.static.planning :refer [find-task build-pred-fn]]
             [onyx.static.validation :as validation]
             [onyx.windowing.aggregation :as agg]
+            [onyx.windowing.window-extensions :as w]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [clj-tuple :as t]))
 
@@ -150,6 +151,7 @@
            agg-var (if (sequential? agg) (first agg) agg)
            calls (var-get (kw->fn agg-var))]
        (assoc window
+              :window/record (w/windowing-record window)
               :window/agg-init (resolve-window-init window calls)
               :window/agg-fn (:aggregation/fn calls)
               :window/log-resolve (:aggregation/log-resolve calls))))

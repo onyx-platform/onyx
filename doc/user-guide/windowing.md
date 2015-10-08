@@ -10,6 +10,7 @@ This section discusses a feature called windowing. Windows allow you to group an
 - [Window Types](#window-types)
   - [Fixed Windows](#fixed-windows)
   - [Sliding Windows](#sliding-windows)
+  - [Global Windows](#global-windows)
 - [Units](#units)
 - [Aggregation](#aggregation)
   - [`:conj`](#conj)
@@ -59,6 +60,10 @@ In contrast to fixed windows, sliding windows allow extents to overlap. When a s
               |-----------|         [20 - 34]
                   |-----------|     [25 - 39]
 ```
+
+#### Global Windows
+
+Global windows are perhaps the easiest to understand. With global windows, there is one window extent that match all data that enters it. This lets you capture events that span over an entire domain of time. Global windows are useful for batch-style computations.
 
 ### Units
 

@@ -132,26 +132,14 @@
 
     ;; after shutdown-peer ensure peers are fully shutdown so that
     ;; :task-after will have been set
-    (is (= [:task-started
-            :task-before
-            :batch-before
-            :batch-after-read
-            :batch-after ; 1
-            :batch-before
-            :batch-after-read
-            :batch-after ; 2
-            :batch-before
-            :batch-after-read
-            :batch-after ; 3
-            :batch-before
-            :batch-after-read
-            :batch-after ; 4
-            :batch-before
-            :batch-after-read
-            :batch-after ; 5
-            :batch-before
-            :batch-after-read
-            :batch-after
-            :task-after] 
-           @call-log))
-    (is (= 3 @started-task-counter))))
+
+    (let [calls @call-log
+          repeated-calls (drop 2 (butlast calls))]
+      (is (= [:task-started :task-before] (take 2 calls)))
+      (is (= :task-after (last calls)))
+      (is (every? (partial = [:batch-before :batch-after-read :batch-after])
+                  (partition 3 repeated-calls)))
+      ;; Allow lifecycles to run more times in case the CI box is lagging
+      ;; and we experience replays.
+      (is (<= (count repeated-calls) 40))
+      (is (= 3 @started-task-counter)))))

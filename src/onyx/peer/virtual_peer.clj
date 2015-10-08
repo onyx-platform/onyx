@@ -9,15 +9,9 @@
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
-  (if (:stall-output? state)
-    (do
-      (doseq [reaction (filter :immediate? reactions)]
-        (clojure.core.async/>!! outbox-ch reaction))
-      (update state :buffered-outbox into (remove :immediate? reactions)))
-    (do
-      (doseq [reaction reactions]
-        (clojure.core.async/>!! outbox-ch reaction))
-      state)))
+  (doseq [reaction reactions]
+    (clojure.core.async/>!! outbox-ch reaction))
+  state)
 
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
   (try
@@ -37,7 +31,6 @@
                            :opts opts
                            :kill-ch kill-ch
                            :restart-ch restart-ch
-                           :stall-output? true
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom

@@ -29,12 +29,10 @@
   (cond (and (= (vals diff) (remove nil? (vals diff)))
              (= (:id peer-args) (:observer diff)))
         [{:fn :accept-join-cluster
-          :args diff
-          :immediate? true}]
+          :args diff}]
         (= (:id peer-args) (:observer (:args entry)))
         [{:fn :abort-join-cluster
-          :args {:id (:observer (:args entry))}
-          :immediate? true}]))
+          :args {:id (:observer (:args entry))}}]))
 
 (s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
   [{:keys [args]} old new diff {:keys [monitoring] :as state}]

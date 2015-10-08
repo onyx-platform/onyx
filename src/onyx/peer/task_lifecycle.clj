@@ -13,6 +13,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.windowing.window-extensions :as we]
               [onyx.windowing.window-id :as wid]
               [onyx.windowing.units :as units]
               [onyx.windowing.aggregation :as agg]
@@ -363,8 +364,9 @@
                                         w-range (apply units/to-standard-units (:window/range w))
                                         w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
                                         units (units/standard-units-for (last (:window/range w)))
-                                        segment-coerced (update segment (:window/window-key w) units/coerce-key units)
-                                        extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) segment-coerced)
+                                        ;; switch we calls to take segments
+                                        segment-coerced (we/uniform-units (:window/record w) segment)
+                                        extents (we/extents (:window/record w) segment-coerced)
                                         extents-entries (doall 
                                                           (map (fn [e]
                                                                  (let [f (:window/agg-fn w)
@@ -379,7 +381,7 @@
                                       (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
                                     extents-entries)))
                            doall
-                           (cons unique-id)
+                           (cons unique-id) ;; store the id at the head of the log entry
                            (state-extensions/store-log-entry state-log event ack-fn))
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
                 (:leaves leaf))))
