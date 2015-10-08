@@ -23,18 +23,18 @@
 
 (defn sum-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [[:set-value (+ state (get segment k))]]))
+    [:set-value (+ state (get segment k))]))
 
 (defn count-aggregation-fn [state window segment]
   [:set-value (inc state)])
 
 (defn min-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [[:set-value (clojure.core/min state (get segment k))]]))
+    [:set-value (clojure.core/min state (get segment k))]))
 
 (defn max-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [[:set-value (clojure.core/max state (get segment k))]]))
+    [:set-value (clojure.core/max state (get segment k))]))
 
 (defn average-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))
