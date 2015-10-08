@@ -232,6 +232,13 @@
   (when (and (= (:window/type w) :fixed) (:window/slide w))
     (throw (ex-info ":fixed windows do not define a :window/slide value" {:window w}))))
 
+(defn global-windows-dont-define-range-or-slide [w]
+  (when (and (= (:window/type w) :global) (:window/range w))
+    (throw (ex-info ":global windows do not define a :window/range value" {:window w})))
+
+  (when (and (= (:window/type w) :global) (:window/slide w))
+    (throw (ex-info ":global windows do not define a :window/slide value" {:window w}))))
+
 (defn validate-windows [windows catalog]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique windows)
@@ -239,7 +246,8 @@
       (window-names-a-task task-names w)
       (range-and-slide-units-compatible w)
       (sliding-windows-define-range-and-slide w)
-      (fixed-windows-dont-define-slide w))))
+      (fixed-windows-dont-define-slide w)
+      (global-windows-dont-define-range-or-slide w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)

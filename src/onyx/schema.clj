@@ -108,7 +108,7 @@
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
-  (s/enum :fixed :sliding))
+  (s/enum :fixed :sliding :global))
 
 (def Window
   {:window/id s/Keyword
@@ -116,7 +116,7 @@
    :window/type WindowType
    :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
-   :window/range Unit
+   (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/doc) s/Str
    s/Keyword s/Any})
