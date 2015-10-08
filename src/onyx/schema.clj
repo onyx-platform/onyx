@@ -108,7 +108,7 @@
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
-  (s/enum :fixed :sliding))
+  (s/enum :fixed :sliding :global))
 
 (def Window
   {:window/id s/Keyword

@@ -13,6 +13,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.windowing.window-extensions :as we]
               [onyx.windowing.window-id :as wid]
               [onyx.windowing.units :as units]
               [onyx.windowing.aggregation :as agg]
@@ -323,11 +324,8 @@
     (doseq [w windows]
       (doseq [msg (mapcat :leaves (:tree results))]
         (let [window-id (:window/id w)
-              w-range (apply units/to-standard-units (:window/range w))
-              w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-              units (units/standard-units-for (last (:window/range w)))
-              message (update (:message msg) (:window/window-key w) units/coerce-key units)
-              extents (wid/wids (or (:window/min-value w) 0) w-range w-slide (:window/window-key w) message)]
+              message (we/uniform-units (:window/record w) msg)
+              extents (we/extents (:window/record w) message)]
           (doseq [e extents]
             (let [f (:window/agg-fn w)
                   state (init-window-state w (get-in @window-state [window-id e]))

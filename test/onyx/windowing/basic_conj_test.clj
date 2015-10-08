@@ -95,8 +95,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 20
         workflow
         [[:in :identity] [:identity :out]]
@@ -148,34 +146,29 @@
          {:lifecycle/task :out
           :lifecycle/calls ::out-calls}
          {:lifecycle/task :out
-          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-
-        v-peers (onyx.api/start-peers 3 peer-group)]
+          :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
     (reset! in-chan (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
-    
-    (onyx.api/submit-job
-     peer-config
-     {:catalog catalog
-      :workflow workflow
-      :lifecycles lifecycles
-      :windows windows
-      :triggers triggers
-      :task-scheduler :onyx.task-scheduler/balanced})
-    
-    (doseq [i input]
-      (>!! @in-chan i))
-    (>!! @in-chan :done)
+    (reset! test-state [])
 
-    (close! @in-chan)
+    (with-test-env [test-env [3 env-config peer-config]]
+      (onyx.api/submit-job
+       peer-config
+       {:catalog catalog
+        :workflow workflow
+        :lifecycles lifecycles
+        :windows windows
+        :triggers triggers
+        :task-scheduler :onyx.task-scheduler/balanced})
+      
+      (doseq [i input]
+        (>!! @in-chan i))
+      (>!! @in-chan :done)
 
-    (let [results (take-segments! @out-chan)]
-      (is (= (into #{} input) (into #{} (butlast results))))
-      (is (= :done (last results)))
-      (is (= expected-windows @test-state)))
-    
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-    (onyx.api/shutdown-peer-group peer-group)
-    (onyx.api/shutdown-env env)))
+      (close! @in-chan)
+
+      (let [results (take-segments! @out-chan)]
+        (is (= (into #{} input) (into #{} (butlast results))))
+        (is (= :done (last results)))
+        (is (= expected-windows @test-state))))))
