@@ -10,7 +10,11 @@
                  "releases" {:url "https://clojars.org/repo"
                              :username :env
                              :password :env
-                             :sign-releases false}}
+                             :sign-releases false}
+                 "jcenter" {:url "http://jcenter.bintray.com"
+                            ;; If a repository contains releases only setting
+                            ;; :snapshots to false will speed up dependencies.
+                            :snapshots false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.apache.curator/curator-framework "2.9.0"]
@@ -27,6 +31,7 @@
                   :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.apache.bookkeeper/bookkeeper-server "4.3.1" 
                   :exclusions [org.slf4j/slf4j-log4j12]]
+                 [com.baqend/bloom-filter "1.0.7"]
                  [log4j/log4j "1.2.17"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]]
