@@ -6,11 +6,11 @@
             [onyx.compression.nippy :as nippy]
             [onyx.extensions :as extensions]
             [onyx.monitoring.measurements :refer [emit-latency-value emit-latency]]
-            [onyx.state.core :as state]
             [onyx.peer.operation :as operation]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.types :refer [inc-count! dec-count!]]
             [onyx.log.replica]
+            [onyx.log.commands.common :refer [peer-slot-id]]
             [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default defaults]])
@@ -53,7 +53,7 @@
         ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
         quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)
         ledger-handle (create-ledger bk-client ensemble-size quorum-size digest-type (password peer-opts))
-        slot-id (state/peer-slot-id event)
+        slot-id (peer-slot-id event)
         new-ledger-id (.getId ledger-handle)] 
     (>!! outbox-ch
          {:fn :assign-bookkeeper-log-id
@@ -132,7 +132,7 @@
   (emit-latency :window-log-playback 
                 monitoring
                 (fn [] 
-                  (let [slot-id (state/peer-slot-id event)
+                  (let [slot-id (peer-slot-id event)
                         ;; Don't play back the final ledger id because we just created it
                         prev-ledger-ids (butlast (get-in @replica [:state-logs job-id task-id slot-id]))]
                     (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" prev-ledger-ids)
