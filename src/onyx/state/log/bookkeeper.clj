@@ -150,8 +150,6 @@
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle]} event ack-fn entry]
-  ;; Interesting post on latency in bookkeeper
-  ;; http://mail-archives.apache.org/mod_mbox/bookkeeper-user/201509.mbox/%3CCAO2yDyaeF6T8Zza0G=BHccWeGceawYL+5TocRe40_wD6AQdFdg@mail.gmail.com%3E
   (.asyncAddEntry ^LedgerHandle ledger-handle 
                   (nippy/window-log-compress entry)
                   HandleWriteCallback
