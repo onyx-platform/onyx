@@ -116,7 +116,7 @@
    :window/type WindowType
    :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
-   :window/range Unit
+   (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/doc) s/Str
    s/Keyword s/Any})
