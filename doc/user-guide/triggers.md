@@ -23,7 +23,7 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 
 ### Summary
 
-Windows capture data over time and place segments into discrete, possibly overlapping buckets. By itself, this is a relatively useless concept. In order to hardness the information that has been captured and rolled up, we need to *move* it somewhere. Triggers let us interact with the state in each extent of a window.
+Windows capture data over time and place segments into discrete, possibly overlapping buckets. By itself, this is a relatively useless concept. In order to harness the information that has been captured and rolled up, we need to *move* it somewhere. Triggers let us interact with the state in each extent of a window.
 
 ### Trigger Types
 
