@@ -45,7 +45,7 @@
 (defrecord BookKeeperLog [client ledger-handle])
 
 ;; TODO: add zk-timeout for bookkeeper
-(defmethod state-extensions/initialise-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
+(defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
                                                                          onyx.core/job-id onyx.core/task-id
                                                                          onyx.core/kill-ch onyx.core/task-kill-ch
                                                                          onyx.core/outbox-ch] :as event}] 

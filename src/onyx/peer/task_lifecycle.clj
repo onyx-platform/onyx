@@ -577,7 +577,7 @@
 (defn resolve-log [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
     (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
-                                           (state-extensions/initialise-log log-impl pipeline)))))
+                                           (state-extensions/initialize-log log-impl pipeline)))))
 
 (defrecord TaskState [timeout-pool links])
 (defrecord WindowState [filter state])
@@ -585,7 +585,7 @@
 (defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
     (assoc pipeline :onyx.core/window-state (if (windowed-task? pipeline) 
-                                              (atom (->WindowState (state-extensions/initialise-filter filter-impl pipeline) 
+                                              (atom (->WindowState (state-extensions/initialize-filter filter-impl pipeline) 
                                                                    {}))))))
 
 (defrecord TaskLifeCycle

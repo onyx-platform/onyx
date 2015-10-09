@@ -1,6 +1,6 @@
 (ns onyx.state.state-extensions)
 
-(defmulti initialise-log 
+(defmulti initialize-log 
   (fn [log-type event]
     log-type))
 
@@ -18,7 +18,7 @@
   (fn [log event state]
     (type log)))
 
-(defmulti initialise-filter 
+(defmulti initialize-filter 
   "Initialises a filter"
   (fn [filter-type event]
     filter-type))

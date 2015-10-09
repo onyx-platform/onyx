@@ -1,7 +1,7 @@
 (ns onyx.state.filter.set
   (:require [onyx.state.state-extensions :as state-extensions]))
 
-(defmethod state-extensions/initialise-filter :set [_ _] 
+(defmethod state-extensions/initialize-filter :set [_ _] 
   #{})
 
 (defmethod state-extensions/apply-filter-id clojure.lang.PersistentHashSet [filter-state _ id] 
