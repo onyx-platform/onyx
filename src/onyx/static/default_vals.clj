@@ -17,7 +17,10 @@
    :onyx.zookeeper/backoff-max-retries 5
 
    ;; bookkeeper defaults
+   :onyx.bookkeeper/server? false
    :onyx.bookkeeper/port 3196
+   :onyx.bookkeeper/local-quorum? false
+   :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
    :onyx.bookkeeper/base-dir "/tmp/bookkeeper/"
    :onyx.bookkeeper/timeout 60000 
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
