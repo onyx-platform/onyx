@@ -203,7 +203,7 @@
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
-   (s/optional-key :onyx.bookkeeper/starting-port) s/Int
+   (s/optional-key :onyx.bookkeeper/port) s/Int
    (s/optional-key :onyx.bookkeeper/base-dir) s/Str
    (s/optional-key :onyx.bookkeeper/timeout) s/Int
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str

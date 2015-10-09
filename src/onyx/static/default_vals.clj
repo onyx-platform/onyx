@@ -15,8 +15,9 @@
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
    :onyx.zookeeper/backoff-max-retries 5
+
    ;; bookkeeper defaults
-   :onyx.bookkeeper/starting-port 3196
+   :onyx.bookkeeper/port 3196
    :onyx.bookkeeper/base-dir "/tmp/bookkeeper/"
    :onyx.bookkeeper/timeout 60000 
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 

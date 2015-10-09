@@ -30,7 +30,7 @@
               _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
               _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
               server-count (if local-quorum? 3 1)
-              base-port (:onyx.bookkeeper/starting-port defaults)
+              base-port (:onyx.bookkeeper/port defaults)
               ports (range base-port (+ base-port server-count))
               base-dir (or (:onyx.bookkeeper/base-dir env-config) 
                            (:onyx.bookkeeper/base-dir defaults))
