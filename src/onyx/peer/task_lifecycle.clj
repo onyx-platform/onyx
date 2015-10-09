@@ -335,9 +335,6 @@
 
 (defn assign-window [segment window-state w]
   (let [window-id (:window/id w)
-        w-range (apply units/to-standard-units (:window/range w))
-        w-slide (apply units/to-standard-units (or (:window/slide w) (:window/range w)))
-        units (units/standard-units-for (last (:window/range w)))
         segment-coerced (we/uniform-units (:window/record w) segment)
         extents (we/extents (:window/record w) segment-coerced)]
     (doall 
