@@ -252,8 +252,8 @@
     (do
       (extensions/emit monitoring (->MonitorEvent :peer-sentinel-found))
       (if (p-ext/drained? pipeline event)
-          (complete-job event)
-          (p-ext/retry-segment pipeline event (sentinel-id event)))
+        (complete-job event)
+        (p-ext/retry-segment pipeline event (sentinel-id event)))
       (update event
               :onyx.core/batch
               (fn [batch]
