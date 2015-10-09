@@ -28,7 +28,10 @@
    zookeeper-read-job-scheduler
    zookeeper-read-messaging
    zookeeper-gc-log-entry
+   window-log-write-entry
+   window-log-playback
    peer-ack-segments
+   peer-ack-segment
    peer-retry-segment
    peer-try-complete-job
    peer-strip-sentinel

@@ -22,6 +22,7 @@
                            :replica replica-atom
                            :peer-replica-view peer-view-atom
                            :log log
+                           :buffered-outbox []
                            :messenger-buffer buffer
                            :messenger messenger
                            :monitoring monitoring

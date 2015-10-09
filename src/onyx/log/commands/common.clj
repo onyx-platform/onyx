@@ -7,6 +7,14 @@
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
+(defn peer-slot-id 
+  [event]
+  (let [replica (:onyx.core/replica event)
+        job-id (:onyx.core/job-id event)
+        peer-id (:onyx.core/id event)
+        task-id (:onyx.core/task-id event)] 
+    (get-in @replica [:task-slot-ids job-id task-id peer-id])))
+
 (defn job->peers [replica]
   (reduce-kv
    (fn [all job tasks]

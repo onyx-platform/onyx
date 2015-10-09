@@ -6,3 +6,9 @@
 
 (defn decompress [x]
   (nippy/thaw x {:v1-compatibility? false}))
+
+(defn window-log-compress [x]
+  (nippy/freeze x {}))
+
+(defn window-log-decompress [x]
+  (nippy/thaw x {:v1-compatibility? false}))

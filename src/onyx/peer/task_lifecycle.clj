@@ -5,7 +5,7 @@
               [onyx.static.rotating-seq :as rsc]
               [onyx.log.commands.common :as common]
               [onyx.log.entry :as entry]
-              [onyx.monitoring.measurements :refer [emit-latency]]
+              [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.static.planning :refer [find-task]]
               [onyx.static.validation :as validation]
               [onyx.messaging.acking-daemon :as acker]
@@ -20,9 +20,12 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent map->Event]]
+              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
               [clj-tuple :as t]
               [onyx.interop]
+              [onyx.state.log.bookkeeper]
+              [onyx.state.filter.set]
+              [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn resolve-calling-params [catalog-entry opts]
@@ -135,8 +138,7 @@
         start-ack-val (or (:ack-val root) 0)]
     (reduce (fn process-leaf [accum {:keys [message] :as leaf}]
               (let [routes (route-data event result message flow-conditions egress-ids)
-                    message* (flow-conditions-transform message routes egress-ids
-                                                        flow-conditions event)
+                    message* (flow-conditions-transform message routes egress-ids flow-conditions event)
                     hash-group (hash-groups message* egress-ids task->group-by-fn)
                     leaf* (if (= message message*)
                             leaf
@@ -174,7 +176,7 @@
                                 retries (:retries accumulated)
                                 ret (add-from-leaves segments retries event result egress-ids
                                                      task->group-by-fn flow-conditions)
-                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) nil)
+                                new-ack (->Ack (:id root) (:completion-id root) (:ack-val ret) (atom 1) nil)
                                 acks (conj! (:acks accumulated) new-ack)]
                             (->Results (:tree results) acks (:segments ret) (:retries ret))))
                         results
@@ -182,7 +184,9 @@
     (assoc event :onyx.core/results (persistent-results! results))))
 
 (defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
-  (doseq [[acker-id acks] (group-by :completion-id (:acks results))]
+  (doseq [[acker-id acks] (->> (:acks results)
+                               (filter dec-count!)
+                               (group-by :completion-id))]
     (when-let [link (operation/peer-link @replica state event acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
@@ -227,17 +231,18 @@
   (if (= task-type :input)
     (let [candidates (:acker-candidates @peer-replica-view)
           _ (validate-ackable! candidates event)]
-      (assoc event
-             :onyx.core/batch
-             (map (fn [segment]
-                    (add-acker-id (rand-nth candidates)
-                                  (add-completion-id id segment)))
-                  (:onyx.core/batch event))))
+      (update event
+              :onyx.core/batch
+              (fn [batch] 
+                (map (fn [segment]
+                       (add-acker-id (rand-nth candidates)
+                                     (add-completion-id id segment)))
+                     batch))))
     event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
   (when (= task-type :input)
-    (swap! state update-in [:timeout-pool] rsc/add-to-head
+    (swap! state update :timeout-pool rsc/add-to-head
            (map :id (:onyx.core/batch event))))
   event)
 
@@ -247,13 +252,13 @@
     (do
       (extensions/emit monitoring (->MonitorEvent :peer-sentinel-found))
       (if (p-ext/drained? pipeline event)
-          (complete-job event)
-          (p-ext/retry-segment pipeline event (sentinel-id event)))
-        (update-in event
-                   [:onyx.core/batch]
-                   (fn [batch]
-                     (remove (fn [v] (= :done (:message v)))
-                             batch))))
+        (complete-job event)
+        (p-ext/retry-segment pipeline event (sentinel-id event)))
+      (update event
+              :onyx.core/batch
+              (fn [batch]
+                (remove (fn [v] (= :done (:message v)))
+                        batch))))
     event))
 
 (defn collect-next-segments [f input]
@@ -300,7 +305,7 @@
                  (transient (t/vector))))))
 
 (defn curry-params [f params]
-  (reduce #(partial %1 %2) f params))
+  (reduce partial f params))
 
 (defn apply-fn [f bulk? event]
   (let [g (curry-params f (:onyx.core/params event))
@@ -318,25 +323,66 @@
   (or window-state
       ((:window/agg-init w) w)))
 
-(defn assign-windows
-  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/results] :as event}]
+(defn replay-windows-from-log
+  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
   (when (seq windows)
-    (doseq [w windows]
-      (doseq [msg (mapcat :leaves (:tree results))]
-        (let [window-id (:window/id w)
-              message (we/uniform-units (:window/record w) msg)
-              extents (we/extents (:window/record w) message)]
-          (doseq [e extents]
-            (let [f (:window/agg-fn w)
-                  state (init-window-state w (get-in @window-state [window-id e]))
-                  entries (f state w (:message msg))
-                  updated-state (reduce (fn [state' [entry-type entry-value]]
-                                          ((:window/log-resolve w) state' entry-value))
-                                        state
-                                        entries)]
-              (swap! window-state assoc-in [(:window/id w) e] updated-state)))
-          (doseq [t (:onyx.core/triggers event)]
-            (triggers/fire-trigger! event window-state t {:segment (:message msg) :context :new-segment}))))))
+    (swap! window-state 
+           (fn [wstate] 
+             (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
+               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
+               replayed-state))))
+  event)
+
+(defn assign-window [segment window-state w]
+  (let [window-id (:window/id w)
+        segment-coerced (we/uniform-units (:window/record w) segment)
+        extents (we/extents (:window/record w) segment-coerced)]
+    (doall 
+      (map (fn [e]
+             (let [f (:window/agg-fn w)
+                   state (init-window-state w (get-in @window-state [window-id e]))
+                   state-transition-entry (f state w segment)
+                   new-state ((:window/apply-state-update w) state state-transition-entry)]
+               (swap! window-state assoc-in [window-id e] new-state)
+               (list e state-transition-entry)))
+           extents))))
+
+(defn assign-windows
+  [{:keys [onyx.core/windows] :as event}]
+  (when (seq windows)
+    (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger 
+                  onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
+                  onyx.core/state-log onyx.core/results]} event
+          id-key (:onyx/uniqueness-key task-map)] 
+      (doall
+        (map 
+          (fn [leaf fused-ack]
+            (let [start-time (System/currentTimeMillis)
+                  ;; Message should only be acked when all log updates have been written
+                  ;; As we filter out messages seen before, some replay can be accepted
+                  ack-fn (fn [] 
+                           (when (dec-count! fused-ack)
+                             (let [link (operation/peer-link @replica state event (:completion-id fused-ack))]
+                               (extensions/internal-ack-segment messenger event link fused-ack)))
+                           (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time)))]
+              (run! 
+                (fn [message]
+                  (let [segment (:message message)
+                        unique-id (if id-key (get segment id-key))
+                        seen? (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))]
+                    (when-not seen?
+                      (inc-count! fused-ack)
+                      (->> windows
+                           (map (partial assign-window segment window-state))
+                           doall
+                           (cons unique-id) ;; store the id at the head of the log entry
+                           (state-extensions/store-log-entry state-log event ack-fn))
+                      (doseq [t triggers]
+                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
+                      (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
+                (:leaves leaf))))
+          (:tree results)
+          (:acks results)))))
   event)
 
 (defn write-batch [pipeline event]
@@ -409,7 +455,7 @@
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
                        (compiled-after-retry-segment-fn event m))))
-              (swap! (:onyx.core/state event) update-in [:timeout-pool] rsc/expire-bucket)
+              (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
 (defn setup-triggers [event]
@@ -460,8 +506,8 @@
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
-             (assign-windows)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
+             (assign-windows)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
              (close-batch-resources)
@@ -504,7 +550,6 @@
   [{:keys [inbound-ch] :as messenger-buffer}]
   (while (first (alts!! [inbound-ch] :default false))))
 
-(defrecord TaskState [timeout-pool links])
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -523,6 +568,25 @@
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
+
+
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
+
+(defn resolve-log [{:keys [onyx.core/peer-opts] :as pipeline}]
+  (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
+    (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
+                                           (state-extensions/initialize-log log-impl pipeline)))))
+
+(defrecord TaskState [timeout-pool links])
+(defrecord WindowState [filter state])
+
+(defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
+  (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
+    (assoc pipeline :onyx.core/window-state (if (windowed-task? pipeline) 
+                                              (atom (->WindowState (state-extensions/initialize-filter filter-impl pipeline) 
+                                                                   {}))))))
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -581,12 +645,13 @@
                            :onyx.core/monitoring (assoc monitoring :task-id task-id :job-id job-id :id id :task task)
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-resp-ch
+                           :onyx.core/task-kill-ch task-kill-ch
+                           :onyx.core/kill-ch kill-ch
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn catalog-entry)
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
-                           :onyx.core/state state
-                           :onyx.core/window-state (atom {})}
+                           :onyx.core/state state}
 
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
@@ -595,10 +660,16 @@
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
-                (Thread/sleep (or (:onyx.peer/peer-not-ready-back-off opts) 2000)))
+                (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
-            pipeline-data ((:onyx.core/compiled-before-task-start-fn pipeline-data) pipeline-data)
-            pipeline-data (setup-triggers pipeline-data)]
+            before-task-start-fn (:onyx.core/compiled-before-task-start-fn pipeline-data)
+
+            pipeline-data (-> pipeline-data
+                              before-task-start-fn
+                              setup-triggers
+                              resolve-window-state
+                              resolve-log
+                              replay-windows-from-log)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -608,7 +679,7 @@
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
             (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
-            (Thread/sleep 500)
+            (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
@@ -633,6 +704,12 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
+      (when-let [state-log (:onyx.core/state-log event)] 
+        (state-extensions/close-log state-log event))
+
+      (when-let [window-state (:onyx.core/window-state event)] 
+        (state-extensions/close-filter (:filter @window-state) event))
+
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))

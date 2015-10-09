@@ -154,7 +154,7 @@
               :window/record (w/windowing-record window)
               :window/agg-init (resolve-window-init window calls)
               :window/agg-fn (:aggregation/fn calls)
-              :window/log-resolve (:aggregation/log-resolve calls))))
+              :window/apply-state-update (:aggregation/apply-state-update calls))))
    windows))
 
 (defn resolve-triggers [triggers]

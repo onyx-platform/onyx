@@ -90,6 +90,13 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:onyx/min-peers`         | `integer`  | `any`               |
 |`:onyx/flux-policy`       | `keyword`  | `:kill`, `:continue`|
 
+##### Maps with associated windows, may have these keys
+
+| key name                 | type       | choices             |
+|--------------------------|------------|---------------------|
+|`:onyx/uniqueness-key`    | `any`      |                     |
+
+
 ### Flow Conditions
 
 - a single Clojure vector which is EDN serializable/deserializable

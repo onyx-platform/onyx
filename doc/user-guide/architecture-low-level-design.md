@@ -246,7 +246,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 ## Command Reference
 
 -------------------------------------------------
-[`prepare-join-cluster`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/prepare_join_cluster.clj)
+[`prepare-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/prepare_join_cluster.clj)
 
 - Submitter: peer (P) that wants to join the cluster
 - Purpose: determines which peer (Q) that will watch P. If P is the only peer, it instantly fully joins the cluster
@@ -256,7 +256,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: Q sends `notify-join-cluster` to the log, with args P and R (R being the peer Q watches currently)
 
 -------------------------------------------------
-[`notify-join-cluster`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/notify_join_cluster.clj)
+[`notify-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/notify_join_cluster.clj)
 
 - Submitter: peer Q helping to stitch peer P into the cluster
 - Purpose: Adds a watch from P to R, where R is the node watched by Q
@@ -266,7 +266,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: P sends `accept-join-cluster` to the log, with args P, Q, and R
 
 -------------------------------------------------
-[`accept-join-cluster`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/accept_join_cluster.clj)
+[`accept-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/accept_join_cluster.clj)
 
 - Submitter: peer P wants to join the cluster
 - Purpose: confirms that P can safely join, Q can drop its watch from R, since P now watches R, and Q watches P
@@ -276,7 +276,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: peer P flushes its outbox of messages
 
 -------------------------------------------------
-[`abort-join-cluster`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/abort_join_cluster.clj)
+[`abort-join-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/abort_join_cluster.clj)
 
 - Submitter: peer (Q) determines that peer (P) cannot join the cluster (P may = Q)
 - Purpose: Aborts P's attempt at joining the cluster, erases attempt from replica
@@ -286,7 +286,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: P optionally sends `:prepare-join-cluster` to the log and tries again
 
 -------------------------------------------------
-[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/leave_cluster.clj)
+[`leave-cluster`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/leave_cluster.clj)
 
 - Submitter: peer (Q) reporting that peer P is dead
 - Purpose: removes P from `:prepared`, `:accepted`, `:pairs`, and/or `:peers`, transitions Q's watch to R (the node P watches) and transitively closes the ring
@@ -295,7 +295,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Side effects: Q adds a ZooKeeper watch to R's pulse node
 
 -------------------------------------------------
-[`seal-task`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/seal_task.clj)
+[`seal-task`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/seal_task.clj)
 
 - Submitter: peer (P), who has seen the leader sentinel
 - Purpose: P wants to propagate the sentinel to all downstream tasks
@@ -305,7 +305,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: None
 
 -------------------------------------------------
-[`submit-job`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/submit_job.clj)
+[`submit-job`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/submit_job.clj)
 
 - Submitter: Client, via public facing API
 - Purpose: Send a catalog and workflow to be scheduled for execution by the cluster
@@ -315,7 +315,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: If the job scheduler dictates that this peer should be reallocated to this job or another job, sends `:volunteer-for-task` to the log
 
 -------------------------------------------------
-[`kill-job`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/kill_job.clj)
+[`kill-job`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/kill_job.clj)
 
 - Submitter: Client, via public facing API
 - Purpose: Stop all peers currently working on this job, and never allow this job's tasks to be scheduled for execution again
@@ -325,7 +325,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: If this peer is executing a task for this job, reacts with `:volunteer-for-task`
 
 -------------------------------------------------
-[`gc`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/gc.clj)
+[`gc`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/gc.clj)
 
 - Submitter: Client, via public facing API
 - Purpose: Compress all peer local replicas and trim old log entries in ZooKeeper.
@@ -335,7 +335,7 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: None
 
 -------------------------------------------------
-[`signal-ready`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/signal_ready.clj)
+[`signal-ready`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/signal_ready.clj)
 
 - Submitter: peer (P), who has successfully started its incoming buffer
 - Purpose: Indicates that this peer is ready to receive segments as input
@@ -344,11 +344,20 @@ The garbage collector can be invoked by the public API function `onyx.api/gc`. U
 - Reactions: None.
 
 -------------------------------------------------
-[`set-replica!`](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/log/commands/set_replica.clj)
+[`set-replica!`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/set_replica.clj)
 
 - Submitter: This is a special entry that should never be appended to the log
 - Purpose: Perform a hard reset of the replica, replacing its entire value. This is useful if a log subscriber is reading behind a garbage collection call and tries to read a non-existent entry. The new origin can be found and its value applied locally via the subscriber.
 - Replica update: Replaces the entire value of the replica with a new value
+- Side effects: None.
+- Reactions: None.
+
+-------------------------------------------------
+[`assign-bookkeeper-log-id`](https://github.com/onyx-platform/onyx/blob/master/src/onyx/log/commands/assign_bookkeeper_log_id.clj)
+
+- Submitter: Peer that performs log initialization.
+- Purpose: Sets an identifier to the ledger that will track the state represented by this log.
+- Replica update: Updates `:state-logs` with the id.
 - Side effects: None.
 - Reactions: None.
 

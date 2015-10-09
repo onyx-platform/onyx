@@ -36,6 +36,7 @@
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size (s/pred pos? 'pos?)
+   (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
@@ -155,8 +156,10 @@
    :onyx/id ClusterId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
+   (s/optional-key :bookkeeper/server?) s/Bool
+   (s/optional-key :bookkeeper/local-quorum?) s/Bool
+   (s/optional-key :bookkeeper/base-dir) s/Str
    s/Keyword s/Any})
-
 
 (def ^{:private true} PortRange
   [(s/one s/Int "port-range-start") 
@@ -170,6 +173,13 @@
 
 (def Messaging
   (s/enum :aeron :dummy-messenger))
+
+(def StateLogImpl
+  (s/enum :bookkeeper))
+
+
+(def StateFilterImpl
+  (s/enum :set :bloom))
 
 (def PeerConfig
   {:zookeeper/address s/Str
@@ -185,12 +195,24 @@
    (s/optional-key :onyx.peer/retry-start-interval) s/Int
    (s/optional-key :onyx.peer/join-failure-back-off) s/Int
    (s/optional-key :onyx.peer/drained-back-off) s/Int
-   (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/job-not-ready-back-off) s/Int
+   (s/optional-key :onyx.peer/peer-not-ready-back-off) s/Int
    (s/optional-key :onyx.peer/fn-params) s/Any
    (s/optional-key :onyx.peer/backpressure-check-interval) s/Int
    (s/optional-key :onyx.peer/backpressure-low-water-pct) s/Int
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
+   (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
+   (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
+   (s/optional-key :onyx.bookkeeper/server?) s/Bool
+   (s/optional-key :onyx.bookkeeper/port) s/Int
+   (s/optional-key :onyx.bookkeeper/local-quorum?) s/Bool
+   (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
+   (s/optional-key :onyx.bookkeeper/base-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/timeout) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
+   (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-quorum-size) s/Int
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int

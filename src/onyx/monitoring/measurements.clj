@@ -21,3 +21,7 @@
       (extensions/emit monitoring (t/->MonitorEventLatency event-type elapsed))
       rets)
     (f)))
+
+(defn emit-latency-value [event-type monitoring elapsed]
+  (when (extensions/registered? monitoring event-type)
+    (extensions/emit monitoring (t/->MonitorEventLatency event-type elapsed))))
