@@ -122,4 +122,4 @@
       (let [results (take-segments! @out-chan)]
         (is (= (into #{} input) (into #{} (butlast results))))
         (is (= :done (last results)))
-        (is (= expecte-dwindows @test-state))))))
+        (is (= expected-windows @test-state))))))
