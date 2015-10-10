@@ -54,7 +54,7 @@
           w-range (apply to-standard-units (:window/range window))
           w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))]
       [(wid/extent-lower win-min w-range w-slide window-id)
-       (wid/extent-upper win-min w-range window-id)])))
+       (wid/extent-upper win-min w-slide window-id)])))
 
 (deftype GlobalWindow [window]
   IWindow
