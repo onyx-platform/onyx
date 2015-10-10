@@ -158,14 +158,13 @@ The `:max` operation retains the maximum value found for `:age`. An initial valu
 
 #### `:onyx.windowing.aggregation/average`
 
-The `:average` operation maintains an average over `:age`. An initial value must be supplied via `:window/init`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
+The `:average` operation maintains an average over `:age`. The state is maintained as a map with two keys - `:n`, the number of elements, and `:average`, the running average.
 
 ```clojure
 {:window/id :average-age
  :window/task :identity
  :window/type :fixed
  :window/aggregation [:onyx.windowing.aggregation/average :age]
- :window/init 0
  :window/window-key :event-time
  :window/range [30 :minutes]
  :window/doc "Finds the average :age in 30 minute fixed windows, default is 0"}

@@ -18,6 +18,9 @@
 (defn count-aggregation-fn-init [window]
   0)
 
+(defn average-aggregation-fn-init [window]
+  {:sum 0 :n 0})
+
 (defn conj-aggregation-fn [state window segment]
   [:conj segment])
 
@@ -67,5 +70,6 @@
    :aggregation/apply-state-update set-value-aggregation-apply-log})
 
 (def average
-  {:aggregation/fn average-aggregation-fn
+  {:aggregation/init average-aggregation-fn-init
+   :aggregation/fn average-aggregation-fn
    :aggregation/apply-state-update set-value-aggregation-apply-log})
