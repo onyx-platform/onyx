@@ -2,6 +2,7 @@
   (:require [onyx.static.planning :refer [find-window]]
             [onyx.windowing.units :refer [to-standard-units coerce-key]]
             [onyx.windowing.window-id :as wid]
+            [onyx.windowing.window-extensions :as we]
             [onyx.static.default-vals :as d]
             [taoensso.timbre :refer [info warn fatal]]))
 
@@ -71,13 +72,9 @@
 (defn iterate-windows [event trigger window-ids f opts]
   (doseq [[window-id state] window-ids]
     (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
-          win-min (or (:window/min-value window) (get d/defaults :onyx.windowing/min-value))
-          w-range (apply to-standard-units (:window/range window))
-          w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))
-          lower (wid/extent-lower win-min w-range w-slide window-id)
-          upper (wid/extent-upper win-min w-slide window-id)
+          [lower upper] (we/bounds (:window/record window) window-id)
           args (merge opts
-                      {:window window :window-id window-id :w-range w-range
+                      {:window window :window-id window-id
                        :lower-extent lower :upper-extent upper})]
       (when (f event trigger args)
         (refine-state event trigger)
