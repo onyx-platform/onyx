@@ -68,7 +68,7 @@ The function is then invoked with `(partial f "abc" "def")`. The order is contro
 
 #### Grouping & Aggregation
 
-Grouping ensures that "like" values are always routed to the same virtual peer, presumably to compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to two group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. Grouped functions must set keys `:onyx/min-peers` and `:onyx/flux-policy`. See below for a description of these.
+Grouping ensures that "like" values are always routed to the same virtual peer, presumably to compute an aggregate. Grouping is specified inside of a catalog entry. There are two ways to group: by key of segment, or by arbitrary function. Grouping by key is a convenience that will reach into each segment and pin all segments with the same key value in the segment together. Grouping functions receive a single segment as input. The output of a grouping function is the value to group on. Grouped functions must set keys `:onyx/min-peers` and `:onyx/flux-policy`. See below for a description of these.
 
 #### Group By Key
 
