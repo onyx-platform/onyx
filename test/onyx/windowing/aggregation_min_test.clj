@@ -1,4 +1,4 @@
-(ns onyx.windowing.aggregation-conj-test
+(ns onyx.windowing.aggregation-min-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -23,50 +23,7 @@
    {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}])
 
 (def expected-windows
-  [[1442113200000 1442113499999 
-    [{:id 1, :age 21, :event-time #inst "2015-09-13T03:00:00.829-00:00"} 
-     {:id 2, :age 12, :event-time #inst "2015-09-13T03:04:00.829-00:00"}]] 
-   [1442113500000 1442113799999 
-    [{:id 3, :age 3, :event-time #inst "2015-09-13T03:05:00.829-00:00"} 
-     {:id 4, :age 64, :event-time #inst "2015-09-13T03:06:00.829-00:00"}
-     {:id 5, :age 53, :event-time #inst "2015-09-13T03:07:00.829-00:00"}]] 
-   [1442113200000 1442113499999
-    [{:id 1, :age 21, :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-     {:id 2, :age 12, :event-time #inst "2015-09-13T03:04:00.829-00:00"}]] 
-   [1442113500000 1442113799999 
-    [{:id 3, :age 3, :event-time #inst "2015-09-13T03:05:00.829-00:00"}
-     {:id 4, :age 64, :event-time #inst "2015-09-13T03:06:00.829-00:00"}
-     {:id 5, :age 53, :event-time #inst "2015-09-13T03:07:00.829-00:00"}
-     {:id 6, :age 52, :event-time #inst "2015-09-13T03:08:00.829-00:00"}
-     {:id 7, :age 24, :event-time #inst "2015-09-13T03:09:00.829-00:00"}]] 
-   [1442114100000 1442114399999 
-    [{:id 8, :age 35, :event-time #inst "2015-09-13T03:15:00.829-00:00"}]] 
-   [1442114700000 1442114999999 
-    [{:id 9, :age 49, :event-time #inst "2015-09-13T03:25:00.829-00:00"}]]
-   [1442115900000 1442116199999 
-    [{:id 10, :age 37, :event-time #inst "2015-09-13T03:45:00.829-00:00"}]] 
-   [1442113200000 1442113499999 
-    [{:id 1, :age 21, :event-time #inst "2015-09-13T03:00:00.829-00:00"} 
-     {:id 2, :age 12, :event-time #inst "2015-09-13T03:04:00.829-00:00"} 
-     {:id 11, :age 15, :event-time #inst "2015-09-13T03:03:00.829-00:00"}]]
-   [1442113500000 1442113799999 
-    [{:id 3, :age 3, :event-time #inst "2015-09-13T03:05:00.829-00:00"} 
-     {:id 4, :age 64, :event-time #inst "2015-09-13T03:06:00.829-00:00"} 
-     {:id 5, :age 53, :event-time #inst "2015-09-13T03:07:00.829-00:00"} 
-     {:id 6, :age 52, :event-time #inst "2015-09-13T03:08:00.829-00:00"} 
-     {:id 7, :age 24, :event-time #inst "2015-09-13T03:09:00.829-00:00"}]] 
-   [1442114100000 1442114399999 
-    [{:id 8, :age 35, :event-time #inst "2015-09-13T03:15:00.829-00:00"}
-     {:id 15, :age 35, :event-time #inst "2015-09-13T03:16:00.829-00:00"}]]
-   [1442114700000 1442114999999 
-    [{:id 9, :age 49, :event-time #inst "2015-09-13T03:25:00.829-00:00"}]] 
-   [1442115900000 1442116199999 
-    [{:id 10, :age 37, :event-time #inst "2015-09-13T03:45:00.829-00:00"}]] 
-   [1442116500000 1442116799999 
-    [{:id 12, :age 22, :event-time #inst "2015-09-13T03:56:00.829-00:00"} 
-     {:id 13, :age 83, :event-time #inst "2015-09-13T03:59:00.829-00:00"}]] 
-   [1442115000000 1442115299999 
-    [{:id 14, :age 60, :event-time #inst "2015-09-13T03:32:00.829-00:00"}]]])
+  [[Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY 3]])
 
 (def test-state (atom []))
 
@@ -89,7 +46,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest conj-test
+(deftest min-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
@@ -124,17 +81,17 @@
         windows
         [{:window/id :collect-segments
           :window/task :identity
-          :window/type :fixed
-          :window/aggregation :onyx.windowing.aggregation/conj
+          :window/type :global
+          :window/aggregation [:onyx.windowing.aggregation/min :age]
           :window/window-key :event-time
-          :window/range [5 :minutes]}]
+          :window/init 99}]
 
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/refinement :accumulating
           :trigger/on :segment
           :trigger/fire-all-extents? true
-          :trigger/threshold [5 :elements]
+          :trigger/threshold [15 :elements]
           :trigger/sync ::update-atom!}]
 
         lifecycles
