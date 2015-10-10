@@ -1,4 +1,4 @@
-(ns onyx.windowing.trigger-predicate-test
+(ns onyx.windowing.trigger-punctuation-test
   (:require [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test :refer [deftest is]]

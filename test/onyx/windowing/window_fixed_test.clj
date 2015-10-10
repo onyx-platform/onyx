@@ -1,4 +1,4 @@
-(ns onyx.windowing.fixed-window-test
+(ns onyx.windowing.window-fixed-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
