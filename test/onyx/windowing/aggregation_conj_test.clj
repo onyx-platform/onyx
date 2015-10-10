@@ -1,4 +1,4 @@
-(ns onyx.windowing.basic-conj-test
+(ns onyx.windowing.aggregation-conj-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
