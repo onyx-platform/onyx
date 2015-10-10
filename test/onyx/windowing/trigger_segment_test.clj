@@ -1,11 +1,10 @@
-(ns onyx.windowing.trigger-percentile-watermark-test
+(ns onyx.windowing.trigger-segment-test
   (:require [clojure.test :refer [deftest is]]
             [onyx.triggers.triggers-api :as api]
             [onyx.api]))
 
-(deftest percentile-watermark-test
-  (let [t 1444443468904
-        window {:window/id :collect-segments
+(deftest segment-trigger-test
+  (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed
                 :window/aggregation :onyx.windowing.aggregation/count
@@ -13,21 +12,18 @@
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
                  :trigger/refinement :accumulating
-                 :trigger/on :percentile-watermark
-                 :trigger/watermark-percentage 0.50
+                 :trigger/on :segment
+                 :trigger/threshold [5 :elements]
                  :trigger/sync ::no-op
                  :trigger/id :trigger-id}
-        segment {:event-time t}
-        event {}]
+        segment {}
+        event {:onyx.triggers/segments (atom {:trigger-id 4})}]
     (is
      (api/trigger-fire?
       event trigger
-      {:window window :segment segment
-       :lower-extent (- t 75)
-       :upper-extent (+ t 25)})))
+      {:window window :segment segment})))
 
-  (let [t 1444443468904
-        window {:window/id :collect-segments
+  (let [window {:window/id :collect-segments
                 :window/task :identity
                 :window/type :fixed
                 :window/aggregation :onyx.windowing.aggregation/count
@@ -35,16 +31,14 @@
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
                  :trigger/refinement :accumulating
-                 :trigger/on :percentile-watermark
-                 :trigger/watermark-percentage 0.50
+                 :trigger/on :segment
+                 :trigger/threshold [5 :elements]
                  :trigger/sync ::no-op
                  :trigger/id :trigger-id}
-        segment {:event-time t}
-        event {}]
+        segment {}
+        event {:onyx.triggers/segments (atom {:trigger-id 3})}]
     (is
      (not
       (api/trigger-fire?
        event trigger
-       {:window window :segment segment
-        :lower-extent (- t 25)
-        :upper-extent (+ t 75)})))))
+       {:window window :segment segment})))))
