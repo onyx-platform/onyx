@@ -46,7 +46,7 @@
 
 (defn start-rotation-fut [peer-opts db id-counter bucket]
   (future
-    (let [rotation-sleep (arg-or-default :onyx.rocksdb.filter/rotation-check-interval peer-opts)
+    (let [rotation-sleep (arg-or-default :onyx.rocksdb.filter/rotation-check-interval-ms peer-opts)
           elements-per-bucket (arg-or-default :onyx.rocksdb.filter/rotate-filter-bucket-every-n peer-opts)] 
       (loop []
         (try
