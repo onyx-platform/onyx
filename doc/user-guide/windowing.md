@@ -11,14 +11,15 @@ This section discusses a feature called windowing. Windows allow you to group an
   - [Fixed Windows](#fixed-windows)
   - [Sliding Windows](#sliding-windows)
   - [Global Windows](#global-windows)
+  - [Session Windows](#session-windows)
 - [Units](#units)
 - [Aggregation](#aggregation)
-  - [`:conj`](#conj)
-  - [`:count`](#count)
-  - [`:sum`](#sum)
-  - [`:min`](#min)
-  - [`:max`](#max)
-  - [`:average`](#average)
+  - [`:onyx.windowing.aggregation/conj`](#onyxwindowingaggregationconj)
+  - [`:onyx.windowing.aggregation/count`](#onyxwindowingaggregationcount)
+  - [`:onyx.windowing.aggregation/sum`](#onyxwindowingaggregationsum)
+  - [`:onyx.windowing.aggregation/min`](#onyxwindowingaggregationmin)
+  - [`:onyx.windowing.aggregation/max`](#onyxwindowingaggregationmax)
+  - [`:onyx.windowing.aggregation/average`](#onyxwindowingaggregationaverage)
 - [Window Specification](#window-specification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -49,6 +50,17 @@ Fixed windows, sometimes called Tumbling windows, span a particular range and do
                           |---|     [35 - 39]
 ```
 
+Example:
+
+```clojure
+{:window/id :collect-segments
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation :onyx.windowing.aggregation/count
+ :window/window-key :event-time
+ :window/range [5 :minutes]}
+```
+
 #### Sliding Windows
 
 In contrast to fixed windows, sliding windows allow extents to overlap. When a sliding window is specified, we have to give it a range for which the window spans, and a *slide* value for how long to wait between spawning a new window extent. Every data point will fall into exactly `range / slide` number of window extents. We draw out what this looks like for a sliding window with range `15` and slide `5`:
@@ -63,13 +75,62 @@ In contrast to fixed windows, sliding windows allow extents to overlap. When a s
                   |-----------|     [25 - 39]
 ```
 
+Example:
+
+```clojure
+{:window/id :collect-segments
+ :window/task :identity
+ :window/type :sliding
+ :window/aggregation :onyx.windowing.aggregation/conj
+ :window/window-key :event-time
+ :window/range [5 :minutes]
+ :window/slide [1 :minute]}
+```
+
 #### Global Windows
 
-Global windows are perhaps the easiest to understand. With global windows, there is one window extent that match all data that enters it. This lets you capture events that span over an entire domain of time. Global windows are useful for batch-style computations.
+Global windows are perhaps the easiest to understand. With global windows, there is exactly one window extent that match all data that enters it. This lets you capture events that span over an entire domain of time. Global windows are useful for modeling batch or timeless computations.
+
+```text
+<- Negative Infinity                Positive Infinity ->
+|-------------------------------------------------------|
+```
+
+Example:
+
+```clojure
+{:window/id :collect-segments
+ :window/task :identity
+ :window/type :global
+ :window/aggregation :onyx.windowing.aggregation/count
+ :window/window-key :event-time}]
+```
 
 #### Session Windows
 
-Session windows are windows that dynamically resize their upper and lower bounds. Sessions capture a time span of activity for a specific key, such as a user ID. If no activity occurs within a timeout gap, the session ends. If an event occurs within the bounds of a session, the window size is fused with the new event, and the session is extended by its timeout gap.
+Session windows are windows that dynamically resize their upper and lower bounds in reaction to incoming data. Sessions capture a time span of activity for a specific key, such as a user ID. If no activity occurs within a timeout gap, the session closes. If an event occurs within the bounds of a session, the window size is fused with the new event, and the session is extended by its timeout gap either in the forward or backward direction.
+
+For example, if events with the same session key occured at `5`, `7`, and `20`, and the session window used a timeout gap of 5, the windows would look like the following:
+
+```text
+1, 5, 10, 15, 20, 25, 30, 35, 40
+   |-|                           [5 - 7]
+              |                  [20 - 20]
+```
+
+Windows that aren't fused to anything are single points in time (see `20`). If an event occurs before or after its timeout gap on the timeline, the two events fuse, as `5`, and `7` do.
+
+Example:
+
+```clojure
+{:window/id :collect-segments
+ :window/task :identity
+ :window/type :session
+ :window/aggregation :onyx.windowing.aggregation/conj
+ :window/window-key :event-time
+ :window/session-key :id
+ :window/timeout-gap [5 :minutes]}]
+```
 
 ### Units
 
