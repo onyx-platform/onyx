@@ -32,8 +32,11 @@
    :onyx.rocksdb.filter/bloom-filter-bits 10
    :onyx.rocksdb.filter/compression :none
    :onyx.rocksdb.filter/block-size 4096
-   ; rocksdb cache per filtering peer, 100MB
+   ;; rocksdb cache per filtering peer, 100MB
    :onyx.rocksdb.filter/peer-block-cache-size (* 100 1024 1024)
+   ;; rotate the filter bucket every n elements, 256 buckets
+   :onyx.rocksdb.filter/rotate-filter-bucket-every-n 1000000 
+   :onyx.rocksdb.filter/rotation-check-interval 100 
 
    ;; peer defaults
    :onyx.peer/inbox-capacity 1000
