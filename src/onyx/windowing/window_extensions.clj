@@ -141,7 +141,7 @@
 
   (merge-extents [this extents super-agg-fn segment]
     (let [session-key (get segment (:window/session-key window))]
-      (loop [ks (sort-by :session-lower-bound (filter (fn [e] (= (:session-key e) session-key)) (keys extents)))
+      (loop [ks (sort-by :session-lower-bound (filter #(= (:session-key %) session-key) (keys extents)))
              results (into {} (filter (fn [[e v]] (not= (:session-key e) session-key)) extents))]
         (if-not (seq ks)
           results
