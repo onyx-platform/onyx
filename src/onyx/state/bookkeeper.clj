@@ -35,8 +35,8 @@
             base-dir (arg-or-default :onyx.bookkeeper/base-dir env-config)
             servers (mapv (fn [port]
                             (let [server-id (java.util.UUID/randomUUID)
-                                  journal-dir (str base-dir port "_jrnl_" server-id)
-                                  ledger-dir (str base-dir port "_ldgr_" server-id)
+                                  journal-dir (str base-dir "/" port "_jrnl_" server-id)
+                                  ledger-dir (str base-dir "/" port "_ldgr_" server-id)
                                   server-conf (doto (ServerConfiguration.)
                                                 (.setZkServers (:zookeeper/address env-config))
                                                 (.setZkLedgersRootPath ledgers-root-path)

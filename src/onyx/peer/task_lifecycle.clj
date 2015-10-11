@@ -25,6 +25,7 @@
               [onyx.interop]
               [onyx.state.log.bookkeeper]
               [onyx.state.filter.set]
+              [onyx.state.filter.rocksdb]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -574,6 +575,9 @@
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
+(defn exactly-once-task? [event]
+  (boolean (get-in event [:onyx.core/task-map :onyx/uniqueness-key])))
+
 (defn resolve-log [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
     (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
@@ -584,9 +588,12 @@
 
 (defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
-    (assoc pipeline :onyx.core/window-state (if (windowed-task? pipeline) 
-                                              (atom (->WindowState (state-extensions/initialize-filter filter-impl pipeline) 
-                                                                   {}))))))
+    (assoc pipeline :onyx.core/window-state (if (exactly-once-task? pipeline) 
+                                              (do
+                                                (info "Initialising window state " )
+                                               
+                                                (atom (->WindowState (state-extensions/initialize-filter filter-impl pipeline) 
+                                                                   {})))))))
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -708,7 +715,8 @@
         (state-extensions/close-log state-log event))
 
       (when-let [window-state (:onyx.core/window-state event)] 
-        (state-extensions/close-filter (:filter @window-state) event))
+        (when (exactly-once-task? event)
+          (state-extensions/close-filter (:filter @window-state) event)))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))

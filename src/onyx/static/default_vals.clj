@@ -21,12 +21,19 @@
    :onyx.bookkeeper/port 3196
    :onyx.bookkeeper/local-quorum? false
    :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
-   :onyx.bookkeeper/base-dir "/tmp/bookkeeper/"
+   :onyx.bookkeeper/base-dir "/tmp/bookkeeper"
    :onyx.bookkeeper/timeout 60000 
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
    :onyx.bookkeeper/ledger-ensemble-size 3
    :onyx.bookkeeper/ledger-quorum-size 3
    :onyx.bookkeeper/ledger-id-written-back-off 500
+
+   :onyx.rocksdb.filter/base-dir "/tmp/rocksdb_filter"
+   :onyx.rocksdb.filter/bloom-filter-bits 10
+   :onyx.rocksdb.filter/compression :none
+   :onyx.rocksdb.filter/block-size 4096
+   ; rocksdb cache per filtering peer, 100MB
+   :onyx.rocksdb.filter/peer-block-cache-size (* 100 1024 1024)
 
    ;; peer defaults
    :onyx.peer/inbox-capacity 1000
@@ -38,7 +45,7 @@
    :onyx.peer/backpressure-low-water-pct 30
    :onyx.peer/backpressure-high-water-pct 60
    :onyx.peer/state-log-impl :bookkeeper
-   :onyx.peer/state-filter-impl :set
+   :onyx.peer/state-filter-impl :rocksdb
 
    ;; messaging defaults
    :onyx.messaging.aeron/embedded-driver? true
