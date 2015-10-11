@@ -31,7 +31,7 @@
       (or (ns-resolve user-ns user-fn)
           (throw (Exception.))))
     (catch Throwable e
-      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:kw kw})))))
+      (throw (ex-info (str "Could not resolve symbol on the classpath, did you require the file that contains the symbol " kw "?") {:kw kw})))))
 
 (defn resolve-fn [task-map]
   (kw->fn (:onyx/fn task-map)))
