@@ -16,9 +16,9 @@
 
 (defn cleanup-dirs [servers]
   (doseq [dir (map :ledger-dir servers)]
-    (FileUtils/deleteDirectory (java.io.File. dir)))
+    (FileUtils/deleteDirectory (java.io.File. ^String dir)))
   (doseq [dir (map :journal-dir servers)]
-    (FileUtils/deleteDirectory (java.io.File. dir))))
+    (FileUtils/deleteDirectory (java.io.File. ^String dir))))
 
 (defrecord Bookie [env-config log]
   component/Lifecycle

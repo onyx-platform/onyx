@@ -1,20 +1,21 @@
 (ns onyx.state.filter.rocksdb
-  (:import [org.rocksdb RocksDB Options BloomFilter BlockBasedTableConfig]
+  (:import [org.rocksdb RocksDB RocksIterator Options BloomFilter BlockBasedTableConfig CompressionType]
            [org.apache.commons.io FileUtils])
   (:require [onyx.state.state-extensions :as state-extensions]
+            [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! thread]]
             [onyx.state.rocksdb :as r]
             [onyx.static.default-vals :refer [arg-or-default defaults]]
             [onyx.compression.nippy :as nippy]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
-(defrecord RocksDbInstance [dir db id-counter bucket rotation-fut])
+(defrecord RocksDbInstance [dir db id-counter bucket rotation-thread shutdown-ch])
 
 (defn new-bucket [v]
   (let [cyc (byte-array 1)]
     (aset cyc 0 (byte v))
     cyc))
 
-(defn bucket-val [cyc]
+(defn bucket-val [^bytes cyc]
   (aget cyc 0))
 
 (defn next-bucket [cyc]
@@ -25,41 +26,42 @@
 
 (def start-bucket 0)
 
-(defn clear-bucket! [db bucket]
+(defn clear-bucket! [db bucket shutdown-ch]
   (let [bucket-val (byte bucket)
-        iterator (.newIterator db)]
+        iterator ^RocksIterator (.newIterator db)]
     (try
       (.seekToFirst iterator)
-      (while (.isValid iterator)
-        (when (= (aget (.value iterator) 0) 
+      (while (and (.isValid iterator) 
+                  (first (alts!! [shutdown-ch] :default true)))
+        (when (= (aget ^bytes (.value iterator) 0) 
                  bucket-val)
-          (.remove db (.key iterator)))
+          (.remove ^RocksDB db ^bytes (.key iterator)))
         (.next iterator))
       (finally
         (.dispose iterator)))))
 
 (defn rotate-bucket! 
   "Rotates to the next bucket, and then starts clearing the one after it"
-  [db bucket]
+  [db bucket shutdown-ch]
   (swap! bucket next-bucket)
-  (clear-bucket! db (bucket-val (next-bucket @bucket))))
+  (clear-bucket! db (bucket-val (next-bucket @bucket)) shutdown-ch))
 
-(defn start-rotation-fut [peer-opts db id-counter bucket]
-  (future
+(defn start-rotation-thread [shutdown-ch peer-opts db id-counter bucket]
+  (thread
     (let [rotation-sleep (arg-or-default :onyx.rocksdb.filter/rotation-check-interval-ms peer-opts)
           elements-per-bucket (arg-or-default :onyx.rocksdb.filter/rotate-filter-bucket-every-n peer-opts)] 
       (loop []
-        (try
-          (Thread/sleep rotation-sleep)
-          (when (> @id-counter elements-per-bucket)
-            (info "Rotating filter bucket after" elements-per-bucket "elements.")
-            (rotate-bucket! db bucket)
-            (reset! id-counter 0)) 
-          (catch InterruptedException e
-            (throw e))
-          (catch Throwable e
-            (fatal e))))
-      (recur))))
+        (let [timeout-ch (timeout rotation-sleep)
+              ch (second (alts!! [timeout-ch shutdown-ch]))]
+          (when (= ch timeout-ch)
+            (try
+              (when (> @id-counter elements-per-bucket)
+                (info "Rotating filter bucket after" elements-per-bucket "elements.")
+                (rotate-bucket! db bucket shutdown-ch)
+                (reset! id-counter 0))
+              (catch Throwable e
+                (fatal e)))
+            (recur)))))))
 
 (defmethod state-extensions/initialize-filter :rocksdb [_ {:keys [onyx.core/peer-opts onyx.core/id onyx.core/task-id] :as event}] 
   (let [_ (RocksDB/loadLibrary)
@@ -68,7 +70,7 @@
         block-cache-size (arg-or-default :onyx.rocksdb.filter/peer-block-cache-size peer-opts)
         base-dir-path (arg-or-default :onyx.rocksdb.filter/base-dir peer-opts)
         bloom-filter-bits (arg-or-default :onyx.rocksdb.filter/bloom-filter-bits peer-opts)
-        base-dir-path-file (java.io.File. base-dir-path)
+        base-dir-path-file ^java.io.File (java.io.File. ^String base-dir-path)
         _ (when-not (.exists base-dir-path-file) (.mkdir base-dir-path-file))
         db-dir (str base-dir-path "/" id "_" task-id)
         bloom-filter (BloomFilter. bloom-filter-bits false)
@@ -77,14 +79,15 @@
                        (.setBlockCacheSize block-size)
                        (.setFilter bloom-filter))
         options (doto (Options.)
-                  (.setCompressionType (r/compression-option->type compression-opt))
+                  (.setCompressionType ^CompressionType (r/compression-option->type compression-opt))
                   (.setCreateIfMissing true)
                   (.setTableFormatConfig block-config))
         db (RocksDB/open options db-dir)
         bucket (atom (new-bucket start-bucket))
         id-counter (atom 0)
-        rotation-fut (start-rotation-fut peer-opts db id-counter bucket)]
-    (->RocksDbInstance db-dir db id-counter bucket rotation-fut)))
+        shutdown-ch (chan 1)
+        rotation-thread (start-rotation-thread shutdown-ch peer-opts db id-counter bucket)]
+    (->RocksDbInstance db-dir db id-counter bucket rotation-thread shutdown-ch)))
 
 (defmethod state-extensions/apply-filter-id onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
   (let [k ^bytes (nippy/localdb-compress id)]
@@ -98,6 +101,8 @@
     (not (nil? (.get ^RocksDB (:db rocks-db) k)))))
 
 (defmethod state-extensions/close-filter onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _]
-  (future-cancel (:rotation-fut rocks-db))
+  (close! (:shutdown-ch rocks-db))
+  ;; Block until background processing has been stopped before closing the db
+  (<!! (:rotation-thread rocks-db))
   (.close ^RocksDB (:db rocks-db))
-  (FileUtils/deleteDirectory (java.io.File. (:dir rocks-db))))
+  (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))

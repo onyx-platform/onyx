@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [fatal error warn trace info]]
             [onyx.state.state-extensions :as se]
             [onyx.compression.nippy :as nippy]
+            [clojure.core.async :refer [thread chan]]
             [clojure.test :refer [deftest is testing]]))
 
 (defn extract-values [db]
@@ -17,14 +18,14 @@
         vs))))
 
 (defn write-bucket [per-bucket f bucket]
-  (rdb/rotate-bucket! (:db f) (:bucket f))
+  (rdb/rotate-bucket! (:db f) (:bucket f) (chan))
   (reduce (fn [f' vr]
             (se/apply-filter-id f' {} (+ vr (* bucket per-bucket))))
           f
           (range per-bucket)))
 
 (deftest rocksdb-filter-test 
-  (with-redefs [rdb/start-rotation-fut (fn [_ _ _ _] (future))] 
+  (with-redefs [rdb/start-rotation-thread (fn [_ _ _ _ _] (thread))] 
     (let [per-bucket 10
           rfilter (se/initialize-filter :rocksdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
                                                   :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))

@@ -711,12 +711,6 @@
   (stop [component]
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
-      (when-let [state-log (:onyx.core/state-log event)] 
-        (state-extensions/close-log state-log event))
-
-      (when-let [window-state (:onyx.core/window-state event)] 
-        (when (exactly-once-task? event)
-          (state-extensions/close-filter (:filter @window-state) event)))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
@@ -726,8 +720,16 @@
       (<!! (:input-retry-segments-ch component))
       (<!! (:aux-ch component))
 
-      ((:onyx.core/compiled-after-task-fn event) event)
       (teardown-triggers event)
+
+      (when-let [state-log (:onyx.core/state-log event)] 
+        (state-extensions/close-log state-log event))
+
+      (when-let [window-state (:onyx.core/window-state event)] 
+        (when (exactly-once-task? event)
+          (state-extensions/close-filter (:filter @window-state) event)))
+
+      ((:onyx.core/compiled-after-task-fn event) event)
 
       (let [state @(:onyx.core/state event)]
         (doseq [[_ link-map] (:links state)]

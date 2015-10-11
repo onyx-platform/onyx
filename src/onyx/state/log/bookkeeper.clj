@@ -14,14 +14,14 @@
             [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default defaults]])
-  (:import [org.apache.bookkeeper.client LedgerHandle BookKeeper BookKeeper$DigestType AsyncCallback$AddCallback]
+  (:import [org.apache.bookkeeper.client LedgerHandle LedgerEntry BookKeeper BookKeeper$DigestType AsyncCallback$AddCallback]
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
-(defn open-ledger ^LedgerHandle [client id digest-type password]
+(defn open-ledger ^LedgerHandle [^BookKeeper client id digest-type password]
   (.openLedger client id digest-type password))
 
-(defn create-ledger ^LedgerHandle [client ensemble-size quorum-size digest-type password]
+(defn create-ledger ^LedgerHandle [^BookKeeper client ensemble-size quorum-size digest-type password]
   (.createLedger client ensemble-size quorum-size digest-type password))
 
 (defn bookkeeper
@@ -40,7 +40,7 @@
   (BookKeeper$DigestType/MAC))
 
 (defn password [peer-opts]
-  (.getBytes (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
+  (.getBytes ^String (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
 
 (defrecord BookKeeperLog [client ledger-handle])
 
@@ -106,8 +106,8 @@
                     (if (pos? last-confirmed)
                       (let [entries (.readEntries lh 0 last-confirmed)] 
                         (if (.hasMoreElements entries)
-                          (loop [st-loop st element (.nextElement entries)]
-                            (let [entry-val (nippy/window-log-decompress (.getEntry element))
+                          (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
+                            (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
                                   unique-id (first entry-val)
                                   st-loop' (let [st (playback-windows-extents st-loop entry-val windows)]
                                              (if unique-id
@@ -120,7 +120,7 @@
                           st))  
                       st))
                   (finally
-                    (.close lh)))))
+                    (.close ^LedgerHandle lh)))))
             state
             ledger-ids))) 
 
@@ -141,7 +141,7 @@
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle]} event] 
   (.close ^LedgerHandle ledger-handle)
-  (.close client))
+  (.close ^BookKeeper client))
 
 (def HandleWriteCallback
   (reify AsyncCallback$AddCallback
