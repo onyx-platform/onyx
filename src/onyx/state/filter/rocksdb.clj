@@ -31,8 +31,7 @@
         iterator ^RocksIterator (.newIterator db)]
     (try
       (.seekToFirst iterator)
-      (while (and (.isValid iterator) 
-                  (first (alts!! [shutdown-ch] :default true)))
+      (while (.isValid iterator) 
         (when (= (aget ^bytes (.value iterator) 0) 
                  bucket-val)
           (.remove ^RocksDB db ^bytes (.key iterator)))
