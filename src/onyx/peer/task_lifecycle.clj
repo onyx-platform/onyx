@@ -46,6 +46,10 @@
 (defn add-completion-id [id m]
   (assoc m :completion-id id))
 
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
+
 (defn sentinel-found? [event]
   (seq (filter #(= :done (:message %))
                (:onyx.core/batch event))))
@@ -325,8 +329,8 @@
       ((:window/agg-init w) w)))
 
 (defn replay-windows-from-log
-  [{:keys [onyx.core/windows onyx.core/window-state onyx.core/state-log] :as event}]
-  (when (seq windows)
+  [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
+  (when (windowed-task? event)
     (swap! window-state 
            (fn [wstate] 
              (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
@@ -379,7 +383,9 @@
                            (cons unique-id) ;; store the id at the head of the log entry
                            (state-extensions/store-log-entry state-log event ack-fn))
                       (doseq [t triggers]
-                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment}))
+                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})))
+                    ;; Always update the filter, to freshen up the fact that the id has been re-seen
+                    (when unique-id 
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
                 (:leaves leaf))))
           (:tree results)
@@ -545,6 +551,7 @@
     (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
                     {:opts opts :pending-timeout pending-timeout}))))
 
+
 (defn clear-messenger-buffer!
   "Clears the messenger buffer of all messages related to prevous task lifecycle.
   In an ideal case, this might transfer messages over to another peer first as it help with retries."
@@ -570,11 +577,6 @@
       (catch Throwable e
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
 
-
-(defn windowed-task? [event]
-  (or (not-empty (:onyx.core/windows event))
-      (not-empty (:onyx.core/triggers event))))
-
 (defn exactly-once-task? [event]
   (boolean (get-in event [:onyx.core/task-map :onyx/uniqueness-key])))
 
@@ -588,12 +590,10 @@
 
 (defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [filter-impl (arg-or-default :onyx.peer/state-filter-impl peer-opts)] 
-    (assoc pipeline :onyx.core/window-state (if (exactly-once-task? pipeline) 
-                                              (do
-                                                (info "Initialising window state " )
-                                               
-                                                (atom (->WindowState (state-extensions/initialize-filter filter-impl pipeline) 
-                                                                   {})))))))
+    (assoc pipeline :onyx.core/window-state (if (windowed-task? pipeline)
+                                              (atom (->WindowState (if (exactly-once-task? pipeline) 
+                                                                     (state-extensions/initialize-filter filter-impl pipeline)) 
+                                                                   {}))))))
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
