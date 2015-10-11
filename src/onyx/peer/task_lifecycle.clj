@@ -1,32 +1,32 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
-              [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
-              [onyx.static.rotating-seq :as rsc]
-              [onyx.log.commands.common :as common]
-              [onyx.log.entry :as entry]
-              [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
-              [onyx.static.planning :refer [find-task]]
-              [onyx.static.validation :as validation]
-              [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.task-compile :as c]
-              [onyx.peer.pipeline-extensions :as p-ext]
-              [onyx.peer.function :as function]
-              [onyx.peer.operation :as operation]
-              [onyx.windowing.window-extensions :as we]
-              [onyx.windowing.window-id :as wid]
-              [onyx.windowing.units :as units]
-              [onyx.windowing.aggregation :as agg]
-              [onyx.triggers.triggers-api :as triggers]
-              [onyx.extensions :as extensions]
-              [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
-              [clj-tuple :as t]
-              [onyx.interop]
-              [onyx.state.log.bookkeeper]
-              [onyx.state.filter.set]
-              [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+  (:require [clojure.core.async :refer [alts!! alt!! <!! >!! <! >! timeout chan close! thread go]]
+            [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [onyx.static.rotating-seq :as rsc]
+            [onyx.static.planning :refer [find-task]]
+            [onyx.static.validation :as validation]
+            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.log.commands.common :as common]
+            [onyx.log.entry :as entry]
+            [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+            [onyx.messaging.acking-daemon :as acker]
+            [onyx.peer.task-compile :as c]
+            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.function :as function]
+            [onyx.peer.operation :as operation]
+            [onyx.windowing.window-extensions :as we]
+            [onyx.windowing.window-id :as wid]
+            [onyx.windowing.units :as units]
+            [onyx.windowing.aggregation :as agg]
+            [onyx.triggers.triggers-api :as triggers]
+            [onyx.extensions :as extensions]
+            [onyx.compression.nippy]
+            [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
+            [onyx.interop]
+            [onyx.state.log.bookkeeper]
+            [onyx.state.filter.set]
+            [onyx.state.state-extensions :as state-extensions]
+            [clj-tuple :as t]))
 
 (defn resolve-calling-params [catalog-entry opts]
   (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
@@ -335,17 +335,32 @@
 
 (defn assign-window [segment window-state w]
   (let [window-id (:window/id w)
-        segment-coerced (we/uniform-units (:window/record w) segment)
-        extents (we/extents (:window/record w) segment-coerced)]
-    (doall 
-      (map (fn [e]
-             (let [f (:window/agg-fn w)
-                   state (init-window-state w (get-in @window-state [window-id e]))
-                   state-transition-entry (f state w segment)
-                   new-state ((:window/apply-state-update w) state state-transition-entry)]
-               (swap! window-state assoc-in [window-id e] new-state)
-               (list e state-transition-entry)))
-           extents))))
+        segment-coerced (we/uniform-units (:window/record w) segment)]
+    (swap! window-state
+           #(assoc % window-id
+                   (we/speculate-update
+                    (:window/record w)
+                    (get % window-id)
+                    segment-coerced)))
+
+    (swap! window-state
+           #(assoc % window-id
+                   (we/merge-extents
+                    (:window/record w)
+                    (get % window-id)
+                    (:window/super-agg-fn w)
+                    segment-coerced)))
+
+    (let [extents (we/extents (:window/record w) (keys (get @window-state window-id)) segment-coerced)]
+      (doall
+       (map (fn [e]
+              (let [f (:window/agg-fn w)
+                    state (init-window-state w (get-in @window-state [window-id e]))
+                    state-transition-entry (f state w segment)
+                    new-state ((:window/apply-state-update w) state state-transition-entry)]
+                (swap! window-state assoc-in [window-id e] new-state)
+                (list e state-transition-entry)))
+            extents)))))
 
 (defn assign-windows
   [{:keys [onyx.core/windows] :as event}]

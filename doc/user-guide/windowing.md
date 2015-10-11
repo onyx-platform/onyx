@@ -31,7 +31,7 @@ We used a significant amount of academic and industrial research to implement th
 
 ### Window Types
 
-The topic of windows has been widely explored in the literature. There are different *types* of windows. Currently, Onyx supports Fixed and Sliding windows. In the future, we will support landmark, global, and session windows. We will now explain the supported window types.
+The topic of windows has been widely explored in the literature. There are different *types* of windows. Currently, Onyx supports Fixed, Sliding, Global, and Session windows. We will now explain the supported window types.
 
 #### Fixed Windows
 
@@ -66,6 +66,10 @@ In contrast to fixed windows, sliding windows allow extents to overlap. When a s
 #### Global Windows
 
 Global windows are perhaps the easiest to understand. With global windows, there is one window extent that match all data that enters it. This lets you capture events that span over an entire domain of time. Global windows are useful for batch-style computations.
+
+#### Session Windows
+
+Session windows are windows that dynamically resize their upper and lower bounds. Sessions capture a time span of activity for a specific key, such as a user ID. If no activity occurs within a timeout gap, the session ends. If an event occurs within the bounds of a session, the window size is fused with the new event, and the session is extended by its timeout gap.
 
 ### Units
 
