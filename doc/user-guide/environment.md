@@ -25,8 +25,8 @@ In this chapter, we'll discuss what you need to set up a develop and production 
 
 #### Dependencies
 
-- Java 7+
-- Clojure 1.6+
+- Java 8+
+- Clojure 1.7+
 
 #### Explanation
 
