@@ -27,13 +27,13 @@
 (def start-bucket 0)
 
 (defn clear-bucket! [db bucket shutdown-ch]
-  (let [bucket-val (byte bucket)
+  (let [bucket (byte bucket)
         iterator ^RocksIterator (.newIterator db)]
     (try
       (.seekToFirst iterator)
       (while (.isValid iterator) 
-        (when (= (aget ^bytes (.value iterator) 0) 
-                 bucket-val)
+        (when (= (bucket-val (.value iterator)) 
+                 bucket)
           (.remove ^RocksDB db ^bytes (.key iterator)))
         (.next iterator))
       (finally
