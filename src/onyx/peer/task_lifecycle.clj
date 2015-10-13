@@ -24,6 +24,7 @@
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.state.log.bookkeeper]
+              [onyx.state.log.none]
               [onyx.state.filter.set]
               [onyx.state.filter.rocksdb]
               [onyx.state.state-extensions :as state-extensions]
