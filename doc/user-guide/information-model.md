@@ -143,9 +143,10 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:window/range`       |`vector`             | no       |
 |`:window/slide`       |`vector`             | sometimes|
 |`:window/init`        |`any`                | sometimes|
+|`:window/timeout-gap` |`vector`             | sometimes|
 |`:window/doc`         |`string`             | yes      |
 
-`:window/range` and `:window/slide` are values that require Units. See below for a description of Units.
+`:window/range`, `:window/slide`, and `:window/timeout-gap` are values that require Units. See below for a description of Units.
 
 ### Triggers
 

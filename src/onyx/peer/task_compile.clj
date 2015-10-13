@@ -154,6 +154,7 @@
               :window/record (w/windowing-record window)
               :window/agg-init (resolve-window-init window calls)
               :window/agg-fn (:aggregation/fn calls)
+              :window/super-agg-fn (:aggregation/super-aggregation-fn calls)
               :window/apply-state-update (:aggregation/apply-state-update calls))))
    windows))
 

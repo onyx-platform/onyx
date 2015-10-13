@@ -46,30 +46,58 @@
         n (inc (:n state))]
     [:set-value {:n n :sum sum :average (/ sum n)}]))
 
+(defn conj-super-aggregation [state-1 state-2 window]
+  (concat state-1 state-2))
+
+(defn sum-super-aggregation [state-1 state-2 window]
+  (+ state-1 state-2))
+
+(defn count-super-aggregation [state-1 state-2 window]
+  (+ state-1 state-2))
+
+(defn min-super-aggregation [state-1 state-2 window]
+  (clojure.core/min state-1 state-2))
+
+(defn max-super-aggregation [state-1 state-2 window]
+  (clojure.core/max state-1 state-2))
+
+(defn average-super-aggregation [state-1 state-2 window]
+  (let [n* (+ (:n state-1) (:n state-2))
+        sum* (+ (:sum state-1) (:sum state-2))]
+    {:n n*
+     :sum sum*
+     :average (/ sum* n*)}))
+
 (def conj
   {:aggregation/init conj-aggregation-fn-init
    :aggregation/fn conj-aggregation-fn
-   :aggregation/apply-state-update conj-aggregation-apply-log})
+   :aggregation/apply-state-update conj-aggregation-apply-log
+   :aggregation/super-aggregation-fn conj-super-aggregation})
 
 (def sum
   {:aggregation/init sum-aggregation-fn-init
    :aggregation/fn sum-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/super-aggregation-fn sum-super-aggregation})
 
 (def count
   {:aggregation/init count-aggregation-fn-init
    :aggregation/fn count-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/super-aggregation-fn count-super-aggregation})
 
 (def min
   {:aggregation/fn min-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/super-aggregation-fn min-super-aggregation})
 
 (def max
   {:aggregation/fn max-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/super-aggregation-fn max-super-aggregation})
 
 (def average
   {:aggregation/init average-aggregation-fn-init
    :aggregation/fn average-aggregation-fn
-   :aggregation/apply-state-update set-value-aggregation-apply-log})
+   :aggregation/apply-state-update set-value-aggregation-apply-log
+   :aggregation/super-aggregation-fn average-super-aggregation})

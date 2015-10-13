@@ -109,7 +109,7 @@
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
-  (s/enum :fixed :sliding :global))
+  (s/enum :fixed :sliding :global :session))
 
 (def Window
   {:window/id s/Keyword
@@ -119,6 +119,8 @@
    :window/aggregation (s/either s/Keyword [s/Keyword])
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
+   (s/optional-key :window/timeout-gap) Unit
+   (s/optional-key :window/session-key) s/Keyword
    (s/optional-key :window/doc) s/Str
    s/Keyword s/Any})
 

@@ -341,17 +341,32 @@
 
 (defn assign-window [segment window-state w]
   (let [window-id (:window/id w)
-        segment-coerced (we/uniform-units (:window/record w) segment)
-        extents (we/extents (:window/record w) segment-coerced)]
-    (doall 
-      (map (fn [e]
-             (let [f (:window/agg-fn w)
-                   state (init-window-state w (get-in @window-state [window-id e]))
-                   state-transition-entry (f state w segment)
-                   new-state ((:window/apply-state-update w) state state-transition-entry)]
-               (swap! window-state assoc-in [window-id e] new-state)
-               (list e state-transition-entry)))
-           extents))))
+        segment-coerced (we/uniform-units (:window/record w) segment)]
+    (swap! window-state
+           #(assoc % window-id
+                   (we/speculate-update
+                    (:window/record w)
+                    (get % window-id)
+                    segment-coerced)))
+
+    (swap! window-state
+           #(assoc % window-id
+                   (we/merge-extents
+                    (:window/record w)
+                    (get % window-id)
+                    (:window/super-agg-fn w)
+                    segment-coerced)))
+
+    (let [extents (we/extents (:window/record w) (keys (get @window-state window-id)) segment-coerced)]
+      (doall
+       (map (fn [e]
+              (let [f (:window/agg-fn w)
+                    state (init-window-state w (get-in @window-state [window-id e]))
+                    state-transition-entry (f state w segment)
+                    new-state ((:window/apply-state-update w) state state-transition-entry)]
+                (swap! window-state assoc-in [window-id e] new-state)
+                (list e state-transition-entry)))
+            extents)))))
 
 (defn assign-windows
   [{:keys [onyx.core/windows] :as event}]

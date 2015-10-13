@@ -239,6 +239,17 @@
   (when (and (= (:window/type w) :global) (:window/slide w))
     (throw (ex-info ":global windows do not define a :window/slide value" {:window w}))))
 
+(defn session-windows-dont-define-range-or-slide [w]
+  (when (and (= (:window/type w) :session) (:window/range w))
+    (throw (ex-info ":session windows do not define a :window/range value" {:window w})))
+
+  (when (and (= (:window/type w) :session) (:window/slide w))
+    (throw (ex-info ":session windows do not define a :window/slide value" {:window w}))))
+
+(defn session-windows-define-a-timeout [w]
+  (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
+    (throw (ex-info ":session windows must define a :window/timeout-gap value" {:window w}))))
+
 (defn validate-windows [windows catalog]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique windows)
@@ -247,7 +258,9 @@
       (range-and-slide-units-compatible w)
       (sliding-windows-define-range-and-slide w)
       (fixed-windows-dont-define-slide w)
-      (global-windows-dont-define-range-or-slide w))))
+      (global-windows-dont-define-range-or-slide w)
+      (session-windows-dont-define-range-or-slide w)
+      (session-windows-define-a-timeout w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
