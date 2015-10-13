@@ -341,23 +341,26 @@
 
 (defn assign-window [segment window-state w]
   (let [window-id (:window/id w)
-        segment-coerced (we/uniform-units (:window/record w) segment)]
+        window-record (:window/record w)
+        segment-coerced (we/uniform-units window-record segment)]
     (swap! window-state
-           #(assoc % window-id
+           #(assoc % 
+                   window-id 
                    (we/speculate-update
-                    (:window/record w)
-                    (get % window-id)
-                    segment-coerced)))
+                     window-record
+                     (get % window-id)
+                     segment-coerced)))
 
     (swap! window-state
-           #(assoc % window-id
+           #(assoc % 
+                   window-id
                    (we/merge-extents
-                    (:window/record w)
-                    (get % window-id)
-                    (:window/super-agg-fn w)
-                    segment-coerced)))
+                     window-record
+                     (get % window-id)
+                     (:window/super-agg-fn w)
+                     segment-coerced)))
 
-    (let [extents (we/extents (:window/record w) (keys (get @window-state window-id)) segment-coerced)]
+    (let [extents (we/extents window-record (keys (get @window-state window-id)) segment-coerced)]
       (doall
        (map (fn [e]
               (let [f (:window/agg-fn w)
