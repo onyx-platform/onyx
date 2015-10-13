@@ -151,11 +151,11 @@
            agg-var (if (sequential? agg) (first agg) agg)
            calls (var-get (kw->fn agg-var))]
        (assoc window
-              :window/record (w/windowing-record window)
-              :window/agg-init (resolve-window-init window calls)
-              :window/agg-fn (:aggregation/fn calls)
-              :window/super-agg-fn (:aggregation/super-aggregation-fn calls)
-              :window/apply-state-update (:aggregation/apply-state-update calls))))
+              :aggregate/record (w/windowing-record window)
+              :aggregate/init (resolve-window-init window calls)
+              :aggregate/fn (:aggregation/fn calls)
+              :aggregate/super-agg-fn (:aggregation/super-aggregation-fn calls)
+              :aggregate/apply-state-update (:aggregation/apply-state-update calls))))
    windows))
 
 (defn resolve-triggers [triggers]

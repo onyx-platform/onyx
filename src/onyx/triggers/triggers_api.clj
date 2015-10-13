@@ -72,7 +72,7 @@
 (defn iterate-windows [event trigger window-ids f opts]
   (doseq [[window-id state] window-ids]
     (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
-          [lower upper] (we/bounds (:window/record window) window-id)
+          [lower upper] (we/bounds (:aggregate/record window) window-id)
           args (merge opts
                       {:window window :window-id window-id
                        :lower-extent lower :upper-extent upper})]

@@ -327,7 +327,7 @@
 
 (defn init-window-state [w window-state]
   (or window-state
-      ((:window/agg-init w) w)))
+      ((:aggregate/init w) w)))
 
 (defn replay-windows-from-log
   [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
@@ -341,13 +341,13 @@
 
 (defn assign-window [segment window-state w]
   (let [window-id (:window/id w)
-        window-record (:window/record w)
-        segment-coerced (we/uniform-units window-record segment)]
+        record (:aggregate/record w)
+        segment-coerced (we/uniform-units record segment)]
     (swap! window-state
            #(assoc % 
                    window-id 
                    (we/speculate-update
-                     window-record
+                     record
                      (get % window-id)
                      segment-coerced)))
 
@@ -355,18 +355,18 @@
            #(assoc % 
                    window-id
                    (we/merge-extents
-                     window-record
+                     record
                      (get % window-id)
-                     (:window/super-agg-fn w)
+                     (:aggregate/super-agg-fn w)
                      segment-coerced)))
 
-    (let [extents (we/extents window-record (keys (get @window-state window-id)) segment-coerced)]
+    (let [extents (we/extents record (keys (get @window-state window-id)) segment-coerced)]
       (doall
        (map (fn [e]
-              (let [f (:window/agg-fn w)
+              (let [f (:aggregate/fn w)
                     state (init-window-state w (get-in @window-state [window-id e]))
                     state-transition-entry (f state w segment)
-                    new-state ((:window/apply-state-update w) state state-transition-entry)]
+                    new-state ((:aggregate/apply-state-update w) state state-transition-entry)]
                 (swap! window-state assoc-in [window-id e] new-state)
                 (list e state-transition-entry)))
             extents)))))

@@ -46,7 +46,6 @@
 
 (defrecord BookKeeperLog [client ledger-handle])
 
-;; TODO: add zk-timeout for bookkeeper
 (defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
                                                                          onyx.core/job-id onyx.core/task-id
                                                                          onyx.core/kill-ch onyx.core/task-kill-ch
@@ -76,12 +75,12 @@
   [state window]
   (if state
     state
-    ((:window/agg-init window) window)))
+    ((:aggregate/init window) window)))
 
 (defn playback-windows-extents [state entry windows]
   (let [id->apply-state-update (into {} 
-                              (map (juxt :window/id :window/apply-state-update) 
-                                   windows))] 
+                                     (map (juxt :window/id :aggregate/apply-state-update) 
+                                          windows))] 
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
               (reduce (fn [state'' [extent entry message-id]]
                         (update-in state'' 
