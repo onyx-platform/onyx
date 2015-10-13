@@ -378,8 +378,8 @@
                     (when-not seen?
                       (inc-count! fused-ack)
                       (->> windows
-                           (map (partial assign-window segment window-state))
-                           doall
+                           (map (fn [w] (assign-window segment window-state w)))
+                           (doall)
                            (cons unique-id) ;; store the id at the head of the log entry
                            (state-extensions/store-log-entry state-log event ack-fn))
                       (doseq [t triggers]
