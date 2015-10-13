@@ -60,7 +60,7 @@
   (component/stop [{:keys [servers] :as component}]
     (doseq [server servers]
       (info "Stopping BookKeeper server")
-      (.shutdown (:server server)))
+      (.shutdown ^BookieServer (:server server)))
     (cleanup-dirs servers)
     (assoc component :servers nil)))
 

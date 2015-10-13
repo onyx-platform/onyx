@@ -175,11 +175,10 @@
   (s/enum :aeron :dummy-messenger))
 
 (def StateLogImpl
-  (s/enum :bookkeeper))
-
+  (s/enum :bookkeeper :none))
 
 (def StateFilterImpl
-  (s/enum :set :bloom))
+  (s/enum :set :rocksdb))
 
 (def PeerConfig
   {:zookeeper/address s/Str
@@ -208,7 +207,8 @@
    (s/optional-key :onyx.bookkeeper/local-quorum?) s/Bool
    (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
    (s/optional-key :onyx.bookkeeper/base-dir) s/Str
-   (s/optional-key :onyx.bookkeeper/timeout) s/Int
+   (s/optional-key :onyx.bookkeeper/client-timeout) s/Int
+   (s/optional-key :onyx.bookkeeper/client-throttle) s/Int
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
    (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) s/Int
    (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) s/Int

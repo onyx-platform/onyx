@@ -28,11 +28,13 @@
   ([opts]
    (bookkeeper (:zookeeper/address opts)
                (zk/ledgers-path (:onyx/id opts))
-               (arg-or-default :onyx.bookkeeper/timeout opts)))
-  ([zk-addr zk-root-path timeout]
+               (arg-or-default :onyx.bookkeeper/client-timeout opts)
+               (arg-or-default :onyx.bookkeeper/client-throttle opts)))
+  ([zk-addr zk-root-path timeout throttle]
    (let [conf (doto (ClientConfiguration.)
                 (.setZkServers zk-addr)
                 (.setZkTimeout timeout)
+                (.setThrottleValue throttle)
                 (.setZkLedgersRootPath zk-root-path))]
      (BookKeeper. conf))))
 
@@ -151,6 +153,6 @@
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle]} event ack-fn entry]
   (.asyncAddEntry ^LedgerHandle ledger-handle 
-                  (nippy/window-log-compress entry)
+                  ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
                   ack-fn))
