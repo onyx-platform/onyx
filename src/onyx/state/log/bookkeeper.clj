@@ -18,6 +18,8 @@
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
+(defrecord BookKeeperLog [client ledger-handle next-ledger-handle])
+
 (defn open-ledger ^LedgerHandle [^BookKeeper client id digest-type password]
   (.openLedger client id digest-type password))
 
@@ -44,18 +46,21 @@
 (defn password [peer-opts]
   (.getBytes ^String (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
 
-(defrecord BookKeeperLog [client ledger-handle])
+
+(defn new-ledger [client peer-opts]
+  (let [ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
+        quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)]
+    (create-ledger client ensemble-size quorum-size digest-type (password peer-opts))))
 
 (defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
                                                                          onyx.core/job-id onyx.core/task-id
                                                                          onyx.core/kill-ch onyx.core/task-kill-ch
                                                                          onyx.core/outbox-ch] :as event}] 
   (let [bk-client (bookkeeper peer-opts)
-        ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
-        quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)
-        ledger-handle (create-ledger bk-client ensemble-size quorum-size digest-type (password peer-opts))
+        ledger-handle (new-ledger bk-client peer-opts)
         slot-id (peer-slot-id event)
-        new-ledger-id (.getId ledger-handle)] 
+        new-ledger-id (.getId ledger-handle)
+        next-ledger-handle nil] 
     (>!! outbox-ch
          {:fn :assign-bookkeeper-log-id
           :args {:job-id job-id
@@ -68,7 +73,7 @@
       (info "New ledger id has not been published yet. Backing off.")
       (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))) 
     (info "Ledger id published.")
-    (->BookKeeperLog bk-client ledger-handle)))
+    (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle))))
 
 (defn default-state 
   "Default state function. Resolves window late for perf."
@@ -93,7 +98,7 @@
                       state'
                       window-entries)) 
             state
-            (map list (rest entry) windows))))
+            (map list (rest entry) windows)))) 
 
 (defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
   (let [pwd (password peer-opts)] 
@@ -115,7 +120,7 @@
                                                (update st :filter state-extensions/apply-filter-id event unique-id)
                                                st))] 
                               (info "Played back entries for message with id: " unique-id)
-                              (if (.hasMoreElements entries) 
+                              (if (.hasMoreElements entries)
                                 (recur st-loop' (.nextElement entries))
                                 st-loop')))
                           st))  
@@ -123,7 +128,8 @@
                   (finally
                     (.close ^LedgerHandle lh)))))
             state
-            ledger-ids))) 
+            ledger-ids)))
+
 
 (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client] :as log} 
@@ -139,9 +145,37 @@
                     (info "Playing back ledgers for" job-id task-id slot-id "ledger-ids" prev-ledger-ids)
                     (playback-ledgers client peer-opts state prev-ledger-ids event)))))
 
-(defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [client ledger-handle]} event] 
+(defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [client ledger-handle]} 
+   {:keys [onyx.core/replica onyx.core/peer-opts
+           onyx.core/job-id onyx.core/task-id
+           onyx.core/kill-ch onyx.core/task-kill-ch
+           onyx.core/outbox-ch] :as event} 
+   state] 
+  (let [ledger-handle (new-ledger client peer-opts)
+        slot-id (peer-slot-id event)
+        new-ledger-id (.getId ledger-handle)] 
+    (>!! outbox-ch
+         {:fn :assign-bookkeeper-log-id
+          :args {:job-id job-id
+                 :task-id task-id
+                 :slot-id slot-id
+                 :ledger-id new-ledger-id}})
+    (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+                (not= new-ledger-id
+                      (last (get-in @replica [:state-logs job-id task-id slot-id]))))
+      (info "New ledger id has not been published yet. Backing off.")
+      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))))
+
+
   (.close ^LedgerHandle ledger-handle)
+  (.close ^BookKeeper client))
+
+(defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
+  [{:keys [client ledger-handle next-ledger-handle]} event] 
+  (.close ^LedgerHandle @ledger-handle)
+  (when @next-ledger-handle
+    (.close ^LedgerHandle @next-ledger-handle))
   (.close ^BookKeeper client))
 
 (def HandleWriteCallback
@@ -151,7 +185,7 @@
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle]} event ack-fn entry]
-  (.asyncAddEntry ^LedgerHandle ledger-handle 
+  (.asyncAddEntry ^LedgerHandle @ledger-handle 
                   ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
                   ack-fn))

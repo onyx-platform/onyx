@@ -8,6 +8,11 @@
   (fn [log event]
     (type log)))
 
+(defmulti compact-log
+  "Compact a log for quicker replay and to reduce storage demands"
+  (fn [log event state]
+    (type log))) 
+
 (defmulti store-log-entry 
   "Store state update [segment-id [[extent [op k v]] ..]] entries in a log"
   (fn [log event ack-fn entry]
