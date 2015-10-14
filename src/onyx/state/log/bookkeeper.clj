@@ -146,15 +146,15 @@
                     (playback-ledgers client peer-opts state prev-ledger-ids event)))))
 
 (defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [client ledger-handle]} 
+  [{:keys [client ledger-handle next-ledger-handle]} 
    {:keys [onyx.core/replica onyx.core/peer-opts
            onyx.core/job-id onyx.core/task-id
            onyx.core/kill-ch onyx.core/task-kill-ch
            onyx.core/outbox-ch] :as event} 
-   state] 
-  (let [ledger-handle (new-ledger client peer-opts)
+   _] 
+  (let [new-ledger-handle (new-ledger client peer-opts)
         slot-id (peer-slot-id event)
-        new-ledger-id (.getId ledger-handle)] 
+        new-ledger-id (.getId new-ledger-handle)] 
     (>!! outbox-ch
          {:fn :assign-bookkeeper-log-id
           :args {:job-id job-id
@@ -164,12 +164,9 @@
     (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                 (not= new-ledger-id
                       (last (get-in @replica [:state-logs job-id task-id slot-id]))))
-      (info "New ledger id has not been published yet. Backing off.")
-      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))))
-
-
-  (.close ^LedgerHandle ledger-handle)
-  (.close ^BookKeeper client))
+      (info "Transitional GC ledger id has not been published yet. Backing off.")
+      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts)))
+    (reset! next-ledger-handle new-ledger-handle)))
 
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle next-ledger-handle]} event] 
@@ -180,11 +177,49 @@
 
 (def HandleWriteCallback
   (reify AsyncCallback$AddCallback
-    (addComplete [this rc lh entry-id ack-fn]
-      (ack-fn))))
+    (addComplete [this rc lh entry-id callback-fn]
+      (callback-fn))))
+
+(defn gc-transition 
+  "Transitions to a new compacted ledger, plus a newly created ledger created
+  earlier.  For example, if there were ledgers [1, 2, 3, 4], we've created a
+  ledger id 5 to start writing to, making [1, 2, 3, 4, 5], then we create a compacted
+  ledger 6, write the updated state to it, and swap [1, 2, 3, 4] in the replica
+  for 6, leaving [6, 5]"
+  [{:keys [client ledger-handle next-ledger-handle] :as log}
+   {:keys [onyx.core/peer-opts onyx.core/job-id onyx.core/replica
+           onyx.core/task-id onyx.core/window-state onyx.core/outbox-ch] 
+    :as event}]
+  (info "Transitioning to new handle after gc" (.getId @next-ledger-handle))
+  (reset! ledger-handle @next-ledger-handle)
+  (reset! next-ledger-handle nil)
+  (let [slot-id (peer-slot-id event)
+        window-state-snapshot (:state @(:onyx.core/window-state event))
+        current-ids (get-in @replica [:state-logs job-id task-id slot-id])]
+    ;; Don't throw an exception, maybe we can give the next GC a chance to succeed
+    (if-not (= (last current-ids) (.getId @ledger-handle))
+      (warn "Could not swap compacted log. Next ledger handle is no longer the next published ledger" 
+            {:job-id job-id :task-id task-id :slot-id slot-id :current-ids current-ids})
+      (future (let [compacted-ledger (new-ledger client peer-opts)
+                    compacted-ledger-id (.getId compacted-ledger)]
+                (info "Snapshotted state " window-state-snapshot " putting in " compacted-ledger-id)
+                (.asyncAddEntry ^LedgerHandle compacted-ledger 
+                                ^bytes (nippy/window-log-compress window-state-snapshot)
+                                HandleWriteCallback
+                                (fn []
+                                  (info "Wrote log message out!")
+                                  (>!! outbox-ch
+                                       {:fn :compact-bookkeeper-log-ids
+                                        :args {:job-id job-id
+                                               :task-id task-id
+                                               :slot-id slot-id
+                                               :prev-ledger-ids (vec (butlast current-ids))
+                                               :new-ledger-ids [compacted-ledger-id]}}))))))))
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
-  [{:keys [ledger-handle]} event ack-fn entry]
+  [{:keys [ledger-handle next-ledger-handle] :as log} event ack-fn entry]
+  (when @next-ledger-handle
+    (gc-transition log event))
   (.asyncAddEntry ^LedgerHandle @ledger-handle 
                   ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
