@@ -100,7 +100,7 @@
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
 
 (defn compile-grouping-fn
-  "Compiles grouping outgoing grouping task info into a task->group-fn map
+  "Compiles outgoing grouping task info into a task->group-fn map
   for quick lookup and group fn calls"
   [catalog egress-ids]
   (merge (->> catalog

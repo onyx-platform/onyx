@@ -34,6 +34,28 @@
   (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
         (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
+(defn grouped-task? [event]
+  (or (:onyx/group-by-key (:onyx.core/task-map event))
+      (:onyx/group-by-fn (:onyx.core/task-map event))))
+
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
+
+(defn grouping-fn [event segment]
+  (if (:onyx/group-by-key (:onyx.core/task-map event))
+    (get segment (:onyx/group-by-key (:onyx.core/task-map event)))
+    (let [f (operation/kw->fn (:onyx/group-by-fn (:onyx.core/task-map event)))]
+      (f segment))))
+
+(defn compile-update-state-fn [event]
+  (if (grouped-task? event)
+    (fn [f old entry segment g]
+      (let [k (grouping-fn event segment)]
+        (g (fn [state window-id e] (assoc-in state [window-id e k] (f old entry))))))
+    (fn [f old entry segment g]
+      (g (fn [state window-id e] (assoc-in state [window-id e] (f old entry)))))))
+
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
@@ -325,9 +347,11 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
-(defn init-window-state [w window-state]
-  (or window-state
-      ((:aggregate/init w) w)))
+(defn init-window-state [event w window-state segment]
+  (if (grouped-task? event)
+    (let [k (:age segment)]
+      (or (get window-state k) ((:aggregate/init w) w)))
+    (or window-state ((:aggregate/init w) w))))
 
 (defn replay-windows-from-log
   [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
@@ -339,7 +363,7 @@
                replayed-state))))
   event)
 
-(defn assign-window [segment window-state w]
+(defn assign-window [event segment window-state w]
   (let [window-id (:window/id w)
         record (:aggregate/record w)
         segment-coerced (we/uniform-units record segment)]
@@ -360,14 +384,17 @@
                      (:aggregate/super-agg-fn w)
                      segment-coerced)))
 
-    (let [extents (we/extents record (keys (get @window-state window-id)) segment-coerced)]
+    (let [extents (we/extents (:aggregate/record w) (keys (get @window-state window-id)) segment-coerced)
+          update-state-f (:onyx.core/update-state-fn event)]
       (doall
        (map (fn [e]
               (let [f (:aggregate/fn w)
-                    state (init-window-state w (get-in @window-state [window-id e]))
+                    window-contents (get-in @window-state [window-id e])
+                    state (init-window-state event w window-contents segment)
                     state-transition-entry (f state w segment)
-                    new-state ((:aggregate/apply-state-update w) state state-transition-entry)]
-                (swap! window-state assoc-in [window-id e] new-state)
+                    transition-f (:aggregate/apply-state-update w)
+                    state-f (partial (fn [window-id e f] (swap! window-state f window-id e)) window-id e)
+                    new-state (update-state-f transition-f state state-transition-entry segment state-f)]
                 (list e state-transition-entry)))
             extents)))))
 
@@ -397,8 +424,7 @@
                     (when-not seen?
                       (inc-count! fused-ack)
                       (->> windows
-                           (map (fn [w] (assign-window segment window-state w)))
-                           (doall)
+                           (map (fn [w] (assign-window event segment window-state w)))
                            (cons unique-id) ;; store the id at the head of the log entry
                            (state-extensions/store-log-entry state-log event ack-fn))
                       (doseq [t triggers]
@@ -483,6 +509,11 @@
                        (compiled-after-retry-segment-fn event m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
+
+(defn resolve-window-triggers [event triggers windows]
+  (merge
+   event
+   {:onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers windows))}))
 
 (defn setup-triggers [event]
   (reduce triggers/trigger-setup
@@ -649,7 +680,6 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows (c/resolve-windows filtered-windows)
-                           :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
@@ -681,6 +711,7 @@
 
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
+            pipeline-data (assoc pipeline-data :onyx.core/update-state-fn (compile-update-state-fn pipeline-data))
 
             restart-pred-fn (operation/resolve-restart-pred-fn catalog-entry)
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
@@ -692,10 +723,11 @@
 
             pipeline-data (-> pipeline-data
                               before-task-start-fn
-                              setup-triggers
                               resolve-window-state
                               resolve-log
-                              replay-windows-from-log)]
+                              replay-windows-from-log
+                              (resolve-window-triggers triggers filtered-windows)
+                              setup-triggers)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))

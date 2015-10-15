@@ -29,7 +29,7 @@
   #{:timer})
 
 (defmethod api/trigger-fire? :timer
-  [event trigger]
+  [event trigger args]
   true)
 
 (defmethod api/trigger-teardown :timer
