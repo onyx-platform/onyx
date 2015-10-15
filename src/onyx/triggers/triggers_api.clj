@@ -80,9 +80,9 @@
         (refine-state event trigger)
         ((:trigger/sync-fn trigger) event window-id lower upper state)))))
 
-(defn fire-trigger! [event window-state-ref trigger opts]
+(defn fire-trigger! [event window-state trigger opts]
   (when (some #{(:context opts)} (trigger-notifications event trigger))
-    (let [window-ids (get @window-state-ref (:trigger/window-id trigger))]
+    (let [window-ids (get window-state (:trigger/window-id trigger))]
       (if (:trigger/fire-all-extents? trigger)
         (when (trigger-fire? event trigger opts)
           (iterate-windows event trigger window-ids (constantly true) opts))

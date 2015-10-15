@@ -339,37 +339,24 @@
                replayed-state))))
   event)
 
-(defn assign-window [segment window-state w]
+
+(defn window-state-updates [segment widstate w]
   (let [window-id (:window/id w)
         record (:aggregate/record w)
-        segment-coerced (we/uniform-units record segment)]
-    (swap! window-state
-           #(assoc % 
-                   window-id 
-                   (we/speculate-update
-                     record
-                     (get % window-id)
-                     segment-coerced)))
-
-    (swap! window-state
-           #(assoc % 
-                   window-id
-                   (we/merge-extents
-                     record
-                     (get % window-id)
-                     (:aggregate/super-agg-fn w)
-                     segment-coerced)))
-
-    (let [extents (we/extents record (keys (get @window-state window-id)) segment-coerced)]
-      (doall
-       (map (fn [e]
-              (let [f (:aggregate/fn w)
-                    state (init-window-state w (get-in @window-state [window-id e]))
-                    state-transition-entry (f state w segment)
-                    new-state ((:aggregate/apply-state-update w) state state-transition-entry)]
-                (swap! window-state assoc-in [window-id e] new-state)
-                (list e state-transition-entry)))
-            extents)))))
+        segment-coerced (we/uniform-units record segment)
+        widstate' (we/speculate-update record widstate segment-coerced)
+        widstate'' (we/merge-extents record widstate' (:aggregate/super-agg-fn w) segment-coerced)
+        extents (we/extents record (keys widstate'') segment-coerced)]
+    (let [record (:aggregate/record w)]
+      (reduce (fn [[wst entries] extent]
+                (let [f (:aggregate/fn w)
+                      state (init-window-state w (get wst extent))
+                      state-transition-entry (f state w segment)
+                      new-state ((:aggregate/apply-state-update w) state state-transition-entry)]
+                  (list (assoc wst extent new-state)
+                        (conj entries (list extent state-transition-entry)))))
+              (list widstate'' [])
+              extents)))) 
 
 (defn assign-windows
   [{:keys [onyx.core/windows] :as event}]
@@ -396,13 +383,20 @@
                         seen? (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))]
                     (when-not seen?
                       (inc-count! fused-ack)
-                      (->> windows
-                           (map (fn [w] (assign-window segment window-state w)))
-                           (doall)
-                           (cons unique-id) ;; store the id at the head of the log entry
-                           (state-extensions/store-log-entry state-log event ack-fn))
+                      (let [[new-window-state full-log-entry] 
+                            (reduce (fn [[window-state log-entries] window]
+                                      (let [window-id (:window/id window)
+                                            window-id-state (get window-state window-id)
+                                            [window-id-state' window-entries] (window-state-updates segment window-id-state window)
+                                            window-state' (assoc window-state window-id window-id-state')]
+                                        (list window-state' 
+                                              (conj log-entries window-entries))))
+                                    (list (:state @window-state) [unique-id])
+                                    windows)]
+                        (state-extensions/store-log-entry state-log event ack-fn full-log-entry)
+                        (swap! window-state assoc :state new-window-state))
                       (doseq [t triggers]
-                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})))
+                        (triggers/fire-trigger! event (:state @window-state) t {:segment segment :context :new-segment})))
                     ;; Always update the filter, to freshen up the fact that the id has been re-seen
                     (when unique-id 
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))

@@ -89,7 +89,7 @@
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
               (reduce (fn [state'' [extent entry message-id]]
                         (update-in state'' 
-                                   [id extent]
+                                   [:state id extent]
                                    (fn [ext-state] 
                                      (let [ext-state' (default-state ext-state window)
                                            apply-fn (id->apply-state-update id)] 
