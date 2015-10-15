@@ -1,5 +1,5 @@
 (ns onyx.state.filter.rocksdb
-  (:import [org.rocksdb RocksDB RocksIterator Options BloomFilter BlockBasedTableConfig CompressionType]
+  (:import [org.rocksdb RocksDB RocksIterator Snapshot Options ReadOptions BloomFilter BlockBasedTableConfig CompressionType]
            [org.apache.commons.io FileUtils])
   (:require [onyx.state.state-extensions :as state-extensions]
             [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! thread]]
@@ -105,3 +105,25 @@
   (<!! (:rotation-thread rocks-db))
   (.close ^RocksDB (:db rocks-db))
   (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))
+
+(defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance [filter-state _] 
+  (let [db ^RocksDB (:db filter-state)
+        snapshot ^Snapshot (.getSnapshot db)
+        bucket (bucket-val @(:bucket filter-state))
+        read-options ^ReadOptions (doto (ReadOptions.)
+                                    (.setSnapshot snapshot))]
+    (future 
+      (let [iterator ^RocksIterator (.newIterator db read-options)]
+        (try
+          (.seekToFirst iterator)
+          {:bucket bucket 
+           :ids (loop [ids (list)]
+                  (if (.isValid iterator)
+                    (let [id (list (nippy/localdb-decompress (.key iterator))
+                                   (aget (.value iterator) 0))] 
+                      (.next iterator)
+                      (recur (conj ids id)))
+                    ids))}
+          (finally
+            (.releaseSnapshot db (.snapshot read-options))
+            (.dispose iterator)))))))

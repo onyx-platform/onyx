@@ -42,3 +42,13 @@
   "Closes a filter"
   (fn [filter-state event]
     (type filter-state)))
+
+(defmulti snapshot-filter 
+  "Returns a future containing a serializable snapshot of the filter"
+  (fn [filter-state event]
+    (type filter-state)))
+
+(defmulti restore-filter 
+  "Restores the state of the filter from a snapshot"
+  (fn [filter-state event snapshot]
+    (type filter-state)))

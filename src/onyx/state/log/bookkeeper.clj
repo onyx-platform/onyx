@@ -180,7 +180,7 @@
     (addComplete [this rc lh entry-id callback-fn]
       (callback-fn))))
 
-(defn gc-transition 
+(defn compaction-transition 
   "Transitions to a new compacted ledger, plus a newly created ledger created
   earlier.  For example, if there were ledgers [1, 2, 3, 4], we've created a
   ledger id 5 to start writing to, making [1, 2, 3, 4, 5], then we create a compacted
@@ -207,7 +207,6 @@
                                 ^bytes (nippy/window-log-compress window-state-snapshot)
                                 HandleWriteCallback
                                 (fn []
-                                  (info "Wrote log message out!")
                                   (>!! outbox-ch
                                        {:fn :compact-bookkeeper-log-ids
                                         :args {:job-id job-id
@@ -219,7 +218,7 @@
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle next-ledger-handle] :as log} event ack-fn entry]
   (when @next-ledger-handle
-    (gc-transition log event))
+    (compaction-transition log event))
   (.asyncAddEntry ^LedgerHandle @ledger-handle 
                   ^bytes (nippy/window-log-compress entry)
                   HandleWriteCallback
