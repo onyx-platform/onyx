@@ -1,13 +1,16 @@
 (ns onyx.windowing.aggregation
   (:refer-clojure :exclude [min max count conj]))
 
-(defn set-value-aggregation-apply-log [state [t v]]
+(defn set-value-aggregation-apply-log [state [t v x y]]
   (case t 
-    :set-value v)) 
+    :set-value v
+    :assoc (assoc state v y)))
 
-(defn conj-aggregation-apply-log [state [t v]]
+(defn conj-aggregation-apply-log [state [t v x]]
+  (prn state t v x)
   (case t
-    :conj (clojure.core/conj state v)))
+    :conj (clojure.core/conj state v)
+    :assoc (update-in state [v] clojure.core/conj x)))
 
 (defn conj-aggregation-fn-init [window]
   [])

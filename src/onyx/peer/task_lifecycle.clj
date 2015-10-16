@@ -34,10 +34,6 @@
   (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
         (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
-(defn grouped-task? [event]
-  (or (:onyx/group-by-key (:onyx.core/task-map event))
-      (:onyx/group-by-fn (:onyx.core/task-map event))))
-
 (defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
@@ -49,10 +45,11 @@
       (f segment))))
 
 (defn compile-update-state-fn [event]
-  (if (grouped-task? event)
+  (if (operation/grouped-task? event)
     (fn [f old entry segment g]
       (let [k (grouping-fn event segment)]
-        (g (fn [state window-id e] (assoc-in state [window-id e k] (f old entry))))))
+        (g (fn [state window-id e]
+             (assoc-in state [window-id e k] (f old entry))))))
     (fn [f old entry segment g]
       (g (fn [state window-id e] (assoc-in state [window-id e] (f old entry)))))))
 
@@ -348,8 +345,8 @@
     rets))
 
 (defn init-window-state [event w window-state segment]
-  (if (grouped-task? event)
-    (let [k (:age segment)]
+  (if (operation/grouped-task? event)
+    (let [k (grouping-fn event segment)]
       (or (get window-state k) ((:aggregate/init w) w)))
     (or window-state ((:aggregate/init w) w))))
 
@@ -362,6 +359,13 @@
                (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
   event)
+
+(defn transform-state-entry [event entry segment]
+  (if (operation/grouped-task? event)
+    (let [k (grouping-fn event segment)]
+      ;; :assoc, grouped key, original op, value
+      [:assoc k (first entry) (second entry)])
+    entry))
 
 (defn assign-window [event segment window-state w]
   (let [window-id (:window/id w)
@@ -392,10 +396,11 @@
                     window-contents (get-in @window-state [window-id e])
                     state (init-window-state event w window-contents segment)
                     state-transition-entry (f state w segment)
+                    transformed-transition-entry (transform-state-entry event state-transition-entry segment)
                     transition-f (:aggregate/apply-state-update w)
                     state-f (partial (fn [window-id e f] (swap! window-state f window-id e)) window-id e)
                     new-state (update-state-f transition-f state state-transition-entry segment state-f)]
-                (list e state-transition-entry)))
+                (list e transformed-transition-entry)))
             extents)))))
 
 (defn assign-windows

@@ -1,4 +1,4 @@
-(ns onyx.state.log.bookkeeper
+(ns ^:no-doc onyx.state.log.bookkeeper
   (:require [onyx.log.curator :as curator]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [com.stuartsierra.component :as component]
@@ -72,45 +72,55 @@
 
 (defn default-state 
   "Default state function. Resolves window late for perf."
-  [state window]
-  (if state
+  [event state window entry]
+  (cond
+    ;; Grouped entry, state already exists
+    (and (operation/grouped-task? event) (get state (second entry)))
     state
-    ((:aggregate/init window) window)))
 
-(defn playback-windows-extents [state entry windows]
-  (let [id->apply-state-update (into {} 
-                                     (map (juxt :window/id :aggregate/apply-state-update) 
-                                          windows))] 
+    ;; Grouped entry, state doesn't exist, initialize it
+    (operation/grouped-task? event) (assoc state (second entry) ((:aggregate/init window) window))
+
+    ;; Non-grouped entry. Exists, return it
+    state state
+
+    ;; Non-grouped entry, doesn't exist yet. Initialize it
+    :else ((:aggregate/init window) window)))
+
+(defn playback-windows-extents [event state entry windows]
+  (let [id->apply-state-update (into {}
+                                     (map (juxt :window/id :aggregate/apply-state-update)
+                                          windows))]
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
               (reduce (fn [state'' [extent entry message-id]]
-                        (update-in state'' 
+                        (update-in state''
                                    [id extent]
-                                   (fn [ext-state] 
-                                     (let [ext-state' (default-state ext-state window)
-                                           apply-fn (id->apply-state-update id)] 
+                                   (fn [ext-state]
+                                     (let [ext-state' (default-state event ext-state window entry)
+                                           apply-fn (id->apply-state-update id)]
                                        (assert apply-fn (str "Apply fn does not exist for window-id " id))
                                        (apply-fn ext-state' entry)))))
                       state'
-                      window-entries)) 
+                      window-entries))
             state
             (map list (rest entry) windows))))
 
 (defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
-  (let [pwd (password peer-opts)] 
+  (let [pwd (password peer-opts)]
     (reduce (fn [st ledger-id]
               ;; TODO: Do I need to deal with recovery exception in here?
               ;; It may be better to just let the thing crash and retry
               (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                 (try
-                  (let [last-confirmed (.getLastAddConfirmed lh)
-                        _ (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)]
+                  (let [last-confirmed (.getLastAddConfirmed lh)]
+                    (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)
                     (if (pos? last-confirmed)
-                      (let [entries (.readEntries lh 0 last-confirmed)] 
+                      (let [entries (.readEntries lh 0 last-confirmed)]
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
                             (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
                                   unique-id (first entry-val)
-                                  st-loop' (let [st (playback-windows-extents st-loop entry-val windows)]
+                                  st-loop' (let [st (playback-windows-extents event st-loop entry-val windows)]
                                              (if unique-id
                                                (update st :filter state-extensions/apply-filter-id event unique-id)
                                                st))] 
