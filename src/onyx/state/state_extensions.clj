@@ -44,7 +44,7 @@
     (type filter-state)))
 
 (defmulti snapshot-filter 
-  "Returns a future containing a serializable snapshot of the filter"
+  "Returns a future containing a snapshot of the filter"
   (fn [filter-state event]
     (type filter-state)))
 

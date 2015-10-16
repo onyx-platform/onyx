@@ -49,3 +49,34 @@
                    (sort (extract-values (:db new-rfilter)))))))
         (finally
           (se/close-filter rfilter {}))))))
+
+(deftest rocksdb-restore-test 
+  (with-redefs [rdb/start-rotation-thread (fn [_ _ _ _ _] (thread))] 
+    (let [per-bucket 10
+          rfilter (se/initialize-filter :rocksdb {:onyx.core/peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
+                                                  :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
+                                                  :onyx.core/task-id :task-id})
+          n-buckets 255
+          filter-range (range (inc n-buckets))]
+      (try
+        (let [new-rfilter (reduce (partial write-bucket per-bucket)
+                                  rfilter
+                                  (range n-buckets))
+
+              snapshot @(se/snapshot-filter new-rfilter {})
+              restore-filter (-> :rocksdb 
+                                 (se/initialize-filter {:onyx.core/peer-opts {:onyx.rocksdb.filter/rotate-filter-bucket-every-n per-bucket}
+                                                        :onyx.core/id (str :peer-id (java.util.UUID/randomUUID))
+                                                        :onyx.core/task-id :task-id})
+                                 (se/restore-filter {} snapshot))]
+          (try 
+            (is (= (extract-values (:db new-rfilter))
+                   (extract-values (:db restore-filter))))
+            (is (= @(:bucket new-rfilter)
+                   @(:bucket restore-filter)))
+            (is (= @(:id-counter new-rfilter)
+                   @(:id-counter restore-filter)))
+            (finally
+              (se/close-filter restore-filter {})))) 
+        (finally
+          (se/close-filter rfilter {}))))))

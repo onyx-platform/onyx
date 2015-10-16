@@ -106,10 +106,21 @@
   (.close ^RocksDB (:db rocks-db))
   (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))
 
+(defmethod state-extensions/restore-filter onyx.state.filter.rocksdb.RocksDbInstance [{:keys [db bucket id-counter] :as rocks-db} 
+                                                                                      event 
+                                                                                      snapshot]
+  (reset! id-counter (:id-counter snapshot))
+  (reset! bucket (:bucket snapshot))
+  (run! (fn [[k v]]
+          (.put ^RocksDB db ^bytes k ^bytes v)) 
+        (:kvs snapshot))
+  rocks-db)
+
 (defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance [filter-state _] 
   (let [db ^RocksDB (:db filter-state)
         snapshot ^Snapshot (.getSnapshot db)
-        bucket (bucket-val @(:bucket filter-state))
+        bucket @(:bucket filter-state)
+        id-counter @(:id-counter filter-state)
         read-options ^ReadOptions (doto (ReadOptions.)
                                     (.setSnapshot snapshot))]
     (future 
@@ -117,10 +128,10 @@
         (try
           (.seekToFirst iterator)
           {:bucket bucket 
-           :ids (loop [ids (list)]
+           :id-counter id-counter
+           :kvs (loop [ids (list)]
                   (if (.isValid iterator)
-                    (let [id (list (nippy/localdb-decompress (.key iterator))
-                                   (aget (.value iterator) 0))] 
+                    (let [id (list (.key iterator) (.value iterator))] 
                       (.next iterator)
                       (recur (conj ids id)))
                     ids))}
