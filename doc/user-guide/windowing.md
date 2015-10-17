@@ -20,6 +20,7 @@ This section discusses a feature called windowing. Windows allow you to group an
   - [`:onyx.windowing.aggregation/min`](#onyxwindowingaggregationmin)
   - [`:onyx.windowing.aggregation/max`](#onyxwindowingaggregationmax)
   - [`:onyx.windowing.aggregation/average`](#onyxwindowingaggregationaverage)
+  - [Grouping](#grouping)
 - [Window Specification](#window-specification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -236,6 +237,12 @@ The `:average` operation maintains an average over `:age`. The state is maintain
  :window/range [30 :minutes]
  :window/doc "Finds the average :age in 30 minute fixed windows, default is 0"}
 ```
+
+#### Grouping
+
+All of the above aggregates have slightly different behavior when `:onyx/group-by-key` or `:onyx/group-by-fn` are specified on the catalog entry. Instead of the maintaining a scalar value in the aggregate, Onyx maintains a map. The keys of the map are the grouped values, and values of the map are normal scalar aggregates.
+
+For example, if you had the catalog entry set to `:onyx/group-by-key` with value `:name`, and you used a window aggregate of `:onyx.windowing.aggregation/count`, and you sent through segments `[{:name "john"} {:name "tiffany"} {:name "john"}]`, the aggregate map would look like `{"john" 2 "tiffany" 1}`.
 
 ### Window Specification
 
