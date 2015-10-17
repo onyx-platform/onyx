@@ -345,9 +345,6 @@
                replayed-state))))
   event)
 
-(defn default-state-value [w state-value]
-  (or state-value ((:aggregate/init w) w)))
-
 (defn window-state-updates [event segment widstate w]
   (let [window-id (:window/id w)
         record (:aggregate/record w)
@@ -360,7 +357,7 @@
     (let [record (:aggregate/record w)]
       (reduce (fn [[wst entries] extent]
                 (let [extent-state (get wst extent)
-                      state-value (default-state-value w (if grp-key (get extent-state grp-key) extent-state))
+                      state-value (agg/default-state-value w (if grp-key (get extent-state grp-key) extent-state))
                       state-transition-entry ((:aggregate/fn w) state-value w segment)
                       new-state-value ((:aggregate/apply-state-update w) state-value state-transition-entry)
                       new-state (if grp-key

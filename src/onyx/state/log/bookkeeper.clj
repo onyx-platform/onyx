@@ -7,6 +7,7 @@
             [onyx.extensions :as extensions]
             [onyx.monitoring.measurements :refer [emit-latency-value emit-latency]]
             [onyx.peer.operation :as operation]
+            [onyx.windowing.aggregation :as agg]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.types :refer [inc-count! dec-count!]]
             [onyx.log.replica]
@@ -88,7 +89,7 @@
                         (update-in state'' 
                                    [:state id extent]
                                    (fn [ext-state] 
-                                     (let [state-value (default-state-value window (if grp-key (get ext-state grp-key) ext-state))
+                                     (let [state-value (agg/default-state-value window (if grp-key (get ext-state grp-key) ext-state))
                                            apply-fn (id->apply-state-update id)
                                            _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
                                            new-state-value (apply-fn state-value entry)] 
@@ -217,6 +218,8 @@
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle next-ledger-handle] :as log} event ack-fn entry]
+  ;; Prescence of next-ledger-handle indicates that we should transition to next handle
+  ;; and start log compaction at a safe point, i.e. before we write the next entry
   (when @next-ledger-handle
     (compaction-transition log event))
   (.asyncAddEntry ^LedgerHandle @ledger-handle 

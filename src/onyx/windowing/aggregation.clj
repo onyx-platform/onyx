@@ -2,6 +2,9 @@
   (:require [taoensso.timbre :refer [info error warn trace fatal] :as timbre])
   (:refer-clojure :exclude [min max count conj]))
 
+(defn default-state-value [w state-value]
+  (or state-value ((:aggregate/init w) w)))
+
 (defn set-value-aggregation-apply-log [state [t v]]
   (case t 
     :set-value v))
