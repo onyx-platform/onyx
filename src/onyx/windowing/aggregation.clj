@@ -7,7 +7,6 @@
     :assoc (assoc state v y)))
 
 (defn conj-aggregation-apply-log [state [t v x]]
-  (prn state t v x)
   (case t
     :conj (clojure.core/conj state v)
     :assoc (update-in state [v] clojure.core/conj x)))
