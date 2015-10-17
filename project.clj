@@ -32,7 +32,7 @@
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]]
   :aot [onyx.interop]
-  :jvm-opts ["-Xmx4g"]
+  :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
   :profiles {:dev {:aot ^:replace []
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/test.check "0.8.2"]

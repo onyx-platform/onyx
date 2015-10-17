@@ -99,8 +99,17 @@
 (defn compile-after-retry-segment-functions [lifecycles task-name]
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
 
+(defn task-map->grouping-fn [task-map]
+  (let [group-key (:onyx/group-by-key task-map)]
+    (cond (keyword? group-key)
+          group-key
+          (sequential? group-key)
+          #(select-keys % group-key)
+          :else
+          #(get % group-key))))
+
 (defn compile-grouping-fn
-  "Compiles grouping outgoing grouping task info into a task->group-fn map
+  "Compiles outgoing grouping task info into a task->group-fn map
   for quick lookup and group fn calls"
   [catalog egress-ids]
   (merge (->> catalog
@@ -108,15 +117,7 @@
                         (and (:onyx/group-by-key entry)
                              egress-ids
                              (egress-ids (:onyx/name entry)))))
-              (map (fn [entry]
-                     (let [group-key (:onyx/group-by-key entry)
-                           group-fn (cond (keyword? group-key)
-                                          group-key
-                                          (sequential? group-key)
-                                          #(select-keys % group-key)
-                                          :else
-                                          #(get % group-key))]
-                       [(:onyx/name entry) group-fn])))
+              (map (juxt :onyx/name task-map->grouping-fn))
               (into (t/hash-map)))
          (->> catalog
               (filter (fn [entry]

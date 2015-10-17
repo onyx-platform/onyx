@@ -1,7 +1,7 @@
 (ns onyx.windowing.basic-windowing-crash-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
-              [taoensso.timbre :as timbre]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
@@ -14,62 +14,53 @@
 ;;; delay is rather long
 
 (def input
-  (reduce into [] 
-          (repeat 20
-                  [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
-                   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
-                   {:id 3  :age 3  :event-time #inst "2015-09-13T03:05:00.829-00:00"}
-                   {:id 4  :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"}
-                   {:id 5  :age 53 :event-time #inst "2015-09-13T03:07:00.829-00:00"}
-                   {:id 6  :age 52 :event-time #inst "2015-09-13T03:08:00.829-00:00"}
-                   {:id 7  :age 24 :event-time #inst "2015-09-13T03:09:00.829-00:00"}
-                   {:id 8  :age 35 :event-time #inst "2015-09-13T03:15:00.829-00:00"}
-                   {:id 9  :age 49 :event-time #inst "2015-09-13T03:25:00.829-00:00"}
-                   {:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
-                   {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"}
-                   {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
-                   {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
-                   {:id 14 :age 60 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
-                   {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}])))
+  ;; ensure some duplicates are around and interdispersed
+  [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   ; Exact dupe
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   ; Exact dupe
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   ; Exact dupe
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 3  :age 3  :event-time #inst "2015-09-13T03:05:00.829-00:00"}
+   {:id 4  :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"}
+   {:id 5  :age 53 :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+   {:id 4  :age 64 :event-time #inst "2015-09-13T03:06:00.829-00:00"}
+   {:id 6  :age 52 :event-time #inst "2015-09-13T03:08:00.829-00:00"}
+   {:id 7  :age 24 :event-time #inst "2015-09-13T03:09:00.829-00:00"}
+   {:id 8  :age 35 :event-time #inst "2015-09-13T03:15:00.829-00:00"}
+   {:id 9  :age 49 :event-time #inst "2015-09-13T03:25:00.829-00:00"}
+   {:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
+   {:id 11 :age 15 :event-time #inst "2015-09-13T03:03:00.829-00:00"}
+   ; Exact dupe
+   {:id 10 :age 37 :event-time #inst "2015-09-13T03:45:00.829-00:00"}
+   {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
+   ; Exact dupe
+   {:id 12 :age 22 :event-time #inst "2015-09-13T03:56:00.829-00:00"}
+   {:id 13 :age 83 :event-time #inst "2015-09-13T03:59:00.829-00:00"}
+   {:id 14 :age 60 :event-time #inst "2015-09-13T03:32:00.829-00:00"}
+   {:id 15 :age 35 :event-time #inst "2015-09-13T03:16:00.829-00:00"}
+   ;; Ensure some duplicate ages are counted, with different ids
+   {:id 16  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 17  :age 52 :event-time #inst "2015-09-13T03:08:00.829-00:00"}
+   {:id 18  :age 53 :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+   {:id 19  :age 3 :event-time #inst "2015-09-13T03:05:00.829-00:00"}])
+
+(defn output->final-counts [window-counts]
+  (let [grouped (group-by (juxt first second) window-counts)]
+    (set (map (fn get-latest [[k v]]
+                (last (sort-by #(apply + (vals (nth % 2))) v)))
+              grouped)))) 
 
 (def expected-windows
-  [[1442113200000 1442113499999 1] 
-   [1442113200000 1442113499999 2] 
-   [1442113200000 1442113499999 3] 
-   [1442113200000 1442113499999 4] 
-   [1442113200000 1442113499999 5] 
-   [1442113200000 1442113499999 6] 
-
-   [1442113500000 1442113799999 1] 
-   [1442113500000 1442113799999 2] 
-   [1442113500000 1442113799999 3] 
-   [1442113500000 1442113799999 4] 
-   [1442113500000 1442113799999 5]
-   [1442113500000 1442113799999 6] 
-   [1442113500000 1442113799999 7] 
-   [1442113500000 1442113799999 8] 
-   [1442113500000 1442113799999 9] 
-   [1442113500000 1442113799999 10]
-
-   [1442114100000 1442114399999 1] 
-   [1442114100000 1442114399999 2] 
-   [1442114100000 1442114399999 3] 
-   [1442114100000 1442114399999 4] 
-
-   [1442114700000 1442114999999 1] 
-   [1442114700000 1442114999999 2] 
-
-   [1442115000000 1442115299999 1] 
-   [1442115000000 1442115299999 2] 
-
-   [1442115900000 1442116199999 1] 
-   [1442115900000 1442116199999 2] 
-
-   [1442116500000 1442116799999 1] 
-   [1442116500000 1442116799999 2] 
-   [1442116500000 1442116799999 3] 
-   [1442116500000 1442116799999 4] 
-   ])
+  #{[1442114700000 1442114999999 {49 1}]
+    [1442113500000 1442113799999 {3 2, 64 1, 53 2, 52 2, 24 1}]
+    [1442114100000 1442114399999 {35 2}]
+    [1442116500000 1442116799999 {22 1, 83 1}]
+    [1442113200000 1442113499999 {21 1, 12 2, 15 1}]
+    [1442115900000 1442116199999 {37 1}]
+    [1442115000000 1442115299999 {60 1}]})
 
 (def test-state (atom []))
 
@@ -86,7 +77,6 @@
    (fn [event lifecycle]
      ; give the peer a bit of time to write the chunks out and ack the batches,
      ; since we want to ensure that the batches aren't re-read on restart
-     ;{}
      (when (= (swap! batch-num inc) 2)
        (Thread/sleep 7000)
        (throw (ex-info "Restartable" {:restartable? true}))))})
@@ -128,9 +118,8 @@
    peer-notify-join
    peer-accept-join])
 
-
-(defn identity-mod-id [segment]
-  [segment (update segment :id * 10000)])
+; (defn identity-mod-id [segment]
+;   [segment (update segment :id * 10000)])
 
 (deftest fault-tolerance-fixed-windows-segment-trigger
 
@@ -149,7 +138,6 @@
 
   (def out-calls
     {:lifecycle/before-task-start inject-out-ch})
-
 
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
@@ -174,7 +162,7 @@
           :onyx/doc "Reads segments from a core.async channel"}
 
          {:onyx/name :identity
-          :onyx/fn ::identity-mod-id
+          :onyx/fn :clojure.core/identity
           :onyx/group-by-key :age ;; irrelevant because only one peer
           :onyx/restart-pred-fn ::restartable?
           :onyx/uniqueness-key :id
@@ -221,7 +209,6 @@
          {:lifecycle/task :out
           :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-
         stats-holder (let [stats (map->MonitoringStats {})]
                        (reduce (fn [st k] (assoc st k (atom []))) 
                                stats
@@ -250,6 +237,5 @@
       (close! in-chan)
 
       (let [results (take-segments! out-chan)]
-        ;(is (= (into #{} input) (into #{} (butlast results))))
         (is (= :done (last results)))
-        (is (= (distinct (sort expected-windows)) (distinct (sort @test-state))))))))
+        (is (= expected-windows (output->final-counts @test-state)))))))

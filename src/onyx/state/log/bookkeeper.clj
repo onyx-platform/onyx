@@ -1,4 +1,4 @@
-(ns onyx.state.log.bookkeeper
+(ns ^:no-doc onyx.state.log.bookkeeper
   (:require [onyx.log.curator :as curator]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [com.stuartsierra.component :as component]
@@ -75,51 +75,51 @@
     (info "Ledger id published.")
     (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle))))
 
-(defn default-state 
-  "Default state function. Resolves window late for perf."
-  [state window]
-  (if state
-    state
-    ((:aggregate/init window) window)))
 
-(defn playback-windows-extents [state entry windows]
-  (let [id->apply-state-update (into {} 
-                                     (map (juxt :window/id :aggregate/apply-state-update) 
-                                          windows))] 
+(defn default-state-value [w state-value]
+  (or state-value ((:aggregate/init w) w)))
+
+(defn playback-windows-extents [event state entry windows]
+  (let [id->apply-state-update (into {}
+                                     (map (juxt :window/id :aggregate/apply-state-update)
+                                          windows))]
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
-              (reduce (fn [state'' [extent entry message-id]]
+              (reduce (fn [state'' [extent entry grp-key]]
                         (update-in state'' 
                                    [:state id extent]
                                    (fn [ext-state] 
-                                     (let [ext-state' (default-state ext-state window)
-                                           apply-fn (id->apply-state-update id)] 
-                                       (assert apply-fn (str "Apply fn does not exist for window-id " id))
-                                       (apply-fn ext-state' entry)))))
+                                     (let [state-value (default-state-value window (if grp-key (get ext-state grp-key) ext-state))
+                                           apply-fn (id->apply-state-update id)
+                                           _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
+                                           new-state-value (apply-fn state-value entry)] 
+                                       (if grp-key
+                                         (assoc ext-state grp-key new-state-value)
+                                         new-state-value)))))
                       state'
-                      window-entries)) 
+                      window-entries))
             state
             (map list (rest entry) windows)))) 
 
 (defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
-  (let [pwd (password peer-opts)] 
+  (let [pwd (password peer-opts)]
     (reduce (fn [st ledger-id]
               ;; TODO: Do I need to deal with recovery exception in here?
               ;; It may be better to just let the thing crash and retry
               (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                 (try
-                  (let [last-confirmed (.getLastAddConfirmed lh)
-                        _ (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)]
+                  (let [last-confirmed (.getLastAddConfirmed lh)]
+                    (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)
                     (if (pos? last-confirmed)
-                      (let [entries (.readEntries lh 0 last-confirmed)] 
+                      (let [entries (.readEntries lh 0 last-confirmed)]
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
                             (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
                                   unique-id (first entry-val)
-                                  st-loop' (let [st (playback-windows-extents st-loop entry-val windows)]
+                                  st-loop' (let [st (playback-windows-extents event st-loop entry-val windows)]
                                              (if unique-id
                                                (update st :filter state-extensions/apply-filter-id event unique-id)
                                                st))] 
-                              (info "Played back entries for message with id: " unique-id)
+                              (info "Played back entries for segment with id:" unique-id)
                               (if (.hasMoreElements entries)
                                 (recur st-loop' (.nextElement entries))
                                 st-loop')))

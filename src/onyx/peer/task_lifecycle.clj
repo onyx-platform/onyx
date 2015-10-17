@@ -34,6 +34,16 @@
   (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name catalog-entry)))
         (map (fn [param] (get catalog-entry param)) (:onyx/params catalog-entry))))
 
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
+
+(defn grouping-fn [event segment]
+  (if (:onyx/group-by-key (:onyx.core/task-map event))
+    (get segment (:onyx/group-by-key (:onyx.core/task-map event)))
+    (let [f (operation/kw->fn (:onyx/group-by-fn (:onyx.core/task-map event)))]
+      (f segment))))
+
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
@@ -325,10 +335,6 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
-(defn init-window-state [w window-state]
-  (or window-state
-      ((:aggregate/init w) w)))
-
 (defn replay-windows-from-log
   [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
   (when (windowed-task? event)
@@ -339,22 +345,32 @@
                replayed-state))))
   event)
 
+(defn default-state-value [w state-value]
+  (or state-value ((:aggregate/init w) w)))
 
-(defn window-state-updates [segment widstate w]
+(defn window-state-updates [event segment widstate w]
   (let [window-id (:window/id w)
         record (:aggregate/record w)
         segment-coerced (we/uniform-units record segment)
         widstate' (we/speculate-update record widstate segment-coerced)
         widstate'' (we/merge-extents record widstate' (:aggregate/super-agg-fn w) segment-coerced)
-        extents (we/extents record (keys widstate'') segment-coerced)]
+        extents (we/extents record (keys widstate'') segment-coerced)
+        grouped-task? (operation/grouped-task? event)
+        grp-key (if grouped-task? (grouping-fn event segment))]
     (let [record (:aggregate/record w)]
       (reduce (fn [[wst entries] extent]
-                (let [f (:aggregate/fn w)
-                      state (init-window-state w (get wst extent))
-                      state-transition-entry (f state w segment)
-                      new-state ((:aggregate/apply-state-update w) state state-transition-entry)]
+                (let [extent-state (get wst extent)
+                      state-value (default-state-value w (if grp-key (get extent-state grp-key) extent-state))
+                      state-transition-entry ((:aggregate/fn w) state-value w segment)
+                      new-state-value ((:aggregate/apply-state-update w) state-value state-transition-entry)
+                      new-state (if grp-key
+                                  (assoc extent-state grp-key new-state-value)
+                                  new-state-value)
+                      log-value (if grp-key 
+                                  (list extent state-transition-entry grp-key)
+                                  (list extent state-transition-entry))]
                   (list (assoc wst extent new-state)
-                        (conj entries (list extent state-transition-entry)))))
+                        (conj entries log-value))))
               (list widstate'' [])
               extents)))) 
 
@@ -387,7 +403,7 @@
                             (reduce (fn [[window-state log-entries] window]
                                       (let [window-id (:window/id window)
                                             window-id-state (get window-state window-id)
-                                            [window-id-state' window-entries] (window-state-updates segment window-id-state window)
+                                            [window-id-state' window-entries] (window-state-updates event segment window-id-state window)
                                             window-state' (assoc window-state window-id window-id-state')]
                                         (list window-state' 
                                               (conj log-entries window-entries))))
@@ -396,7 +412,7 @@
                         (state-extensions/store-log-entry state-log event ack-fn full-log-entry)
                         (swap! window-state assoc :state new-window-state))
                       (doseq [t triggers]
-                        (triggers/fire-trigger! event (:state @window-state) t {:segment segment :context :new-segment})))
+                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})))
                     ;; Always update the filter, to freshen up the fact that the id has been re-seen
                     (when unique-id 
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
@@ -477,6 +493,11 @@
                        (compiled-after-retry-segment-fn event m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
+
+(defn resolve-window-triggers [event triggers windows]
+  (merge
+   event
+   {:onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers windows))}))
 
 (defn setup-triggers [event]
   (reduce triggers/trigger-setup
@@ -643,7 +664,6 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows (c/resolve-windows filtered-windows)
-                           :onyx.core/triggers (c/resolve-triggers (c/filter-triggers triggers filtered-windows))
                            :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
                            :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
                            :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
@@ -675,6 +695,7 @@
 
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
+            ;pipeline-data (assoc pipeline-data :onyx.core/update-state-fn (compile-update-state-fn pipeline-data))
 
             restart-pred-fn (operation/resolve-restart-pred-fn catalog-entry)
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
@@ -686,10 +707,11 @@
 
             pipeline-data (-> pipeline-data
                               before-task-start-fn
-                              setup-triggers
                               resolve-window-state
                               resolve-log
-                              replay-windows-from-log)]
+                              replay-windows-from-log
+                              (resolve-window-triggers triggers filtered-windows)
+                              setup-triggers)]
 
         (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))

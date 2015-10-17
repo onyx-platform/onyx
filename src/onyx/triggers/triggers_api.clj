@@ -59,7 +59,7 @@
 
 (defmethod refine-state :discarding
   [{:keys [onyx.core/window-state]} trigger]
-  (first (swap-pair! window-state #(dissoc % (:trigger/window-id trigger)))))
+  (first (swap-pair! window-state #(update % :state dissoc (:trigger/window-id trigger)))))
 
 (defmethod trigger-setup :default
   [event trigger]
@@ -82,7 +82,7 @@
 
 (defn fire-trigger! [event window-state trigger opts]
   (when (some #{(:context opts)} (trigger-notifications event trigger))
-    (let [window-ids (get window-state (:trigger/window-id trigger))]
+    (let [window-ids (get-in @window-state [:state (:trigger/window-id trigger)])]
       (if (:trigger/fire-all-extents? trigger)
         (when (trigger-fire? event trigger opts)
           (iterate-windows event trigger window-ids (constantly true) opts))

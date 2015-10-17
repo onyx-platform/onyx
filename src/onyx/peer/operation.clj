@@ -82,3 +82,7 @@
           :link)
       (do (warn "Could not obtain peer-site from replica" peer-id)
           nil))))
+
+(defn grouped-task? [event]
+  (or (:onyx/group-by-key (:onyx.core/task-map event))
+      (:onyx/group-by-fn (:onyx.core/task-map event))))
