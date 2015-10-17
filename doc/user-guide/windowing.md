@@ -20,6 +20,7 @@ This section discusses a feature called windowing. Windows allow you to group an
   - [`:onyx.windowing.aggregation/min`](#onyxwindowingaggregationmin)
   - [`:onyx.windowing.aggregation/max`](#onyxwindowingaggregationmax)
   - [`:onyx.windowing.aggregation/average`](#onyxwindowingaggregationaverage)
+  - [Grouping](#grouping)
 - [Window Specification](#window-specification)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
