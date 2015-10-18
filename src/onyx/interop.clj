@@ -2,16 +2,15 @@
   (:gen-class :name onyx.interop
               :methods [^:static [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
                         ^:static [read_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
-  (:require [onyx.peer.function :refer [write-batch read-batch]]
-            [onyx.peer.pipeline-extensions :refer [PipelineInput Pipeline]]))
+  (:require [onyx.peer.pipeline-extensions :refer [PipelineInput Pipeline]]))
 
 (defn -write_batch
   [event]
-  (write-batch event))
+  ((resolve 'onyx.peer.function/write-batch) event))
 
 (defn -read_batch
   [event]
-  (read-batch event))
+  ((resolve 'onyx.peer.function/read-batch) event))
 
 (gen-interface
   :name onyx.IPipelineInput
