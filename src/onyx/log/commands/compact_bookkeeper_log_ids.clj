@@ -6,6 +6,7 @@
             [schema.core :as s]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
+            [onyx.state.log.bookkeeper :as logbk]
             [onyx.extensions :as extensions]))
 
 (s/defmethod extensions/apply-log-entry :compact-bookkeeper-log-ids :- Replica
@@ -34,5 +35,17 @@
 
 (s/defmethod extensions/fire-side-effects! :compact-bookkeeper-log-ids :- State
   [{:keys [args message-id]} :- LogEntry old new diff state]
-  ;;; PXIME, clean up delete swapped ledgers
+  ;; FIXME: should be the peer assigned to the slot id that 
+  ;; deletes the ledgers not the peer that submitted the swap
+  (when (= (:id state) (:peer-id args))
+    ;; If nothing changed, delete the new compacted ledger
+    ;; Otherwise, delete the stale ledgers that have been compacted
+    (let [delete-ids (if (= new old)
+                       (:new-ledger-ids args)
+                       (:prev-ledger-ids args))
+          bk-client (logbk/bookkeeper (:opts state))]
+      (doseq [ledger-id delete-ids]
+        (info "Deleting compacted ledger id:" ledger-id)
+        (.deleteLedger bk-client ledger-id))
+        (.close bk-client)))
   state)
