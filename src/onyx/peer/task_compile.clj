@@ -100,34 +100,24 @@
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
 
 (defn task-map->grouping-fn [task-map]
-  (let [group-key (:onyx/group-by-key task-map)]
+  (if-let [group-key (:onyx/group-by-key task-map)]
     (cond (keyword? group-key)
           group-key
           (sequential? group-key)
           #(select-keys % group-key)
           :else
-          #(get % group-key))))
+          #(get % group-key))
+    (if-let [group-fn (:onyx/group-by-fn task-map)]
+      (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn task-map)}))))
 
 (defn compile-grouping-fn
   "Compiles outgoing grouping task info into a task->group-fn map
   for quick lookup and group fn calls"
   [catalog egress-ids]
-  (merge (->> catalog
-              (filter (fn [entry]
-                        (and (:onyx/group-by-key entry)
-                             egress-ids
-                             (egress-ids (:onyx/name entry)))))
-              (map (juxt :onyx/name task-map->grouping-fn))
-              (into (t/hash-map)))
-         (->> catalog
-              (filter (fn [entry]
-                        (and (:onyx/group-by-fn entry)
-                             egress-ids
-                             (egress-ids (:onyx/name entry)))))
-              (map (fn [entry]
-                     [(:onyx/name entry)
-                      (operation/resolve-fn {:onyx/fn (:onyx/group-by-fn entry)})]))
-              (into (t/hash-map)))))
+  (->> catalog
+       (map (juxt :onyx/name task-map->grouping-fn))
+       (filter second)
+       (into (t/hash-map))))
 
 (defn filter-windows [windows task]
   (filter #(= (:window/task %) task) windows))
