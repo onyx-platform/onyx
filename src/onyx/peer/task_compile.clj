@@ -116,7 +116,8 @@
   [catalog egress-ids]
   (->> catalog
        (map (juxt :onyx/name task-map->grouping-fn))
-       (filter second)
+       (filter (fn [[n f]]
+                 (and f egress-ids (egress-ids n))))
        (into (t/hash-map))))
 
 (defn filter-windows [windows task]

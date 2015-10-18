@@ -77,11 +77,9 @@
     (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle))))
 
 
-(defn default-state-value [w state-value]
-  (or state-value ((:aggregate/init w) w)))
-
 (defn playback-windows-extents [event state entry windows]
-  (let [id->apply-state-update (into {}
+  (let [grouped-task? (operation/grouped-task? event)
+        id->apply-state-update (into {}
                                      (map (juxt :window/id :aggregate/apply-state-update)
                                           windows))]
     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
@@ -89,11 +87,12 @@
                         (update-in state'' 
                                    [:state id extent]
                                    (fn [ext-state] 
-                                     (let [state-value (agg/default-state-value window (if grp-key (get ext-state grp-key) ext-state))
+                                     (let [state-value (-> (if grouped-task? (get ext-state grp-key) ext-state)
+                                                           (agg/default-state-value window))
                                            apply-fn (id->apply-state-update id)
                                            _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
                                            new-state-value (apply-fn state-value entry)] 
-                                       (if grp-key
+                                       (if grouped-task?
                                          (assoc ext-state grp-key new-state-value)
                                          new-state-value)))))
                       state'
@@ -198,23 +197,25 @@
         window-state-snapshot (:state @(:onyx.core/window-state event))
         current-ids (get-in @replica [:state-logs job-id task-id slot-id])]
     ;; Don't throw an exception, maybe we can give the next GC a chance to succeed
+    ;; Log is still in a known good state, we have transitioned to a ledger that is in the replica
     (if-not (= (last current-ids) (.getId @ledger-handle))
       (warn "Could not swap compacted log. Next ledger handle is no longer the next published ledger" 
             {:job-id job-id :task-id task-id :slot-id slot-id :current-ids current-ids})
-      (future (let [compacted-ledger (new-ledger client peer-opts)
-                    compacted-ledger-id (.getId compacted-ledger)]
-                (info "Snapshotted state " window-state-snapshot " putting in " compacted-ledger-id)
-                (.asyncAddEntry ^LedgerHandle compacted-ledger 
-                                ^bytes (nippy/window-log-compress window-state-snapshot)
-                                HandleWriteCallback
-                                (fn []
-                                  (>!! outbox-ch
-                                       {:fn :compact-bookkeeper-log-ids
-                                        :args {:job-id job-id
-                                               :task-id task-id
-                                               :slot-id slot-id
-                                               :prev-ledger-ids (vec (butlast current-ids))
-                                               :new-ledger-ids [compacted-ledger-id]}}))))))))
+      (future 
+        (let [compacted-ledger (new-ledger client peer-opts)
+              compacted-ledger-id (.getId compacted-ledger)]
+          (info "Snapshotted state " window-state-snapshot " putting in " compacted-ledger-id)
+          (.asyncAddEntry ^LedgerHandle compacted-ledger 
+                          ^bytes (nippy/window-log-compress window-state-snapshot)
+                          HandleWriteCallback
+                          (fn []
+                            (>!! outbox-ch
+                                 {:fn :compact-bookkeeper-log-ids
+                                  :args {:job-id job-id
+                                         :task-id task-id
+                                         :slot-id slot-id
+                                         :prev-ledger-ids (vec (butlast current-ids))
+                                         :new-ledger-ids [compacted-ledger-id]}}))))))))
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle next-ledger-handle] :as log} event ack-fn entry]

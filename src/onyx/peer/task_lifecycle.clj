@@ -38,12 +38,6 @@
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
-(defn grouping-fn [event segment]
-  (if (:onyx/group-by-key (:onyx.core/task-map event))
-    (get segment (:onyx/group-by-key (:onyx.core/task-map event)))
-    (let [f (operation/kw->fn (:onyx/group-by-fn (:onyx.core/task-map event)))]
-      (f segment))))
-
 (defn munge-start-lifecycle [event]
   (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
@@ -345,25 +339,25 @@
                replayed-state))))
   event)
 
-(defn window-state-updates [event segment widstate w]
+(defn window-state-updates [segment widstate w event grouping-fn]
   (let [window-id (:window/id w)
         record (:aggregate/record w)
         segment-coerced (we/uniform-units record segment)
         widstate' (we/speculate-update record widstate segment-coerced)
         widstate'' (we/merge-extents record widstate' (:aggregate/super-agg-fn w) segment-coerced)
         extents (we/extents record (keys widstate'') segment-coerced)
-        grouped-task? (operation/grouped-task? event)
-        grp-key (if grouped-task? (grouping-fn event segment))]
+        grp-key (if grouping-fn (grouping-fn segment))]
     (let [record (:aggregate/record w)]
       (reduce (fn [[wst entries] extent]
                 (let [extent-state (get wst extent)
-                      state-value (agg/default-state-value w (if grp-key (get extent-state grp-key) extent-state))
+                      state-value (-> (if grouping-fn (get extent-state grp-key) extent-state)
+                                      (agg/default-state-value w))
                       state-transition-entry ((:aggregate/fn w) state-value w segment)
                       new-state-value ((:aggregate/apply-state-update w) state-value state-transition-entry)
-                      new-state (if grp-key
+                      new-state (if grouping-fn
                                   (assoc extent-state grp-key new-state-value)
                                   new-state-value)
-                      log-value (if grp-key 
+                      log-value (if grouping-fn 
                                   (list extent state-transition-entry grp-key)
                                   (list extent state-transition-entry))]
                   (list (assoc wst extent new-state)
@@ -372,11 +366,12 @@
               extents)))) 
 
 (defn assign-windows
-  [{:keys [onyx.core/windows] :as event}]
+  [compiled {:keys [onyx.core/windows] :as event}]
   (when (seq windows)
     (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger 
                   onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
                   onyx.core/state-log onyx.core/results]} event
+          grouping-fn (:grouping-fn compiled)
           id-key (:onyx/uniqueness-key task-map)] 
       (doall
         (map 
@@ -400,7 +395,7 @@
                             (reduce (fn [[window-state log-entries] window]
                                       (let [window-id (:window/id window)
                                             window-id-state (get window-state window-id)
-                                            [window-id-state' window-entries] (window-state-updates event segment window-id-state window)
+                                            [window-id-state' window-entries] (window-state-updates segment window-id-state window event grouping-fn)
                                             window-state' (assoc window-state window-id window-id-state')]
                                         (list window-state' 
                                               (conj log-entries window-entries))))
@@ -522,6 +517,7 @@
            onyx.core/replica
            onyx.core/peer-replica-view
            onyx.core/state
+           onyx.core/compiled
            onyx.core/compiled-before-batch-fn
            onyx.core/task->group-by-fn
            onyx.core/flow-conditions
@@ -545,7 +541,7 @@
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
-             (assign-windows)
+             (assign-windows compiled)
              (write-batch pipeline)
              (flow-retry-segments replica state messenger monitoring)
              (close-batch-resources)
@@ -626,6 +622,8 @@
                                                                      (state-extensions/initialize-filter filter-impl pipeline)) 
                                                                    {}))))))
 
+(defrecord FastLookup [grouping-fn])
+
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring]
@@ -671,6 +669,7 @@
                            :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
+                           :onyx.core/compiled (->FastLookup (c/task-map->grouping-fn catalog-entry))
                            :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task
@@ -690,9 +689,9 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
+
             pipeline (build-pipeline catalog-entry pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
-            ;pipeline-data (assoc pipeline-data :onyx.core/update-state-fn (compile-update-state-fn pipeline-data))
 
             restart-pred-fn (operation/resolve-restart-pred-fn catalog-entry)
             ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
