@@ -30,6 +30,7 @@
    zookeeper-gc-log-entry
    window-log-write-entry
    window-log-playback
+   window-log-compaction
    peer-ack-segments
    peer-ack-segment
    peer-retry-segment

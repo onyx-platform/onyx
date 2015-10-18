@@ -73,7 +73,7 @@
                       (last (get-in @replica [:state-logs job-id task-id slot-id]))))
       (info "New ledger id has not been published yet. Backing off.")
       (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))) 
-    (info "Ledger id published.")
+    (info "Ledger id" new-ledger-id "published")
     (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle))))
 
 
@@ -98,7 +98,24 @@
                       state'
                       window-entries))
             state
-            (map list (rest entry) windows)))) 
+            (map list (rest entry) windows))))
+
+(defn compacted-reset? [entry]
+  (and (map? entry)
+       (= (:type entry) :compacted))) 
+
+(defn unpack-compacted [state {:keys [filter-snapshot extent-state]} event]
+  (-> state
+      (assoc :state extent-state)
+      (update :filter state-extensions/restore-filter event filter-snapshot)))
+
+(defn playback-entry [entry state event windows]
+  (let [unique-id (first entry)
+        _ (trace "Playing back entries for segment with id:" unique-id)
+        new-state (playback-windows-extents event state entry windows)]
+    (if unique-id
+      (update new-state :filter state-extensions/apply-filter-id event unique-id)
+      new-state)))
 
 (defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
   (let [pwd (password peer-opts)]
@@ -114,12 +131,9 @@
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
                             (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
-                                  unique-id (first entry-val)
-                                  st-loop' (let [st (playback-windows-extents event st-loop entry-val windows)]
-                                             (if unique-id
-                                               (update st :filter state-extensions/apply-filter-id event unique-id)
-                                               st))] 
-                              (info "Played back entries for segment with id:" unique-id)
+                                  st-loop' (if (compacted-reset? entry-val)
+                                             (unpack-compacted st-loop entry-val event)
+                                             (playback-entry entry-val st-loop event windows))] 
                               (if (.hasMoreElements entries)
                                 (recur st-loop' (.nextElement entries))
                                 st-loop')))
@@ -188,27 +202,32 @@
   for 6, leaving [6, 5]"
   [{:keys [client ledger-handle next-ledger-handle] :as log}
    {:keys [onyx.core/peer-opts onyx.core/job-id onyx.core/replica
-           onyx.core/task-id onyx.core/window-state onyx.core/outbox-ch] 
+           onyx.core/task-id onyx.core/monitoring onyx.core/window-state onyx.core/outbox-ch] 
     :as event}]
   (info "Transitioning to new handle after gc" (.getId @next-ledger-handle))
   (reset! ledger-handle @next-ledger-handle)
   (reset! next-ledger-handle nil)
-  (let [slot-id (peer-slot-id event)
-        window-state-snapshot (:state @(:onyx.core/window-state event))
-        current-ids (get-in @replica [:state-logs job-id task-id slot-id])]
+  (let [start-time (System/currentTimeMillis)
+        slot-id (peer-slot-id event)
+        extent-snapshot (:state @window-state)
+        filter-snapshot @(state-extensions/snapshot-filter (:filter @window-state) event)
+        current-ids (get-in @replica [:state-logs job-id task-id slot-id])
+        compacted {:type :compacted
+                   :filter-snapshot filter-snapshot
+                   :extent-state extent-snapshot}]
     ;; Don't throw an exception, maybe we can give the next GC a chance to succeed
     ;; Log is still in a known good state, we have transitioned to a ledger that is in the replica
     (if-not (= (last current-ids) (.getId @ledger-handle))
       (warn "Could not swap compacted log. Next ledger handle is no longer the next published ledger" 
-            {:job-id job-id :task-id task-id :slot-id slot-id :current-ids current-ids})
+            {:job-id job-id :task-id task-id :slot-id slot-id :ledger-handle (.getId @ledger-handle) :current-ids current-ids})
       (future 
         (let [compacted-ledger (new-ledger client peer-opts)
               compacted-ledger-id (.getId compacted-ledger)]
-          (info "Snapshotted state " window-state-snapshot " putting in " compacted-ledger-id)
           (.asyncAddEntry ^LedgerHandle compacted-ledger 
-                          ^bytes (nippy/window-log-compress window-state-snapshot)
+                          ^bytes (nippy/window-log-compress compacted)
                           HandleWriteCallback
                           (fn []
+                            (emit-latency-value :window-log-compaction monitoring (- (System/currentTimeMillis) start-time))
                             (>!! outbox-ch
                                  {:fn :compact-bookkeeper-log-ids
                                   :args {:job-id job-id

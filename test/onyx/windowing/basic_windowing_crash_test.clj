@@ -3,6 +3,7 @@
             [clojure.test :refer [deftest is]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.state.state-extensions :as state-extensions]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
@@ -75,11 +76,19 @@
 (def identity-crash
   {:lifecycle/before-batch 
    (fn [event lifecycle]
-     ; give the peer a bit of time to write the chunks out and ack the batches,
-     ; since we want to ensure that the batches aren't re-read on restart
-     (when (= (swap! batch-num inc) 2)
-       (Thread/sleep 7000)
-       (throw (ex-info "Restartable" {:restartable? true}))))})
+     (case (swap! batch-num inc)
+       2 
+       (do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
+           (Thread/sleep 7000))
+       ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
+       ;; before crashing
+       4
+       (do
+         ; give the peer a bit of time to write the chunks out and ack the batches,
+         ; since we want to ensure that the batches aren't re-read on restart
+         (Thread/sleep 7000)
+         (throw (ex-info "Restartable" {:restartable? true})))
+       {}))})
 
 (defrecord MonitoringStats
   [zookeeper-write-log-entry
@@ -106,6 +115,7 @@
    zookeeper-gc-log-entry
    window-log-write-entry
    window-log-playback
+   window-log-compaction
    peer-ack-segments
    peer-retry-segment
    peer-try-complete-job
@@ -118,8 +128,8 @@
    peer-notify-join
    peer-accept-join])
 
-; (defn identity-mod-id [segment]
-;   [segment (update segment :id * 10000)])
+(def compaction-finished? (atom false))
+(def playback-occurred? (atom false))
 
 (deftest fault-tolerance-fixed-windows-segment-trigger
 
@@ -143,7 +153,7 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        batch-size 10
+        batch-size 5 
         workflow
         [[:in :identity] [:identity :out]]
 
@@ -216,10 +226,14 @@
 
         event-fn (fn print-monitoring-event [_ event]
                    (let [stats-value (swap! (get stats-holder (:event event)) conj event)]
-                     #_(timbre/info "MONITORING NOW: " stats-value)))
+                     (case (:event event)
+                       :window-log-compaction (reset! compaction-finished? true)
+                       :window-log-playback (reset! playback-occurred? true)
+                       nil)))
 
         monitoring-config {:monitoring :custom
                            :zookeeper-read-catalog event-fn
+                           :window-log-compaction event-fn
                            :window-log-playback event-fn
                            :window-log-write-entry event-fn}]
     (with-test-env [test-env [6 env-config peer-config monitoring-config]]
@@ -238,4 +252,6 @@
 
       (let [results (take-segments! out-chan)]
         (is (= :done (last results)))
+        (is (true? @compaction-finished?))
+        (is (true? @playback-occurred?))
         (is (= expected-windows (output->final-counts @test-state)))))))
