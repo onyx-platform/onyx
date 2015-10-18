@@ -106,9 +106,8 @@
   (.close ^RocksDB (:db rocks-db))
   (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))
 
-(defmethod state-extensions/restore-filter onyx.state.filter.rocksdb.RocksDbInstance [{:keys [db bucket id-counter] :as rocks-db} 
-                                                                                      event 
-                                                                                      snapshot]
+(defmethod state-extensions/restore-filter onyx.state.filter.rocksdb.RocksDbInstance 
+  [{:keys [db bucket id-counter] :as rocks-db} event snapshot]
   (reset! id-counter (:id-counter snapshot))
   (reset! bucket (:bucket snapshot))
   (run! (fn [[k v]]
@@ -116,7 +115,8 @@
         (:kvs snapshot))
   rocks-db)
 
-(defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance [filter-state _] 
+(defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance 
+  [filter-state _] 
   (let [db ^RocksDB (:db filter-state)
         snapshot ^Snapshot (.getSnapshot db)
         bucket @(:bucket filter-state)
