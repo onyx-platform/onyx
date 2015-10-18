@@ -109,7 +109,7 @@
                 (try
                   (let [last-confirmed (.getLastAddConfirmed lh)]
                     (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)
-                    (if (pos? last-confirmed)
+                    (if-not (neg? last-confirmed)
                       (let [entries (.readEntries lh 0 last-confirmed)]
                         (if (.hasMoreElements entries)
                           (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
