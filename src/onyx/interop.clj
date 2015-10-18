@@ -29,9 +29,9 @@
 (extend-protocol PipelineInput
   onyx.IPipelineInput
   (ack-segment [this event message-id]
-    (.ackMessage this event message-id))
+    (.ackSegment this event message-id))
   (retry-segment [this event message-id]
-    (.retryMessage this event message-id))
+    (.retrySegment this event message-id))
   (pending? [this event message-id]
     (.isPending this event message-id))
   (drained? [this event]
