@@ -12,7 +12,6 @@
             [onyx.types :refer [inc-count! dec-count!]]
             [onyx.log.replica]
             [onyx.log.commands.common :refer [peer-slot-id]]
-            [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default defaults]])
   (:import [org.apache.bookkeeper.client LedgerHandle LedgerEntry BookKeeper BookKeeper$DigestType AsyncCallback$AddCallback]
@@ -26,6 +25,9 @@
 
 (defn create-ledger ^LedgerHandle [^BookKeeper client ensemble-size quorum-size digest-type password]
   (.createLedger client ensemble-size quorum-size digest-type password))
+
+(defn close-handle [^LedgerHandle ledger-handle]
+  (.close ledger-handle))
 
 (defn bookkeeper
   ([opts]
@@ -58,7 +60,7 @@
                                                                          onyx.core/kill-ch onyx.core/task-kill-ch
                                                                          onyx.core/outbox-ch] :as event}] 
   (let [bk-client (bookkeeper peer-opts)
-        ledger-handle (new-ledger bk-client peer-opts)
+        ledger-handle ^LedgerHandle (new-ledger bk-client peer-opts)
         slot-id (peer-slot-id event)
         new-ledger-id (.getId ledger-handle)
         next-ledger-handle nil] 
@@ -120,8 +122,6 @@
 (defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
   (let [pwd (password peer-opts)]
     (reduce (fn [st ledger-id]
-              ;; TODO: Do I need to deal with recovery exception in here?
-              ;; It may be better to just let the thing crash and retry
               (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                 (try
                   (let [last-confirmed (.getLastAddConfirmed lh)]
@@ -140,7 +140,7 @@
                           st))  
                       st))
                   (finally
-                    (.close ^LedgerHandle lh)))))
+                    (close-handle lh)))))
             state
             ledger-ids)))
 
@@ -166,27 +166,28 @@
            onyx.core/kill-ch onyx.core/task-kill-ch
            onyx.core/outbox-ch] :as event} 
    _] 
-  (let [new-ledger-handle (new-ledger client peer-opts)
-        slot-id (peer-slot-id event)
-        new-ledger-id (.getId new-ledger-handle)] 
-    (>!! outbox-ch
-         {:fn :assign-bookkeeper-log-id
-          :args {:job-id job-id
-                 :task-id task-id
-                 :slot-id slot-id
-                 :ledger-id new-ledger-id}})
-    (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                (not= new-ledger-id
-                      (last (get-in @replica [:state-logs job-id task-id slot-id]))))
-      (info "Transitional GC ledger id has not been published yet. Backing off.")
-      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts)))
-    (reset! next-ledger-handle new-ledger-handle)))
+  (future
+    (let [new-ledger-handle ^LedgerHandle (new-ledger client peer-opts)
+          slot-id (peer-slot-id event)
+          new-ledger-id (.getId new-ledger-handle)] 
+      (>!! outbox-ch
+           {:fn :assign-bookkeeper-log-id
+            :args {:job-id job-id
+                   :task-id task-id
+                   :slot-id slot-id
+                   :ledger-id new-ledger-id}})
+      (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
+                  (not= new-ledger-id
+                        (last (get-in @replica [:state-logs job-id task-id slot-id]))))
+        (info "Transitional GC ledger id has not been published yet. Backing off.")
+        (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts)))
+      (reset! next-ledger-handle new-ledger-handle))))
 
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle next-ledger-handle]} event] 
-  (.close ^LedgerHandle @ledger-handle)
+  (close-handle @ledger-handle)
   (when @next-ledger-handle
-    (.close ^LedgerHandle @next-ledger-handle))
+    (close-handle @next-ledger-handle))
   (.close ^BookKeeper client))
 
 (def HandleWriteCallback
@@ -202,28 +203,32 @@
   for 6, leaving [6, 5]"
   [{:keys [client ledger-handle next-ledger-handle] :as log}
    {:keys [onyx.core/peer-opts onyx.core/job-id onyx.core/replica
-           onyx.core/task-id onyx.core/monitoring onyx.core/window-state onyx.core/outbox-ch] 
+           onyx.core/id onyx.core/task-id onyx.core/monitoring onyx.core/window-state onyx.core/outbox-ch] 
     :as event}]
-  (info "Transitioning to new handle after gc" (.getId @next-ledger-handle))
-  (reset! ledger-handle @next-ledger-handle)
-  (reset! next-ledger-handle nil)
-  (let [start-time (System/currentTimeMillis)
+  (info "Transitioning to new handle after gc" (.getId ^LedgerHandle @next-ledger-handle))
+  (let [previous-handle @ledger-handle
+        start-time (System/currentTimeMillis)
         slot-id (peer-slot-id event)
         extent-snapshot (:state @window-state)
-        filter-snapshot @(state-extensions/snapshot-filter (:filter @window-state) event)
-        current-ids (get-in @replica [:state-logs job-id task-id slot-id])
-        compacted {:type :compacted
-                   :filter-snapshot filter-snapshot
-                   :extent-state extent-snapshot}]
+        ;; Deref future later so that we can immediately return and continue processing
+        filter-snapshot (state-extensions/snapshot-filter (:filter @window-state) event)
+        current-ids (get-in @replica [:state-logs job-id task-id slot-id])]
+    (reset! ledger-handle @next-ledger-handle)
+    (reset! next-ledger-handle nil)
     ;; Don't throw an exception, maybe we can give the next GC a chance to succeed
     ;; Log is still in a known good state, we have transitioned to a ledger that is in the replica
-    (if-not (= (last current-ids) (.getId @ledger-handle))
+    (if-not (= (last current-ids) (.getId ^LedgerHandle @ledger-handle))
       (warn "Could not swap compacted log. Next ledger handle is no longer the next published ledger" 
-            {:job-id job-id :task-id task-id :slot-id slot-id :ledger-handle (.getId @ledger-handle) :current-ids current-ids})
+            {:job-id job-id :task-id task-id :slot-id slot-id 
+             :ledger-handle (.getId ^LedgerHandle @ledger-handle) :current-ids current-ids})
       (future 
-        (let [compacted-ledger (new-ledger client peer-opts)
+        (close-handle previous-handle)
+        (let [compacted {:type :compacted
+                         :filter-snapshot @filter-snapshot
+                         :extent-state extent-snapshot}
+              compacted-ledger ^LedgerHandle (new-ledger client peer-opts)
               compacted-ledger-id (.getId compacted-ledger)]
-          (.asyncAddEntry ^LedgerHandle compacted-ledger 
+          (.asyncAddEntry compacted-ledger 
                           ^bytes (nippy/window-log-compress compacted)
                           HandleWriteCallback
                           (fn []
@@ -233,6 +238,7 @@
                                   :args {:job-id job-id
                                          :task-id task-id
                                          :slot-id slot-id
+                                         :peer-id id
                                          :prev-ledger-ids (vec (butlast current-ids))
                                          :new-ledger-ids [compacted-ledger-id]}}))))))))
 

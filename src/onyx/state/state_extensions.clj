@@ -9,7 +9,8 @@
     (type log)))
 
 (defmulti compact-log
-  "Compact a log for quicker replay and to reduce storage demands"
+  "Compact a log for quicker replay and to reduce storage demands
+  Returns a future that will perform the compaction transparently."
   (fn [log event state]
     (type log))) 
 
