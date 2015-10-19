@@ -21,15 +21,15 @@ else
   grep "$OLD_VERSION" README.MD || (echo "Version string $1 was not found in README" && exit 1)
 
   lein set-version $NEW_VERSION
-  sed -i '' "s/$OLD_VERSION/$NEW_VERSION/g" README.md
-  sed -i '' "s/$OLD_BRANCH/$NEW_BRANCH/g" README.md
-  sed -i '' "s/$OLD_BRANCH/$NEW_BRANCH/g" circle.yml
+  sed -i.bak "s/$OLD_VERSION/$NEW_VERSION/g" README.md
+  sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" README.md
+  sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" circle.yml
   git rm -rf doc/api
   lein doc
 
   # Push and deploy release.
   git add doc
-  git commit -m "Release version $NEW_VERSION." project.clj README.md doc
+  git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml
   git tag $NEW_VERSION
   git push origin $NEW_VERSION
   git push origin master
@@ -44,7 +44,7 @@ else
   lein set-version
 
   SNAPSHOT_VERSION=`lein pprint :version|sed s/\"//g`
-  sed -i '' "s/$NEW_VERSION/$SNAPSHOT_VERSION/g" README.md
+  sed -i.bak "s/$NEW_VERSION/$SNAPSHOT_VERSION/g" README.md
 
   git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
