@@ -74,7 +74,7 @@ All peers require the ability to connect to the ZooKeeper instances over TCP.
 
 #### Dependencies
 
-- Java 7+
+- Java 8+
 - Clojure 1.6+
 - ZooKeeper 3.4.5+
 
