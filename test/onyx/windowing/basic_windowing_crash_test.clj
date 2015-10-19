@@ -63,32 +63,8 @@
     [1442115900000 1442116199999 {37 1}]
     [1442115000000 1442115299999 {60 1}]})
 
-(def test-state (atom []))
-
-(defn update-atom! [event window-id lower-bound upper-bound state]
-  (swap! test-state conj [lower-bound upper-bound state]))
-
 (defn restartable? [e] 
   true)
-
-(def batch-num (atom 0))
-
-(def identity-crash
-  {:lifecycle/before-batch 
-   (fn [event lifecycle]
-     (case (swap! batch-num inc)
-       2 
-       (do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
-           (Thread/sleep 7000))
-       ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
-       ;; before crashing
-       4
-       (do
-         ; give the peer a bit of time to write the chunks out and ack the batches,
-         ; since we want to ensure that the batches aren't re-read on restart
-         (Thread/sleep 7000)
-         (throw (ex-info "Restartable" {:restartable? true})))
-       {}))})
 
 (defrecord MonitoringStats
   [zookeeper-write-log-entry
@@ -128,10 +104,34 @@
    peer-notify-join
    peer-accept-join])
 
-(def compaction-finished? (atom false))
-(def playback-occurred? (atom false))
-
 (deftest fault-tolerance-fixed-windows-segment-trigger
+
+  (def test-state (atom []))
+
+  (defn update-atom! [event window-id lower-bound upper-bound state]
+    (swap! test-state conj [lower-bound upper-bound state]))
+
+  (def batch-num (atom 0))
+
+  (def identity-crash
+    {:lifecycle/before-batch 
+     (fn [event lifecycle]
+       (case (swap! batch-num inc)
+         2 
+         (do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
+             (Thread/sleep 7000))
+         ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
+         ;; before crashing
+         4
+         (do
+           ; give the peer a bit of time to write the chunks out and ack the batches,
+           ; since we want to ensure that the batches aren't re-read on restart
+           (Thread/sleep 7000)
+           (throw (ex-info "Restartable" {:restartable? true})))
+         {}))})
+
+  (def compaction-finished? (atom false))
+  (def playback-occurred? (atom false))
 
   (def in-chan (chan (inc (count input))))
 
