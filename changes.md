@@ -1,3 +1,7 @@
+#### 0.7.11
+
+- Fixes transitive AOT compilation problem of interop namespace. [#339](https://github.com/onyx-platform/onyx/issues/339).
+
 #### 0.7.10
 
 - No functional changes in this release. Fixing build issue.
