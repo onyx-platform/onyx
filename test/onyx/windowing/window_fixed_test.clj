@@ -119,6 +119,7 @@
 
     (reset! in-chan (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
+    (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
       (onyx.api/submit-job peer-config
