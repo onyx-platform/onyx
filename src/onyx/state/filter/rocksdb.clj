@@ -11,20 +11,20 @@
 
 (defrecord RocksDbInstance [dir db id-counter buckets bucket rotation-thread shutdown-ch])
 
-(defn build-bucket [^RocksDB db]
+(defn build-bucket [^RocksDB db id]
   (.createColumnFamily db 
-                       (ColumnFamilyDescriptor. (.getBytes (str (java.util.UUID/randomUUID))) 
+                       (ColumnFamilyDescriptor. (.getBytes (str id)) 
                                                 (ColumnFamilyOptions.))))
 
 (defn clear-bucket! [db bucket]
   (.dropColumnFamily ^RocksDB db ^ColumnFamilyHandle bucket))
 
-(def max-buckets 255)
+(def max-buckets 10)
 
 (defn rotate-bucket! 
   "Rotates to the next bucket, and then starts the dropped one"
   [db buckets bucket]
-  (let [new-bucket (build-bucket db)
+  (let [new-bucket (build-bucket db (java.util.UUID/randomUUID))
         new-buckets (swap! buckets conj new-bucket)]
     (reset! bucket new-bucket)
     (when (> (count new-buckets) max-buckets)
@@ -69,7 +69,7 @@
                   (.setCreateIfMissing true)
                   (.setTableFormatConfig block-config))
         db (RocksDB/open options db-dir)
-        initial-bucket (build-bucket db)
+        initial-bucket (build-bucket db (java.util.UUID/randomUUID))
         buckets (atom [initial-bucket])
         bucket (atom initial-bucket)
         id-counter (atom 0)
@@ -77,11 +77,15 @@
         rotation-thread (start-rotation-thread! shutdown-ch peer-opts db id-counter buckets bucket)]
     (->RocksDbInstance db-dir db id-counter buckets bucket rotation-thread shutdown-ch)))
 
+
+(def magic-value 
+  (doto (byte-array 1)
+    (aset 0 (byte 99))))
+
 (defmethod state-extensions/apply-filter-id onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
-  (let [k ^bytes (nippy/localdb-compress id)
-        v (byte-array 0)]
+  (let [k ^bytes (nippy/localdb-compress id)]
     (swap! (:id-counter rocks-db) inc)
-    (.put ^RocksDB (:db rocks-db) ^ColumnFamilyHandle @(:bucket rocks-db) k ^bytes v))
+    (.put ^RocksDB (:db rocks-db) ^ColumnFamilyHandle @(:bucket rocks-db) k ^bytes magic-value))
   ;; Expects a filter back
   rocks-db)
 
@@ -90,7 +94,10 @@
         strbuf (StringBuffer.)
         db ^RocksDB (:db rocks-db)]
     (some (fn [^ColumnFamilyHandle bucket]
-            (.keyMayExist db bucket k strbuf))
+            (let [may-exist? (.keyMayExist db bucket k strbuf)]
+              (and may-exist? 
+                   (or (pos? (.length strbuf))
+                       (not (nil? (.get db bucket k)))))))
           @(:buckets rocks-db))))
 
 (defmethod state-extensions/close-filter onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _]
