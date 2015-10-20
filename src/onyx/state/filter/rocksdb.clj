@@ -1,5 +1,6 @@
 (ns onyx.state.filter.rocksdb
-  (:import [org.rocksdb RocksDB RocksIterator Snapshot Options ReadOptions BloomFilter BlockBasedTableConfig CompressionType]
+  (:import [org.rocksdb RocksDB RocksIterator ColumnFamilyDescriptor ColumnFamilyHandle ColumnFamilyOptions 
+            Snapshot Options ReadOptions BloomFilter BlockBasedTableConfig CompressionType]
            [org.apache.commons.io FileUtils])
   (:require [onyx.state.state-extensions :as state-extensions]
             [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close! thread]]
@@ -8,44 +9,30 @@
             [onyx.compression.nippy :as nippy]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
-(defrecord RocksDbInstance [dir db id-counter bucket rotation-thread shutdown-ch])
+(defrecord RocksDbInstance [dir db id-counter buckets bucket rotation-thread shutdown-ch])
 
-(defn new-bucket [v]
-  (let [cyc (byte-array 1)]
-    (aset cyc 0 (byte v))
-    cyc))
+(defn build-bucket [^RocksDB db]
+  (.createColumnFamily db 
+                       (ColumnFamilyDescriptor. (.getBytes (str (java.util.UUID/randomUUID))) 
+                                                (ColumnFamilyOptions.))))
 
-(defn bucket-val [^bytes cyc]
-  (aget cyc 0))
+(defn clear-bucket! [db bucket]
+  (.dropColumnFamily ^RocksDB db ^ColumnFamilyHandle bucket))
 
-(defn next-bucket [cyc]
-  (new-bucket (- (mod (+ (inc (bucket-val cyc)) 
-                        128) 
-                     256)
-                128)))
-
-(def start-bucket 0)
-
-(defn clear-bucket! [db bucket shutdown-ch]
-  (let [bucket (byte bucket)
-        iterator ^RocksIterator (.newIterator db)]
-    (try
-      (.seekToFirst iterator)
-      (while (.isValid iterator) 
-        (when (= (bucket-val (.value iterator)) 
-                 bucket)
-          (.remove ^RocksDB db ^bytes (.key iterator)))
-        (.next iterator))
-      (finally
-        (.dispose iterator)))))
+(def max-buckets 255)
 
 (defn rotate-bucket! 
-  "Rotates to the next bucket, and then starts clearing the one after it"
-  [db bucket shutdown-ch]
-  (swap! bucket next-bucket)
-  (clear-bucket! db (bucket-val (next-bucket @bucket)) shutdown-ch))
+  "Rotates to the next bucket, and then starts the dropped one"
+  [db buckets bucket]
+  (let [new-bucket (build-bucket db)
+        new-buckets (swap! buckets conj new-bucket)]
+    (reset! bucket new-bucket)
+    (when (> (count new-buckets) max-buckets)
+      (swap! buckets (fn [bks] (vec (drop 1 bks))))
+      (let [dropped-bucket (first new-buckets)]
+        (clear-bucket! db dropped-bucket)))))
 
-(defn start-rotation-thread [shutdown-ch peer-opts db id-counter bucket]
+(defn start-rotation-thread! [shutdown-ch peer-opts db id-counter buckets bucket]
   (thread
     (let [rotation-sleep (arg-or-default :onyx.rocksdb.filter/rotation-check-interval-ms peer-opts)
           elements-per-bucket (arg-or-default :onyx.rocksdb.filter/rotate-filter-bucket-every-n peer-opts)] 
@@ -56,7 +43,7 @@
             (try
               (when (> @id-counter elements-per-bucket)
                 (info "Rotating filter bucket after" elements-per-bucket "elements.")
-                (rotate-bucket! db bucket shutdown-ch)
+                (rotate-bucket! db buckets bucket)
                 (reset! id-counter 0))
               (catch Throwable e
                 (fatal e)))
@@ -82,22 +69,29 @@
                   (.setCreateIfMissing true)
                   (.setTableFormatConfig block-config))
         db (RocksDB/open options db-dir)
-        bucket (atom (new-bucket start-bucket))
+        initial-bucket (build-bucket db)
+        buckets (atom [initial-bucket])
+        bucket (atom initial-bucket)
         id-counter (atom 0)
         shutdown-ch (chan 1)
-        rotation-thread (start-rotation-thread shutdown-ch peer-opts db id-counter bucket)]
-    (->RocksDbInstance db-dir db id-counter bucket rotation-thread shutdown-ch)))
+        rotation-thread (start-rotation-thread! shutdown-ch peer-opts db id-counter buckets bucket)]
+    (->RocksDbInstance db-dir db id-counter buckets bucket rotation-thread shutdown-ch)))
 
 (defmethod state-extensions/apply-filter-id onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
-  (let [k ^bytes (nippy/localdb-compress id)]
+  (let [k ^bytes (nippy/localdb-compress id)
+        v (byte-array 0)]
     (swap! (:id-counter rocks-db) inc)
-    (.put ^RocksDB (:db rocks-db) k ^bytes @(:bucket rocks-db)))
+    (.put ^RocksDB (:db rocks-db) ^ColumnFamilyHandle @(:bucket rocks-db) k ^bytes v))
   ;; Expects a filter back
   rocks-db)
 
 (defmethod state-extensions/filter? onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _ id] 
-  (let [k (nippy/localdb-compress id)]
-    (not (nil? (.get ^RocksDB (:db rocks-db) k)))))
+  (let [k ^bytes (nippy/localdb-compress id)
+        strbuf (StringBuffer.)
+        db ^RocksDB (:db rocks-db)]
+    (some (fn [^ColumnFamilyHandle bucket]
+            (.keyMayExist db bucket k strbuf))
+          @(:buckets rocks-db))))
 
 (defmethod state-extensions/close-filter onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _]
   (close! (:shutdown-ch rocks-db))
