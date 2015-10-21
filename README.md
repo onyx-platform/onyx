@@ -133,7 +133,7 @@ Some code has been incorporated from the following projects:
 
 ### Author
 
-The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator. You can get me directly at (mjd3089.at.rit.edu) if needed.
+The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator.
 
 ### License
 
