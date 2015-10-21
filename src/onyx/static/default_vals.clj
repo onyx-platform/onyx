@@ -35,9 +35,10 @@
    :onyx.rocksdb.filter/block-size 4096
    ;; rocksdb cache per filtering peer, 100MB
    :onyx.rocksdb.filter/peer-block-cache-size (* 100 1024 1024)
+   ;;
+   :onyx.rocksdb.filter/num-buckets 10
    ;; rotate the filter bucket every n elements, 256 buckets
-   :onyx.rocksdb.filter/rotate-filter-bucket-every-n 1000000 
-   :onyx.rocksdb.filter/rotation-check-interval-ms 100 
+   :onyx.rocksdb.filter/num-ids-per-bucket 10000000
 
    ;; peer defaults
    :onyx.peer/inbox-capacity 1000

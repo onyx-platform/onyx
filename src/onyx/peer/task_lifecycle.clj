@@ -372,6 +372,7 @@
                   onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
                   onyx.core/state-log onyx.core/results]} event
           grouping-fn (:grouping-fn compiled)
+          uniqueness-check? (contains? task-map :onyx/uniqueness-key)
           id-key (:onyx/uniqueness-key task-map)] 
       (doall
         (map 
@@ -387,9 +388,8 @@
               (run! 
                 (fn [message]
                   (let [segment (:message message)
-                        unique-id (if id-key (get segment id-key))
-                        seen? (and unique-id (state-extensions/filter? (:filter @window-state) event unique-id))]
-                    (when-not seen?
+                        unique-id (if uniqueness-check? (get segment id-key))]
+                    (when-not (and uniqueness-check? (state-extensions/filter? (:filter @window-state) event unique-id))
                       (inc-count! fused-ack)
                       (let [[new-window-state full-log-entry] 
                             (reduce (fn [[window-state log-entries] window]
@@ -406,7 +406,7 @@
                       (doseq [t triggers]
                         (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})))
                     ;; Always update the filter, to freshen up the fact that the id has been re-seen
-                    (when unique-id 
+                    (when uniqueness-check? 
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))
                 (:leaves leaf))))
           (:tree results)
