@@ -16,8 +16,9 @@
                        (ColumnFamilyDescriptor. (.getBytes (str id)) 
                                                 (ColumnFamilyOptions.))))
 
-(defn clear-bucket! [db bucket]
-  (.dropColumnFamily ^RocksDB db ^ColumnFamilyHandle bucket))
+(defn clear-bucket! [^RocksDB db ^ColumnFamilyHandle bucket]
+  (.dropColumnFamily db bucket)
+  (.dispose bucket))
 
 (defn rotate-bucket! 
   "Rotates to the next bucket, and then starts the dropped one"
@@ -98,16 +99,17 @@
                        (not (nil? (.get db bucket k)))))))
           @(:buckets rocks-db))))
 
+(defn clear-buckets! [{:keys [db bucket buckets] :as rocks-db}]
+  (run! (partial clear-bucket! db) @buckets)
+  (reset! buckets []))
+
 (defmethod state-extensions/close-filter onyx.state.filter.rocksdb.RocksDbInstance [rocks-db _]
   (close! (:shutdown-ch rocks-db))
   ;; Block until background processing has been stopped before closing the db
   (<!! (:rotation-thread rocks-db))
+  (clear-buckets! rocks-db)
   (.close ^RocksDB (:db rocks-db))
   (FileUtils/deleteDirectory (java.io.File. ^String (:dir rocks-db))))
-
-(defn clear-buckets! [{:keys [db bucket buckets] :as rocks-db}]
-  (run! (partial clear-bucket! db) @buckets)
-  (reset! buckets []))
 
 (defn add-bucket! [{:keys [db bucket buckets] :as rocks-db}
                    bucket-values]
@@ -125,6 +127,19 @@
   (run! #(add-bucket! rocks-db %) (:buckets snapshot))
   rocks-db)
 
+(defn capture-bucket [^RocksDB db ^ReadOptions read-options ^ColumnFamilyHandle bucket]
+  (let [iterator ^RocksIterator (.newIterator db bucket read-options)]
+    (try
+      (.seekToFirst iterator)
+      (loop [ids (list)]
+        (if (.isValid iterator)
+          (let [id (list (.key iterator) (.value iterator))] 
+            (.next iterator)
+            (recur (conj ids id)))
+          ids))
+      (finally
+        (.dispose iterator)))))
+
 (defmethod state-extensions/snapshot-filter onyx.state.filter.rocksdb.RocksDbInstance 
   [filter-state _] 
   (let [db ^RocksDB (:db filter-state)
@@ -135,18 +150,6 @@
                                     (.setSnapshot snapshot))]
     (future 
       (try {:id-counter id-counter 
-       :buckets (mapv (fn [^ColumnFamilyHandle bucket]
-                        (let [iterator ^RocksIterator (.newIterator db bucket read-options)]
-                          (try
-                            (.seekToFirst iterator)
-                            (loop [ids (list)]
-                              (if (.isValid iterator)
-                                (let [id (list (.key iterator) (.value iterator))] 
-                                  (.next iterator)
-                                  (recur (conj ids id)))
-                                ids))
-                            (finally
-                              (.dispose iterator)))))
-                      buckets)}
+            :buckets (mapv #(capture-bucket db read-options %) buckets)}
            (finally
              (.releaseSnapshot db (.snapshot read-options)))))))
