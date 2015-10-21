@@ -28,6 +28,8 @@
    :onyx.bookkeeper/ledger-ensemble-size 3
    :onyx.bookkeeper/ledger-quorum-size 2
    :onyx.bookkeeper/ledger-id-written-back-off 500
+   :onyx.bookkeeper/write-batch-size 20
+   :onyx.bookkeeper/write-batch-timeout 50
 
    :onyx.rocksdb.filter/base-dir "/tmp/rocksdb_filter"
    :onyx.rocksdb.filter/bloom-filter-bits 10
