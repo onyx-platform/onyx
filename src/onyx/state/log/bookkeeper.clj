@@ -92,9 +92,10 @@
                          :filter-snapshot @filter-snapshot
                          :extent-state extent-snapshot}
               compacted-ledger (new-ledger client peer-opts)
-              compacted-ledger-id (.getId compacted-ledger)]
+              compacted-ledger-id (.getId compacted-ledger)
+              compacted-serialized ^bytes (nippy/window-log-compress compacted)]
           (.asyncAddEntry compacted-ledger 
-                          ^bytes (nippy/window-log-compress compacted)
+                          compacted-serialized
                           HandleWriteCallback
                           (fn []
                             (emit-latency-value :window-log-compaction monitoring (- (System/currentTimeMillis) start-time))
@@ -136,8 +137,7 @@
                        {:keys [onyx.core/kill-ch onyx.core/task-kill-ch onyx.core/peer-opts] :as event}]
   (thread 
     (loop [[result batch ack-fns] (read-batch peer-opts batch-ch kill-ch task-kill-ch)]
-      ;; Prescence of next-ledger-handle indicates that we should transition to next handle
-      ;; and start log compaction at a safe point, i.e. before we write the next entry
+      ;; Safe point to transition to the next ledger handle
       (when @next-ledger-handle
         (compaction-transition log event))
       (when-not (empty? batch) 
@@ -146,7 +146,7 @@
                         HandleWriteCallback
                         (fn [] (run! (fn [f] (f)) ack-fns))))
       (if-not (= :shutdown result)
-        (recur (read-batch batch-ch kill-ch task-kill-ch))))
+        (recur (read-batch peer-opts batch-ch kill-ch task-kill-ch))))
     (info "BookKeeper: shutting down batch processing")))
 
 (defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
