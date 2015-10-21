@@ -5,13 +5,13 @@
 (defn default-state-value [state-value w]
   (or state-value ((:aggregate/init w) w)))
 
-(defn set-value-aggregation-apply-log [state [t v]]
-  (case t 
-    :set-value v))
+(defn set-value-aggregation-apply-log [state v]
+  ;; Log command is not needed for single transition type
+  v)
 
-(defn conj-aggregation-apply-log [state [t v]]
-  (case t
-    :conj (clojure.core/conj state v)))
+(defn conj-aggregation-apply-log [state v]
+  ;; Log command is not needed for single transition type
+  (clojure.core/conj state v))
 
 (defn conj-aggregation-fn-init [window]
   [])
@@ -26,29 +26,30 @@
   {:sum 0 :n 0})
 
 (defn conj-aggregation-fn [state window segment]
-  [:conj segment])
+  ;; Log command is not needed for single transition type
+  segment)
 
 (defn sum-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [:set-value (+ state (get segment k))]))
+    (+ state (get segment k))))
 
 (defn count-aggregation-fn [state window segment]
-  [:set-value (inc state)])
+  (inc state))
 
 (defn min-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [:set-value (clojure.core/min state (get segment k))]))
+    (clojure.core/min state (get segment k))))
 
 (defn max-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))]
-    [:set-value (clojure.core/max state (get segment k))]))
+    (clojure.core/max state (get segment k))))
 
 (defn average-aggregation-fn [state window segment]
   (let [k (second (:window/aggregation window))
         sum (+ (:sum state)
                (get segment k))
         n (inc (:n state))]
-    [:set-value {:n n :sum sum :average (/ sum n)}]))
+    {:n n :sum sum :average (/ sum n)}))
 
 (defn conj-super-aggregation [state-1 state-2 window]
   (concat state-1 state-2))
