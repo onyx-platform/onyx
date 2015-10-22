@@ -51,10 +51,6 @@
 (defn add-completion-id [id m]
   (assoc m :completion-id id))
 
-(defn windowed-task? [event]
-  (or (not-empty (:onyx.core/windows event))
-      (not-empty (:onyx.core/triggers event))))
-
 (defn sentinel-found? [event]
   (seq (filter #(= :done (:message %))
                (:onyx.core/batch event))))
