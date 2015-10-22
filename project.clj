@@ -77,6 +77,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
+    {:git "git@onyx-metrics:onyx-platform/onyx-metrics.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-dashboard:onyx-platform/onyx-dashboard.git"
      :branch "compatibility"
      :release-branch "master"
