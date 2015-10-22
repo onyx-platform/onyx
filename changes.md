@@ -1,3 +1,7 @@
+#### 0.7.13
+
+- No functional changes in this release. Fixing build issue.
+
 #### 0.7.12
 
 - No functional changes in this release. Fixing build issue.
