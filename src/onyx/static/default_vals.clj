@@ -28,18 +28,22 @@
    :onyx.bookkeeper/ledger-ensemble-size 3
    :onyx.bookkeeper/ledger-quorum-size 2
    :onyx.bookkeeper/ledger-id-written-back-off 500
+   ; number of state entries to write to a single bookeeper entry
    :onyx.bookkeeper/write-batch-size 20
+   ; number of bookkeeper entries to read at a time
+   ; effective batch read of state entries is write-batch-size * read-batch-size
+   :onyx.bookkeeper/read-batch-size 50
    :onyx.bookkeeper/write-batch-timeout 50
 
    :onyx.rocksdb.filter/base-dir "/tmp/rocksdb_filter"
    :onyx.rocksdb.filter/bloom-filter-bits 10
    :onyx.rocksdb.filter/compression :none
    :onyx.rocksdb.filter/block-size 4096
-   ;; rocksdb cache per filtering peer, 100MB
+   ; rocksdb cache per filtering peer, 100MB
    :onyx.rocksdb.filter/peer-block-cache-size (* 100 1024 1024)
-   ;;
+   ; number of filter buckets
    :onyx.rocksdb.filter/num-buckets 10
-   ;; rotate the filter bucket every n elements, 256 buckets
+   ; rotate the filter bucket every n elements
    :onyx.rocksdb.filter/num-ids-per-bucket 10000000
 
    ;; peer defaults

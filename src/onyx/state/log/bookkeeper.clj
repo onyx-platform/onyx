@@ -219,26 +219,42 @@
             state
             batch)) 
 
-(defn playback-ledgers [bk-client peer-opts state ledger-ids {:keys [onyx.core/windows] :as event}]
+(defn playback-entries-chunk [state ^LedgerHandle lh start end {:keys [onyx.core/windows] :as event}]
+  (let [entries (.readEntries lh start end)]
+    (if (.hasMoreElements entries)
+      (loop [state' state element ^LedgerEntry (.nextElement entries)]
+        (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
+              state' (if (compacted-reset? entry-val)
+                         (unpack-compacted state' entry-val event)
+                         (playback-batch-entry state' entry-val event windows))] 
+          (if (.hasMoreElements entries)
+            (recur state' (.nextElement entries))
+            state')))
+      state)))
+
+
+(def chunk-size 2)
+
+(defn playback-ledger [state ^LedgerHandle lh last-confirmed {:keys [onyx.core/peer-opts] :as event}]
+  (let [chunk-size (arg-or-default :onyx.bookkeeper/read-batch-size peer-opts)]
+    (if-not (neg? last-confirmed)
+      (loop [loop-state state start 0 end (min chunk-size last-confirmed)] 
+        (let [new-state (playback-entries-chunk loop-state lh start end event)]
+          (if (= end last-confirmed)
+            new-state
+            (recur new-state 
+                   (inc end) 
+                   (min (+ chunk-size end) last-confirmed)))))
+      state)))
+
+(defn playback-ledgers [bk-client peer-opts state ledger-ids event]
   (let [pwd (password peer-opts)]
-    (reduce (fn [st ledger-id]
+    (reduce (fn [state' ledger-id]
               (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                 (try
                   (let [last-confirmed (.getLastAddConfirmed lh)]
                     (info "Opened ledger:" ledger-id "last confirmed:" last-confirmed)
-                    (if-not (neg? last-confirmed)
-                      (let [entries (.readEntries lh 0 last-confirmed)]
-                        (if (.hasMoreElements entries)
-                          (loop [st-loop st element ^LedgerEntry (.nextElement entries)]
-                            (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
-                                  st-loop' (if (compacted-reset? entry-val)
-                                             (unpack-compacted st-loop entry-val event)
-                                             (playback-batch-entry st-loop entry-val event windows))] 
-                              (if (.hasMoreElements entries)
-                                (recur st-loop' (.nextElement entries))
-                                st-loop')))
-                          st))  
-                      st))
+                    (playback-ledger state' lh last-confirmed event))
                   (finally
                     (close-handle lh)))))
             state
