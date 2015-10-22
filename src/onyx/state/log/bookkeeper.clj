@@ -232,9 +232,6 @@
             state')))
       state)))
 
-
-(def chunk-size 2)
-
 (defn playback-ledger [state ^LedgerHandle lh last-confirmed {:keys [onyx.core/peer-opts] :as event}]
   (let [chunk-size (arg-or-default :onyx.bookkeeper/read-batch-size peer-opts)]
     (if-not (neg? last-confirmed)
