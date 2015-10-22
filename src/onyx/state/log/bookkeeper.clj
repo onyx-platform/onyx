@@ -127,9 +127,8 @@
             (recur (conj entries entry) 
                    (conj ack-fns ack-fn) 
                    (inc i))
-            [(ch->type ch batch-ch timeout-ch kill-ch task-kill-ch) 
-             entries
-             ack-fns]))
+            (let [msg-type (ch->type ch batch-ch timeout-ch kill-ch task-kill-ch)]
+              [msg-type entries ack-fns])))
         [:read entries ack-fns]))))
 
 (defn process-batches [{:keys [ledger-handle next-ledger-handle batch-ch] :as log} 
@@ -148,16 +147,12 @@
         (recur (read-batch peer-opts batch-ch kill-ch task-kill-ch))))
     (info "BookKeeper: shutting down batch processing")))
 
-(defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/replica onyx.core/peer-opts
-                                                                         onyx.core/job-id onyx.core/task-id
-                                                                         onyx.core/kill-ch onyx.core/task-kill-ch
-                                                                         onyx.core/outbox-ch] :as event}] 
-  (let [bk-client (bookkeeper peer-opts)
-        ledger-handle (new-ledger bk-client peer-opts)
-        slot-id (peer-slot-id event)
-        new-ledger-id (.getId ledger-handle)
-        batch-ch (chan 10000) ;; don't use constant 
-        next-ledger-handle nil] 
+(defn assign-bookkeeper-log-id-spin [{:keys [onyx.core/replica onyx.core/peer-opts
+                                             onyx.core/job-id onyx.core/task-id
+                                             onyx.core/kill-ch onyx.core/task-kill-ch
+                                             onyx.core/outbox-ch] :as event}
+                                     new-ledger-id]
+  (let [slot-id (peer-slot-id event)]
     (>!! outbox-ch
          {:fn :assign-bookkeeper-log-id
           :args {:job-id job-id
@@ -168,7 +163,15 @@
                 (not= new-ledger-id
                       (last (get-in @replica [:state-logs job-id task-id slot-id]))))
       (info "New ledger id has not been published yet. Backing off.")
-      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts))) 
+      (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts)))))
+
+(defmethod state-extensions/initialize-log :bookkeeper [log-type {:keys [onyx.core/peer-opts] :as event}] 
+  (let [bk-client (bookkeeper peer-opts)
+        ledger-handle (new-ledger bk-client peer-opts)
+        new-ledger-id (.getId ledger-handle)
+        batch-ch (chan (arg-or-default :onyx.bookkeeper/write-buffer-size peer-opts))
+        next-ledger-handle nil] 
+    (assign-bookkeeper-log-id-spin event new-ledger-id)
     (info "Ledger id" new-ledger-id "published")
     (doto (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle) batch-ch)
       (process-batches event)))) 
@@ -273,26 +276,12 @@
 
 (defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle next-ledger-handle]} 
-   {:keys [onyx.core/replica onyx.core/peer-opts
-           onyx.core/job-id onyx.core/task-id
-           onyx.core/kill-ch onyx.core/task-kill-ch
-           onyx.core/outbox-ch] :as event} 
+   {:keys [onyx.core/peer-opts] :as event} 
    _] 
   (future
     (let [new-ledger-handle (new-ledger client peer-opts)
-          slot-id (peer-slot-id event)
           new-ledger-id (.getId new-ledger-handle)] 
-      (>!! outbox-ch
-           {:fn :assign-bookkeeper-log-id
-            :args {:job-id job-id
-                   :task-id task-id
-                   :slot-id slot-id
-                   :ledger-id new-ledger-id}})
-      (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                  (not= new-ledger-id
-                        (last (get-in @replica [:state-logs job-id task-id slot-id]))))
-        (info "Transitional GC ledger id has not been published yet. Backing off.")
-        (Thread/sleep (arg-or-default :onyx.bookkeeper/ledger-id-written-back-off peer-opts)))
+      (assign-bookkeeper-log-id-spin event new-ledger-id)
       (reset! next-ledger-handle new-ledger-handle))))
 
 (defmethod state-extensions/close-log onyx.state.log.bookkeeper.BookKeeperLog
