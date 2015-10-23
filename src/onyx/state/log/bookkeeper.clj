@@ -176,7 +176,7 @@
     (doto (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle) batch-ch)
       (process-batches event)))) 
 
-(defn playback-windows-extents [event state entry windows]
+(defn playback-windows-extents [state entry {:keys [onyx.core/windows] :as event}]
   (let [grouped-task? (operation/grouped-task? event)
         id->apply-state-update (into {}
                                      (map (juxt :window/id :aggregate/apply-state-update)
@@ -208,28 +208,28 @@
       (assoc :state extent-state)
       (update :filter state-extensions/restore-filter event filter-snapshot)))
 
-(defn playback-entry [state entry event windows]
+(defn playback-entry [state entry event]
   (let [unique-id (first entry)
         _ (trace "Playing back entries for segment with id:" unique-id)
-        new-state (playback-windows-extents event state entry windows)]
+        new-state (playback-windows-extents state entry event)]
     (if unique-id
       (update new-state :filter state-extensions/apply-filter-id event unique-id)
       new-state)))
 
-(defn playback-batch-entry [state batch event windows]
+(defn playback-batch-entry [state batch event]
   (reduce (fn [state entry]
-            (playback-entry state entry event windows))
+            (playback-entry state entry event))
             state
             batch)) 
 
-(defn playback-entries-chunk [state ^LedgerHandle lh start end {:keys [onyx.core/windows] :as event}]
+(defn playback-entries-chunk [state ^LedgerHandle lh start end event]
   (let [entries (.readEntries lh start end)]
     (if (.hasMoreElements entries)
       (loop [state' state element ^LedgerEntry (.nextElement entries)]
         (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
               state' (if (compacted-reset? entry-val)
                          (unpack-compacted state' entry-val event)
-                         (playback-batch-entry state' entry-val event windows))] 
+                         (playback-batch-entry state' entry-val event))] 
           (if (.hasMoreElements entries)
             (recur state' (.nextElement entries))
             state')))
