@@ -61,7 +61,7 @@
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
     (common/start-new-lifecycle
      old new diff
-     (cond (common/should-seal? new {:job job} state message-id)
+     (cond (common/should-seal? new job state message-id)
            (>!! (:seal-ch state) true)
 
            (and (= (:id state) (:observer updated-watch))

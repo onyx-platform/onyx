@@ -26,6 +26,6 @@
 (s/defmethod extensions/fire-side-effects! :signal-ready :- State
   [{:keys [args message-id]} :- LogEntry old new diff state]
   (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-    (when (common/should-seal? new {:job job} state message-id)
+    (when (common/should-seal? new job state message-id)
       (>!! (:seal-ch state) true)))
   state)
