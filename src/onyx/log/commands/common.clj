@@ -79,10 +79,14 @@
       (let [n (mod message-id (count peers))]
         (= (nth peers n) id)))))
 
+(defn allocated-to-job [replica args id])
+
 (defn should-seal? [replica args state message-id]
-  (and (all-inputs-exhausted? replica (:job args))
-       (executing-output-task? replica (:id state))
-       (elected-sealer? replica message-id (:id state))))
+  (let [allocated-to-job? (= (:job args) (:job (peer->allocated-job (:allocations replica) (:id state))))]
+    (and allocated-to-job?
+         (all-inputs-exhausted? replica (:job args))
+         (executing-output-task? replica (:id state))
+         (elected-sealer? replica message-id (:id state)))))
 
 (defn at-least-one-active? [replica peers]
   (->> peers
