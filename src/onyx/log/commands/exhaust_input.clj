@@ -20,6 +20,6 @@
 
 (s/defmethod extensions/fire-side-effects! :exhaust-input :- State
   [{:keys [args message-id]} old new diff state]
-  (when (common/should-seal? new args state message-id)
+  (when (common/should-seal? new (:job args) state message-id)
     (>!! (:seal-ch state) true))
   state)

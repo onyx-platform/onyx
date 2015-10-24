@@ -89,10 +89,10 @@
 
 (defn allocated-to-job [replica args id])
 
-(defn should-seal? [replica args state message-id]
-  (let [allocated-to-job? (= (:job args) (:job (peer->allocated-job (:allocations replica) (:id state))))]
+(defn should-seal? [replica job-id state message-id]
+  (let [allocated-to-job? (= job-id (:job (peer->allocated-job (:allocations replica) (:id state))))]
     (and allocated-to-job?
-         (all-inputs-exhausted? replica (:job args))
+         (all-inputs-exhausted? replica job-id)
          (executing-output-task? replica (:id state))
          (elected-sealer? replica message-id (:id state)))))
 
