@@ -79,8 +79,6 @@
       (let [n (mod message-id (count peers))]
         (= (nth peers n) id)))))
 
-(defn allocated-to-job [replica args id])
-
 (defn should-seal? [replica job-id state message-id]
   (let [allocated-to-job? (= job-id (:job (peer->allocated-job (:allocations replica) (:id state))))]
     (and allocated-to-job?
