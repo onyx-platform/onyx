@@ -1,3 +1,7 @@
+#### 0.7.14
+
+- Bug fix: Fixed a case where a peer would complete multiple jobs in response to a sealing event, rather than the only completing the one job that it was supposed to.
+
 #### 0.7.13
 
 - No functional changes in this release. Fixing build issue.
