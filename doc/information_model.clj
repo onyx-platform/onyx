@@ -176,7 +176,7 @@ When denoted as a vector of keywords, the first value in the vector  may either 
    :type :boolean
    :optional? true
    :default false
-   :restrictions ["Any entry that has :flow/short-circuit? set to true must come before any entries for an task that have it set to false or nil."]}
+   :restrictions ["Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to false or nil."]}
 
   :flow/thrown-exception?
   {:doc "If an exception is thrown from an Onyx transformation function, you can capture it from within your flow conditions by setting this value to `true`. If an exception is thrown, only flow conditions with `:flow/thrown-exception?` set to `true` will be evaluated. The value that is normally the segment which is sent to the predicate will be the exception object that was thrown. Note that exceptions don't serialize. This feature is meant to be used in conjunction with Post-transformations and Actions for sending exception values to downstream tasks."
@@ -465,13 +465,13 @@ If this value is a vector, it contain two values: a keyword as described above, 
   {:doc "The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return the decompressed value of the byte array."
    :optional? true
    :type :function
-   :default onyx.compression.nippy/decompress}
+   :default 'onyx.compression.nippy/decompress}
 
   :onyx.messaging/compress-fn
   {:doc "The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte array representing the segment seq."
    :optional? true
    :type :function
-   :default onyx.compression.nippy/compress}
+   :default 'onyx.compression.nippy/compress}
 
   :onyx.messaging/impl
   {:doc "The messaging protocol to use for peer-to-peer communication."
