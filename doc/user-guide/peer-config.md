@@ -191,13 +191,11 @@ Number of milliseconds to wait for process to periodically clear out ack-vals th
 
 ##### `:onyx.messaging/decompress-fn`
 
-The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return
-the decompressed value of the byte array.
+The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return the decompressed value of the byte array.
 
 ##### `:onyx.messaging/compress-fn`
 
-The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte
-array representing the segment seq.
+The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte array representing the segment seq.
 
 ##### `:onyx.messaging/impl`
 
@@ -209,39 +207,27 @@ An IP address to bind the peer to for messaging. Defaults to `nil`, binds to it'
 
 ##### `:onyx.messaging/peer-port-range`
 
-A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictable in-order.
+A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictably in-order.
 
 ##### `:onyx.messaging/peer-ports`
 
-A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictable in-order.
+A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictably in-order.
 
 ##### `:onyx.messaging/allow-short-circuit?`
 
-A boolean denoting whether to allow virtual peers to short circuit networked
-messaging when colocated with the other virtual peer. Short circuiting allows
-for direct transfer of messages to a virtual peer's internal buffers, which
-improves performance where possible. This configuration option is primarily for
-use in perfomance testing, as peers will not generally be able to short circuit
-messaging after scaling to many nodes.
+A boolean denoting whether to allow virtual peers to short circuit networked messaging when colocated with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in perfomance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes.
 
 ##### `:onyx.messaging.aeron/embedded-driver?`
 
-A boolean denoting whether an Aeron media driver should be started up with the environment.
-See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
+A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
 
 ##### `:onyx.messaging.aeron/subscriber-count`
 
-The number of Aeron subscriber threads that receive messages for the
-peer-group.  As peer-groups are generally configured per-node (machine), this
-setting can bottleneck receive performance if many virtual peers are used
-per-node, or are receiving and/or de-serializing large volumes of data. A good
-guidline is is `num cores = num virtual peers + num subscribers`, assuming
-virtual peers are generally being fully utilised.
+The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guidline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilised.
 
 ##### `:onyx.messaging.aeron/write-buffer-size`
 
-Size of the write queue for the Aeron publication. Writes to this queue will
-currently block once full.
+Size of the write queue for the Aeron publication. Writes to this queue will currently block once full.
 
 ##### `:onyx.messaging.aeron/poll-idle-strategy`
 

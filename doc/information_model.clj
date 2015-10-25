@@ -348,4 +348,189 @@ If this value is a vector, it contain two values: a keyword as described above, 
    :type :integer
    :unit :milliseconds
    :default 400
-   :optional? true}}}
+   :optional? true}
+
+  :onyx.peer/peer-not-ready-back-off
+  {:doc "Number of ms to back off and wait before retrying the call to `start-task?` lifecycle hook if it returns false."
+   :type :integer
+   :unit :milliseconds
+   :default 2000
+   :optional? true}
+
+  :onyx.peer/job-not-ready-back-off
+  {:doc "Number of ms to back off and wait before trying to discover configuration needed to start the subscription after discovery failure."
+   :type :integer
+   :unit :milliseconds
+   :optional? true
+   :default 500}
+
+  :onyx.peer/fn-params
+  {:doc "A map of keywords to vectors. Keywords represent task names, vectors represent the first parameters to apply to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function underlying `:add` with `(f 42 <segment>)` This will apply to any job with this task name."
+   :type :map
+   :optional? true
+   :default {}}
+
+  :onyx.peer/backpressure-check-interval
+  {:doc "Number of ms between checking whether the virtual peer should notify the cluster of backpressure-on/backpressure-off."
+   :type :integer
+   :unit :milliseconds
+   :optional? true
+   :default 10}
+
+  :onyx.peer/backpressure-low-water-pct
+  {:doc "Percentage of messaging inbound-buffer-size that constitutes a low water mark for backpressure purposes."
+   :type :integer
+   :optional? true
+   :default 30}
+
+  :onyx.peer/backpressure-high-water-pct
+  {:doc "Percentage of messaging inbound-buffer-size that constitutes a high water mark for backpressure purposes."
+   :type :integer
+   :optional? true
+   :default 60}
+
+  :onyx.zookeeper/backoff-base-sleep-time-ms
+  {:doc "Initial amount of time to wait between ZooKeeper connection retries"
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 1000}
+
+  :onyx.zookeeper/backoff-max-sleep-time-ms
+  {:doc "Maximum amount of time in ms to sleep on each retry"
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 30000}
+  
+  :onyx.zookeeper/backoff-max-retries
+  {:doc "Maximum number of times to retry connecting to ZooKeeper"
+   :optional? true
+   :type :integer
+   :default 5}
+
+  :onyx.messaging/inbound-buffer-size
+  {:doc "Number of messages to buffer in the core.async channel for received segments."
+   :optional? true
+   :type :integer
+   :default 20000}
+
+  :onyx.messaging/completion-buffer-size
+  {:doc "Number of messages to buffer in the core.async channel for completing messages on an input task."
+   :optional? true
+   :type :integer
+   :default 1000}
+  
+  :onyx.messaging/release-ch-buffer-size
+  {:doc "Number of messages to buffer in the core.async channel for released completed messages."
+   :optional? true
+   :type :integer
+   :default 10000}
+  
+  :onyx.messaging/retry-ch-buffer-size
+  {:doc "Number of messages to buffer in the core.async channel for retrying timed-out messages."
+   :optional? true
+   :type :integer
+   :default 10000}
+  
+  :onyx.messaging/peer-link-gc-interval
+  {:doc "The interval in milliseconds to wait between closing idle peer links."
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 90000}
+
+  :onyx.messaging/peer-link-idle-timeout
+  {:doc "The maximum amount of time that a peer link can be idle (not looked up in the state atom for usage) before it is eligible to be closed. The connection will be reopened from scratch the next time it is needed."
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 60000}
+
+  :onyx.messaging/ack-daemon-timeout
+  {:doc "Number of milliseconds that an ack value can go without being updates on a daemon before it is eligible to time out."
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 60000}
+
+  :onyx.messaging/ack-daemon-clear-interval
+  {:doc "Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon."
+   :unit :milliseconds
+   :optional? true
+   :type :integer
+   :default 15000}
+
+  :onyx.messaging/decompress-fn
+  {:doc "The Clojure function to use for messaging decompression. Receives one argument - a byte array. Must return the decompressed value of the byte array."
+   :optional? true
+   :type :function
+   :default onyx.compression.nippy/decompress}
+
+  :onyx.messaging/compress-fn
+  {:doc "The Clojure function to use for messaging compression. Receives one argument - a sequence of segments. Must return a byte array representing the segment seq."
+   :optional? true
+   :type :function
+   :default onyx.compression.nippy/compress}
+
+  :onyx.messaging/impl
+  {:doc "The messaging protocol to use for peer-to-peer communication."
+   :optional? false
+   :type :keyword
+   :choices [:aeron]}
+
+  :onyx.messaging/bind-addr
+  {:doc "An IP address to bind the peer to for messaging. Defaults to `nil`. When `nil`, Onyx binds to it's external IP to the result of calling `http://checkip.amazonaws.com`."
+   :optional? false
+   :type :string
+   :default nil}
+
+  :onyx.messaging/peer-port-range
+  {:doc "A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictably in-order."
+   :required-when ["`:onyx.messaging/peer-ports` is not defined."]
+   :type :vector
+   :default []}
+
+  :onyx.messaging/peer-ports
+  {:doc "A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictably in-order. "
+   :required-when ["`:onyx.messaging/peer-port-range` is not defined."]
+   :type :vector
+   :default []}
+
+  :onyx.messaging/allow-short-circuit?
+  {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when colocated with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in perfomance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
+   :optional? true
+   :type :boolean
+   :default true}
+  
+  :onyx.messaging.aeron/embedded-driver?
+  {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
+   :optional? true
+   :type :boolean
+   :default true}
+
+  :onyx.messaging.aeron/subscriber-count
+  {:doc "The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guidline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilised."
+   :optional? true
+   :type :integer
+   :default 2}
+
+  :onyx.messaging.aeron/write-buffer-size
+  {:doc "Size of the write queue for the Aeron publication. Writes to this queue will currently block once full."
+   :optional? true
+   :type :integer
+   :default 1000}
+
+  :onyx.messaging.aeron/poll-idle-strategy
+  {:doc "The Aeron idle strategy to use between when polling for new messages. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput."
+   :optional? true
+   :type :keyword
+   :default :high-restart-latency
+   :choices [:high-restart-latency :low-restart-latency]}
+
+  :onyx.messaging.aeron/offer-idle-strategy
+  {:doc "The Aeron idle strategy to use between when offering messages to another peer. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput."
+   :optional? true
+   :type :keyword
+   :default :high-restart-latency
+   :choices [:high-restart-latency :low-restart-latency]}}}
