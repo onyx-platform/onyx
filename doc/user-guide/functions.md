@@ -14,6 +14,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 - [Flux Policies](#flux-policies)
   - [Continue Policy](#continue-policy)
   - [Kill Policy](#kill-policy)
+  - [Recover Policy](#recover-policy)
 - [Bulk Functions](#bulk-functions)
 - [Leaf Functions](#leaf-functions)
 
@@ -113,6 +114,10 @@ When `:onyx/flux-policy` is set to `:continue` on a catalog entry, a peer leavin
 ##### Kill Policy
 
 When `:onyx/flux-policy` is set to `:kill`, the job is killed and all peers abort execution of the job. Some jobs cannot compute correct answers if there is a shift in the hashing algorithm's consistency. An example of this is a word count batch job.
+
+##### Recover Policy
+
+When `:onyx/flux-policy` is set to `:recover`, the job is continues as is if any peers abort execution of the task. If any other peers are available, they will be added to this task to progressively meet the `:onyx/min-peers` number of peers concurrently working on this task.
 
 #### Bulk Functions
 
