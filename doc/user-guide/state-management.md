@@ -14,8 +14,8 @@ This section discusses state management and fault tolerance used in windowing/st
 
 Onyx provides the ability to perform stateful updates for segments which are
 calculated over [windows] (doc/user-guide/windowing.md). For example, a
-grouping task may accumulate incoming values for a number of keys over a global
-window.
+grouping task may accumulate incoming values for a number of keys over windows
+of 5 minutes.
 
 #### State Example
 
