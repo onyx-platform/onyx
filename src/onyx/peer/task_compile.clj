@@ -4,6 +4,7 @@
             [onyx.static.validation :as validation]
             [onyx.windowing.aggregation :as agg]
             [onyx.windowing.window-extensions :as w]
+            [onyx.state.state-extensions :as state-extensions]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [clj-tuple :as t]))
 
@@ -156,3 +157,46 @@
       :trigger/id (java.util.UUID/randomUUID)
       :trigger/sync-fn (kw->fn (:trigger/sync %)))
    triggers))
+
+(defn compacted-reset? [entry]
+  (and (map? entry)
+       (= (:type entry) :compacted)))
+
+(defn unpack-compacted [state {:keys [filter-snapshot extent-state]} event]
+  (-> state
+      (assoc :state extent-state)
+      (update :filter state-extensions/restore-filter event filter-snapshot)))
+
+(defn compile-apply-window-entry-fn [{:keys [onyx.core/task-map onyx.core/windows] :as event}]
+  (let [grouped-task? (operation/grouped-task? task-map)
+        id->apply-state-update (into {}
+                                     (map (juxt :window/id :aggregate/apply-state-update)
+                                          windows))
+        extents-fn (fn [state entry] 
+                     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
+                               (reduce (fn [state'' [extent entry grp-key]]
+                                         (update-in state'' 
+                                                    [:state id extent]
+                                                    (fn [ext-state] 
+                                                      (let [state-value (-> (if grouped-task? (get ext-state grp-key) ext-state)
+                                                                            (agg/default-state-value window))
+                                                            apply-fn (id->apply-state-update id)
+                                                            _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
+                                                            new-state-value (apply-fn state-value entry)] 
+                                                        (if grouped-task?
+                                                          (assoc ext-state grp-key new-state-value)
+                                                          new-state-value)))))
+                                       state'
+                                       window-entries))
+                             state
+                             (map list (rest entry) windows)))]
+    (fn [state entry]
+      (if (compacted-reset? entry)
+        (unpack-compacted state entry event)
+        (let [unique-id (first entry)
+              _ (trace "Playing back entries for segment with id:" unique-id)
+              new-state (extents-fn state entry)]
+          (if unique-id
+            (update new-state :filter state-extensions/apply-filter-id event unique-id)
+            new-state))))))
+

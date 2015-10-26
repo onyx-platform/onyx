@@ -330,7 +330,8 @@
   (when (windowed-task? event)
     (swap! window-state 
            (fn [wstate] 
-             (let [replayed-state (state-extensions/playback-log-entries state-log event wstate)]
+             (let [compiled-apply-fn (c/compile-apply-window-entry-fn event)
+                   replayed-state (state-extensions/playback-log-entries state-log event wstate compiled-apply-fn)]
                (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
   event)
@@ -618,7 +619,7 @@
                                                                      (state-extensions/initialize-filter filter-impl pipeline)) 
                                                                    {}))))))
 
-(defrecord FastLookup [grouping-fn])
+(defrecord Compiled [grouping-fn])
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
@@ -665,7 +666,7 @@
                            :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
-                           :onyx.core/compiled (->FastLookup (c/task-map->grouping-fn catalog-entry))
+                           :onyx.core/compiled (->Compiled (c/task-map->grouping-fn catalog-entry))
                            :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map catalog-entry
                            :onyx.core/serialized-task task

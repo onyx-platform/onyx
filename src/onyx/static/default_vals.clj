@@ -26,7 +26,7 @@
    :onyx.bookkeeper/client-throttle 30000
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
    :onyx.bookkeeper/ledger-ensemble-size 3
-   :onyx.bookkeeper/ledger-quorum-size 2
+   :onyx.bookkeeper/ledger-quorum-size 3
    :onyx.bookkeeper/ledger-id-written-back-off 500
    ; number of state entries to write to a single bookeeper entry
    :onyx.bookkeeper/write-batch-size 20

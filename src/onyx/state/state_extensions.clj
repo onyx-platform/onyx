@@ -21,7 +21,7 @@
 
 (defmulti playback-log-entries 
   "Read state update entries from log"
-  (fn [log event state]
+  (fn [log event state apply-fn]
     (type log)))
 
 (defmulti initialize-filter 
