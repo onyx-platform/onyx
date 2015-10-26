@@ -75,7 +75,7 @@ Resulting in the following events:
 
 
 | Action           | Result                       |
-|-------------------------------------------------|
+|------------------|------------------------------|
 | Initial state    | `0`                          |
 | Incoming segment | `{:name "John" :age 49}`     |
 | Changelog entry  | `[:set-value 49]`            |
