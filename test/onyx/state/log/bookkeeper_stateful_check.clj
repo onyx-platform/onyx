@@ -19,12 +19,6 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
-(defn new-replica []
-    (atom {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                     :messaging {:onyx.messaging/impl :dummy-messenger}}
-           :message-id 0}))
-
-
 (def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
 
 (def id (java.util.UUID/randomUUID))
@@ -35,18 +29,10 @@
 
 (def peer-config (assoc (:peer-config config) 
                         :onyx/id id
-                        :onyx.bookkeeper/write-batch-size 1
-                        :onyx.bookkeeper/write-batch-timeout 10000000))
+                        :onyx.bookkeeper/write-batch-size 2 
+                        :onyx.bookkeeper/write-batch-timeout 5))
 
 (def bookkeeper-peer-state (atom nil))
-
-(defn add-to-bookkeeper [arg]
-  (let [event (:event @bookkeeper-peer-state)
-        state-log (:onyx.core/state-log event)
-        ack-promise (promise)]
-    (state-ext/store-log-entry state-log event (fn [] (deliver ack-promise :done)) arg)
-    ;; Wait until it's acked
-    @ack-promise))
 
 (defn init-state [& args]
   [])
@@ -63,14 +49,29 @@
 
 (def previous-peer-state (atom nil))
 
+(defn add-to-bookkeeper [arg]
+  (let [event (:event @bookkeeper-peer-state)
+        state-log (:onyx.core/state-log event)
+        ack-promise (promise)]
+    (swap! bookkeeper-peer-state update :ack-promises conj ack-promise)
+    (state-ext/store-log-entry state-log event (fn [] (deliver ack-promise :done)) arg)))
+
 (defn new-log-after-crash []
   (let [pipeline (new-pipeline)]
+    (run! deref (:ack-promises @bookkeeper-peer-state))
     (reset! previous-peer-state @bookkeeper-peer-state)
     (swap! bookkeeper-peer-state assoc :event pipeline)))
 
 (defn close-peer [event]
   (close! (:onyx.core/task-kill-ch event))
   (state-ext/close-log (:onyx.core/state-log event) event))
+
+(defn new-peer-log []
+  (reset! bookkeeper-peer-state {:ledger-ids []
+                                 :ack-promises []
+                                 :event-log []})
+  ;; must setup before new-pipeline so that ledger id is recorded
+  (swap! bookkeeper-peer-state assoc :event (new-pipeline)))
 
 (def crash-and-playback-spec
   {:model/args (fn [state]
@@ -91,19 +92,12 @@
                                 (close-peer (:event @previous-peer-state)))))
    :real/command #'new-log-after-crash})
 
-
 (def add-to-log-espec
   {:model/args (fn [state]
                  [gen/int])
    :next-state (fn [state [arg] result]
                  (conj state arg))
    :real/command #'add-to-bookkeeper})
-
-(defn new-peer-log []
-  (reset! bookkeeper-peer-state {:ledger-ids []
-                                 :event-log []})
-  ;; must setup before new-pipeline so that ledger id is recorded
-  (swap! bookkeeper-peer-state assoc :event (new-pipeline)))
 
 (defn close-peer-cleanup [state]
   (close-peer (:event @bookkeeper-peer-state)))
