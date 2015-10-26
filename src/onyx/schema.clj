@@ -163,10 +163,6 @@
    (s/optional-key :bookkeeper/base-dir) s/Str
    s/Keyword s/Any})
 
-(def ^{:private true} PortRange
-  [(s/one s/Int "port-range-start") 
-   (s/one s/Int "port-range-end")])
-
 (def AeronIdleStrategy
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
@@ -188,8 +184,7 @@
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str
-   (s/optional-key :onyx.messaging/peer-port-range) PortRange
-   (s/optional-key :onyx.messaging/peer-ports) [s/Int]
+   (s/optional-key :onyx.messaging/peer-port) s/Int
    (s/optional-key :onyx.messaging/external-addr) s/Str
    (s/optional-key :onyx.peer/inbox-capacity) s/Int
    (s/optional-key :onyx.peer/outbox-capacity) s/Int

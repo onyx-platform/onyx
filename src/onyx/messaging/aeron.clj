@@ -190,13 +190,8 @@
       pub-manager)))
 
 (defn opts->port [opts]
-  (or (first (common/allowable-ports opts))
-      (throw
-        (ex-info "Couldn't assign port - ran out of available ports.
-                 Available ports can be configured in the peer-config.
-                 e.g. {:onyx.messaging/peer-ports [40000, 40002],
-                       :onyx.messaging/peer-port-range [40200 40260]}"
-                 {:opts opts}))))
+  (or (:onyx.messaging/peer-port opts)
+      (throw (ex-info "Peer port (:onyx.messaging/peer-port) is not defined" opts))))
 
 
 ;; FIXME: gc'ing publications could be racy if a publication is grabbed

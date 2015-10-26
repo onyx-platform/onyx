@@ -34,8 +34,7 @@ The chapter describes the all options available to configure the virtual peers a
     - [`:onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
     - [`:onyx.messaging/impl`](#onyxmessagingimpl)
     - [`:onyx.messaging/bind-addr`](#onyxmessagingbind-addr)
-    - [`:onyx.messaging/peer-port-range`](#onyxmessagingpeer-port-range)
-    - [`:onyx.messaging/peer-ports`](#onyxmessagingpeer-ports)
+    - [`:onyx.messaging/peer-port`](#onyxmessagingpeer-port)
 - [Peer Full Example](#peer-full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -88,8 +87,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.messaging/compress-fn`               | `function` | `onyx.compression.nippy/compress`  |
 |`:onyx.messaging/impl`                      | `keyword`  | `:aeron`                           |
 |`:onyx.messaging/bind-addr`                 | `string`   | `nil`                              |
-|`:onyx.messaging/peer-port-range`           | `vector`   | `[]`                               |
-|`:onyx.messaging/peer-ports`                | `vector`   | `[]`                               |
+|`:onyx.messaging/peer-port`                 | `int`      | `nil`                              |
 |`:onyx.messaging/allow-short-circuit?`      | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/embedded-driver?`    | `boolean`  | `true`                             |
 |`:onyx.messaging.aeron/subscriber-count`    | `int`      | `2`                                |
@@ -205,13 +203,9 @@ The messaging protocol to use for peer-to-peer communication.
 
 An IP address to bind the peer to for messaging. Defaults to `nil`, binds to it's external IP to the result of calling `http://checkip.amazonaws.com`.
 
-##### `:onyx.messaging/peer-port-range`
+##### `:onyx.messaging/peer-port`
 
-A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictably in-order.
-
-##### `:onyx.messaging/peer-ports`
-
-A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictably in-order.
+The port that peers should use to communicate.
 
 ##### `:onyx.messaging/allow-short-circuit?`
 

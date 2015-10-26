@@ -1,3 +1,22 @@
+### 0.8.0
+- **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.
+
+#### 0.7.14
+
+- Bug fix: Fixed a case where a peer would complete multiple jobs in response to a sealing event, rather than the only completing the one job that it was supposed to.
+
+#### 0.7.13
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.12
+
+- No functional changes in this release. Fixing build issue.
+
+#### 0.7.11
+
+- Fixes transitive AOT compilation problem of interop namespace. [#339](https://github.com/onyx-platform/onyx/issues/339).
+
 #### 0.7.10
 
 - No functional changes in this release. Fixing build issue.

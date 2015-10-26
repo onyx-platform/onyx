@@ -537,15 +537,9 @@
            :type :string
            :default nil}
 
-          :onyx.messaging/peer-port-range
-          {:doc "A vector of two integers that denotes the low and high values, inclusive, of ports that peers should use to communicate. Ports are allocated predictably in-order."
-           :required-when ["`:onyx.messaging/peer-ports` is not defined."]
-           :type :vector
-           :default []}
-
-          :onyx.messaging/peer-ports
-          {:doc "A vector of integers denoting ports that may be used for peer communication. This differences from `peer-port-range` in that this names specific ports, not a sequence of ports. Ports are allocated predictably in-order. "
-           :required-when ["`:onyx.messaging/peer-port-range` is not defined."]
+          :onyx.messaging/peer-port
+          {:doc "Port that peers should use to communicate."
+           :optional? false
            :type :vector
            :default []}
 
