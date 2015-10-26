@@ -285,7 +285,7 @@
                                            :type :function
                                            :optional? false}}}
  :trigger-entry
- {:summary "In this section, we talk about Triggers. Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
+ {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
   :link nil
   :model {:trigger/window-id
           {:doc "The name of a `:window/id` window to fire the trigger against."
