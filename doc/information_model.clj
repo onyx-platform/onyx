@@ -263,6 +263,20 @@ If this value is a vector, it contain two values: a keyword as described above, 
    :type :string
    :optional? true}}
 
+  :state-aggregation
+  {:aggregation/init {:doc "Fn (window) to initialise the state."
+                      :type :function
+                      :optional? true}
+   :aggregation/fn {:doc "Fn (state, window, segment) to generate a serializable state machine update."
+                    :type :function
+                    :optional? false}
+   :aggregation/super-aggregation-fn {:doc "Fn (state-1, state-2, window) to combine two states in the case of two windows being merged, e.g. session windows."
+                                      :type :function
+                                      :optional? true}
+   :aggregation/apply-state-update {:doc "Fn (state, entry) to apply state machine update entry to a state."
+                                    :type :function
+                                    :optional? false}}
+
  :trigger-entry
  {:trigger/window-id
   {:doc "The name of a `:window/id` window to fire the trigger against."
@@ -313,6 +327,28 @@ If this value is a vector, it contain two values: a keyword as described above, 
   {:doc "A docstring for this lifecycle."
    :type :string
    :optional? true}}
+  :lifecycle-calls
+   {:lifecycle/start-task? {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a boolean value indicating whether to start the task or not. If false, the process backs off for a preconfigured amount of time and calls this task again. Useful for lock acquisition. This function is called prior to any processes inside the task becoming active."
+                            :type :function
+                            :optional? true}
+    :lifecycle/before-task-start {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called after processes in the task are launched, but before the peer listens for incoming segments from other peers."
+                                  :type :function
+                                  :optional? true}
+    :lifecycle/before-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called prior to receiving a batch of segments from the reading function."
+                             :type :function
+                             :optional? true}
+    :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been read by the peer. The segments are available in the event map by the key `:onyx.core/batch`."
+                            :type :function
+                            :optional? true}
+    :lifecycle/after-task-stop {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called before the peer relinquishes its task. No more segments will be received."
+                                :type :function
+                                :optional? true}
+    :lifecycle/after-ack-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been fully acked."
+                                  :type :function
+                                  :optional? true}
+    :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
+                                    :type :function
+                                    :optional? true}}
 
  :peer-config
  {:onyx.peer/inbox-capacity
