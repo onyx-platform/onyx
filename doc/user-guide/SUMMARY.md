@@ -8,6 +8,7 @@
 * [Flow Conditions](doc/user-guide/flow-conditions.md)
 * [Lifecycles](doc/user-guide/lifecycles.md)
 * [Windowing and Aggregation](doc/user-guide/windowing.md)
+* [State Management and Aggregation](doc/user-guide/state-management.md)
 * [Triggers](doc/user-guide/triggers.md)
 * [Deployment](doc/user-guide/deployment.md)
 * [Environment](doc/user-guide/environment.md)
