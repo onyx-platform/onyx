@@ -6,13 +6,16 @@
             [onyx.state.state-extensions :as state-ext]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.peer.task-lifecycle :as task-lifecycle :refer [->WindowState]]
+            [clojure.core.async :refer [chan close!]]
             [clojure.test.check :refer [quick-check] :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
             [onyx.test-helper :refer [load-config]]           
             [clojure.test :refer :all]
+            [onyx.monitoring.no-op-monitoring :refer [no-op-monitoring-agent]]
             [onyx.state.log.bookkeeper :as log-bk]
+            [onyx.log.commands.common]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
@@ -35,75 +38,92 @@
                         :onyx.bookkeeper/write-batch-size 1
                         :onyx.bookkeeper/write-batch-timeout 10000000))
 
-(def initial-bookkeeper-state {:logs [[]] :ledger-ids [0]})
-
-(def bookkeeper-state (atom initial-bookkeeper-state))
 (def bookkeeper-peer-state (atom nil))
 
 (defn add-to-bookkeeper [arg]
-  (swap! bookkeeper-state (fn [bs-state]
-                            (update-in bs-state [:logs (last (:ledger-ids bs-state))] conj arg))))
+  (let [event (:event @bookkeeper-peer-state)
+        state-log (:onyx.core/state-log event)
+        ack-promise (promise)]
+    (state-ext/store-log-entry state-log event (fn [] (deliver ack-promise :done)) arg)
+    ;; Wait until it's acked
+    @ack-promise))
+
+(defn init-state [& args]
+  [])
+
+(defn new-pipeline []
+  (let [pipeline {:onyx.core/task-id :task-id
+                  :onyx.core/monitoring (no-op-monitoring-agent)
+                  :onyx.core/kill-ch (chan)
+                  :onyx.core/task-kill-ch (chan)
+                  :onyx.core/peer-opts peer-config}] 
+    (-> pipeline
+        (assoc :onyx.core/window-state (->WindowState (state-ext/initialize-filter :set pipeline) (init-state)))
+        (assoc :onyx.core/state-log (state-ext/initialize-log :bookkeeper pipeline)))))
+
+(def previous-peer-state (atom nil))
+
+(defn new-log-after-crash []
+  (let [pipeline (new-pipeline)]
+    (reset! previous-peer-state @bookkeeper-peer-state)
+    (swap! bookkeeper-peer-state assoc :event pipeline)))
+
+(defn close-peer [event]
+  (close! (:onyx.core/task-kill-ch event))
+  (state-ext/close-log (:onyx.core/state-log event) event))
+
+(def crash-and-playback-spec
+  {:model/args (fn [state]
+                 [])
+   :next-state (fn [state [arg] result]
+                 state)
+   :real/postcondition (fn [prev-state next-state args result]
+                         (try 
+                           (let [playback-state (state-ext/playback-log-entries (:onyx.core/state-log (:event @bookkeeper-peer-state))
+                                                                                (:event @bookkeeper-peer-state)
+                                                                                (init-state)
+                                                                                (fn [state entry]
+                                                                                  (conj state entry)))]
+                             (= next-state playback-state))
+                              (finally
+                                ;; cleanup *after* we playback and test, as this is realistic in cases where
+                                ;; a log may not have been cleaned up
+                                (close-peer (:event @previous-peer-state)))))
+   :real/command #'new-log-after-crash})
+
 
 (def add-to-log-espec
   {:model/args (fn [state]
                  [gen/int])
    :next-state (fn [state [arg] result]
                  (conj state arg))
-   :real/postcondition (fn [prev-state next-state [arg] result]
-                         (= (reduce into [] (:logs @bookkeeper-state)) next-state))
    :real/command #'add-to-bookkeeper})
 
-(defn switch-to-next-ledger []
-  (swap! bookkeeper-state (fn [bs-state]
-                            (-> bs-state
-                                (update :logs conj [])
-                                (update :ledger-ids conj (inc (apply max (:ledger-ids bs-state))))))))
-
-(def peer-crash-new-log-spec
-  {:model/args (fn [state]
-                 [])
-   :next-state (fn [state [arg] result]
-                 state)
-   ;:real/postcondition (fn [prev-state next-state [arg] result]
-   ;                      (= (reduce into [] (:logs @bookkeeper-state)) next-state))
-   :real/command #'switch-to-next-ledger})
-
 (defn new-peer-log []
-  (let [bk-peer-val {:ledger-ids []
-                     :event-log []
-                     :event (let [pipeline {:onyx.core/peer-opts peer-config}] 
-                              (-> pipeline
-                                  ;(assoc :onyx.core/window-state (->WindowState (state-ext/initialize-filter :set pipeline) {}))
-                                  (assoc :onyx.core/state-log (state-ext/initialize-log :bookkeeper pipeline))))}] 
-    (reset! bookkeeper-state initial-bookkeeper-state)
-    (reset! bookkeeper-peer-state bk-peer-val)))
+  (reset! bookkeeper-peer-state {:ledger-ids []
+                                 :event-log []})
+  ;; must setup before new-pipeline so that ledger id is recorded
+  (swap! bookkeeper-peer-state assoc :event (new-pipeline)))
 
-(defn close-peer-log [state]
-  (let [real-state-event (:event @bookkeeper-peer-state)] 
-    (info " Closing log")
-    (state-ext/close-log (:onyx.core/state-log real-state-event) real-state-event)))
+(defn close-peer-cleanup [state]
+  (close-peer (:event @bookkeeper-peer-state)))
 
 (def log-spec
   {:commands {:add-to-log add-to-log-espec
-              :peer-crash-new-log peer-crash-new-log-spec}
+              :crash-and-playback crash-and-playback-spec}
    :real/setup #'new-peer-log 
-   :real/cleanup #'close-peer-log
-   :real/postcondition (fn [final-state]
-                         (= (reduce into [] (:logs @bookkeeper-state)) final-state))
-   :initial-state (fn [setup] [])
-   ;:model/generate-command (fn [state]
-   ;                          (gen/elements [(gen/return :add-to-log)
-   ;                                         (gen/return :peer-crash-new-log)]))
-   })
-
+   :real/cleanup #'close-peer-cleanup
+   :real/postcondition (fn [state] true)
+   :initial-state #'init-state})
 
 (deftest log-test-correct
   (with-redefs [log-bk/assign-bookkeeper-log-id-spin (fn [event new-ledger-id]
-                                                       (swap! bookkeeper-peer-state 
-                                                              (fn [ps]
-                                                                (update ps :ledger-ids conj new-ledger-id))))]
+                                                       (swap! bookkeeper-peer-state update :ledger-ids conj new-ledger-id))
+                log-bk/event->ledger-ids (fn [event] 
+                                           (:ledger-ids @bookkeeper-peer-state))
+                onyx.log.commands.common/peer-slot-id (fn [event] 0)]
     (let [env (onyx.api/start-env env-config)]
       (try
-        (is (specification-correct? log-spec))
+        (is (specification-correct? log-spec {:num-tests 10}))
         (finally
           (onyx.api/shutdown-env env))))))
