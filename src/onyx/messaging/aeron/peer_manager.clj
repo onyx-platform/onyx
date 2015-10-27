@@ -1,4 +1,4 @@
-(ns onyx.messaging.aeron.peer-manager
+(ns ^:no-doc onyx.messaging.aeron.peer-manager
   "Fast way for peer group subscribers to multiplex via a short id to peer channels. "
   (:refer-clojure :exclude [assoc dissoc])
   (:require [taoensso.timbre :refer [fatal info] :as timbre])
