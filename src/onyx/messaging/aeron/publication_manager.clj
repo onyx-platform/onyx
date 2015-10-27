@@ -1,4 +1,4 @@
-(ns onyx.messaging.aeron.publication-manager
+(ns ^:no-doc onyx.messaging.aeron.publication-manager
   (:require [taoensso.timbre :refer [error fatal info] :as timbre]
             [clojure.core.async :refer [chan >!! <!! put! close! sliding-buffer thread]])
   (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
