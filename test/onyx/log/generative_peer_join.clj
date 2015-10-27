@@ -249,6 +249,56 @@
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
     (is (= [] (map count (vals (get (:allocations replica) job-3-id)))))))
 
+
+(def job-max-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
+
+(def job-max-peers
+  {:workflow [[:a :b] [:b :c]]
+   :catalog [{:onyx/name :a
+              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/type :input
+              :onyx/max-peers 1
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/max-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/type :output
+              :onyx/max-peers 1
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest balanced-all-max-peers-allocations
+  (checking
+    "Checking balanced allocation causes peers to be evenly split"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+                          :job-1 {:queue [(api/create-submit-job-entry
+                                            job-max-peers-id
+                                            peer-config
+                                            job-max-peers
+                                            (planning/discover-tasks (:catalog job-max-peers) (:workflow job-max-peers)))]})
+          :log []
+          :peer-choices []}))]
+    (standard-invariants replica)
+    (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
+    (is (= [1 1 1] (map count (vals (get (:allocations replica) job-max-peers-id)))))))
+
 (deftest job-percentages-balance
   (checking
     "Checking percentages allocation causes peers to be evenly split"
