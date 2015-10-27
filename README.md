@@ -55,6 +55,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
+- [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
 
 ### API Docs 0.7.15-SNAPSHOT
 
