@@ -9,7 +9,10 @@
    (reduce
     (fn [[peers-to-drop allocations] _]
       (let [max-peers (->> allocations
-                           (sort-by (comp count val))
+                           (remove (fn [[task peers]]
+                                     (= (count peers) (get-in replica [:min-required-peers job task] 1))))
+                           (sort-by (fn [[task peers]]
+                                      (count peers)))
                            reverse
                            first
                            second
