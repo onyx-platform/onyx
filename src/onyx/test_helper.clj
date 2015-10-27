@@ -50,8 +50,8 @@
 
 (defn add-test-env-peers! 
   "Add peers to an OnyxTestEnv component"
-  [{:keys [peer-group peers] :as component} n-peers]
-  (swap! peers into (try-start-peers n-peers peer-group)))
+  [{:keys [peer-group peers monitoring-config] :as component} n-peers]
+  (swap! peers into (try-start-peers n-peers peer-group monitoring-config)))
 
 (defrecord OnyxTestEnv [env-config peer-config monitoring-config n-peers]
   component/Lifecycle
