@@ -64,7 +64,7 @@
                (if (cts/preallocated-grouped-task? replica job task)
                  (assoc all task (count (get-in replica [:allocations job task])))
                  (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
-                                      (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)))))
+                                      (get-in replica [:min-required-peers job task] 1)))))
              {}
              (map vector tasks (range)))
             spare-peers (- n (apply + (vals init)))]

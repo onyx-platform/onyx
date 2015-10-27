@@ -37,7 +37,7 @@
                         ;; Cannot allocate anymore, you have what you have.
                         (count (get-in replica [:allocations job task]))
                         ;; Grab the absolute minimum for this task, no constraints.
-                        (get-in replica [:min-required-peers job task])))
+                        (get-in replica [:min-required-peers job task] 1)))
                     tasks))
       (apply + (vals (get-in replica [:min-required-peers job]))))))
 
