@@ -591,3 +591,100 @@
     ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
     ;; job must be able to go on
     (is (>= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 7))))
+
+
+;; Reproduce onyx-test scheduler issue
+(def inner-job-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
+
+(def inner-job
+  {:workflow [[:a :b] [:b :c] [:c :d] [:d :e]]
+   :catalog [{:onyx/name :a
+              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/type :input
+              :onyx/min-peers 4
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :d
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :e
+              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/max-peers 1
+              :onyx/type :output
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(def outer-job-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
+
+(def outer-job
+  {:workflow [[:d :e] [:e :f]]
+   :catalog [{:onyx/name :d
+              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/max-peers 1
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :e
+              :onyx/fn :mock/fn
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :f
+              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/type :output
+              :onyx/max-peers 1
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(defn running? [peer-counts]
+  (and (not (empty? peer-counts)) 
+       (not (some zero? peer-counts))))
+
+#_(deftest outer-inner-allocations
+  (checking
+    "Reproduce scheduler issue in https://github.com/littlebird/onyx-test. 
+    Second job fails to run due to cjs/job-offer-n-peers :onyx.job-scheduler/balanced"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 11))
+                          :job-1 {:queue [(api/create-submit-job-entry
+                                            inner-job-id
+                                            peer-config
+                                            inner-job
+                                            (planning/discover-tasks (:catalog inner-job) (:workflow inner-job)))]}
+                          :job-2 {:queue [(api/create-submit-job-entry
+                                            outer-job-id
+                                            peer-config
+                                            outer-job
+                                            (planning/discover-tasks (:catalog outer-job) (:workflow outer-job)))]})
+          :log []
+          :peer-choices []}))]
+    (standard-invariants replica)
+    (is (= #{:active} (set (vals (:peer-state replica)))))
+    (is (running? (map count (vals (get (:allocations replica) inner-job-id)))))
+    (is (running? (map count (vals (get (:allocations replica) outer-job-id)))))))
