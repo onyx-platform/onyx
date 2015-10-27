@@ -9,7 +9,10 @@
    (reduce
     (fn [[peers-to-drop allocations] _]
       (let [max-peers (->> allocations
-                           (sort-by (comp count val))
+                           (remove (fn [[task peers]]
+                                     (= (count peers) (get-in replica [:min-required-peers job task] 1))))
+                           (sort-by (fn [[task peers]]
+                                      (count peers)))
                            reverse
                            first
                            second
@@ -39,8 +42,7 @@
        ;; task is allowed to be allocated to, we give it one peer and rotate it
        ;; to the back to possibly get more peers later.
        (and (< (get results least-allocated-task)
-               (or (get-in replica [:task-saturation job least-allocated-task]
-                           Double/POSITIVE_INFINITY)))
+               (get-in replica [:task-saturation job least-allocated-task] Double/POSITIVE_INFINITY))
             (not (cts/preallocated-grouped-task? replica job least-allocated-task)))
        (recur task-seq (update-in results [least-allocated-task] inc) (dec capacity))
 
@@ -62,7 +64,7 @@
                (if (cts/preallocated-grouped-task? replica job task)
                  (assoc all task (count (get-in replica [:allocations job task])))
                  (assoc all task (min (get-in replica [:task-saturation job task] Double/POSITIVE_INFINITY)
-                                      (get-in replica [:min-required-peers job task] Double/POSITIVE_INFINITY)))))
+                                      (get-in replica [:min-required-peers job task] 1)))))
              {}
              (map vector tasks (range)))
             spare-peers (- n (apply + (vals init)))]
