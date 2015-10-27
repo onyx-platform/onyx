@@ -254,6 +254,7 @@
 
 (def job-max-peers
   {:workflow [[:a :b] [:b :c]]
+   :percentage 100
    :catalog [{:onyx/name :a
               :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
@@ -277,27 +278,82 @@
               :onyx/doc "Writes segments to a core.async channel"}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
-(deftest balanced-all-max-peers-allocations
+(deftest all-max-peers-allocations-all-schedulers
   (checking
-    "Checking balanced allocation causes peers to be evenly split"
+    "Checking job where all tasks have max-peers set"
     (times 50)
     [{:keys [replica log peer-choices]}
      (log-gen/apply-entries-gen
-       (gen/return
-         {:replica {:job-scheduler :onyx.job-scheduler/balanced
-                    :messaging {:onyx.messaging/impl :dummy-messenger}}
-          :message-id 0
-          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
-                          :job-1 {:queue [(api/create-submit-job-entry
-                                            job-max-peers-id
-                                            peer-config
-                                            job-max-peers
-                                            (planning/discover-tasks (:catalog job-max-peers) (:workflow job-max-peers)))]})
-          :log []
-          :peer-choices []}))]
+       (gen/fmap 
+         (fn [scheduler]
+           {:replica {:job-scheduler scheduler
+                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+            :message-id 0
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+                            :job-1 {:queue [(api/create-submit-job-entry
+                                              job-max-peers-id
+                                              peer-config
+                                              job-max-peers
+                                              (planning/discover-tasks (:catalog job-max-peers) (:workflow job-max-peers)))]})
+            :log []
+            :peer-choices []})
+         (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
     (standard-invariants replica)
     (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
-    (is (= [1 1 1] (map count (vals (get (:allocations replica) job-max-peers-id)))))))
+    (is (= (sort [1 1 1]) (sort (map count (vals (get (:allocations replica) job-max-peers-id))))))))
+
+
+(def job-min-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
+
+(def job-min-peers
+  {:workflow [[:a :b] [:b :c]]
+   :percentage 100
+   :catalog [{:onyx/name :a
+              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/type :input
+              :onyx/min-peers 2
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/min-peers 2
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/type :output
+              :onyx/min-peers 2
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest all-min-peers-allocations-all-schedulers
+  (checking
+    "Checking job where all tasks have min-peers set"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/fmap 
+         (fn [scheduler]
+           {:replica {:job-scheduler scheduler
+                      :messaging {:onyx.messaging/impl :dummy-messenger}}
+            :message-id 0
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
+                            :job-1 {:queue [(api/create-submit-job-entry
+                                              job-min-peers-id
+                                              peer-config
+                                              job-min-peers
+                                              (planning/discover-tasks (:catalog job-min-peers) (:workflow job-min-peers)))]})
+            :log []
+            :peer-choices []})
+         (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
+    (standard-invariants replica)
+    (is (= (sort [2 2 2]) (sort (map count (vals (get (:allocations replica) job-min-peers-id))))))
+    (is (= (sort [:active :active :active :active :active :active]) (sort (vals (:peer-state replica)))))))
 
 (deftest job-percentages-balance
   (checking
