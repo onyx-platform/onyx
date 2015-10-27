@@ -39,8 +39,7 @@
        ;; task is allowed to be allocated to, we give it one peer and rotate it
        ;; to the back to possibly get more peers later.
        (and (< (get results least-allocated-task)
-               (or (get-in replica [:task-saturation job least-allocated-task]
-                           Double/POSITIVE_INFINITY)))
+               (get-in replica [:task-saturation job least-allocated-task] Double/POSITIVE_INFINITY))
             (not (cts/preallocated-grouped-task? replica job least-allocated-task)))
        (recur task-seq (update-in results [least-allocated-task] inc) (dec capacity))
 
