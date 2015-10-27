@@ -292,7 +292,7 @@
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-max-peers-id
-                                              peer-config
+                                              (assoc peer-config :onyx.peer/job-scheduler scheduler)
                                               job-max-peers
                                               (planning/discover-tasks (:catalog job-max-peers) (:workflow job-max-peers)))]})
             :log []
@@ -345,7 +345,7 @@
             :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-min-peers-id
-                                              peer-config
+                                              (assoc peer-config :onyx.peer/job-scheduler scheduler)
                                               job-min-peers
                                               (planning/discover-tasks (:catalog job-min-peers) (:workflow job-min-peers)))]})
             :log []
