@@ -28,8 +28,7 @@
   (peer-channels [this k]
     (.get m (int k)))
   (clone [this]
-    ;; Unsure why a lock is needed, however concurrency bugs have shown up
-    ;; Look into this later. Clone is a very infrequent operation
+    ;; Needs to be locked because we're using a deftype, not defrecord
     (locking this 
       (VPeerManager.
         (let [iterator (.iterator (.entrySet (.m this)))
