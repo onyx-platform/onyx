@@ -5,7 +5,6 @@
            [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
            [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
 
-;comment
 ;;;;;;
 ;; Constants
 
