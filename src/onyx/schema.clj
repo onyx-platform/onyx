@@ -136,6 +136,12 @@
    (s/optional-key :trigger/doc) s/Str
    s/Keyword s/Any})
 
+(def JobScheduler
+  s/Keyword)
+
+(def TaskScheduler
+  s/Keyword)
+
 (def Job
   {:catalog Catalog
    :workflow Workflow
@@ -165,12 +171,6 @@
 
 (def AeronIdleStrategy
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
-
-(def JobScheduler
-  s/Keyword)
-
-(def TaskScheduler
-  s/Keyword)
 
 (def Messaging
   (s/enum :aeron :dummy-messenger))
