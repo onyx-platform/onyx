@@ -139,7 +139,7 @@
 (def Job
   {:catalog Catalog
    :workflow Workflow
-   :task-scheduler s/Keyword
+   :task-scheduler TaskScheduler
    (s/optional-key :percentage) s/Int
    (s/optional-key :flow-conditions) [FlowCondition]
    (s/optional-key :windows) [Window]
@@ -167,6 +167,9 @@
   (s/enum :busy-spin :low-restart-latency :high-restart-latency))
 
 (def JobScheduler
+  s/Keyword)
+
+(def TaskScheduler
   s/Keyword)
 
 (def Messaging
