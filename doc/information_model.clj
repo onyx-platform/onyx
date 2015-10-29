@@ -540,8 +540,8 @@
           :onyx.messaging/peer-port
           {:doc "Port that peers should use to communicate."
            :optional? false
-           :type :vector
-           :default []}
+           :type :integer
+           :default nil}
 
           :onyx.messaging/allow-short-circuit?
           {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when colocated with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in perfomance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
@@ -579,4 +579,54 @@
            :optional? true
            :type :keyword
            :default :high-restart-latency
-           :choices [:high-restart-latency :low-restart-latency]}}}}
+           :choices [:high-restart-latency :low-restart-latency]}}}
+:env-config
+ {:summary "All options available to configure the node environment."
+  :link nil
+  :model {:zookeeper/server?
+          {:doc "Bool to denote whether to startup a local, in-memory ZooKeeper for TEST PURPORSES ONLY."
+           :type :boolean
+           :optional? true}
+
+          :zookeeper.server/port
+          {:doc "Port to use for the local in-memory ZooKeeper"
+           :type :integer
+           :required-when ["The `:zookeeper/server?` is `true`."]}
+
+          :onyx.bookkeeper/server?
+          {:doc "Bool to denote whether to startup a BookKeeper instance on this node, for use in persisting Onyx state information."
+           :type :boolean
+           :default false
+           :optional? true}
+
+          :onyx.bookkeeper/local-quorum?
+          {:doc "Bool to denote whether to startup a full quorum of BookKeeper instances on this node for testing purposes."
+           :default false
+           :type :boolean
+           :required-when ["The `:onyx.bookkeeper/server?` is `true` and `:onyx.bookkeeper/local-quorum?` is `true`"]
+           :optional? true}
+
+          :onyx.bookkeeper/local-quorum-ports
+          {:doc "Ports to use for the local BookKeeper quorum."
+           :type :vector
+           :default [3196 3197 3198]
+           :required-when ["The `:onyx.bookkeeper/server?` is `true` and `:onyx.bookkeeper/local-quorum?` is `true`"]
+           :optional? true}
+
+          :onyx.bookkeeper/port
+          {:doc "Port to startup this node's BookKeeper instance on."
+           :type :integer
+           :default 3196
+           :required-when ["The `:onyx.bookkeeper/server?` is `true` and `:onyx.bookkeeper/local-quorum?` is `false`"]}
+
+          :onyx.bookkeeper/base-journal-dir
+          {:doc "Directory to store BookKeeper's journal in. It is recommended that this is altered to somewhere fast, preferably on a different disk to the BookKeeper ledger."
+           :type :string
+           :default "/tmp/bookkeeper_journal"
+           :optional? true}
+
+          :onyx.bookkeeper/base-ledger-dir
+          {:doc "Directory to store BookKeeper's ledger in. It is recommended that this is altered to somewhere fast, preferably on a different disk to the BookKeeper journal"
+           :type :string
+           :default "/tmp/bookkeeper_ledger"
+           :optional? true}}}}
