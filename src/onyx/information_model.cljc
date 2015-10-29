@@ -587,7 +587,7 @@
 {:summary "All options available to configure the node environment."
  :link nil
  :model {:zookeeper/server?
-         {:doc "Bool to denote whether to startup a local, in-memory ZooKeeper for TEST PURPORSES ONLY."
+         {:doc "Bool to denote whether to startup a local, in-memory ZooKeeper. **Important: for TEST purposes only.**"
           :type :boolean
           :optional? true}
 
@@ -603,7 +603,7 @@
           :optional? true}
 
          :onyx.bookkeeper/local-quorum?
-         {:doc "Bool to denote whether to startup a full quorum of BookKeeper instances on this node for testing purposes."
+         {:doc "Bool to denote whether to startup a full quorum of BookKeeper instances on this node. **Important: for TEST purposes only.**"
           :default false
           :type :boolean
           :required-when ["The `:onyx.bookkeeper/server?` is `true` and `:onyx.bookkeeper/local-quorum?` is `true`"]
