@@ -32,11 +32,12 @@
             ports (if local-quorum?
                     (arg-or-default :onyx.bookkeeper/local-quorum-ports env-config)
                     (vector (arg-or-default :onyx.bookkeeper/port env-config)))
-            base-dir (arg-or-default :onyx.bookkeeper/base-dir env-config)
+            base-journal-dir (arg-or-default :onyx.bookkeeper/base-journal-dir env-config)
+            base-ledger-dir (arg-or-default :onyx.bookkeeper/base-ledger-dir env-config)
             servers (mapv (fn [port]
                             (let [server-id (java.util.UUID/randomUUID)
-                                  journal-dir (str base-dir "/" port "_jrnl_" server-id)
-                                  ledger-dir (str base-dir "/" port "_ldgr_" server-id)
+                                  journal-dir (str base-journal-dir "/" port server-id)
+                                  ledger-dir (str base-ledger-dir "/" port server-id)
                                   server-conf (doto (ServerConfiguration.)
                                                 (.setZkServers (:zookeeper/address env-config))
                                                 (.setZkLedgersRootPath ledgers-root-path)

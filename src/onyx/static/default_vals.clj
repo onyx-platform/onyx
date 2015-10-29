@@ -21,7 +21,8 @@
    :onyx.bookkeeper/port 3196
    :onyx.bookkeeper/local-quorum? false
    :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
-   :onyx.bookkeeper/base-dir "/tmp/bookkeeper"
+   :onyx.bookkeeper/base-journal-dir "/tmp/bookkeeper_journal"
+   :onyx.bookkeeper/base-ledger-dir "/tmp/bookkeeper_ledger"
    :onyx.bookkeeper/client-timeout 60000 
    :onyx.bookkeeper/client-throttle 30000
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
