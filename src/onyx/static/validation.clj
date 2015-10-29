@@ -4,7 +4,7 @@
             [schema.core :as schema]
             [onyx.static.planning :as planning]
             [onyx.windowing.units :as u]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
+            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
 (defn validate-java-version []
@@ -110,6 +110,9 @@
 
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
+
+(defn validate-state-aggregation-calls [m]
+  (schema/validate StateAggregationCall m))
 
 (defn validate-env-config [env-config]
   (schema/validate EnvConfig env-config))
