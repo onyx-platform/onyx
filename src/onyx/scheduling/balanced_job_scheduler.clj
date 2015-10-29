@@ -34,15 +34,13 @@
   then tries to balance by peer count"
   [replica jobs]
   (->> jobs
-       (sort-by (fn [job]
-                  (let [peer-count (val job)
-                        covered (max 0 (- (cjs/job-lower-bound replica (key job)) peer-count))]
+       (sort-by (fn [[job-id peer-count :as job]]
+                  (let [covered (max 0 (- (cjs/job-lower-bound replica job-id) peer-count))]
                     (vector covered
                             peer-count
                             (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job)))))
-       (remove (fn [job]
-                 (let [peer-count (val job)]
-                   (>= peer-count (cjs/job-upper-bound replica (key job))))))
+       (remove (fn [[job-id peer-count]]
+                 (>= peer-count (cjs/job-upper-bound replica job-id))))
        (ffirst)))
 
 (defmethod cjs/equivalent-allocation? :onyx.job-scheduler/balanced
