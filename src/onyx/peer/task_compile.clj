@@ -143,6 +143,7 @@
      (let [agg (:window/aggregation window)
            agg-var (if (sequential? agg) (first agg) agg)
            calls (var-get (kw->fn agg-var))]
+       (validation/validate-state-aggregation-calls calls)
        (assoc window
               :aggregate/record (w/windowing-record window)
               :aggregate/init (resolve-window-init window calls)

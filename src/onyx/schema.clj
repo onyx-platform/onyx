@@ -32,7 +32,7 @@
 (def Language
   (s/enum :java :clojure))
 
-(def ^{:private true} base-task-map
+(def base-task-map
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size (s/pred pos? 'pos?)
@@ -58,7 +58,7 @@
     :kill 
     (or (:onyx/n-peers entry)
         (:onyx/min-peers entry)
-        (= (:onyx/max-peers entry) 1))
+        (= (:onyx/max-peers entry) 2))
     :recover
     (or (:onyx/n-peers entry)
         (and (:onyx/max-peers entry)
@@ -69,7 +69,7 @@
 (def FluxPolicyNPeers
   (s/pred valid-min-peers-max-peers-n-peers? 'valid-min-peers-max-peers-n-peers?))
 
-(def ^{:private true} partial-grouping-task
+(def partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
    (s/optional-key :onyx/group-by-fn) NamespacedKeyword
    :onyx/flux-policy FluxPolicy})
@@ -79,12 +79,12 @@
        (or (not (nil? (:onyx/group-by-key task-map)))
            (not (nil? (:onyx/group-by-fn task-map))))))
 
-(def ^{:private true} partial-input-output-task
+(def partial-input-output-task
   {:onyx/plugin NamespacedKeyword
    :onyx/medium s/Keyword
    (s/optional-key :onyx/fn) NamespacedKeyword})
 
-(def ^{:private true} partial-fn-task
+(def partial-fn-task
   {:onyx/fn NamespacedKeyword})
 
 (def TaskMap
@@ -157,6 +157,13 @@
    (s/optional-key :trigger/doc) s/Str
    s/Keyword s/Any})
 
+(def StateAggregationCall
+  {(s/optional-key :aggregation/init) Function
+   :aggregation/fn Function
+   :aggregation/apply-state-update Function
+   (s/optional-key :aggregation/super-aggregation-fn) Function
+   s/Keyword s/Any})
+
 (def JobScheduler
   s/Keyword)
 
@@ -185,9 +192,12 @@
    :onyx/id ClusterId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
-   (s/optional-key :bookkeeper/server?) s/Bool
-   (s/optional-key :bookkeeper/local-quorum?) s/Bool
-   (s/optional-key :bookkeeper/base-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/server?) s/Bool
+   (s/optional-key :onyx.bookkeeper/port) s/Int
+   (s/optional-key :onyx.bookkeeper/local-quorum?) s/Bool
+   (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
+   (s/optional-key :onyx.bookkeeper/base-journal-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/base-ledger-dir) s/Str
    s/Keyword s/Any})
 
 (def AeronIdleStrategy
