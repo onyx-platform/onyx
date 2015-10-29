@@ -348,12 +348,12 @@
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
         timeout-ch (timeout ms)]
-    (loop [segments [] i 0]
+    (loop [segments (transient []) i 0]
       (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
-          (recur (conj segments v) (inc i))
-          segments)
-        segments))))
+          (recur (conj! segments v) (inc i))
+          (persistent! segments))
+        (persistent! segments)))))
 
 (defn short-circuit-ch [messenger id ch-k]
   (-> messenger
