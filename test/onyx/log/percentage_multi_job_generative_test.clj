@@ -62,7 +62,23 @@
            {:replica {:job-scheduler :onyx.job-scheduler/percentage
                       :messaging {:onyx.messaging/impl :dummy-messenger}}
             :message-id 0
-            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 20))
+            :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 24))
+                            :leave-1 {:predicate (fn [replica entry]
+                                                   (some #{:p1} (:peers replica)))
+                                      :queue [{:fn :leave-cluster
+                                               :args {:id :p1}}]}
+                            :leave-2 {:predicate (fn [replica entry]
+                                                   (some #{:p2} (:peers replica)))
+                                      :queue [{:fn :leave-cluster
+                                               :args {:id :p2}}]}
+                            :leave-3 {:predicate (fn [replica entry]
+                                                   (some #{:p3} (:peers replica)))
+                                      :queue [{:fn :leave-cluster
+                                               :args {:id :p3}}]}
+                            :leave-4 {:predicate (fn [replica entry]
+                                                   (some #{:p4} (:peers replica)))
+                                      :queue [{:fn :leave-cluster
+                                               :args {:id :p4}}]}
                             :job-1 {:queue [(api/create-submit-job-entry
                                               job-1-id
                                               percentages-peer-config
