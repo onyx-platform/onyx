@@ -12,7 +12,7 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+                 [org.clojure/core.async "0.2.371"]
                  [org.apache.curator/curator-framework "2.9.0"]
                  [org.apache.curator/curator-test "2.9.0"]
                  [clj-tuple "0.2.2"]
