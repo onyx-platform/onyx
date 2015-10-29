@@ -27,7 +27,7 @@
 
 (def Workflow
   (s/->Both [(s/pred vector? 'vector?)
-                  [edge-validator]]))
+             [edge-validator]]))
 
 (def Language
   (s/enum :java :clojure))
@@ -42,15 +42,36 @@
    (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
    (s/optional-key :onyx/doc) s/Str
    (s/optional-key :onyx/max-peers) (s/pred pos? 'pos?)
+   (s/optional-key :onyx/min-peers) (s/pred pos? 'pos?)
+   (s/optional-key :onyx/n-peers) (s/pred pos? 'pos?)
    s/Keyword s/Any})
 
 (def FluxPolicy 
   (s/enum :continue :kill :recover))
 
+(defn valid-min-peers-max-peers-n-peers? [entry]
+  (case (:onyx/flux-policy entry)
+    :continue 
+    (or (:onyx/n-peers entry)
+        (:onyx/min-peers entry)
+        (= (:onyx/max-peers entry) 1))
+    :kill 
+    (or (:onyx/n-peers entry)
+        (:onyx/min-peers entry)
+        (= (:onyx/max-peers entry) 1))
+    :recover
+    (or (:onyx/n-peers entry)
+        (and (:onyx/max-peers entry)
+             (= (:onyx/max-peers entry) 
+                (:onyx/min-peers entry)))
+        (= (:onyx/max-peers entry) 1))))
+
+(def FluxPolicyNPeers
+  (s/pred valid-min-peers-max-peers-n-peers? 'valid-min-peers-max-peers-n-peers?))
+
 (def ^{:private true} partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
    (s/optional-key :onyx/group-by-fn) NamespacedKeyword
-   :onyx/min-peers s/Int
    :onyx/flux-policy FluxPolicy})
 
 (defn grouping-task? [task-map]
@@ -70,7 +91,7 @@
   (s/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
                       (merge base-task-map partial-input-output-task)
                       grouping-task?
-                      (merge base-task-map partial-fn-task partial-grouping-task)
+                      (s/->Both [FluxPolicyNPeers (merge base-task-map partial-fn-task partial-grouping-task)])
                       #(= (:onyx/type %) :function)
                       (merge base-task-map partial-fn-task)))
 

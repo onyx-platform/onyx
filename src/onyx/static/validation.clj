@@ -28,15 +28,6 @@
     (when-not (= (distinct tasks) tasks)
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
-(defn flux-policy-check [entry]
-  (when (and (= :recover (:onyx/flux-policy entry))
-             (not (and (:onyx/max-peers entry)
-                       (:onyx/min-peers entry)
-                       (or (= (:onyx/max-peers entry) 1)
-                           (= (:onyx/max-peers entry) 
-                              (:onyx/min-peers entry))))))
-    (throw (ex-info ":onyx/flux-policy :recover must have :onyx/min-peers = :onyx/max-peers" {:entry entry}))))
-
 (defn min-and-max-peers-sane [entry]
   (when (and (:onyx/min-peers entry)
              (:onyx/max-peers entry))
@@ -55,7 +46,6 @@
   (schema/validate Catalog catalog)
   (doseq [entry catalog]
     (name-and-type-not-equal entry)
-    (flux-policy-check entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)))
 
