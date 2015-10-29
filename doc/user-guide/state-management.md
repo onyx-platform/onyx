@@ -91,6 +91,10 @@ This state can be emitted via triggers or another mechanism.  Use of a log
 command type like `:set-value` ensures that your aggregation function can emit
 multiple types of state transition if necessary.
 
+### Exactly Once Processing
+
+Should exactly once discussion be in another doc?
+
 ### Fault Tolerance
 
 To allow for full recovery after peer crashes, this state must be replicated
@@ -107,13 +111,11 @@ written, the full state will be recovered. Partial updates ensure that only
 minimal update data is written for each segment processed, while remaining
 correct on peer failure.
 
-### Exactly Once Processing
-
-Should exactly once discussion be in another doc?
-
 ### BookKeeper Implementation
 
 TODO: FILL ME IN
+
+### BookKeeper Configuration
 
 ### Log Compaction
 

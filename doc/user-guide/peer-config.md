@@ -49,11 +49,16 @@ The chapter describes the all options available to configure the virtual peers a
 
 ### Environment Only
 
-| key name               | type       | optional?  |
-|------------------------|------------|------------|
-|`:zookeeper/server?`    |  `boolean` | Yes        |
-|`:zookeeper.server/port`|  `int`     | Yes        |
-
+| key name                            | type       | optional?  |
+|-------------------------------------|------------|------------|
+|`:zookeeper/server?`                 | `boolean`  | Yes        |
+|`:zookeeper.server/port`             | `int`      | Yes        |
+| :onyx.bookkeeper/server?            | `boolean`  | Yes        |
+| :onyx.bookkeeper/local-quorum?      | `boolean`  | Yes        |
+| :onyx.bookkeeper/local-quorum-ports | `[int]`    | Yes        |
+| :onyx.bookkeeper/port               | `int`      | Yes        |
+| :onyx.bookkeeper/base-journal-dir   | `string`   | Yes        |
+| :onyx.bookkeeper/base-ledger-dir    | `string`   | Yes        |
 
 ### Peer Only
 
