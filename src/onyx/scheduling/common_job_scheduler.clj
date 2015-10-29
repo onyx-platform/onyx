@@ -108,10 +108,10 @@
                           (mapcat
                            (fn [job]
                              (let [current (get (current-task-allocations replica) job)
-                                   desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job))
+                                   desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job 0))
                                    tasks (get-in replica [:tasks job])]
                                (map (fn [t]
-                                      (when (< (or (get current t) 0) (get desired t))
+                                      (when (< (get current t 0) (get desired t))
                                         [job t]))
                                     tasks)))
                            (sort-job-priority replica (:jobs replica))))]
@@ -145,7 +145,7 @@
      nil?
      (mapcat
       (fn [job]
-        (let [overflow (- (get current-allocations job) (get max-util job))]
+        (let [overflow (- (get current-allocations job 0) (get max-util job 0))]
           (when (pos? overflow)
             (cts/drop-peers replica job overflow))))
       (:jobs replica))))))
