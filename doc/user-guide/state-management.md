@@ -91,32 +91,62 @@ This state can be emitted via triggers or another mechanism.  Use of a log
 command type like `:set-value` ensures that your aggregation function can emit
 multiple types of state transition if necessary.
 
-### Exactly Once Processing
+### Exactly Once Data Processing
 
-Should exactly once discussion be in another doc?
+Exactly once data processing is supported via Onyx's filtering feature. When a
+windowing task's catalog has `:onyx/uniqueness-key` set, this key is looked up
+in the segment and used as an ID for whether the segment has been seen before.
+If it has been seen, then the segment is not processed. This ID is persisted to
+the state log, so that it can be recovered in case of a peer failure.
+            
+#### Considerations
+
+In order to reduce memory consumption, uniqueness-key values are persisted to a
+local database. This database has a bloom filter on top of it, and a memory
+cache, allowing Onyx to avoid hitting disk for most filter checks.
+
+In order to prevent unbounded increase in the size of the filter's disk
+consumption, uniqueness-key values are bucketed based on recency, and the
+oldest bucket is expired as the newest is filled.
+
+Relevant peer-config parameters:
+* `:onyx.rocksdb.filter/peer-block-cache-size`
+* `:onyx.rocksdb.filter/num-buckets`
+* `:onyx.rocksdb.filter/num-ids-per-bucket`
+
+#### Exactly Once Side-Effects
+
+Exactly once side-effects responding to a segment are impossible to achieve, as
+exactly once side-effects are impossible to achieve. Onyx guarantees that a
+segment's effect on window states are exactly once, however any side-effects
+that occur as a result of the segment being processed cannot be guaranteed to
+only occur once.
 
 ### Fault Tolerance
 
-To allow for full recovery after peer crashes, this state must be replicated
-somewhere. As state updates occur, Onyx publishes the stream of changelog updates
-to a replicated log.
+To allow for full recovery after peer crashes, the window state must be replicated
+somewhere. As state updates occur, Onyx publishes the stream of changelog
+updates to a replicated log.
 
 After the changelog entry is written to the replicated log, the segment is
 acked, ensuring that a segment is only cleared from the input source after the
-update it caused has been fully written to the log.  When a peer crash occurs,
-a new peer will be assigned to the task, and this peer will play back all of
-the changelog entries, and apply them to the state, starting with the initial
-state. As the changelog updates are read back in the same order that they were
-written, the full state will be recovered. Partial updates ensure that only
-minimal update data is written for each segment processed, while remaining
-correct on peer failure.
+update to window states it caused has been fully written to the log. When a
+peer crash occurs, a new peer will be assigned to the task, and this peer will
+play back all of the changelog entries, and apply them to the state, starting
+with the initial state. As the changelog updates are read back in the same
+order that they were written, the full state will be recovered. Partial updates
+ensure that only minimal update data is written for each segment processed,
+while remaining correct on peer failure.
 
 ### BookKeeper Implementation
 
-TODO: FILL ME IN
+Local bookkeeper implementation available via start-env.
+Writes are batched and compressed by default.
+
+### Log Compaction
+
 
 ### BookKeeper Configuration
 
-### Log Compaction
 
 TODO: FILL ME IN
