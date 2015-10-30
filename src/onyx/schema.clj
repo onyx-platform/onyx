@@ -42,7 +42,6 @@
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size PosInt
-   (s/optional-key :onyx/fn) NamespacedKeyword
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
@@ -90,7 +89,7 @@
 (def partial-input-task
   {:onyx/plugin NamespacedKeyword
    :onyx/medium s/Keyword
-   :onyx/type :input
+   :onyx/type (s/enum :input)
    (s/optional-key :onyx/input-retry-timeout) PosInt 
    (s/optional-key :onyx/pending-timeout) PosInt 
    (s/optional-key :onyx/max-pending) PosInt})
@@ -98,7 +97,7 @@
 (def partial-output-task
   {:onyx/plugin NamespacedKeyword
    :onyx/medium s/Keyword
-   :onyx/type :output})
+   :onyx/type (s/enum :output)})
 
 (def partial-fn-task
   {:onyx/fn NamespacedKeyword})
@@ -139,13 +138,13 @@
 (def FlowCondition
   {:flow/from s/Keyword
    :flow/to (s/either s/Keyword [s/Keyword])
+   :flow/predicate (s/either s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
    (s/optional-key :flow/action?) FlowAction
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
 (def Unit
@@ -157,7 +156,7 @@
 
 (def Window
   {:window/id s/Keyword
-   :window/task s/Keyword
+   :window/task TaskName
    :window/type WindowType
    :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
@@ -268,8 +267,8 @@
    (s/optional-key :onyx.bookkeeper/write-buffer-size) PosInt
    (s/optional-key :onyx.bookkeeper/write-batch-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/read-batch-size) PosInt
-   (s/optional-key :onyx.rocksdb.filter/base-dir) "/tmp/rocksdb_filter"
-   (s/optional-key :onyx.rocksdb.filter/bloom-filter-bits) 10
+   (s/optional-key :onyx.rocksdb.filter/base-dir) s/Str
+   (s/optional-key :onyx.rocksdb.filter/bloom-filter-bits) PosInt
    (s/optional-key :onyx.rocksdb.filter/compression) (s/enum :bzip2 :lz4 :lz4hc :none :snappy :zlib)
    (s/optional-key :onyx.rocksdb.filter/block-size) PosInt
    (s/optional-key :onyx.rocksdb.filter/peer-block-cache-size) PosInt
