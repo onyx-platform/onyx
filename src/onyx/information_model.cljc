@@ -350,11 +350,11 @@
    :lifecycle-entry
    {:summary "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
     :link nil
-    :model {:lifecycle/name
-            {:doc "A unique name identifying this lifecycle."
+    :model {:lifecycle/task
+            {:doc "The task that this lifecycle applies to."
              :type :keyword
              :optional? false
-             :restrictions ["Must be unique across all lifecycle entries."]}
+             :restrictions ["Must be a task defined in the workflow."]}
 
             :lifecycle/calls
             {:doc "A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys further specified by the information model. The keys in this map denote the concrete functions to invoke at execution time."
