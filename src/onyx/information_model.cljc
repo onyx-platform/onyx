@@ -322,6 +322,20 @@
              :type :keyword
              :optional? false}
 
+            :trigger/period
+            {:doc "A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
+             :type :keyword
+             :required-when ["`:trigger/on` is `:timer`"]
+             :choices [:milliseconds :seconds :minutes :hours :days]
+             :optional? true}
+
+            :trigger/threshold
+            {:doc "A segment trigger will fire every threshold of segments."
+             :required-when ["`:trigger/on` is `:segments`"]
+             :type [:integer :elements]
+             :example [5 :elements]
+             :optional? true}
+
             :trigger/fire-all-extents?
             {:doc "When set to `true`, if any particular extent fires in reaction to this trigger, all extents also fire."
              :type :boolean
