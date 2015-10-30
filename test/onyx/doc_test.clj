@@ -22,7 +22,8 @@
   (is (= (set (keys (:model (:catalog-entry model)))) 
          (set (concat (schema-keys schema/base-task-map)
                       (schema-keys schema/partial-grouping-task)
-                      (schema-keys schema/partial-input-output-task)
+                      (schema-keys schema/partial-input-task)
+                      (schema-keys schema/partial-output-task)
                       (schema-keys schema/partial-fn-task))))))
 
 (deftest peer-config-test

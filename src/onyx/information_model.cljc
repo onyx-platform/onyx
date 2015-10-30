@@ -205,7 +205,12 @@
              :choices [:retry]
              :optional? true
              :default nil
-             :restrictions ["Any flow condition clauses with `:flow/action` set to `:retry` must also have `:flow/short-circuit?` set to `true`, and `:flow/to` set to `:none`."]}}}
+             :restrictions ["Any flow condition clauses with `:flow/action` set to `:retry` must also have `:flow/short-circuit?` set to `true`, and `:flow/to` set to `:none`."]}
+
+            :flow/doc
+            {:doc "A docstring for this flow condition."
+             :type :string
+             :optional? true}}}
 
    :window-entry
    {:summary "Windows allow you to group and accrue data into possibly overlapping buckets. Windows are intimately related to the Triggers feature."
@@ -237,7 +242,7 @@
 
             :window/window-key
             {:doc "The key of the incoming segments to window over. This key can represent any totally ordered domain, for example `:event-time`."
-             :type :keyword
+             :type :any
              :optional? false}
 
             :window/min-key
@@ -245,6 +250,11 @@
              :type :integer
              :optional? true
              :default 0}
+
+            :window/session-key
+            {:doc "The key of the incoming segments to calculate a session window over. This key can represent any totally ordered domain, e.g. `:event-time`"
+             :type :any
+             :optional? true}
 
             :window/range
             {:doc "The span of time, or other totally ordered domain, that this window will capture data within."
@@ -345,7 +355,10 @@
    :lifecycle-calls
    {:summary "Lifecycle calls are related to lifecycles. They consist of a map of functions that are used when resolving lifecycle entries to their corresponding functions."
     :link nil
-    :model {:lifecycle/start-task? {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a boolean value indicating whether to start the task or not. If false, the process backs off for a preconfigured amount of time and calls this task again. Useful for lock acquisition. This function is called prior to any processes inside the task becoming active."
+    :model {:lifecycle/doc {:doc "A docstring for these lifecycle calls."
+                            :type :string
+                            :optional? true}
+            :lifecycle/start-task? {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a boolean value indicating whether to start the task or not. If false, the process backs off for a preconfigured amount of time and calls this task again. Useful for lock acquisition. This function is called prior to any processes inside the task becoming active."
                                     :type :function
                                     :optional? true}
             :lifecycle/before-task-start {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called after processes in the task are launched, but before the peer listens for incoming segments from other peers."
@@ -354,7 +367,10 @@
             :lifecycle/before-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called prior to receiving a batch of segments from the reading function."
                                      :type :function
                                      :optional? true}
-            :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been read by the peer. The segments are available in the event map by the key `:onyx.core/batch`."
+            :lifecycle/after-read-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been read by the peer. The segments are available in the event map by the key `:onyx.core/batch`."
+                                         :type :function
+                                         :optional? true}
+            :lifecycle/after-batch {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called immediately after a batch of segments has been procesed by the peer, but before the batch is acked."
                                     :type :function
                                     :optional? true}
             :lifecycle/after-task-stop {:doc "A function that takes two arguments - an event map, and the matching lifecycle map. Must return a map that is merged back into the original event map. This function is called before the peer relinquishes its task. No more segments will be received."
@@ -370,7 +386,23 @@
    :peer-config
    {:summary "All options available to configure the virtual peers and development environment."
     :link nil
-    :model {:onyx.peer/inbox-capacity
+    :model {:onyx/id 
+            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+             :type [:one-of [:string :uuid]]
+             :optional? false}
+
+            :onyx.peer/job-scheduler 
+            {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
+             :type :keyword
+             :choices [:onyx.job-scheduler/percentage :onyx.job-scheduler/balanced :onyx.job-scheduler/greedy]
+             :optional? false}
+
+            :zookeeper/address
+            {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
+             :type :string
+             :optional? false}
+
+            :onyx.peer/inbox-capacity
             {:doc "Maximum number of messages to try to prefetch and store in the inbox, since reading from the log happens asynchronously."
              :type :integer
              :unit :messages
@@ -443,6 +475,12 @@
              :type :integer
              :optional? true
              :default 60}
+
+            :onyx.windowing/min-value
+            {:doc "A default strict miminum value that `:window/window-key` can ever be. Note, this is generally best configured individually via :window/min-value in the task map."
+             :type :integer
+             :optional? true
+             :default 0}
 
             :onyx.zookeeper/backoff-base-sleep-time-ms
             {:doc "Initial amount of time to wait between ZooKeeper connection retries"
@@ -540,6 +578,12 @@
              :type :string
              :default nil}
 
+            :onyx.messaging/external-addr
+            {:doc "An IP address to advertise to other peers. Useful in case of firewalling, port forwarding, etc, where the interface/IP that is bound is different to the address that other peers should connect to."
+             :optional? true
+             :type :string
+             :default nil}
+
             :onyx.messaging/peer-port
             {:doc "Port that peers should use to communicate."
              :optional? false
@@ -582,7 +626,127 @@
              :optional? true
              :type :keyword
              :default :high-restart-latency
-             :choices [:high-restart-latency :low-restart-latency]}}}
+             :choices [:high-restart-latency :low-restart-latency]}
+
+            :onyx.peer/state-log-impl
+            {:doc "Choice of state persistence implementation."
+             :optional? true
+             :type :keyword
+             :default :bookkeeper
+             :choices [:bookkeeper]}
+
+            :onyx.bookkeeper/read-batch-size
+            {:doc "Number of bookkeeper ledger entries to read at a time when recovering state. Effective batch read of state entries is write-batch-size * read-batch-size."
+             :optional? true
+             :type :integer
+             :default 50}
+
+            :onyx.bookkeeper/write-batch-size
+            {:doc "Number of state persistence writes to batch into a single BookKeeper ledger entry."
+             :optional? true
+             :type :integer
+             :default 20}
+
+            :onyx.bookkeeper/write-batch-timeout
+            {:doc "Maximum amount of time to wait while batching BookKeeper writes, before writing the batch to BookKeeper. In case of a full batch read, timeout will not be hit."
+             :unit :milliseconds
+             :optional? true
+             :type :integer
+             :default 50}
+
+            :onyx.bookkeeper/ledger-ensemble-size
+            {:doc "The number of BookKeeper instances over which entries will be striped. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
+             :optional? true
+             :type :integer
+             :default 3}
+
+            :onyx.bookkeeper/ledger-quorum-size
+            {:doc "The number of BookKeeper instances over which entries will be written to. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
+             :optional? true
+             :type :integer
+             :default 3}
+
+            :onyx.bookkeeper/ledger-id-written-back-off
+            {:doc "Number of milliseconds to back off (sleep) after writing BookKeeper ledger id to the replica."
+             :optional? true
+             :type :integer
+             :unit :milliseconds
+             :default 50}
+
+            :onyx.bookkeeper/ledger-password
+            {:doc "Password to use for Onyx state persisted to BookKeeper ledgers. Highly recommended this is changed on cluster wide basis."
+             :optional? true
+             :type :string
+             :default "INSECUREDEFAULTPASSWORD"}
+
+            :onyx.bookkeeper/client-throttle
+            {:doc "Tunable write throttle for BookKeeper ledgers."
+             :optional? true
+             :type :integer
+             :default 30000}
+
+            :onyx.bookkeeper/write-buffer-size
+            {:doc "Size of the buffer to which BookKeeper ledger writes are buffered via."
+             :optional? true
+             :type :integer
+             :default 10000}
+
+            :onyx.bookkeeper/client-timeout
+            {:doc "BookKeeper client timeout."
+             :optional? true
+             :type :integer
+             :unit :milliseconds
+             :default 60000}
+
+            :onyx.peer/state-filter-impl
+            {:doc "Choice of uniqueness key filtering implementation."
+             :optional? true
+             :type :keyword
+             :default :rocksdb
+             :choices [:rocksdb]}
+
+
+            :onyx.rocksdb.filter/base-dir
+            {:doc "Temporary directory to persist uniqueness filtering data."
+             :optional? true
+             :type :string
+             :default "/tmp/rocksdb_filter"}
+
+
+            :onyx.rocksdb.filter/bloom-filter-bits 
+            {:doc "Number of bloom filter bits to use per uniqueness key value"
+             :optional? true
+             :type :integer
+             :default 10}
+            :onyx.rocksdb.filter/compression
+            {:doc "Whether to use compression in rocksdb filter. Recommended this is turned off unless your keys are large."
+             :optional? true
+             :type :string
+             :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib] 
+             :default :none}
+
+            :onyx.rocksdb.filter/block-size 
+            {:doc "RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values."
+             :optional? true
+             :type :integer
+             :default 4096}
+            :onyx.rocksdb.filter/peer-block-cache-size 
+            {:doc "RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the prescence of a uniqueness key on disk. Defaults to 100MB."
+             :optional? true
+             :type :integer
+             :default 104857600}
+
+            :onyx.rocksdb.filter/num-buckets 
+            {:doc "Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist."
+             :optional? true
+             :type :integer
+             :default 10}
+            
+            :onyx.rocksdb.filter/num-ids-per-bucket 
+            {:doc "Number of uniqueness key values that can exist in a RocksDB filter bucket."
+             :optional? true
+             :type :integer
+             :default 10000000}}}
 :env-config
 {:summary "All options available to configure the node environment."
  :link nil
@@ -595,6 +759,17 @@
          {:doc "Port to use for the local in-memory ZooKeeper"
           :type :integer
           :required-when ["The `:zookeeper/server?` is `true`."]}
+
+         :onyx/id 
+         {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+          :type [:one-of [:string :uuid]]
+          :required-when ["`:onyx.bookkeeper/server?` is `true`."]
+          :optional? true}
+
+         :zookeeper/address
+         {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
+          :type :string
+          :optional? false}
 
          :onyx.bookkeeper/server?
          {:doc "Bool to denote whether to startup a BookKeeper instance on this node, for use in persisting Onyx state information."

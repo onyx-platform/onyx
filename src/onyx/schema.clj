@@ -32,18 +32,26 @@
 (def Language
   (s/enum :java :clojure))
 
+(def PosInt 
+  (s/pred pos? 'pos?))
+
+(def SPosInt 
+  (s/pred (fn [v] (>= v 0)) 'spos?))
+
 (def base-task-map
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
-   :onyx/batch-size (s/pred pos? 'pos?)
+   :onyx/batch-size PosInt
+   (s/optional-key :onyx/fn) NamespacedKeyword
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
-   (s/optional-key :onyx/batch-timeout) (s/pred pos? 'pos?)
+   (s/optional-key :onyx/batch-timeout) PosInt
    (s/optional-key :onyx/doc) s/Str
-   (s/optional-key :onyx/max-peers) (s/pred pos? 'pos?)
-   (s/optional-key :onyx/min-peers) (s/pred pos? 'pos?)
-   (s/optional-key :onyx/n-peers) (s/pred pos? 'pos?)
+   (s/optional-key :onyx/bulk?) s/Bool
+   (s/optional-key :onyx/max-peers) PosInt
+   (s/optional-key :onyx/min-peers) PosInt
+   (s/optional-key :onyx/n-peers) PosInt
    s/Keyword s/Any})
 
 (def FluxPolicy 
@@ -79,21 +87,31 @@
        (or (not (nil? (:onyx/group-by-key task-map)))
            (not (nil? (:onyx/group-by-fn task-map))))))
 
-(def partial-input-output-task
+(def partial-input-task
   {:onyx/plugin NamespacedKeyword
    :onyx/medium s/Keyword
-   (s/optional-key :onyx/fn) NamespacedKeyword})
+   :onyx/type :input
+   (s/optional-key :onyx/input-retry-timeout) PosInt 
+   (s/optional-key :onyx/pending-timeout) PosInt 
+   (s/optional-key :onyx/max-pending) PosInt})
+
+(def partial-output-task
+  {:onyx/plugin NamespacedKeyword
+   :onyx/medium s/Keyword
+   :onyx/type :output})
 
 (def partial-fn-task
   {:onyx/fn NamespacedKeyword})
 
 (def TaskMap
-  (s/conditional #(or (= (:onyx/type %) :input) (= (:onyx/type %) :output))
-                      (merge base-task-map partial-input-output-task)
-                      grouping-task?
-                      (s/->Both [FluxPolicyNPeers (merge base-task-map partial-fn-task partial-grouping-task)])
-                      #(= (:onyx/type %) :function)
-                      (merge base-task-map partial-fn-task)))
+  (s/conditional #(= (:onyx/type %) :input) 
+                 (merge base-task-map partial-input-task)
+                 #(= (:onyx/type %) :output)
+                 (merge base-task-map partial-output-task)
+                 grouping-task?
+                 (s/->Both [FluxPolicyNPeers (merge base-task-map partial-fn-task partial-grouping-task)])
+                 #(= (:onyx/type %) :function)
+                 (merge base-task-map partial-fn-task)))
 
 (def Catalog
   [TaskMap])
@@ -115,13 +133,18 @@
    (s/optional-key :lifecycle/after-ack-segment) Function
    (s/optional-key :lifecycle/after-retry-segment) Function})
 
+(def FlowAction
+  (s/enum [:retry]))
+
 (def FlowCondition
   {:flow/from s/Keyword
    :flow/to (s/either s/Keyword [s/Keyword])
+   (s/optional-key :flow/post-transform) NamespacedKeyword
+   (s/optional-key :flow/thrown-exception?) s/Bool
+   (s/optional-key :flow/action?) FlowAction
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   (s/optional-key :flow/params) [s/Keyword]
    :flow/predicate (s/either s/Keyword [s/Any])
    s/Keyword s/Any})
 
@@ -138,10 +161,12 @@
    :window/type WindowType
    :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
+   (s/optional-key :window/init) s/Any
+   (s/optional-key :window/min-key) SPosInt
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
-   (s/optional-key :window/session-key) s/Keyword
+   (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
    s/Keyword s/Any})
 
@@ -165,10 +190,10 @@
    s/Keyword s/Any})
 
 (def JobScheduler
-  s/Keyword)
+  NamespacedKeyword)
 
 (def TaskScheduler
-  s/Keyword)
+  NamespacedKeyword)
 
 (def Job
   {:catalog Catalog
@@ -233,17 +258,23 @@
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
-   (s/optional-key :onyx.bookkeeper/server?) s/Bool
-   (s/optional-key :onyx.bookkeeper/port) s/Int
-   (s/optional-key :onyx.bookkeeper/local-quorum?) s/Bool
-   (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
-   (s/optional-key :onyx.bookkeeper/base-dir) s/Str
-   (s/optional-key :onyx.bookkeeper/client-timeout) s/Int
-   (s/optional-key :onyx.bookkeeper/client-throttle) s/Int
+   (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
+   (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
-   (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) s/Int
-   (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) s/Int
-   (s/optional-key :onyx.bookkeeper/ledger-quorum-size) s/Int
+   (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) PosInt
+   (s/optional-key :onyx.bookkeeper/ledger-ensemble-size) PosInt
+   (s/optional-key :onyx.bookkeeper/ledger-quorum-size) PosInt
+   (s/optional-key :onyx.bookkeeper/write-batch-size) PosInt
+   (s/optional-key :onyx.bookkeeper/write-buffer-size) PosInt
+   (s/optional-key :onyx.bookkeeper/write-batch-timeout) PosInt
+   (s/optional-key :onyx.bookkeeper/read-batch-size) PosInt
+   (s/optional-key :onyx.rocksdb.filter/base-dir) "/tmp/rocksdb_filter"
+   (s/optional-key :onyx.rocksdb.filter/bloom-filter-bits) 10
+   (s/optional-key :onyx.rocksdb.filter/compression) (s/enum :bzip2 :lz4 :lz4hc :none :snappy :zlib)
+   (s/optional-key :onyx.rocksdb.filter/block-size) PosInt
+   (s/optional-key :onyx.rocksdb.filter/peer-block-cache-size) PosInt
+   (s/optional-key :onyx.rocksdb.filter/num-buckets) PosInt
+   (s/optional-key :onyx.rocksdb.filter/num-ids-per-bucket) PosInt
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
@@ -263,6 +294,7 @@
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
+   (s/optional-key :onyx.windowing/min-value) s/Int
    s/Keyword s/Any})
 
 (def PeerId
