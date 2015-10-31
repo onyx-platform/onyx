@@ -42,17 +42,18 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |----------------------|------------|----------------------------------|
 |`:onyx/name`          | `keyword`  | `any`                            |
 |`:onyx/type`          | `keyword`  | `:input`, `:output`, `:function` |
-|`:onyx/batch-size`    | `integer`  | `>= 0`                           |
+|`:onyx/batch-size`    | `integer`  | `> 0`                            |
 
 ##### All maps may optionally have these keys
 
 | key name              | type       | choices              | default    |    Meaning                                                            |
 |-----------------------|------------|----------------------|------------|-----------------------------------------------------------------------|
-|`:onyx/batch-timeout`  | `integer`  | `>= 0`               | `1000`     |                                                                       |
+|`:onyx/batch-timeout`  | `integer`  | `> 0`                | `1000`     |                                                                       |
 |`:onyx/max-peers`      | `integer`  | `> 0`                |            |                                                                       |
-|`:onyx/n-peers`        | `integer`  | `> 0`                |            | Expands to make `:onyx/min-peers` and `:onyx/max-peers this value.    |
+|`:onyx/n-peers`        | `integer`  | `> 0`                |            | Expands to make `:onyx/min-peers` and `:onyx/max-peers this value     |
 |`:onyx/language`       | `keyword`  | `:clojure`, `:java`  | `:clojure` | Affects `:onyx/fn` and `:onyx/plugin` function and plugin resolution  |
 |`:onyx/restart-pred-fn`| `keyword`  | `any`                |            | Keyword pointing to function taking an exception which returns a boolean for whether a peer is restartable following that exception  |
+|`:onyx/doc`            | `string`   |                      |            | A docstring for this task                                             |
 
 ##### Maps with `:onyx/type` set to `:input` or `:output` must have these keys
 
@@ -85,10 +86,10 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 
 ##### Maps with `:onyx/group-by-key` or `:onyx/group-by-fn` must have these keys
 
-| key name                 | type       | choices             |
-|--------------------------|------------|---------------------|
-|`:onyx/min-peers`         | `integer`  | `any`               |
-|`:onyx/flux-policy`       | `keyword`  | `:kill`, `:continue`|
+| key name                 | type       | choices                         |
+|--------------------------|------------|---------------------------------|
+|`:onyx/min-peers`         | `integer`  | `any`                           |
+|`:onyx/flux-policy`       | `keyword`  | `:kill`, `:continue`, `:recover`|
 
 ##### Maps with associated windows, may have these keys
 

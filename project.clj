@@ -42,9 +42,9 @@
                              [lein-set-version "0.4.1"]
                              [lonocloud/lein-unison "0.1.11"]
                              [codox "0.8.8"]]}
-	     :reflection-check {:global-vars  {*warn-on-reflection* true
-					       *assert* false
-					       *unchecked-math* :warn-on-boxed}}
+             :reflection-check {:global-vars  {*warn-on-reflection* true
+                                               *assert* false
+                                               *unchecked-math* :warn-on-boxed}}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
