@@ -2,35 +2,35 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.extensions :as extensions]
             [schema.core :as s]
             [onyx.api]))
 
 (def n-messages 15000)
 
-(def in-chan-1 (chan (inc n-messages)))
+(def in-chan-1 (atom nil))
 
-(def out-chan-1 (chan (sliding-buffer (inc n-messages))))
+(def out-chan-1 (atom nil))
 
-(def in-chan-2 (chan (inc n-messages)))
+(def in-chan-2 (atom nil))
 
-(def out-chan-2 (chan (sliding-buffer (inc n-messages))))
+(def out-chan-2 (atom nil))
 
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
 (defn inject-in-1-ch [event lifecycle]
-  {:core.async/chan in-chan-1})
+  {:core.async/chan @in-chan-1})
 
 (defn inject-in-2-ch [event lifecycle]
-  {:core.async/chan in-chan-2})
+  {:core.async/chan @in-chan-2})
 
 (defn inject-out-1-ch [event lifecycle]
-  {:core.async/chan out-chan-1})
+  {:core.async/chan @out-chan-1})
 
 (defn inject-out-2-ch [event lifecycle]
-  {:core.async/chan out-chan-2})
+  {:core.async/chan @out-chan-2})
 
 (def in-1-calls
   {:lifecycle/before-task-start inject-in-1-ch})
@@ -49,14 +49,7 @@
         config (load-config)
         batch-size 20
         env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)]
-    ;; Don't write any segments to j1 so that the job will stay alive until we kill it.
-    (doseq [n (range n-messages)]
-      (>!! in-chan-2 {:n n}))
-    (>!! in-chan-2 :done)
-
+        peer-config (assoc (:peer-config config) :onyx/id id)]
     (let [catalog-1
           [{:onyx/name :in-1
             :onyx/plugin :onyx.plugin.core-async/input
@@ -122,28 +115,35 @@
            {:lifecycle/task :out-2
             :lifecycle/calls :onyx.peer.killed-job-test/out-2-calls}
            {:lifecycle/task :out-2
-            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
 
-          v-peers (onyx.api/start-peers 3 peer-group)   
+      (reset! in-chan-1 (chan (inc n-messages)))
+      (reset! in-chan-2 (chan (inc n-messages)))
+      (reset! out-chan-1 (chan (sliding-buffer (inc n-messages))))
+      (reset! out-chan-2 (chan (sliding-buffer (inc n-messages))))
 
-          j1 (:job-id (onyx.api/submit-job
-                       peer-config
-                       {:catalog catalog-1 :workflow workflow-1
-                        :lifecycles lifecycles-1
-                        :task-scheduler :onyx.task-scheduler/balanced}))
+      ;; Don't write any segments to j1 so that the job will stay alive until we kill it.
+      (doseq [n (range n-messages)]
+        (>!! @in-chan-2 {:n n}))
+      (>!! @in-chan-2 :done)
 
-          j2 (:job-id (onyx.api/submit-job
-                       peer-config
-                       {:catalog catalog-2 :workflow workflow-2
-                        :lifecycles lifecycles-2
-                        :task-scheduler :onyx.task-scheduler/balanced}))]
+    (with-test-env [test-env [3 env-config peer-config]]
+      (let [j1 (:job-id (onyx.api/submit-job
+                          peer-config
+                          {:catalog catalog-1 :workflow workflow-1
+                           :lifecycles lifecycles-1
+                           :task-scheduler :onyx.task-scheduler/balanced}))
 
+            j2 (:job-id (onyx.api/submit-job
+                          peer-config
+                          {:catalog catalog-2 :workflow workflow-2
+                           :lifecycles lifecycles-2
+                           :task-scheduler :onyx.task-scheduler/balanced}))]
       (onyx.api/kill-job peer-config j1)
-
-      (let [results (take-segments! out-chan-2)
+      (let [results (take-segments! @out-chan-2)
             ch (chan 100)]
         ;; Make sure we find the killed job in the replica, then bail
-        (loop [replica (extensions/subscribe-to-log (:log env) ch)]
+        (loop [replica (extensions/subscribe-to-log (:log (:env test-env)) ch)]
           (let [entry (<!! ch)
                 new-replica (extensions/apply-log-entry entry replica)]
             (when-not (= (first (:killed-jobs new-replica)) j1)
@@ -151,11 +151,4 @@
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
           (is (= expected (set (butlast results))))
-          (is (= :done (last results))))
-
-        (doseq [v-peer v-peers]
-          (onyx.api/shutdown-peer v-peer))
-
-        (onyx.api/shutdown-peer-group peer-group)
-
-        (onyx.api/shutdown-env env)))))
+          (is (= :done (last results))))))))))

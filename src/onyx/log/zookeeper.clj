@@ -35,6 +35,12 @@
 (defn lifecycles-path [prefix]
   (str (prefix-path prefix) "/lifecycles"))
 
+(defn windows-path [prefix]
+  (str (prefix-path prefix) "/windows"))
+
+(defn triggers-path [prefix]
+  (str (prefix-path prefix) "/triggers"))
+
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
@@ -52,6 +58,12 @@
 
 (defn messaging-path [prefix]
   (str (prefix-path prefix) "/messaging"))
+
+(defn ledgers-path [prefix]
+  (str (prefix-path prefix) "/ledgers"))
+
+(defn ledgers-available-path [prefix]
+  (str (prefix-path prefix) "/ledgers/available"))
 
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
@@ -89,6 +101,8 @@
       (zk/create conn (workflow-path onyx-id) :persistent? true)
       (zk/create conn (flow-path onyx-id) :persistent? true)
       (zk/create conn (lifecycles-path onyx-id) :persistent? true)
+      (zk/create conn (windows-path onyx-id) :persistent? true)
+      (zk/create conn (triggers-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
@@ -306,6 +320,30 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :windows]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (windows-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-windows :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/write-chunk [ZooKeeper :triggers]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (triggers-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-triggers :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (compress chunk)]
@@ -408,6 +446,26 @@
        (let [node (str (lifecycles-path prefix) "/" id)]
          (decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-lifecycles :id id :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-chunk [ZooKeeper :windows]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (windows-path prefix) "/" id)]
+         (decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-windows :id id :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-chunk [ZooKeeper :triggers]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (triggers-path prefix) "/" id)]
+         (decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-triggers :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]

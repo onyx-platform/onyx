@@ -2,15 +2,15 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [schema.core :as s]
             [onyx.api]))
 
 (def output (atom []))
 
-(def in-chan (chan 1000000))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer 1000000)))
+(def out-chan (atom nil))
 
 (defn inject-sum-state [event lifecycle]
   (let [balance (atom {})]
@@ -29,10 +29,10 @@
   name)
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -49,8 +49,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
 
         workflow [[:in :sum-balance]
                   [:sum-balance :out]]
@@ -137,37 +135,33 @@
                (map (fn [_] {:name "Luz" :amount 10}) (range size))
                (map (fn [_] {:name "Tyesha" :amount 10}) (range size))
                (map (fn [_] {:name "Eusebia" :amount 10}) (range size))
-               (map (fn [_] {:name "Fletcher" :amount 10}) (range size)))
+               (map (fn [_] {:name "Fletcher" :amount 10}) (range size)))]
 
-        v-peers (onyx.api/start-peers 4 peer-group)]
+    (reset! in-chan (chan 1000000))
+    (reset! out-chan (chan (sliding-buffer 1000000)))
 
-    (doseq [x data]
-      (>!! in-chan x))
+    (with-test-env [test-env [4 env-config peer-config]]
+      (doseq [x data]
+        (>!! @in-chan x))
 
-    (>!! in-chan :done)
-    (close! in-chan)
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
-    (onyx.api/submit-job
-      peer-config
-      {:catalog catalog :workflow workflow
-       :lifecycles lifecycles
-       :task-scheduler :onyx.task-scheduler/balanced})
+      (onyx.api/submit-job
+        peer-config
+        {:catalog catalog :workflow workflow
+         :lifecycles lifecycles
+         :task-scheduler :onyx.task-scheduler/balanced})
 
-    (let [results (take-segments! out-chan)]
-      (doseq [v-peer v-peers]
-        (onyx.api/shutdown-peer v-peer))
-
-      (let [out-val @output]
-        (is (not (empty? out-val)))
-
-        ;; Scan the key set, dropping any nils. Count the distinct keys.
-        ;; Do the same for the right hand side of the expression, but turn it into a set.
-        ;; If there's the same number of elements, then the grouping was mutually exclusive.
-        (is (= (count (into #{} (filter identity (mapcat keys out-val))))
-               (count (filter identity (mapcat keys out-val)))))
-
+      (let [results (take-segments! @out-chan)]
         (is (= [:done] results))))
 
-    (onyx.api/shutdown-peer-group peer-group)
+    ;; Once peers are shutdown:
+    (let [out-val @output] 
+      (is (not (empty? out-val)))
 
-    (onyx.api/shutdown-env env)))
+    ;; Scan the key set, dropping any nils. Count the distinct keys.
+    ;; Do the same for the right hand side of the expression, but turn it into a set.
+    ;; If there's the same number of elements, then the grouping was mutually exclusive.
+    (is (= (count (into #{} (filter identity (mapcat keys out-val))))
+           (count (filter identity (mapcat keys out-val))))))))

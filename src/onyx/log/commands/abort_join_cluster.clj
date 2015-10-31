@@ -29,8 +29,7 @@
              (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
-             :peer-site (extensions/peer-site (:messenger peer-args))}
-      :immediate? true}]))
+             :peer-site (extensions/peer-site (:messenger peer-args))}}]))
 
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
   [{:keys [args]} old new diff state]

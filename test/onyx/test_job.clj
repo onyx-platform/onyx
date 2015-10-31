@@ -6,7 +6,7 @@
             [onyx.extensions :as extensions]
             [com.stuartsierra.component :as component]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def config (load-config))

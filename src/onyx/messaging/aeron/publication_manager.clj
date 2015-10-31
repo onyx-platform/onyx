@@ -1,4 +1,4 @@
-(ns onyx.messaging.aeron.publication-manager
+(ns ^:no-doc onyx.messaging.aeron.publication-manager
   (:require [taoensso.timbre :refer [error fatal info] :as timbre]
             [clojure.core.async :refer [chan >!! <!! put! close! sliding-buffer thread]])
   (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
@@ -62,9 +62,7 @@
   (connect [this]
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
-                            (taoensso.timbre/warn "Aeron messaging publication error:" x)
-                            #_(taoensso.timbre/warn "Resetting Aeron publication.")
-                            #_(reset-connection this)))
+                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           conn (Aeron/connect (.errorHandler (Aeron$Context.) error-handler))
           pub (.addPublication conn channel stream-id)]
       (assoc this :publication pub :connection conn))))

@@ -1,9 +1,10 @@
 (ns onyx.static.validation
   (:require [clojure.walk :refer [prewalk]]
             [com.stuartsierra.dependency :as dep]
-            [onyx.static.planning :as planning]
             [schema.core :as schema]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall
+            [onyx.static.planning :as planning]
+            [onyx.windowing.units :as u]
+            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
 (defn validate-java-version []
@@ -27,15 +28,6 @@
     (when-not (= (distinct tasks) tasks)
       (throw (ex-info "Multiple catalog entries found with the same :onyx/name." {:catalog catalog})))))
 
-(defn flux-policy-check [entry]
-  (when (and (= :recover (:onyx/flux-policy entry))
-             (not (and (:onyx/max-peers entry)
-                       (:onyx/min-peers entry)
-                       (or (= (:onyx/max-peers entry) 1)
-                           (= (:onyx/max-peers entry) 
-                              (:onyx/min-peers entry))))))
-    (throw (ex-info ":onyx/flux-policy :recover must have :onyx/min-peers = :onyx/max-peers" {:entry entry}))))
-
 (defn min-and-max-peers-sane [entry]
   (when (and (:onyx/min-peers entry)
              (:onyx/max-peers entry))
@@ -54,7 +46,6 @@
   (schema/validate Catalog catalog)
   (doseq [entry catalog]
     (name-and-type-not-equal entry)
-    (flux-policy-check entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)))
 
@@ -120,6 +111,9 @@
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
 
+(defn validate-state-aggregation-calls [m]
+  (schema/validate StateAggregationCall m))
+
 (defn validate-env-config [env-config]
   (schema/validate EnvConfig env-config))
 
@@ -131,7 +125,7 @@
   (let [all (into #{} (concat (map first workflow) (map second workflow)))]
     (doseq [entry flow-schema]
       (let [from (:flow/from entry)]
-        (when-not (some #{from} all)
+        (when-not (or (some #{from} all) (= from :all))
           (throw (ex-info ":flow/from value doesn't name a node in the workflow"
                           {:entry entry}))))
 
@@ -206,6 +200,69 @@
   (validate-none-position flow-conditions)
   (validate-short-circuit flow-conditions)
   (validate-auto-short-circuit flow-conditions))
+
+(defn window-names-a-task [tasks w]
+  (when-not (some #{(:window/task w)} tasks)
+    (throw (ex-info ":window/task must name a task in the catalog" {:window w :tasks tasks}))))
+
+(defn window-ids-unique [windows]
+  (let [ids (map :window/id windows)]
+    (when-not (= (count ids) (count (into #{} ids)))
+      (throw (ex-info ":window/id must be unique across windows, found" {:ids ids})))))
+
+(defn range-and-slide-units-compatible [w]
+  (when (and (:window/range w) (:window/slide w))
+    (when-not (= (u/standard-units-for (second (:window/range w)))
+                 (u/standard-units-for (second (:window/slide w))))
+      (throw (ex-info "Incompatible units for :window/range and :window/slide" {:window w})))))
+
+(defn sliding-windows-define-range-and-slide [w]
+  (when (= (:window/type w) :sliding)
+    (when (or (not (:window/range w)) (not (:window/slide w)))
+      (throw (ex-info ":sliding windows must define both :window/range and :window/slide" {:window w})))))
+
+(defn fixed-windows-dont-define-slide [w]
+  (when (and (= (:window/type w) :fixed) (:window/slide w))
+    (throw (ex-info ":fixed windows do not define a :window/slide value" {:window w}))))
+
+(defn global-windows-dont-define-range-or-slide [w]
+  (when (and (= (:window/type w) :global) (:window/range w))
+    (throw (ex-info ":global windows do not define a :window/range value" {:window w})))
+
+  (when (and (= (:window/type w) :global) (:window/slide w))
+    (throw (ex-info ":global windows do not define a :window/slide value" {:window w}))))
+
+(defn session-windows-dont-define-range-or-slide [w]
+  (when (and (= (:window/type w) :session) (:window/range w))
+    (throw (ex-info ":session windows do not define a :window/range value" {:window w})))
+
+  (when (and (= (:window/type w) :session) (:window/slide w))
+    (throw (ex-info ":session windows do not define a :window/slide value" {:window w}))))
+
+(defn session-windows-define-a-timeout [w]
+  (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
+    (throw (ex-info ":session windows must define a :window/timeout-gap value" {:window w}))))
+
+(defn validate-windows [windows catalog]
+  (let [task-names (map :onyx/name catalog)]
+    (window-ids-unique windows)
+    (doseq [w windows]
+      (window-names-a-task task-names w)
+      (range-and-slide-units-compatible w)
+      (sliding-windows-define-range-and-slide w)
+      (fixed-windows-dont-define-slide w)
+      (global-windows-dont-define-range-or-slide w)
+      (session-windows-dont-define-range-or-slide w)
+      (session-windows-define-a-timeout w))))
+
+(defn trigger-names-a-window [window-ids t]
+  (when-not (some #{(:trigger/window-id t)} window-ids)
+    (throw (ex-info "Trigger must name a window ID" {:trigger t :window-ids window-ids}))))
+
+(defn validate-triggers [triggers windows]
+  (let [window-names (map :window/id windows)]
+    (doseq [t triggers]
+      (trigger-names-a-window window-names t))))
 
 (defn coerce-uuid [uuid]
   (if (instance? java.util.UUID uuid)

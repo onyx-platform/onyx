@@ -55,5 +55,3 @@ For example:
 ```
 
 When modifying the replica, please assoc-in into replica under [:task-metadata job-id task-id], so that it will be cleaned up when the job is completed or killed.
-
-A good example for how this is done can be found in the [onyx-kafka plugin](https://github.com/onyx-platform/onyx-kafka/blob/master/src/onyx/plugin/kafka_log.clj).

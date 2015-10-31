@@ -9,6 +9,7 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
+            [onyx.state.bookkeeper :refer [new-bookie]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
@@ -24,15 +25,26 @@
             [onyx.log.commands.backpressure-on]
             [onyx.log.commands.backpressure-off]
             [onyx.log.commands.peer-replica-view]
+            [onyx.log.commands.compact-bookkeeper-log-ids]
+            [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
+            [onyx.windowing.units]
+            [onyx.windowing.window-extensions]
+            [onyx.windowing.aggregation]
+            [onyx.triggers.triggers-api]
+            [onyx.triggers.timer]
+            [onyx.triggers.segment]
+            [onyx.triggers.punctuation]
+            [onyx.triggers.watermark]
+            [onyx.triggers.percentile-watermark]
             [onyx.plugin.core-async]
             [onyx.extensions :as extensions]))
 
-(def development-components [:monitoring :logging-config :log])
+(def development-components [:monitoring :logging-config :log :bookkeeper])
 
 (def client-components [:monitoring :log :messaging-require])
 
@@ -112,6 +124,7 @@
      (map->OnyxDevelopmentEnv
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :logging-config (logging-config/logging-configuration peer-config)
+       :bookkeeper (component/using (new-bookie peer-config) [:log])
        :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client

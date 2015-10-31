@@ -27,7 +27,7 @@
         n (count peers)]
     (if (> n 0)
       (let [joining-peer (:joiner args)
-            all-joined-peers (set (concat (keys (:pairs replica)) peers))
+            all-joined-peers (set (into (keys (:pairs replica)) peers))
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))
@@ -66,14 +66,12 @@
   (cond (and (= (:id peer-args) (:joiner (:args entry)))
              (nil? diff))
         [{:fn :abort-join-cluster
-          :args {:id (:id peer-args)}
-          :immediate? true}]
+          :args {:id (:id peer-args)}}]
         (= (:id peer-args) (:observer diff))
         [{:fn :notify-join-cluster
           :args {:observer (:subject diff)
                  :subject (or (get (:pairs new) (:observer diff))
-                              (:observer diff))}
-          :immediate? true}]))
+                              (:observer diff))}}]))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args]} :- LogEntry old new diff {:keys [monitoring] :as state}]
@@ -102,7 +100,5 @@
          (= (:id state) (:instant-join diff))
          (do (extensions/open-peer-site (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))
-             (doseq [entry (:buffered-outbox state)]
-               (>!! (:outbox-ch state) entry))
-             (assoc (dissoc state :buffered-outbox) :stall-output? false))
+             state)
          :else state)))

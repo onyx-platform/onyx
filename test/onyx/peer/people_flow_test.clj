@@ -2,33 +2,33 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
-(def people-in-chan (chan 100))
+(def people-in-chan (atom nil))
 
-(def children-out-chan (chan (sliding-buffer 100)))
+(def children-out-chan (atom nil))
 
-(def adults-out-chan (chan (sliding-buffer 100)))
+(def adults-out-chan (atom nil))
 
-(def athletes-wa-out-chan (chan (sliding-buffer 100)))
+(def athletes-wa-out-chan (atom nil))
 
-(def everyone-out-chan (chan (sliding-buffer 100)))
+(def everyone-out-chan (atom nil))
 
 (defn inject-people-in-ch [event lifecycle]
-  {:core.async/chan people-in-chan})
+  {:core.async/chan @people-in-chan})
 
 (defn inject-children-out-ch [event lifecycle]
-  {:core.async/chan children-out-chan})
+  {:core.async/chan @children-out-chan})
 
 (defn inject-adults-out-ch [event lifecycle]
-  {:core.async/chan adults-out-chan})
+  {:core.async/chan @adults-out-chan})
 
 (defn inject-athletes-wa-out-ch [event lifecycle]
-  {:core.async/chan athletes-wa-out-chan})
+  {:core.async/chan @athletes-wa-out-chan})
 
 (defn inject-everyone-out-ch [event lifecycle]
-  {:core.async/chan everyone-out-chan})
+  {:core.async/chan @everyone-out-chan})
 
 (def people-in-calls
   {:lifecycle/before-task-start inject-people-in-ch})
@@ -78,8 +78,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
         catalog [{:onyx/name :people-in
                   :onyx/plugin :onyx.plugin.core-async/input
@@ -191,30 +189,6 @@
                     {:lifecycle/task :everyone-out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
 
-        v-peers (onyx.api/start-peers 9 peer-group)
-
-        _ (doseq [x [{:age 24 :job "athlete" :location "Washington"}
-                     {:age 17 :job "programmer" :location "Washington"}
-                     {:age 18 :job "mechanic" :location "Vermont"}
-                     {:age 13 :job "student" :location "Maine"}
-                     {:age 42 :job "doctor" :location "Florida"}
-                     {:age 64 :job "athlete" :location "Pennsylvania"}
-                     {:age 35 :job "bus driver" :location "Texas"}
-                     {:age 50 :job "lawyer" :location "California"}
-                     {:age 25 :job "psychologist" :location "Washington"}]]
-            (>!! people-in-chan x))
-        _ (>!! people-in-chan :done)
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog :workflow workflow
-             :flow-conditions flow-conditions
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
-        children (take-segments! children-out-chan)
-        adults (take-segments! adults-out-chan)
-        athletes-wa (take-segments! athletes-wa-out-chan)
-        everyone (take-segments! everyone-out-chan)
-
         children-expectatations #{{:age 17 :job "programmer" :location "Washington"}
                                   {:age 13 :job "student" :location "Maine"}
                                   :done}
@@ -239,16 +213,37 @@
                                   {:age 25 :job "psychologist" :location "Washington"}
                                   :done}]
 
-    (is (= children-expectatations (into #{} children)))
-    (is (= adults-expectatations (into #{} adults)))
-    (is (= athletes-wa-expectatations (into #{} athletes-wa)))
-    (is (= everyone-expectatations (into #{} everyone)))
+    (reset! people-in-chan (chan 100))
+    (reset! children-out-chan (chan (sliding-buffer 100)))
+    (reset! adults-out-chan (chan (sliding-buffer 100)))
+    (reset! athletes-wa-out-chan (chan (sliding-buffer 100)))
+    (reset! everyone-out-chan (chan (sliding-buffer 100)))
 
-    (close! people-in-chan)
+    (with-test-env [test-env [9 env-config peer-config]]
+        (doseq [x [{:age 24 :job "athlete" :location "Washington"}
+                     {:age 17 :job "programmer" :location "Washington"}
+                     {:age 18 :job "mechanic" :location "Vermont"}
+                     {:age 13 :job "student" :location "Maine"}
+                     {:age 42 :job "doctor" :location "Florida"}
+                     {:age 64 :job "athlete" :location "Pennsylvania"}
+                     {:age 35 :job "bus driver" :location "Texas"}
+                     {:age 50 :job "lawyer" :location "California"}
+                     {:age 25 :job "psychologist" :location "Washington"}]]
+            (>!! @people-in-chan x))
+        (>!! @people-in-chan :done)
+        (onyx.api/submit-job peer-config
+                             {:catalog catalog :workflow workflow
+                              :flow-conditions flow-conditions
+                              :lifecycles lifecycles
+                              :task-scheduler :onyx.task-scheduler/balanced})
+        (let [children (take-segments! @children-out-chan)
+              adults (take-segments! @adults-out-chan)
+              athletes-wa (take-segments! @athletes-wa-out-chan)
+              everyone (take-segments! @everyone-out-chan)] 
 
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
+          (is (= children-expectatations (into #{} children)))
+          (is (= adults-expectatations (into #{} adults)))
+          (is (= athletes-wa-expectatations (into #{} athletes-wa)))
+          (is (= everyone-expectatations (into #{} everyone)))
 
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+          (close! @people-in-chan)))))

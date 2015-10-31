@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.7.15-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.8.0-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -12,35 +12,39 @@
                              :password :env
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+                 [org.clojure/core.async "0.2.371"]
                  [org.apache.curator/curator-framework "2.9.0"]
                  [org.apache.curator/curator-test "2.9.0"]
                  [clj-tuple "0.2.2"]
-                 [com.stuartsierra/dependency "0.1.1"]
-                 [com.stuartsierra/component "0.2.3"]
-                 [com.taoensso/timbre "4.1.1"]
-                 [com.taoensso/nippy "2.9.0"]
-                 [uk.co.real-logic/Agrona "0.4.3"]
-                 [uk.co.real-logic/aeron-client "0.1.3"]
-                 [uk.co.real-logic/aeron-driver "0.1.3"]
+                 [com.stuartsierra/dependency "0.2.0"]
+                 [com.stuartsierra/component "0.3.0"]
+                 [com.taoensso/timbre "4.1.4"]
+                 [com.taoensso/nippy "2.10.0"]
+                 [uk.co.real-logic/aeron-all "0.1.5"]
                  [prismatic/schema "1.0.1"]
-                 [org.apache.zookeeper/zookeeper "3.4.6" :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.apache.zookeeper/zookeeper "3.4.6" 
+                  :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.apache.bookkeeper/bookkeeper-server "4.3.1" 
+                  :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.rocksdb/rocksdbjni "4.0"]
                  [log4j/log4j "1.2.17"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]]
   :aot [onyx.interop]
-  :jvm-opts ["-Xmx4g"]
+  :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
   :profiles {:dev {:aot ^:replace []
-                   :dependencies [[yeller-timbre-appender "2.0.0"]
+                   :dependencies [[org.clojure/tools.nrepl "0.2.11"]
+                                  [org.clojure/test.check "0.8.2"]
                                   [org.clojars.czan/stateful-check "0.3.1"]
-                                  [org.clojure/test.check "0.8.1"]
-                                  [com.gfredericks/test.chuck "0.1.22"]
-                                  [org.clojure/data.generators "0.1.2"]
-                                  [org.clojure/tools.nrepl "0.2.10"]]
+                                  [com.gfredericks/test.chuck "0.2.0"]
+                                  [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
                              [lonocloud/lein-unison "0.1.11"]
                              [codox "0.8.8"]]}
+             :reflection-check {:global-vars  {*warn-on-reflection* true
+                                               *assert* false
+                                               *unchecked-math* :warn-on-boxed}}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"

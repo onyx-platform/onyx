@@ -10,6 +10,7 @@ pom.xml.asc
 /.nrepl-port
 onyx.log*
 hs_err_pid*
+*.log
 .#*
 .DS_Store
 *.jfr

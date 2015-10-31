@@ -1,10 +1,14 @@
-(ns onyx.messaging.aeron.peer-manager
-  "Fast way for peer group subscribers to dispatch via short id to peer channels"
+(ns ^:no-doc onyx.messaging.aeron.peer-manager
+  "Fast way for peer group subscribers to multiplex via a short id to peer channels. "
   (:refer-clojure :exclude [assoc dissoc])
+  (:require [taoensso.timbre :refer [fatal info] :as timbre])
   (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$EntryIterator])) 
 
 (defrecord PeerChannels [acking-ch inbound-ch release-ch retry-ch])
 
+;; Note, slow to assoc/dissoc to as it clones with a lock on it.
+;; Very fast to get from via peer-channels function - which is the main case, as dissoc/assoc 
+;; only occurs when peers join/leave
 (defprotocol PeerManager
   (clone [this])
   (assoc [this k v])
@@ -24,15 +28,17 @@
   (peer-channels [this k]
     (.get m (int k)))
   (clone [this]
-    (VPeerManager.
-      (let [iterator (.iterator (.entrySet m))
-            new-hm ^Int2ObjectHashMap (Int2ObjectHashMap.)]
-        (while (.hasNext iterator)
-          (let [kv ^Int2ObjectHashMap$EntryIterator (.next iterator)]
-            (.put new-hm 
-                  ^java.lang.Integer (.getKey kv) 
-                  ^PeerChannels (.getValue kv))))
-        new-hm))))
+    ;; Needs to be locked because we're using a deftype, not defrecord
+    (locking this 
+      (VPeerManager.
+        (let [iterator (.iterator (.entrySet (.m this)))
+              new-hm ^Int2ObjectHashMap (Int2ObjectHashMap.)]
+          (while (.hasNext iterator)
+            (let [kv ^Int2ObjectHashMap$EntryIterator (.next iterator)
+                  k ^java.lang.Integer (.getKey kv) 
+                  v ^PeerChannels (.getValue kv)]
+              (.put new-hm k v)))
+          new-hm)))))
 
 (defn vpeer-manager []
   (VPeerManager. (Int2ObjectHashMap.)))

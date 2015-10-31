@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -29,6 +29,10 @@
   (swap! call-log (fn [call-log] (conj call-log :batch-before)))
   {})
 
+(defn after-read-batch [event lifecycle]
+  (swap! call-log (fn [call-log] (conj call-log :batch-after-read)))
+  {})
+
 (defn after-batch [event lifecycle]
   (swap! call-log (fn [call-log] (conj call-log :batch-after)))
   {})
@@ -37,20 +41,21 @@
   (swap! started-task-counter inc)
   {})
 
-(def in-chan (chan (inc n-messages)))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer (inc n-messages))))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def calls
   {:lifecycle/start-task? start-task?
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
+   :lifecycle/after-read-batch after-read-batch
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop})
 
@@ -68,8 +73,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 20
         catalog [{:onyx/name :in
                   :onyx/plugin :onyx.plugin.core-async/input
@@ -104,53 +107,39 @@
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :all
-                     :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]
+                     :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]]
 
+    (reset! in-chan (chan (inc n-messages)))
+    (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
-        v-peers (onyx.api/start-peers 3 peer-group)
+    (with-test-env [test-env [3 env-config peer-config]]
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog
+                            :workflow workflow
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
 
-        _ (onyx.api/submit-job
-            peer-config
-            {:catalog catalog
-             :workflow workflow
-             :lifecycles lifecycles
-             :task-scheduler :onyx.task-scheduler/balanced})
+      (doseq [n (range n-messages)]
+        (>!! @in-chan {:n n}))
 
-        _ (doseq [n (range n-messages)]
-            (>!! in-chan {:n n}))
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
-        _ (>!! in-chan :done)
-        _ (close! in-chan)
+      (let [results (take-segments! @out-chan)
+            expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+        (is (= expected (set (butlast results))))
+        (is (= :done (last results)))))
 
-        results (take-segments! out-chan)]
-
-    (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-      (is (= expected (set (butlast results))))
-      (is (= :done (last results))))
-
-    ;; shutdown-peer ensure peers are fully shutdown so that
+    ;; after shutdown-peer ensure peers are fully shutdown so that
     ;; :task-after will have been set
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
 
-    (is (= [:task-started
-            :task-before
-            :batch-before
-            :batch-after ; 1
-            :batch-before
-            :batch-after ; 2
-            :batch-before
-            :batch-after ; 3
-            :batch-before
-            :batch-after ; 4
-            :batch-before
-            :batch-after ; 5
-            :batch-before
-            :batch-after
-            :task-after] 
-           @call-log))
-    (is (= 3 @started-task-counter))
-
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+    (let [calls @call-log
+          repeated-calls (drop 2 (butlast calls))]
+      (is (= [:task-started :task-before] (take 2 calls)))
+      (is (= :task-after (last calls)))
+      (is (every? (partial = [:batch-before :batch-after-read :batch-after])
+                  (partition 3 repeated-calls)))
+      ;; Allow lifecycles to run more times in case the CI box is lagging
+      ;; and we experience replays.
+      (is (<= (count repeated-calls) 40))
+      (is (= 3 @started-task-counter)))))

@@ -9,15 +9,9 @@
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
-  (if (:stall-output? state)
-    (do
-      (doseq [reaction (filter :immediate? reactions)]
-        (clojure.core.async/>!! outbox-ch reaction))
-      (update-in state [:buffered-outbox] concat (remove :immediate? reactions)))
-    (do
-      (doseq [reaction reactions]
-        (clojure.core.async/>!! outbox-ch reaction))
-      state)))
+  (doseq [reaction reactions]
+    (clojure.core.async/>!! outbox-ch reaction))
+  state)
 
 (defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
   (try
@@ -28,6 +22,7 @@
                            :replica replica-atom
                            :peer-replica-view peer-view-atom
                            :log log
+                           :buffered-outbox []
                            :messenger-buffer buffer
                            :messenger messenger
                            :monitoring monitoring
@@ -36,7 +31,6 @@
                            :opts opts
                            :kill-ch kill-ch
                            :restart-ch restart-ch
-                           :stall-output? true
                            :task-lifecycle-fn task-lifecycle}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
@@ -69,8 +63,11 @@
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
 
-(defn track-backpressure [id messenger-buffer outbox-ch low-water-pct high-water-pct check-interval]
-  (let [on? (atom false)
+(defn track-backpressure [id messenger-buffer outbox-ch opts]
+  (let [low-water-pct (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
+        high-water-pct (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
+        check-interval (arg-or-default :onyx.peer/backpressure-check-interval opts)
+        on? (atom false)
         buf (.buf (:inbound-ch messenger-buffer))
         low-water-ratio (/ low-water-pct 100)
         high-water-ratio (/ high-water-pct 100)]
@@ -111,10 +108,7 @@
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
                 processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring))
-                track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch
-                                                                   (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
-                                                                   (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
-                                                                   (arg-or-default :onyx.peer/backpressure-check-interval opts)))]
+                track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch opts))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch

@@ -28,8 +28,7 @@
     (is (= {:a :d} (:prepared new-replica)))
     (is (= {:observer :a :subject :d} diff))
     (is (= [{:fn :notify-join-cluster
-             :args {:observer :d :subject :b}
-             :immediate? true}] 
+             :args {:observer :d :subject :b}}] 
            reactions))
 
     (let [old-replica (assoc-in old-replica [:prepared :a] :e)
@@ -39,8 +38,7 @@
       (is (= {:a :e :b :d} (:prepared new-replica)))
       (is (= {:observer :b :subject :d} diff))
       (is (= [{:fn :notify-join-cluster
-                         :args {:observer :d :subject :c}
-                         :immediate? true}] 
+                         :args {:observer :d :subject :c}}] 
              reactions)))
     (let [old-replica (-> old-replica
                           (assoc-in [:prepared :a] :e)
@@ -52,8 +50,7 @@
       (is (= {:a :e :b :f :c :g} (:prepared new-replica)))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d}
-               :immediate? true}] 
+               :args {:id :d}}] 
              reactions)))
 
     (let [old-replica (merge replica/base-replica 
@@ -79,8 +76,7 @@
       (is (= {:a :d} (:prepared new-replica)))
       (is (= {:observer :a :subject :d} diff))
       (is (= [{:fn :notify-join-cluster
-               :args {:observer :d :subject :a}
-               :immediate? true}] 
+               :args {:observer :d :subject :a}}] 
              reactions)))
 
     (let [old-replica (merge replica/base-replica
@@ -96,6 +92,5 @@
       (is (= old-replica new-replica))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d}
-               :immediate? true}] 
+               :args {:id :d}}] 
              reactions)))))

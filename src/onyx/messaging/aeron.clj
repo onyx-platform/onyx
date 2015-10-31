@@ -6,6 +6,7 @@
             [onyx.messaging.aeron.publication-manager :as pubm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
+            [onyx.types :refer [->MonitorEventBytes]]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [compress decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
@@ -36,7 +37,7 @@
           external-channel (:external-channel messaging-group)
           short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
                                (fn [channel] (= channel external-channel))
-                               (constantly false))
+                               (fn [_] false))
           release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
           retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size config)
@@ -119,18 +120,27 @@
   (let [msg-type (protocol/read-message-type buffer offset)
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
-        offset (+ offset protocol/short-size)]
+        offset (unchecked-add offset protocol/short-size)]
     (cond (= msg-type protocol/ack-msg-id)
           (let [ack (protocol/read-acker-message buffer offset)]
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
               (>!! (:acking-ch chs) ack)))
 
+          (= msg-type protocol/batched-ack-msg-id)
+          (let [acks (protocol/read-acker-messages buffer offset)]
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+              (let [acking-ch (:acking-ch chs)]
+                (run! (fn [ack]
+                        (>!! acking-ch ack))
+                      acks)))) 
+
           (= msg-type protocol/messages-msg-id)
-          (let [segments (protocol/read-messages-buf decompress-f buffer offset length)]
+          (let [segments (protocol/read-messages-buf decompress-f buffer offset)]
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
               (let [inbound-ch (:inbound-ch chs)]
-                (doseq [segment segments]
-                  (>!! inbound-ch segment)))))
+                (run! (fn [segment]
+                        (>!! inbound-ch segment))
+                      segments))))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
@@ -138,9 +148,9 @@
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
-            (let [retry-id (protocol/read-retry buffer offset)]
-              (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
-                (>!! (:retry-ch chs) retry-id))))))
+          (let [retry-id (protocol/read-retry buffer offset)]
+            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+              (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
   (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
@@ -180,13 +190,8 @@
       pub-manager)))
 
 (defn opts->port [opts]
-  (or (first (common/allowable-ports opts))
-      (throw
-        (ex-info "Couldn't assign port - ran out of available ports.
-                 Available ports can be configured in the peer-config.
-                 e.g. {:onyx.messaging/peer-ports [40000, 40002],
-                       :onyx.messaging/peer-port-range [40200 40260]}"
-                 {:opts opts}))))
+  (or (:onyx.messaging/peer-port opts)
+      (throw (ex-info "Peer port (:onyx.messaging/peer-port) is not defined" opts))))
 
 
 ;; FIXME: gc'ing publications could be racy if a publication is grabbed
@@ -343,12 +348,12 @@
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
         timeout-ch (timeout ms)]
-    (loop [segments [] i 0]
+    (loop [segments (transient []) i 0]
       (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
-          (recur (conj segments v) (inc i))
-          segments)
-        segments))))
+          (recur (conj! segments v) (inc i))
+          (persistent! segments))
+        (persistent! segments)))))
 
 (defn short-circuit-ch [messenger id ch-k]
   (-> messenger
@@ -359,8 +364,13 @@
 
 (defn send-messages-short-circuit [ch batch]
   (when ch
-    (doseq [segment batch]
-      (>!! ch segment))))
+    (run! (fn [segment]
+            (>!! ch segment))
+          batch)))
+
+(defn ack-segment-short-circuit [ch ack]
+  (when ch
+    (>!! ch ack))) 
 
 (defn ack-segments-short-circuit [ch acks]
   (when ch
@@ -380,17 +390,26 @@
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (short-circuit-ch messenger (:id conn-info) :inbound-ch) batch)
     (let [pub-man (get-publication messenger conn-info)
-          [len buf] (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
-      (pubm/write pub-man buf 0 len))))
+          buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) id batch)]
+      (pubm/write pub-man buf 0 (.capacity buf)))))
+
+(defmethod extensions/internal-ack-segment AeronConnection
+  [messenger event {:keys [id channel] :as conn-info} ack]
+  (if ((:short-circuitable? messenger) channel)
+    (ack-segment-short-circuit (short-circuit-ch messenger id :acking-ch) ack)
+    (let [pub-man (get-publication messenger conn-info)]
+      (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
+        (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
-  [messenger event {:keys [id channel] :as conn-info} acks]
-  (if ((:short-circuitable? messenger) channel)
-    (ack-segments-short-circuit (short-circuit-ch messenger id :acking-ch) acks)
-    (let [pub-man (get-publication messenger conn-info)]
-      (doseq [ack acks]
-        (let [buf (protocol/build-acker-message id (:id ack) (:completion-id ack) (:ack-val ack))]
-          (pubm/write pub-man buf 0 protocol/ack-msg-length))))))
+  [messenger event conn-info acks]
+  (if ((:short-circuitable? messenger) (:channel conn-info))
+    (ack-segments-short-circuit (short-circuit-ch messenger (:id conn-info) :acking-ch) acks)
+    (let [pub-man (get-publication messenger conn-info)
+          buf ^UnsafeBuffer (protocol/build-acker-messages (:id conn-info) acks)
+          size (.capacity buf)]
+      (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes size))
+      (pubm/write pub-man buf 0 size))))
 
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [id channel] :as conn-info}]

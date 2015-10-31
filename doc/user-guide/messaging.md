@@ -72,9 +72,8 @@ is provided for the purposes of more realistic performance testing on a single n
 
 ##### Port Use
 
-The Aeron messaging implementation will use the first port configured via
-`:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports`. UDP ports
-coinciding with these options must be open.
+The Aeron messaging implementation will use the port configured via
+`:onyx.messaging/peer-port`. This *UDP port* must be unfirewalled.
 
 ##### Media Driver
 

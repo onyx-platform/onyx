@@ -46,18 +46,14 @@
              (nil? diff)
              (= (:id state) accepted-joiner))
       [{:fn :abort-join-cluster
-        :args {:id accepted-joiner}
-        :immediate? true}]
+        :args {:id accepted-joiner}}]
       [])))
 
-(defn unbuffer-messages [state diff new]
-  (if (= (:id state) (:subject diff))
-    (do (extensions/open-peer-site (:messenger state)
-                                   (get-in new [:peer-sites (:id state)]))
-        (doseq [entry (:buffered-outbox state)]
-          (>!! (:outbox-ch state) entry))
-        (assoc (dissoc state :buffered-outbox) :stall-output? false))
-    state))
+(defn open-site [state diff new]
+  (when (= (:id state) (:subject diff))
+    (extensions/open-peer-site
+     (:messenger state)
+     (get-in new [:peer-sites (:id state)]))))
 
 (s/defmethod extensions/fire-side-effects! :accept-join-cluster :- State
   [{:keys [args]} :- LogEntry 
@@ -68,6 +64,6 @@
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new)
-    (let [next-state (unbuffer-messages state diff new)]
-      (common/start-new-lifecycle old new diff next-state))
+    (do (open-site state diff new)
+        (common/start-new-lifecycle old new diff state))
     state))

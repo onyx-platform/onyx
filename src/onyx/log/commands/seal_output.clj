@@ -18,7 +18,7 @@
   [{:keys [args]} :- LogEntry replica]
   (let [new (update-in replica [:sealed-outputs (:job args)] union #{(:task args)})]
     (if (all-outputs-sealed? new (:job args))
-      (let [peers (apply concat (vals (get-in replica [:allocations (:job args)])))]
+      (let [peers (reduce into [] (vals (get-in replica [:allocations (:job args)])))]
         (-> new
             (update-in [:exhausted-inputs] dissoc (:job args))
             (update-in [:sealed-outputs] dissoc (:job args))

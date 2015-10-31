@@ -2,7 +2,7 @@
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.log.replica :as replica]
             [onyx.system]
             [schema.test]
@@ -23,7 +23,7 @@
         reactions (rep-reactions 
                     old-replica new-replica diff {:id :d :messenger (dummy-messenger {})})]
     (is (= {:observer :d :subject :b :accepted-joiner :d :accepted-observer :a} diff))
-    (is (= [{:fn :accept-join-cluster :args diff :immediate? true}] reactions))
+    (is (= [{:fn :accept-join-cluster :args diff}] reactions))
     (is (= nil (rep-reactions old-replica new-replica diff {:id :a})))
     (is (= nil (rep-reactions old-replica new-replica diff {:id :b})))
     (is (= nil (rep-reactions old-replica new-replica diff {:id :c})))))

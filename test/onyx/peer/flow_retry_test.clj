@@ -3,18 +3,18 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [taoensso.timbre :refer [info warn trace fatal] :as timbre]
-            [onyx.test-helper :refer [load-config]]
+            [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
-(def in-chan (chan 100))
+(def in-chan (atom nil))
 
-(def out-chan (chan (sliding-buffer 100)))
+(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
+  {:core.async/chan @in-chan})
 
 (defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
+  {:core.async/chan @out-chan})
 
 (def in-calls
   {:lifecycle/before-task-start inject-in-ch})
@@ -41,8 +41,6 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)
         peer-config (assoc (:peer-config config) :onyx/id id)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
         batch-size 10
 
         catalog [{:onyx/name :in
@@ -82,29 +80,24 @@
                           :flow/to [:out]
                           :flow/short-circuit? true
                           :flow/action :retry
-                          :flow/predicate ::retry?}]
+                          :flow/predicate ::retry?}]]
 
-        v-peers (onyx.api/start-peers 3 peer-group)]
+    (reset! in-chan (chan 100))
+    (reset! out-chan (chan (sliding-buffer 100)))
 
-    (doseq [x (range 20)]
-      (>!! in-chan {:n x}))
+    (with-test-env [test-env [3 env-config peer-config]]
+      (doseq [x (range 20)]
+        (>!! @in-chan {:n x}))
 
-    (>!! in-chan :done)
-    (close! in-chan)
+      (>!! @in-chan :done)
+      (close! @in-chan)
 
-    (onyx.api/submit-job peer-config
-                         {:catalog catalog :workflow workflow
-                          :flow-conditions flow-conditions
-                          :lifecycles lifecycles
-                          :task-scheduler :onyx.task-scheduler/balanced})
+      (onyx.api/submit-job peer-config
+                           {:catalog catalog :workflow workflow
+                            :flow-conditions flow-conditions
+                            :lifecycles lifecycles
+                            :task-scheduler :onyx.task-scheduler/balanced})
 
-    (let [results (take-segments! out-chan)]
-      (is @retried?)
-      (is (= 21 (count results))))
-
-    (doseq [v-peer v-peers]
-      (onyx.api/shutdown-peer v-peer))
-
-    (onyx.api/shutdown-peer-group peer-group)
-
-    (onyx.api/shutdown-env env)))
+      (let [results (take-segments! @out-chan)]
+        (is @retried?)
+        (is (= 21 (count results)))))))
