@@ -10,38 +10,6 @@
 
 (def my-inc identity)
 
-(def a-chan (chan 100))
-
-(def c-chan (chan (sliding-buffer 100)))
-
-(def d-chan (chan 100))
-
-(def f-chan (chan (sliding-buffer 100)))
-
-(defn inject-a-ch [event lifecycle]
-  {:core.async/chan a-chan})
-
-(defn inject-c-ch [event lifecycle]
-  {:core.async/chan c-chan})
-
-(defn inject-d-ch [event lifecycle]
-  {:core.async/chan d-chan})
-
-(defn inject-f-ch [event lifecycle]
-  {:core.async/chan f-chan})
-
-(def a-calls
-  {:lifecycle/before-task-start inject-a-ch})
-
-(def c-calls
-  {:lifecycle/before-task-start inject-c-ch})
-
-(def d-calls
-  {:lifecycle/before-task-start inject-d-ch})
-
-(def f-calls
-  {:lifecycle/before-task-start inject-f-ch})
-
 (deftest log-two-job
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
@@ -54,11 +22,10 @@
         n-peers 12
         v-peers (onyx.api/start-peers n-peers peer-group)
         catalog-1 [{:onyx/name :a
-                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/plugin :onyx.test-helper/dummy-input
                     :onyx/type :input
-                    :onyx/medium :core.async
-                    :onyx/batch-size 20
-                    :onyx/doc "Reads segments from a core.async channel"}
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}
 
                    {:onyx/name :b
                     :onyx/fn :onyx.log.two-job-test/my-inc
@@ -66,18 +33,16 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :c
-                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/plugin :onyx.test-helper/dummy-output
                     :onyx/type :output
-                    :onyx/medium :core.async
-                    :onyx/batch-size 20
-                    :onyx/doc "Writes segments to a core.async channel"}]
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}]
 
         catalog-2 [{:onyx/name :d
-                    :onyx/plugin :onyx.plugin.core-async/input
+                    :onyx/plugin :onyx.test-helper/dummy-input
                     :onyx/type :input
-                    :onyx/medium :core.async
-                    :onyx/batch-size 20
-                    :onyx/doc "Reads segments from a core.async channel"}
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}
 
                    {:onyx/name :e
                     :onyx/fn :onyx.log.two-job-test/my-inc
@@ -85,40 +50,19 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :f
-                    :onyx/plugin :onyx.plugin.core-async/output
+                    :onyx/plugin :onyx.test-helper/dummy-output
                     :onyx/type :output
-                    :onyx/medium :core.async
-                    :onyx/batch-size 20
-                    :onyx/doc "Writes segments to a core.async channel"}]
-
-        lifecycles-1 [{:lifecycle/task :a
-                       :lifecycle/calls :onyx.log.two-job-test/a-calls}
-                      {:lifecycle/task :a
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-                      {:lifecycle/task :c
-                       :lifecycle/calls :onyx.log.two-job-test/c-calls}
-                      {:lifecycle/task :c
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
-
-        lifecycles-2 [{:lifecycle/task :d
-                       :lifecycle/calls :onyx.log.two-job-test/d-calls}
-                      {:lifecycle/task :d
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-                      {:lifecycle/task :f
-                       :lifecycle/calls :onyx.log.two-job-test/f-calls}
-                      {:lifecycle/task :f
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}]
 
         j1 (onyx.api/submit-job peer-config
                                 {:workflow [[:a :b] [:b :c]]
                                  :catalog catalog-1
-                                 :lifecycles lifecycles-1
                                  :task-scheduler :onyx.task-scheduler/balanced})
 
         j2 (onyx.api/submit-job peer-config
                                 {:workflow [[:d :e] [:e :f]]
                                  :catalog catalog-2
-                                 :lifecycles lifecycles-2
                                  :task-scheduler :onyx.task-scheduler/balanced})
         ch (chan n-peers)
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]

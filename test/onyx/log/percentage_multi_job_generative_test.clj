@@ -22,36 +22,32 @@
         job-1 {:workflow [[:a :b]]
                :percentage 70
                :catalog [{:onyx/name :a
-                          :onyx/plugin :onyx.plugin.core-async/input
+                          :onyx/plugin :onyx.test-helper/dummy-input
                           :onyx/type :input
-                          :onyx/medium :core.async
-                          :onyx/batch-size 20
-                          :onyx/doc "Reads segments from a core.async channel"}
+                          :onyx/medium :dummy
+                          :onyx/batch-size 20}
 
                          {:onyx/name :b
-                          :onyx/plugin :onyx.plugin.core-async/output
+                          :onyx/plugin :onyx.test-helper/dummy-output
                           :onyx/type :output
-                          :onyx/medium :core.async
-                          :onyx/batch-size 20
-                          :onyx/doc "Writes segments to a core.async channel"}]
+                          :onyx/medium :dummy
+                          :onyx/batch-size 20}]
                :task-scheduler :onyx.task-scheduler/balanced}
 
         job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14"
         job-2 {:workflow [[:c :d]]
                :percentage 30
                :catalog [{:onyx/name :c
-                          :onyx/plugin :onyx.plugin.core-async/input
+                          :onyx/plugin :onyx.test-helper/dummy-input
                           :onyx/type :input
-                          :onyx/medium :core.async
-                          :onyx/batch-size 20
-                          :onyx/doc "Reads segments from a core.async channel"}
+                          :onyx/medium :dummy
+                          :onyx/batch-size 20}
 
                          {:onyx/name :d
-                          :onyx/plugin :onyx.plugin.core-async/output
+                          :onyx/plugin :onyx.test-helper/dummy-output
                           :onyx/type :output
-                          :onyx/medium :core.async
-                          :onyx/batch-size 20
-                          :onyx/doc "Writes segments to a core.async channel"}]
+                          :onyx/medium :dummy
+                          :onyx/batch-size 20}]
                :task-scheduler :onyx.task-scheduler/balanced}] 
     (checking
       "Checking percentage multi job test, replicates onyx.log.percentage-multi-job-test"

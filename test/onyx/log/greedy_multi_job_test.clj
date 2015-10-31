@@ -81,20 +81,24 @@
         lifecycles-1 [{:lifecycle/task :a
                        :lifecycle/calls :onyx.log.greedy-multi-job-test/a-calls}
                       {:lifecycle/task :a
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls
+                       :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :b
                        :lifecycle/calls :onyx.log.greedy-multi-job-test/b-calls}
                       {:lifecycle/task :b
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls
+                       :core.async/allow-unsafe-concurrency? true}]
 
         lifecycles-2 [{:lifecycle/task :c
                        :lifecycle/calls :onyx.log.greedy-multi-job-test/c-calls}
                       {:lifecycle/task :c
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                       :lifecycle/calls :onyx.plugin.core-async/reader-calls
+                       :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :d
                        :lifecycle/calls :onyx.log.greedy-multi-job-test/d-calls}
                       {:lifecycle/task :d
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                       :lifecycle/calls :onyx.plugin.core-async/writer-calls
+                       :core.async/allow-unsafe-concurrency? true}]
 
         j1 (onyx.api/submit-job peer-config
                                 {:workflow [[:a :b]]
