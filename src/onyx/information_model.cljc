@@ -243,7 +243,9 @@
             :window/window-key
             {:doc "The key of the incoming segments to window over. This key can represent any totally ordered domain, for example `:event-time`."
              :type :any
-             :optional? false}
+             :required-when ["`:window/type` is set to `:fixed`"
+                             "`:window/type` is set to `:sliding`"
+                             "`:window/type` is set to `:session`"]}
 
             :window/min-key
             {:doc "A globally minimum value that values of `:window/window-key` will never be less than. This is used for calculating materialized aggregates for windows in a space efficient manner."

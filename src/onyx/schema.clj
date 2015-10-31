@@ -158,8 +158,8 @@
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
-   :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
+   (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/min-key) SPosInt
    (s/optional-key :window/range) Unit
