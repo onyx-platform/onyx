@@ -742,7 +742,7 @@
              :default 10}
 
             :onyx.rocksdb.filter/compression
-            {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large."
+            {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible."
              :optional? true
              :type :string
              :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib] 

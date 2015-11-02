@@ -150,7 +150,7 @@ Several configuration parameters are available for the rocksdb based local filte
 | `:onyx.rocksdb.filter/bloom-filter-bits`     | Number of bloom filter bits to use per uniqueness key value                                                                                                                         | true      |
 | `:onyx.rocksdb.filter/num-ids-per-bucket`    | Number of uniqueness key values that can exist in a RocksDB filter bucket.                                                                                                          | true      |
 | `:onyx.rocksdb.filter/block-size`            | RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values.                                                                                      | true      |
-| `:onyx.rocksdb.filter/compression`           | Whether to use compression in rocksdb filter. Recommended this is turned off unless your keys are large.                                                                            | true      |
+| `:onyx.rocksdb.filter/compression`           | "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible.                                       | true      |
 | `:onyx.rocksdb.filter/base-dir`              | Temporary directory to persist uniqueness filtering data.                                                                                                                           | true      |
 
 #### Exactly Once Side-Effects
