@@ -1,4 +1,6 @@
-(ns onyx.information-model)
+(ns onyx.information-model
+  (:require [table.core :as t]
+            [table.width]))
 
 (def model
   {:catalog-entry
@@ -822,3 +824,29 @@
           :type :string
           :default "/tmp/bookkeeper_ledger"
           :optional? true}}}})
+
+(defn format-md [v]
+  (cond (keyword? v) 
+        (str "`" v "`")
+        :else v))
+
+(defn gen-markdown [model rows table-width]
+  (binding [table.width/*width* (delay table-width)] 
+    (let [header (into ["Parameter"] (map second rows))]  
+      (t/table (into [header]
+                     (map (fn [[k v]]
+                            (map format-md 
+                                 (into [k] 
+                                       (map (fn [[col-key _]] 
+                                              (col-key (model k))) 
+                                            rows))))
+                          model))
+             :style :github-markdown))))
+
+(comment 
+  (def a 
+    (spit "a.txt" (with-out-str 
+                    (gen-markdown (:model (:peer-config model)) 
+                                  [[:doc "Doc"] 
+                                   [:optional? "Optional?"]]
+                                  800)))))
