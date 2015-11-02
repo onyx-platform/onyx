@@ -282,6 +282,7 @@
   ([n {:keys [config] :as peer-group} monitoring-config]
      (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
        (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+     (validator/validate-java-version)
      (doall
       (map
        (fn [_]
