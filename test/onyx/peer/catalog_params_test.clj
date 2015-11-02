@@ -46,8 +46,8 @@
                  {:onyx/name :add
                   :onyx/fn :onyx.peer.catalog-params-test/my-adder
                   :onyx/type :function
-                  :onyx/factor 42
-                  :onyx/params [:onyx/factor]
+                  :some/factor 42
+                  :onyx/params [:some/factor]
                   :onyx/batch-size batch-size}
 
                  {:onyx/name :out
