@@ -12,7 +12,7 @@
 
 (defmethod api/trigger-notifications :percentile-watermark
   [event trigger]
-  #{:new-segment})
+  #{:new-segment :task-complete})
 
 (defn exceeds-watermark? [window trigger lower-extent-bound upper-extent-bound segment]
   (let [watermark (get segment (:window/window-key window))

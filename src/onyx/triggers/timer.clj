@@ -26,7 +26,7 @@
 
 (defmethod api/trigger-notifications :timer
   [event trigger]
-  #{:timer})
+  #{:timer :task-complete})
 
 (defmethod api/trigger-fire? :timer
   [event trigger args]
