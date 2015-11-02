@@ -243,6 +243,12 @@
   (when (and (= (:window/type w) :session) (not (:window/timeout-gap w)))
     (throw (ex-info ":session windows must define a :window/timeout-gap value" {:window w}))))
 
+(defn window-key-where-required [w]
+  (let [t (:window/type w)]
+    (when (and (some #{t} #{:fixed :sliding :session})
+               (not (:window/window-key w)))
+      (throw (ex-info (format "Window type %s requires a :window/window-key" t) {:window w})))))
+
 (defn validate-windows [windows catalog]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique windows)
@@ -253,7 +259,8 @@
       (fixed-windows-dont-define-slide w)
       (global-windows-dont-define-range-or-slide w)
       (session-windows-dont-define-range-or-slide w)
-      (session-windows-define-a-timeout w))))
+      (session-windows-define-a-timeout w)
+      (window-key-where-required w))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)

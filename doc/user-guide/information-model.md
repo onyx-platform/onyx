@@ -139,7 +139,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:window/task`        |`keyword`            | no       |
 |`:window/type`        |`keyword`            | no       |
 |`:window/aggregation` |`vector` or `keyword`| no       |
-|`:window/window-key`  |`keyword`            | no       |
+|`:window/window-key`  |`any`                | sometimes|
 |`:window/min-value`   |`int`                | yes      |
 |`:window/range`       |`vector`             | no       |
 |`:window/slide`       |`vector`             | sometimes|

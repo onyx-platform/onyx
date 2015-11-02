@@ -3,6 +3,8 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer  [info warn trace fatal error] :as timbre]
             [onyx.extensions :as extensions]
+            [onyx.peer.function :as function]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.api]))
 
 (defn playback-log [log replica ch timeout-ms]
@@ -96,3 +98,45 @@
          (Thread/interrupted))
        (finally
          (component/stop ~symbol-name)))))
+
+(defrecord DummyInput []
+  p-ext/Pipeline
+  (write-batch
+    [this event])
+
+  (read-batch [_ event]
+    (Thread/sleep 500)
+    {:onyx.core/batch []})
+
+  p-ext/PipelineInput
+  (ack-segment [_ _ message-id])
+
+  (retry-segment
+    [_ _ message-id])
+
+  (pending?
+    [_ _ message-id]
+    false)
+
+  (drained?
+    [_ _]
+    false))
+
+(defn dummy-input [pipeline-data]
+  (->DummyInput))
+
+(defrecord DummyOutput []
+  p-ext/Pipeline
+  (read-batch
+    [_ event]
+    (function/read-batch event))
+
+  (write-batch
+    [_ event]
+    {})
+
+  (seal-resource
+    [_ event]))
+
+(defn dummy-output [pipeline-data]
+  (->DummyOutput))

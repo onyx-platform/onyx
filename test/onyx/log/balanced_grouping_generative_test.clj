@@ -31,11 +31,10 @@
 (def job-1
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Reads segments from a core.async channel"}
+              :onyx/medium :dummy
+              :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
@@ -47,11 +46,10 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Writes segments to a core.async channel"}]
+              :onyx/medium :dummy
+              :onyx/batch-size 20}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
@@ -59,11 +57,10 @@
 (def job-2
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Reads segments from a core.async channel"}
+              :onyx/medium :dummy
+              :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
@@ -74,11 +71,10 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Writes segments to a core.async channel"}]
+              :onyx/medium :dummy
+              :onyx/batch-size 20}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-3-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
@@ -86,11 +82,10 @@
 (def job-3
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Reads segments from a core.async channel"}
+              :onyx/medium :dummy
+              :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
@@ -101,11 +96,10 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Writes segments to a core.async channel"}]
+              :onyx/medium :dummy
+              :onyx/batch-size 20}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-4-id #uuid "60180f08-60b9-4584-9900-93dbbe2c3905")
@@ -113,11 +107,10 @@
 (def job-4
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Reads segments from a core.async channel"}
+              :onyx/medium :dummy
+              :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
@@ -128,11 +121,10 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
-              :onyx/medium :core.async
-              :onyx/batch-size 20
-              :onyx/doc "Writes segments to a core.async channel"}]
+              :onyx/medium :dummy
+              :onyx/batch-size 20}]
    :task-scheduler :onyx.task-scheduler/balanced})
 
 (deftest min-peers-one-job-upper-bound

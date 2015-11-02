@@ -230,8 +230,8 @@
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
-   :window/window-key s/Any
    :window/aggregation (s/either s/Keyword [s/Keyword])
+   (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/min-key) SPosInt
    (s/optional-key :window/range) Unit
@@ -245,10 +245,11 @@
   (s/enum :accumulating :discarding))
 
 (def TriggerPeriod 
-  (s/enum :milliseconds :seconds :minutes :hours :days))
+  (s/enum :milliseconds :seconds :minutes :hours :days
+          :millisecond :second :minute :hour :day))
 
 (def TriggerThreshold
-  (s/enum :elements))
+  (s/enum :elements :element))
 
 (def UnsupportedTriggerKey
   (s/pred (fn [k]

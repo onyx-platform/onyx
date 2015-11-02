@@ -1,5 +1,21 @@
 ### 0.8.0
 - **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.
+- New major feature: Windowing and Triggers.
+- New feature: Fixed windows
+- New feature: Sliding windows
+- New feature: Session windows
+- New feature: Global windows
+- New feature: Timer triggers
+- New feature: Segment-based triggers
+- New feature: Watermark triggers
+- New feature: Percentile Watermark triggers
+- New feature: Punctuation triggers
+- New feature: Accumulating refinement mode
+- New feature: Discarding refinement mode
+- New feature: BookKeeper & embedded RocksDB automatic state management
+- New flux policy: Recover
+- New lifecycle: after-read-batch
+- New metric: peer-send-bytes
 
 #### 0.7.14
 

@@ -740,6 +740,10 @@
     (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
     (when-let [event (:pipeline-data component)]
 
+      ;; Fire all triggers on task completion.
+      (doseq [t (:onyx.core/triggers event)]
+        (triggers/fire-trigger! event (:onyx.core/window-state event) t {:context :task-complete}))
+
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
