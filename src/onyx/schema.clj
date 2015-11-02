@@ -38,10 +38,17 @@
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
 
+(def UnsupportedKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "onyx" (namespace k)))))
+          'unsupported-key-combination))
+
 (def base-task-map
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size PosInt
+   (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
@@ -51,7 +58,7 @@
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
-   s/Keyword s/Any})
+   UnsupportedKey s/Any})
 
 (def FluxPolicy 
   (s/enum :continue :kill :recover))
@@ -74,7 +81,7 @@
         (= (:onyx/max-peers entry) 1))))
 
 (def FluxPolicyNPeers
-  (s/pred valid-min-peers-max-peers-n-peers? 'valid-min-peers-max-peers-n-peers?))
+  (s/pred valid-min-peers-max-peers-n-peers? 'valid-flux-policy-min-max-n-peers))
 
 (def partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
@@ -87,30 +94,76 @@
            (not (nil? (:onyx/group-by-fn task-map))))))
 
 (def partial-input-task
-  {:onyx/plugin NamespacedKeyword
+  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
+   (s/optional-key :onyx/fn) NamespacedKeyword
    (s/optional-key :onyx/input-retry-timeout) PosInt 
    (s/optional-key :onyx/pending-timeout) PosInt 
    (s/optional-key :onyx/max-pending) PosInt})
 
 (def partial-output-task
-  {:onyx/plugin NamespacedKeyword
+  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
-   :onyx/type (s/enum :output)})
+   :onyx/type (s/enum :output)
+   (s/optional-key :onyx/fn) NamespacedKeyword})
+
+(def NonNamespacedKeyword 
+  (s/pred (fn [v]
+            (and (keyword? v)
+                 (not (namespace v))))
+          'keyword-non-namespaced))
+
+(def partial-java-plugin
+  {:onyx/plugin NonNamespacedKeyword})
+
+(def partial-clojure-plugin
+  {:onyx/plugin NamespacedKeyword})
 
 (def partial-fn-task
-  {:onyx/fn NamespacedKeyword})
+  {:onyx/fn NamespacedKeyword
+   (s/optional-key :onyx/plugin) (s/either NamespacedKeyword s/Keyword)})
+
+(defn java? [task-map]
+  (= :java (:onyx/language task-map)))
+
+(def OutputTaskSchema 
+  (let [base-output-schema (merge base-task-map partial-output-task)
+        base-output-grouping (merge base-output-schema partial-grouping-task)
+        java-output-grouping (merge base-output-grouping partial-java-plugin)
+        clojure-output-grouping (merge base-output-grouping partial-clojure-plugin)]
+    (s/conditional grouping-task?
+                   (s/conditional java? 
+                                  (s/->Both [FluxPolicyNPeers java-output-grouping])
+                                  :else
+                                  (s/->Both [FluxPolicyNPeers clojure-output-grouping]))
+                   :else 
+                   (s/conditional java?
+                                  (merge base-output-schema partial-java-plugin)
+                                  :else
+                                  (merge base-output-schema partial-clojure-plugin)))))
+
+(def InputTaskSchema 
+  (let [base-input-schema (merge base-task-map partial-input-task)] 
+    (s/conditional java?
+                   (merge base-input-schema partial-java-plugin)
+                   :else
+                   base-input-schema)))
+
+(def FunctionTaskSchema
+  (let [base-function-task (merge base-task-map partial-fn-task)]
+    (s/conditional grouping-task?
+                   (s/->Both [FluxPolicyNPeers (merge base-function-task partial-grouping-task)])
+                   :else 
+                   base-function-task)))
 
 (def TaskMap
   (s/conditional #(= (:onyx/type %) :input) 
-                 (merge base-task-map partial-input-task)
+                 InputTaskSchema
                  #(= (:onyx/type %) :output)
-                 (merge base-task-map partial-output-task)
-                 grouping-task?
-                 (s/->Both [FluxPolicyNPeers (merge base-task-map partial-fn-task partial-grouping-task)])
+                 OutputTaskSchema
                  #(= (:onyx/type %) :function)
-                 (merge base-task-map partial-fn-task)))
+                 FunctionTaskSchema))
 
 (def Catalog
   [TaskMap])

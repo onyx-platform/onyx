@@ -3,6 +3,8 @@
             [onyx.test-helper :refer [load-config with-test-env]]
             [taoensso.timbre :refer [info] :as timbre]
             [clojure.test :refer [deftest is testing]]
+            [onyx.schema :as os]
+            [schema.core :as s]
             [onyx.api]))
 
 (deftest validation-errors
@@ -205,3 +207,157 @@
       (is (= (:id e) (:e (:egress-ids d))))
       (is (= (:id f) (:f (:egress-ids e))))
       (is (= (:id g) (:g (:egress-ids f)))))))
+
+(deftest task-map-schemas 
+  (testing "Input examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/type :output
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (thrown? Exception
+                 (s/validate os/InputTaskSchema 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin/builder
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :input
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-java-plugin-ns
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :input
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-java-plugin-ns
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :some/fn
+                     :onyx/type :input
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40})))
+
+  (testing "Function examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+    
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+    
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/group-by-fn :a/b
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40})))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/flux-policy :recover
+                              :onyx/batch-size 40})))
+
+    (is (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40}))
+    
+    (is (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/max-peers 2
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :recover
+                              :onyx/batch-size 40})))
+
+  (testing "Output examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/type :output
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :output
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :output
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin/bad-plugin
+                              :onyx/language :java
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :output
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin
+                              :onyx/language :clojure
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :output
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))))
