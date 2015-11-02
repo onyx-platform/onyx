@@ -206,7 +206,7 @@
              :default nil
              :restrictions ["`:flow/thrown-exception?` must be set to `true`."]}
 
-            :flow/action?
+            :flow/action
             {:doc "Names a side effect to perform in response to processing this segment. If set to `:retry`, this segment will be immediately, forcibly retried from the root input task from which it eminated. This segment will not be sent to any downstream tasks."
              :type :keyword
              :choices [:retry]

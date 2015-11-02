@@ -194,7 +194,7 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
-   (s/optional-key :flow/action?) FlowAction
+   (s/optional-key :flow/action) FlowAction
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
