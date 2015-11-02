@@ -10,12 +10,17 @@
   (is (empty? (remove (apply merge (map :model (vals model))) 
                       (keys defaults)))))
 
+(def non-doc-keys 
+  #{s/Keyword s/Any 
+    schema/UnsupportedTaskMapKey schema/UnsupportedWindowKey 
+    schema/UnsupportedFlowKey schema/UnsupportedTriggerKey})
+
 (defn schema-keys [sc]
   (mapv (fn [k]
           (if (= (type k) schema.core.OptionalKey)
             (:k k)
             k)) 
-        (remove #{s/Keyword s/Any} 
+        (remove non-doc-keys 
                 (keys sc))))
 
 (deftest catalog-test

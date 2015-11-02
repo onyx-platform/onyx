@@ -22,8 +22,8 @@
 
 (def ^{:private true} edge-validator
   (s/->Both [(s/pred vector? 'vector?)
-                  (s/pred edge-two-nodes? 'edge-two-nodes?)
-                  [TaskName]]))
+             (s/pred edge-two-nodes? 'edge-two-nodes?)
+             [TaskName]]))
 
 (def Workflow
   (s/->Both [(s/pred vector? 'vector?)
@@ -38,7 +38,7 @@
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
 
-(def UnsupportedKey
+(def UnsupportedTaskMapKey
   (s/pred (fn [k]
             (or (not (keyword? k))
                 (not (= "onyx" (namespace k)))))
@@ -58,7 +58,7 @@
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
-   UnsupportedKey s/Any})
+   UnsupportedTaskMapKey s/Any})
 
 (def FluxPolicy 
   (s/enum :continue :kill :recover))
@@ -187,6 +187,10 @@
 
 (def FlowAction
   (s/enum [:retry]))
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "flow" (namespace k)))))
+          'unsupported-flow-key))
 
 (def FlowCondition
   {:flow/from s/Keyword
@@ -198,7 +202,14 @@
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   s/Keyword s/Any})
+   UnsupportedFlowKey s/Any})
+
+(s/validate FlowCondition {:flow/from :colors-in
+                          :flow/to :none
+                          :flow/short-circuit? true
+                          :flow/exclude-keys [:extra-key]
+                          :flow/action :retry
+                          :flow/predicate :onyx.peer.colors-flow-test/black?})
 
 (def Unit
   [(s/one s/Int "unit-count")
@@ -206,6 +217,12 @@
 
 (def WindowType
   (s/enum :fixed :sliding :global :session))
+
+(def UnsupportedWindowKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "window" (namespace k)))))
+          'unsupported-window-key))
 
 (def Window
   {:window/id s/Keyword
@@ -220,7 +237,7 @@
    (s/optional-key :window/timeout-gap) Unit
    (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
-   s/Keyword s/Any})
+   UnsupportedWindowKey s/Any})
 
 (def TriggerRefinement
   (s/enum :accumulating :discarding))
@@ -230,6 +247,12 @@
 
 (def TriggerThreshold
   (s/enum :elements))
+
+(def UnsupportedTriggerKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "trigger" (namespace k)))))
+          'unsupported-trigger-key))
 
 (def Trigger
   {:trigger/window-id s/Keyword
@@ -242,14 +265,13 @@
                                      (s/one TriggerPeriod "threshold type")]
    (s/optional-key :trigger/threshold) [(s/one PosInt "number elements") 
                                         (s/one TriggerThreshold "threshold type")]
-   s/Keyword s/Any})
+   UnsupportedTriggerKey s/Any})
 
 (def StateAggregationCall
   {(s/optional-key :aggregation/init) Function
    :aggregation/fn Function
    :aggregation/apply-state-update Function
-   (s/optional-key :aggregation/super-aggregation-fn) Function
-   s/Keyword s/Any})
+   (s/optional-key :aggregation/super-aggregation-fn) Function})
 
 (def JobScheduler
   NamespacedKeyword)
