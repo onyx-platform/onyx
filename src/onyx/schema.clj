@@ -186,7 +186,9 @@
    (s/optional-key :lifecycle/after-retry-segment) Function})
 
 (def FlowAction
-  (s/enum [:retry]))
+  (s/enum :retry))
+
+(def UnsupportedFlowKey
   (s/pred (fn [k]
             (or (not (keyword? k))
                 (not (= "flow" (namespace k)))))
