@@ -25,7 +25,7 @@
                  #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
            (:jobs replica)))
 
-;; filter out saturated, then sort by is-covered? (no before yes),
+;; filter out saturated, then sort by is-covered? (yes before no),
 ;; then by number of allocated peers
 
 (defn select-job-requiring-peer
