@@ -27,12 +27,10 @@
         illegal-input-catalog
         [{:onyx/name :in-bootstrapped
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}]
         illegal-output-catalog
         [{:onyx/name :in-bootstrapped
           :onyx/type :output
-          :onyx/bootstrap? true
           :onyx/batch-size 2}]
 
         illegal-function-catalog
@@ -90,6 +88,75 @@
         [{:lifecycle/task :in
           :lifecycle/calls :non-namespaced-calls}]
 
+        bad-fn-ns-form
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        bad-input-plugin
+        [{:onyx/name :in
+          :onyx/plugin :ab
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        bad-output-plugin
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        java-input-plugin
+        [{:onyx/name :in
+          :onyx/plugin :ab
+          :onyx/medium :some-medium
+          :onyx/language :java
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
         correct-catalog
         [{:onyx/name :in
           :onyx/plugin :a/b
@@ -125,6 +192,15 @@
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
                                                                :task-scheduler :onyx.task-scheduler/balanced}))))
 
     (testing "bad-jobs-2"
@@ -154,7 +230,7 @@
                                                                :lifecycles invalid-lifecycles
                                                                :task-scheduler :onyx.task-scheduler/balanced}))))
 
-    (onyx.api/shutdown-env env))) 
+    (onyx.api/shutdown-env env)))
 
 
 (deftest map-set-workflow
