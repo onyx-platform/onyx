@@ -38,7 +38,7 @@
                   (let [covered (max 0 (- (cjs/job-lower-bound replica job-id) peer-count))]
                     (vector covered
                             peer-count
-                            (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job)))))
+                            (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job-id)))))
        (remove (fn [[job-id peer-count]]
                  (>= peer-count (cjs/job-upper-bound replica job-id))))
        (ffirst)))
