@@ -1,4 +1,4 @@
-## State Management
+## Aggregation / State Management
 
 This section discusses state management and fault tolerance used in windowing/streaming joins.
 
@@ -12,10 +12,11 @@ This section discusses state management and fault tolerance used in windowing/st
 
 ### Summary
 
-Onyx provides the ability to perform stateful updates for segments which are
-calculated over [windows] (doc/user-guide/windowing.md). For example, a
-grouping task may accumulate incoming values for a number of keys over windows
-of 5 minutes.
+Onyx provides the ability to perform updates to a state machine for segments
+which are calculated over [windows] (doc/user-guide/windowing.md). For example,
+a grouping task may accumulate incoming values for a number of keys over
+windows of 5 minutes. This feature is commonly used for aggregations, such as
+summing values, though it can be used to build more complex state machines.
 
 #### State Example
 
@@ -124,11 +125,12 @@ while remaining correct on peer failure.
 ### Exactly Once Data Processing
 
 Exactly once data processing is supported via Onyx's filtering feature. When a
-windowing task's catalog has `:onyx/uniqueness-key` set, this key is looked up
-in the segment and used as an ID for whether the segment has been seen before.
-If it has been seen, then the segment is not processed. This key is persisted to
-the state log, along with the window changelog updates, so that the key can be
-recovered in case of a peer failure.
+task's catalog has `:onyx/uniqueness-key` set, this key is looked up in the
+segment and used as an ID key to determine whether the segment has been seen
+before. If it has previously been processed, and state updates have been
+persisted, then the segment is not re-processed. This key is persisted to the
+state log along with the window changelog updates, so that previously seen keys
+can be recovered in case of a peer failure.
             
 #### Considerations
 
@@ -141,17 +143,20 @@ In order to prevent unbounded increase in the size of the filter's disk
 consumption, uniqueness-key values are bucketed based on recency, and the
 oldest bucket is expired as the newest is filled.
 
-Several configuration parameters are available for the rocksdb based local filter. The most relevant of these for general configuration is `:onyx.rocksdb.filter/num-ids-per-bucket`, and `:onyx.rocksdb.num-buckets`, which are the size and the number of buckets referenced above.
+Several configuration parameters are available for the rocksdb based local
+filter. The most relevant of these for general configuration is
+`:onyx.rocksdb.filter/num-ids-per-bucket`, and `:onyx.rocksdb.num-buckets`,
+which are the size and the number of buckets referenced above.
 
-| Parameter                                    | Description                                                                                                                                                                         | Optional? |
-|--------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------|
-| `:onyx.rocksdb.filter/peer-block-cache-size` | RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the prescence of a uniqueness key on disk. Defaults to 100MB.               | true      |
-| `:onyx.rocksdb.filter/num-buckets`           | Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist. | true      |
-| `:onyx.rocksdb.filter/bloom-filter-bits`     | Number of bloom filter bits to use per uniqueness key value                                                                                                                         | true      |
-| `:onyx.rocksdb.filter/num-ids-per-bucket`    | Number of uniqueness key values that can exist in a RocksDB filter bucket.                                                                                                          | true      |
-| `:onyx.rocksdb.filter/block-size`            | RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values.                                                                                      | true      |
-| `:onyx.rocksdb.filter/compression`           | "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible.                                       | true      |
-| `:onyx.rocksdb.filter/base-dir`              | Temporary directory to persist uniqueness filtering data.                                                                                                                           | true      |
+| Parameter                                    | Description                                                                                                                                                                         | Default             |
+|--------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------|
+| `:onyx.rocksdb.filter/peer-block-cache-size` | RocksDB block cache size in bytes. Larger caches reduce the chance that the peer will need to check for the prescence of a uniqueness key on disk. Defaults to 100MB.               | 104857600           |
+| `:onyx.rocksdb.filter/bloom-filter-bits`     | Number of bloom filter bits to use per uniqueness key value                                                                                                                         | 10                  |
+| `:onyx.rocksdb.filter/num-ids-per-bucket`    | Number of uniqueness key values that can exist in a RocksDB filter bucket.                                                                                                          | 10000000            |
+| `:onyx.rocksdb.filter/num-buckets`           | Number of rotating filter buckets to use. Buckets are rotated every `:onyx.rocksdb.filter/num-ids-per-bucket`, with the oldest bucket being discarded if num-buckets already exist. | 10                  |
+| `:onyx.rocksdb.filter/block-size`            | RocksDB block size. May worth being tuned depending on the size of your uniqueness-key values.                                                                                      | 4096                |
+| `:onyx.rocksdb.filter/compression`           | Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible.                                        | `:none`             |
+| `:onyx.rocksdb.filter/base-dir`              | Temporary directory to persist uniqueness filtering data.                                                                                                                           | /tmp/rocksdb_filter |
 
 #### Exactly Once Side-Effects
 
@@ -163,13 +168,71 @@ cannot be guaranteed to only occur once.
 
 ### BookKeeper Implementation
 
-Local bookkeeper implementation available via start-env.
-Writes are batched and compressed by default.
+State update changelog entries are persisted to BookKeeper, a replicated log
+server. An embedded BookKeeper server is included with Onyx. The embedded
+server is currently the recommended approach to running BookKeeper along side
+Onyx. This will be re-evaluated in the beta release of Onyx 0.8.0.
 
-### Log Compaction
+BookKeeper ensures that changelog entries are replicated to multiple nodes,
+allowing for the recovery of windowing states upon the crash of a windowed task
+task.
+
+By default the the Onyx BookKeeper replication is striped to 3 BookKeeper
+instances (the quorum), and written to 3 instances (the ensemble).
+
+#### Running the embedded BookKeeper server
+
+The embedded BookKeeper server can be started via the onyx.api/start-env api
+call, with an env-config where `:onyx.bookkeeper/server?` is `true`.
+
+When running on a single node, you may wish to use BookKeeper without starting
+the multiple instances of BookKeeper required to meet the ensemble and quorum
+requirements. In this case you may start a local quorum (3) of BookKeeper
+servers by setting `:onyx.bookkeeper/local-quorum?` to `true`.
+
+##### Embedded BookKeeper Configuration Parameters
+
+| Parameter                             | Description                                                                                                                                                    | Default                 |
+|-------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------|
+| `:onyx.bookkeeper/server?`            | Bool to denote whether to startup a BookKeeper instance on this node, for use in persisting Onyx state information.                                            | false                   |
+| `:onyx.bookkeeper/base-ledger-dir`    | Directory to store BookKeeper's ledger in. It is recommended that this is altered to somewhere fast, preferably on a different disk to the BookKeeper journal  | /tmp/bookkeeper_ledger  |
+| `:onyx.bookkeeper/port`               | Port to startup this node's BookKeeper instance on.                                                                                                            | 3196                    |
+| `:onyx.bookkeeper/local-quorum-ports` | Ports to use for the local BookKeeper quorum.                                                                                                                  | [3196 3197 3198]        |
+| `:onyx.bookkeeper/base-journal-dir`   | Directory to store BookKeeper's journal in. It is recommended that this is altered to somewhere fast, preferably on a different disk to the BookKeeper ledger. | /tmp/bookkeeper_journal |
+| `:onyx.bookkeeper/local-quorum?`      | Bool to denote whether to startup a full quorum of BookKeeper instances on this node. **Important: for TEST purposes only.**                                   | false                   |
 
 
-### BookKeeper Configuration
+#### State Log Compaction
 
+It is recommended that the state changelog is periodically compacted. When
+compaction occurs, the current state is written to a new ledger and all
+previous ledgers are swapped for the new compacted state ledger.
 
-TODO: FILL ME IN
+Compaction can currently only be performed within a task lifecycle for the
+windowed task. Be careful to choose the condition (see `YOUR-CONDITION` in the
+example below, as compacting too often is likely expensive. Compacting once
+every X segments is reasonable good choice of condition.
+
+```clojure
+(def compaction-lifecycle
+    {:lifecycle/before-batch 
+     (fn [event lifecycle]
+      (when YOUR-CONDITION
+        (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event)))
+      {})})
+```
+
+#### BookKeeper Implementation Configuration Parameters
+
+| Parameter                                     | Description                                                                                                                                                                                                                                                                            | Default                 |
+|---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------|
+| `:onyx.bookkeeper/read-batch-size`            | Number of bookkeeper ledger entries to read at a time when recovering state. Effective batch read of state entries is write-batch-size * read-batch-size.                                                                                                                              | 50                      |
+| `:onyx.bookkeeper/ledger-id-written-back-off` | Number of milliseconds to back off (sleep) after writing BookKeeper ledger id to the replica.                                                                                                                                                                                          | 50                      |
+| `:onyx.bookkeeper/ledger-password`            | Password to use for Onyx state persisted to BookKeeper ledgers. Highly recommended this is changed on cluster wide basis.                                                                                                                                                              | INSECUREDEFAULTPASSWORD |
+| `:onyx.bookkeeper/client-throttle`            | Tunable write throttle for BookKeeper ledgers.                                                                                                                                                                                                                                         | 30000                   |
+| `:onyx.bookkeeper/write-buffer-size`          | Size of the buffer to which BookKeeper ledger writes are buffered via.                                                                                                                                                                                                                 | 10000                   |
+| `:onyx.bookkeeper/client-timeout`             | BookKeeper client timeout.                                                                                                                                                                                                                                                             | 60000                   |
+| `:onyx.bookkeeper/write-batch-size`           | Number of state persistence writes to batch into a single BookKeeper ledger entry.                                                                                                                                                                                                     | 20                      |
+| `:onyx.bookkeeper/ledger-quorum-size`         | The number of BookKeeper instances over which entries will be written to. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc. | 3                       |
+| `:onyx.bookkeeper/ledger-ensemble-size`       | The number of BookKeeper instances over which entries will be striped. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc.    | 3                       |
+| `:onyx.bookkeeper/write-batch-timeout`        | Maximum amount of time to wait while batching BookKeeper writes, before writing the batch to BookKeeper. In case of a full batch read, timeout will not be hit.                                                                                                                        | 50                      |
