@@ -182,7 +182,7 @@ instances (the quorum), and written to 3 instances (the ensemble).
 
 #### Running the embedded BookKeeper server
 
-The embedded BookKeeper server can be started via the onyx.api/start-env api
+The embedded BookKeeper server can be started via the `onyx.api/start-env` api
 call, with an env-config where `:onyx.bookkeeper/server?` is `true`.
 
 When running on a single node, you may wish to use BookKeeper without starting
@@ -222,7 +222,12 @@ every X segments is reasonable good choice of condition.
       {})})
 ```
 
-#### BookKeeper Implementation Configuration Parameters
+#### BookKeeper Implementation Configuration
+
+The BookKeeper state log implementation can be configured via the peer-config.
+Of particular note, is `:onyx.bookkeeper/ledger-password` which generally be
+changed to a more secure default.
+
 
 | Parameter                                     | Description                                                                                                                                                                                                                                                                            | Default                 |
 |---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------|
