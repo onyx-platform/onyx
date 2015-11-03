@@ -437,3 +437,41 @@
                               :onyx/min-peers 2
                               :onyx/flux-policy :kill
                               :onyx/batch-size 40})))))
+
+(deftest java-style-functions
+  (testing "Non-namespaced keywords are used for Java entries"
+    (is
+     (s/validate os/FunctionTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/type :function
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/InputTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/plugin :my.other.class
+                  :onyx/type :input
+                  :onyx/medium :abc
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/OutputTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/plugin :my.other.class
+                  :onyx/type :output
+                  :onyx/medium :abc
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/FunctionTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/type :function
+                  :onyx/batch-size 40}))))

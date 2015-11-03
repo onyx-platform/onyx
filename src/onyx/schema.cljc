@@ -97,7 +97,7 @@
   {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
-   (s/optional-key :onyx/fn) NamespacedKeyword
+   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/input-retry-timeout) PosInt 
    (s/optional-key :onyx/pending-timeout) PosInt 
    (s/optional-key :onyx/max-pending) PosInt})
@@ -106,7 +106,7 @@
   {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
-   (s/optional-key :onyx/fn) NamespacedKeyword})
+   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)})
 
 (def NonNamespacedKeyword 
   (s/pred (fn [v]
@@ -115,14 +115,22 @@
           'keyword-non-namespaced))
 
 (def partial-java-plugin
-  {:onyx/plugin NonNamespacedKeyword})
+  {:onyx/plugin NonNamespacedKeyword
+   (s/optional-key :onyx/fn) s/Keyword})
 
 (def partial-clojure-plugin
-  {:onyx/plugin NamespacedKeyword})
+  {:onyx/plugin NamespacedKeyword
+   (s/optional-key :onyx/fn) NamespacedKeyword})
 
 (def partial-fn-task
-  {:onyx/fn NamespacedKeyword
+  {:onyx/fn (s/either NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/plugin) (s/either NamespacedKeyword s/Keyword)})
+
+(def partial-clojure-fn-task
+  {:onyx/fn NamespacedKeyword})
+
+(def partial-java-fn-task
+  {:onyx/fn s/Keyword})
 
 (defn java? [task-map]
   (= :java (:onyx/language task-map)))
@@ -153,9 +161,20 @@
 (def FunctionTaskSchema
   (let [base-function-task (merge base-task-map partial-fn-task)]
     (s/conditional grouping-task?
-                   (s/->Both [FluxPolicyNPeers (merge base-function-task partial-grouping-task)])
-                   :else 
-                   base-function-task)))
+
+                   (s/conditional java?
+                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
+                                                                     partial-grouping-task
+                                                                     partial-java-fn-task)])
+                                  :else
+                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
+                                                                     partial-grouping-task
+                                                                     partial-clojure-fn-task)]))
+                   :else
+                   (s/conditional java?
+                                  (merge base-function-task partial-java-fn-task)
+                                  :else
+                                  (merge base-function-task partial-clojure-fn-task)))))
 
 (def TaskMap
   (s/conditional #(= (:onyx/type %) :input) 
