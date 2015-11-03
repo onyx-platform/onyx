@@ -41,8 +41,8 @@
 
 (defmethod cjs/sort-job-priority :onyx.job-scheduler/percentage
   [replica jobs]
-  (sort-by (juxt #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %)
-                 (partial job-peer-count replica))
+  (sort-by (juxt #(common/job-peer-count replica %)
+                 #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
            (:jobs replica)))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/percentage
