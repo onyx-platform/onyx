@@ -18,7 +18,7 @@
        (assoc job :capacity n)))
    jobs))
 
-(defn maximum-jobs-to-use [jobs]
+(defn drop-jobs-overflow [jobs]
   (reduce
    (fn [all {:keys [pct] :as job}]
      (let [sum (apply + (map :pct all))]
@@ -32,7 +32,7 @@
   [replica]
   (let [n-peers (count (:peers replica))
         sorted-jobs (sort-jobs-by-pct replica)
-        jobs-to-use (maximum-jobs-to-use sorted-jobs)
+        jobs-to-use (drop-jobs-overflow sorted-jobs)
         init-allocations (min-allocations jobs-to-use n-peers)]
     (into {} (map (fn [j] {(:job j) (:capacity j)}) init-allocations))))
 
