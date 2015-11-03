@@ -21,7 +21,7 @@
 
 (defmethod cjs/sort-job-priority :onyx.job-scheduler/balanced
   [replica jobs]
-  (sort-by (juxt (fn [job] (apply + (map count (vals (get-in replica [:allocations job])))))
+  (sort-by (juxt #(common/job-peer-count replica %)
                  #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
            (:jobs replica)))
 
@@ -46,10 +46,10 @@
 (defmethod cjs/equivalent-allocation? :onyx.job-scheduler/balanced
   [replica replica-new]
   (= (sort (map (fn [[job-id _]]
-                  (apply + (map count (vals (get-in replica [:allocations job-id])))))
+                  (common/job-peer-count replica job-id))
                 (:allocations replica)))
      (sort (map (fn [[job-id _]]
-                  (apply + (map count (vals (get-in replica-new [:allocations job-id])))))
+                  (common/job-peer-count replica-new job-id))
                 (:allocations replica-new)))))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
