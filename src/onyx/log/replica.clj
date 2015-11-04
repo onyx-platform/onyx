@@ -29,4 +29,6 @@
    :percentages {}
    :completed-jobs []
    :killed-jobs []
+   :state-logs {} 
+   :state-logs-marked #{}
    :task-slot-ids {}})
