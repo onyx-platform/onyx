@@ -36,7 +36,7 @@ The easiest way to learn how to use flow conditions is to see an example. Suppos
  ...]
 ```
 
-This workflow takes some input in (presumably a stream of people), and directs segments to four possible tasks - `:process-children`, `:process-adults`, `:process-athlete-females`, and `:process-everyone`. Suppose we want to *conditionally* direct a segment to zero or more of these tasks, depending on some predicates. We use flow conditions to carry out this work. Flow conditions are their own data structure that are bundled along with the workflow and catalog to `onyx.api/submit-job` (with key `:flow-conditions`). Here's an example of what a flow conditions data structure would look like for our proposed workflow:
+This workflow takes some input in (presumably a stream of people), and directs segments to four possible tasks - `:process-children`, `:process-adults`, `:process-female-athletes`, and `:process-everyone`. Suppose we want to *conditionally* direct a segment to zero or more of these tasks, depending on some predicates. We use flow conditions to carry out this work. Flow conditions are their own data structure that are bundled along with the workflow and catalog to `onyx.api/submit-job` (with key `:flow-conditions`). Here's an example of what a flow conditions data structure would look like for our proposed workflow:
 
 ```clojure
 [{:flow/from :input-stream
