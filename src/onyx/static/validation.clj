@@ -4,6 +4,7 @@
             [schema.core :as schema]
             [onyx.static.planning :as planning]
             [onyx.windowing.units :as u]
+            [onyx.information-model :refer [model]]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
@@ -40,6 +41,44 @@
             (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
+(defn describe-cause [k]
+  (if (= schema.utils.ValidationError (type k))
+    (cond (= onyx.schema/UnsupportedTaskMapKey (.schema k))
+          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)] 
+            {:cause "Unsupported combination of task-map keys." 
+             :key (.value k)
+             :documentation doc} 
+            {:cause "Unsupported onyx task-map key."
+             :key (.value k)})
+          :else
+          k)
+    k))
+
+(defn describe-value [k v]
+  (if (= schema.utils.ValidationError (type v))
+    (if-let [doc (dissoc (get-in model [:catalog-entry :model k]) :doc)] 
+      {:cause "Unsupported value" 
+       :data {k (.value v)}
+       :documentation doc} 
+      {:cause "Unsupported value"
+       :data {k (.value v)}
+       :value (.value v)})
+    v)) 
+
+(defn improve-issue [m]
+  (into {}
+        (mapv (fn [[k v]]
+                [(describe-cause k)
+                 (describe-value k v)]) 
+              m)))
+
+(defn task-map-schema-exception->help [e]
+  (let [{:keys [type schema value error] :as exd} (ex-data e)
+        schema-data (:data exd)]
+    (case type
+      :schema.core/error (improve-issue error)
+      e)))
+
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
@@ -47,11 +86,16 @@
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)
-    (try 
-      (schema/validate TaskMap entry)
-      (catch Exception e
-        (throw (ex-info (format "Task %s failed validation %s" (:onyx/name entry) (task-map-schema-exception->help e))
-                        {:explanation (task-map-schema-exception->help e)}))))))
+    (schema/validate TaskMap entry)
+    #_(try 
+        (schema/validate TaskMap entry)
+        (catch Exception e
+          (try (let [friendly-exception (task-map-schema-exception->help e)]
+                 (throw (ex-info (format "Task %s failed validation. Error: %s" (:onyx/name entry) friendly-exception)
+                                 {:explanation friendly-exception})))
+               (catch Exception fe 
+                 ;; Throw original exception. We have obviously messed up providing a friendlier one
+                 (throw e)))))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
