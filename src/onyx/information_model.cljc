@@ -1,6 +1,4 @@
-(ns onyx.information-model
-  (:require [table.core :as t]
-            [table.width]))
+(ns onyx.information-model)
 
 (def model
   {:catalog-entry
@@ -49,8 +47,7 @@
             :onyx/min-peers
             {:doc "The minimum number of peers that will be concurrently assigned to execute this task before it begins. If the number of peers working on this task falls below its initial count due to failure or planned departure, the choice of `:onyx/flux-policy` defines the strategy for what to do."
              :type :integer
-             :restrictions ["Value must be greater than 0."
-                            "`:onyx/flux-policy` must also be defined in this catalog entry."]
+             :restrictions ["Value must be greater than 0."]
              :optional? true}
 
             :onyx/n-peers
@@ -58,8 +55,7 @@
              :type :integer
              :restrictions ["Value must be greater than 0."
                             "`:onyx/min-peers` cannot also be defined for this catalog entry."
-                            "`:onyx/max-peers` cannot also be defined for this catalog entry."
-                            "`:onyx/flux-policy` must also be defined in this catalog entry."]
+                            "`:onyx/max-peers` cannot also be defined for this catalog entry."]
              :optional? true}
 
             :onyx/language
@@ -92,6 +88,7 @@
             {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified, namespaced keyword pointing to a function that takes the Event map and returns a Record implementing the Plugin interfaces. When `:onyx/language` is set to `:java`, this is a keyword pointing to a Java class that is constructed with the Event map. This class must implement the interoperability interfaces."
              :type :keyword
              :choices :any
+             :restrictions ["Namespaced keyword required unless :onyx/language :java is set, in which case a non-namespaced keyword is required."]
              :required-when ["`:onyx/type` is set to `:input`"
                              "`:onyx/type` is set to `:output`"]}
 
@@ -129,14 +126,16 @@
             :onyx/group-by-key
             {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
              :type [:any [:any]]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
-             :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."]}
+             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+             :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."
+                            "`:onyx/flux-policy` must also be defined in this catalog entry."]}
 
             :onyx/group-by-fn
             {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes a single argument, a segment, as a parameter. The value that the function returns will be hashed. Values that hash to the same value will always be sent to the same virtual peer."
              :type :keyword
-             :optionally-allowed-when ["`:onyx/type` is set to `:function`"]
-             :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."]}
+             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
+             :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."
+                            "`:onyx/flux-policy` must also be defined in this catalog entry."]}
 
             :onyx/bulk?
             {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this function's return value is ignored. The segments are identically propogated to the downstream tasks."
@@ -149,7 +148,8 @@
             {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
              :type :keyword
              :choices [:kill :continue :recover]
-             :optionally-allowed-when ["`:onyx/type` is set to `:function`"
+             :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` or `:onyx/n-peers`` must also be defined. "]
+             :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]}
 
             :onyx/uniqueness-key
@@ -831,21 +831,3 @@
           :type :string
           :default "/tmp/bookkeeper_ledger"
           :optional? true}}}})
-
-(defn format-md [v]
-  (cond (keyword? v) 
-        (str "`" v "`")
-        :else v))
-
-(defn gen-markdown [model rows table-width]
-  (binding [table.width/*width* (delay table-width)] 
-    (let [header (into ["Parameter"] (map second rows))]  
-      (t/table (into [header]
-                     (map (fn [[k v]]
-                            (map format-md 
-                                 (into [k] 
-                                       (map (fn [[col-key _]] 
-                                              (col-key (model k))) 
-                                            rows))))
-                          model))
-             :style :github-markdown))))

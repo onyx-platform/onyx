@@ -32,6 +32,33 @@ In this chapter, we'll discuss what you need to set up a develop and production 
 
 One of the primary design goals of Onyx is to make the development environment as close as possible to production - without making the developer run a lot of services locally. A development environment in Onyx merely needs Clojure 1.6+ to operate. A ZooKeeper server is spun up in memory via Curator, so you don't need to install ZooKeeper locally if you don't want to.
 
+#### Dependencies
+
+- Java 8+
+- Clojure 1.7+
+- ZooKeeper 3.4.5+
+
+#### Multi-node & Production Checklist
+
+Congratulations! You're going to production, or at least testing your Onyx jobs with a multi-node setup.
+
+We strongly recommend you run through this checklist before you do so, as it will likely save you a lot of time.
+
+- [ ] **Ensure all nodes are using the same `:onyx/id`**: `:onyx/id` in the peer-config is used to denote which cluster a virtual peer should join. If all your nodes do not use the same `:onyx/id`, they will not be a part of the same cluster and will not run the same jobs. Any jobs submitted a cluster must also use the same `:onyx/id` to ensure that cluster runs the job.
+- [ ] **Do not use core async tasks**: switch all input or output tasks from core.async as it is a not a suitable medium for multi-node use and will result in many issues when used in this way. The [Kafka plugin](https://github.com/onyx-platform/onyx-kafka) is one recommended alternative.
+- [ ] **Ensure short circuiting is enabled in production**: short circuiting improves performance by locally messaging where possible. Ensure `:onyx.messaging/allow-short-circuit? true` is set in the peer-config on production.
+- [ ] **Disable embedded ZooKeeper**: when `onyx.api/start-env` is called with a config where `:zookeeper/server? true`, it will start an embedded ZooKeeper. `:zookeeper/server?` should be set to `false` in production.
+- [ ] **Setup production ZooKeeper**: A full [ZooKeeper ensemble](https://zookeeper.apache.org/) should be used in lieu of the testing ZooKeeper embedded in Onyx.
+- [ ] **Increase maximum ZK connections** Onyx establishes a large number of ZooKeeper connections, in which case you will see an exception like the following: `WARN org.apache.zookeeper.server.NIOServerCnxn: Too many connections from /127.0.0.1 - max is 10`. Increase the number of connections in zoo.cfg, via `maxClientCnxns`. This should be set to a number moderately larger than the number of virtual peers that you will start.
+- [ ] **Configure ZooKeeper address to point an ensemble**: `:zookeeper/address` should be set in your peer-config e.g. `:zookeeper/address "server1:2181,server2:2181,server3:2181"`.
+- [ ] **Open UDP ports for Aeron**: Aeron requires the port defined in `:onyx.messaging/peer-port` to be open for UDP traffic. In 0.7.0 and below, the UDP ports defined in `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` must be open.
+- [ ] **Set messaging bind address**: the messaging layer must be bound to the network interface used by peers to communicate. To do so, set `:onyx.messaging/bind-addr` in peer-config to a string defining the interface's IP. On AWS, this IP can easily be obtained via `(slurp "http://169.254.169.254/latest/meta-data/local-ipv4")`.
+- [ ] **Is your bind address external facing?**: If your bind address is something other than the one accessible to your other peers (e.g. docker, without net=host), then you will need to define an external address to advertise. This can be set via `:onyx.messaging/external-addr` in peer-config.
+- [ ] **Test on a single node with without short circuiting**: when `:onyx.messaging/allow-short-circuit?` is `true`, Aeron messaging will be short circuited completely. To test messaging on a local mode as if it's in production, set `:onyx.messaging/allow-short-circuit? false`.
+- [ ] **Setup metrics**: when in production, it is essential that you are able to measure retried messages, input message complete latency, throughput and batch latency. Setup Onyx to use [onyx-metrics](https://github.com/onyx-platform/onyx-metrics). We recommend at very least using the timbre logging plugin, which is easy to setup.
+- [ ] **Ensure your JVM is running with JVM opts -server** Performance will be greatly decreased if you do not run Onyx via Java without at least `-server` JVM opts.
+- [ ] **Setup an external Aeron Media Driver**: If messaging performance is a factor, it is recommended that the Aeron Media Driver is run out of process. First, disable the embedded driver by setting `:onyx.messaging.aeron/embedded-driver? false`. An example out of process media driver is included in [onyx-template](https://github.com/onyx-platform/onyx-template/blob/master/resources/leiningen/new/onyx_app/aeron_media_driver.clj). This media driver can be started via `lein run -m`, or via an uberjar, each by referencing the correct namespace, which contains a main entry point. Ensure that the media driver is started with JVM opts `-server`.
+
 #### ZooKeeper
 
 ##### Environment Launch of In-Memory ZooKeeper
@@ -59,22 +86,11 @@ Here's an example of using ZooKeeper in-memory, with some non-ZooKeeper required
   {:zookeeper/address "127.0.0.1:2182"
    :onyx/id id})
 ```
-
-### Production Environment
-
-Running a good production Onyx cluster requires a multi-node ZooKeeper cluster. Otherwise, your configuration will remain exactly the same.
-
 ### Networking / Firewall
 
 Messaging requires the *UDP* port to be open for port set `:onyx.messaging/peer-port`.
 
 All peers require the ability to connect to the ZooKeeper instances over TCP.
-
-#### Dependencies
-
-- Java 8+
-- Clojure 1.6+
-- ZooKeeper 3.4.5+
 
 #### Explanation
 

@@ -48,7 +48,6 @@
         [{:onyx/name :in-bootstrapped
           :onyx/type :input
           :onyx/medium :onyx-memory-test-plugin
-          :onyx/bootstrap? true
           :onyx/batch-size 2}]
 
         workflow-tests-catalog
@@ -93,7 +92,6 @@
           :onyx/plugin :a/b
           :onyx/medium :some-medium
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}
          {:onyx/name :intermediate
           :onyx/fn :fn-path
@@ -110,7 +108,6 @@
           :onyx/plugin :ab
           :onyx/medium :some-medium
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}
          {:onyx/name :intermediate
           :onyx/fn :a/fn-path
@@ -127,7 +124,6 @@
           :onyx/plugin :a/b
           :onyx/medium :some-medium
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}
          {:onyx/name :intermediate
           :onyx/fn :a/fn-path
@@ -145,7 +141,6 @@
           :onyx/medium :some-medium
           :onyx/language :java
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}
          {:onyx/name :intermediate
           :onyx/fn :a/fn-path
@@ -162,7 +157,6 @@
           :onyx/plugin :a/b
           :onyx/medium :some-medium
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}
          {:onyx/name :intermediate
           :onyx/fn :a/fn-path
@@ -283,6 +277,9 @@
       (is (= (:id e) (:e (:egress-ids d))))
       (is (= (:id f) (:f (:egress-ids e))))
       (is (= (:id g) (:g (:egress-ids f)))))))
+
+
+
 
 (deftest task-map-schemas 
   (testing "Input examples"

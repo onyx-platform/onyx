@@ -195,10 +195,18 @@
             state'')))
       state)))
 
+(defn check-abort-playback! 
+  "Check whether playback should be aborted if the peer is already rescheduled or killed"
+  [{:keys [onyx.core/task-kill-ch onyx.core/kill-ch] :as event}]
+  (when (nil? (first (alts!! [kill-ch task-kill-ch] :default true)))
+    (throw (ex-info "Playback aborted as peer has been rescheduled during state-log playback. Restarting peer."
+                    {:playback-aborted? true}))))
+
 (defn playback-ledger [state apply-entry-fn ^LedgerHandle lh last-confirmed {:keys [onyx.core/peer-opts] :as event}]
   (let [chunk-size (arg-or-default :onyx.bookkeeper/read-batch-size peer-opts)]
     (if-not (neg? last-confirmed)
       (loop [loop-state state start 0 end (min chunk-size last-confirmed)] 
+        (check-abort-playback! event)
         (let [new-state (playback-entries-chunk loop-state apply-entry-fn lh start end event)]
           (if (= end last-confirmed)
             new-state
@@ -208,8 +216,9 @@
       state)))
 
 (defn playback-ledgers [bk-client state apply-entry-fn ledger-ids {:keys [onyx.core/peer-opts] :as event}]
-  (let [pwd (password peer-opts)]
-    (reduce (fn [state' ledger-id]
+  (try 
+    (let [pwd (password peer-opts)]
+      (reduce (fn [state' ledger-id]
                 (let [lh (open-ledger bk-client ledger-id digest-type pwd)]
                   (try
                     (let [last-confirmed (.getLastAddConfirmed lh)]
@@ -217,8 +226,16 @@
                       (playback-ledger state' apply-entry-fn lh last-confirmed event))
                     (finally
                       (close-handle lh)))))
-            state
-            ledger-ids)))
+              state
+              ledger-ids))
+    (catch clojure.lang.ExceptionInfo e
+      ;; Playback was aborted, safe to return empty state
+      ;; as peer will no longer be allocated to this task
+      (if (:playback-aborted? (ex-data e))
+        (do
+          (warn "Playback aborted as task or peer was killed." (ex-data e))
+          state)
+        (throw e)))))
 
 (defmethod state-extensions/playback-log-entries onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client] :as log} 
@@ -228,10 +245,10 @@
   (emit-latency :window-log-playback 
                 monitoring
                 (fn [] 
-                  (let [;; Don't play back the final ledger id because we just created it
-                        prev-ledger-ids (butlast (event->ledger-ids event))]
-                    (info "Playing back ledgers for" task-id "ledger-ids" prev-ledger-ids)
-                    (playback-ledgers client state apply-entry-fn prev-ledger-ids event)))))
+                    (let [;; Don't play back the final ledger id because we just created it
+                          prev-ledger-ids (butlast (event->ledger-ids event))]
+                      (info "Playing back ledgers for" task-id "ledger-ids" prev-ledger-ids)
+                      (playback-ledgers client state apply-entry-fn prev-ledger-ids event)))))
 
 (defmethod state-extensions/compact-log onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [client ledger-handle next-ledger-handle]} 

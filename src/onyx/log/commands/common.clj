@@ -21,6 +21,9 @@
      (assoc all job (reduce into [] (vals tasks))))
    {} (:allocations replica)))
 
+(defn job-peer-count [replica job]
+  (apply + (map count (vals (get-in replica [:allocations job])))))
+
 (defn peer->allocated-job [allocations id]
   (get
    (reduce-kv

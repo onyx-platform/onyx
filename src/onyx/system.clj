@@ -27,6 +27,7 @@
             [onyx.log.commands.peer-replica-view]
             [onyx.log.commands.compact-bookkeeper-log-ids]
             [onyx.log.commands.assign-bookkeeper-log-id]
+            [onyx.log.commands.deleted-bookkeeper-log-ids]
             [onyx.scheduling.greedy-job-scheduler]
             [onyx.scheduling.balanced-job-scheduler]
             [onyx.scheduling.percentage-job-scheduler]

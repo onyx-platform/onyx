@@ -420,6 +420,9 @@
 (def TaskScheduler 
   s/Keyword)
 
+(def SlotId
+  s/Int)
+
 (def Replica
   {:job-scheduler JobScheduler
    :messaging {:onyx.messaging/impl Messaging
@@ -451,7 +454,9 @@
    :percentages {JobId s/Num}
    :completed-jobs [JobId] 
    :killed-jobs [JobId] 
-   :task-slot-ids {JobId {TaskId {PeerId s/Int}}}
+   :state-logs {JobId {TaskId {SlotId [s/Int]}}}
+   :state-logs-marked #{s/Int}
+   :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
    :exhausted-inputs {JobId #{TaskId}}})
 
 (def LogEntry
