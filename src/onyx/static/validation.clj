@@ -46,8 +46,12 @@
   (doseq [entry catalog]
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
-    (min-max-n-peers-mutually-exclusive entry))
-  (schema/validate Catalog catalog))
+    (min-max-n-peers-mutually-exclusive entry)
+    (try 
+      (schema/validate TaskMap entry)
+      (catch Exception e
+        (throw (ex-info (format "Task %s failed validation %s" (:onyx/name entry) (task-map-schema-exception->help e))
+                        {:explanation (task-map-schema-exception->help e)}))))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -141,9 +145,9 @@
 
 (defn validate-job
   [job]
-  (schema/validate Job job)
   (validate-catalog (:catalog job))
-  (validate-workflow job))
+  (validate-workflow job)
+  (schema/validate Job job))
 
 (defn validate-flow-pred-all-kws [flow-schema]
   (prewalk
