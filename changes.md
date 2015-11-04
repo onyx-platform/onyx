@@ -13,7 +13,7 @@
 - New feature: Punctuation triggers
 - New feature: Accumulating refinement mode
 - New feature: Discarding refinement mode
-- New feature: BookKeeper & embedded RocksDB automatic state management
+- New feature: BookKeeper & embedded RocksDB automatic "exactly once" filtering.
 - New flux policy: Recover
 - New lifecycle: after-read-batch
 - New metric: peer-send-bytes
