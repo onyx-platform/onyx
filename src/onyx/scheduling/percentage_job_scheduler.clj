@@ -42,9 +42,35 @@
                  #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
            (:jobs replica)))
 
+(defn desired-allocation [replica job]
+  (* (count (:peers replica))
+     0.01
+     (get-in replica [:percentages job])))
+
+(defn select-job-requiring-peer
+  "Selects the next job deserving a peer.
+   Tries to cover job requiring the least peers to cover first,
+   then tries to give the peer to whichever job is furthers from its desired
+   percentage allocation." 
+  [replica jobs]
+  (->> jobs
+       (sort-by (fn [[job-id peer-count :as job]]
+                  (let [covered (max 0 (- (cjs/job-lower-bound replica job-id) peer-count))
+                        diff-from-desired (- (common/job-peer-count replica job-id)
+                                             (desired-allocation replica job-id))
+                        job-index (.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) job-id)]
+                    (vector covered diff-from-desired job-index))))
+       (remove (fn [[job-id peer-count]]
+                 (>= peer-count (cjs/job-upper-bound replica job-id))))
+       (ffirst)))
+
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/percentage
   [replica jobs n]
-  ;; We can get away with using the exact same algorithm as the
-  ;; Balanced job scheduler.
-  (cjs/claim-spare-peers
-   (assoc replica :job-scheduler :onyx.job-scheduler/balanced) jobs n))
+  (loop [jobs* jobs n* n]
+    (if (zero? n*)
+      jobs*
+      (let [job (select-job-requiring-peer replica jobs*)]
+        (if job
+          (recur (update jobs* job inc)
+                 (dec n*))
+          jobs*)))))
