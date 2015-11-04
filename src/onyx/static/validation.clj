@@ -43,11 +43,11 @@
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
-  (schema/validate Catalog catalog)
   (doseq [entry catalog]
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
-    (min-max-n-peers-mutually-exclusive entry)))
+    (min-max-n-peers-mutually-exclusive entry))
+  (schema/validate Catalog catalog))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
