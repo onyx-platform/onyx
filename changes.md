@@ -17,6 +17,7 @@
 - New flux policy: Recover
 - New lifecycle: after-read-batch
 - New metric: peer-send-bytes
+- Bug fix: fixed an issue where the percentage job scheduler would misallocate.
 
 #### 0.7.14
 
