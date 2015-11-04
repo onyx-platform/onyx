@@ -14,7 +14,6 @@ Onyx has no built-in mechanism for deployment. Rather, we let you deploy at your
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-
 ### Deployment Style
 
 Unlike Hadoop and Storm, Onyx does not have a built-in deployment feature. To deploy your application, you need to uberjar your program and place it on every node in your cluster. Start up the uberjar, passing it your shared Onyx ID and ZooKeeper address. Once it connects, you've successfully deployed!
@@ -36,3 +35,7 @@ Mesos and Marathon are a pair of applications that work together to manage your 
 #### Kubernetes
 
 We are less familiar with Kubernetes as it's a bit younger than Mesos and Marathon, but Kubernetes will deliver roughly the same functionality that Mesos and Marathon will.
+
+#### Production Check List
+
+A production check list is included in the [Environment documentation](doc/user-guide/environment.md). 
