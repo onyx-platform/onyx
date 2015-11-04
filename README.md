@@ -124,6 +124,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Ole Krüger](https://github.com/dignati)
 - [Juho Teperi](https://github.com/Deraen)
 - [Nicolas Ha](https://github.com/nha)
+- [Andrew Meredith](https://github.com/kendru)
 
 #### Acknowledgements
 
