@@ -9,7 +9,7 @@
    :onyx/max-pending 10000
 
    ;; task defaults
-   :onyx/batch-timeout 1000
+   :onyx/batch-timeout 50
 
    ;; zookeeper defaults
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000

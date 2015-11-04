@@ -103,19 +103,16 @@
                  {:onyx/name :process-red
                   :onyx/fn :onyx.peer.colors-flow-test/process-red
                   :onyx/type :function
-                  :onyx/consumption :concurrent
                   :onyx/batch-size batch-size}
 
                  {:onyx/name :process-blue
                   :onyx/fn :onyx.peer.colors-flow-test/process-blue
                   :onyx/type :function
-                  :onyx/consumption :concurrent
                   :onyx/batch-size batch-size}
 
                  {:onyx/name :process-green
                   :onyx/fn :onyx.peer.colors-flow-test/process-green
                   :onyx/type :function
-                  :onyx/consumption :concurrent
                   :onyx/batch-size batch-size}
 
                  {:onyx/name :red-out

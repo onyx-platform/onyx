@@ -3,6 +3,8 @@
             [onyx.test-helper :refer [load-config with-test-env]]
             [taoensso.timbre :refer [info] :as timbre]
             [clojure.test :refer [deftest is testing]]
+            [onyx.schema :as os]
+            [schema.core :as s]
             [onyx.api]))
 
 (deftest validation-errors
@@ -25,12 +27,10 @@
         illegal-input-catalog
         [{:onyx/name :in-bootstrapped
           :onyx/type :input
-          :onyx/bootstrap? true
           :onyx/batch-size 2}]
         illegal-output-catalog
         [{:onyx/name :in-bootstrapped
           :onyx/type :output
-          :onyx/bootstrap? true
           :onyx/batch-size 2}]
 
         illegal-function-catalog
@@ -88,6 +88,75 @@
         [{:lifecycle/task :in
           :lifecycle/calls :non-namespaced-calls}]
 
+        bad-fn-ns-form
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        bad-input-plugin
+        [{:onyx/name :in
+          :onyx/plugin :ab
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        bad-output-plugin
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        java-input-plugin
+        [{:onyx/name :in
+          :onyx/plugin :ab
+          :onyx/medium :some-medium
+          :onyx/language :java
+          :onyx/type :input
+          :onyx/bootstrap? true
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
         correct-catalog
         [{:onyx/name :in
           :onyx/plugin :a/b
@@ -123,6 +192,15 @@
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog incomplete-catalog :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-output-plugin :workflow workflow
                                                                :task-scheduler :onyx.task-scheduler/balanced}))))
 
     (testing "bad-jobs-2"
@@ -152,7 +230,7 @@
                                                                :lifecycles invalid-lifecycles
                                                                :task-scheduler :onyx.task-scheduler/balanced}))))
 
-    (onyx.api/shutdown-env env))) 
+    (onyx.api/shutdown-env env)))
 
 
 (deftest map-set-workflow
@@ -205,3 +283,195 @@
       (is (= (:id e) (:e (:egress-ids d))))
       (is (= (:id f) (:f (:egress-ids e))))
       (is (= (:id g) (:g (:egress-ids f)))))))
+
+(deftest task-map-schemas 
+  (testing "Input examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/type :output
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (thrown? Exception
+                 (s/validate os/InputTaskSchema 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin/builder
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :input
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-java-plugin-ns
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :input
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-java-plugin-ns
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :some/fn
+                     :onyx/type :input
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40})))
+
+  (testing "Function examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+    
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+    
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :function
+                     :onyx/group-by-fn :a/b
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40})))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/flux-policy :recover
+                              :onyx/batch-size 40})))
+
+    (is (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40}))
+    
+    (is (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :function
+                              :onyx/group-by-fn :a/b
+                              :onyx/max-peers 2
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :recover
+                              :onyx/batch-size 40})))
+
+  (testing "Output examples"
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/type :output
+                     :onyx/min-peers 2
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin/builder
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :output
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+
+    (is (s/validate os/TaskMap 
+                    {:onyx/name :sum-balance
+                     :onyx/plugin :your-plugin
+                     :onyx/language :java
+                     :onyx/medium :some-medium
+                     :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                     :onyx/type :output
+                     :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                     :onyx/min-peers 2
+                     :onyx/flux-policy :kill
+                     :onyx/batch-size 40}))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin/bad-plugin
+                              :onyx/language :java
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :output
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))
+
+    (is (thrown? Exception 
+                 (s/validate os/TaskMap 
+                             {:onyx/name :sum-balance
+                              :onyx/plugin :your-plugin
+                              :onyx/language :clojure
+                              :onyx/medium :some-medium
+                              :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
+                              :onyx/type :output
+                              :onyx/group-by-fn :onyx.peer.fn-grouping-test/group-by-name
+                              :onyx/min-peers 2
+                              :onyx/flux-policy :kill
+                              :onyx/batch-size 40})))))
+
+(deftest java-style-functions
+  (testing "Non-namespaced keywords are used for Java entries"
+    (is
+     (s/validate os/FunctionTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/type :function
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/InputTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/plugin :my.other.class
+                  :onyx/type :input
+                  :onyx/medium :abc
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/OutputTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/plugin :my.other.class
+                  :onyx/type :output
+                  :onyx/medium :abc
+                  :onyx/batch-size 40}))
+
+    (is
+     (s/validate os/FunctionTaskSchema
+                 {:onyx/name :my-task
+                  :onyx/language :java
+                  :onyx/fn :my.class
+                  :onyx/type :function
+                  :onyx/batch-size 40}))))

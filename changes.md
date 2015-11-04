@@ -1,5 +1,6 @@
 ### 0.8.0
 - **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.
+- **Important change**: default task batch timeout was reduced from 1000ms to 50ms.
 - New major feature: Windowing and Triggers.
 - New feature: Fixed windows
 - New feature: Sliding windows
@@ -16,6 +17,7 @@
 - New flux policy: Recover
 - New lifecycle: after-read-batch
 - New metric: peer-send-bytes
+- Bug fix: fixed an issue where the percentage job scheduler would misallocate.
 
 #### 0.7.14
 

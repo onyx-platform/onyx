@@ -22,8 +22,8 @@
 
 (def ^{:private true} edge-validator
   (s/->Both [(s/pred vector? 'vector?)
-                  (s/pred edge-two-nodes? 'edge-two-nodes?)
-                  [TaskName]]))
+             (s/pred edge-two-nodes? 'edge-two-nodes?)
+             [TaskName]]))
 
 (def Workflow
   (s/->Both [(s/pred vector? 'vector?)
@@ -38,10 +38,17 @@
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
 
+(def UnsupportedTaskMapKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "onyx" (namespace k)))))
+          'unsupported-key-combination))
+
 (def base-task-map
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
    :onyx/batch-size PosInt
+   (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
@@ -51,7 +58,7 @@
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
-   s/Keyword s/Any})
+   UnsupportedTaskMapKey s/Any})
 
 (def FluxPolicy 
   (s/enum :continue :kill :recover))
@@ -74,7 +81,7 @@
         (= (:onyx/max-peers entry) 1))))
 
 (def FluxPolicyNPeers
-  (s/pred valid-min-peers-max-peers-n-peers? 'valid-min-peers-max-peers-n-peers?))
+  (s/pred valid-min-peers-max-peers-n-peers? 'valid-flux-policy-min-max-n-peers))
 
 (def partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
@@ -87,30 +94,95 @@
            (not (nil? (:onyx/group-by-fn task-map))))))
 
 (def partial-input-task
-  {:onyx/plugin NamespacedKeyword
+  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
+   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)
    (s/optional-key :onyx/input-retry-timeout) PosInt 
    (s/optional-key :onyx/pending-timeout) PosInt 
    (s/optional-key :onyx/max-pending) PosInt})
 
 (def partial-output-task
-  {:onyx/plugin NamespacedKeyword
+  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
-   :onyx/type (s/enum :output)})
+   :onyx/type (s/enum :output)
+   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)})
+
+(def NonNamespacedKeyword 
+  (s/pred (fn [v]
+            (and (keyword? v)
+                 (not (namespace v))))
+          'keyword-non-namespaced))
+
+(def partial-java-plugin
+  {:onyx/plugin NonNamespacedKeyword
+   (s/optional-key :onyx/fn) s/Keyword})
+
+(def partial-clojure-plugin
+  {:onyx/plugin NamespacedKeyword
+   (s/optional-key :onyx/fn) NamespacedKeyword})
 
 (def partial-fn-task
+  {:onyx/fn (s/either NamespacedKeyword s/Keyword)
+   (s/optional-key :onyx/plugin) (s/either NamespacedKeyword s/Keyword)})
+
+(def partial-clojure-fn-task
   {:onyx/fn NamespacedKeyword})
+
+(def partial-java-fn-task
+  {:onyx/fn s/Keyword})
+
+(defn java? [task-map]
+  (= :java (:onyx/language task-map)))
+
+(def OutputTaskSchema 
+  (let [base-output-schema (merge base-task-map partial-output-task)
+        base-output-grouping (merge base-output-schema partial-grouping-task)
+        java-output-grouping (merge base-output-grouping partial-java-plugin)
+        clojure-output-grouping (merge base-output-grouping partial-clojure-plugin)]
+    (s/conditional grouping-task?
+                   (s/conditional java? 
+                                  (s/->Both [FluxPolicyNPeers java-output-grouping])
+                                  :else
+                                  (s/->Both [FluxPolicyNPeers clojure-output-grouping]))
+                   :else 
+                   (s/conditional java?
+                                  (merge base-output-schema partial-java-plugin)
+                                  :else
+                                  (merge base-output-schema partial-clojure-plugin)))))
+
+(def InputTaskSchema 
+  (let [base-input-schema (merge base-task-map partial-input-task)] 
+    (s/conditional java?
+                   (merge base-input-schema partial-java-plugin)
+                   :else
+                   base-input-schema)))
+
+(def FunctionTaskSchema
+  (let [base-function-task (merge base-task-map partial-fn-task)]
+    (s/conditional grouping-task?
+
+                   (s/conditional java?
+                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
+                                                                     partial-grouping-task
+                                                                     partial-java-fn-task)])
+                                  :else
+                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
+                                                                     partial-grouping-task
+                                                                     partial-clojure-fn-task)]))
+                   :else
+                   (s/conditional java?
+                                  (merge base-function-task partial-java-fn-task)
+                                  :else
+                                  (merge base-function-task partial-clojure-fn-task)))))
 
 (def TaskMap
   (s/conditional #(= (:onyx/type %) :input) 
-                 (merge base-task-map partial-input-task)
+                 InputTaskSchema
                  #(= (:onyx/type %) :output)
-                 (merge base-task-map partial-output-task)
-                 grouping-task?
-                 (s/->Both [FluxPolicyNPeers (merge base-task-map partial-fn-task partial-grouping-task)])
+                 OutputTaskSchema
                  #(= (:onyx/type %) :function)
-                 (merge base-task-map partial-fn-task)))
+                 FunctionTaskSchema))
 
 (def Catalog
   [TaskMap])
@@ -133,7 +205,13 @@
    (s/optional-key :lifecycle/after-retry-segment) Function})
 
 (def FlowAction
-  (s/enum [:retry]))
+  (s/enum :retry))
+
+(def UnsupportedFlowKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "flow" (namespace k)))))
+          'unsupported-flow-key))
 
 (def FlowCondition
   {:flow/from s/Keyword
@@ -141,11 +219,18 @@
    :flow/predicate (s/either s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
-   (s/optional-key :flow/action?) FlowAction
+   (s/optional-key :flow/action) FlowAction
    (s/optional-key :flow/short-circuit?) s/Bool
    (s/optional-key :flow/exclude-keys) [s/Keyword]
    (s/optional-key :flow/doc) s/Str
-   s/Keyword s/Any})
+   UnsupportedFlowKey s/Any})
+
+(s/validate FlowCondition {:flow/from :colors-in
+                          :flow/to :none
+                          :flow/short-circuit? true
+                          :flow/exclude-keys [:extra-key]
+                          :flow/action :retry
+                          :flow/predicate :onyx.peer.colors-flow-test/black?})
 
 (def Unit
   [(s/one s/Int "unit-count")
@@ -154,30 +239,41 @@
 (def WindowType
   (s/enum :fixed :sliding :global :session))
 
+(def UnsupportedWindowKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "window" (namespace k)))))
+          'unsupported-window-key))
+
 (def Window
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
    :window/aggregation (s/either s/Keyword [s/Keyword])
-   (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/init) s/Any
+   (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/min-key) SPosInt
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
    (s/optional-key :window/session-key) s/Any
    (s/optional-key :window/doc) s/Str
-   s/Keyword s/Any})
+   UnsupportedWindowKey s/Any})
 
 (def TriggerRefinement
   (s/enum :accumulating :discarding))
 
 (def TriggerPeriod 
-  (s/enum :milliseconds :seconds :minutes :hours :days
-          :millisecond :second :minute :hour :day))
+  (s/enum :milliseconds :seconds :minutes :hours :days))
 
 (def TriggerThreshold
-  (s/enum :elements :element))
+  (s/enum :elements))
+
+(def UnsupportedTriggerKey
+  (s/pred (fn [k]
+            (or (not (keyword? k))
+                (not (= "trigger" (namespace k)))))
+          'unsupported-trigger-key))
 
 (def Trigger
   {:trigger/window-id s/Keyword
@@ -190,14 +286,13 @@
                                      (s/one TriggerPeriod "threshold type")]
    (s/optional-key :trigger/threshold) [(s/one PosInt "number elements") 
                                         (s/one TriggerThreshold "threshold type")]
-   s/Keyword s/Any})
+   UnsupportedTriggerKey s/Any})
 
 (def StateAggregationCall
   {(s/optional-key :aggregation/init) Function
    :aggregation/fn Function
    :aggregation/apply-state-update Function
-   (s/optional-key :aggregation/super-aggregation-fn) Function
-   s/Keyword s/Any})
+   (s/optional-key :aggregation/super-aggregation-fn) Function})
 
 (def JobScheduler
   NamespacedKeyword)

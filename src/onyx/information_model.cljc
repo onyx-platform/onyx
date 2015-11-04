@@ -1,4 +1,6 @@
-(ns onyx.information-model)
+(ns onyx.information-model
+  (:require [table.core :as t]
+            [table.width]))
 
 (def model
   {:catalog-entry
@@ -72,6 +74,11 @@
              :type :keyword
              :choices :any
              :restrictions ["Must resolve to a function on the classpath at runtime."]
+             :optional? true}
+
+            :onyx/params
+            {:doc "A vector of keys to obtain from the task map, and inject into the parameters of the function defined in :onyx/fn."
+             :type :vector
              :optional? true}
 
             :onyx/medium
@@ -199,7 +206,7 @@
              :default nil
              :restrictions ["`:flow/thrown-exception?` must be set to `true`."]}
 
-            :flow/action?
+            :flow/action
             {:doc "Names a side effect to perform in response to processing this segment. If set to `:retry`, this segment will be immediately, forcibly retried from the root input task from which it eminated. This segment will not be sent to any downstream tasks."
              :type :keyword
              :choices [:retry]
@@ -293,12 +300,12 @@
             :aggregation/fn {:doc "Fn (state, window, segment) to generate a serializable state machine update."
                              :type :function
                              :optional? false}
-            :aggregation/super-aggregation-fn {:doc "Fn (state-1, state-2, window) to combine two states in the case of two windows being merged, e.g. session windows."
-                                               :type :function
-                                               :optional? true}
             :aggregation/apply-state-update {:doc "Fn (state, entry) to apply state machine update entry to a state."
                                              :type :function
-                                             :optional? false}}}
+                                             :optional? false}
+            :aggregation/super-aggregation-fn {:doc "Fn (state-1, state-2, window) to combine two states in the case of two windows being merged, e.g. session windows."
+                                               :type :function
+                                               :optional? true}}}
    :trigger-entry
    {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
     :link nil
@@ -721,7 +728,6 @@
              :default :rocksdb
              :choices [:rocksdb]}
 
-
             :onyx.rocksdb.filter/base-dir
             {:doc "Temporary directory to persist uniqueness filtering data."
              :optional? true
@@ -734,8 +740,9 @@
              :optional? true
              :type :integer
              :default 10}
+
             :onyx.rocksdb.filter/compression
-            {:doc "Whether to use compression in rocksdb filter. Recommended this is turned off unless your keys are large."
+            {:doc "Whether to use compression in rocksdb filter. It is recommended that `:none` is used unless your uniqueness keys are large and compressible."
              :optional? true
              :type :string
              :choices [:bzip2 :lz4 :lz4hc :none :snappy :zlib] 
@@ -824,3 +831,21 @@
           :type :string
           :default "/tmp/bookkeeper_ledger"
           :optional? true}}}})
+
+(defn format-md [v]
+  (cond (keyword? v) 
+        (str "`" v "`")
+        :else v))
+
+(defn gen-markdown [model rows table-width]
+  (binding [table.width/*width* (delay table-width)] 
+    (let [header (into ["Parameter"] (map second rows))]  
+      (t/table (into [header]
+                     (map (fn [[k v]]
+                            (map format-md 
+                                 (into [k] 
+                                       (map (fn [[col-key _]] 
+                                              (col-key (model k))) 
+                                            rows))))
+                          model))
+             :style :github-markdown))))
