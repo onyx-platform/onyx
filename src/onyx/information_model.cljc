@@ -830,4 +830,103 @@
          {:doc "Directory to store BookKeeper's ledger in. It is recommended that this is altered to somewhere fast, preferably on a different disk to the BookKeeper journal"
           :type :string
           :default "/tmp/bookkeeper_ledger"
-          :optional? true}}}})
+          :optional? true}}}}) 
+
+(def model-display-order
+  {:catalog-entry
+   [:onyx/name 
+    :onyx/type 
+    :onyx/batch-size 
+    :onyx/batch-timeout 
+    :onyx/doc
+    :onyx/min-peers 
+    :onyx/max-peers 
+    :onyx/n-peers 
+    :onyx/language
+    :onyx/params 
+    :onyx/medium 
+    :onyx/plugin
+    :onyx/pending-timeout 
+    :onyx/input-retry-timeout 
+    :onyx/max-pending 
+    :onyx/fn
+    :onyx/group-by-key 
+    :onyx/group-by-fn 
+    :onyx/bulk?  
+    :onyx/flux-policy
+    :onyx/uniqueness-key
+    :onyx/restart-pred-fn]
+   :flow-conditions-entry
+   [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
+    :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
+   :window-entry
+   [:window/id :window/task :window/type :window/aggregation :window/window-key
+    :window/min-key :window/session-key :window/range :window/slide
+    :window/init :window/timeout-gap :window/doc]
+   :state-aggregation
+   [:aggregation/init :aggregation/fn :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
+   :trigger-entry
+   [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync
+    :trigger/period :trigger/threshold :trigger/fire-all-extents?
+    :trigger/doc] 
+   :lifecycle-entry
+   [:lifecycle/task :lifecycle/calls :lifecycle/doc]
+   :lifecycle-calls
+   [:lifecycle/doc 
+    :lifecycle/start-task? 
+    :lifecycle/before-task-start 
+    :lifecycle/before-batch 
+    :lifecycle/after-read-batch 
+    :lifecycle/after-batch 
+    :lifecycle/after-task-stop 
+    :lifecycle/after-ack-segment 
+    :lifecycle/after-retry-segment]
+   :peer-config
+   [:onyx/id :onyx.peer/job-scheduler :zookeeper/address
+    :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
+    :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
+    :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
+    :onyx.peer/job-not-ready-back-off :onyx.peer/fn-params
+    :onyx.peer/backpressure-check-interval
+    :onyx.peer/backpressure-low-water-pct
+    :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
+    :onyx.zookeeper/backoff-base-sleep-time-ms
+    :onyx.zookeeper/backoff-max-sleep-time-ms
+    :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
+    :onyx.messaging/completion-buffer-size
+    :onyx.messaging/release-ch-buffer-size :onyx.messaging/retry-ch-buffer-size
+    :onyx.messaging/peer-link-gc-interval
+    :onyx.messaging/peer-link-idle-timeout :onyx.messaging/ack-daemon-timeout
+    :onyx.messaging/ack-daemon-clear-interval :onyx.messaging/decompress-fn
+    :onyx.messaging/compress-fn :onyx.messaging/impl :onyx.messaging/bind-addr
+    :onyx.messaging/external-addr :onyx.messaging/peer-port
+    :onyx.messaging/allow-short-circuit?
+    :onyx.messaging.aeron/embedded-driver?
+    :onyx.messaging.aeron/subscriber-count
+    :onyx.messaging.aeron/write-buffer-size
+    :onyx.messaging.aeron/poll-idle-strategy
+    :onyx.messaging.aeron/offer-idle-strategy 
+    :onyx.peer/state-log-impl
+    :onyx.bookkeeper/read-batch-size 
+    :onyx.bookkeeper/write-batch-size
+    :onyx.bookkeeper/write-batch-timeout 
+    :onyx.bookkeeper/ledger-ensemble-size
+    :onyx.bookkeeper/ledger-quorum-size
+    :onyx.bookkeeper/ledger-id-written-back-off
+    :onyx.bookkeeper/ledger-password 
+    :onyx.bookkeeper/client-throttle
+    :onyx.bookkeeper/write-buffer-size 
+    :onyx.bookkeeper/client-timeout
+    :onyx.peer/state-filter-impl 
+    :onyx.rocksdb.filter/base-dir
+    :onyx.rocksdb.filter/bloom-filter-bits 
+    :onyx.rocksdb.filter/compression
+    :onyx.rocksdb.filter/block-size 
+    :onyx.rocksdb.filter/peer-block-cache-size
+    :onyx.rocksdb.filter/num-buckets 
+    :onyx.rocksdb.filter/num-ids-per-bucket]
+   :env-config
+   [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
+    :onyx.bookkeeper/server? :onyx.bookkeeper/local-quorum?
+    :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
+    :onyx.bookkeeper/base-journal-dir :onyx.bookkeeper/base-ledger-dir]})
