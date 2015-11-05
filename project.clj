@@ -13,15 +13,15 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.2.371"]
-                 [org.apache.curator/curator-framework "2.9.0"]
-                 [org.apache.curator/curator-test "2.9.0"]
+                 [org.apache.curator/curator-framework "2.9.1"]
+                 [org.apache.curator/curator-test "2.9.1"]
                  [clj-tuple "0.2.2"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.0"]
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.10.0"]
-                 [uk.co.real-logic/aeron-all "0.1.5"]
-                 [prismatic/schema "1.0.1"]
+                 [uk.co.real-logic/aeron-all "0.2"]
+                 [prismatic/schema "1.0.3"]
                  [org.apache.zookeeper/zookeeper "3.4.6" 
                   :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.apache.bookkeeper/bookkeeper-server "4.3.1" 
