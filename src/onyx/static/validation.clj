@@ -296,6 +296,14 @@
                (not (:window/window-key w)))
       (throw (ex-info (format "Window type %s requires a :window/window-key" t) {:window w})))))
 
+(defn task-has-uniqueness-key [w catalog]
+  (let [t (planning/find-task catalog (:window/task w))]
+    (when-not (:onyx/uniqueness-key t)
+      (throw (ex-info
+              (format "Task %s is windowed, and therefore define :onyx/uniqueness-key"
+                      (:onyx/name t))
+              {:task t})))))
+
 (defn validate-windows [windows catalog]
   (let [task-names (map :onyx/name catalog)]
     (window-ids-unique windows)
@@ -307,7 +315,8 @@
       (global-windows-dont-define-range-or-slide w)
       (session-windows-dont-define-range-or-slide w)
       (session-windows-define-a-timeout w)
-      (window-key-where-required w))))
+      (window-key-where-required w)
+      (task-has-uniqueness-key w catalog))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
