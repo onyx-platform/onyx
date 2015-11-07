@@ -264,10 +264,11 @@
   (s/enum :accumulating :discarding))
 
 (def TriggerPeriod 
-  (s/enum :milliseconds :seconds :minutes :hours :days))
+  (s/enum :milliseconds :seconds :minutes :hours :days
+          :mullisecond :second :minute :hour :day))
 
 (def TriggerThreshold
-  (s/enum :elements))
+  (s/enum :elements :element))
 
 (def UnsupportedTriggerKey
   (s/pred (fn [k]
