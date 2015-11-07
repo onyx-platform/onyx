@@ -75,13 +75,13 @@
           :onyx/medium :core.async
           :onyx/batch-size batch-size
           :onyx/max-peers 1
-          :onyx/uniqueness-key :id
           :onyx/doc "Reads segments from a core.async channel"}
 
          {:onyx/name :identity
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
+          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out

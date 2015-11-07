@@ -3,19 +3,19 @@
 
 (def NamespacedKeyword
   (s/pred (fn [kw]
-                 (and (keyword? kw)
-                      (namespace kw)))
-               'keyword-namespaced?))
+            (and (keyword? kw)
+                 (namespace kw)))
+          'keyword-namespaced?))
 
 (def Function
   (s/pred fn? 'fn?))
 
 (def TaskName
   (s/pred (fn [v]
-                 (and (not= :all v)
-                      (not= :none v)
-                      (keyword? v)))
-               'task-name?))
+            (and (not= :all v)
+                 (not= :none v)
+                 (keyword? v)))
+          'task-name?))
 
 (defn ^{:private true} edge-two-nodes? [edge]
   (= (count edge) 2))
