@@ -86,16 +86,15 @@
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)
-    (schema/validate TaskMap entry)
-    #_(try 
-        (schema/validate TaskMap entry)
-        (catch Exception e
-          (try (let [friendly-exception (task-map-schema-exception->help e)]
-                 (throw (ex-info (format "Task %s failed validation. Error: %s" (:onyx/name entry) friendly-exception)
-                                 {:explanation friendly-exception})))
-               (catch Exception fe 
-                 ;; Throw original exception. We have obviously messed up providing a friendlier one
-                 (throw e)))))))
+    (try 
+      (schema/validate TaskMap entry)
+      (catch Exception e
+        (let [friendly-exception (try (task-map-schema-exception->help e)
+                                      (catch Exception fe 
+                                        ;; Throw original exception. We have obviously messed up providing a friendlier one
+                                        (throw e)))]
+          (throw (ex-info (format "Task %s failed validation. Error: %s" (:onyx/name entry) friendly-exception)
+                          {:explanation friendly-exception})))))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
