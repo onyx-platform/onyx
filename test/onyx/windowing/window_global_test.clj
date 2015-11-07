@@ -67,6 +67,7 @@
           :onyx/fn :clojure.core/identity
           :onyx/type :function
           :onyx/max-peers 1
+          :onyx/uniqueness-key :id
           :onyx/batch-size batch-size}
 
          {:onyx/name :out
