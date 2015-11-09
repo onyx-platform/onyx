@@ -4,7 +4,7 @@
             [onyx.static.default-vals :refer [defaults]]
             [onyx.schema :as schema]
             [schema.core :as s]
-            [onyx.information-model :refer [model]]))
+            [onyx.information-model :refer [model model-display-order]]))
 
 (deftest missing-documentation-test
   (is (empty? (remove (apply merge (map :model (vals model))) 
@@ -58,3 +58,12 @@
 (deftest state-aggregation-test
   (is (= (set (keys (:model (:state-aggregation model)))) 
          (set (schema-keys schema/StateAggregationCall)))))
+
+(deftest check-model-display-order
+  (testing "Checks whether all keys in information model are accounted for in ordering used in cheat sheet"
+    (is (= (map (fn [k]
+                  (set (keys (:model (model k)))))
+                (keys model))
+           (map (fn [k]
+                  (set (model-display-order k)))
+                (keys model))))))
