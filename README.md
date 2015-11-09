@@ -24,20 +24,20 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.7.15-SNAPSHOT"]
+[org.onyxplatform/onyx "0.8.0-SNAPSHOT"]
 ```
 
 ### Build Status
 
-Component | `0.7.x`| `master`
+Component | `0.8.x`| `master`
 ----------|--------|--------
-onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master)
-onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
-onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
-onyx-redis| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master)
-onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
-onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
-onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.7.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
+onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master)
+onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master)
+onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
+onyx-redis| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master)
+onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
+onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
+onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 
 ### Companies Running Onyx in Production
 
@@ -48,22 +48,22 @@ onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dur
 
 ### Quick Start Guide
 
-Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.7.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
+Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.8.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.7.15-SNAPSHOT
+### User Guide 0.8.0-SNAPSHOT
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 - [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
 
-### API Docs 0.7.15-SNAPSHOT
+### API Docs 0.8.0-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.7.15-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.0-SNAPSHOT).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.7.15-SNAPSHOT` goes with `onyx` version `0.7.15-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.7.15-SNAPSHOT.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.0-SNAPSHOT` goes with `onyx` version `0.8.0-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.0-SNAPSHOT.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -89,7 +89,7 @@ Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-u
 
 ### Want the logo?
 
-Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.7.x/resources/logo).
+Feel free to use it anywhere. You can find [a few different versions here](https://github.com/onyx-platform/onyx/tree/0.8.x/resources/logo).
 
 ### Running the tests
 
@@ -124,6 +124,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Ole Krüger](https://github.com/dignati)
 - [Juho Teperi](https://github.com/Deraen)
 - [Nicolas Ha](https://github.com/nha)
+- [Andrew Meredith](https://github.com/kendru)
 
 #### Acknowledgements
 
