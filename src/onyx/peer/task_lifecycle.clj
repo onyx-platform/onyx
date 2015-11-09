@@ -402,9 +402,9 @@
                       (let [trigger-entries
                             (reduce
                              (fn [entries t]
-                               (concat
+                               (into
                                 entries
-                                [unique-id
+                                [nil
                                  (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})]))
                              []
                              triggers)]
