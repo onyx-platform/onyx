@@ -10,9 +10,8 @@
 ;; temporary workaround to prevent timbre from crashing under some circumstances
 ;; e.g. java.lang.IllegalArgumentException: Multiple methods in multimethod 'exception-dispatch' match dispatch value: class schema.core.Either 
 ;; -> interface clojure.lang.IPersistentMap and interface clojure.lang.IRecord, and neither is preferred]
-
-(defmethod pretty/exception-dispatch clojure.lang.IPersistentMap [m]
-  (pr-str m))
+; (defmethod pretty/exception-dispatch clojure.lang.IPersistentMap [m]
+;   (pr-str m))
 
 (defrecord LoggingConfiguration [file config]
   component/Lifecycle
