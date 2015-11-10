@@ -8,6 +8,7 @@
             {:doc "The name of the task that represents this catalog entry. Must correspond to a keyword in the workflow associated with this catalog."
              :type :keyword
              :choices :any
+             :tags [:task]
              :restrictions ["Must be unique across all catalog entries."
                             "Value cannot be `:none`."
                             "Value cannot be `:all`."]
@@ -16,12 +17,14 @@
             :onyx/type
             {:doc "The role that this task performs. `:input` reads data. `:function` applies a transformation. `:output` writes data."
              :type :keyword
+             :tags [:task]
              :choices [:input :function :output]
              :optional? false}
 
             :onyx/batch-size
             {:doc "The number of segments a peer will wait to read before processing them all in a batch for this task. Segments will be processed when either `:onyx/batch-size` segments have been received at this peer, or `:onyx/batch-timeout` milliseconds have passed - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-timeout`."
              :type :integer
+             :tags [:latency :throughput]
              :restrictions ["Value must be greater than 0."]
              :optional? false}
 
@@ -29,30 +32,35 @@
             {:doc "The number of milliseconds a peer will wait to read more segments before processing them all in a batch for this task. Segments will be processe when either `:onyx/batch-timeout` milliseconds passed, or `:onyx/batch-size` segments have been read - whichever comes first. This is a knob that is used to tune throughput and latency, and it goes hand-in-hand with `:onyx/batch-size`."
              :type :integer
              :unit :milliseconds
+             :tags [:latency :throughput]
              :restrictions ["Value must be greater than 0."]
-             :default 1000
+             :default 50
              :optional? true}
 
             :onyx/doc
             {:doc "A docstring for this catalog entry."
              :type :string
+             :tags [:documentation]
              :optional? true}
 
             :onyx/max-peers
             {:doc "The maximum number of peers that will ever be assigned to this task concurrently."
              :type :integer
+             :tags [:aggregation :grouping]
              :restrictions ["Value must be greater than 0."]
              :optional? true}
 
             :onyx/min-peers
             {:doc "The minimum number of peers that will be concurrently assigned to execute this task before it begins. If the number of peers working on this task falls below its initial count due to failure or planned departure, the choice of `:onyx/flux-policy` defines the strategy for what to do."
              :type :integer
+             :tags [:aggregation :grouping]
              :restrictions ["Value must be greater than 0."]
              :optional? true}
 
             :onyx/n-peers
             {:doc "A convenience parameter which expands to `:onyx/min-peers` and `:onyx/max-peers` set to the same value. This is useful if you want to specify exactly how many peers should concurrently execute this task - no more, and no less."
              :type :integer
+             :tags [:aggregation :grouping]
              :restrictions ["Value must be greater than 0."
                             "`:onyx/min-peers` cannot also be defined for this catalog entry."
                             "`:onyx/max-peers` cannot also be defined for this catalog entry."]
@@ -61,6 +69,7 @@
             :onyx/language
             {:doc "Designates the language that the function denoted by `:onyx/fn` is implemented in."
              :type :keyword
+             :tags [:interoperability]
              :choices [:clojure :java]
              :default :clojure
              :optional? true}
@@ -69,17 +78,20 @@
             {:doc "A fully-qualified namespaced keyword pointing to function which takes an exception as a parameter, returning a boolean indicating whether the peer that threw this exception should restart its task."
              :type :keyword
              :choices :any
+             :tags [:fault-tolerance]
              :restrictions ["Must resolve to a function on the classpath at runtime."]
              :optional? true}
 
             :onyx/params
             {:doc "A vector of keys to obtain from the task map, and inject into the parameters of the function defined in :onyx/fn."
              :type :vector
+             :tags [:function]
              :optional? true}
 
             :onyx/medium
             {:doc "Denotes the kind of input or output communication or storage that is being read from or written to (e.g. `:kafka` or `:web-socket`). This is currently does not affect any functionality, and is reserved for the future."
              :type :keyword
+             :tags [:plugin]
              :choices :any
              :required-when ["`:onyx/type` is set to `:input`"
                              "`:onyx/type` is set to `:output`"]}
@@ -87,6 +99,7 @@
             :onyx/plugin
             {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified, namespaced keyword pointing to a function that takes the Event map and returns a Record implementing the Plugin interfaces. When `:onyx/language` is set to `:java`, this is a keyword pointing to a Java class that is constructed with the Event map. This class must implement the interoperability interfaces."
              :type :keyword
+             :tags [:plugin]
              :choices :any
              :restrictions ["Namespaced keyword required unless :onyx/language :java is set, in which case a non-namespaced keyword is required."]
              :required-when ["`:onyx/type` is set to `:input`"
@@ -96,6 +109,7 @@
             {:doc "The duration of time, in milliseconds, that a segment that enters an input task has to be fully acknowledged and processed. That is, this segment, and any subsequent segments that it creates in downstream tasks, must be fully processed before this timeout occurs. If the segment is not fully processed, it will automatically be retried."
              :type :integer
              :default 60000
+             :tags [:input :plugin :latency :fault-tolerance]
              :units :milliseconds
              :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                        "Value must be greater than 0."]}
@@ -104,6 +118,7 @@
             {:doc "The duration of time, in milliseconds, that the input task goes dormant between checking which segments should expire from its internal pending pool. When segments expire, they are automatically retried."
              :type :integer
              :default 1000
+             :tags [:input :plugin :latency :fault-tolerance]
              :units :milliseconds
              :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                        "Value must be greater than 0."]}
@@ -112,6 +127,7 @@
             {:doc "The maximum number of segments that a peer executing an input task will allow in its internal pending message pool. If this pool is filled to capacity, it will not accept new segments - exhibiting backpressure to upstream message produces."
              :type :integer
              :default 10000
+             :tags [:input :plugin :latency :backpressure :fault-tolerance]
              :units :segments
              :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                        "Value must be greater than 0."]}
@@ -119,6 +135,7 @@
             :onyx/fn
             {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
              :type :keyword
+             :tags [:function]
              :required-when ["`:onyx/type` is set to `:function`"]
              :optionally-allowed-when ["`:onyx/type` is set to `:input`"
                                        "`:onyx/type` is set to `:output`"]}
@@ -126,6 +143,7 @@
             :onyx/group-by-key
             {:doc "The key, or vector of keys, to group incoming segments by. Keys that hash to the same value will always be sent to the same virtual peer."
              :type [:any [:any]]
+             :tags [:aggregation :grouping :windows]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
              :restrictions ["Cannot be defined when `:onyx/group-by-fn` is defined."
                             "`:onyx/flux-policy` must also be defined in this catalog entry."]}
@@ -133,6 +151,7 @@
             :onyx/group-by-fn
             {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes a single argument, a segment, as a parameter. The value that the function returns will be hashed. Values that hash to the same value will always be sent to the same virtual peer."
              :type :keyword
+             :tags [:aggregation :grouping :windows :function]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"]
              :restrictions ["Cannot be defined when `:onyx/group-by-key` is defined."
                             "`:onyx/flux-policy` must also be defined in this catalog entry."]}
@@ -141,13 +160,14 @@
             {:doc "Boolean value indicating whether the function in this catalog entry denoted by `:onyx/fn` should take a single segment, or the entire batch of segments that were read as a parameter. When set to `true`, this function's return value is ignored. The segments are identically propogated to the downstream tasks."
              :type :boolean
              :default false
+             :tags [:function]
              :optionally-allowed-when ["`:onyx/type` is set to `:function`"]}
-
 
             :onyx/flux-policy
             {:doc "The policy that should be used when a task with grouping enabled loses a peer. Losing a peer means that the consistent hashing used to pin the same hashed values to the same peers will be altered. Using the `:kill` flux policy will kill the job. This is useful for jobs that cannot tolerate an altered hashing strategy. Using `:continue` will allow the job to continue running. With `:kill` and `:continue`, new peers will never be added to this job. The final policy is `:recover`, which is like `:continue`, but will allow peers to be added back to this job to meet the `:onyx/min-peers` number of peers working on this task concurrently."
              :type :keyword
              :choices [:kill :continue :recover]
+             :tags [:aggregation :grouping :windows]
              :restrictions ["`:onyx/min-peers` or `:onyx/n-peers` must also be defined for this catalog entry. If `:recover` is used, then `:onyx/max-peers` or `:onyx/n-peers`` must also be defined. "]
              :optionally-allowed-when ["`:onyx/type` is set to `:function` or `:output`"
                                        "`:onyx/group-by-key` or `:onyx/group-by-fn` is set."]}
@@ -155,7 +175,16 @@
             :onyx/uniqueness-key
             {:doc "The key of incoming segments that indicates global uniqueness. This is used by the Windowing feature to detect duplicated processing of segments. An example of this would be an `:id` key for segments representing users, assuming `:id` is globally unique in your system. An example of a bad uniqueness-key would be `:first-name` as two or more users may have their first names in common."
              :type :any
-             :required-when ["A Window is defined on this task."]}}}
+             :tags [:aggregation :windows]
+             :required-when ["A Window is defined on this task."]}
+            
+            :onyx/deduplicate?
+            {:doc "Does not deduplicate segments using the `:onyx/uniqueness-key`, which is otherwise required when using windowed tasks. Often useful if your segments do not have a unique key that you can use to filter incoming replayed or duplicated segments."
+             :type :boolean
+             :default true
+             :tags [:aggregation :windows]
+             :optionally-allowed-when ["A window is defined on this task."]
+             :required-when ["A Window is defined on this task and there is no possible :onyx/uniqueness-key to on the segment to deduplicate with."]}}}
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
@@ -861,6 +890,7 @@
     :onyx/bulk?  
     :onyx/flux-policy
     :onyx/uniqueness-key
+    :onyx/deduplicate?
     :onyx/restart-pred-fn]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
