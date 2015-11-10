@@ -14,10 +14,12 @@
 - New feature: Accumulating refinement mode
 - New feature: Discarding refinement mode
 - New feature: BookKeeper & embedded RocksDB automatic "exactly once" filtering.
+- New feature: friendlier error messages. Added custom schema error handlers to print out documentation and required types in a more customized format.
 - New flux policy: Recover
 - New lifecycle: after-read-batch
 - New metric: peer-send-bytes
 - Bug fix: fixed an issue where the percentage job scheduler would misallocate.
+- Bug fix: fixed `:data` key being removed from exception messages in the logs.
 
 #### 0.7.14
 
