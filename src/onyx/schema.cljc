@@ -161,7 +161,6 @@
 (def FunctionTaskSchema
   (let [base-function-task (merge base-task-map partial-fn-task)]
     (s/conditional grouping-task?
-
                    (s/conditional java?
                                   (s/->Both [FluxPolicyNPeers (merge base-function-task
                                                                      partial-grouping-task
@@ -317,6 +316,7 @@
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
    (s/optional-key :onyx.bookkeeper/server?) s/Bool
+   (s/optional-key :onyx.bookkeeper/delete-server-data?) s/Bool
    (s/optional-key :onyx.bookkeeper/port) s/Int
    (s/optional-key :onyx.bookkeeper/local-quorum?) s/Bool
    (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]

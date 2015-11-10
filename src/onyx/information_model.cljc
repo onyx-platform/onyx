@@ -800,6 +800,12 @@
           :default false
           :optional? true}
 
+         :onyx.bookkeeper/delete-server-data? 
+         {:doc "Bool to denote whether to delete all BookKeeper server instance data on environment shutdown. Set to true when using BookKeeper for unit/integration test runs."
+          :type :boolean
+          :default false
+          :optional? true}
+
          :onyx.bookkeeper/local-quorum?
          {:doc "Bool to denote whether to startup a full quorum of BookKeeper instances on this node. **Important: for TEST purposes only.**"
           :default false
@@ -927,6 +933,8 @@
     :onyx.rocksdb.filter/num-ids-per-bucket]
    :env-config
    [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
-    :onyx.bookkeeper/server? :onyx.bookkeeper/local-quorum?
+    :onyx.bookkeeper/server? 
+    :onyx.bookkeeper/delete-server-data?
+    :onyx.bookkeeper/local-quorum?
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
     :onyx.bookkeeper/base-journal-dir :onyx.bookkeeper/base-ledger-dir]})

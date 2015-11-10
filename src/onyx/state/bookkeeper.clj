@@ -24,7 +24,8 @@
   component/Lifecycle
   (component/start [component]
     (if (arg-or-default :onyx.bookkeeper/server? env-config)
-      (let [ledgers-root-path (ozk/ledgers-path (:onyx/id env-config))
+      (let [onyx-id (:onyx/id env-config)
+            ledgers-root-path (ozk/ledgers-path onyx-id)
             ledgers-available-path (ozk/ledgers-available-path (:onyx/id env-config))
             _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
             _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
@@ -35,9 +36,9 @@
             base-journal-dir (arg-or-default :onyx.bookkeeper/base-journal-dir env-config)
             base-ledger-dir (arg-or-default :onyx.bookkeeper/base-ledger-dir env-config)
             servers (mapv (fn [port]
-                            (let [server-id (java.util.UUID/randomUUID)
-                                  journal-dir (str base-journal-dir "/" port server-id)
-                                  ledger-dir (str base-ledger-dir "/" port server-id)
+                            (let [server-id (str onyx-id "_" port)
+                                  journal-dir (str base-journal-dir "/" server-id)
+                                  ledger-dir (str base-ledger-dir "/" server-id)
                                   server-conf (doto (ServerConfiguration.)
                                                 (.setZkServers (:zookeeper/address env-config))
                                                 (.setZkLedgersRootPath ledgers-root-path)
@@ -53,9 +54,10 @@
                                :journal-dir journal-dir 
                                :ledger-dir ledger-dir}))
                           ports)]
-        (.addShutdownHook (Runtime/getRuntime) 
-                          (Thread. (fn []
-                                     (cleanup-dirs servers))))
+        (when (:onyx.bookkeeper/delete-server-data? env-config) 
+          (.addShutdownHook (Runtime/getRuntime) 
+                            (Thread. (fn []
+                                       (cleanup-dirs servers)))))
         (assoc component :servers servers)) 
       component))
   (component/stop [{:keys [servers] :as component}]

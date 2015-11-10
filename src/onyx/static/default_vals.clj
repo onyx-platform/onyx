@@ -18,6 +18,7 @@
 
    ;; bookkeeper defaults
    :onyx.bookkeeper/server? false
+   :onyx.bookkeeper/delete-server-data? false
    :onyx.bookkeeper/port 3196
    :onyx.bookkeeper/local-quorum? false
    :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
