@@ -2,12 +2,13 @@
   (:require [onyx.windowing.units :refer [to-standard-units standard-units-for]]
             [onyx.windowing.window-id :as wid]
             [onyx.triggers.triggers-api :as api]
+            [onyx.state.state-extensions :as state-extensions]
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.static.planning :refer [find-window]]
             [taoensso.timbre :refer [fatal]]))
 
 (defmethod api/trigger-setup :timer
-  [{:keys [onyx.core/window-state] :as event} trigger]
+  [{:keys [onyx.core/window-state onyx.core/state-log] :as event} trigger]
   (if (= (standard-units-for (second (:trigger/period trigger))) :milliseconds)
     (let [ms (apply to-standard-units (:trigger/period trigger))
           fut
@@ -15,7 +16,12 @@
             (loop []
               (try
                 (Thread/sleep ms)
-                (api/fire-trigger! event window-state trigger {:context :timer})
+                (let [state (get (:state @window-state) (:trigger/window-id trigger))]
+                  (api/fire-trigger! event window-state trigger {:context :timer})
+                  (when (and state (api/refinement-destructive? event trigger))
+                    ;; Write the trigger to the log.
+                    (let [entry [nil [nil (map (fn [[k v]] [k nil]) state)]]]
+                      (state-extensions/store-log-entry state-log event (constantly true) entry))))
                 (catch InterruptedException e
                   (throw e))
                 (catch Throwable e

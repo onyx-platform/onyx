@@ -394,14 +394,21 @@
                                             window-id-state (get window-state window-id)
                                             [window-id-state' window-entries] (window-state-updates segment window-id-state window event grouping-fn)
                                             window-state' (assoc window-state window-id window-id-state')]
-                                        (list window-state' 
-                                              (conj log-entries window-entries))))
+                                        (list window-state' (conj log-entries window-entries))))
                                     (list (:state @window-state) [unique-id])
                                     windows)]
                         (state-extensions/store-log-entry state-log event ack-fn full-log-entry)
                         (swap! window-state assoc :state new-window-state))
-                      (doseq [t triggers]
-                        (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})))
+                      (let [trigger-entries
+                            (reduce
+                             (fn [entries t]
+                               (into
+                                entries
+                                [nil
+                                 (triggers/fire-trigger! event window-state t {:segment segment :context :new-segment})]))
+                             []
+                             triggers)]
+                        (state-extensions/store-log-entry state-log event (constantly true) trigger-entries)))
                     ;; Always update the filter, to freshen up the fact that the id has been re-seen
                     (when uniqueness-check? 
                       (swap! window-state update :filter state-extensions/apply-filter-id event unique-id))))

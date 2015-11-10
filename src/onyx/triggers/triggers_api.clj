@@ -39,6 +39,11 @@
   (fn [event trigger]
     (:trigger/refinement trigger)))
 
+(defmulti refinement-destructive?
+  "Returns true if this refinement mode destructs local state."
+  (fn [event trigger]
+    (:trigger/refinement trigger)))
+
 ;; Adapted from Prismatic Plumbing:
 ;; https://github.com/Prismatic/plumbing/blob/c53ba5d0adf92ec1e25c9ab3b545434f47bc4156/src/plumbing/core.cljx#L346-L361
 (defn swap-pair!
@@ -61,6 +66,14 @@
   [{:keys [onyx.core/window-state]} trigger]
   (first (swap-pair! window-state #(update % :state dissoc (:trigger/window-id trigger)))))
 
+(defmethod refinement-destructive? :discarding
+  [event trigger]
+  true)
+
+(defmethod refinement-destructive? :default
+  [event trigger]
+  false)
+
 (defmethod trigger-setup :default
   [event trigger]
   event)
@@ -70,15 +83,22 @@
   event)
 
 (defn iterate-windows [event trigger window-ids f opts]
-  (doseq [[window-id state] window-ids]
-    (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
-          [lower upper] (we/bounds (:aggregate/record window) window-id)
-          args (merge opts
-                      {:window window :window-id window-id
-                       :lower-extent lower :upper-extent upper})]
-      (when (f event trigger args)
-        (refine-state event trigger)
-        ((:trigger/sync-fn trigger) event window-id lower upper state)))))
+  (reduce
+   (fn [entries [window-id state]]
+     (let [window (find-window (:onyx.core/windows event) (:trigger/window-id trigger))
+           [lower upper] (we/bounds (:aggregate/record window) window-id)
+           args (merge opts
+                       {:window window :window-id window-id
+                        :lower-extent lower :upper-extent upper})]
+       (if (f event trigger args)
+         (do (refine-state event trigger)
+             ((:trigger/sync-fn trigger) event window-id lower upper state)
+             (if (refinement-destructive? event trigger)
+               (conj entries [window-id nil])
+               entries))
+         entries)))
+   []
+   window-ids))
 
 (defn fire-trigger! [event window-state trigger opts]
   (when (some #{(:context opts)} (trigger-notifications event trigger))

@@ -189,7 +189,7 @@
     (if (.hasMoreElements entries)
       (loop [state' state element ^LedgerEntry (.nextElement entries)]
         (let [entry-val (nippy/window-log-decompress ^bytes (.getEntry element))
-              state'' (playback-batch-entry state' apply-entry-fn entry-val)] 
+              state'' (playback-batch-entry state' apply-entry-fn entry-val)]
           (if (.hasMoreElements entries)
             (recur state'' (.nextElement entries))
             state'')))
