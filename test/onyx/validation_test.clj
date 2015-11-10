@@ -278,9 +278,6 @@
       (is (= (:id f) (:f (:egress-ids e))))
       (is (= (:id g) (:g (:egress-ids f)))))))
 
-
-
-
 (deftest task-map-schemas 
   (testing "Input examples"
     (is (s/validate os/TaskMap 

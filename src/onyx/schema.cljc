@@ -50,6 +50,7 @@
    :onyx/batch-size PosInt
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
+   (s/optional-key :onyx/deduplicate?) s/Bool
    (s/optional-key :onyx/restart-pred-fn) s/Keyword
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) PosInt
