@@ -1,12 +1,14 @@
 (ns ^:no-doc onyx.peer.virtual-peer
-    (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
-              [com.stuartsierra.component :as component]
-              [onyx.extensions :as extensions]
-              [taoensso.timbre :as timbre]
-              [onyx.peer.operation :as operation]
-              [onyx.peer.task-lifecycle :refer [task-lifecycle]]
-              [onyx.log.entry :refer [create-log-entry]]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+  (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
+            [com.stuartsierra.component :as component]
+            [onyx.extensions :as extensions]
+            [taoensso.timbre :as timbre]
+            [onyx.peer.operation :as operation]
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.static.default-vals :refer [defaults arg-or-default]])
+  (:import [clojure.core.async.impl.buffers SlidingBuffer]
+           [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (doseq [reaction reactions]
@@ -68,7 +70,7 @@
         high-water-pct (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
         check-interval (arg-or-default :onyx.peer/backpressure-check-interval opts)
         on? (atom false)
-        buf (.buf (:inbound-ch messenger-buffer))
+        buf ^SlidingBuffer (.buf ^ManyToManyChannel (:inbound-ch messenger-buffer))
         low-water-ratio (/ low-water-pct 100)
         high-water-ratio (/ high-water-pct 100)]
     (while (not (Thread/interrupted))
