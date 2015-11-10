@@ -737,7 +737,9 @@
         component)))
 
   (stop [component]
-    (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id (:onyx.core/task (:pipeline-data component))))
+    (if-let [task-name (:onyx.core/task (:pipeline-data component))]
+      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
+      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
     (when-let [event (:pipeline-data component)]
 
       ;; Fire all triggers on task completion.
