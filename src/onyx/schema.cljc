@@ -225,13 +225,6 @@
    (s/optional-key :flow/doc) s/Str
    UnsupportedFlowKey s/Any})
 
-(s/validate FlowCondition {:flow/from :colors-in
-                          :flow/to :none
-                          :flow/short-circuit? true
-                          :flow/exclude-keys [:extra-key]
-                          :flow/action :retry
-                          :flow/predicate :onyx.peer.colors-flow-test/black?})
-
 (def Unit
   [(s/one s/Int "unit-count")
    (s/one s/Keyword "unit-type")])
