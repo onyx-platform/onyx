@@ -79,7 +79,8 @@
         (swap! pending-messages assoc (:id m) (:message m)))
       (when (and (= 1 (count @pending-messages))
                  (= (count batch) 1)
-                 (= (:message (first batch)) :done))
+                 (= (:message (first batch)) :done)
+                 (zero? (count (.buf retry-ch))))
         (reset! drained true))
       {:onyx.core/batch batch}))
 
@@ -91,10 +92,10 @@
   (retry-segment
     [_ _ message-id]
     (when-let [msg (get @pending-messages message-id)]
-      (swap! pending-messages dissoc message-id)
       (when-not (= msg :done)
         (swap! retry-count inc))
-      (>!! retry-ch msg)))
+      (>!! retry-ch msg)
+      (swap! pending-messages dissoc message-id)))
 
   (pending?
     [_ _ message-id]
