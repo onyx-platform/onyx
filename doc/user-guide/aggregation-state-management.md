@@ -100,7 +100,7 @@ Results in the following events:
 | Applied to state | `104`                        |
 | Incoming segment | `{:name "Geoffrey" :age 14}` |
 | Changelog entry  | `[:set-value 128]`           |
-| Applied to state | `104`                        |
+| Applied to state | `128`                        |
 
 This state can be emitted via triggers or another mechanism. By describing
 changelog updates as a vector with a log command, such as `:set-value`
