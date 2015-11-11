@@ -94,9 +94,9 @@
             {:job-id job-id :task-id task-id :slot-id slot-id 
              :ledger-handle (.getId ^LedgerHandle @ledger-handle) :current-ids current-ids})
       (future 
-        (close-handle previous-handle)
         (let [;; Write compacted as a batch
               compacted [{:type :compacted
+                          ;; TODO: add a timeout when derefing here.
                           :filter-snapshot @filter-snapshot
                           :extent-state extent-snapshot}]
               compacted-ledger (new-ledger client peer-opts)
@@ -106,6 +106,7 @@
                           compacted-serialized
                           HandleWriteCallback
                           (fn []
+                            (close-handle previous-handle)
                             (emit-latency-value :window-log-compaction monitoring (- (System/currentTimeMillis) start-time))
                             (>!! outbox-ch
                                  {:fn :compact-bookkeeper-log-ids
