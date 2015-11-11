@@ -131,7 +131,7 @@
         timeout-ch (timeout timeout-ms)]
     (loop [entries [] ack-fns [] i 0]
       (if (< i batch-size)
-        (let [[[entry ack-fn] ch] (alts!! [batch-ch timeout-ch kill-ch task-kill-ch])]
+        (let [[[entry ack-fn] ch] (alts!! [kill-ch task-kill-ch batch-ch timeout-ch] :priority true)]
           (if entry 
             (recur (conj entries entry) 
                    (conj ack-fns ack-fn) 
