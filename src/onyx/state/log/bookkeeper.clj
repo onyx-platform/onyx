@@ -14,7 +14,8 @@
             [onyx.log.commands.common :refer [peer-slot-id]]
             [onyx.log.zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default defaults]])
-  (:import [org.apache.bookkeeper.client LedgerHandle LedgerEntry BookKeeper BookKeeper$DigestType AsyncCallback$AddCallback]
+  (:import [org.apache.bookkeeper.client LedgerHandle LedgerEntry BookKeeper BookKeeper$DigestType 
+            BKException BKException$Code AsyncCallback$AddCallback]
            [org.apache.bookkeeper.conf ClientConfiguration]
            [org.apache.curator.framework CuratorFramework CuratorFrameworkFactory]))
 
@@ -62,8 +63,9 @@
 
 (def HandleWriteCallback
   (reify AsyncCallback$AddCallback
-    (addComplete [this rc lh entry-id callback-fn]
-      (callback-fn))))
+    (addComplete [this rc lh entry-id ack-fn]
+      (when (= rc (BKException$Code/OK))
+        (ack-fn)))))
 
 (defn compaction-transition 
   "Transitions to a new compacted ledger, plus a newly created ledger created
