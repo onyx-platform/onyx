@@ -36,6 +36,17 @@
 
 (defrecord Function [replica peer-replica-view state messenger egress-tasks]
   p-ext/Pipeline
+
+  ;;; Start temp fix for: https://github.com/onyx-platform/onyx/issues/344
+  (ack-segment [this event message-id])
+
+  (retry-segment [this event message-id])
+
+  (pending? [this event message-id])
+
+  (drained? [this event])
+  ;;; End temp fix.
+  
   (read-batch
     [_ event]
     (read-batch event messenger))
