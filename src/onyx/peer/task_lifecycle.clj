@@ -602,13 +602,16 @@
 (defrecord Compiled [grouping-fn])
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
-     kill-ch outbox-ch seal-resp-ch completion-ch opts task-kill-ch monitoring]
+    [id log messenger-buffer messenger job task replica peer-replica-view restart-ch
+     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch monitoring]
   component/Lifecycle
 
   (start [component]
     (try
-      (let [catalog (extensions/read-chunk log :catalog job-id)
+      (let [job-id job
+            task-id task
+            _ (info "LOG " log "lob" job-id)
+            catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             windows (extensions/read-chunk log :windows job-id)
@@ -656,7 +659,7 @@
                            :onyx.core/messenger messenger
                            :onyx.core/monitoring (assoc monitoring :task-id task-id :job-id job-id :id id :task task)
                            :onyx.core/outbox-ch outbox-ch
-                           :onyx.core/seal-ch seal-resp-ch
+                           :onyx.core/seal-ch seal-ch
                            :onyx.core/task-kill-ch task-kill-ch
                            :onyx.core/kill-ch kill-ch
                            :onyx.core/peer-opts opts
@@ -698,18 +701,18 @@
         (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
-              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
+              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-ch kill-ch ex-f))]
           (assoc component
                  :pipeline pipeline
                  :pipeline-data pipeline-data
-                 :seal-ch seal-resp-ch
+                 :seal-ch seal-ch
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception (constantly false) e restart-ch outbox-ch job-id)
+        (handle-exception (constantly false) e restart-ch outbox-ch job)
         component)))
 
   (stop [component]
@@ -749,13 +752,5 @@
       :input-retry-segments-ch nil
       :task-lifecycle-ch nil)))
 
-
-(defn task-lifecycle [args {:keys [id log messenger job task replica peer-replica-view messenger-buffer
-                                   restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch
-                                   monitoring]}]
-  (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer
-                       :messenger messenger :job-id job :task-id task :restart-ch restart-ch
-                       :peer-replica-view peer-replica-view
-                       :kill-ch kill-ch :outbox-ch outbox-ch
-                       :replica replica :seal-resp-ch seal-ch :completion-ch completion-ch
-                       :opts opts :task-kill-ch task-kill-ch :monitoring monitoring}))
+(defn task-lifecycle [peer-state task-state]
+  (map->TaskLifeCycle (merge peer-state task-state)))

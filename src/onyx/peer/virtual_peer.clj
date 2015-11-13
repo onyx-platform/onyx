@@ -4,7 +4,6 @@
             [onyx.extensions :as extensions]
             [taoensso.timbre :as timbre]
             [onyx.peer.operation :as operation]
-            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
   (:import [clojure.core.async.impl.buffers SlidingBuffer]
@@ -15,12 +14,13 @@
     (clojure.core.async/>!! outbox-ch reaction))
   state)
 
-(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
+(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn]
   (try
     (let [replica-atom (atom nil)
           peer-view-atom (atom {})]
       (reset! replica-atom origin)
       (loop [state (merge {:id id
+                           :task-component-fn task-component-fn
                            :replica replica-atom
                            :peer-replica-view peer-view-atom
                            :log log
@@ -28,11 +28,11 @@
                            :messenger messenger
                            :monitoring monitoring
                            :outbox-ch outbox-ch
+                           ;; TO REMOVE
                            :completion-ch completion-ch
                            :opts opts
                            :kill-ch kill-ch
-                           :restart-ch restart-ch
-                           :task-lifecycle-fn task-lifecycle}
+                           :restart-ch restart-ch}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
               peer-view @peer-view-atom
@@ -83,7 +83,7 @@
                   (>!! outbox-ch (create-log-entry :backpressure-off {:peer id})))))
       (Thread/sleep check-interval))))
 
-(defrecord VirtualPeer [opts]
+(defrecord VirtualPeer [opts task-component-fn]
   component/Lifecycle
 
   (start [{:keys [log acking-daemon messenger monitoring] :as component}]
@@ -100,6 +100,7 @@
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
+              ;; TO REMOVE
               completion-ch (:completion-ch acking-daemon)
               peer-site (extensions/peer-site messenger)
               entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site})
@@ -108,7 +109,7 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring))
+                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))
                 ;track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch opts))
                 ]
             (assoc component
@@ -136,5 +137,5 @@
            :kill-ch nil :restart-ch nil
            :outbox-loop-ch nil :processing-loop-ch nil)))
 
-(defn virtual-peer [opts]
-  (map->VirtualPeer {:opts opts}))
+(defn virtual-peer [opts task-component-fn]
+  (map->VirtualPeer {:opts opts :task-component-fn task-component-fn}))

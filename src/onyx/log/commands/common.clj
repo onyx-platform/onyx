@@ -3,7 +3,6 @@
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [com.stuartsierra.component :as component]
-            [onyx.messaging.messenger-buffer :as buffer]
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
@@ -129,21 +128,14 @@
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
-            (close! (:task-kill-ch state))
             (component/stop @(:lifecycle state)))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   task-kill-ch (chan)
-                  messenger (:messenger state)
-                  _ (extensions/unregister-task-peer messenger (get-in old [:peer-sites (:id state)]))
-                  messenger-buffer (component/start (buffer/messenger-buffer (:opts state)))
-                  _ (extensions/register-task-peer messenger (get-in new [:peer-sites (:id state)]) messenger-buffer)
-                  new-state (assoc state 
-                                   :messenger-buffer messenger-buffer
-                                   :job (:job new-allocation) :task (:task new-allocation)
-                                   :seal-ch seal-ch :task-kill-ch task-kill-ch)
-                  new-lifecycle (future (component/start ((:task-lifecycle-fn state)
-                                                          (select-keys new-allocation [:job :task]) new-state)))]
-              (assoc new-state :lifecycle new-lifecycle))
-            (assoc state :lifecycle nil :seal-ch nil :task-kill-ch nil :job nil :task nil)))
+                  peer-site (get-in new [:peer-sites (:id state)])
+                  task-state {:job (:job new-allocation) :task (:task new-allocation) 
+                              :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
+                  new-lifecycle (future (component/start ((:task-component-fn state) state task-state)))]
+              (assoc state :lifecycle new-lifecycle))
+            (assoc state :lifecycle nil)))
       state)))
