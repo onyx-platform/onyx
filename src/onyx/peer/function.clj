@@ -6,6 +6,7 @@
             [onyx.peer.operation :as operation]
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
+            [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
@@ -29,8 +30,8 @@
                  (let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))
                        target (pick-peer-fn hash-group)]
                    (when target
-                     (when-let [link (operation/peer-link replica-val state event target)]
-                       (onyx.extensions/send-messages messenger event link segs)))))
+                     (when-let [site (peer-site peer-replica-view target)]
+                       (onyx.extensions/send-messages messenger event site segs)))))
                grouped))))
    {}))
 
