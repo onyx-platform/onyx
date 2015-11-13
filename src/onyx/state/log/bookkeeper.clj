@@ -82,7 +82,7 @@
         start-time (System/currentTimeMillis)
         slot-id (peer-slot-id event)
         extent-snapshot (:state @window-state)
-        ;; Deref future later so that we can immediately return and continue processing
+        ;; Deref future later. This way we can immediately return and continue processing
         filter-snapshot (state-extensions/snapshot-filter (:filter @window-state) event)
         current-ids (get-in @replica [:state-logs job-id task-id slot-id])]
     (reset! ledger-handle @next-ledger-handle)

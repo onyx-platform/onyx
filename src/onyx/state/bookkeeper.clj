@@ -26,7 +26,7 @@
     (if (arg-or-default :onyx.bookkeeper/server? env-config)
       (let [onyx-id (:onyx/id env-config)
             ledgers-root-path (ozk/ledgers-path onyx-id)
-            ledgers-available-path (ozk/ledgers-available-path (:onyx/id env-config))
+            ledgers-available-path (ozk/ledgers-available-path onyx-id)
             _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
             _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
             local-quorum? (arg-or-default :onyx.bookkeeper/local-quorum? env-config)
