@@ -10,16 +10,16 @@
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [taoensso.timbre :refer [info] :as timbre]))
 
-(defn add-site [replica {:keys [joiner peer-site]}]
+(defn add-site-acker [replica {:keys [joiner peer-site]}]
   (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
   (-> replica
       (assoc-in [:peer-sites joiner]
                 (merge
                   peer-site
-                  (extensions/assign-site-resources replica
-                                                    joiner
-                                                    peer-site
-                                                    (:peer-sites replica))))))
+                  (extensions/assign-acker-resources replica
+                                                     joiner
+                                                     peer-site
+                                                     (:peer-sites replica))))))
 
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
@@ -38,14 +38,14 @@
                 watcher (nth sorted-candidates index)]
             (-> replica
                 (update-in [:prepared] merge {watcher joining-peer})
-                (add-site args)
+                (add-site-acker args)
                 (reconfigure-cluster-workload)))
           replica))
       (-> replica
           (update-in [:peers] conj (:joiner args))
           (update-in [:peers] vec)
           (assoc-in [:peer-state (:joiner args)] :idle)
-          (add-site args)
+          (add-site-acker args)
           (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff
@@ -98,7 +98,7 @@
              state)
            state)
          (= (:id state) (:instant-join diff))
-         (do (extensions/open-peer-site (:messenger state)
+         (do (extensions/register-acker (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))
              state)
          :else state)))

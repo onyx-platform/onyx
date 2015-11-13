@@ -120,7 +120,7 @@
               send-messenger (component/start (aeron peer-group))]
 
           (try
-            (let [_ (ext/open-peer-site recv-messenger {:onyx.messaging/bind-addr "127.0.0.1"
+            (let [_ (ext/register-acker recv-messenger {:onyx.messaging/bind-addr "127.0.0.1"
                                                         :aeron/port server-port})
                   send-link (ext/connect-to-peer send-messenger nil {:aeron/external-addr "127.0.0.1"
                                                                      :aeron/port server-port})]
