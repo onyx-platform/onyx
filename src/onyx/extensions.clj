@@ -57,7 +57,7 @@
 
 (defmulti register-acker (fn [messenger assigned] (type messenger)))
 
-(defmulti register-task-peer (fn [messenger assigned] (type messenger)))
+(defmulti register-task-peer (fn [messenger assigned buffers] (type messenger)))
 
 (defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
 

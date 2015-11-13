@@ -434,42 +434,44 @@
     (merge event rets)))
 
 (defn launch-aux-threads!
-  [{:keys [release-ch retry-ch] :as messenger} {:keys [onyx.core/pipeline
-                                                       onyx.core/compiled-after-ack-segment-fn
-                                                       onyx.core/compiled-after-retry-segment-fn
-                                                       onyx.core/monitoring
-                                                       onyx.core/replica
-                                                       onyx.core/peer-replica-view
-                                                       onyx.core/state] :as event}
+  [messenger {:keys [onyx.core/pipeline
+                     onyx.core/compiled-after-ack-segment-fn
+                     onyx.core/compiled-after-retry-segment-fn
+                     onyx.core/messenger-buffer
+                     onyx.core/monitoring
+                     onyx.core/replica
+                     onyx.core/peer-replica-view
+                     onyx.core/state] :as event}
    outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
    (try
-     (loop []
-       (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
-         (when v
-           (cond (= ch release-ch)
-                 (->> (p-ext/ack-segment pipeline event v)
-                      (compiled-after-ack-segment-fn event v))
+     (let [{:keys [retry-ch release-ch]} messenger-buffer] 
+       (loop []
+         (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
+           (when v
+             (cond (= ch release-ch)
+                   (->> (p-ext/ack-segment pipeline event v)
+                        (compiled-after-ack-segment-fn event v))
 
-                 (= ch completion-ch)
-                 (let [{:keys [id peer-id]} v
-                       site (peer-site peer-replica-view peer-id)]
-                   (when site 
-                     (emit-latency :peer-complete-message
-                                   monitoring
-                                   #(extensions/internal-complete-message messenger event id site))))
+                   (= ch completion-ch)
+                   (let [{:keys [id peer-id]} v
+                         site (peer-site peer-replica-view peer-id)]
+                     (when site 
+                       (emit-latency :peer-complete-message
+                                     monitoring
+                                     #(extensions/internal-complete-message messenger event id site))))
 
-                 (= ch retry-ch)
-                 (->> (p-ext/retry-segment pipeline event v)
-                      (compiled-after-retry-segment-fn event v))
+                   (= ch retry-ch)
+                   (->> (p-ext/retry-segment pipeline event v)
+                        (compiled-after-retry-segment-fn event v))
 
-                 (= ch seal-ch)
-                 (do
-                   (p-ext/seal-resource pipeline event)
-                   (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
-                                                                     :task (:onyx.core/task-id event)})]
-                     (>!! outbox-ch entry))))
-           (recur))))
+                   (= ch seal-ch)
+                   (do
+                     (p-ext/seal-resource pipeline event)
+                     (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
+                                                                       :task (:onyx.core/task-id event)})]
+                       (>!! outbox-ch entry))))
+             (recur)))))
      (catch Throwable e
        (fatal e)))))
 
@@ -559,13 +561,6 @@
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
     (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
                     {:opts opts :pending-timeout pending-timeout}))))
-
-
-(defn clear-messenger-buffer!
-  "Clears the messenger buffer of all messages related to prevous task lifecycle.
-  In an ideal case, this might transfer messages over to another peer first as it help with retries."
-  [{:keys [inbound-ch] :as messenger-buffer}]
-  (while (first (alts!! [inbound-ch] :default false))))
 
 
 (defn build-pipeline [task-map pipeline-data]
@@ -690,7 +685,6 @@
                               (resolve-window-triggers triggers filtered-windows)
                               setup-triggers)]
 
-        (clear-messenger-buffer! messenger-buffer)
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
         (loop [replica-state @replica]
@@ -755,7 +749,8 @@
       :input-retry-segments-ch nil
       :task-lifecycle-ch nil)))
 
-(defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica peer-replica-view
+
+(defn task-lifecycle [args {:keys [id log messenger job task replica peer-replica-view messenger-buffer
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch
                                    monitoring]}]
   (map->TaskLifeCycle {:id id :log log :messenger-buffer messenger-buffer

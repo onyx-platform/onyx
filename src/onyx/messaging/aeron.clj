@@ -25,7 +25,7 @@
 
 (defrecord AeronConnection
   [peer-group messaging-group short-circuitable? publications virtual-peers acking-daemon acking-ch
-   send-idle-strategy compress-f inbound-ch release-ch retry-ch]
+   send-idle-strategy compress-f]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
@@ -33,13 +33,10 @@
           messaging-group (:messaging-group peer-group)
           publications (:publications messaging-group)
           virtual-peers (:virtual-peers messaging-group)
-          inbound-ch (:inbound-ch (:messenger-buffer component))
           external-channel (:external-channel messaging-group)
           short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
                                (fn [channel] (= channel external-channel))
                                (fn [_] false))
-          release-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/release-ch-buffer-size config)))
-          retry-ch (chan (sliding-buffer (arg-or-default :onyx.messaging/retry-ch-buffer-size config)))
           write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size config)
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
@@ -56,16 +53,12 @@
              :send-idle-strategy send-idle-strategy
              :write-buffer-size write-buffer-size
              :compress-f compress-f
-             :acking-ch acking-ch
-             :inbound-ch inbound-ch
-             :release-ch release-ch
-             :retry-ch retry-ch)))
+             :acking-ch acking-ch)))
 
-  (stop [{:keys [release-ch retry-ch virtual-peers peer-task-short-id acker-short-id] :as component}]
+  (stop [{:keys [retry-ch virtual-peers peer-task-short-id acker-short-id] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try
-      (close! release-ch)
-      (close! retry-ch)
+      (close! acking-ch) 
       (when @peer-task-short-id
         (swap! virtual-peers pm/dissoc @peer-task-short-id))
       (when @acker-short-id
@@ -80,22 +73,23 @@
            :peer-task-short-id nil
            :acker-short-id nil
            :compress-f nil :decompress-f nil
-           :inbound-ch nil :release-ch nil :retry-ch nil )))
+           :acking-ch nil)))
 
 (defmethod extensions/register-acker AeronConnection
-  [{:keys [virtual-peers acker-short-id acking-ch inbound-ch release-ch retry-ch] :as messenger}
+  [{:keys [virtual-peers acker-short-id acking-ch] :as messenger}
    {:keys [aeron/acker-id]}]
   (reset! acker-short-id acker-id)
-  (swap! virtual-peers pm/assoc acker-id (pm/->PeerChannels acking-ch inbound-ch release-ch retry-ch)))
+  (swap! virtual-peers pm/assoc acker-id acking-ch))
 
 (defmethod extensions/register-task-peer AeronConnection
-  [{:keys [virtual-peers peer-task-short-id acking-ch inbound-ch release-ch retry-ch] :as messenger}
-   {:keys [aeron/peer-task-id]}]
+  [{:keys [virtual-peers peer-task-short-id] :as messenger}
+   {:keys [aeron/peer-task-id]}
+   task-buffer]
   (reset! peer-task-short-id peer-task-id)
-  (swap! virtual-peers pm/assoc peer-task-id (pm/->PeerChannels acking-ch inbound-ch release-ch retry-ch)))
+  (swap! virtual-peers pm/assoc peer-task-id task-buffer))
 
 (defmethod extensions/unregister-task-peer AeronConnection
-  [{:keys [virtual-peers peer-task-short-id acking-ch inbound-ch release-ch retry-ch] :as messenger}
+  [{:keys [virtual-peers peer-task-short-id] :as messenger}
    {:keys [aeron/peer-task-id]}]
   (reset! peer-task-short-id nil)
   (when peer-task-id 
@@ -140,16 +134,15 @@
         offset (unchecked-add offset protocol/short-size)]
     (cond (= msg-type protocol/ack-msg-id)
           (let [ack (protocol/read-acker-message buffer offset)]
-            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
-              (>!! (:acking-ch chs) ack)))
+            (when-let [acking-ch (pm/peer-channels @virtual-peers peer-id)]
+              (>!! acking-ch ack)))
 
           (= msg-type protocol/batched-ack-msg-id)
           (let [acks (protocol/read-acker-messages buffer offset)]
-            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
-              (let [acking-ch (:acking-ch chs)]
-                (run! (fn [ack]
-                        (>!! acking-ch ack))
-                      acks)))) 
+            (when-let [acking-ch (pm/peer-channels @virtual-peers peer-id)]
+              (run! (fn [ack]
+                      (>!! acking-ch ack))
+                    acks))) 
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset)]
@@ -362,13 +355,13 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id acker-id peer-task-id)))
 
 (defmethod extensions/receive-messages AeronConnection
-  [messenger {:keys [onyx.core/task-map] :as event}]
+  [messenger {:keys [onyx.core/task-map onyx.core/messenger-buffer] :as event}]
   ;; We reuse a single timeout channel. This allows us to
   ;; continually block against one thread that is continually
   ;; expiring. This property lets us take variable amounts of
   ;; time when reading each segment and still allows us to return
   ;; within the predefined batch timeout limit.
-  (let [ch (:inbound-ch messenger)
+  (let [ch (:inbound-ch messenger-buffer)
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
         timeout-ch (timeout ms)]
@@ -379,12 +372,11 @@
           (persistent! segments))
         (persistent! segments)))))
 
-(defn short-circuit-ch [messenger id ch-k]
+(defn lookup-channels [messenger id]
   (-> messenger
       :virtual-peers
       deref
-      (pm/peer-channels id)
-      ch-k))
+      (pm/peer-channels id)))
 
 (defn send-messages-short-circuit [ch batch]
   (when ch
@@ -412,7 +404,7 @@
 (defmethod extensions/send-messages AeronConnection
   [messenger event {:keys [peer-task-id channel] :as conn-info} batch]
   (if ((:short-circuitable? messenger) channel)
-    (send-messages-short-circuit (short-circuit-ch messenger peer-task-id :inbound-ch) batch)
+    (send-messages-short-circuit (:inbound-ch (lookup-channels messenger peer-task-id)) batch)
     (let [pub-man (get-publication messenger conn-info)
           buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) peer-task-id batch)]
       (pubm/write pub-man buf 0 (.capacity buf)))))
@@ -420,7 +412,7 @@
 (defmethod extensions/internal-ack-segment AeronConnection
   [messenger event {:keys [acker-id channel] :as conn-info} ack]
   (if ((:short-circuitable? messenger) channel)
-    (ack-segment-short-circuit (short-circuit-ch messenger acker-id :acking-ch) ack)
+    (ack-segment-short-circuit (lookup-channels messenger acker-id) ack)
     (let [pub-man (get-publication messenger conn-info)]
       (let [buf (protocol/build-acker-message acker-id (:acker-id ack) (:completion-id ack) (:ack-val ack))]
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
@@ -428,7 +420,7 @@
 (defmethod extensions/internal-ack-segments AeronConnection
   [messenger event {:keys [acker-id] :as conn-info} acks]
   (if ((:short-circuitable? messenger) (:channel conn-info))
-    (ack-segments-short-circuit (short-circuit-ch messenger acker-id :acking-ch) acks)
+    (ack-segments-short-circuit (lookup-channels messenger acker-id) acks)
     (let [pub-man (get-publication messenger conn-info)
           buf ^UnsafeBuffer (protocol/build-acker-messages acker-id acks)
           size (.capacity buf)]
@@ -438,7 +430,7 @@
 (defmethod extensions/internal-complete-message AeronConnection
   [messenger event completion-id {:keys [peer-task-id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
-    (complete-message-short-circuit (short-circuit-ch messenger peer-task-id :release-ch) completion-id)
+    (complete-message-short-circuit (:release-ch (lookup-channels messenger peer-task-id)) completion-id)
     (let [pub-man (get-publication messenger conn-info)
           buf (protocol/build-completion-msg-buf peer-task-id completion-id)]
       (pubm/write pub-man buf 0 protocol/completion-msg-length))))
@@ -446,7 +438,7 @@
 (defmethod extensions/internal-retry-segment AeronConnection
   [messenger event retry-id {:keys [peer-task-id channel] :as conn-info}]
   (if ((:short-circuitable? messenger) channel)
-    (retry-segment-short-circuit (short-circuit-ch messenger peer-task-id :retry-ch) retry-id)
+    (retry-segment-short-circuit (:retry-ch (lookup-channels messenger peer-task-id)) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
           pub-man (get-publication messenger conn-info)
           buf (protocol/build-retry-msg-buf peer-task-id retry-id)]
