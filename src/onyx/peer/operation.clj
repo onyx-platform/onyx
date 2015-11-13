@@ -61,8 +61,6 @@
                                          (into-array Class [clojure.lang.IPersistentMap]))
                 (into-array [pipeline-data])))
 
-
-
 (defn grouped-task? [task-map]
   (or (:onyx/group-by-key task-map)
       (:onyx/group-by-fn task-map)))

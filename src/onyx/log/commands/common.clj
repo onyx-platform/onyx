@@ -133,7 +133,10 @@
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   task-kill-ch (chan)
-                  new-state (assoc state :job (:job new-allocation) :task (:task new-allocation)
+                  _ (extensions/unregister-task-peer (:messenger state) (get-in old [:peer-sites (:id state)]))
+                  _ (extensions/register-task-peer (:messenger state) (get-in new [:peer-sites (:id state)]))
+                  new-state (assoc state 
+                                   :job (:job new-allocation) :task (:task new-allocation)
                                    :seal-ch seal-ch :task-kill-ch task-kill-ch)
                   new-lifecycle (future (component/start ((:task-lifecycle-fn state)
                                                           (select-keys new-allocation [:job :task]) new-state)))]

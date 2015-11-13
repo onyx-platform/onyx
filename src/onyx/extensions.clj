@@ -44,7 +44,10 @@
 
 ;; Messaging interface
 
-(defmulti assign-site-resources (fn [replica peer-id peer-site peer-sites]
+(defmulti assign-acker-resources (fn [replica peer-id peer-site peer-sites]
+                                  (:onyx.messaging/impl (:messaging replica))))
+
+(defmulti assign-task-resources (fn [replica peer-id task-id peer-site peer-sites]
                                   (:onyx.messaging/impl (:messaging replica))))
 
 (defmulti peer-site (fn [messenger] (type messenger)))
@@ -52,7 +55,11 @@
 (defmulti get-peer-site (fn [replica peer]
                           (:onyx.messaging/impl (:messaging replica))))
 
-(defmulti open-peer-site (fn [messenger assigned] (type messenger)))
+(defmulti register-acker (fn [messenger assigned] (type messenger)))
+
+(defmulti register-task-peer (fn [messenger assigned] (type messenger)))
+
+(defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
 
 (defmulti connect-to-peer (fn [messenger peer-id event peer-site] (type messenger)))
 
@@ -71,12 +78,6 @@
 (defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
 
 (defmulti internal-retry-segment (fn [messenger event id peer-link] (type messenger)))
-
-(defmethod open-peer-site :default
-  [_ _] "localhost")
-
-(defmethod get-peer-site :default
-  [_ _] "localhost")
 
 ;; Monitoring interface
 

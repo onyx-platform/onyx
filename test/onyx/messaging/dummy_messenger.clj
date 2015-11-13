@@ -1,8 +1,12 @@
 (ns onyx.messaging.dummy-messenger
   (:require [onyx.extensions :as extensions]))
 
-(defmethod extensions/assign-site-resources :dummy-messenger
+(defmethod extensions/assign-acker-resources :dummy-messenger
   [config peer-id peer-site peer-sites]
+  {:port 1})
+
+(defmethod extensions/assign-task-resources :dummy-messenger
+  [config peer-id task-id peer-site peer-sites]
   {:port 1})
 
 (defmethod extensions/get-peer-site :dummy-messenger
