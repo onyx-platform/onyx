@@ -65,7 +65,7 @@
             peer-sites (zipmap peer-sites-peers
                                (map (fn [id]
                                       (let [peer-site (-> new-replica :peer-sites (get id))] 
-                                        (extensions/connect-to-peer messenger id nil peer-site)))
+                                        (extensions/connection-spec messenger id nil peer-site)))
                                     peer-sites-peers))]
         (->PeerReplicaView backpressure? pick-peer-fns job-ackers peer-sites job-id task-id catalog task))
       (->PeerReplicaView nil nil nil nil nil nil nil nil))))

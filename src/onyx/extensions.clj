@@ -61,7 +61,7 @@
 
 (defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
 
-(defmulti connect-to-peer (fn [messenger peer-id event peer-site] (type messenger)))
+(defmulti connection-spec (fn [messenger peer-id event peer-site] (type messenger)))
 
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
