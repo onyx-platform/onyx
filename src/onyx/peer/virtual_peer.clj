@@ -15,7 +15,7 @@
     (clojure.core.async/>!! outbox-ch reaction))
   state)
 
-(defn processing-loop [id log buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
+(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring]
   (try
     (let [replica-atom (atom nil)
           peer-view-atom (atom {})]
@@ -25,7 +25,6 @@
                            :peer-replica-view peer-view-atom
                            :log log
                            :buffered-outbox []
-                           :messenger-buffer buffer
                            :messenger messenger
                            :monitoring monitoring
                            :outbox-ch outbox-ch
@@ -87,7 +86,7 @@
 (defrecord VirtualPeer [opts]
   component/Lifecycle
 
-  (start [{:keys [log acking-daemon messenger-buffer messenger monitoring] :as component}]
+  (start [{:keys [log acking-daemon messenger monitoring] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
       (try
@@ -109,12 +108,12 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger-buffer messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring))
-                track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch opts))]
+                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring))
+                ;track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch opts))
+                ]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
-                   :track-backpressure-fut track-backpressure-fut
                    :id id :inbox-ch inbox-ch
                    :outbox-ch outbox-ch :kill-ch kill-ch
                    :restart-ch restart-ch)))
@@ -125,7 +124,7 @@
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
-    (future-cancel (:track-backpressure-fut component))
+    ;(future-cancel (:track-backpressure-fut component))
     (close! (:inbox-ch component))
     (close! (:outbox-ch component))
     (close! (:kill-ch component))
@@ -133,8 +132,8 @@
     (<!! (:outbox-loop-ch component))
     (<!! (:processing-loop-ch component))
 
-    (assoc component :track-backpressure-fut nil :inbox-ch nil
-           :outbox-loop-ch nil :kill-ch nil :restart-ch nil
+    (assoc component :inbox-ch nil :outbox-loop-ch nil 
+           :kill-ch nil :restart-ch nil
            :outbox-loop-ch nil :processing-loop-ch nil)))
 
 (defn virtual-peer [opts]

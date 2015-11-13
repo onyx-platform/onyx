@@ -3,6 +3,7 @@
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
             [com.stuartsierra.component :as component]
+            [onyx.messaging.messenger-buffer :as buffer]
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
@@ -133,9 +134,12 @@
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   task-kill-ch (chan)
-                  _ (extensions/unregister-task-peer (:messenger state) (get-in old [:peer-sites (:id state)]))
-                  _ (extensions/register-task-peer (:messenger state) (get-in new [:peer-sites (:id state)]))
+                  messenger (:messenger state)
+                  _ (extensions/unregister-task-peer messenger (get-in old [:peer-sites (:id state)]))
+                  messenger-buffer (component/start (buffer/messenger-buffer (:opts state)))
+                  _ (extensions/register-task-peer messenger (get-in new [:peer-sites (:id state)]) messenger-buffer)
                   new-state (assoc state 
+                                   :messenger-buffer messenger-buffer
                                    :job (:job new-allocation) :task (:task new-allocation)
                                    :seal-ch seal-ch :task-kill-ch task-kill-ch)
                   new-lifecycle (future (component/start ((:task-lifecycle-fn state)

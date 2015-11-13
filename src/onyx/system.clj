@@ -4,7 +4,6 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
-            [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -50,9 +49,7 @@
 (def client-components [:monitoring :log :messaging-require])
 
 (def peer-components
-  [:monitoring :log :messaging-require
-   :messenger-buffer :messenger :acking-daemon
-   :virtual-peer])
+  [:monitoring :log :messaging-require :messenger :acking-daemon :virtual-peer])
 
 (def peer-group-components [:logging-config :messaging-require :messaging-group])
 
@@ -146,11 +143,8 @@
        :messaging-require (messaging-require-ctor config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger-buffer (component/using (messenger-buffer config)[:monitoring :log :acking-daemon])
-       :messenger (component/using (messenger-ctor peer-group)
-                                   [:monitoring :messaging-require :acking-daemon :messenger-buffer])
-       :virtual-peer (component/using (virtual-peer config)
-                                      [:monitoring :log :acking-daemon :messenger-buffer :messenger])})))
+       :messenger (component/using (messenger-ctor peer-group) [:monitoring :messaging-require :acking-daemon])
+       :virtual-peer (component/using (virtual-peer config) [:monitoring :log :acking-daemon :messenger])})))
 
 (defn onyx-peer-group
   [config]
