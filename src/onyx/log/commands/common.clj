@@ -128,6 +128,7 @@
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
+            (close! (:task-kill-ch (:task-state state)))
             (component/stop @(:lifecycle state)))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
@@ -136,6 +137,6 @@
                   task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
                               :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
                   new-lifecycle (future (component/start ((:task-component-fn state) state task-state)))]
-              (assoc state :lifecycle new-lifecycle))
-            (assoc state :lifecycle nil)))
+              (assoc state :lifecycle new-lifecycle :task-state task-state))
+            (assoc state :lifecycle nil :task-state nil)))
       state)))
