@@ -61,7 +61,7 @@
     (common/start-new-lifecycle
      old new diff
      (cond (common/should-seal? new job state message-id)
-           (>!! (:seal-ch state) true)
+           (>!! (:seal-ch (:task-state state)) true)
 
            (and (= (:id state) (:observer updated-watch))
                 (not= (:observer updated-watch) (:subject updated-watch)))
