@@ -43,6 +43,7 @@
                                                 (.setZkServers (:zookeeper/address env-config))
                                                 (.setZkLedgersRootPath ledgers-root-path)
                                                 (.setBookiePort port)
+                                                ;(.setAutoRecoveryDaemonEnabled true)
                                                 (.setJournalDirName journal-dir)
                                                 (.setLedgerDirNames (into-array String [ledger-dir]))
                                                 (.setAllowLoopback true))
