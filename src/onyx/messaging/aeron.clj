@@ -77,7 +77,6 @@
            :compress-f nil :decompress-f nil
            :inbound-ch nil :release-ch nil :retry-ch nil )))
 
-
 (defmethod extensions/open-peer-site AeronConnection
   [{:keys [virtual-peers multiplex-id acking-ch inbound-ch release-ch retry-ch] :as messenger}
    {:keys [aeron/id]}]
@@ -169,7 +168,6 @@
 
 (defn get-publication [messenger {:keys [channel] :as conn-info}]
   ;; FIXME, race condition may cause two publications to be created
-  ;; same goes for operation/peer-link
   (if-let [pub (get @(:publications messenger) channel)]
     (do
       (reset! (:last-used pub) (System/currentTimeMillis))
@@ -247,7 +245,6 @@
              :bind-addr bind-addr
              :external-addr external-addr
              :external-channel external-channel
-             :port port
              :media-driver-context media-driver-context
              :media-driver media-driver
              :publications publications
@@ -327,6 +324,7 @@
 
 (defrecord AeronPeerConnection [channel stream-id id])
 
+;; TODO: RENAME
 (defmethod extensions/connect-to-peer AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
@@ -427,7 +425,3 @@
           pub-man (get-publication messenger conn-info)
           buf (protocol/build-retry-msg-buf id retry-id)]
       (pubm/write pub-man buf 0 protocol/retry-msg-length))))
-
-(defmethod extensions/close-peer-connection AeronConnection
-  [messenger event peer-link]
-  {})

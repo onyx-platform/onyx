@@ -21,6 +21,7 @@
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
               [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [clj-tuple :as t]
               [onyx.interop]
               [onyx.state.log.bookkeeper]
@@ -189,22 +190,22 @@
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
 
-(defn ack-segments [task-map replica state messenger monitoring {:keys [onyx.core/results] :as event}]
+(defn ack-segments [task-map peer-replica-view state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [[acker-id acks] (->> (:acks results)
                                (filter dec-count!)
                                (group-by :completion-id))]
-    (when-let [link (operation/peer-link @replica state event acker-id)]
+    (when-let [site (peer-site peer-replica-view acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
-                    #(extensions/internal-ack-segments messenger event link acks))))
+                    #(extensions/internal-ack-segments messenger event site acks))))
   event)
 
-(defn flow-retry-segments [replica state messenger monitoring {:keys [onyx.core/results] :as event}]
+(defn flow-retry-segments [peer-replica-view state messenger monitoring {:keys [onyx.core/results] :as event}]
   (doseq [root (:retries results)]
-    (when-let [link (operation/peer-link @replica state event (:completion-id root))]
+    (when-let [site (peer-site peer-replica-view (:completion-id root))]
       (emit-latency :peer-retry-segment
                     monitoring
-                    #(extensions/internal-retry-segment messenger event (:id root) link))))
+                    #(extensions/internal-retry-segment messenger event (:id root) site))))
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
@@ -365,7 +366,7 @@
 (defn assign-windows
   [compiled {:keys [onyx.core/windows] :as event}]
   (when (seq windows)
-    (let [{:keys [onyx.core/monitoring onyx.core/replica onyx.core/state onyx.core/messenger 
+    (let [{:keys [onyx.core/monitoring onyx.core/peer-replica-view onyx.core/state onyx.core/messenger 
                   onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
                   onyx.core/state-log onyx.core/results]} event
           grouping-fn (:grouping-fn compiled)
@@ -379,8 +380,8 @@
                   ;; As we filter out messages seen before, some replay can be accepted
                   ack-fn (fn [] 
                            (when (dec-count! fused-ack)
-                             (let [link (operation/peer-link @replica state event (:completion-id fused-ack))]
-                               (extensions/internal-ack-segment messenger event link fused-ack)))
+                             (when-let [site (peer-site peer-replica-view (:completion-id fused-ack))]
+                               (extensions/internal-ack-segment messenger event site fused-ack)))
                            (emit-latency-value :window-log-write-entry monitoring (- (System/currentTimeMillis) start-time)))]
               (run! 
                 (fn [message]
@@ -438,6 +439,7 @@
                                                        onyx.core/compiled-after-retry-segment-fn
                                                        onyx.core/monitoring
                                                        onyx.core/replica
+                                                       onyx.core/peer-replica-view
                                                        onyx.core/state] :as event}
    outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
@@ -451,11 +453,11 @@
 
                  (= ch completion-ch)
                  (let [{:keys [id peer-id]} v
-                       peer-link (operation/peer-link @replica state event peer-id)]
-                   (when peer-link 
+                       site (peer-site peer-replica-view peer-id)]
+                   (when site 
                      (emit-latency :peer-complete-message
                                    monitoring
-                                   #(extensions/internal-complete-message messenger event id peer-link))))
+                                   #(extensions/internal-complete-message messenger event id site))))
 
                  (= ch retry-ch)
                  (->> (p-ext/retry-segment pipeline event v)
@@ -547,35 +549,11 @@
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
              (assign-windows compiled)
              (write-batch pipeline)
-             (flow-retry-segments replica state messenger monitoring)
+             (flow-retry-segments peer-replica-view state messenger monitoring)
              (close-batch-resources)
-             (ack-segments task-map replica state messenger monitoring)))
+             (ack-segments task-map peer-replica-view state messenger monitoring)))
       (catch Throwable e
         (ex-f e)))))
-
-(defn gc-peer-links [event state opts]
-  (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
-        idle (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)
-        monitoring (:onyx.core/monitoring event)]
-    (loop []
-      (try
-        (Thread/sleep interval)
-        (let [t (System/currentTimeMillis)
-              snapshot @state
-              to-remove (map first
-                             (filter (fn [[k v]] (>= (- t @(:timestamp v)) idle))
-                                     (:links snapshot)))]
-          (doseq [k to-remove]
-            (swap! state dissoc k)
-            (extensions/close-peer-connection (:onyx.core/messenger event)
-                                              event
-                                              (:link (get (:links snapshot) k)))
-            (extensions/emit monitoring (->MonitorEvent :peer-gc-peer-link))))
-        (catch InterruptedException e
-          (throw e))
-        (catch Throwable e
-          (fatal e)))
-      (recur))))
 
 (defn validate-pending-timeout [pending-timeout opts]
   (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
@@ -616,7 +594,7 @@
     (assoc pipeline :onyx.core/state-log (if (windowed-task? pipeline) 
                                            (state-extensions/initialize-log log-impl pipeline)))))
 
-(defrecord TaskState [timeout-pool links])
+(defrecord TaskState [timeout-pool])
 (defrecord WindowState [filter state])
 
 (defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
@@ -649,8 +627,7 @@
             input-retry-timeout (arg-or-default :onyx/input-retry-timeout catalog-entry)
             pending-timeout (arg-or-default :onyx/pending-timeout catalog-entry)
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
-            links {}
-            state (atom (->TaskState r-seq links))
+            state (atom (->TaskState r-seq))
 
             _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
             _ (validate-pending-timeout pending-timeout opts)
@@ -728,8 +705,7 @@
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-resp-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))
-              peer-link-gc-thread (future (gc-peer-links pipeline-data state opts))]
+              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-resp-ch kill-ch ex-f))]
           (assoc component
                  :pipeline pipeline
                  :pipeline-data pipeline-data
@@ -737,8 +713,7 @@
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :input-retry-segments-ch input-retry-segments-ch
-                 :aux-ch aux-ch
-                 :peer-link-gc-thread peer-link-gc-thread)))
+                 :aux-ch aux-ch)))
       (catch Throwable e
         (handle-exception (constantly false) e restart-ch outbox-ch job-id)
         component)))
@@ -770,14 +745,7 @@
         (when (exactly-once-task? event)
           (state-extensions/close-filter (:filter @window-state) event)))
 
-      ((:onyx.core/compiled-after-task-fn event) event)
-
-      (let [state @(:onyx.core/state event)]
-        (doseq [[_ link-map] (:links state)]
-          (extensions/close-peer-connection (:onyx.core/messenger event) event (:link link-map)))))
-
-    (when-let [t (:peer-link-gc-thread component)]
-      (future-cancel t))
+      ((:onyx.core/compiled-after-task-fn event) event))
 
     (assoc component
       :pipeline nil
@@ -785,8 +753,7 @@
       :seal-ch nil
       :aux-ch nil
       :input-retry-segments-ch nil
-      :task-lifecycle-ch nil
-      :peer-link-gc-thread nil)))
+      :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [args {:keys [id log messenger-buffer messenger job task replica peer-replica-view
                                    restart-ch kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch
