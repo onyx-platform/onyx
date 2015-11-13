@@ -414,7 +414,7 @@
   (if ((:short-circuitable? messenger) channel)
     (ack-segment-short-circuit (lookup-channels messenger acker-id) ack)
     (let [pub-man (get-publication messenger conn-info)]
-      (let [buf (protocol/build-acker-message acker-id (:acker-id ack) (:completion-id ack) (:ack-val ack))]
+      (let [buf (protocol/build-acker-message acker-id (:id ack) (:completion-id ack) (:ack-val ack))]
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
