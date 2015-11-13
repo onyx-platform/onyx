@@ -133,7 +133,7 @@
             (let [seal-ch (chan)
                   task-kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
-                  task-state {:job (:job new-allocation) :task (:task new-allocation) 
+                  task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
                               :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
                   new-lifecycle (future (component/start ((:task-component-fn state) state task-state)))]
               (assoc state :lifecycle new-lifecycle))

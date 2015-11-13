@@ -445,7 +445,7 @@
    outbox-ch seal-ch completion-ch task-kill-ch]
   (thread
    (try
-     (let [{:keys [retry-ch release-ch]} messenger-buffer] 
+     (let [{:keys [retry-ch release-ch]} messenger-buffer]
        (loop []
          (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
            (when v
@@ -602,16 +602,13 @@
 (defrecord Compiled [grouping-fn])
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job task replica peer-replica-view restart-ch
+    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
      kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch monitoring]
   component/Lifecycle
 
   (start [component]
     (try
-      (let [job-id job
-            task-id task
-            _ (info "LOG " log "lob" job-id)
-            catalog (extensions/read-chunk log :catalog job-id)
+      (let [catalog (extensions/read-chunk log :catalog job-id)
             task (extensions/read-chunk log :task task-id)
             flow-conditions (extensions/read-chunk log :flow-conditions job-id)
             windows (extensions/read-chunk log :windows job-id)
@@ -712,7 +709,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception (constantly false) e restart-ch outbox-ch job)
+        (handle-exception (constantly false) e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
