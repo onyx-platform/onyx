@@ -344,7 +344,7 @@
 (defrecord AeronPeerConnection [channel stream-id acker-id peer-task-id])
 
 ;; TODO: RENAME
-(defmethod extensions/connect-to-peer AeronConnection
+(defmethod extensions/connection-spec AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/acker-id aeron/peer-task-id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
         ;; ensure that each machine spreads their use of a node/peer-group's

@@ -122,7 +122,7 @@
           (try
             (let [_ (ext/register-acker recv-messenger {:onyx.messaging/bind-addr "127.0.0.1"
                                                         :aeron/port server-port})
-                  send-link (ext/connect-to-peer send-messenger nil {:aeron/external-addr "127.0.0.1"
+                  send-link (ext/connection-spec send-messenger nil {:aeron/external-addr "127.0.0.1"
                                                                      :aeron/port server-port})]
               (reduce (fn [_ command]
                         (case (:command command)
