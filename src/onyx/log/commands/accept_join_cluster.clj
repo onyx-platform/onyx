@@ -49,9 +49,9 @@
         :args {:id accepted-joiner}}]
       [])))
 
-(defn open-site [state diff new]
+(defn register-acker [state diff new]
   (when (= (:id state) (:subject diff))
-    (extensions/open-peer-site
+    (extensions/register-acker
      (:messenger state)
      (get-in new [:peer-sites (:id state)]))))
 
@@ -64,6 +64,6 @@
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new)
-    (do (open-site state diff new)
+    (do (register-acker state diff new)
         (common/start-new-lifecycle old new diff state))
     state))

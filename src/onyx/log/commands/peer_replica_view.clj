@@ -7,7 +7,10 @@
             [onyx.static.planning :as planning]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates job-id task-id catalog task])
+(defn peer-site [peer-replica-view peer-id]
+  (get (:peer-sites @peer-replica-view) peer-id))
+
+(defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates peer-sites job-id task-id catalog task])
 
 (defn build-pick-peer-fn [task-id task-map egress-peers slot-id->peer-id]
   (let [out-peers (egress-peers task-id)] 
@@ -29,8 +32,10 @@
             (rand-nth out-peers)))))
 
 (defmethod extensions/peer-replica-view :default 
-  [log entry old-replica new-replica diff old-view peer-id opts]
-  (let [allocations (:allocations new-replica)
+  [log entry old-replica new-replica diff old-view state opts]
+  (let [peer-id (:id state)
+        messenger (:messenger state)
+        allocations (:allocations new-replica)
         allocated-job (common/peer->allocated-job allocations peer-id)
         task-id (:task allocated-job)
         job-id (:job allocated-job)]
@@ -52,6 +57,15 @@
                                         (vector task-id 
                                                 (build-pick-peer-fn task-id task-map receivable-peers slot-id->peer-id)))))
                                (into {}))
-            job-ackers (get ackers job-id)]
-        (->PeerReplicaView backpressure? pick-peer-fns job-ackers job-id task-id catalog task))
-      (->PeerReplicaView nil nil nil nil nil nil nil))))
+            job-ackers (get ackers job-id)
+            ;; Really should only use peers that are on egress tasks, and input tasks
+            ;; all other tasks are non receivable from this peer
+            peer-sites-peers (into (reduce into #{} (vals receivable-peers)) 
+                                  job-ackers)
+            peer-sites (zipmap peer-sites-peers
+                               (map (fn [id]
+                                      (let [peer-site (-> new-replica :peer-sites (get id))] 
+                                        (extensions/connect-to-peer messenger id nil peer-site)))
+                                    peer-sites-peers))]
+        (->PeerReplicaView backpressure? pick-peer-fns job-ackers peer-sites job-id task-id catalog task))
+      (->PeerReplicaView nil nil nil nil nil nil nil nil))))

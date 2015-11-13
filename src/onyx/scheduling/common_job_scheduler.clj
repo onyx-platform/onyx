@@ -122,6 +122,13 @@
                  (-> replica
                      (common/remove-peers peer)
                      (assoc-in [:peer-state peer] :idle)
+                     (update-in [:peer-sites peer] (fn [peer-site] 
+                                                     (merge peer-site 
+                                                            (extensions/assign-task-resources replica
+                                                                                              peer
+                                                                                              task-id
+                                                                                              peer-site
+                                                                                              (:peer-sites replica)))))
                      (update-in [:allocations job-id task-id]
                                 (fn [allocation]
                                   (vec (conj allocation peer))))
