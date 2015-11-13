@@ -5,9 +5,7 @@
             [taoensso.timbre :as timbre]
             [onyx.peer.operation :as operation]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [clojure.core.async.impl.buffers SlidingBuffer]
-           [clojure.core.async.impl.channels ManyToManyChannel]))
+            [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
   (doseq [reaction reactions]
@@ -28,7 +26,6 @@
                            :messenger messenger
                            :monitoring monitoring
                            :outbox-ch outbox-ch
-                           ;; TO REMOVE
                            :completion-ch completion-ch
                            :opts opts
                            :kill-ch kill-ch
@@ -64,25 +61,6 @@
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
 
-(defn track-backpressure [id messenger-buffer outbox-ch opts]
-  (let [low-water-pct (arg-or-default :onyx.peer/backpressure-low-water-pct opts)
-        high-water-pct (arg-or-default :onyx.peer/backpressure-high-water-pct opts)
-        check-interval (arg-or-default :onyx.peer/backpressure-check-interval opts)
-        on? (atom false)
-        buf ^SlidingBuffer (.buf ^ManyToManyChannel (:inbound-ch messenger-buffer))
-        low-water-ratio (/ low-water-pct 100)
-        high-water-ratio (/ high-water-pct 100)]
-    (while (not (Thread/interrupted))
-      (let [ratio (/ (count buf) (.n buf))
-            on-val @on?]
-        (cond (and (not on-val) (> ratio high-water-ratio))
-              (do (reset! on-val true)
-                  (>!! outbox-ch (create-log-entry :backpressure-on {:peer id})))
-              (and on-val (< ratio low-water-ratio))
-              (do (reset! on? false)
-                  (>!! outbox-ch (create-log-entry :backpressure-off {:peer id})))))
-      (Thread/sleep check-interval))))
-
 (defrecord VirtualPeer [opts task-component-fn]
   component/Lifecycle
 
@@ -98,10 +76,9 @@
 
         (let [inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity opts))
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
+              completion-ch (:completion-ch acking-daemon)
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
-              ;; TO REMOVE
-              completion-ch (:completion-ch acking-daemon)
               peer-site (extensions/peer-site messenger)
               entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site})
               origin (extensions/subscribe-to-log log inbox-ch)]
@@ -110,7 +87,6 @@
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
                 processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))
-                ;track-backpressure-fut (future (track-backpressure id messenger-buffer outbox-ch opts))
                 ]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
@@ -125,7 +101,6 @@
   (stop [component]
     (taoensso.timbre/info (format "Stopping Virtual Peer %s" (:id component)))
 
-    ;(future-cancel (:track-backpressure-fut component))
     (close! (:inbox-ch component))
     (close! (:outbox-ch component))
     (close! (:kill-ch component))

@@ -4,6 +4,7 @@
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+            [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
             [onyx.messaging.messenger-buffer :as buffer]
@@ -57,7 +58,7 @@
 (def peer-group-components [:logging-config :messaging-require :messaging-group])
 
 (def task-components
-  [:task-lifecycle :register-messenger-peer :messenger-buffer])
+  [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll])
 
 (defn rethrow-component [f]
   (try
@@ -164,6 +165,7 @@
     {:peer-state peer-state
      :task-state task-state
      :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:messenger-buffer :register-messenger-peer])
+     :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer])
      :register-messenger-peer (component/using (map->RegisterMessengerPeer {:messenger (:messenger peer-state) 
                                                                        :peer-site (:peer-site task-state)}) 
                                           [:messenger-buffer])
