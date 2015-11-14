@@ -3,9 +3,11 @@
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
+            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+            [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
-            [onyx.messaging.messenger-buffer :refer [messenger-buffer]]
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
+            [onyx.messaging.messenger-buffer :as buffer]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
@@ -43,6 +45,7 @@
             [onyx.triggers.watermark]
             [onyx.triggers.percentile-watermark]
             [onyx.plugin.core-async]
+            [clojure.core.async :refer [chan close!]]
             [onyx.extensions :as extensions]))
 
 (def development-components [:monitoring :logging-config :log :bookkeeper])
@@ -50,11 +53,12 @@
 (def client-components [:monitoring :log :messaging-require])
 
 (def peer-components
-  [:monitoring :log :messaging-require
-   :messenger-buffer :messenger :acking-daemon
-   :virtual-peer])
+  [:monitoring :log :messaging-require :messenger :acking-daemon :virtual-peer])
 
 (def peer-group-components [:logging-config :messaging-require :messaging-group])
+
+(def task-components
+  [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll])
 
 (defn rethrow-component [f]
   (try
@@ -137,6 +141,36 @@
        :messaging-require (messaging-require-ctor peer-config)
        :log (component/using (zookeeper peer-config) [:monitoring])})))
 
+(defrecord RegisterMessengerPeer [messenger peer-site]
+  component/Lifecycle
+  (start [component]
+    (extensions/register-task-peer messenger peer-site (:messenger-buffer component))
+    component)
+  (stop [component]
+    (extensions/unregister-task-peer messenger peer-site)
+    component))
+
+(defrecord OnyxTask [peer-site peer-state task-state]
+  component/Lifecycle
+  (start [component]
+    (rethrow-component
+      #(component/start-system component task-components)))
+  (stop [component]
+    (rethrow-component
+      #(component/stop-system component task-components))))
+
+(defn onyx-task
+  [peer-state task-state]
+  (map->OnyxTask
+    {:peer-state peer-state
+     :task-state task-state
+     :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:messenger-buffer :register-messenger-peer])
+     :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer])
+     :register-messenger-peer (component/using (map->RegisterMessengerPeer {:messenger (:messenger peer-state) 
+                                                                       :peer-site (:peer-site task-state)}) 
+                                          [:messenger-buffer])
+     :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
+
 (defn onyx-peer
   ([peer-group]
      (onyx-peer peer-group {:monitoring :no-op}))
@@ -146,11 +180,8 @@
        :messaging-require (messaging-require-ctor config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger-buffer (component/using (messenger-buffer config)[:monitoring :log :acking-daemon])
-       :messenger (component/using (messenger-ctor peer-group)
-                                   [:monitoring :messaging-require :acking-daemon :messenger-buffer])
-       :virtual-peer (component/using (virtual-peer config)
-                                      [:monitoring :log :acking-daemon :messenger-buffer :messenger])})))
+       :messenger (component/using (messenger-ctor peer-group) [:monitoring :messaging-require :acking-daemon])
+       :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :acking-daemon :messenger])})))
 
 (defn onyx-peer-group
   [config]

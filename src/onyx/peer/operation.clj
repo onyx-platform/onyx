@@ -61,28 +61,6 @@
                                          (into-array Class [clojure.lang.IPersistentMap]))
                 (into-array [pipeline-data])))
 
-(defn peer-link
-  [replica-val state event peer-id]
-  (if-let [link (get (:links @state) peer-id)]
-    (do
-      (reset! (:timestamp link) (System/currentTimeMillis))
-      (:link link))
-    (if-let [site (-> replica-val
-                      :peer-sites
-                      (get peer-id))]
-      (-> state
-          (swap! update-in
-                 [:links peer-id]
-                 (fn [link]
-                   (or link
-                       (->Link (extensions/connect-to-peer (:onyx.core/messenger event) peer-id event site)
-                               (atom (System/currentTimeMillis))))))
-          :links
-          (get peer-id)
-          :link)
-      (do (warn "Could not obtain peer-site from replica" peer-id)
-          nil))))
-
 (defn grouped-task? [task-map]
   (or (:onyx/group-by-key task-map)
       (:onyx/group-by-fn task-map)))
