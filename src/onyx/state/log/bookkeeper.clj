@@ -64,8 +64,10 @@
 (def HandleWriteCallback
   (reify AsyncCallback$AddCallback
     (addComplete [this rc lh entry-id ack-fn]
-      (when (= rc (BKException$Code/OK))
-        (ack-fn)))))
+      (if (= rc (BKException$Code/OK))
+        (ack-fn)
+        ;; TODO: should restart peer, see https://github.com/onyx-platform/onyx/issues/390
+        (warn "Unable to complete async write to bookkeeper. BookKeeper exception code:" rc)))))
 
 (defn compaction-transition 
   "Transitions to a new compacted ledger, plus a newly created ledger created
