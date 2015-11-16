@@ -34,8 +34,8 @@
       (fatal "Writing to closed publication." e)
       (stop publication-manager))
     (catch Throwable t
-      ;; TODO, handle this outcome better. Should reset connection?
-      (fatal "Aeron write from buffer error: " t))))
+      (fatal "Aeron write from buffer error: " t)
+      (stop publication-manager))))
 
 (defrecord PublicationManager [channel stream-id send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
   PPublicationManager
@@ -48,6 +48,7 @@
     (>!! pending-ch (->Message buf start end)))
 
   (stop [this]
+    (info (format "Stopped publication manager at: %s, stream-id: %s" channel stream-id))
     (cleanup-fn)
     (future-cancel (:write-fut this))
     (close! pending-ch)
@@ -65,6 +66,7 @@
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           conn (Aeron/connect (.errorHandler (Aeron$Context.) error-handler))
           pub (.addPublication conn channel stream-id)]
+      (info (format "Connected via publication on: %s, stream-id: %s" channel stream-id))
       (assoc this :publication pub :connection conn))))
 
 (defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size cleanup-fn]
