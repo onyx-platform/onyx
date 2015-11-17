@@ -83,11 +83,6 @@
 (defn acking-daemon [config]
   (map->AckingDaemon {:opts config}))
 
-(defn gen-message-id
-  "Generates a unique ID for a message - acts as the root id."
-  []
-  (java.util.UUID/randomUUID))
-
 (defn gen-ack-value
   "Generate a 64-bit value to bit-xor against the current ack-value."
   []

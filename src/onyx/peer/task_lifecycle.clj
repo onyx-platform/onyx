@@ -8,6 +8,7 @@
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.static.planning :refer [find-task]]
               [onyx.static.validation :as validation]
+              [onyx.static.uuid :as uuid]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-compile :as c]
               [onyx.peer.pipeline-extensions :as p-ext]
@@ -210,7 +211,7 @@
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
   (let [rets (-> (compiled-before-batch-fn event)
-                 (assoc :onyx.core/lifecycle-id (java.util.UUID/randomUUID)))]
+                 (assoc :onyx.core/lifecycle-id (uuid/random-uuid)))]
     (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
     rets))
