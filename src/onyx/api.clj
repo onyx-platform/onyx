@@ -300,12 +300,19 @@
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
    and removes it from the execution of any tasks. This peer will
-   not longer volunteer for tasks."
+   not longer volunteer for tasks. Returns nil."
   [peer]
   (>!! (:shutdown-ch peer) true)
   (<!! (:ack-ch peer))
   (close! (:shutdown-ch peer))
   (close! (:ack-ch peer)))
+
+(defn ^{:added "0.8.1"} shutdown-peers
+  "Like shutdown-peers, but takes a sequence of peers as an argument,
+   shutting each down in order. Returns nil."
+  [peers]
+  (doseq [p peers]
+    (shutdown-peer p)))
 
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
