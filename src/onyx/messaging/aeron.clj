@@ -177,26 +177,22 @@
 
 (defrecord TrackedPub [publication last-used])
 
-(defn get-publication [messenger {:keys [channel] :as conn-info}]
-  ;; FIXME, race condition may cause two publications to be created
-  (if-let [pub (get @(:publications messenger) channel)]
+(defn get-publication [{:keys [publications] :as messenger} {:keys [channel] :as conn-info}]
+  (if-let [pub (get @publications channel)]
     (do
       (reset! (:last-used pub) (System/currentTimeMillis))
       (:publication pub))
-    (let [stream-id (:stream-id conn-info)
-          pub-manager (-> (pubm/new-publication-manager channel 
-                                                        stream-id 
-                                                        (:send-idle-strategy messenger) 
-                                                        (:write-buffer-size messenger)
-                                                        (fn []
-                                                          (swap! (:publications messenger) dissoc channel))) 
-                          (pubm/connect) 
-                          (pubm/start))]
-      (swap! (:publications messenger) 
-             assoc 
-             channel 
-             (->TrackedPub pub-manager (atom (System/currentTimeMillis))))
-      pub-manager)))
+    (locking publications
+      (let [stream-id (:stream-id conn-info)
+            pub-manager (-> (pubm/new-publication-manager channel 
+                                                          stream-id 
+                                                          (:send-idle-strategy messenger) 
+                                                          (:write-buffer-size messenger)
+                                                          (fn [] (swap! publications dissoc channel))) 
+                            (pubm/connect) 
+                            (pubm/start))]
+        (swap! publications assoc channel (->TrackedPub pub-manager (atom (System/currentTimeMillis))))
+        pub-manager))))
 
 (defn opts->port [opts]
   (or (:onyx.messaging/peer-port opts)
