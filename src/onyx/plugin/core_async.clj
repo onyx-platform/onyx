@@ -3,6 +3,7 @@
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
+            [onyx.static.uuid :as uuid]
             [onyx.types :as t]
             [taoensso.timbre :refer [debug info] :as timbre]))
 
@@ -70,8 +71,7 @@
                       segments
                       (if-let [message (first (alts!! [retry-ch chan timeout-ch] :priority true))]
                         (recur (conj segments
-                                     (t/input (java.util.UUID/randomUUID)
-                                              message))
+                                     (t/input (uuid/random-uuid) message))
                                (inc cnt))
                         segments)))
                   (<!! timeout-ch))]
