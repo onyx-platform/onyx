@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.aeron.publication-manager :as pubm]
+            [onyx.messaging.aeron.publication-group :as pg :refer [get-publication]]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.types :refer [->MonitorEventBytes]]
@@ -24,20 +25,20 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronConnection
-  [peer-group messaging-group short-circuitable? publications virtual-peers acking-daemon acking-ch
+  [peer-group messaging-group publication-group short-circuitable? publications virtual-peers acking-daemon acking-ch
    send-idle-strategy compress-f]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
+          publication-group (:publication-group messaging-group)
           publications (:publications messaging-group)
           virtual-peers (:virtual-peers messaging-group)
           external-channel (:external-channel messaging-group)
           short-circuitable? (if (arg-or-default :onyx.messaging/allow-short-circuit? config)
                                (fn [channel] (= channel external-channel))
                                (fn [_] false))
-          write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size config)
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
@@ -46,12 +47,11 @@
       (assoc component
              :messaging-group messaging-group
              :short-circuitable? short-circuitable?
-             :publications publications
+             :publication-group publication-group
              :peer-task-short-id peer-task-short-id
              :acker-short-id acker-short-id
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
-             :write-buffer-size write-buffer-size
              :compress-f compress-f
              :acking-ch acking-ch)))
 
@@ -67,8 +67,7 @@
     (assoc component
            :send-idle-strategy nil
            :short-circuitable? nil
-           :publications nil
-           :write-buffer-size nil
+           :publication-group publication-group
            :virtual-peers nil
            :peer-task-short-id nil
            :acker-short-id nil
@@ -175,52 +174,11 @@
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
-(defrecord TrackedPub [publication last-used])
-
-(defn get-publication [{:keys [publications] :as messenger} {:keys [channel] :as conn-info}]
-  (if-let [pub (get @publications channel)]
-    (do
-      (reset! (:last-used pub) (System/currentTimeMillis))
-      (:publication pub))
-    (locking publications
-      (let [stream-id (:stream-id conn-info)
-            pub-manager (-> (pubm/new-publication-manager channel 
-                                                          stream-id 
-                                                          (:send-idle-strategy messenger) 
-                                                          (:write-buffer-size messenger)
-                                                          (fn [] (swap! publications dissoc channel))) 
-                            (pubm/connect) 
-                            (pubm/start))]
-        (swap! publications assoc channel (->TrackedPub pub-manager (atom (System/currentTimeMillis))))
-        pub-manager))))
-
 (defn opts->port [opts]
   (or (:onyx.messaging/peer-port opts)
       (throw (ex-info "Peer port (:onyx.messaging/peer-port) is not defined" opts))))
 
-
-;; FIXME: gc'ing publications could be racy if a publication is grabbed
-;; just as it is being gc'd - though it is unlikely
-(defn gc-publications [publications opts]
-  (let [interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
-        idle ^long (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
-    (loop []
-      (try
-        (Thread/sleep interval)
-        (let [t (System/currentTimeMillis)
-              snapshot @publications
-              to-remove (map first
-                             (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle))
-                                     snapshot))]
-          (doseq [k to-remove]
-            (pubm/stop (:publication (snapshot k)))))
-        (catch InterruptedException e
-          (throw e))
-        (catch Throwable e
-          (fatal e)))
-      (recur))))
-
-(defrecord AeronPeerGroup [opts publications subscribers subscriber-count compress-f decompress-f send-idle-strategy]
+(defrecord AeronPeerGroup [opts publication-group subscribers subscriber-count compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
@@ -241,20 +199,18 @@
           compress-f (or (:onyx.messaging/compress-fn opts) compress)
           decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
           virtual-peers (atom (pm/vpeer-manager))
-          publications (atom {})
+          publication-group (component/start (pg/new-publication-group opts send-idle-strategy))
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
           subscribers (mapv (fn [stream-id]
                               (start-subscriber! bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
-                            (range subscriber-count))
-          pub-gc-thread (future (gc-publications publications opts))]
+                            (range subscriber-count))]
       (assoc component
-             :pub-gc-thread pub-gc-thread
              :bind-addr bind-addr
              :external-addr external-addr
              :external-channel external-channel
              :media-driver-context media-driver-context
              :media-driver media-driver
-             :publications publications
+             :publication-group publication-group
              :virtual-peers virtual-peers
              :compress-f compress-f
              :decompress-f decompress-f
@@ -263,19 +219,17 @@
              :subscriber-count subscriber-count
              :subscribers subscribers)))
 
-  (stop [{:keys [media-driver media-driver-context subscribers publications] :as component}]
+  (stop [{:keys [media-driver media-driver-context subscribers publication-group] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (future-cancel (:pub-gc-thread component))
+    (component/stop publication-group)
     (doseq [subscriber subscribers]
       (future-cancel (:subscriber-fut subscriber))
       (.close ^Subscription (:subscription subscriber))
       (.close ^Aeron (:conn subscriber)))
-    (doseq [pub (vals @publications)]
-      (pubm/stop (:publication pub))) 
+     
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
-           :pub-gc-thread nil
            :bind-addr nil :external-addr nil :external-channel nil
            :media-driver nil :publications nil :virtual-peers nil
            :media-driver-context nil
@@ -339,7 +293,6 @@
 
 (defrecord AeronPeerConnection [channel stream-id acker-id peer-task-id])
 
-;; TODO: RENAME
 (defmethod extensions/connection-spec AeronConnection
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/acker-id aeron/peer-task-id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
@@ -398,44 +351,44 @@
     (>!! ch retry-id)))
 
 (defmethod extensions/send-messages AeronConnection
-  [messenger event {:keys [peer-task-id channel] :as conn-info} batch]
+  [messenger event {:keys [peer-task-id channel] :as conn-spec} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (:inbound-ch (lookup-channels messenger peer-task-id)) batch)
-    (let [pub-man (get-publication messenger conn-info)
+    (let [pub-man (get-publication (:publication-group messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) peer-task-id batch)]
       (pubm/write pub-man buf 0 (.capacity buf)))))
 
 (defmethod extensions/internal-ack-segment AeronConnection
-  [messenger event {:keys [acker-id channel] :as conn-info} ack]
+  [messenger event {:keys [acker-id channel] :as conn-spec} ack]
   (if ((:short-circuitable? messenger) channel)
     (ack-segment-short-circuit (lookup-channels messenger acker-id) ack)
-    (let [pub-man (get-publication messenger conn-info)]
+    (let [pub-man (get-publication (:publication-group messenger) conn-spec)]
       (let [buf (protocol/build-acker-message acker-id (:id ack) (:completion-id ack) (:ack-val ack))]
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
 (defmethod extensions/internal-ack-segments AeronConnection
-  [messenger event {:keys [acker-id] :as conn-info} acks]
-  (if ((:short-circuitable? messenger) (:channel conn-info))
+  [messenger event {:keys [acker-id] :as conn-spec} acks]
+  (if ((:short-circuitable? messenger) (:channel conn-spec))
     (ack-segments-short-circuit (lookup-channels messenger acker-id) acks)
-    (let [pub-man (get-publication messenger conn-info)
+    (let [pub-man (get-publication (:publication-group messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-acker-messages acker-id acks)
           size (.capacity buf)]
       (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes size))
       (pubm/write pub-man buf 0 size))))
 
 (defmethod extensions/internal-complete-message AeronConnection
-  [messenger event completion-id {:keys [peer-task-id channel] :as conn-info}]
+  [messenger event completion-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (:release-ch (lookup-channels messenger peer-task-id)) completion-id)
-    (let [pub-man (get-publication messenger conn-info)
+    (let [pub-man (get-publication (:publication-group messenger) conn-spec)
           buf (protocol/build-completion-msg-buf peer-task-id completion-id)]
       (pubm/write pub-man buf 0 protocol/completion-msg-length))))
 
 (defmethod extensions/internal-retry-segment AeronConnection
-  [messenger event retry-id {:keys [peer-task-id channel] :as conn-info}]
+  [messenger event retry-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (retry-segment-short-circuit (:retry-ch (lookup-channels messenger peer-task-id)) retry-id)
     (let [idle-strategy (:send-idle-strategy messenger)
-          pub-man (get-publication messenger conn-info)
+          pub-man (get-publication (:publication-group messenger) conn-spec)
           buf (protocol/build-retry-msg-buf peer-task-id retry-id)]
       (pubm/write pub-man buf 0 protocol/retry-msg-length))))

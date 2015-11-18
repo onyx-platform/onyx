@@ -72,3 +72,5 @@
 (defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size cleanup-fn]
   (->PublicationManager channel stream-id send-idle-strategy 
                         nil nil (chan write-buffer-size) nil cleanup-fn))
+
+
