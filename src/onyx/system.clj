@@ -11,7 +11,7 @@
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
-            [onyx.state.bookkeeper :refer [new-bookie]]
+            [onyx.state.bookkeeper :refer [multi-bookie-server]]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
@@ -129,7 +129,7 @@
      (map->OnyxDevelopmentEnv
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :logging-config (logging-config/logging-configuration peer-config)
-       :bookkeeper (component/using (new-bookie peer-config) [:log])
+       :bookkeeper (component/using (multi-bookie-server peer-config) [:log])
        :log (component/using (zookeeper peer-config) [:monitoring :logging-config])})))
 
 (defn onyx-client
