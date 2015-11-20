@@ -55,8 +55,9 @@
   (component/stop [{:keys [server] :as component}]
     (info "Stopping BookKeeper server")
     (.shutdown ^BookieServer server)
-    (cleanup-dir (:journal-dir component))
-    (cleanup-dir (:ledger-dir component))
+    (when (:onyx.bookkeeper/delete-server-data? env-config) 
+      (cleanup-dir (:journal-dir component))
+      (cleanup-dir (:ledger-dir component)))
     (assoc component :server nil :port nil :journal-dir nil :ledger-dir nil)))
 
 (defn started? [bookie]
@@ -76,7 +77,7 @@
                               (reset! bookie (component/start (->Bookie env-config port log)))
                               (catch Throwable t
                                 (error t "Error starting BookKeeper server:"))))
-                          (Thread/sleep 100)))]
+                          (Thread/sleep 1000)))]
       (info "Starting BookKeeper Monitor service")
       (assoc component :bookie bookie :monitor-fut monitor-fut)))
   (component/stop [component]
