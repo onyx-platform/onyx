@@ -66,7 +66,7 @@
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           conn (Aeron/connect (.errorHandler (Aeron$Context.) error-handler))
           pub (.addPublication conn channel stream-id)]
-      (info (format "Connected via publication on: %s, stream-id: %s" channel stream-id))
+      (info (format "Created publication at: %s, stream-id: %s" channel stream-id))
       (assoc this :publication pub :connection conn))))
 
 (defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size cleanup-fn]
