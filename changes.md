@@ -1,3 +1,6 @@
+#### 0.8.1
+- onyx.helper-env has been removed, which is superseded by onyx.test-helper's functions and components
+
 #### 0.8.0
 - **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.
 - **Important change**: default task batch timeout was reduced from 1000ms to 50ms.
