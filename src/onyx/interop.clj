@@ -2,7 +2,8 @@
   (:gen-class :name onyx.interop
               :methods [^:static [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
                         ^:static [read_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
-  (:require [onyx.peer.pipeline-extensions :refer [PipelineInput Pipeline]]))
+  (:require [onyx.peer.pipeline-extensions :refer [PipelineInput Pipeline]]
+            [onyx.information-model :refer [model]]))
 
 (defn -write_batch
   [event]
@@ -44,3 +45,31 @@
     (.writeBatch this event))
   (seal-resource [this event]
     (.sealResource this event)))
+
+(def casts
+  {:boolean (fn [x] x)
+   :integer (fn [x] x)
+   :string (fn [x] x)
+   :any (fn [x] x)
+   :keyword (fn [x] (keyword x))
+   :vector (fn [x] (vec x))})
+
+(defn cast-types [section m]
+  (let [section* (keyword section)]
+    (reduce-kv
+     (fn [m* k v]
+       (let [k* (keyword k)
+             type (get-in model [section* :model k* :type])
+             v* ((get casts type identity) v)]
+         (assoc m* k* v*)))
+     {}
+     m)))
+
+(defn coerce-workflow [workflow]
+  (mapv #(mapv (fn [v] (keyword v)) %) workflow))
+
+(defn coerce-catalog [catalog]
+  (mapv #(cast-types :catalog-entry %) catalog))
+
+(defn coerce-lifecycles [lifecycles]
+  (mapv #(cast-types :lifecycle-entry %) lifecycles))
