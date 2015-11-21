@@ -73,3 +73,12 @@
 
 (defn coerce-lifecycles [lifecycles]
   (mapv #(cast-types :lifecycle-entry %) lifecycles))
+
+(defn coerce-flow-conditions [fcs]
+  (mapv #(cast-types :flow-conditions-entry %) fcs))
+
+(defn coerce-windows [windows]
+  (mapv #(cast-types :window-entry %) windows))
+
+(defn coerce-trigger [trigger]
+  (mapv #(cast-types :trigger-entry %) trigger))
