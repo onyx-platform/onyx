@@ -22,8 +22,12 @@
 
 (defmethod api/trigger-fire? :percentile-watermark
   [{:keys [onyx.core/window-state] :as event} trigger args]
-  (exceeds-watermark? (:window args) trigger (:lower-extent args)
-                      (:upper-extent args) (:segment args)))
+  ;; If this was stimulated by a new segment, check if it should fire.
+  ;; Otherwise if this was a completed task, always fire.
+  (if (:segment args)
+    (exceeds-watermark? (:window args) trigger (:lower-extent args)
+                        (:upper-extent args) (:segment args))
+    true))
 
 (defmethod api/trigger-teardown :percentile-watermark
   [event trigger]
