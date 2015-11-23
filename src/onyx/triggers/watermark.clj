@@ -20,7 +20,11 @@
 
 (defmethod api/trigger-fire? :watermark
   [event trigger args]
-  (exceeds-watermark? (:window args) (:upper-extent args) (:segment args)))
+  ;; If this was stimulated by a new segment, check if it should fire.
+  ;; Otherwise if this was a completed task, always fire.
+  (if (:segment args)
+    (exceeds-watermark? (:window args) (:upper-extent args) (:segment args))
+    true))
 
 (defmethod api/trigger-teardown :watermark
   [event trigger]
