@@ -13,8 +13,8 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.2.374"]
-                 [org.apache.curator/curator-framework "3.0.0"]
-                 [org.apache.curator/curator-test "3.0.0"]
+                 [org.apache.curator/curator-framework "2.9.1"]
+                 [org.apache.curator/curator-test "2.9.1"]
                  [clj-tuple "0.2.2"]
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.0"]
