@@ -20,38 +20,36 @@
 (defrecord Bookie [env-config port log]
   component/Lifecycle
   (component/start [component]
-    (if (arg-or-default :onyx.bookkeeper/server? env-config)
-      (let [onyx-id (:onyx/id env-config)
-            ledgers-root-path (ozk/ledgers-path onyx-id)
-            ledgers-available-path (ozk/ledgers-available-path onyx-id)
-            _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
-            _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
-            base-journal-dir (arg-or-default :onyx.bookkeeper/base-journal-dir env-config)
-            base-ledger-dir (arg-or-default :onyx.bookkeeper/base-ledger-dir env-config)
-            server-id (str onyx-id "_" port)
-            journal-dir (str base-journal-dir "/" server-id)
-            ledger-dir (str base-ledger-dir "/" server-id)
-            server-conf (doto (ServerConfiguration.)
-                          (.setZkServers (:zookeeper/address env-config))
-                          (.setZkLedgersRootPath ledgers-root-path)
-                          (.setBookiePort port)
-                          (.setJournalDirName journal-dir)
-                          (.setLedgerDirNames (into-array String [ledger-dir]))
-                          (.setAllowLoopback true))
-            server (BookieServer. server-conf)
-            _ (info "Starting BookKeeper server on port" port)
-            _ (.start server)]
-        (when (:onyx.bookkeeper/delete-server-data? env-config) 
-          (.addShutdownHook (Runtime/getRuntime) 
-                            (Thread. (fn []
-                                       (cleanup-dir base-ledger-dir)
-                                       (cleanup-dir base-journal-dir)))))
-        (assoc component 
-               :server server 
-               :port port 
-               :journal-dir journal-dir 
-               :ledger-dir ledger-dir)) 
-      component))
+    (let [onyx-id (:onyx/id env-config)
+          ledgers-root-path (ozk/ledgers-path onyx-id)
+          ledgers-available-path (ozk/ledgers-available-path onyx-id)
+          _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
+          _ (zk/create (:conn log) ledgers-available-path :persistent? true) 
+          base-journal-dir (arg-or-default :onyx.bookkeeper/base-journal-dir env-config)
+          base-ledger-dir (arg-or-default :onyx.bookkeeper/base-ledger-dir env-config)
+          server-id (str onyx-id "_" port)
+          journal-dir (str base-journal-dir "/" server-id)
+          ledger-dir (str base-ledger-dir "/" server-id)
+          server-conf (doto (ServerConfiguration.)
+                        (.setZkServers (:zookeeper/address env-config))
+                        (.setZkLedgersRootPath ledgers-root-path)
+                        (.setBookiePort port)
+                        (.setJournalDirName journal-dir)
+                        (.setLedgerDirNames (into-array String [ledger-dir]))
+                        (.setAllowLoopback true))
+          server (BookieServer. server-conf)
+          _ (info "Starting BookKeeper server on port" port)
+          _ (.start server)]
+      (when (:onyx.bookkeeper/delete-server-data? env-config) 
+        (.addShutdownHook (Runtime/getRuntime) 
+                          (Thread. (fn []
+                                     (cleanup-dir base-ledger-dir)
+                                     (cleanup-dir base-journal-dir)))))
+      (assoc component 
+             :server server 
+             :port port 
+             :journal-dir journal-dir 
+             :ledger-dir ledger-dir)))
   (component/stop [{:keys [server] :as component}]
     (info "Stopping BookKeeper server")
     (.shutdown ^BookieServer server)
@@ -96,16 +94,19 @@
 (defrecord BookieServers [env-config log]
   component/Lifecycle
   (component/start [component]
-    (let [local-quorum? (arg-or-default :onyx.bookkeeper/local-quorum? env-config)
+    (if (arg-or-default :onyx.bookkeeper/server? env-config)
+      (let [local-quorum? (arg-or-default :onyx.bookkeeper/local-quorum? env-config)
           ports (if local-quorum?
                   (arg-or-default :onyx.bookkeeper/local-quorum-ports env-config)
                   (vector (arg-or-default :onyx.bookkeeper/port env-config)))]
       (assoc component :servers (mapv (fn [port] 
                                         (component/start (->BookieMonitor env-config log port)))
-                                      ports)))) 
+                                      ports))
+      component))) 
   (component/stop [component]
-    (doseq [server (:servers component)]
-      (component/stop server))))
+    (if (arg-or-default :onyx.bookkeeper/server? env-config)
+      (doseq [server (:servers component)]
+        (component/stop server)))))
 
 (defn multi-bookie-server [env-config]
   (map->BookieServers {:env-config env-config}))
