@@ -161,8 +161,10 @@
             (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
               (>!! (:retry-ch chs) retry-id))))))
 
-(defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
-  (let [ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
+(defn start-subscriber! [bind-addr port inter-service-timeout stream-id virtual-peers decompress-f idle-strategy]
+  (let [ctx (-> (Aeron$Context.)
+                (.errorHandler no-op-error-handler)
+                (.interServiceTimeout inter-service-timeout))
         conn (Aeron/connect ctx)
         channel (aeron-channel bind-addr port)
         handler (fragment-data-handler
@@ -183,6 +185,7 @@
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
+          inter-service-timeout (arg-or-default :onyx.messaging.aeron/inter-service-timeout-ns opts)
           media-driver-context (if embedded-driver?
                                  (doto (MediaDriver$Context.)))
           media-driver (if embedded-driver?
@@ -202,7 +205,7 @@
           publication-group (component/start (pg/new-publication-group opts send-idle-strategy))
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)
           subscribers (mapv (fn [stream-id]
-                              (start-subscriber! bind-addr port stream-id virtual-peers decompress-f receive-idle-strategy))
+                              (start-subscriber! bind-addr port inter-service-timeout stream-id virtual-peers decompress-f receive-idle-strategy))
                             (range subscriber-count))]
       (assoc component
              :bind-addr bind-addr
