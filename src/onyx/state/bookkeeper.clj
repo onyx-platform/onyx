@@ -96,13 +96,13 @@
   (component/start [component]
     (if (arg-or-default :onyx.bookkeeper/server? env-config)
       (let [local-quorum? (arg-or-default :onyx.bookkeeper/local-quorum? env-config)
-          ports (if local-quorum?
-                  (arg-or-default :onyx.bookkeeper/local-quorum-ports env-config)
-                  (vector (arg-or-default :onyx.bookkeeper/port env-config)))]
-      (assoc component :servers (mapv (fn [port] 
-                                        (component/start (->BookieMonitor env-config log port)))
-                                      ports))
-      component))) 
+            ports (if local-quorum?
+                    (arg-or-default :onyx.bookkeeper/local-quorum-ports env-config)
+                    (vector (arg-or-default :onyx.bookkeeper/port env-config)))]
+        (assoc component :servers (mapv (fn [port] 
+                                          (component/start (->BookieMonitor env-config log port)))
+                                        ports)))
+      component)) 
   (component/stop [component]
     (if (arg-or-default :onyx.bookkeeper/server? env-config)
       (doseq [server (:servers component)]
