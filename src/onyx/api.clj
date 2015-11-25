@@ -167,7 +167,7 @@
        (extensions/write-log-entry (:log client) entry)
        (component/stop client)
        {:job-id id
-        :task-ids tasks})))
+        :task-ids (zipmap (map :name tasks) tasks)})))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
