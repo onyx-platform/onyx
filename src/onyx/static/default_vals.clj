@@ -65,17 +65,17 @@
    :onyx.messaging.aeron/embedded-driver? true
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
-   :onyx.messaging.aeron/inter-service-timeout-ns 20000000000
+   :onyx.messaging.aeron/inter-service-timeout-ns 10000000000
    :onyx.messaging.aeron/subscriber-count 2
    :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging/allow-short-circuit? true
-   :onyx.messaging/inbound-buffer-size 200000
-   :onyx.messaging/completion-buffer-size 50000
+   :onyx.messaging/inbound-buffer-size 50000
+   :onyx.messaging/completion-buffer-size 10000
    :onyx.messaging/release-ch-buffer-size 10000
    :onyx.messaging/retry-ch-buffer-size 10000
    :onyx.messaging/peer-link-gc-interval 90000
    :onyx.messaging/peer-link-idle-timeout 60000
-   :onyx.messaging/ack-daemon-timeout default-pending-timeout
+   :onyx.messaging/ack-daemon-timeout 480000
    :onyx.messaging/ack-daemon-clear-interval 15000
 
    ;; windowing defaults

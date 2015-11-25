@@ -10,6 +10,14 @@
   (is (empty? (remove (apply merge (map :model (vals model))) 
                       (keys defaults)))))
 
+(deftest different-defaults-test
+  (let [flattened (apply merge (map :model (vals model)))] 
+    (is (= [] 
+           (remove (fn [[k v]] 
+                     (= (defaults k) 
+                        (:default (flattened k))))
+                   defaults)))))
+
 (def non-doc-keys 
   #{s/Keyword s/Any 
     schema/UnsupportedTaskMapKey schema/UnsupportedWindowKey 

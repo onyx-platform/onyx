@@ -493,7 +493,7 @@
             {:doc "Number of ms to back off and wait before retrying the call to `start-task?` lifecycle hook if it returns false."
              :type :integer
              :unit :milliseconds
-             :default 2000
+             :default 500
              :optional? true}
 
             :onyx.peer/job-not-ready-back-off
@@ -558,13 +558,13 @@
             {:doc "Number of messages to buffer in the core.async channel for received segments."
              :optional? true
              :type :integer
-             :default 20000}
+             :default 50000}
 
             :onyx.messaging/completion-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for completing messages on an input task."
              :optional? true
              :type :integer
-             :default 1000}
+             :default 10000}
 
             :onyx.messaging/release-ch-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for released completed messages."
@@ -597,7 +597,7 @@
              :unit :milliseconds
              :optional? true
              :type :integer
-             :default 60000}
+             :default 480000}
 
             :onyx.messaging/ack-daemon-clear-interval
             {:doc "Number of milliseconds to wait for process to periodically clear out ack-vals that have timed out in the daemon."
@@ -937,7 +937,8 @@
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
     :onyx.messaging/completion-buffer-size
-    :onyx.messaging/release-ch-buffer-size :onyx.messaging/retry-ch-buffer-size
+    :onyx.messaging/release-ch-buffer-size 
+    :onyx.messaging/retry-ch-buffer-size
     :onyx.messaging/peer-link-gc-interval
     :onyx.messaging/peer-link-idle-timeout :onyx.messaging/ack-daemon-timeout
     :onyx.messaging/ack-daemon-clear-interval :onyx.messaging/decompress-fn
