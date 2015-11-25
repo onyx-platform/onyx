@@ -1,3 +1,6 @@
+#### 0.8.2
+- changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
+
 #### 0.8.1
 - onyx.helper-env has been removed, which is superseded by onyx.test-helper's functions and components
 
