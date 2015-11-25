@@ -187,7 +187,7 @@
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
           inter-service-timeout (arg-or-default :onyx.messaging.aeron/inter-service-timeout-ns opts)
           ;; client liveness timeout should match inter-service-timeout
-          _ (System/setProperty "aeron.client.liveness.timeout" inter-service-timeout)
+          _ (System/setProperty "aeron.client.liveness.timeout" (str inter-service-timeout))
           media-driver-context (if embedded-driver?
                                  (doto (MediaDriver$Context.)))
           media-driver (if embedded-driver?
