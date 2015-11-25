@@ -65,6 +65,8 @@ The basic idea is that every entry in the Flow Conditions data structure denotes
 
 There is *one* flow conditions data structure per job - that is, there is one vector of maps. The order that you specify the flow conditions in matters. More on that later in this section.
 
+Example project: [flow-combine](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flow-combine)
+
 ### Predicate Function Signatures
 
 A predicate function is a Clojure function that takes at least four parameters - a context map, the old segment, the new segment, and the collection of all new segments produced from the old segment. Predicates can take parameters at runtime. They will be appended to the end of the function invocation. See Predicate Parameters for further discussion of how to use runtime parameters.
@@ -112,9 +114,13 @@ Our predicate for flow conditions might need to use the `:side-effects-result` t
  :flow/doc "Emits segment if this segment is an adult."}
 ```
 
+Example project: [flow-exclude-keys](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flow-exclude-keys)
+
 ### Predicate Composition
 
 One extraordinarily powerful feature of Flow Conditions is its composition characters. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and an athlete in `[:and :my.ns/female? :my.ns/athlete?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/athlete? :my/state-param]]` Parameters *may not* specify logical functions.
+
+Example project: [flow-predicate-composition](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flow-predicate-composition)
 
 ### Match All/None
 
@@ -145,6 +151,8 @@ If a flow condition specifies `:all` as its `:flow/to`, it must come before any 
 ### Short Circuiting
 
 If multiple flow condition entries evaluate to a true predicate, their `:flow/to` values are unioned (duplicates aren't acknowledged), as well as their `:flow/exclude-keys`. Sometimes you don't want this behavior, and you want to specify exactly the downstream tasks to emit to - and not check any more flow condition entries. You can do this with `:flow/short-circuit?` set to `true`. Any entry that has `:flow/short-circuit?` set to `true` must come before any entries for an task that have it set to `false` or `nil`.
+
+Example project: [flow-short-circuit](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flow-short-circuit)
 
 ### Exceptions
 

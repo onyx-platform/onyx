@@ -53,6 +53,8 @@ Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:cat
 
 Given a job ID, blocks the calling thread until all the tasks for this job have been completed.
 
+Example project: [block-on-job-completion](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/block-on-job-completion)
+
 ##### `gc`
 
 Invokes the garbage collector. Compresses the replica in Zookeeper, freeing up storage and deleting log history. Frees up memory on the local, in memory replica on all peers.
@@ -60,6 +62,8 @@ Invokes the garbage collector. Compresses the replica in Zookeeper, freeing up s
 ##### `kill-job`
 
 Stops this job from executing, never allowing it to be run again.
+
+Example project: [kill-job](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/kill-job)
 
 ##### `subscribe-to-log`
 

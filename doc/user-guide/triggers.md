@@ -25,6 +25,8 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 
 Windows capture data over time and place segments into discrete, possibly overlapping buckets. By itself, this is a relatively useless concept. In order to harness the information that has been captured and rolled up, we need to *move* it somewhere. Triggers let us interact with the state in each extent of a window.
 
+Example project: [aggregation](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/aggregation)
+
 ### Trigger Types
 
 Onyx ships a number of trigger implementations that can be used out of the box. Each trigger fires in response to a particular stimulous. All triggers implemented in Onyx core fire at task completion. We outline each here and show an example of each in action.

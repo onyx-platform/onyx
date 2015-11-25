@@ -62,6 +62,8 @@ Example:
  :window/range [5 :minutes]}
 ```
 
+Example project: [fixed-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/fixed-windows)
+
 #### Sliding Windows
 
 In contrast to fixed windows, sliding windows allow extents to overlap. When a sliding window is specified, we have to give it a range for which the window spans, and a *slide* value for how long to wait between spawning a new window extent. Every data point will fall into exactly `range / slide` number of window extents. We draw out what this looks like for a sliding window with range `15` and slide `5`:
@@ -88,6 +90,8 @@ Example:
  :window/slide [1 :minute]}
 ```
 
+Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/sliding-windows)
+
 #### Global Windows
 
 Global windows are perhaps the easiest to understand. With global windows, there is exactly one window extent that match all data that enters it. This lets you capture events that span over an entire domain of time. Global windows are useful for modeling batch or timeless computations.
@@ -106,6 +110,8 @@ Example:
  :window/aggregation :onyx.windowing.aggregation/count
  :window/window-key :event-time}]
 ```
+
+Example project: [global-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/global-windows)
 
 #### Session Windows
 
@@ -132,6 +138,8 @@ Example:
  :window/session-key :id
  :window/timeout-gap [5 :minutes]}]
 ```
+
+Example project: [session-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/session-windows)
 
 ### Units
 

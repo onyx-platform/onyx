@@ -74,6 +74,8 @@ The workflow representation is a Clojure vector of vectors. Each inner vector co
  [:processing-2 :output]]
 ```
 
+Example projects: [flat-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flat-workflow), [multi-output-workflow](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/multi-output-workflow)
+
 #### Catalog
 
 All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog.

@@ -31,6 +31,9 @@ A Function is a construct that takes a segment as a parameter and outputs a segm
 
 Note that you may *only* pass segments between functions - no other shape of data is allowed.
 
+Example project: [filtering](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/filtering)
+
+
 #### Function Parameterization
 
 A function can be parameterized before a job is submitted to Onyx. The segment is always the last argument to the function. If more than one of these options are used, the arguments are concatenated in the order that this documentation section lists them. There are three ways to parameterize a function:
@@ -66,6 +69,8 @@ The function is then invoked with `(partial f :my-args-here)`.
 ```
 
 The function is then invoked with `(partial f "abc" "def")`. The order is controlled by the vector of `:onyx/params`.
+
+Example projects: [parameterized](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/parameterized), [interface-injection](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/interface-injection), [catalog-parameters](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/catalog-parameters)
 
 #### Grouping & Aggregation
 
@@ -103,7 +108,7 @@ To group by an arbitrary function, use `:onyx/group-by-fn` in the catalog entry:
 
 Functions that use the grouping feature are presumably stateful. For this reason, once a job begins, no matter how many peers are added to the cluster, no new peers will be allocated to grouping tasks. If we added more peers after the job began, the hashing algorithm lose its consistency, and stateful operations wouldn't work correctly.
 
-Given the fact the Onyx will not add more peers to a grouping task after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers`.
+Given the fact the Onyx will not add more peers to a grouping task after it begins, we introduce a new parameter - `:onyx/min-peers`. This should be set to an integer that indicates the minimum number of peers that will be allocated to this task before the job can begin. Onyx *may* schedule more than the minimum number that you set. You can create an upper bound by also using `:onyx/max-peers` (example project: [max-peers](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/max-peers)).
 
 One concern that immediately needs to be handled is addressing what happens if a peer on a grouping task leaves the cluster after the job has begun? Clearly, removing a peer from a grouping task also breaks the consistent hashing algorithm that supports statefulness. The policy that is enforced is configurable, and must be chosen by the developer. We offer two policies, outlined below.
 
