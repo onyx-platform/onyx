@@ -189,7 +189,7 @@
           ;; client liveness timeout should match inter-service-timeout
           _ (System/setProperty "aeron.client.liveness.timeout" (str inter-service-timeout))
           media-driver-context (if embedded-driver?
-                                 (doto (MediaDriver$Context.)))
+                                 (MediaDriver$Context.))
           media-driver (if embedded-driver?
                          (MediaDriver/launch media-driver-context))
 

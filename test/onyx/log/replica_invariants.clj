@@ -18,9 +18,10 @@
     :as replica}]
   (let [peer-allocations (common/allocations->peers allocations)
         slot-id-peers (mapcat keys (vals (reduce merge (vals task-slot-ids))))]
-    (mapv (fn [coll] 
-            (is (empty? (remove (set peers) coll))))
-          (map keys [peer-state peer-sites prepared accepted pairs]))
+    (do
+      (mapv (fn [coll] 
+              (is (empty? (remove (set peers) coll))))
+            (map keys [peer-state peer-sites prepared accepted pairs])))
 
     (testing "slot ids only allocated once" 
       (is (= slot-id-peers
