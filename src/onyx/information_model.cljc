@@ -659,7 +659,7 @@
              :optional? true
              :type :long
              :unit :nanoseconds
-             :default 10000000000}
+             :default 20000000000}
 
             :onyx.messaging.aeron/subscriber-count
             {:doc "The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guidline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilised."

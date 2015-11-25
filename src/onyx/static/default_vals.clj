@@ -65,7 +65,7 @@
    :onyx.messaging.aeron/embedded-driver? true
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
-   :onyx.messaging.aeron/inter-service-timeout-ns 10000000000
+   :onyx.messaging.aeron/inter-service-timeout-ns 20000000000
    :onyx.messaging.aeron/subscriber-count 2
    :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging/allow-short-circuit? true
