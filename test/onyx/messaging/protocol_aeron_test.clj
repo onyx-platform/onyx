@@ -1,6 +1,6 @@
 (ns onyx.messaging.protocol-aeron-test
   (:require [onyx.messaging.protocol-aeron :as protocol]
-            [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.types :refer [map->Leaf map->Ack]]
             [clojure.test :refer [deftest is testing]]))
 
@@ -13,7 +13,7 @@
                   (= msg-type protocol/ack-msg-id)
                   (protocol/read-acker-message buf 3)
                   (= msg-type protocol/messages-msg-id)
-                  (protocol/read-messages-buf decompress buf 3)
+                  (protocol/read-messages-buf messaging-decompress buf 3)
                   (= msg-type protocol/completion-msg-id)
                   (protocol/read-completion buf 3)
                   (= msg-type protocol/retry-msg-id)
@@ -60,13 +60,13 @@
                              :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
                              :message {:n 2}
                              :ack-val 729233382010058362})]]
-    (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
+    (let [buf (protocol/build-messages-msg-buf messaging-compress peer-id message)]
       (is (= (vector peer-id message) 
              (read-buf buf)))))
 
   (let [peer-id -32767
         message []]
-    (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
+    (let [buf (protocol/build-messages-msg-buf messaging-compress peer-id message)]
       (is (= (vector peer-id message) 
              (read-buf buf)))))
 
@@ -76,6 +76,6 @@
                              :completion-id #uuid "7ad37c45-ce67-4fd4-8850-f3ec58ede0bf"
                              :message {}
                              :ack-val 729233382010058362})]]
-    (let [buf (protocol/build-messages-msg-buf compress peer-id message)]
+    (let [buf (protocol/build-messages-msg-buf messaging-compress peer-id message)]
       (is (= (vector peer-id message) 
              (read-buf buf))))))

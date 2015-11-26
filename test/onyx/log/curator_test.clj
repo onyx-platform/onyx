@@ -6,7 +6,7 @@
             [onyx.messaging.dummy-messenger]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.log.curator :as cu]
-            [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [taoensso.timbre :refer [fatal error warn trace info]]
             [clojure.test :refer [deftest is testing]]
             [onyx.api]))
