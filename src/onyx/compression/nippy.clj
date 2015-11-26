@@ -1,15 +1,25 @@
 (ns onyx.compression.nippy
   (:require [taoensso.nippy :as nippy]))
 
-(def compress-opts {:compressor nil})
+(def messaging-compress-opts {})
 
-(defn compress [x]
-  (nippy/freeze x compress-opts))
+(defn messaging-compress [x]
+  (nippy/freeze x messaging-compress-opts))
 
-(def decompress-opts {:v1-compatibility? false})
+(def messaging-decompress-opts {:v1-compatibility? false})
 
-(defn decompress [x]
-  (nippy/thaw x decompress-opts))
+(defn messaging-decompress [x]
+  (nippy/thaw x messaging-decompress-opts))
+
+(def zookeeper-compress-opts {})
+
+(defn zookeeper-compress [x]
+  (nippy/freeze x zookeeper-compress-opts))
+
+(def zookeeper-decompress-opts {:v1-compatibility? false})
+
+(defn zookeeper-decompress [x]
+  (nippy/thaw x zookeeper-decompress-opts))
 
 (defn window-log-compress [x]
   (nippy/freeze x {}))

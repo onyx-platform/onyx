@@ -60,7 +60,7 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 #### `:punctuation`
 
-Trigger wakes up in reaction to a new segment being processed. Trigger only fires if `:trigger/pred` evaluates to `true`. The signature of `:trigger/pred` is of arity-5: `event, window-id, upper, lower, segment`. Punctuation triggers are often useful to send signals through that indicate that no more data will be coming through for a particular window of time.
+Trigger wakes up in reaction to a new segment being processed. Trigger only fires if `:trigger/pred` evaluates to `true`. The signature of `:trigger/pred` is of arity-5: `event, window-id, lower, upper, segment`. Punctuation triggers are often useful to send signals through that indicate that no more data will be coming through for a particular window of time.
 
 ```clojure
 {:trigger/window-id :collect-segments

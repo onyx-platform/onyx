@@ -9,7 +9,7 @@
             [onyx.messaging.common :as common]
             [onyx.types :refer [->MonitorEventBytes]]
             [onyx.extensions :as extensions]
-            [onyx.compression.nippy :refer [compress decompress]]
+            [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
   (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
@@ -189,7 +189,7 @@
           ;; client liveness timeout should match inter-service-timeout
           _ (System/setProperty "aeron.client.liveness.timeout" (str inter-service-timeout))
           media-driver-context (if embedded-driver?
-                                 (doto (MediaDriver$Context.)))
+                                 (MediaDriver$Context.))
           media-driver (if embedded-driver?
                          (MediaDriver/launch media-driver-context))
 
@@ -201,8 +201,8 @@
           offer-idle-strategy-config (arg-or-default :onyx.messaging.aeron/offer-idle-strategy opts)
           send-idle-strategy (backoff-strategy poll-idle-strategy-config)
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
-          compress-f (or (:onyx.messaging/compress-fn opts) compress)
-          decompress-f (or (:onyx.messaging/decompress-fn opts) decompress)
+          compress-f (or (:onyx.messaging/compress-fn opts) messaging-compress)
+          decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
           virtual-peers (atom (pm/vpeer-manager))
           publication-group (component/start (pg/new-publication-group opts send-idle-strategy))
           subscriber-count (arg-or-default :onyx.messaging.aeron/subscriber-count opts)

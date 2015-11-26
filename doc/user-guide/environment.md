@@ -30,7 +30,7 @@ In this chapter, we'll discuss what you need to set up a develop and production 
 
 #### Explanation
 
-One of the primary design goals of Onyx is to make the development environment as close as possible to production - without making the developer run a lot of services locally. A development environment in Onyx merely needs Clojure 1.6+ to operate. A ZooKeeper server is spun up in memory via Curator, so you don't need to install ZooKeeper locally if you don't want to.
+One of the primary design goals of Onyx is to make the development environment as close as possible to production - without making the developer run a lot of services locally. A development environment in Onyx merely needs Clojure 1.7+ to operate. A ZooKeeper server is spun up in memory via Curator, so you don't need to install ZooKeeper locally if you don't want to.
 
 #### Dependencies
 

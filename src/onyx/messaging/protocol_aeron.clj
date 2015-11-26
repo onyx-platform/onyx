@@ -60,13 +60,13 @@
     (.putByte buf 0 batched-ack-msg-id)
     (write-vpeer-id buf 1 peer-id)
     (.putInt buf 3 message-count)
-    (reduce (fn [offset msg]
-              (write-uuid buf offset (:id msg))
-              (write-uuid buf (unchecked-add offset 16) (:completion-id msg))
-              (.putLong buf (unchecked-add offset 32) (:ack-val msg))
-              (unchecked-add offset ack-batch-msg-length)) 
-            7
-            messages)
+    (do (reduce (fn [offset msg]
+                  (write-uuid buf offset (:id msg))
+                  (write-uuid buf (unchecked-add offset 16) (:completion-id msg))
+                  (.putLong buf (unchecked-add offset 32) (:ack-val msg))
+                  (unchecked-add offset ack-batch-msg-length)) 
+                7
+                messages))
     buf))
 
 (defn read-message-type [buf offset]
