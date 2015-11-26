@@ -1,3 +1,6 @@
+#### 0.8.2
+- Fix badly named 0.8.1 release version caused by release scripts.
+
 #### 0.8.1
 - changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
 - Turned on nippy compression for ZooKeeper writes and messaging writes
