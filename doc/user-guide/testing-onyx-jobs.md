@@ -8,7 +8,7 @@ In this chapter, we'll cover what you need to know about testing your Onyx appli
 
 - [Overview](#overview)
   - [Automatic Resource Clean up](#automatic-resource-clean-up)
-- [Code Reloading](#code-reloading)
+  - [Code Reloading](#code-reloading)
   - [In-Memory I/O](#in-memory-io)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -45,7 +45,7 @@ In practice, this looks something like the following:
           (is (= expected results)))))))
 ```
 
-### Code Reloading
+#### Code Reloading
 
 Another painful part of writing asynchronous code in general is the matter of reloading code without restarting your repl. Something that plays particularly well with Onyx is clojure.tools.namespace. A pattern that we like to use is to create a `user.clj` file for the developer with the following contents:
 
