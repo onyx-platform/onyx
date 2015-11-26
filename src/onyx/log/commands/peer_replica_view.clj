@@ -22,7 +22,8 @@
                  (mod hash-group
                       (count out-peers))))
           (and (planning/grouping-task? task-map) (= :recover (:onyx/flux-policy task-map)))
-          (let [n-peers (:onyx/max-peers task-map)] 
+          (let [n-peers (or (:onyx/n-peers task-map)
+                            (:onyx/max-peers task-map))] 
             (fn [hash-group] 
               (slot-id->peer-id (mod hash-group n-peers))))
           (planning/grouping-task? task-map) 
