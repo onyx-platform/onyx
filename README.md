@@ -105,10 +105,6 @@ A simple `lein midje` will run the full suite.
 
 Contributions are welcome. Please fork the repository and send a pull request to the master branch.
 
-#### Branching
-
-Onyx uses a similiar branching strategy to Clojure itself. Onyx uses semantic versioning, and each minor version gets its own branch. All work is done on develop or feature branches and dropped into a major.minor.x branch when it's time to cut a new release. Pull requests into the develop branch are welcome.
-
 #### Commit rights
 
 Anyone who has a patch accepted may request commit rights. Please do so inside the pull request post-merge.
