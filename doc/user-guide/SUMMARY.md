@@ -11,6 +11,7 @@
 * [State Management](doc/user-guide/aggregation-state-management.md)
 * [Triggers](doc/user-guide/triggers.md)
 * [Environment: Development & Going to Production](doc/user-guide/environment.md)
+* [Testing Onyx Jobs](doc/user-guide/testing-onyx-jobs.md)
 * [Deployment](doc/user-guide/deployment.md)
 * [Peer Configuration](doc/user-guide/peer-config.md)
 * [Information Model](doc/user-guide/information-model.md)
