@@ -42,6 +42,7 @@
    :onyx.rocksdb.filter/bloom-filter-bits 10
    :onyx.rocksdb.filter/compression :none
    :onyx.rocksdb.filter/block-size 4096
+   :onyx.rocksdb.filter/rotation-check-interval-ms 50
    ; rocksdb cache per filtering peer, 100MB
    :onyx.rocksdb.filter/peer-block-cache-size (* 100 1024 1024)
    ; number of filter buckets
@@ -82,4 +83,5 @@
    :onyx.windowing/min-value 0})
 
 (defn arg-or-default [k opts]
+  {:post [(not (nil? %))]}
   (get opts k (get defaults k)))

@@ -439,17 +439,17 @@
    {:summary "All options available to configure the virtual peers and development environment."
     :link nil
     :model {:onyx/id 
-            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
-             :type [:one-of [:string :uuid]]
-             :optional? false}
+	    {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+	     :type [:one-of [:string :uuid]]
+	     :optional? false}
 
-            :onyx.peer/job-scheduler 
-            {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
-             :type :keyword
-             :choices [:onyx.job-scheduler/percentage :onyx.job-scheduler/balanced :onyx.job-scheduler/greedy]
-             :optional? false}
+	    :onyx.peer/job-scheduler 
+	    {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
+	     :type :keyword
+	     :choices [:onyx.job-scheduler/percentage :onyx.job-scheduler/balanced :onyx.job-scheduler/greedy]
+	     :optional? false}
 
-            :zookeeper/address
+	    :zookeeper/address
             {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
              :type :string
              :optional? false}
@@ -805,7 +805,12 @@
             {:doc "Number of uniqueness key values that can exist in a RocksDB filter bucket."
              :optional? true
              :type :integer
-             :default 10000000}}}
+             :default 10000000}
+            :onyx.rocksdb.filter/rotation-check-interval-ms
+            {:doc "Check whether filter bucket should be rotated every interval ms"
+             :optional? true
+             :type :integer
+             :default 50}}}
 :env-config
 {:summary "All options available to configure the node environment."
  :link nil
@@ -969,7 +974,8 @@
     :onyx.rocksdb.filter/block-size 
     :onyx.rocksdb.filter/peer-block-cache-size
     :onyx.rocksdb.filter/num-buckets 
-    :onyx.rocksdb.filter/num-ids-per-bucket]
+    :onyx.rocksdb.filter/num-ids-per-bucket
+    :onyx.rocksdb.filter/rotation-check-interval-ms]
    :env-config
    [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
     :onyx.bookkeeper/server? 
