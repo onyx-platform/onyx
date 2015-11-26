@@ -375,6 +375,7 @@
    (s/optional-key :onyx.rocksdb.filter/peer-block-cache-size) PosInt
    (s/optional-key :onyx.rocksdb.filter/num-buckets) PosInt
    (s/optional-key :onyx.rocksdb.filter/num-ids-per-bucket) PosInt
+   (s/optional-key :onyx.rocksdb.filter/rotation-check-interval-ms) PosInt
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
