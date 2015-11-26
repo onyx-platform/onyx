@@ -57,6 +57,12 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 - [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
 
+### Developer's Guide 0.8.1-SNAPSHOT
+
+- [Branch Policy](doc/developers-guide/branch-policy.md)
+- [Release Checklist](doc/developers-guide/release-checklist.md)
+- [Deployment Process](doc/developers-guide/deployment-process.md)
+
 ### API Docs 0.8.1-SNAPSHOT
 
 Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.1-SNAPSHOT).
@@ -100,10 +106,6 @@ Feel free to use it anywhere. You can find [a few different versions here](https
 ### Running the tests
 
 A simple `lein midje` will run the full suite.
-
-### Contributing
-
-Contributions are welcome. Please fork the repository and send a pull request to the master branch.
 
 #### Commit rights
 
