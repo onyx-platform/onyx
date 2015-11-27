@@ -1,3 +1,6 @@
+#### 0.8.3
+- removed :onyx.messaging.aeron/inter-service-timeout-ns peer config setting. Client liveness timeout is now completely set via java property: aeron.client.liveness.timeout
+
 #### 0.8.2
 - changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
 - Turned on nippy compression for ZooKeeper writes and messaging writes
