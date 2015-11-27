@@ -93,10 +93,6 @@ Unofficial plugins have not been vetted.
 
 You can run a dashboard to monitor Onyx cluster activity, found [here](https://github.com/lbradstreet/onyx-dashboard). Further, you can collect metrics and send them to the dashboard, or anywhere, by using the [onyx-metrics plugin](https://github.com/onyx-platform/onyx-metrics).
 
-### Release Notes
-
-You can find [the latest major release notes here](doc/release-notes/0.7.0.md).
-
 ### Need help?
 
 Check out the [Onyx Google Group](https://groups.google.com/forum/#!forum/onyx-user).
