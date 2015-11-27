@@ -139,10 +139,6 @@ Some code has been incorporated from the following projects:
 - [Riemann] (https://github.com/aphyr/riemann)
 - [zookeeper-clj] (https://github.com/liebke/zookeeper-clj)
 
-### Author
-
-The lead for this project is [Michael Drogalis](https://twitter.com/MichaelDrogalis), the original creator.
-
 ### License
 
 Copyright © 2015 Michael Drogalis
