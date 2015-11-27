@@ -36,6 +36,7 @@ onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/
 onyx-datomic  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-datomic/tree/master)
 onyx-redis| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-redis/tree/master)
 onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-sql/tree/master)
+onyx-bookkeeper  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master)
 onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
 onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
 
@@ -76,6 +77,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-datomic`](https://github.com/onyx-platform/onyx-datomic)
 - [`onyx-redis`](https://github.com/onyx-platform/onyx-redis)
 - [`onyx-sql`](https://github.com/onyx-platform/onyx-sql)
+- [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
 - [`onyx-seq`](https://github.com/onyx-platform/onyx-seq)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 
@@ -114,10 +116,10 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 #### Contributor list
 
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
+- [Lucas Bradstreet](https://github.com/lbradstreet)
 - [Owen Jones](https://github.com/owengalenjones)
 - [Bruce Durling](https://github.com/otfrom)
 - [Malcolm Sparks](https://github.com/malcolmsparks)
-- [Lucas Bradstreet](https://github.com/lbradstreet)
 - [Bryce Blanton](https://github.com/bblanton)
 - [David Rupp](https://github.com/davidrupp)
 - [sbennett33](https://github.com/sbennett33)
