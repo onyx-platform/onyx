@@ -107,7 +107,7 @@ Feel free to use it anywhere. You can find [a few different versions here](https
 
 ### Running the tests
 
-A simple `lein midje` will run the full suite.
+A simple `lein test` will run the full suite for Onyx core.
 
 #### Commit rights
 
