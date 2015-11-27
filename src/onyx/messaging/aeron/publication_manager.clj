@@ -37,7 +37,7 @@
       (fatal "Aeron write from buffer error: " t)
       (stop publication-manager))))
 
-(defrecord PublicationManager [channel stream-id inter-service-timeout send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
+(defrecord PublicationManager [channel stream-id send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
   PPublicationManager
   (start [this]
     (assoc this :write-fut (future (write-from-buffer this pending-ch send-idle-strategy))))
@@ -65,16 +65,14 @@
                           (onError [this x] 
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           ctx (-> (Aeron$Context.)
-                  (.errorHandler error-handler)
-                  (.interServiceTimeout inter-service-timeout))
+                  (.errorHandler error-handler))
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel stream-id)]
       (info (format "Created publication at: %s, stream-id: %s" channel stream-id))
       (assoc this :publication pub :connection conn))))
 
-(defn new-publication-manager [channel stream-id send-idle-strategy 
-                               write-buffer-size inter-service-timeout cleanup-fn]
-  (->PublicationManager channel stream-id inter-service-timeout send-idle-strategy 
+(defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size cleanup-fn]
+  (->PublicationManager channel stream-id send-idle-strategy 
                         nil nil (chan write-buffer-size) nil cleanup-fn))
 
 

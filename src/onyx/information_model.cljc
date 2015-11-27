@@ -654,13 +654,6 @@
              :type :boolean
              :default true}
 
-            :onyx.messaging.aeron/inter-service-timeout-ns
-            {:doc "Set the timeout between service calls for Aeron publications and subscriptions."
-             :optional? true
-             :type :long
-             :unit :nanoseconds
-             :default 20000000000}
-
             :onyx.messaging.aeron/subscriber-count
             {:doc "The number of Aeron subscriber threads that receive messages for the peer-group.  As peer-groups are generally configured per-node (machine), this setting can bottleneck receive performance if many virtual peers are used per-node, or are receiving and/or de-serializing large volumes of data. A good guidline is is `num cores = num virtual peers + num subscribers`, assuming virtual peers are generally being fully utilised."
              :optional? true
@@ -951,7 +944,6 @@
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/embedded-driver?
-    :onyx.messaging.aeron/inter-service-timeout-ns
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy

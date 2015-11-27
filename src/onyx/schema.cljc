@@ -392,7 +392,6 @@
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
-   (s/optional-key :onyx.messaging.aeron/inter-service-timeout-ns) s/Int
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy

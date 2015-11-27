@@ -62,12 +62,10 @@
   PPublicationGroup
   (add-publication! [this {:keys [stream-id channel] :as conn-spec}]
     (let [write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size opts)
-          inter-service-timeout (arg-or-default :onyx.messaging.aeron/inter-service-timeout-ns opts)
           pub-manager (-> (pubm/new-publication-manager channel 
                                                         stream-id 
                                                         send-idle-strategy
                                                         write-buffer-size
-                                                        inter-service-timeout
                                                         (fn [] (remove-publication! this conn-spec))) 
                           (pubm/connect) 
                           (pubm/start))
