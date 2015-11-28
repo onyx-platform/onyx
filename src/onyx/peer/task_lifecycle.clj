@@ -225,10 +225,10 @@
 (defn read-batch [task-type replica peer-replica-view job-id pipeline event]
   (if (and (= task-type :input) (:backpressure? peer-replica-view))
     (assoc event :onyx.core/batch '())
-    (let [rets (p-ext/read-batch pipeline event)
+    (let [rets (merge event (p-ext/read-batch pipeline event))
           rets ((:onyx.core/compiled-after-read-batch-fn event) rets)]
       (handle-backoff! event)
-      (merge event rets))))
+      rets)))
 
 (defn validate-ackable! [peers event]
   (when-not (seq peers)
