@@ -428,11 +428,11 @@
     rets))
 
 (defn close-batch-resources [event]
-  (let [rets ((:onyx.core/compiled-after-batch-fn event) event)]
+  (let [rets ((:onyx.core/compiled-after-batch-fn event) event)] 
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)))
-    (merge event rets)))
+    rets))
 
 (defn launch-aux-threads!
   [messenger {:keys [onyx.core/pipeline
