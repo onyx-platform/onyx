@@ -25,15 +25,15 @@
   (apply + (map count (vals (get-in replica [:allocations job])))))
 
 (defn peer->allocated-job [allocations id]
-  (get
-   (reduce-kv
-    (fn [all job tasks]
-      (->> tasks
-           (mapcat (fn [[t ps]] (map (fn [p] {p {:job job :task t}}) ps)))
-           (into {})
-           (merge all)))
-    {} allocations)
-   id))
+  (if-let [[job-id [task-id]] 
+           (first 
+             (remove (comp empty? second) 
+                     (map (fn [[job-id task-peers]]
+                            [job-id (first (filter (fn [[task-id peers]]
+                                                     (get (set peers) id))
+                                                   task-peers))])
+                          allocations)))]
+    {:job job-id :task task-id}))
 
 (defn allocations->peers [allocations]
    (reduce-kv
