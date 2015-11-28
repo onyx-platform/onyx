@@ -249,13 +249,11 @@
   (set (map short (range -32768 32768))))
 
 (defn available-ids [used]
-  (->> (clojure.set/difference possible-ids used)
-       (into [])
-       not-empty))
+  (clojure.set/difference possible-ids used))
 
 (defn choose-id [hsh used]
   (when-let [available (available-ids used)]
-    (nth available (mod hsh (count available)))))
+    (nth (seq available) (mod hsh (count available)))))
 
 (defn allocate-id [peer-id peer-site peer-sites]
   ;;; Assigns a unique id to each peer so that messages do not need
