@@ -38,11 +38,15 @@
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
 
-(def UnsupportedTaskMapKey
+(defn build-allowed-key-ns [nspace]
   (s/pred (fn [k]
             (or (not (keyword? k))
-                (not (= "onyx" (namespace k)))))
+                (not (= (name nspace) 
+                        (namespace k)))))
           'unsupported-key-combination))
+
+(def UnsupportedTaskMapKey
+  (build-allowed-key-ns :onyx))
 
 (def base-task-map
   {:onyx/name TaskName
