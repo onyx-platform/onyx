@@ -138,35 +138,44 @@
 
 (defrecord AccumAckSegments [ack-val segments retries])
 
+(defn add-segments [accum routes hash-group leaf]
+  (if (empty? routes)
+    accum
+    (if-let [route (first routes)]
+      (let [ack-val (acker/gen-ack-value)
+            grp (get hash-group route)
+            leaf* (-> leaf
+                      (assoc :ack-val ack-val)
+                      (assoc :hash-group grp)
+                      (assoc :route route))
+            fused-ack (bit-xor ^long (:ack-val accum) ^long ack-val)]
+        (-> accum
+            (assoc :ack-val fused-ack)
+            (update :segments (fn [s] (conj! s leaf*)))
+            (add-segments (rest routes) hash-group leaf)))
+      (add-segments accum (rest routes) hash-group leaf))))
+
+(defn add-from-leaf [event result egress-ids task->group-by-fn flow-conditions 
+                     root leaves start-ack-val accum {:keys [message] :as leaf}]
+  (let [routes (route-data event result message flow-conditions egress-ids)
+        message* (flow-conditions-transform message routes egress-ids flow-conditions event)
+        hash-group (hash-groups message* egress-ids task->group-by-fn)
+        leaf* (if (= message message*)
+                leaf
+                (assoc leaf :message message*))]
+    (if (= :retry (:action routes))
+      (assoc accum :retries (conj! (:retries accum) root))
+      (add-segments accum (:flow routes) hash-group leaf*))))
+
 (defn add-from-leaves
   "Flattens root/leaves into an xor'd ack-val, and accumulates new segments and retries"
   [segments retries event result egress-ids task->group-by-fn flow-conditions]
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)]
-    (reduce (fn process-leaf [accum {:keys [message] :as leaf}]
-              (let [routes (route-data event result message flow-conditions egress-ids)
-                    message* (flow-conditions-transform message routes egress-ids flow-conditions event)
-                    hash-group (hash-groups message* egress-ids task->group-by-fn)
-                    leaf* (if (= message message*)
-                            leaf
-                            (assoc leaf :message message*))]
-                (if (= :retry (:action routes))
-                  (assoc accum :retries (conj! (:retries accum) root))
-                  (reduce (fn process-route [accum2 route]
-                            (if route
-                              (let [ack-val (acker/gen-ack-value)
-                                    grp (get hash-group route)
-                                    leaf** (-> leaf*
-                                               (assoc :ack-val ack-val)
-                                               (assoc :hash-group grp)
-                                               (assoc :route route))]
-                                (->AccumAckSegments (bit-xor ^long (:ack-val accum2) ^long ack-val)
-                                                    (conj! (:segments accum2) leaf**)
-                                                    (:retries accum2)))
-                              accum2))
-                          accum
-                          (:flow routes)))))
+    (reduce (fn [accum leaf] 
+              (add-from-leaf event result egress-ids task->group-by-fn flow-conditions 
+                             root leaves start-ack-val accum leaf))
             (->AccumAckSegments start-ack-val segments retries)
             leaves)))
 
