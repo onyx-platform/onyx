@@ -15,6 +15,7 @@ Now that Onyx is stabilizing feature-wise, this is a good time to rewrite this p
 - List out each thread that we're running (both Java and Go green threads) and what its purpose is.
 - Increase the test coverage of this area by approaching it with a test.check mindset.
 - Prepare for the implementation of a batch engine by factoring out streaming engine specifics.
+- Reduce the number of mutable components as close to 1 atom as possible.
 - Incrementally phase this new proposed design into the `master` branch.
 
 ### Current Pieces
@@ -43,9 +44,35 @@ We often make use of runtime compilation by turning a keyword into a symbol, the
 
 - The function that we compile is very opaque. It's hard to tell what it takes as its input, and what output it will produce.
 - The functions that we produce are often not tested.
+- It's not always obvious which keys in the event map are precompiled ahead of time, and which are compiled during each batch.
+
+##### Suggestions
+
+- Use a special notation for runtime compiled functions in the event map, such as `:onyx.compiled/my-function`, rather than `:onyx.core/my-function`.
+- Enhance `task_compile.clj` to be a more serious compiler. This would mean finding the commonality of all the runtime compiled pieces and documenting what happens at each pass.
 
 ##### Examples
 
 - [Task Lifecycle Atomic Compilation](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L82-L101)
 - [Task Lifecycle Composed Compilation](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L57-L66)
 - [Compiled Windowing Function](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L171)
+
+#### Asynchronous event handling
+
+Task lifecycle, as it stands, needs to be able to react to outside, asynchronous events. These events include notification of a fully acknowledged segment, notification of a force-retried segment, a command to shut down the current task, and so forth.
+
+##### Pain Points
+
+- Since all of the state that a task accretes in held within task lifecycle, events that need affect change to that state must asynchronously contact the task. This requires launching multiple threads, reading from each thread asynchronously, and manipulating the stateful component. There are a lot of subtle places that we've made mistakes here - like having an exception thrown in the asynchronous reading and not recovering.
+- Channel buffers have proven to be a finicky thing. When we use regular core.async buffers, we halt upstream work completely and potentionally deadlock. When we use sliding or dropping buffers, we lose data, and often have a very hard time figuring out where we lost it, and why.
+- Figuring out the default size for any channel buffer has been hard.
+
+##### Suggestions
+
+- Move as much data outside of the task lifecycle as possible into "sibling components". These components should pass the data into the lifecycle. Doing it this way encourages task lifecycle to be a piece of sequential (non-concurrent) code.
+- Thoroughly document what each channel's purpose is, and what channels it receives data from and writes data to. Understanding the full graph of channels will help us come up with better default buffer sizes, and understand any performance or retry mishaps.
+
+##### Examples
+
+- [Task Lifecycle Auxillary Threads](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L446-L486)
+- [Input Retried Segments](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L488-L505)
