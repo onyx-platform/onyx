@@ -86,8 +86,7 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))
-                ]
+                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
