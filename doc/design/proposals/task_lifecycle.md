@@ -133,6 +133,7 @@ When a segment enters a task, it may create new segments. The lineage of the seg
 ##### Examples
 
 - [Building New Segments](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L188-L201)
+
 #### Bitwise Message Fusion
 
 Our streaming engine maintains a compact representation of the lineage of a single segment in just a few bytes. This algorithm is documented in the user guide. In order to minimize the number of bytes that we send over the network, we perform an exclusive-or operation at the site of the task, then we send that value over the wire instead. We call this process fusion.
