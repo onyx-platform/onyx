@@ -24,6 +24,7 @@ After examining the code in its current state (Git SHA `4dd1ce7373c7ad9a812a33c3
 
 - Runtime compilation
 - Asynchronous event handling
+- Searching
 - Flow conditions
 - Lifecycles
 - Windowing
@@ -33,7 +34,6 @@ After examining the code in its current state (Git SHA `4dd1ce7373c7ad9a812a33c3
 - Bitwise message fusion
 - Message lineage tracking
 - Error handling
-- Searching
 - Performance optimizations
 
 #### Runtime compilation
@@ -66,6 +66,7 @@ Task lifecycle, as it stands, needs to be able to react to outside, asynchronous
 - Since all of the state that a task accretes in held within task lifecycle, events that need affect change to that state must asynchronously contact the task. This requires launching multiple threads, reading from each thread asynchronously, and manipulating the stateful component. There are a lot of subtle places that we've made mistakes here - like having an exception thrown in the asynchronous reading and not recovering.
 - Channel buffers have proven to be a finicky thing. When we use regular core.async buffers, we halt upstream work completely and potentionally deadlock. When we use sliding or dropping buffers, we lose data, and often have a very hard time figuring out where we lost it, and why.
 - Figuring out the default size for any channel buffer has been hard.
+- Some tasks need more threads than others. For example, input tasks have the responsibility of listening for fully completed segments, and for replaying timed out segments. This gets awkward for function and output tasks, since they can completely ignore this work.
 
 ##### Suggestions
 
@@ -76,3 +77,24 @@ Task lifecycle, as it stands, needs to be able to react to outside, asynchronous
 
 - [Task Lifecycle Auxillary Threads](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L446-L486)
 - [Input Retried Segments](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L488-L505)
+
+#### Searching
+
+There are a handful of instances where we need to look for something in a collection either before the task begins, or as it runs. Examples include finding an entry in the catalog, or finding information about a downstream task for grouping.
+
+##### Pain Points
+
+- We don't always consider what happens when we don't find the thing we were looking for, or what happens if we find more than one matching thing. Sometimes garbage-in-garbage out is good, but other times we can give ourselves much better error messages to detect deeper problems.
+- We can probably optimize this code a lot, or at least document it when we don't need high performance when searching through a collection.
+
+##### Suggestions
+
+- Create a standard set of search utilities that are tuned for performance, documenting to the caller what happens when the target isn't found.
+- Add only the search utilities that we need. It's tempting to add an entire suite of search tools, but this is best left for repositories like lib-onyx.
+- Remove all ad-hoc searching code. I (Michael) certainly wrote this kind of code more than a few times in haste.
+
+##### Examples
+
+- [Lifecycle Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L37-L39)
+- [Trigger Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L127-L130)
+- [Sentinel ID Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L64-L66)
