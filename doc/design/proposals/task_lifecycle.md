@@ -25,11 +25,11 @@ After examining the code in its current state (Git SHA `4dd1ce7373c7ad9a812a33c3
 - Runtime compilation
 - Asynchronous event handling
 - Searching
+- Grouping
 - Flow conditions
 - Lifecycles
 - Windowing
 - Triggers
-- Grouping
 - Message acknowledgment
 - Bitwise message fusion
 - Message lineage tracking
@@ -98,3 +98,22 @@ There are a handful of instances where we need to look for something in a collec
 - [Lifecycle Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L37-L39)
 - [Trigger Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_compile.clj#L127-L130)
 - [Sentinel ID Searching](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L64-L66)
+
+#### Grouping
+
+Grouping is the behavior of sending segments to downstream peers in a "sticky" fashion. We do this by hashing the segment according to a particular function, then matching it up with the last peer that we sent the hash value to.
+
+##### Pain Points
+
+- The idea of "hash grouping" everything got a little hazy. It's hard to understand the relationship between the segments and their hashed values.
+- Handling what happens when a peer leaves, and hence the hash function becomes inconsistent, is a ill-defined in terms of code. We support this first class with flux conditions, but the methodology by how we prove stability could be clarified.
+
+##### Suggestions
+
+- ?
+
+##### Examples
+
+- [Segment Hashing](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L124-L131)
+- [Peer Picking](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/function.clj#L30)
+- [Peer Picking Function Compilation](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/log/commands/peer_replica_view.clj#L15-L37)
