@@ -26,13 +26,13 @@ After examining the code in its current state (Git SHA `4dd1ce7373c7ad9a812a33c3
 - Asynchronous event handling
 - Searching
 - Grouping
+- Message lineage tracking
+- Bitwise message fusion
+- Message acknowledgment
 - Flow conditions
 - Lifecycles
 - Windowing
 - Triggers
-- Message acknowledgment
-- Bitwise message fusion
-- Message lineage tracking
 - Error handling
 - Performance optimizations
 
@@ -117,3 +117,51 @@ Grouping is the behavior of sending segments to downstream peers in a "sticky" f
 - [Segment Hashing](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L124-L131)
 - [Peer Picking](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/function.clj#L30)
 - [Peer Picking Function Compilation](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/log/commands/peer_replica_view.clj#L15-L37)
+
+#### Message Lineage Tracking
+
+When a segment enters a task, it may create new segments. The lineage of the segment to its children, and ancestors, is tracked through a shared identifier. Within a task, we need to track all of the new segments, and which segment they were created from.
+
+##### Pain Points
+
+- We created a data structure to point from the original segment to the new segments, but it's deeply nested, and the keys have confusing names.
+
+##### Suggestions
+
+- Create and document a new data structure that maintains the mapping from old to new segments. It's critical that we document the structure of this as it's one of the main pieces for ensuring correctness. We also should consider using Schema here.
+
+##### Examples
+
+- [Building New Segments](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L188-L201)
+#### Bitwise Message Fusion
+
+Our streaming engine maintains a compact representation of the lineage of a single segment in just a few bytes. This algorithm is documented in the user guide. In order to minimize the number of bytes that we send over the network, we perform an exclusive-or operation at the site of the task, then we send that value over the wire instead. We call this process fusion.
+
+##### Pain Points
+
+- We sneak in this fusion at an arbitrary point in time. It's hard to test and debug any potentional problems that are related to ack values.
+
+##### Suggestions
+
+- Make fusion a function of a Result type - something that can be created on-demand, rather than stored and tracked within the type itself.
+
+##### Examples
+
+- [Add New Segments](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L141-L156)
+
+#### Message Acknowledgment
+
+Message acknowledge is the process by which an input task maintains a set of segments pending completion. An external signal, via the acking daemon, sends a message to release segments from the pool.
+
+##### Pain Points
+
+- The state for the pending pool is kept within the task itself. This means signals need to be asynchronously propagated into the task, bringing all the pains of the asynchronous event handling section.
+- Since not all tasks need to perform this operation, there is conditional code in task lifecycle to only do certain things depending on the type of task.
+
+##### Suggestions
+
+- Move the stateful component (pool of pending messages) outside of the task lifecycle and into a sibling component.
+
+##### Examples
+
+- [Periodic Message Retry](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L488-L505)
