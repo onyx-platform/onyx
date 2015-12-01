@@ -46,7 +46,8 @@
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))))))
     (catch Throwable e
-      (taoensso.timbre/error e (str e) "Error in processing loop"))
+      (taoensso.timbre/error e (str e) "Error in processing loop. Restarting.")
+      (close! restart-ch))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
 
