@@ -31,6 +31,7 @@
                                            (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle-timeout))
                                                    snapshot))]
                         (doseq [k to-remove]
+                          (info (format "Publication %k GC'd after non use within %s" k idle-timeout))
                           (pubm/stop (:publication (snapshot k)))))
                       (catch InterruptedException e
                         (throw e))
