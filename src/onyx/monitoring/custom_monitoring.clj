@@ -33,10 +33,10 @@
    window-log-compaction
    peer-ack-segments
    peer-ack-segment
+   peer-complete-segment
    peer-retry-segment
    peer-try-complete-job
    peer-strip-sentinel
-   peer-complete-message
    peer-gc-peer-link
    peer-backpressure-on
    peer-backpressure-off

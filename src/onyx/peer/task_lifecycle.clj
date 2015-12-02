@@ -467,7 +467,7 @@
                    (let [{:keys [id peer-id]} v
                          site (peer-site peer-replica-view peer-id)]
                      (when site 
-                       (emit-latency :peer-complete-message
+                       (emit-latency :peer-complete-segment
                                      monitoring
                                      #(extensions/internal-complete-message messenger event id site))))
 
