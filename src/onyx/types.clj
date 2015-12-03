@@ -33,4 +33,6 @@
 
 (defrecord MonitorEventBytes [event bytes])
 
+(defrecord MonitorTaskEventCount [event count])
+
 (defrecord MonitorEventLatencyBytes [event latency bytes])

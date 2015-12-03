@@ -30,12 +30,16 @@
    window-log-write-entry
    window-log-playback
    window-log-compaction
+   messenger-queue-count
+   messenger-queue-count-unregister
+   messenger-queue-wait
    peer-ack-segments
    peer-ack-segment
    peer-complete-segment
    peer-retry-segment
    peer-try-complete-job
    peer-strip-sentinel
+   peer-sentinel-found
    peer-gc-peer-link
    peer-backpressure-on
    peer-backpressure-off
