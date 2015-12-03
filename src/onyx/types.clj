@@ -1,6 +1,5 @@
 (ns onyx.types)
 
-
 (defrecord Event [monitoring metrics])
 
 (defrecord Leaf [message id acker-id completion-id ack-val hash-group route])
