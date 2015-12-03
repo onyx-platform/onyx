@@ -15,16 +15,18 @@
 
 (defrecord Message [buf start end])
 
+(defn write-to-pub [^Publication pub ^IdleStrategy send-idle-strategy msg]
+  (loop [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
+    (when (neg? result) 
+      (.idle send-idle-strategy 0)
+      (recur ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))))))
+
 (defn write-from-buffer [publication-manager pending-ch send-idle-strategy]
   (try 
     (let [pub (:publication publication-manager)] 
       (loop [] 
         (when-let [msg (<!! pending-ch)]
-          (while (let [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
-                   (or (= result Publication/BACK_PRESSURED)
-                       (= result Publication/NOT_CONNECTED)))
-            ;; idle for different amounts of time depending on whether backpressuring or not?
-            (.idle ^IdleStrategy send-idle-strategy 0))
+          (write-to-pub pub send-idle-strategy msg)
           (recur))))
     (catch InterruptedException e)
     (catch DriverTimeoutException e
