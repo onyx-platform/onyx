@@ -1,11 +1,10 @@
 (ns onyx.monitoring.custom-monitoring
-  (:require [onyx.extensions :as extensions]))
+  (:require [onyx.extensions :as extensions]
+            [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info warn trace fatal error] :as timbre]))
 
 (defrecord CustomMonitoringAgent
-  [task
-   id
-   job-id
-   task-id
+  [task-information
    zookeeper-write-log-entry
    zookeeper-read-log-entry
    zookeeper-write-catalog
@@ -49,8 +48,14 @@
     (get this event-type))
   (extensions/emit [this event]
     (when-let [f (get this (:event event))]
-      (f this event))))
+      (f this event)))
+  component/Lifecycle
+  (start [component] 
+    component)
+  (stop [component] 
+    component))
 
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]
   (map->CustomMonitoringAgent monitoring-config))
+

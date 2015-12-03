@@ -3,7 +3,7 @@
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
-            [onyx.peer.task-lifecycle :refer [task-lifecycle]]
+            [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
@@ -48,24 +48,14 @@
             [clojure.core.async :refer [chan close!]]
             [onyx.extensions :as extensions]))
 
-(def development-components [:monitoring :logging-config :log :bookkeeper])
-
-(def client-components [:monitoring :log :messaging-require])
-
-(def peer-components
-  [:monitoring :log :messaging-require :messenger :acking-daemon :virtual-peer])
-
-(def peer-group-components [:logging-config :messaging-require :messaging-group])
-
-(def task-components
-  [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll])
-
 (defn rethrow-component [f]
   (try
     (f)
     (catch Throwable e
       (fatal e)
       (throw (.getCause e)))))
+
+(def development-components [:monitoring :logging-config :log :bookkeeper])
 
 (defrecord OnyxDevelopmentEnv []
   component/Lifecycle
@@ -76,6 +66,8 @@
     (rethrow-component
      #(component/stop-system this development-components))))
 
+(def client-components [:monitoring :log :messaging-require])
+
 (defrecord OnyxClient []
   component/Lifecycle
   (start [this]
@@ -85,6 +77,9 @@
     (rethrow-component
      #(component/stop-system this client-components))))
 
+(def peer-components
+  [:monitoring :log :messaging-require :messenger :acking-daemon :virtual-peer])
+
 (defrecord OnyxPeer []
   component/Lifecycle
   (start [this]
@@ -93,6 +88,8 @@
   (stop [this]
     (rethrow-component
      #(component/stop-system this peer-components))))
+
+(def peer-group-components [:logging-config :messaging-require :messaging-group])
 
 (defrecord OnyxPeerGroup []
   component/Lifecycle
@@ -150,6 +147,9 @@
     (extensions/unregister-task-peer messenger peer-site)
     component))
 
+(def task-components
+  [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll :task-information :task-monitoring])
+
 (defrecord OnyxTask [peer-site peer-state task-state]
   component/Lifecycle
   (start [component]
@@ -164,11 +164,16 @@
   (map->OnyxTask
     {:peer-state peer-state
      :task-state task-state
-     :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:messenger-buffer :register-messenger-peer])
-     :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer])
-     :register-messenger-peer (component/using (map->RegisterMessengerPeer {:messenger (:messenger peer-state) 
-                                                                       :peer-site (:peer-site task-state)}) 
-                                          [:messenger-buffer])
+     :task-information (component/using (new-task-information peer-state task-state) [])
+     :task-monitoring (component/using (:monitoring peer-state) [:task-information])
+     :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:task-information 
+                                                                              :messenger-buffer 
+                                                                              :task-monitoring
+                                                                              :register-messenger-peer])
+     :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer :task-monitoring])
+     :register-messenger-peer (component/using (map->RegisterMessengerPeer 
+                                                 {:messenger (:messenger peer-state) 
+                                                  :peer-site (:peer-site task-state)}) [:messenger-buffer])
      :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
 
 (defn onyx-peer
