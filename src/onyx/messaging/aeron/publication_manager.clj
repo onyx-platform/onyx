@@ -43,11 +43,11 @@
   (start [this]
     (warn "Started nil publication manager, likely due to timeout on creation."))
   (write [this _ _ _]
-    (warn "Started nil publication manager, likely due to timeout on creation."))
+    (warn "Writing nil publication manager, likely due to timeout on creation."))
   (stop [this]
-    (warn "Started nil publication manager, likely due to timeout on creation."))
+    (warn "Stopping nil publication manager, likely due to timeout on creation."))
   (connect [this]
-    (warn "Started nil publication manager, likely due to timeout on creation.")))
+    (warn "Connecting to nil publication manager, likely due to timeout on creation.")))
 
 (defrecord PublicationManager [channel stream-id send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
   PPublicationManager
