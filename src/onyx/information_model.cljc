@@ -680,6 +680,11 @@
              :default :high-restart-latency
              :choices [:high-restart-latency :low-restart-latency]}
 
+            :onyx.messaging.aeron/publication-creation-timeout
+            {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
+             :optional? true
+             :type :integer
+             :default 1000}
             :onyx.peer/state-log-impl
             {:doc "Choice of state persistence implementation."
              :optional? true
@@ -948,6 +953,7 @@
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy
     :onyx.messaging.aeron/offer-idle-strategy 
+    :onyx.messaging.aeron/publication-creation-timeout
     :onyx.peer/state-log-impl
     :onyx.bookkeeper/read-batch-size 
     :onyx.bookkeeper/write-batch-size

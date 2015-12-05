@@ -59,6 +59,7 @@
       (info "Shutdown Publication Group Manager Thread"))))
 
 
+
 (defrecord PublicationGroup [opts send-idle-strategy publications manager-thread command-ch shutdown-ch]
   PPublicationGroup
   (add-publication! [this {:keys [stream-id channel] :as conn-spec}]
@@ -80,9 +81,10 @@
       (do
         (reset! (:last-used pub) (System/currentTimeMillis))
         (:publication pub))
-      (let [tracked-pub (promise)] 
+      (let [publication-creation-timeout (arg-or-default :onyx.messaging.aeron/publication-creation-timeout opts)
+            tracked-pub (promise)] 
         (>!! (:command-ch this) [:add-publication conn-spec tracked-pub])
-        (:publication (deref tracked-pub 2000 nil)))))
+        (:publication (deref tracked-pub publication-creation-timeout nil)))))
   component/Lifecycle
   (component/start [this]
     (assoc this :manager-thread (start-manager-thread! this opts command-ch shutdown-ch)))
