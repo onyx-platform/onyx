@@ -83,6 +83,7 @@
         (:publication pub))
       (let [publication-creation-timeout (arg-or-default :onyx.messaging.aeron/publication-creation-timeout opts)
             tracked-pub (promise)] 
+        (info "Creating publication at:" (into {} conn-spec))
         (>!! (:command-ch this) [:add-publication conn-spec tracked-pub])
         (:publication (deref tracked-pub publication-creation-timeout nil)))))
   component/Lifecycle
