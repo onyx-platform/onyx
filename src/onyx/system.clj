@@ -6,6 +6,7 @@
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
+            [onyx.messaging.aeron] 
             [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
             [onyx.messaging.messenger-buffer :as buffer]
             [onyx.monitoring.no-op-monitoring]
