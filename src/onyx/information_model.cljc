@@ -946,6 +946,7 @@
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
+    :onyx.zookeeper/prepare-failure-detection-interval
     :onyx.messaging/completion-buffer-size
     :onyx.messaging/release-ch-buffer-size 
     :onyx.messaging/retry-ch-buffer-size
