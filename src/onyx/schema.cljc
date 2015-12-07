@@ -383,6 +383,7 @@
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
+   (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
    (s/optional-key :onyx.messaging/inbound-buffer-size) s/Int
    (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
    (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
@@ -426,8 +427,7 @@
 
 (def Replica
   {:job-scheduler JobScheduler
-   :messaging {:onyx.messaging/impl Messaging
-               s/Keyword s/Any}
+   :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}

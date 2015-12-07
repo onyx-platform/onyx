@@ -2,9 +2,11 @@
   (:require [clojure.core.async :refer [chan go >! <! >!! close!]]
             [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.peer.operation :as operation]
+            [onyx.log.failure-detector :refer [failure-detector]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
@@ -96,7 +98,8 @@
               (:log state)
               {:fn :leave-cluster :args {:id (:observer diff)}})
              state)
-           state)
+           (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
+             (assoc state :failure-detector (component/start fd))))
          (= (:id state) (:instant-join diff))
          (do (extensions/register-acker (:messenger state)
                                         (get-in new [:peer-sites (:id state)]))

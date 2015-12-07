@@ -1,6 +1,7 @@
 (ns onyx.log.commands.notify-join-cluster
   (:require [clojure.core.async :refer [chan go >! <! close!]]
             [clojure.set :refer [union difference map-invert]]
+            [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info] :as timbre]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
@@ -46,5 +47,9 @@
              {:fn :leave-cluster :args {:id (:subject diff)}}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
-      (assoc state :watch-ch ch))
+      (let [result-state (assoc state :watch-ch ch)]
+        (if-let [failure-detector (:failure-detector result-state)]
+          (do (component/stop failure-detector)
+              (dissoc result-state :failure-detector))
+          result-state)))
     state))

@@ -11,15 +11,14 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-           [uk.co.real_logic.agrona ErrorHandler CloseHelper]
+           [uk.co.real_logic.agrona ErrorHandler]
            [uk.co.real_logic.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
-
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
@@ -28,6 +27,7 @@
   [peer-group messaging-group publication-group short-circuitable? publications virtual-peers acking-daemon acking-ch
    send-idle-strategy compress-f]
   component/Lifecycle
+
   (start [component]
     (taoensso.timbre/info "Starting Aeron")
     (let [config (:config peer-group)

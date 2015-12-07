@@ -1,11 +1,10 @@
 (ns ^:no-doc onyx.messaging.aeron.publication-manager
   (:require [taoensso.timbre :refer [error fatal info warn] :as timbre]
             [clojure.core.async :refer [chan >!! <!! put! close! sliding-buffer thread]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
-           [uk.co.real_logic.agrona ErrorHandler CloseHelper]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context Publication Subscription]
+           [uk.co.real_logic.agrona ErrorHandler]
            [uk.co.real_logic.aeron.exceptions DriverTimeoutException]
-           [uk.co.real_logic.agrona.concurrent 
-            UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]))
+           [uk.co.real_logic.agrona.concurrent IdleStrategy]))
 
 (defprotocol PPublicationManager
   (write [this buf start end])
@@ -43,11 +42,11 @@
   (start [this]
     (warn "Started nil publication manager, likely due to timeout on creation."))
   (write [this _ _ _]
-    (warn "Started nil publication manager, likely due to timeout on creation."))
+    (warn "Writing nil publication manager, likely due to timeout on creation."))
   (stop [this]
-    (warn "Started nil publication manager, likely due to timeout on creation."))
+    (warn "Stopping nil publication manager, likely due to timeout on creation."))
   (connect [this]
-    (warn "Started nil publication manager, likely due to timeout on creation.")))
+    (warn "Connecting to nil publication manager, likely due to timeout on creation.")))
 
 (defrecord PublicationManager [channel stream-id send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
   PPublicationManager

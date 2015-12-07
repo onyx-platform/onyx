@@ -19,6 +19,7 @@ This chapter outlines how Onyx works on the inside to meet the required properti
     - [Examples](#examples)
   - [Dead peer removal](#dead-peer-removal)
     - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
+    - [Peer Failure Detection Thread](#peer-failure-detection-thread)
     - [Examples](#examples-1)
   - [Messaging](#messaging)
     - [The Algorithm](#the-algorithm)
@@ -192,6 +193,10 @@ In a cluster of > 1 peer, when a peer dies another peer will have a watch regist
 <img src="/doc/design/images/diagram-12.png" height="85%" width="85%">
 
 *Peer 1 signals peer 4's death, and further closes to the ring by adding a watch to Peer 3. The ring is now fully intact.*
+
+#### Peer Failure Detection Thread
+
+There is a window of time (inbetween when a peer prepares to join the cluster and when its monitoring peer notifies the cluster of its presence) that the monitoring node may fail, effectively deadlocking the new peer. This can occur because a peer will check if its monitoring dead is dead during the prepare phase - essentially performing eviction on a totally dead cluster - and may find a false positive that a node is alive when it is actually dead. The root issue is that ephemeral znodes stick around for a short period of time after the creating process goes down. The new peer must watch its monitor until it delivers the second phase message for joining - notification. When this occurs, we can stop monitoring, because the monitoring node is clearly alive. If the znode is deleted because the process exited, we can safely effect it and free the peer from deadlocking. [Issue #416](https://github.com/onyx-platform/onyx/issues/416) found this bug, and offers more context about the specific problem that we encountered.
 
 #### Examples
 

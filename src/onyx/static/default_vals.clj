@@ -15,6 +15,7 @@
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
    :onyx.zookeeper/backoff-max-retries 5
+   :onyx.zookeeper/prepare-failure-detection-interval 1000
 
    ;; bookkeeper defaults
    :onyx.bookkeeper/server? false
