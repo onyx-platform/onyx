@@ -554,6 +554,13 @@
              :type :integer
              :default 5}
 
+            :onyx.zookeeper/prepare-failure-detection-interval
+            {:doc "Number of ms to wait between checking if the peer that joins this peer via prepare has failed. This value is used within a loop to periodically detect a false-positive case where a ZooKeeper ephemeral node is still present even though the process has (recently died). This value is only used within the prepare phase of joining a peer, and is not used for the normal failure detection path when a peer has fully joined the cluster."
+             :unit :milliseconds
+             :optional? true
+             :type :integer
+             :default 1000}
+
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
              :optional? true
