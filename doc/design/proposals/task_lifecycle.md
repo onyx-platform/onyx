@@ -166,3 +166,21 @@ Message acknowledge is the process by which an input task maintains a set of seg
 ##### Examples
 
 - [Periodic Message Retry](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L488-L505)
+
+#### Flow Conditions
+
+Flow Conditions dynamically route segments to downstream tasks.
+
+##### Pain Points
+
+- This feature introduces a lot of different code paths for all the different combinations of actions that we can take per downstream task.
+- Often conflicting code paths for tasks that don't use flow conditions.
+- Makes it hard to reason about which ack values to generate.
+
+##### Suggestions
+
+- Unify code paths for non-flow condition tasks, and those that do use it.
+
+##### Examples
+
+- [Flow condition routing](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L73-L96)
