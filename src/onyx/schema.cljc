@@ -426,8 +426,7 @@
 
 (def Replica
   {:job-scheduler JobScheduler
-   :messaging {:onyx.messaging/impl Messaging
-               s/Keyword s/Any}
+   :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}
