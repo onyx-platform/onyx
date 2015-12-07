@@ -233,6 +233,7 @@ Note that my review is from a more recent Git SHA than the above links.
 - Worth describing what we're batching, why, and under what circumstances it happens. [Here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L139) might not be the best place for that, though. A doc with performance descriptions would be a better place for this one.
 - Should we drop a warning when [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L136) let doesn't find a value?
 - [This](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L179) should be defunct now that we check the peer config with schema and only have one key for it.
+- I think I don't understand [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L173) Javaism and why this needs to be in a future.
 
 #### PeerManager
 
