@@ -17,6 +17,7 @@ Now that Onyx is stabilizing feature-wise, this is a good time to rewrite this p
 - Prepare for the implementation of a batch engine by factoring out streaming engine specifics.
 - Reduce the number of mutable components as close to 1 atom as possible.
 - Incrementally phase this new proposed design into the `master` branch.
+- Switch away from using batch-timeouts to a configurable, aggressive read-and-process strategy.
 
 ### Current Pieces
 
@@ -184,3 +185,37 @@ Flow Conditions dynamically route segments to downstream tasks.
 ##### Examples
 
 - [Flow condition routing](https://github.com/onyx-platform/onyx/blob/4dd1ce7373c7ad9a812a33c3b6f99e70b90b844b/src/onyx/peer/task_lifecycle.clj#L73-L96)
+
+
+
+
+### Code review notes
+
+Note that my review is from a more recent Git SHA than the above links.
+
+#### Publication Manager
+
+- What's the difference between [`start` and `connect`](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L12-L13)? Can we merge them?
+- I see that protocol `PPublicationManager` has both [`start` and `stop` functions](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L13-L14). Can we also implement `Component` here for uniformity?
+- Should we emit an `info` or `warn` call [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L31)?
+- Should [this channel](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L88) block?
+- Should we way a have to break out of [this loop](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L20) after a certain number of retries?
+- Time to use [`offer!`](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L60)?
+- Can some of [these nil values](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_manager.clj#L88) be created on-demand in `start`?
+- Let's make [this value](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L8) configurable.
+
+#### Publication Group
+
+- [This](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L27-L40) would be a good piece of code to have unit/generative tests against.
+- Is [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L50-L56) code permanently dead?
+- Can we convert [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L47) into a `swap!` call that adds the new publication when it's not found? That will protect us from the (written) assumption that we have the only access point to this collection, just in case that becomes not true in the future.
+- It looks like the PublicationManager [removes itself](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L71) from the PublicationGroup when it closes. I presume this is because the PublicationManager itself is available when we want to close it, but not the PublicationGroup. We should considering giving the functions that close down the PublicationManager access to the PublicationGroup to avoid this "backward reaching" state manipulation. It can be hard to follow.
+- Leaving a note to try and figure out how to remove [this atom](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L74).
+- I think [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L87) is the cause of our `nil` PublicationMangers that we're seeing.
+- It's possible that [this block](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L22) can throw an exception that would go uncaught. This would cause the `command-ch` to not be read off of, thus never delivering on `promise`s.
+- If we used the above suggestion, to create publications inside of a defensive `swap!`, I think having a channel to interact with the publications atom as a single-point of access would no longer be necessary, since atoms are already serially accessed.
+- A thread can sneak in [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L94) and create a new publication after we've deref'ed the atom. Could this be a cause of Aeron connections hanging open after we had an apparently clean shutdown?
+
+#### Zookeeper Log
+
+- Is it possible that we ever [read the same log entry twice](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/log/zookeeper.clj#L228) and deliver that entry to the replica?
