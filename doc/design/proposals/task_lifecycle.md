@@ -216,6 +216,30 @@ Note that my review is from a more recent Git SHA than the above links.
 - If we used the above suggestion, to create publications inside of a defensive `swap!`, I think having a channel to interact with the publications atom as a single-point of access would no longer be necessary, since atoms are already serially accessed.
 - A thread can sneak in [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/publication_group.clj#L94) and create a new publication after we've deref'ed the atom. Could this be a cause of Aeron connections hanging open after we had an apparently clean shutdown?
 
+#### Aeron
+
+- Define what an Aeron channel is.
+- Create a Schema for the Aeron Connection specification.
+- A sort of "object composition diagram" would be helpful to describe how all the Aeron Components that we've created fit together.
+- [Big constructor](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L28), let's make use a map to name the parameters.
+- Is [`short-circuitable?`, `messaging-group`, `publication-group`, `publications`, `virtual-peers`, `acking-daemon`, `acking-ch`, `send-idle-strategy`, and `compress-f`](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L28) ignored here via its constructor?
+- Can we fuse [these two atoms](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L45-L46)?
+- Why keep the [Group](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L70) around and discard everything else to `nil`? Could use a comment if there's a reason.
+- Double deref [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L63) and [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L65).
+- Why is it important to dissociate [these values](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L62-L65) from the map on shutdown? As far as I can tell, we're just dropping them out of the hashmap.
+- [Possibly suspicious line](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L94), wondering if we can track down a root cause of this being `nil`. Worth a comment if it's the best approach.
+- We should deref once in [this function](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L136).
+- Should have an `:else` and `throw` for [this cond](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L134) for debuggings sake.
+- Worth describing what we're batching, why, and under what circumstances it happens. [Here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L139) might not be the best place for that, though. A doc with performance descriptions would be a better place for this one.
+- Should we drop a warning when [this](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L136) let doesn't find a value?
+- [This](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron.clj#L179) should be defunct now that we check the peer config with schema and only have one key for it.
+
+#### PeerManager
+
+- This whole file could use some explanation. What is meant by a "short id"? What are we multiplexing? Who are the subscribers? What do they subscribe to?
+- Is it worth putting an `info` statement on [these](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/peer_manager.clj#L13-L14) functions if they're known slow paths?
+- Why use a `deftype` and not a Record [here](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/messaging/aeron/peer_manager.clj#L30)?
+
 #### Zookeeper Log
 
 - Is it possible that we ever [read the same log entry twice](https://github.com/onyx-platform/onyx/blob/2737583af60031a307d9b270ba0917d15bcdb198/src/onyx/log/zookeeper.clj#L228) and deliver that entry to the replica?
