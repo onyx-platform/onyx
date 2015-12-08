@@ -10,13 +10,3 @@
 (defn external-addr [peer-config]
   (or (:onyx.messaging/external-addr peer-config)
       (bind-addr peer-config)))
-
-(defmulti messenger :onyx.messaging/impl)
-
-(defmulti messaging-peer-group :onyx.messaging/impl)
-
-(defmethod messenger :aeron [_]
-  (ns-resolve 'onyx.messaging.aeron 'aeron))
-
-(defmethod messaging-peer-group :aeron [_]
-  (ns-resolve 'onyx.messaging.aeron 'aeron-peer-group))

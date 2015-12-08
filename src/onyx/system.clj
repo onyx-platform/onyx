@@ -7,7 +7,6 @@
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
-            [onyx.messaging.common :refer [messenger messaging-peer-group]]
             [onyx.messaging.messenger-buffer :as buffer]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -102,16 +101,10 @@
      #(component/stop-system this peer-group-components))))
 
 (defn messenger-ctor [{:keys [config] :as peer-group}]
-  (let [rets ((messenger config) peer-group)]
-    (when-not rets
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
-    rets))
+  (am/aeron peer-group))
 
 (defn messaging-peer-group-ctor [config]
-  (let [rets ((messaging-peer-group config) config)]
-    (when-not rets
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
-    rets))
+  (am/aeron-peer-group config))
 
 (defn onyx-development-env
   ([peer-config]
