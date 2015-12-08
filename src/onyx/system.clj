@@ -100,12 +100,6 @@
     (rethrow-component
      #(component/stop-system this peer-group-components))))
 
-(defn messenger-ctor [{:keys [config] :as peer-group}]
-  (am/aeron peer-group))
-
-(defn messaging-peer-group-ctor [config]
-  (am/aeron-peer-group config))
-
 (defn onyx-development-env
   ([peer-config]
      (onyx-development-env peer-config {:monitoring :no-op}))
@@ -170,7 +164,7 @@
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger (component/using (messenger-ctor peer-group) [:monitoring :acking-daemon])
+       :messenger (component/using (am/aeron peer-group) [:monitoring :acking-daemon])
        :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :acking-daemon :messenger])})))
 
 (defn onyx-peer-group
@@ -178,4 +172,4 @@
   (map->OnyxPeerGroup
    {:config config
     :logging-config (logging-config/logging-configuration config)
-    :messaging-group (component/using (messaging-peer-group-ctor config) [:logging-config])}))
+    :messaging-group (component/using (am/aeron-peer-group config) [:logging-config])}))
