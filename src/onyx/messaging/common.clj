@@ -11,22 +11,9 @@
   (or (:onyx.messaging/external-addr peer-config)
       (bind-addr peer-config)))
 
-(defmulti messaging-require :onyx.messaging/impl)
-
 (defmulti messenger :onyx.messaging/impl)
 
 (defmulti messaging-peer-group :onyx.messaging/impl)
-
-(defn safe-require [sym]
-  (try (require sym)
-       (catch Throwable e
-         (fatal e
-                (str "Error loading messaging. "
-                     "If your peer is AOT compiled you will need to manually require " sym))
-         (throw e))))
-
-(defmethod messaging-require :aeron [_]
-  (safe-require 'onyx.messaging.aeron))
 
 (defmethod messenger :aeron [_]
   (ns-resolve 'onyx.messaging.aeron 'aeron))

@@ -6,8 +6,8 @@
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
             [onyx.messaging.acking-daemon :refer [acking-daemon]]
-            [onyx.messaging.aeron] 
-            [onyx.messaging.common :refer [messenger messaging-require messaging-peer-group]]
+            [onyx.messaging.aeron :as am]
+            [onyx.messaging.common :refer [messenger messaging-peer-group]]
             [onyx.messaging.messenger-buffer :as buffer]
             [onyx.monitoring.no-op-monitoring]
             [onyx.monitoring.custom-monitoring]
@@ -67,7 +67,7 @@
     (rethrow-component
      #(component/stop-system this development-components))))
 
-(def client-components [:monitoring :log :messaging-require])
+(def client-components [:monitoring :log])
 
 (defrecord OnyxClient []
   component/Lifecycle
@@ -79,7 +79,7 @@
      #(component/stop-system this client-components))))
 
 (def peer-components
-  [:monitoring :log :messaging-require :messenger :acking-daemon :virtual-peer])
+  [:monitoring :log :messenger :acking-daemon :virtual-peer])
 
 (defrecord OnyxPeer []
   component/Lifecycle
@@ -90,7 +90,7 @@
     (rethrow-component
      #(component/stop-system this peer-components))))
 
-(def peer-group-components [:logging-config :messaging-require :messaging-group])
+(def peer-group-components [:logging-config :messaging-group])
 
 (defrecord OnyxPeerGroup []
   component/Lifecycle
@@ -106,13 +106,6 @@
     (when-not rets
       (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))
     rets))
-
-(defn messaging-require-ctor [config]
-  (try
-    (messaging-require config)
-    :loaded
-    (catch Throwable e
-      (throw (ex-info "Could not find Messaging implementation" {:impl (:onyx.messaging/impl config)})))))
 
 (defn messaging-peer-group-ctor [config]
   (let [rets ((messaging-peer-group config) config)]
@@ -136,7 +129,6 @@
   ([peer-config monitoring-config]
      (map->OnyxClient
       {:monitoring (extensions/monitoring-agent monitoring-config)
-       :messaging-require (messaging-require-ctor peer-config)
        :log (component/using (zookeeper peer-config) [:monitoring])})))
 
 (defrecord RegisterMessengerPeer [messenger peer-site]
@@ -183,10 +175,9 @@
   ([{:keys [config] :as peer-group} monitoring-config]
      (map->OnyxPeer
       {:monitoring (extensions/monitoring-agent monitoring-config)
-       :messaging-require (messaging-require-ctor config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger (component/using (messenger-ctor peer-group) [:monitoring :messaging-require :acking-daemon])
+       :messenger (component/using (messenger-ctor peer-group) [:monitoring :acking-daemon])
        :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :acking-daemon :messenger])})))
 
 (defn onyx-peer-group
@@ -194,5 +185,4 @@
   (map->OnyxPeerGroup
    {:config config
     :logging-config (logging-config/logging-configuration config)
-    :messaging-require (messaging-require-ctor config)
-    :messaging-group (component/using (messaging-peer-group-ctor config) [:messaging-require :logging-config])}))
+    :messaging-group (component/using (messaging-peer-group-ctor config) [:logging-config])}))
