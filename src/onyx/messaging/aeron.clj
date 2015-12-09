@@ -127,22 +127,23 @@
   (let [msg-type (protocol/read-message-type buffer offset)
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
-        offset (unchecked-add offset protocol/short-size)]
+        offset (unchecked-add offset protocol/short-size)
+        v-peers @virtual-peers]
     (cond (= msg-type protocol/ack-msg-id)
           (let [ack (protocol/read-acker-message buffer offset)]
-            (when-let [acking-ch (pm/peer-channels @virtual-peers peer-id)]
+            (when-let [acking-ch (pm/peer-channels v-peers peer-id)]
               (>!! acking-ch ack)))
 
           (= msg-type protocol/batched-ack-msg-id)
           (let [acks (protocol/read-acker-messages buffer offset)]
-            (when-let [acking-ch (pm/peer-channels @virtual-peers peer-id)]
+            (when-let [acking-ch (pm/peer-channels v-peers peer-id)]
               (run! (fn [ack]
                       (>!! acking-ch ack))
                     acks))) 
 
           (= msg-type protocol/messages-msg-id)
           (let [segments (protocol/read-messages-buf decompress-f buffer offset)]
-            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+            (when-let [chs (pm/peer-channels v-peers peer-id)]
               (let [inbound-ch (:inbound-ch chs)]
                 (run! (fn [segment]
                         (>!! inbound-ch segment))
@@ -150,12 +151,12 @@
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
-            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+            (when-let [chs (pm/peer-channels v-peers peer-id)]
               (>!! (:release-ch chs) completion-id)))
 
           (= msg-type protocol/retry-msg-id)
           (let [retry-id (protocol/read-retry buffer offset)]
-            (when-let [chs (pm/peer-channels @virtual-peers peer-id)]
+            (when-let [chs (pm/peer-channels v-peers peer-id)]
               (>!! (:retry-ch chs) retry-id))))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
