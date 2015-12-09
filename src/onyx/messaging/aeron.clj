@@ -176,10 +176,6 @@
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
-(defn opts->port [opts]
-  (or (:onyx.messaging/peer-port opts)
-      (throw (ex-info "Peer port (:onyx.messaging/peer-port) is not defined" opts))))
-
 (defrecord AeronPeerGroup [opts publication-group subscribers subscriber-count compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
@@ -192,7 +188,7 @@
 
           bind-addr (common/bind-addr opts)
           external-addr (common/external-addr opts)
-          port (opts->port opts)
+          port (:onyx.messaging/peer-port opts)
           external-channel (aeron-channel external-addr port)
           poll-idle-strategy-config (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts)
           offer-idle-strategy-config (arg-or-default :onyx.messaging.aeron/offer-idle-strategy opts)
