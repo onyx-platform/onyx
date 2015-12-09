@@ -691,7 +691,6 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
-
             pipeline (build-pipeline task-map pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
