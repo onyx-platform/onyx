@@ -334,6 +334,11 @@
       (trigger-names-a-window window-names t))))
 
 (defn coerce-uuid [uuid]
-  (if (instance? java.util.UUID uuid)
-    uuid
-    (java.util.UUID/fromString uuid)))
+  (try 
+    (if (instance? java.util.UUID uuid)
+        uuid
+        (java.util.UUID/fromString uuid))
+    (catch Throwable t
+      (throw (ex-info (format "Argument must be a UUID or string UUID. Type was %s" (type uuid))
+                      {:type (type uuid)
+                       :value uuid})))))
