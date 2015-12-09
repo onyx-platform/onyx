@@ -304,7 +304,7 @@
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
    and removes it from the execution of any tasks. This peer will
-   not longer volunteer for tasks. Returns nil."
+   no longer volunteer for tasks. Returns nil."
   [peer]
   (>!! (:shutdown-ch peer) true)
   (<!! (:ack-ch peer))
@@ -319,7 +319,7 @@
     (shutdown-peer p)))
 
 (defn ^{:added "0.6.0"} start-env
-  "Starts a development environment using an in-memory implementation ZooKeeper."
+  "Starts a development environment using an in-memory implementation of ZooKeeper."
   ([env-config]
    (start-env env-config {:monitoring :no-op}))
   ([env-config monitoring-config]
