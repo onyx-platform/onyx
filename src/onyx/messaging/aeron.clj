@@ -42,55 +42,53 @@
           acking-ch (:acking-ch (:acking-daemon component))
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
-          peer-task-short-id (atom nil)
-          acker-short-id (atom nil)]
+          short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
              :short-circuitable? short-circuitable?
              :publication-group publication-group
-             :peer-task-short-id peer-task-short-id
-             :acker-short-id acker-short-id
+             :short-ids short-ids
              :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
              :compress-f compress-f
              :acking-ch acking-ch)))
 
-  (stop [{:keys [retry-ch virtual-peers peer-task-short-id acker-short-id] :as component}]
+  (stop [{:keys [retry-ch virtual-peers short-ids acker-short-id] :as component}]
     (taoensso.timbre/info "Stopping Aeron")
     (try
-      (close! acking-ch) 
-      (when @peer-task-short-id
-        (swap! virtual-peers pm/dissoc @peer-task-short-id))
-      (when @acker-short-id
-        (swap! virtual-peers pm/dissoc @acker-short-id))
+      (close! acking-ch)
+      (let [short-ids-snapshot @short-ids]
+        (when (:peer-task-short-id short-ids-snapshot)
+          (swap! virtual-peers pm/dissoc (:peer-task-short-id short-ids-snapshot)))
+        (when (:acker-short-id short-ids-snapshot)
+          (swap! virtual-peers pm/dissoc (:acker-short-id short-ids-snapshot))))
       (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil
            :short-circuitable? nil
            :publication-group publication-group
            :virtual-peers nil
-           :peer-task-short-id nil
-           :acker-short-id nil
+           :short-ids nil
            :compress-f nil :decompress-f nil
            :acking-ch nil)))
 
 (defmethod extensions/register-acker AeronConnection
-  [{:keys [virtual-peers acker-short-id acking-ch] :as messenger}
+  [{:keys [virtual-peers short-ids acking-ch] :as messenger}
    {:keys [aeron/acker-id]}]
-  (reset! acker-short-id acker-id)
+  (swap! short-ids assoc :acker-short-id acker-id)
   (swap! virtual-peers pm/assoc acker-id acking-ch))
 
 (defmethod extensions/register-task-peer AeronConnection
-  [{:keys [virtual-peers peer-task-short-id] :as messenger}
+  [{:keys [virtual-peers short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}
    task-buffer]
-  (reset! peer-task-short-id peer-task-id)
+  (swap! short-ids assoc :peer-task-short-id peer-task-id)
   (swap! virtual-peers pm/assoc peer-task-id task-buffer))
 
 (defmethod extensions/unregister-task-peer AeronConnection
-  [{:keys [virtual-peers peer-task-short-id] :as messenger}
+  [{:keys [virtual-peers short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}]
-  (reset! peer-task-short-id nil)
+  (swap! short-ids dissoc peer-task-id)
   (when peer-task-id 
     (swap! virtual-peers pm/dissoc peer-task-id)))
 
