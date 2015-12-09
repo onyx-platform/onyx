@@ -23,13 +23,12 @@
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
-(defrecord AeronConnection
-  [peer-group messaging-group publication-group short-circuitable? publications virtual-peers acking-daemon acking-ch
-   send-idle-strategy compress-f]
+(defrecord AeronMessenger
+  [peer-group]
   component/Lifecycle
 
   (start [component]
-    (taoensso.timbre/info "Starting Aeron")
+    (taoensso.timbre/info "Starting Aeron Messenger")
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
           publication-group (:publication-group messaging-group)
@@ -53,8 +52,8 @@
              :compress-f compress-f
              :acking-ch acking-ch)))
 
-  (stop [{:keys [retry-ch virtual-peers short-ids acker-short-id] :as component}]
-    (taoensso.timbre/info "Stopping Aeron")
+  (stop [{:keys [retry-ch acking-ch publication-group virtual-peers short-ids acker-short-id] :as component}]
+    (taoensso.timbre/info "Stopping Aeron Messenger")
     (try
       (close! acking-ch)
       (let [short-ids-snapshot @short-ids]
@@ -66,26 +65,26 @@
     (assoc component
            :send-idle-strategy nil
            :short-circuitable? nil
-           :publication-group publication-group
+           :publication-group nil
            :virtual-peers nil
            :short-ids nil
-           :compress-f nil :decompress-f nil
+           :compress-f nil
            :acking-ch nil)))
 
-(defmethod extensions/register-acker AeronConnection
+(defmethod extensions/register-acker AeronMessenger
   [{:keys [virtual-peers short-ids acking-ch] :as messenger}
    {:keys [aeron/acker-id]}]
   (swap! short-ids assoc :acker-short-id acker-id)
   (swap! virtual-peers pm/assoc acker-id acking-ch))
 
-(defmethod extensions/register-task-peer AeronConnection
+(defmethod extensions/register-task-peer AeronMessenger
   [{:keys [virtual-peers short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}
    task-buffer]
   (swap! short-ids assoc :peer-task-short-id peer-task-id)
   (swap! virtual-peers pm/assoc peer-task-id task-buffer))
 
-(defmethod extensions/unregister-task-peer AeronConnection
+(defmethod extensions/unregister-task-peer AeronMessenger
   [{:keys [virtual-peers short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}]
   (swap! short-ids dissoc peer-task-id)
@@ -283,17 +282,17 @@
   [replica peer]
   (get-in replica [:peer-sites peer :aeron/external-addr]))
 
-(defn aeron [peer-group]
-  (map->AeronConnection {:peer-group peer-group}))
+(defn aeron-messenger [peer-group]
+  (map->AeronMessenger {:peer-group peer-group}))
 
-(defmethod extensions/peer-site AeronConnection
+(defmethod extensions/peer-site AeronMessenger
   [messenger]
   {:aeron/external-addr (:external-addr (:messaging-group messenger))
    :aeron/port (:port (:messaging-group messenger))})
 
 (defrecord AeronPeerConnection [channel stream-id acker-id peer-task-id])
 
-(defmethod extensions/connection-spec AeronConnection
+(defmethod extensions/connection-spec AeronMessenger
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/acker-id aeron/peer-task-id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
         ;; ensure that each machine spreads their use of a node/peer-group's
@@ -303,7 +302,7 @@
                        sub-count)]
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id acker-id peer-task-id)))
 
-(defmethod extensions/receive-messages AeronConnection
+(defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/task-map onyx.core/messenger-buffer] :as event}]
   ;; We reuse a single timeout channel. This allows us to
   ;; continually block against one thread that is continually
@@ -350,7 +349,7 @@
   (when ch
     (>!! ch retry-id)))
 
-(defmethod extensions/send-messages AeronConnection
+(defmethod extensions/send-messages AeronMessenger
   [messenger event {:keys [peer-task-id channel] :as conn-spec} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (:inbound-ch (lookup-channels messenger peer-task-id)) batch)
@@ -358,7 +357,7 @@
           buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) peer-task-id batch)]
       (pubm/write pub-man buf 0 (.capacity buf)))))
 
-(defmethod extensions/internal-ack-segment AeronConnection
+(defmethod extensions/internal-ack-segment AeronMessenger
   [messenger event {:keys [acker-id channel] :as conn-spec} ack]
   (if ((:short-circuitable? messenger) channel)
     (ack-segment-short-circuit (lookup-channels messenger acker-id) ack)
@@ -366,7 +365,7 @@
       (let [buf (protocol/build-acker-message acker-id (:id ack) (:completion-id ack) (:ack-val ack))]
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
-(defmethod extensions/internal-ack-segments AeronConnection
+(defmethod extensions/internal-ack-segments AeronMessenger
   [messenger event {:keys [acker-id] :as conn-spec} acks]
   (if ((:short-circuitable? messenger) (:channel conn-spec))
     (ack-segments-short-circuit (lookup-channels messenger acker-id) acks)
@@ -376,7 +375,7 @@
       (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes size))
       (pubm/write pub-man buf 0 size))))
 
-(defmethod extensions/internal-complete-message AeronConnection
+(defmethod extensions/internal-complete-message AeronMessenger
   [messenger event completion-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (:release-ch (lookup-channels messenger peer-task-id)) completion-id)
@@ -384,7 +383,7 @@
           buf (protocol/build-completion-msg-buf peer-task-id completion-id)]
       (pubm/write pub-man buf 0 protocol/completion-msg-length))))
 
-(defmethod extensions/internal-retry-segment AeronConnection
+(defmethod extensions/internal-retry-segment AeronMessenger
   [messenger event retry-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (retry-segment-short-circuit (:retry-ch (lookup-channels messenger peer-task-id)) retry-id)
