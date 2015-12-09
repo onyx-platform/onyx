@@ -177,6 +177,7 @@
   ([peer-config job-id]
      (kill-job peer-config job-id {:monitoring :no-op}))
   ([peer-config job-id monitoring-config]
+     (validator/validate-peer-config peer-config)
      (when (nil? job-id)
        (throw (ex-info "Invalid job id" {:job-id job-id})))
      (let [client (component/start (system/onyx-client peer-config monitoring-config))
@@ -196,6 +197,7 @@
   ([peer-config ch]
      (subscribe-to-log peer-config ch {:monitoring :no-op}))
   ([peer-config ch monitoring-config]
+     (validator/validate-peer-config peer-config)
      (let [env (component/start (system/onyx-client peer-config monitoring-config))]
        {:replica (extensions/subscribe-to-log (:log env) ch)
         :env env})))
@@ -210,6 +212,7 @@
   ([peer-config]
    (gc peer-config {:monitoring :no-op}))
   ([peer-config monitoring-config]
+   (validator/validate-peer-config peer-config)
    (let [id (java.util.UUID/randomUUID)
            client (component/start (system/onyx-client peer-config monitoring-config))
            entry (create-log-entry :gc {:id id})
@@ -232,6 +235,7 @@
   ([peer-config job-id]
      (await-job-completion peer-config job-id {:monitoring-config {:monitoring :no-op}}))
   ([peer-config job-id {:keys [monitoring-config timeout-ms]}]
+   (validator/validate-peer-config peer-config)
    (let [job-id (validator/coerce-uuid job-id)
          client (component/start (system/onyx-client peer-config monitoring-config))
          ch (chan 100)
