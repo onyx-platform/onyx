@@ -157,7 +157,11 @@
           (= msg-type protocol/retry-msg-id)
           (let [retry-id (protocol/read-retry buffer offset)]
             (when-let [chs (pm/peer-channels v-peers peer-id)]
-              (>!! (:retry-ch chs) retry-id))))))
+              (>!! (:retry-ch chs) retry-id)))
+
+          :else
+          (throw (ex-info "Could not deserialize incoming message from Aeron"
+                          {:msg-type msg-type})))))
 
 (defn start-subscriber! [bind-addr port stream-id virtual-peers decompress-f idle-strategy]
   (let [ctx (-> (Aeron$Context.)
