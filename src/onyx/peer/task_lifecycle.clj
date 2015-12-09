@@ -469,7 +469,7 @@
                      (when site 
                        (emit-latency :peer-complete-segment
                                      monitoring
-                                     #(extensions/internal-complete-message messenger event id site))))
+                                     #(extensions/internal-complete-segment messenger event id site))))
 
                    (= ch retry-ch)
                    (->> (p-ext/retry-segment pipeline event v)
