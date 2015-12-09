@@ -86,8 +86,8 @@ Example:
  :window/type :sliding
  :window/aggregation :onyx.windowing.aggregation/conj
  :window/window-key :event-time
- :window/range [5 :minutes]
- :window/slide [1 :minute]}
+ :window/range [15 :minutes]
+ :window/slide [5 :minute]}
 ```
 
 Example project: [sliding-windows](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/sliding-windows)
