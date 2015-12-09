@@ -1,0 +1,110 @@
+<html>
+<head>
+  <link href="https://cdn.rawgit.com/knsv/mermaid/0.5.5/dist/mermaid.css" rel="stylesheet">
+  <script src="https://cdn.rawgit.com/knsv/mermaid/0.5.5/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true});</script>
+</head>
+
+<body>
+    <div class="mermaid">
+graph BT
+    O[Subscription] --> A
+    A[Aeron Subscriber] --> B[Aeron Connection]
+    B --> C[Aeron Channel]
+    C --> D[network]
+
+    F[VirtualPeer] --> G[AeronConnection]
+    G --> H[PeerGroup]
+    H --> I[PeerManager]
+    H --> J[PublicationGroup]
+    J --> K[TrackedPublication]
+    K --> L[PublicationManager]
+    L --> M[Aeron Publication]
+    M --> N[Aeron Channel]
+    N --> D
+    P --> J
+    P[Task] --> W[Messenger Buffer]
+    F --> P
+    W --> X[inbound-ch]
+    W --> Y[retry-ch]
+    W --> Z[release-ch]
+    P --> QQ[Backpressure Poll]
+
+    P --> AA[Task Lifecycle]
+    BB --> Q
+    
+    F --> Q[Log]
+    Q --> R[ZooKeeper Connection]
+    R --> D
+    
+    F --> S[Acking Daemon]
+    S --> T[acking-ch]
+    S --> U[update-ack-state]
+    S --> V[clear-ack-state]
+
+    O --> TT[acking-ch]
+    O --> XX[inbound-ch]
+    O --> YY[retry-ch]
+    O --> ZZ[release-ch]
+
+    F --> CC[inbox-ch]
+    F --> DD[outbox-ch]
+
+    F --> EE[outbox-writer-loop]
+    F --> FF[inbox-reader-loop]
+    EE --> DD
+    EE --> Q
+    FF --> CC
+    FF --> Q
+
+    AA --> GG[Channel Listener]
+    GG --> HH[release-ch]
+    GG --> II[completion-ch]
+    GG --> JJ[retry-ch]
+    GG --> KK[seal-ch]
+    GG --> LL[run-task-lifecycle]
+    LL --> MM[outbox-ch]
+    LL --> NN[task-kill-ch]
+    GG --> OO[input-retry-segments]
+    GG --> PP[kill-ch]
+
+    AA --> BB[Task Information]
+
+    style D fill: #ffffd6
+    style C fill: #d6ffeb
+    style N fill: #d6ffeb
+    style B fill: #FFD6EB
+    style M fill: #FFD6EB
+    style A fill: #FFD6EB
+    style P fill: #FFDFD6
+
+    style U fill: #DED9D3
+    style V fill: #DED9D3
+    style EE fill: #DED9D3
+    style FF fill: #DED9D3
+    style GG fill: #DED9D3
+    style LL fill: #DED9D3
+    style OO fill: #DED9D3
+    style QQ fill: #DED9D3
+
+    style T fill: #93DEED
+    style X fill: #93DEED
+    style Y fill: #93DEED
+    style Z fill: #93DEED
+
+    style CC fill: #93DEED
+    style DD fill: #93DEED
+    style HH fill: #93DEED
+    style II fill: #93DEED
+    style JJ fill: #93DEED
+    style KK fill: #93DEED
+    style MM fill: #93DEED
+    style NN fill: #93DEED
+    style PP fill: #93DEED
+    style TT fill: #93DEED
+    style XX fill: #93DEED
+    style YY fill: #93DEED
+    style ZZ fill: #93DEED
+    </div>
+</body>
+</html>
