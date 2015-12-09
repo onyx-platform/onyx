@@ -139,35 +139,35 @@
   "Takes a peer configuration, job map, and optional monitoring config,
    sending the job to the cluster for eventual execution."
   ([peer-config job]
-     (submit-job peer-config job {:monitoring :no-op}))
+   (submit-job peer-config job {:monitoring :no-op}))
   ([peer-config job monitoring-config]
-     (try (validator/validate-peer-config peer-config)
-          (validator/validate-job (assoc job :workflow (:workflow job)))
-          (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-          (validator/validate-lifecycles (:lifecycles job) (:catalog job))
-          (validator/validate-windows (:windows job) (:catalog job))
-          (validator/validate-triggers (:triggers job) (:windows job))
-          (catch Throwable t
-            (error t)
-            (throw t)))
-     (let [id (java.util.UUID/randomUUID)
-           tasks (planning/discover-tasks (:catalog job) (:workflow job))
-           entry (create-submit-job-entry id peer-config job tasks)
-           client (component/start (system/onyx-client peer-config monitoring-config))]
-       (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-       (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-       (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-       (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
-       (extensions/write-chunk (:log client) :windows (:windows job) id)
-       (extensions/write-chunk (:log client) :triggers (:triggers job) id)
+   (try (validator/validate-peer-config peer-config)
+        (validator/validate-job (assoc job :workflow (:workflow job)))
+        (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+        (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+        (validator/validate-windows (:windows job) (:catalog job))
+        (validator/validate-triggers (:triggers job) (:windows job))
+        (catch Throwable t
+          (error t)
+          (throw t)))
+   (let [id (java.util.UUID/randomUUID)
+         tasks (planning/discover-tasks (:catalog job) (:workflow job))
+         entry (create-submit-job-entry id peer-config job tasks)
+         client (component/start (system/onyx-client peer-config monitoring-config))]
+     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
+     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
+     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
+     (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
+     (extensions/write-chunk (:log client) :windows (:windows job) id)
+     (extensions/write-chunk (:log client) :triggers (:triggers job) id)
 
-       (doseq [task tasks]
-         (extensions/write-chunk (:log client) :task task id))
+     (doseq [task tasks]
+       (extensions/write-chunk (:log client) :task task id))
 
-       (extensions/write-log-entry (:log client) entry)
-       (component/stop client)
-       {:job-id id
-        :task-ids (zipmap (map :name tasks) tasks)})))
+     (extensions/write-log-entry (:log client) entry)
+     (component/stop client)
+     {:job-id id
+      :task-ids (zipmap (map :name tasks) tasks)})))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
@@ -175,16 +175,16 @@
    Task lifecycle APIs for closing tasks are invoked. This job is never again scheduled
    for execution."
   ([peer-config job-id]
-     (kill-job peer-config job-id {:monitoring :no-op}))
+   (kill-job peer-config job-id {:monitoring :no-op}))
   ([peer-config job-id monitoring-config]
-     (validator/validate-peer-config peer-config)
-     (when (nil? job-id)
-       (throw (ex-info "Invalid job id" {:job-id job-id})))
-     (let [client (component/start (system/onyx-client peer-config monitoring-config))
-           entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
-       (extensions/write-log-entry (:log client) entry)
-       (component/stop client)
-       true)))
+   (validator/validate-peer-config peer-config)
+   (when (nil? job-id)
+     (throw (ex-info "Invalid job id" {:job-id job-id})))
+   (let [client (component/start (system/onyx-client peer-config monitoring-config))
+         entry (create-log-entry :kill-job {:job (validator/coerce-uuid job-id)})]
+     (extensions/write-log-entry (:log client) entry)
+     (component/stop client)
+     true)))
 
 (defn ^{:added "0.6.0"} subscribe-to-log
   "Sends all events from the log to the provided core.async channel.
@@ -195,12 +195,12 @@
    convenient for directly querying the znodes. :env can be shutdown with
    the onyx.api/shutdown-env function"
   ([peer-config ch]
-     (subscribe-to-log peer-config ch {:monitoring :no-op}))
+   (subscribe-to-log peer-config ch {:monitoring :no-op}))
   ([peer-config ch monitoring-config]
-     (validator/validate-peer-config peer-config)
-     (let [env (component/start (system/onyx-client peer-config monitoring-config))]
-       {:replica (extensions/subscribe-to-log (:log env) ch)
-        :env env})))
+   (validator/validate-peer-config peer-config)
+   (let [env (component/start (system/onyx-client peer-config monitoring-config))]
+     {:replica (extensions/subscribe-to-log (:log env) ch)
+      :env env})))
 
 (defn ^{:added "0.6.0"} gc
   "Invokes the garbage collector on Onyx. Compresses all local replicas
@@ -214,26 +214,26 @@
   ([peer-config monitoring-config]
    (validator/validate-peer-config peer-config)
    (let [id (java.util.UUID/randomUUID)
-           client (component/start (system/onyx-client peer-config monitoring-config))
-           entry (create-log-entry :gc {:id id})
-           ch (chan 1000)]
-       (extensions/write-log-entry (:log client) entry)
+         client (component/start (system/onyx-client peer-config monitoring-config))
+         entry (create-log-entry :gc {:id id})
+         ch (chan 1000)]
+     (extensions/write-log-entry (:log client) entry)
 
-       (loop [replica (extensions/subscribe-to-log (:log client) ch)]
-         (let [entry (<!! ch)
-               new-replica (extensions/apply-log-entry entry replica)]
-           (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
-             (let [diff (extensions/replica-diff entry replica new-replica)]
-               (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
-             (recur new-replica))))
-       (component/stop client)
-       true)))
+     (loop [replica (extensions/subscribe-to-log (:log client) ch)]
+       (let [entry (<!! ch)
+             new-replica (extensions/apply-log-entry entry replica)]
+         (if (and (= (:fn entry) :gc) (= (:id (:args entry)) id))
+           (let [diff (extensions/replica-diff entry replica new-replica)]
+             (extensions/fire-side-effects! entry replica new-replica diff {:id id :log (:log client)}))
+           (recur new-replica))))
+     (component/stop client)
+     true)))
 
 (defn ^{:added "0.7.4"} await-job-completion
   "Blocks until job-id has had all of its tasks completed or the job is killed.
    Returns true if the job completed successfully, false if the job was killed."
   ([peer-config job-id]
-     (await-job-completion peer-config job-id {:monitoring-config {:monitoring :no-op}}))
+   (await-job-completion peer-config job-id {:monitoring-config {:monitoring :no-op}}))
   ([peer-config job-id {:keys [monitoring-config timeout-ms]}]
    (validator/validate-peer-config peer-config)
    (let [job-id (validator/coerce-uuid job-id)
@@ -282,24 +282,24 @@
    a 3rd argument - a monitoring configuration map. See the User Guide
    for details."
   ([n peer-group]
-     (start-peers n peer-group {:monitoring :no-op}))
+   (start-peers n peer-group {:monitoring :no-op}))
   ([n {:keys [config] :as peer-group} monitoring-config]
-     (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
-       (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
-     (validator/validate-java-version)
-     (doall
-      (map
-       (fn [_]
-         (let [v-peer (system/onyx-peer peer-group monitoring-config)
-               live (component/start v-peer)
-               shutdown-ch (chan 1)
-               ack-ch (chan)
-               started-peer (atom live)]
-           {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
-            :started-peer started-peer
-            :shutdown-ch shutdown-ch
-            :ack-ch ack-ch}))
-       (range n)))))
+   (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
+     (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
+   (validator/validate-java-version)
+   (doall
+    (map
+     (fn [_]
+       (let [v-peer (system/onyx-peer peer-group monitoring-config)
+             live (component/start v-peer)
+             shutdown-ch (chan 1)
+             ack-ch (chan)
+             started-peer (atom live)]
+         {:peer-lifecycle (future (peer-lifecycle started-peer config shutdown-ch ack-ch))
+          :started-peer started-peer
+          :shutdown-ch shutdown-ch
+          :ack-ch ack-ch}))
+     (range n)))))
 
 (defn ^{:added "0.6.0"} shutdown-peer
   "Shuts down the virtual peer, which releases all of its resources
@@ -321,7 +321,7 @@
 (defn ^{:added "0.6.0"} start-env
   "Starts a development environment using an in-memory implementation ZooKeeper."
   ([env-config]
-     (start-env env-config {:monitoring :no-op}))
+   (start-env env-config {:monitoring :no-op}))
   ([env-config monitoring-config]
    (validator/validate-env-config env-config)
    (component/start (system/onyx-development-env env-config monitoring-config))))
