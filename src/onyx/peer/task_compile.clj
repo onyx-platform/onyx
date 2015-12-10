@@ -50,7 +50,7 @@
 
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs (resolve-lifecycle-functions lifecycles
+        fs (resolve-lifecycle-functions matched
                                         :lifecycle/start-task?
                                         (fn [lifecycle f]
                                           (fn [event]
@@ -62,7 +62,7 @@
 
 (defn compile-lifecycle-handle-exception-functions [lifecycles task-name]
   (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs (resolve-lifecycle-functions lifecycles
+        fs (resolve-lifecycle-functions matched
                                         :lifecycle/handle-exception
                                         (fn [lifecycle f]
                                           (fn [event phase e]
