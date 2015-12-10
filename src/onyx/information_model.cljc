@@ -509,7 +509,12 @@
             :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
                                             :type :function
                                             :optional? true
-                                            :added "0.8.0"}}}
+                                            :added "0.8.0"}
+
+            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 3 arguments - an event map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed."
+                                            :type :function
+                                            :optional? true
+                                            :added "0.8.3"}}}
 
    :peer-config
    {:summary "All options available to configure the virtual peers and development environment."
@@ -1083,7 +1088,8 @@
     :lifecycle/after-batch 
     :lifecycle/after-task-stop 
     :lifecycle/after-ack-segment 
-    :lifecycle/after-retry-segment]
+    :lifecycle/after-retry-segment
+    :lifecycle/handle-exception]
    :peer-config
    [:onyx/id :onyx.peer/job-scheduler :zookeeper/address
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
