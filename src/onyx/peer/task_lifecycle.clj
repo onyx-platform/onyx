@@ -40,8 +40,21 @@
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
+(defn call-with-lifecycle-handler [event phase handler-fn f & args]
+  (try
+    (apply f args)
+    (catch Throwable t
+      (when-not (handler-fn event phase t)
+        (throw t)))))
+
 (defn munge-start-lifecycle [event]
-  (let [rets ((:onyx.core/compiled-start-task-fn event) event)]
+  (let [rets
+        (call-with-lifecycle-handler
+         event
+         :lifecycle/start-task?
+         (:onyx.core/compiled-handle-exception-fn event)
+         (:onyx.core/compiled-start-task-fn event)
+         event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
                            (:onyx.core/id event))))
@@ -219,7 +232,12 @@
   event)
 
 (defn inject-batch-resources [compiled-before-batch-fn pipeline event]
-  (let [rets (-> (compiled-before-batch-fn event)
+  (let [rets (-> (call-with-lifecycle-handler
+                  event
+                  :lifecycle/before-batch
+                  (:onyx.core/compiled-handle-exception-fn event)
+                  compiled-before-batch-fn
+                  event)
                  (assoc :onyx.core/lifecycle-id (uuid/random-uuid)))]
     (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
@@ -235,7 +253,13 @@
   (if (and (= task-type :input) (:backpressure? peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [rets (merge event (p-ext/read-batch pipeline event))
-          rets ((:onyx.core/compiled-after-read-batch-fn event) rets)]
+          rets
+          (call-with-lifecycle-handler
+           event
+           :lifecycle/after-read-batch
+           (:onyx.core/compiled-handle-exception-fn event)
+           (:onyx.core/compiled-after-read-batch-fn event)
+           rets)]
       (handle-backoff! event)
       rets)))
 
@@ -437,7 +461,12 @@
     rets))
 
 (defn close-batch-resources [event]
-  (let [rets ((:onyx.core/compiled-after-batch-fn event) event)] 
+  (let [rets (call-with-lifecycle-handler
+              event
+              :lifecycle/after-batch
+              (:onyx.core/compiled-handle-exception-fn event)
+              (:onyx.core/compiled-after-batch-fn event)
+              event)]
     (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
                                    (:onyx.core/id rets)
                                    (:onyx.core/lifecycle-id rets)))
@@ -461,7 +490,13 @@
            (when v
              (cond (= ch release-ch)
                    (->> (p-ext/ack-segment pipeline event v)
-                        (compiled-after-ack-segment-fn event v))
+                        (call-with-lifecycle-handler
+                         event
+                         :lifecycle/after-ack-segment
+                         (:onyx.core/compiled-handle-exception-fn event)
+                         compiled-after-ack-segment-fn
+                         event
+                         v))
 
                    (= ch completion-ch)
                    (let [{:keys [id peer-id]} v
@@ -473,7 +508,13 @@
 
                    (= ch retry-ch)
                    (->> (p-ext/retry-segment pipeline event v)
-                        (compiled-after-retry-segment-fn event v))
+                        (call-with-lifecycle-handler
+                          event
+                          :lifecycle/after-retry-segment
+                          (:onyx.core/compiled-handle-exception-fn event)
+                          compiled-after-retry-segment-fn
+                          event
+                          v))
 
                    (= ch seal-ch)
                    (do
@@ -500,7 +541,13 @@
                 (when (p-ext/pending? pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
-                       (compiled-after-retry-segment-fn event m))))
+                       (call-with-lifecycle-handler
+                        event
+                        :lifecycle/after-retry-segment
+                        (:onyx.core/compiled-handle-exception-fn event)
+                        compiled-after-retry-segment-fn
+                        event
+                        m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
@@ -669,6 +716,7 @@
                            :onyx.core/compiled-after-task-fn (c/compile-after-task-functions lifecycles (:name task))
                            :onyx.core/compiled-after-ack-segment-fn (c/compile-after-ack-segment-functions lifecycles (:name task))
                            :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
+                           :onyx.core/compiled-handle-exception-fn (c/compile-handle-exception-functions lifecycles (:name task))
                            :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
                            :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
                            :onyx.core/compiled (->Compiled (c/task-map->grouping-fn task-map))
@@ -701,7 +749,13 @@
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
-            before-task-start-fn (:onyx.core/compiled-before-task-start-fn pipeline-data)
+            before-task-start-fn (fn [event]
+                                   (call-with-lifecycle-handler
+                                    event
+                                    :lifecycle/start-task?
+                                    (:onyx.core/compiled-handle-exception-fn event)
+                                    (:onyx.core/compiled-before-task-start-fn event)
+                                    event))
 
             pipeline-data (-> pipeline-data
                               before-task-start-fn
@@ -765,7 +819,12 @@
         (when (exactly-once-task? event)
           (state-extensions/close-filter (:filter @window-state) event)))
 
-      ((:onyx.core/compiled-after-task-fn event) event))
+      (call-with-lifecycle-handler
+       event
+       :lifecycle/after-task-stop
+       (:onyx.core/compiled-handle-exception-fn event)
+       (:onyx.core/compiled-after-task-fn event)
+       event))
 
     (assoc component
       :pipeline nil

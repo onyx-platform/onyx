@@ -56,6 +56,9 @@ A function that takes four arguments - an event map, a message id, the return of
 
 A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried.
 
+#### Handle Exception
+
+If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 3 arguments - an event map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed.
 
 ### Example
 
@@ -94,6 +97,10 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 (defn after-retry-segment [event message-id rets lifecycle]
   (println "Retrying message " message-id))
 
+(defn handle-exception [event lifecycle e]
+  (println "Caught exception: " e)
+  (println "Returning true, indicating that this task should restart.")
+  true)
 ```
 
 Notice that all lifecycle functions return maps except `start-task?`. This map is merged back into the `event` parameter that you received. `start-task?` is a boolean function that allows you to block and back off if you don't want to start the task quite yet. This function will be called periodically as long as `false` is returned. If more than one `start-task?` is specified in your lifecycles, they must all return `true` for the task to begin. `start-task?` is invoked *before* `before-task-start`.
@@ -105,10 +112,12 @@ Next, define a map that wires all these functions together by mapping predefined
   {:lifecycle/start-task? start-task?
    :lifecycle/before-task-start before-task-start
    :lifecycle/before-batch before-batch
+   :lifecycle/after-read-batch after-read-batch
    :lifecycle/after-batch after-batch
    :lifecycle/after-task-stop after-task-stop
    :lifecycle/after-ack-segment after-ack-segment
-   :lifecycle/after-retry-segment after-retry-segment})
+   :lifecycle/after-retry-segment after-retry-segment
+   :lifecycle/handle-exception handle-exception})
 ```
 
 Each of these 6 keys maps to a function. All of these keys are optional, so you can mix and match depending on which functions you actually need to use.
