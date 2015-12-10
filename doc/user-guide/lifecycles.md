@@ -58,7 +58,7 @@ A function that takes four arguments - an event map, a message id, the return of
 
 #### Handle Exception
 
-If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 3 arguments - an event map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed.
+If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed.
 
 ### Example
 
@@ -97,7 +97,7 @@ Let's work with an example to show how lifecycles work. Suppose you want to prin
 (defn after-retry-segment [event message-id rets lifecycle]
   (println "Retrying message " message-id))
 
-(defn handle-exception [event lifecycle e]
+(defn handle-exception [event lifecycle lifecycle-phase e]
   (println "Caught exception: " e)
   (println "Returning true, indicating that this task should restart.")
   true)

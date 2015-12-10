@@ -752,7 +752,7 @@
             before-task-start-fn (fn [event]
                                    (call-with-lifecycle-handler
                                     event
-                                    :lifecycle/start-task?
+                                    :lifecycle/before-task-start
                                     (:onyx.core/compiled-handle-exception-fn event)
                                     (:onyx.core/compiled-before-task-start-fn event)
                                     event))

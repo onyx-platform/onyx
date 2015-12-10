@@ -38,21 +38,23 @@
   (filter #(or (= (:lifecycle/task %) :all)
                (= (:lifecycle/task %) task-name)) lifecycles))
 
-(defn resolve-lifecycle-functions [lifecycles invoker]
+(defn resolve-lifecycle-functions [lifecycles phase invoker]
   (remove
    nil?
    (map
     (fn [lifecycle]
       (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-        (when-let [g (:lifecycle/start-task? calls-map)]
+        (when-let [g (get calls-map phase)]
           (invoker lifecycle g))))
     lifecycles)))
 
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs (resolve-lifecycle-functions lifecycles (fn [lifecycle f]
-                                                     (fn [event]
-                                                       (f event lifecycle))))]
+        fs (resolve-lifecycle-functions lifecycles
+                                        :lifecycle/start-task?
+                                        (fn [lifecycle f]
+                                          (fn [event]
+                                            (f event lifecycle))))]
     (fn [event]
       (if (seq fs)
         (every? true? ((apply juxt fs) event))
@@ -60,12 +62,14 @@
 
 (defn compile-lifecycle-handle-exception-functions [lifecycles task-name]
   (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs (resolve-lifecycle-functions lifecycles (fn [lifecycle f]
-                                                     (fn [event e]
-                                                       (f event lifecycle e))))]
-    (fn [event e]
+        fs (resolve-lifecycle-functions lifecycles
+                                        :lifecycle/handle-exception
+                                        (fn [lifecycle f]
+                                          (fn [event phase e]
+                                            (f event lifecycle phase e))))]
+    (fn [event phase e]
       (if (seq fs)
-        (some #{false} ((apply juxt fs) event e))
+        (some #{false} ((apply juxt fs) event phase e))
         false))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]

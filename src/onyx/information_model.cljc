@@ -511,7 +511,7 @@
                                             :optional? true
                                             :added "0.8.0"}
 
-            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 3 arguments - an event map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed."
+            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed."
                                             :type :function
                                             :optional? true
                                             :added "0.8.3"}}}
