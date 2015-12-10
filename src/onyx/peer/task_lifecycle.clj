@@ -519,11 +519,12 @@
           event
           (:onyx.core/triggers event)))
 
-(defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
+(defn handle-exception [log restart-pred-fn e restart-ch outbox-ch job-id]
   (warn e)
   (if (restart-pred-fn e)
     (>!! restart-ch true)
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
+      (extensions/write-chunk log :exception e job-id)
       (>!! outbox-ch entry))))
 
 (defn run-task-lifecycle
@@ -695,7 +696,7 @@
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
             restart-pred-fn (operation/resolve-restart-pred-fn task-map)
-            ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception log restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -734,7 +735,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception (constantly false) e restart-ch outbox-ch job-id)
+        (handle-exception log (constantly false) e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]

@@ -21,34 +21,33 @@
 ;; Thanks to zookeeper-clj
 (defn stat-to-map
   ([^org.apache.zookeeper.data.Stat stat]
-   ;;(long czxid, long mzxid, long ctime, long mtime, int version, int cversion, int aversion, long ephemeralOwner, int dataLength, int numChildren, long pzxid)
    (when stat
-     {:czxid (.getCzxid stat)
-      :mzxid (.getMzxid stat)
-      :ctime (.getCtime stat)
-      :mtime (.getMtime stat)
-      :version (.getVersion stat)
-      :cversion (.getCversion stat)
-      :aversion (.getAversion stat)
-      :ephemeralOwner (.getEphemeralOwner stat)
-      :dataLength (.getDataLength stat)
-      :numChildren (.getNumChildren stat)
-      :pzxid (.getPzxid stat)})))
+     {:czxid (.getCzxid stat) ;; long
+      :mzxid (.getMzxid stat) ;; long
+      :ctime (.getCtime stat) ;; long
+      :mtime (.getMtime stat) ;; long
+      :version (.getVersion stat) ;; int
+      :cversion (.getCversion stat) ;;  int
+      :aversion (.getAversion stat) ;; long
+      :ephemeralOwner (.getEphemeralOwner stat) ;;int
+      :dataLength (.getDataLength stat) ;; int
+      :numChildren (.getNumChildren stat) ;; int
+      :pzxid (.getPzxid stat)}))) ;; long
 
 (defn event-to-map
   ([^org.apache.zookeeper.WatchedEvent event]
-     (when event
-       {:event-type (keyword (.name (.getType event)))
-        :keeper-state (keyword (.name (.getState event)))
-        :path (.getPath event)})))
+   (when event
+     {:event-type (keyword (.name (.getType event)))
+      :keeper-state (keyword (.name (.getState event)))
+      :path (.getPath event)})))
 
 ;; Watcher
 
 (defn make-watcher
   ([handler]
-     (reify Watcher
-       (process [this event]
-         (handler (event-to-map event))))))
+   (reify Watcher
+     (process [this event]
+       (handler (event-to-map event))))))
 
 (defn ^CuratorFramework connect
   ([connection-string]
@@ -56,16 +55,16 @@
   ([connection-string ns]
    (connect connection-string ns
             (BoundedExponentialBackoffRetry.
-              (:onyx.zookeeper/backoff-base-sleep-time-ms defaults)
-              (:onyx.zookeeper/backoff-max-sleep-time-ms defaults)
-              (:onyx.zookeeper/backoff-max-retries defaults))))
+             (:onyx.zookeeper/backoff-base-sleep-time-ms defaults)
+             (:onyx.zookeeper/backoff-max-sleep-time-ms defaults)
+             (:onyx.zookeeper/backoff-max-retries defaults))))
   ([connection-string ns ^RetryPolicy retry-policy]
    (doto
-     (.. (CuratorFrameworkFactory/builder)
-         (namespace ns)
-         (connectString connection-string)
-         (retryPolicy retry-policy)
-         (build))
+       (.. (CuratorFrameworkFactory/builder)
+           (namespace ns)
+           (connectString connection-string)
+           (retryPolicy retry-policy)
+           (build))
      .start)))
 
 (defn close
@@ -87,8 +86,8 @@
   [^CuratorFramework client path & {:keys [data] :as opts}]
   (try
     (let [cr ^SetDataBuilder (.. client
-                 create
-                 (withMode (create-mode opts)))]
+                                 create
+                                 (withMode (create-mode opts)))]
       (if data
         (.forPath ^SetDataBuilder cr path data)
         (.forPath ^SetDataBuilder cr path)))
@@ -136,7 +135,7 @@
 
 (defn exists [^CuratorFramework client path & {:keys [watcher]}]
   (stat-to-map
-    (let [builder ^ExistsBuilder (.. client checkExists)]
-      (if watcher
-        (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
-        (.forPath builder path)))))
+   (let [builder ^ExistsBuilder (.. client checkExists)]
+     (if watcher
+       (.forPath ^ExistsBuilder (.usingWatcher builder ^Watcher (make-watcher watcher)) path)
+       (.forPath builder path)))))

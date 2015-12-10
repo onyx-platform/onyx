@@ -72,6 +72,7 @@ Event name                         | Keys                             |
 `:zookeeper-write-chunk`           | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-job-scheduler`   | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-messaging`       | `:event`, `:latency`, `:bytes`   |
+`:zookeeper-write-exception`       | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-force-write-chunk`     | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-write-origin`          | `:event`, `:latency`, `:bytes`   |
 `:zookeeper-read-catalog`          | `:event`, `:latency`             |
@@ -85,6 +86,7 @@ Event name                         | Keys                             |
 `:zookeeper-read-origin`           | `:event`, `:latency`             |
 `:zookeeper-read-job-scheduler`    | `:event`, `:latency`             |
 `:zookeeper-read-messaging`        | `:event`, `:latency`             |
+`:zookeeper-read-exception`        | `:event`, `:latency`             |
 `:zookeeper-gc-log-entry`          | `:event`, `:latency`, `:position`|
 `:peer-ack-segments`               | `:event`, `:latency`             |
 `:peer-retry-segment`              | `:event`, `:latency`             |
