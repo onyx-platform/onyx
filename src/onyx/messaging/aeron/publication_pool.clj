@@ -1,4 +1,4 @@
-(ns ^:no-doc onyx.messaging.aeron.publication-group
+(ns ^:no-doc onyx.messaging.aeron.publication-pool
   (:require [clojure.core.async :refer [alts!! <!! >!! timeout chan close! thread]]
             [com.stuartsierra.component :as component]
             [onyx.messaging.aeron.publication-manager :as pubm]
@@ -9,14 +9,14 @@
 
 (defrecord TrackedPub [publication last-used])
 
-(defprotocol PPublicationGroup
+(defprotocol PPublicationPool
   (add-publication! [this conn-spec])
   (remove-publication! [this conn-spec])
   (get-publication [this conn-spec])
   (gc-publications! [this]))
 
-;; Ensures all proper modifications to publication-group are done on a single thread
-(defn start-manager-thread! [publication-group opts command-ch shutdown-ch]
+;; Ensures all proper modifications to publication-pool are done on a single thread
+(defn start-manager-thread! [publication-pool opts command-ch shutdown-ch]
   (let [gc-interval (arg-or-default :onyx.messaging/peer-link-gc-interval opts)
         idle-timeout ^long (arg-or-default :onyx.messaging/peer-link-idle-timeout opts)]
     (thread
@@ -26,7 +26,7 @@
           (cond (= ch timeout-ch)
                 (do (try
                       (let [t (System/currentTimeMillis)
-                            snapshot @(:publications publication-group)
+                            snapshot @(:publications publication-pool)
                             to-remove (map first
                                            (filter (fn [[k v]] (>= (- t ^long @(:last-used v)) idle-timeout))
                                                    snapshot))]
@@ -44,23 +44,23 @@
                       (let [[_ conn-spec promised] v] 
                         ;; First check if we've already added it.
                         ;; Since we are the single writer this is a safe point to check
-                        (if-let [pub (get @(:publications publication-group) (:channel conn-spec))]
+                        (if-let [pub (get @(:publications publication-pool) (:channel conn-spec))]
                           (deliver promised pub)
-                          (deliver promised (add-publication! publication-group conn-spec)))))
+                          (deliver promised (add-publication! publication-pool conn-spec)))))
                     (recur)))))
-      (info "Shutdown Publication Group Manager Thread"))))
+      (info "Shutdown Publication Pool Manager Thread"))))
 
-(defrecord PublicationGroup [opts send-idle-strategy publications manager-thread command-ch shutdown-ch]
-  PPublicationGroup
+(defrecord PublicationPool [opts send-idle-strategy publications manager-thread command-ch shutdown-ch]
+  PPublicationPool
 
   (add-publication! [this {:keys [stream-id channel] :as conn-spec}]
     (let [write-buffer-size (arg-or-default :onyx.messaging.aeron/write-buffer-size opts)
-          pub-manager (-> (pubm/new-publication-manager channel 
-                                                        stream-id 
+          pub-manager (-> (pubm/new-publication-manager channel
+                                                        stream-id
                                                         send-idle-strategy
                                                         write-buffer-size
-                                                        (fn [] (remove-publication! this conn-spec))) 
-                          (pubm/connect) 
+                                                        (fn [] (remove-publication! this conn-spec)))
+                          (pubm/connect)
                           (pubm/start))
           tracked-pub (->TrackedPub pub-manager (atom (System/currentTimeMillis)))]
       (swap! publications assoc channel tracked-pub)
@@ -93,5 +93,5 @@
     (reset! publications {})
     this))
 
-(defn new-publication-group [opts send-idle-strategy]
-  (->PublicationGroup opts send-idle-strategy (atom {}) nil (chan command-channel-size) (chan)))
+(defn new-publication-pool [opts send-idle-strategy]
+  (->PublicationPool opts send-idle-strategy (atom {}) nil (chan command-channel-size) (chan)))
