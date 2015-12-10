@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.8.3-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.8.5-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -24,7 +24,7 @@
                  [prismatic/schema "1.0.3"]
                  [org.apache.zookeeper/zookeeper "3.4.6" 
                   :exclusions [org.slf4j/slf4j-log4j12]]
-                 [org.apache.bookkeeper/bookkeeper-server "4.3.1" 
+                 [org.apache.bookkeeper/bookkeeper-server "4.3.2" 
                   :exclusions [org.slf4j/slf4j-log4j12]]
                  [org.rocksdb/rocksdbjni "4.0"]
                  [log4j/log4j "1.2.17"]
