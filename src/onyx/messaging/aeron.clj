@@ -378,7 +378,7 @@
       (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes size))
       (pubm/write pub-man buf 0 size))))
 
-(defmethod extensions/internal-complete-message AeronMessenger
+(defmethod extensions/internal-complete-segment AeronMessenger
   [messenger event completion-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (:release-ch (lookup-channels messenger peer-task-id)) completion-id)
