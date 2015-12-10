@@ -24,7 +24,9 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronMessenger
-  [peer-group]
+    [peer-group messaging-group publication-group short-circuitable?
+     publications virtual-peers acking-daemon acking-ch send-idle-strategy
+     compress-f]
   component/Lifecycle
 
   (start [component]
