@@ -164,7 +164,7 @@
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :log (component/using (zookeeper config) [:monitoring])
        :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger (component/using (am/aeron peer-group) [:monitoring :acking-daemon])
+       :messenger (component/using (am/aeron-messenger peer-group) [:monitoring :acking-daemon])
        :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :acking-daemon :messenger])})))
 
 (defn onyx-peer-group
