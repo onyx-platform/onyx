@@ -280,6 +280,7 @@
    :trigger/sync s/Keyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
    (s/optional-key :trigger/doc) s/Str
+   (s/optional-key :trigger/pred) s/Keyword
    (s/optional-key :trigger/period) [(s/one PosInt "trigger period") 
                                      (s/one TriggerPeriod "threshold type")]
    (s/optional-key :trigger/threshold) [(s/one PosInt "number elements") 
