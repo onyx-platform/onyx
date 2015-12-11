@@ -25,6 +25,6 @@
    upper-extent
    segment))
 
-(defmethod api/trigger-teardown :segment
+(defmethod api/trigger-teardown :punctuation
   [event trigger]
   event)
