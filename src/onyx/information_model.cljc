@@ -360,6 +360,11 @@
              :type :keyword
              :optional? false}
 
+            :trigger/pred
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
+             :type :keyword
+             :optional? false}
+
             :trigger/period
             {:doc "A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
@@ -920,7 +925,7 @@
    [:aggregation/init :aggregation/fn :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync
-    :trigger/period :trigger/threshold :trigger/fire-all-extents?
+    :trigger/period :trigger/threshold :trigger/pred :trigger/fire-all-extents?
     :trigger/doc] 
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
