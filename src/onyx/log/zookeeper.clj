@@ -1,7 +1,7 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal warn trace]]
+            [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
@@ -263,15 +263,15 @@
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e
          (trace e)
-         ;; Curator client has been shutdown, close the subscriber cleanly.
-         (close! ch))
+         ;; Curator client has been shutdown, pass exception along
+         (>!! ch e))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+         ;; ZooKeeper has been shutdown, pass exception along
          (trace e)
-         ;; ZooKeeper has been shutdown, close the subscriber cleanly.
-         (close! ch))
+         (>!! ch e))
        (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
          (trace e)
-         (close! ch))
+         (>!! ch e))
        (catch Throwable e
          (fatal e))))
     (<!! rets)))
