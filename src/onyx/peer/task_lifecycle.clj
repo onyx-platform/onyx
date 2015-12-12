@@ -469,7 +469,7 @@
                      (when site 
                        (emit-latency :peer-complete-segment
                                      monitoring
-                                     #(extensions/internal-complete-message messenger event id site))))
+                                     #(extensions/internal-complete-segment messenger event id site))))
 
                    (= ch retry-ch)
                    (->> (p-ext/retry-segment pipeline event v)
@@ -519,11 +519,12 @@
           event
           (:onyx.core/triggers event)))
 
-(defn handle-exception [restart-pred-fn e restart-ch outbox-ch job-id]
-  (warn e)
+(defn handle-exception [log restart-pred-fn e restart-ch outbox-ch job-id]
+  (warn e "Uncaught exception throw inside task lifecycle.")
   (if (restart-pred-fn e)
     (>!! restart-ch true)
     (let [entry (entry/create-log-entry :kill-job {:job job-id})]
+      (extensions/write-chunk log :exception e job-id)
       (>!! outbox-ch entry))))
 
 (defn run-task-lifecycle
@@ -691,12 +692,11 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
-
             pipeline (build-pipeline task-map pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
 
             restart-pred-fn (operation/resolve-restart-pred-fn task-map)
-            ex-f (fn [e] (handle-exception restart-pred-fn e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception log restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -735,7 +735,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception (constantly false) e restart-ch outbox-ch job-id)
+        (handle-exception log (constantly false) e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]

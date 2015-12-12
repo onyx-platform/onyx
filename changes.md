@@ -1,15 +1,16 @@
 #### 0.8.3
-- removed :onyx.messaging.aeron/inter-service-timeout-ns peer config setting. Client liveness timeout is now completely set via java property: aeron.client.liveness.timeout
+- Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`.
+- Fixed method dispatch bug for punctuation triggers.
 
 #### 0.8.2
-- changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
+- Changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name.
 - Turned on nippy compression for ZooKeeper writes and messaging writes
 - Fix badly named 0.8.1 release version caused by release scripts.
 
 #### 0.8.1
-- changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
+- Changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name
 - Turned on nippy compression for ZooKeeper writes and messaging writes
-- onyx.helper-env has been removed, which is superseded by onyx.test-helper's functions and components
+- `onyx.helper-env` has been removed, which is superseded by `onyx.test-helper`'s functions and components
 
 #### 0.8.0
 - **Breaking change** `:onyx.messaging/peer-port-range` and `:onyx.messaging/peer-ports` are deprecated in favour of a single `:onyx.messaging/peer-port` port. The Aeron layer multiplexed all communication over a single port so multiple port selection is longer required.

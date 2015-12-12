@@ -1,5 +1,5 @@
 (ns onyx.messaging.messaging-gen-test
-  (:require [onyx.messaging.aeron :as aeron :refer [aeron]]
+  (:require [onyx.messaging.aeron :as aeron :refer [aeron-messenger]]
             [onyx.messaging.protocol-aeron :as protocol-aeron]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
@@ -116,8 +116,8 @@
       (with-redefs [aeron/handle-sent-message (handle-sent-message received)
                     aeron/handle-aux-message (handle-aux-message received)]
         (let [server-port 53001
-              recv-messenger (component/start (aeron peer-group))
-              send-messenger (component/start (aeron peer-group))]
+              recv-messenger (component/start (aeron-messenger peer-group))
+              send-messenger (component/start (aeron-messenger peer-group))]
 
           (try
             (let [_ (ext/register-acker recv-messenger {:onyx.messaging/bind-addr "127.0.0.1"

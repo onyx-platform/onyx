@@ -15,6 +15,7 @@
    zookeeper-write-chunk
    zookeeper-write-job-scheduler
    zookeeper-write-messaging
+   zookeeper-write-exception
    zookeeper-force-write-chunk
    zookeeper-write-origin
    zookeeper-read-catalog
@@ -26,6 +27,7 @@
    zookeeper-read-origin
    zookeeper-read-job-scheduler
    zookeeper-read-messaging
+   zookeeper-read-exception
    zookeeper-gc-log-entry
    window-log-write-entry
    window-log-playback
