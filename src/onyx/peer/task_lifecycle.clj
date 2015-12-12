@@ -49,10 +49,13 @@
               (throw t)
 
               (= action :restart)
-              (>!! (:onyx.core/restart-ch event) true)
+              (do (>!! (:onyx.core/restart-ch event) true)
+                  (throw t))
 
               :else
-              (throw (ex-info (format "Internal error, cannot handle exception with policy %s" action)
+              (throw (ex-info
+                      (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
+                              action)
                               {})))))))
 
 (defn munge-start-lifecycle [event]
