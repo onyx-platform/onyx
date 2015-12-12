@@ -365,6 +365,11 @@
              :type :keyword
              :optional? false}
 
+            :trigger/watermark-percentage
+            {:doc "A double between 0.0 and 1.0, both inclusive, representing a percentage greater than the lower bound of a window. If an segment is seen with a value for a windowing key greater than this percentage, the trigger fires."
+             :type :double
+             :optional? false}
+
             :trigger/period
             {:doc "A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
@@ -925,7 +930,7 @@
    [:aggregation/init :aggregation/fn :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
    :trigger-entry
    [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync
-    :trigger/period :trigger/threshold :trigger/pred :trigger/fire-all-extents?
+    :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents?
     :trigger/doc] 
    :lifecycle-entry
    [:lifecycle/task :lifecycle/calls :lifecycle/doc]
