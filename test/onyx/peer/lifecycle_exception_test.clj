@@ -7,6 +7,10 @@
 
 (def n-messages 100)
 
+(def in-chan (atom nil))
+
+(def out-chan (atom nil))
+
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
@@ -49,10 +53,6 @@
 
 (defn handle-exception [event lifecycle phase e]
   :restart)
-
-(def in-chan (atom nil))
-
-(def out-chan (atom nil))
 
 (defn inject-in-ch [event lifecycle]
   {:core.async/chan @in-chan})
