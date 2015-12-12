@@ -1,7 +1,7 @@
 {
   "title": "Onyx",
   "language": "en",
-  "gitbook": ">=2.0.0",
+  "gitbook": "2.5.2",
   "structure": {
     "readme": "README.md",
     "summary": "doc/user-guide/SUMMARY.md"
