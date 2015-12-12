@@ -511,7 +511,7 @@
                                             :optional? true
                                             :added "0.8.0"}
 
-            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `:kill`, `:restart` or `:defer` indicating whether the job should be killed, the task restarted, or the decision defered to the next lifecycle exception handler, if another is defined. If all handlers `:defer`, the default behavior is `:kill`."
+            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `:kill`, `:restart` or `:defer` indicating whether the job should be killed, the task restarted, or the decision defered to the next lifecycle exception handler, if another is defined. If all handlers `:defer`, the default behavior is `:kill`."
                                             :type :function
                                             :optional? true
                                             :added "0.8.3"}}}

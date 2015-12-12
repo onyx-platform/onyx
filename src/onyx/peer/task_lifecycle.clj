@@ -831,12 +831,7 @@
         (when (exactly-once-task? event)
           (state-extensions/close-filter (:filter @window-state) event)))
 
-      (call-with-lifecycle-handler
-       event
-       :lifecycle/after-task-stop
-       (:onyx.core/compiled-handle-exception-fn event)
-       (:onyx.core/compiled-after-task-fn event)
-       event))
+      ((:onyx.core/compiled-after-task-fn event) event))
 
     (assoc component
       :pipeline nil
