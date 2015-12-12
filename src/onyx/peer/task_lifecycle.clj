@@ -44,8 +44,16 @@
   (try
     (apply f args)
     (catch Throwable t
-      (when-not (handler-fn event phase t)
-        (throw t)))))
+      (let [action (handler-fn event phase t)]
+        (cond (= action :kill)
+              (throw t)
+
+              (= action :restart)
+              (>!! (:onyx.core/restart-ch event) true)
+
+              :else
+              (throw (ex-info (format "Internal error, cannot handle exception with policy %s" action)
+                              {})))))))
 
 (defn munge-start-lifecycle [event]
   (let [rets
@@ -732,6 +740,7 @@
                            :onyx.core/monitoring task-monitoring
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-ch
+                           :onyx.core/restart-ch restart-ch
                            :onyx.core/task-kill-ch task-kill-ch
                            :onyx.core/kill-ch kill-ch
                            :onyx.core/peer-opts opts

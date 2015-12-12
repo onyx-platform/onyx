@@ -69,8 +69,8 @@
                                             (f event lifecycle phase e))))]
     (fn [event phase e]
       (if (seq fs)
-        (some #{false} ((apply juxt fs) event phase e))
-        false))))
+        (first (filter (partial = :defer) ((apply juxt fs) event phase e)))
+        :kill))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]
   (let [matched (select-applicable-lifecycles lifecycles task-name)]
