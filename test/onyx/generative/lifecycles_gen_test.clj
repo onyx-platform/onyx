@@ -1,4 +1,4 @@
-(ns onyx.generative-lifecycles-gen-test
+(ns onyx.generative.lifecycles-gen-test
   (:require [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
