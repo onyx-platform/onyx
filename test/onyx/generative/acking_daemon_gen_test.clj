@@ -1,5 +1,5 @@
 (ns onyx.generative.acking-daemon-gen-test
-  (:require [clojure.core.async :refer [chan]]
+  (:require [clojure.core.async :refer [chan dropping-buffer]]
             [clojure.test :refer :all]
             [clojure.test :refer [is]]
             [clojure.test.check.generators :as gen]
@@ -25,9 +25,9 @@
        [(:real-state state)
         (gen/return (chan 1))
         (gen/hash-map
-         :id (gen/no-shrink (gen/return (UUID/randomUUID)))
-         :completion-id (gen/no-shrink (gen/return (UUID/randomUUID)))
-         :ack-val (gen/no-shrink (gen/return (a/gen-ack-value))))]))
+         :id (gen/return (UUID/randomUUID))
+         :completion-id (gen/return (UUID/randomUUID))
+         :ack-val (gen/return (a/gen-ack-value)))]))
 
    :real/command #'a/ack-segment
 
@@ -61,7 +61,7 @@
      (let [message-ids (keys (:model-state state))
            id-gen (gen/elements message-ids)]
        [(:real-state state)
-        (gen/return (chan 1))
+        (gen/return (chan (dropping-buffer 1)))
         (gen/hash-map
          :id id-gen
          :ack-val (gen/return (a/gen-ack-value))
@@ -86,15 +86,59 @@
            current-ack-val (get-in (:state real) [id :ack-val])
            prev-model-ack-val (get-in prev-state [:model-state id :ack-val])
            next-model-ack-val (get-in next-state [:model-state id :ack-val])]
-       (and (= current-ack-val next-model-ack-val )
-            (not= prev-model-ack-val current-ack-val )
+       (and (= current-ack-val next-model-ack-val)
+            (not= prev-model-ack-val current-ack-val)
             (not= prev-model-ack-val next-model-ack-val)
             (not (nil? current-ack-val))
             (not (nil? prev-model-ack-val)))))})
 
+(def complete-existing-segment-specification
+  {:model/requires
+   ;; A segment must exist for us to complete it over
+   ;; more than one action.
+   (fn [state]
+     (seq (keys (:model-state state))))
+
+   ;; Pick a segment ID that already exists and ack
+   ;; its current value. This will result in the XOR
+   ;; operation equaling 0, thus completing the segment.
+   :model/args
+   (fn [state]
+     (let [message-ids (keys (:model-state state))
+           id-gen (gen/elements message-ids)]
+       [(:real-state state)
+        (gen/return (chan (dropping-buffer 1)))
+        (gen/fmap
+         (fn [v]
+           (let [av (get-in state [:model-state (:id v) :ack-val])
+                 ci (get-in state [:model-state (:id v) :completion-id])]
+             (-> v
+                 (assoc :ack-val av)
+                 (assoc :completion-id ci))))
+         (gen/hash-map :id id-gen))]))
+
+   :real/command #'a/ack-segment
+
+   ;; Transition should go to zero, removing this segment from the state.
+   :next-state
+   (fn [state [real-state ch {:keys [id completion-id ack-val]}] result]
+     (update-in state [:model-state] dissoc id))
+
+   ;; Segment should be gone from both the model and the real state.
+   :real/postcondition
+   (fn [prev-state next-state [real-state ch {:keys [id ack-val]}] result]
+     (let [real @(:real-state next-state)
+           real-record (get (:state real) id)
+           prev-model-record (get-in prev-state [:model-state id])
+           next-model-record (get-in next-state [:model-state id])]
+       (and (nil? real-record)
+            (nil? next-model-record)
+            (not (nil? prev-model-record)))))})
+
 (def acking-daemon-spec
   {:commands {:new #'new-segment-specification
-              :update #'updated-segment-specification}
+              :update #'updated-segment-specification
+              :complete-existing #'complete-existing-segment-specification}
    :real/setup #'a/init-state
    :initial-state (fn [ack-state] {:real-state ack-state :model-state {}})})
 
