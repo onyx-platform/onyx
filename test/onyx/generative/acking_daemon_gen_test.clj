@@ -20,14 +20,12 @@
    ;; UUID for its identifier.
    :model/args
    (fn [state]
-     (let [message-ids (keys (:model-state state))
-           new-msg-id (fn [v] (not (some #{v} message-ids)))]
-       [(:real-state state)
-        (gen/return (chan 1))
-        (gen/hash-map
-         :id (gen/return (UUID/randomUUID))
-         :completion-id (gen/return (UUID/randomUUID))
-         :ack-val (gen/return (a/gen-ack-value)))]))
+     [(:real-state state)
+      (gen/return (chan 1))
+      (gen/hash-map
+       :id (gen/return (UUID/randomUUID))
+       :completion-id (gen/return (UUID/randomUUID))
+       :ack-val (gen/return (a/gen-ack-value)))])
 
    :real/command #'a/ack-segment
 
@@ -135,10 +133,46 @@
             (nil? next-model-record)
             (not (nil? prev-model-record)))))})
 
+(def complete-new-segment-specification
+  {:model/requires
+   (fn [state]
+     (<= (count (keys (:model-state state))) max-state-size))
+
+   ;; Complete a new segment by immediately reported 0 as an ack val.
+   ;; This can happen if a flow condition for an input task chooses
+   ;; not to route a segment to the next task.
+   :model/args
+   (fn [state]
+     [(:real-state state)
+      (gen/return (chan 1))
+      (gen/hash-map
+       :id (gen/return (UUID/randomUUID))
+       :completion-id (gen/return (UUID/randomUUID))
+       :ack-val (gen/return 0))])
+
+   :real/command #'a/ack-segment
+
+   ;; Immediately remove this segment from the state.
+   :next-state
+   (fn [state [real-state ch {:keys [id completion-id ack-val]}] result]
+     (update-in state [:model-state] dissoc id))
+
+   ;; Check that it was removed from the state.
+   :real/postcondition
+   (fn [prev-state next-state [real-state ch {:keys [id ack-val]}] result]
+     (let [real @(:real-state next-state)
+           real-record (get (:state real) id)
+           prev-model-record (get-in prev-state [:model-state id])
+           next-model-record (get-in next-state [:model-state id])]
+       (and (nil? real-record)
+            (nil? next-model-record)
+            (nil? prev-model-record))))})
+
 (def acking-daemon-spec
   {:commands {:new #'new-segment-specification
               :update #'updated-segment-specification
-              :complete-existing #'complete-existing-segment-specification}
+              :complete-existing #'complete-existing-segment-specification
+              :complete-new #'complete-new-segment-specification}
    :real/setup #'a/init-state
    :initial-state (fn [ack-state] {:real-state ack-state :model-state {}})})
 
