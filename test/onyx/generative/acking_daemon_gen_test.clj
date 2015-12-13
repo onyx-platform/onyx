@@ -1,16 +1,13 @@
 (ns onyx.generative.acking-daemon-gen-test
-  (:require [clojure.core.async :refer [chan dropping-buffer]]
+  (:require [clojure.core.async :refer [chan]]
             [clojure.test :refer :all]
             [clojure.test :refer [is]]
             [clojure.test.check.generators :as gen]
             [stateful-check.core :refer [specification-correct?]]
-            [onyx.messaging.acking-daemon :as a]))
+            [onyx.messaging.acking-daemon :as a])
+  (:import [java.util UUID]))
 
 (def max-state-size 10000)
-
-(def gen-uuid
-  (gen/fmap (fn [[a b]] (java.util.UUID. a b))
-            (gen/resize Long/MAX_VALUE (gen/tuple gen/int gen/int))))
 
 (def new-segment-specification
   ;; Disallow the acking daemon state to grow too large by not
@@ -26,11 +23,11 @@
      (let [message-ids (keys (:model-state state))
            new-msg-id (fn [v] (not (some #{v} message-ids)))]
        [(:real-state state)
-        (gen/return (chan (dropping-buffer 1)))
-        (gen/hash-map :id (gen/such-that new-msg-id gen-uuid)
-                      :completion-id gen-uuid
-                      :ack-val (gen/such-that #(not= 0 %)
-                                              (gen/resize Long/MAX_VALUE gen/int)))]))
+        (gen/return (chan 1))
+        (gen/hash-map
+         :id (gen/no-shrink (gen/return (UUID/randomUUID)))
+         :completion-id (gen/no-shrink (gen/return (UUID/randomUUID)))
+         :ack-val (gen/no-shrink (gen/return (a/gen-ack-value))))]))
 
    :real/command #'a/ack-segment
 
@@ -64,23 +61,14 @@
      (let [message-ids (keys (:model-state state))
            id-gen (gen/elements message-ids)]
        [(:real-state state)
-        (gen/return (chan (dropping-buffer 1)))
-        (gen/hash-map :id id-gen
-                      :ack-val
-                      (gen/bind
-                       id-gen
-                       (fn [id]
-                         (gen/such-that
-                          (fn [ack-val]
-                            (let [current-ack-val (get-in state [:model-state id :ack-val])]
-                              (and (not= current-ack-val ack-val)
-                                   (not= 0 ack-val)
-                                   (not= 0 (bit-xor ack-val current-ack-val)))))
-                          (gen/resize Long/MAX_VALUE gen/int))))
-                      :completion-id
-                      (gen/bind
-                       id-gen
-                       #(gen/return (get-in state [:model-state % :completion-id]))))]))
+        (gen/return (chan 1))
+        (gen/hash-map
+         :id id-gen
+         :ack-val (gen/return (a/gen-ack-value))
+         :completion-id
+         (gen/bind
+          id-gen
+          #(gen/return (get-in state [:model-state % :completion-id]))))]))
 
    ;; Notice this is the same command as the new-segment
    ;; specification. It works for both types of interactions.
