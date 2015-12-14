@@ -80,6 +80,22 @@ logging system using the
   )
 ```
 
+If you already have timbre logging configured somewhere in your code base,
+you can specify `:onyx.log/config {}` to ensure your settings remain unchanged.
+In effect, this simply merges in the empty map into whatever settings you may
+have already specified for logging.
+
+```clojure
+(let [log-config {:onyx.log/config {}}
+      peer-config (merge my-peer-config log-config)
+      env-config (merge my-env-config log-config)]
+  (onyx.api/start-env env-config)
+  (onyx.api/start-peer-group peer-config)
+
+  ;; ...
+  )
+```
+
 See the Timbre
 [example configuration](https://github.com/ptaoussanis/timbre#configuration)
 for more information on valid values for the `:onyx.log/config` map.
