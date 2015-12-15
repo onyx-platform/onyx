@@ -176,4 +176,5 @@
    :real/setup #'a/init-state
    :initial-state (fn [ack-state] {:real-state ack-state :model-state {}})})
 
-(is (specification-correct? acking-daemon-spec))
+(deftest acking-darmon-test
+  (is (specification-correct? acking-daemon-spec)))
