@@ -9,6 +9,8 @@
 
 (def task :my-task)
 
+(def irrelevant-task :not-my-task)
+
 (defn handle-exception-defer [event lifecycle phase e]
   :defer)
 
@@ -38,6 +40,10 @@
 (def kill-lifecycle
   {:lifecycle/task task
    :lifecycle/calls ::kill-calls})
+
+(def restart-irrelevant-lifecycle
+  {:lifecycle/task irrelevant-task
+   :lifecycle/calls ::restart-calls})
 
 (def lifecycles [defer-lifecycle restart-lifecycle kill-lifecycle])
 
@@ -83,4 +89,12 @@
     trailing (gen/vector (gen/elements lifecycles))]
    (let [v (into (conj defers kill-lifecycle) trailing)
          res ((c/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
+     (is (= :kill res)))))
+
+(deftest filter-irrelevant-lifecycles
+  (checking
+   "It doesn't use lifecycles that aren't in my task"
+   (times 50)
+   [v (gen/vector (gen/elements [kill-lifecycle restart-irrelevant-lifecycle]))]
+   (let [res ((c/compile-lifecycle-handle-exception-functions v task) nil nil nil)]
      (is (= :kill res)))))
