@@ -58,3 +58,16 @@ will improve performance in a way that is unrealistic for multi-node use.
 Remember to turn messaging short circuiting back on for production use, as it
 *does* improve performance overall.
 
+#### `org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:X to ledger:Y`
+
+You have encountered the following exception:
+
+```
+2015-12-16 16:59:35 ERROR org.apache.bookkeeper.proto.WriteEntryProcessorV3: Error writing entry:0 to ledger:2
+org.apache.bookkeeper.bookie.Bookie$NoLedgerException: Ledger 2 not found
+```
+
+Your ZooKeeper directory has been cleared out of information that points to the BookKeeper servers,
+and the two processes can't sync up. This can be fixed by removing the data directory from the
+BookKeeper servers and ZooKeeper servers.
+
