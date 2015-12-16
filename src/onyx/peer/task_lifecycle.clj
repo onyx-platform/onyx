@@ -352,7 +352,9 @@
         record (:aggregate/record w)
         segment-coerced (we/uniform-units record segment)
         widstate' (we/speculate-update record widstate segment-coerced)
-        widstate'' (we/merge-extents record widstate' (:aggregate/super-agg-fn w) segment-coerced)
+        widstate'' (if grouping-fn 
+                     (merge-with #(we/merge-extents record % (:aggregate/super-agg-fn w) segment-coerced) widstate')
+                     (we/merge-extents record widstate' (:aggregate/super-agg-fn w) segment-coerced))
         extents (we/extents record (keys widstate'') segment-coerced)
         grp-key (if grouping-fn (grouping-fn segment))]
     (let [record (:aggregate/record w)]
