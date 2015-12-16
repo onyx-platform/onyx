@@ -27,30 +27,44 @@
 
 (defrecord AckState [state completed?])
 
-(defn ack-segment [ack-state completion-ch message-id completion-id ack-val]
-  (let [rets
-        (swap!
-          ack-state
-          (fn [as]
-            (let [state (:state as)
-                  ack (get state message-id)]
-              (if ack
-                (let [updated-ack-val (bit-xor ^long (:ack-val ack) ^long ack-val)]
-                  (if (zero? updated-ack-val)
-                    (->AckState (dissoc state message-id) true)
-                    (->AckState (assoc state message-id (assoc ack :ack-val updated-ack-val)) false)))
-                (if (zero? ^long ack-val)
-                  (->AckState state true)
-                  (->AckState (assoc state message-id (->Ack nil completion-id ack-val nil (now))) false))))))]
+(defn update-found-ack [state found-ack message-id ack-val]
+  (let [updated-ack-val (bit-xor ^long (:ack-val found-ack) ack-val)]
+    (if (zero? updated-ack-val)
+      (->AckState (dissoc state message-id) true)
+      (->AckState (assoc state message-id (assoc found-ack :ack-val updated-ack-val)) false))))
+
+(defn fully-acked [state]
+  (->AckState state true))
+
+(defn add-ack [state message-id ack-val completion-id]
+  (->AckState (assoc state message-id (->Ack nil completion-id ack-val nil (now))) 
+              false))
+
+(defn update-ack-state [ack-state ack]
+  (let [ack-val ^long (:ack-val ack)
+        state (:state ack-state)
+        message-id (:id ack)
+        found-ack (get state message-id)]
+    (cond found-ack
+          (update-found-ack state found-ack message-id ack-val)
+
+          (zero? ^long ack-val)
+          (fully-acked state)
+
+          :else
+          (add-ack state message-id ack-val (:completion-id ack)))))
+
+(defn ack-segment [ack-state completion-ch ack]
+  (let [rets (swap! ack-state (fn [as] (update-ack-state as ack)))]
     (when (:completed? rets)
       (>!! completion-ch
-           {:id message-id :peer-id completion-id}))))
+           {:id (:id ack)
+            :peer-id (:completion-id ack)}))))
 
 (defn ack-segments-loop [ack-state acking-ch completion-ch]
   (loop []
     (when-let [ack (<!! acking-ch)]
-      (ack-segment ack-state completion-ch
-                   (:id ack) (:completion-id ack) (:ack-val ack))
+      (ack-segment ack-state completion-ch ack)
       (recur)))
   (timbre/info "Stopped Ack Messages Loop"))
 

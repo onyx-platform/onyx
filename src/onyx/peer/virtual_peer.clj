@@ -33,8 +33,14 @@
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
               peer-view @peer-view-atom
-              entry (first (alts!! [kill-ch inbox-ch] :priority true))]
-          (if entry
+              [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
+          (cond 
+            (instance? java.lang.Throwable entry) 
+            (close! restart-ch)
+            (nil? entry) 
+            (when (:lifecycle state)
+              (component/stop @(:lifecycle state)))
+            :else
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
@@ -42,22 +48,22 @@
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)
-              (recur (send-to-outbox new-state reactions)))
-            (when (:lifecycle state)
-              (component/stop @(:lifecycle state)))))))
+              (recur (send-to-outbox new-state reactions)))))))
     (catch Throwable e
-      (taoensso.timbre/error e (str e) "Error in processing loop"))
+      (taoensso.timbre/error e (str e) "Error in processing loop. Restarting.")
+      (close! restart-ch))
     (finally
      (taoensso.timbre/info "Fell out of processing loop"))))
 
-(defn outbox-loop [id log outbox-ch]
+(defn outbox-loop [id log outbox-ch restart-ch]
   (try
     (loop []
       (when-let [entry (<!! outbox-ch)]
         (extensions/write-log-entry log entry)
         (recur)))
     (catch Throwable e
-      (taoensso.timbre/info e))
+      (taoensso.timbre/info "Error writing log entry. Restarting." e)
+      (close! restart-ch))
     (finally
      (taoensso.timbre/info "Fell out of outbox loop"))))
 
@@ -85,9 +91,8 @@
           (extensions/register-pulse log id)
           (>!! outbox-ch entry)
 
-          (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))
-                ]
+          (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch restart-ch))
+                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch

@@ -1,11 +1,10 @@
 (ns ^:no-doc onyx.messaging.aeron.publication-manager
-  (:require [taoensso.timbre :refer [error fatal info] :as timbre]
+  (:require [taoensso.timbre :refer [error fatal info warn] :as timbre]
             [clojure.core.async :refer [chan >!! <!! put! close! sliding-buffer thread]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
-           [uk.co.real_logic.agrona ErrorHandler CloseHelper]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context Publication Subscription]
+           [uk.co.real_logic.agrona ErrorHandler]
            [uk.co.real_logic.aeron.exceptions DriverTimeoutException]
-           [uk.co.real_logic.agrona.concurrent 
-            UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]))
+           [uk.co.real_logic.agrona.concurrent IdleStrategy]))
 
 (defprotocol PPublicationManager
   (write [this buf start end])
@@ -15,16 +14,18 @@
 
 (defrecord Message [buf start end])
 
+(defn write-to-pub [^Publication pub ^IdleStrategy send-idle-strategy msg]
+  (loop [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
+    (when (neg? result) 
+      (.idle send-idle-strategy 0)
+      (recur ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))))))
+
 (defn write-from-buffer [publication-manager pending-ch send-idle-strategy]
   (try 
     (let [pub (:publication publication-manager)] 
       (loop [] 
         (when-let [msg (<!! pending-ch)]
-          (while (let [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
-                   (or (= result Publication/BACK_PRESSURED)
-                       (= result Publication/NOT_CONNECTED)))
-            ;; idle for different amounts of time depending on whether backpressuring or not?
-            (.idle ^IdleStrategy send-idle-strategy 0))
+          (write-to-pub pub send-idle-strategy msg)
           (recur))))
     (catch InterruptedException e)
     (catch DriverTimeoutException e
@@ -37,7 +38,17 @@
       (fatal "Aeron write from buffer error: " t)
       (stop publication-manager))))
 
-(defrecord PublicationManager [channel stream-id inter-service-timeout send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
+(extend-protocol PPublicationManager nil 
+  (start [this]
+    (warn "Started nil publication manager, likely due to timeout on creation."))
+  (write [this _ _ _]
+    (warn "Writing nil publication manager, likely due to timeout on creation."))
+  (stop [this]
+    (warn "Stopping nil publication manager, likely due to timeout on creation."))
+  (connect [this]
+    (warn "Connecting to nil publication manager, likely due to timeout on creation.")))
+
+(defrecord PublicationManager [channel stream-id send-idle-strategy connection publication pending-ch write-fut cleanup-fn]
   PPublicationManager
   (start [this]
     (assoc this :write-fut (future (write-from-buffer this pending-ch send-idle-strategy))))
@@ -65,16 +76,14 @@
                           (onError [this x] 
                             (taoensso.timbre/warn "Aeron messaging publication error:" x)))
           ctx (-> (Aeron$Context.)
-                  (.errorHandler error-handler)
-                  (.interServiceTimeout inter-service-timeout))
+                  (.errorHandler error-handler))
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel stream-id)]
       (info (format "Created publication at: %s, stream-id: %s" channel stream-id))
       (assoc this :publication pub :connection conn))))
 
-(defn new-publication-manager [channel stream-id send-idle-strategy 
-                               write-buffer-size inter-service-timeout cleanup-fn]
-  (->PublicationManager channel stream-id inter-service-timeout send-idle-strategy 
+(defn new-publication-manager [channel stream-id send-idle-strategy write-buffer-size cleanup-fn]
+  (->PublicationManager channel stream-id send-idle-strategy 
                         nil nil (chan write-buffer-size) nil cleanup-fn))
 
 

@@ -83,7 +83,7 @@ Our approach leverages Onyx's all-data job specification. We've found it helpful
   (let [datomic-uri (my-env-helper/get-datomic-uri mode onyx-id)]
     {:workflow wf/parse-event-workflow
      :catalog (cat/build-parse-event-catalog datomic-uri)
-     :flow-conditions (fcp/parser-flow-conditions :parse-bank-log
+     :flow-conditions (fcp/parser-flow-conditions :parse-log
                                                   [:write-parse-failures]
                                                   [:write-to-datomic])
      :lifecycles sl/base-parse-event-lifecycles

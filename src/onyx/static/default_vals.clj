@@ -15,6 +15,7 @@
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
    :onyx.zookeeper/backoff-max-retries 5
+   :onyx.zookeeper/prepare-failure-detection-interval 1000
 
    ;; bookkeeper defaults
    :onyx.bookkeeper/server? false
@@ -66,9 +67,9 @@
    :onyx.messaging.aeron/embedded-driver? true
    :onyx.messaging.aeron/offer-idle-strategy :high-restart-latency
    :onyx.messaging.aeron/poll-idle-strategy :high-restart-latency
-   :onyx.messaging.aeron/inter-service-timeout-ns 20000000000
    :onyx.messaging.aeron/subscriber-count 2
    :onyx.messaging.aeron/write-buffer-size 1000
+   :onyx.messaging.aeron/publication-creation-timeout 1000
    :onyx.messaging/allow-short-circuit? true
    :onyx.messaging/inbound-buffer-size 50000
    :onyx.messaging/completion-buffer-size 10000

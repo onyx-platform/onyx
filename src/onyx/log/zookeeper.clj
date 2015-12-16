@@ -1,7 +1,7 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal warn trace]]
+            [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
             [onyx.static.default-vals :refer [defaults]]
@@ -65,6 +65,9 @@
 (defn ledgers-available-path [prefix]
   (str (prefix-path prefix) "/ledgers/available"))
 
+(defn exception-path [prefix]
+  (str (prefix-path prefix) "/exception"))
+
 (defn throw-subscriber-closed []
   (throw (ex-info "Log subscriber closed due to disconnection from ZooKeeper" {})))
 
@@ -109,6 +112,7 @@
       (zk/create conn (origin-path onyx-id) :persistent? true)
       (zk/create conn (job-scheduler-path onyx-id) :persistent? true)
       (zk/create conn (messaging-path onyx-id) :persistent? true)
+      (zk/create conn (exception-path onyx-id) :persistent? true)
 
       (initialize-origin! conn config onyx-id)
       (assoc component :server server :conn conn :prefix onyx-id)))
@@ -259,15 +263,15 @@
              (recur (inc position)))))
        (catch java.lang.IllegalStateException e
          (trace e)
-         ;; Curator client has been shutdown, close the subscriber cleanly.
-         (close! ch))
+         ;; Curator client has been shutdown, pass exception along
+         (>!! ch e))
        (catch org.apache.zookeeper.KeeperException$ConnectionLossException e
+         ;; ZooKeeper has been shutdown, pass exception along
          (trace e)
-         ;; ZooKeeper has been shutdown, close the subscriber cleanly.
-         (close! ch))
+         (>!! ch e))
        (catch org.apache.zookeeper.KeeperException$SessionExpiredException e
          (trace e)
-         (close! ch))
+         (>!! ch e))
        (catch Throwable e
          (fatal e))))
     (<!! rets)))
@@ -390,6 +394,19 @@
          (let [node (str (messaging-path prefix) "/messaging")]
            (zk/create conn node :persistent? true :data bytes))))
      #(let [args {:event :zookeeper-write-messaging :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
+(defmethod extensions/write-chunk [ZooKeeper :exception]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (exception-path prefix) "/" id)]
+           (zk/create-all conn node :persistent? true :data bytes)
+           id)))
+     #(let [args {:event :zookeeper-write-exception :id id
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
@@ -516,6 +533,16 @@
        (let [node (str (messaging-path prefix) "/messaging")]
          (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-messaging :id id :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-chunk [ZooKeeper :exception]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (exception-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-exception :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/update-origin! ZooKeeper

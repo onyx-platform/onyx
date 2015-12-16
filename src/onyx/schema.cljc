@@ -38,11 +38,15 @@
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
 
-(def UnsupportedTaskMapKey
+(defn build-allowed-key-ns [nspace]
   (s/pred (fn [k]
             (or (not (keyword? k))
-                (not (= "onyx" (namespace k)))))
+                (not (= (name nspace) 
+                        (namespace k)))))
           'unsupported-key-combination))
+
+(def UnsupportedTaskMapKey
+  (build-allowed-key-ns :onyx))
 
 (def base-task-map
   {:onyx/name TaskName
@@ -275,6 +279,8 @@
    :trigger/on s/Keyword
    :trigger/sync s/Keyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
+   (s/optional-key :trigger/pred) s/Keyword
+   (s/optional-key :trigger/watermark-percentage) double
    (s/optional-key :trigger/doc) s/Str
    (s/optional-key :trigger/period) [(s/one PosInt "trigger period") 
                                      (s/one TriggerPeriod "threshold type")]
@@ -379,6 +385,7 @@
    (s/optional-key :onyx.zookeeper/backoff-base-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-sleep-time-ms) s/Int
    (s/optional-key :onyx.zookeeper/backoff-max-retries) s/Int
+   (s/optional-key :onyx.zookeeper/prepare-failure-detection-interval) s/Int
    (s/optional-key :onyx.messaging/inbound-buffer-size) s/Int
    (s/optional-key :onyx.messaging/completion-buffer-size) s/Int
    (s/optional-key :onyx.messaging/release-ch-buffer-size) s/Int
@@ -392,10 +399,10 @@
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
-   (s/optional-key :onyx.messaging.aeron/inter-service-timeout-ns) s/Int
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
+   (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
    s/Keyword s/Any})
 
@@ -422,8 +429,7 @@
 
 (def Replica
   {:job-scheduler JobScheduler
-   :messaging {:onyx.messaging/impl Messaging
-               s/Keyword s/Any}
+   :messaging {:onyx.messaging/impl Messaging s/Keyword s/Any}
    :peers [PeerId]
    :peer-state {PeerId PeerState}
    :peer-sites {PeerId PeerSite}

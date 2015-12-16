@@ -1,7 +1,7 @@
 (ns onyx.test-helper
   (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer  [info warn trace fatal error] :as timbre]
+            [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
             [onyx.extensions :as extensions]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]

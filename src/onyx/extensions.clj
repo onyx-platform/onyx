@@ -75,7 +75,7 @@
 (defmulti internal-ack-segments (fn [messenger event peer-link acks]
                                   (type messenger)))
 
-(defmulti internal-complete-message (fn [messenger event id peer-link] (type messenger)))
+(defmulti internal-complete-segment (fn [messenger event id peer-link] (type messenger)))
 
 (defmulti internal-retry-segment (fn [messenger event id peer-link] (type messenger)))
 

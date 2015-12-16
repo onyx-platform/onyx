@@ -16,18 +16,22 @@
   (let [out-peers (egress-peers task-id)] 
     (cond (empty? out-peers)
           (fn [_] nil)
+
           (and (planning/grouping-task? task-map) (#{:continue :kill} (:onyx/flux-policy task-map)))
           (fn [hash-group] 
             (nth out-peers
                  (mod hash-group
                       (count out-peers))))
+
           (and (planning/grouping-task? task-map) (= :recover (:onyx/flux-policy task-map)))
           (let [n-peers (or (:onyx/n-peers task-map)
                             (:onyx/max-peers task-map))] 
             (fn [hash-group] 
               (slot-id->peer-id (mod hash-group n-peers))))
+
           (planning/grouping-task? task-map) 
           (throw (ex-info "Unhandled grouping-task flux-policy." task-map))
+
           :else
           (fn [_]
             (rand-nth out-peers)))))
