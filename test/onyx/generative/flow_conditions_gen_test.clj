@@ -82,7 +82,9 @@
   (gen/bind
    base-gen
    (fn [v]
-     (let [g (gen/hash-map :flow/action (gen/return :retry))]
+     (let [g (gen/hash-map :flow/action (gen/return :retry)
+                           :flow/short-circuit? (gen/return true)
+                           :flow/to (gen/return nil))]
        (gen/fmap #(merge v %) g)))))
 
 (deftest nil-flow-conditions
@@ -119,19 +121,58 @@
 (deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
-   (times 50)
-   [true-fcs (gen/vector (->> :a
-                              (flow-condition-gen)
-                              (flow-to-tasks-gen)
-                              (true-flow-condition-gen)))
-    false-fcs (gen/vector (->> :a
-                               (flow-condition-gen)
-                               (flow-to-tasks-gen)
-                               (false-flow-condition-gen)))]
+   (times 20)
+   [true-fcs
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (true-flow-condition-gen)))
+    false-fcs
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (false-flow-condition-gen)))]
    (let [flow-conditions (into true-fcs false-fcs)
          downstream (mapcat :flow/to true-fcs false-fcs)
          compiled (c/compile-fc-norms flow-conditions :a)
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
+     (is (nil? (:action results))))))
+
+(deftest short-circuit
+  (checking
+   "It stops searching when it finds a short circuit true pred"
+   (times 20)
+   [false-1
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (false-flow-condition-gen)
+                     (short-circuit-flow-condition-gen)))
+    true-1
+    (gen/not-empty (gen/vector (->> :a
+                                    (flow-condition-gen)
+                                    (flow-to-tasks-gen)
+                                    (true-flow-condition-gen)
+                                    (short-circuit-flow-condition-gen))))
+    false-2
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (false-flow-condition-gen)
+                     (short-circuit-flow-condition-gen)))
+    mixed-1
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     ((fn [g] (gen/frequency
+                              [[1 (true-flow-condition-gen g)]
+                               [1 (false-flow-condition-gen g)]])))))]
+   (let [flow-conditions (into (into (into false-1 true-1) false-1) mixed-1)
+         downstream (mapcat :flow/to flow-conditions)
+         compiled (c/compile-fc-norms flow-conditions :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil flow-conditions downstream)]
+     (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
