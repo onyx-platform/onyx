@@ -1,7 +1,7 @@
 #### 0.8.3
 - **Breaking change**: Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`
 - New feature: Serialize the exception that kills a job to ZooKeeper
-- New monitoring metrics: `zookeeper-write-exception` and `zookeeper-write-exception`
+- New monitoring metrics: `zookeeper-write-exception` and `zookeeper-read-exception`
 - New peer configuration parameter: `onyx.zookeeper/prepare-failure-detection-interval`
 - Bug fix: Fixed method dispatch bug for punctuation triggers
 - Bug fix: Fixed `:trigger/pred` not being in the validation schema
