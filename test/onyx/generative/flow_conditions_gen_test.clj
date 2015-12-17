@@ -87,6 +87,11 @@
                            :flow/to (gen/return nil))]
        (gen/fmap #(merge v %) g)))))
 
+(defn maybe-predicate [g]
+  (gen/frequency
+   [[1 (true-flow-condition-gen g)]
+    [1 (false-flow-condition-gen g)]]))
+
 (deftest nil-flow-conditions
   "No flow condition routes to all downstream tasks"
   (let [downstream [:a :b]
@@ -105,17 +110,19 @@
   (checking
    "It joins the :flow/to tasks together and limits selection"
    (times 50)
-   [flow-conditions (gen/vector (->> :a
-                         (flow-condition-gen)
-                         (flow-to-tasks-gen)
-                         (true-flow-condition-gen)))
+   [flow-conditions
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-tasks-gen)
+                      (true-flow-condition-gen))))
     other-downstream-tasks (gen/vector gen/keyword)]
    (let [compiled (c/compile-fc-norms flow-conditions :a)
          target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
-     (is (= (into #{} target-tasks) (:flow results)))
+     (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
 (deftest no-false-predicate-picks
@@ -166,9 +173,7 @@
     (gen/vector (->> :a
                      (flow-condition-gen)
                      (flow-to-tasks-gen)
-                     ((fn [g] (gen/frequency
-                              [[1 (true-flow-condition-gen g)]
-                               [1 (false-flow-condition-gen g)]])))))]
+                     (maybe-predicate)))]
    (let [flow-conditions (into (into (into false-1 true-1) false-1) mixed-1)
          downstream (mapcat :flow/to flow-conditions)
          compiled (c/compile-fc-norms flow-conditions :a)
@@ -176,3 +181,49 @@
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
+
+(deftest retry-action
+  (checking
+   "Using a retry action with a true predicate flows to nil"
+   (times 20)
+   [retry-false
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (false-flow-condition-gen)
+                     (retry-flow-condition-gen)))
+    retry-true
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (true-flow-condition-gen)
+                      (retry-flow-condition-gen))))
+    retry-mixed
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (retry-flow-condition-gen)
+                     (maybe-predicate)))
+    ss
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (short-circuit-flow-condition-gen)
+                     (maybe-predicate)))
+    exceptions
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (exception-flow-condition-gen)
+                     (maybe-predicate)))
+    mixed
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (maybe-predicate)))]
+   (let [all [retry-false retry-true retry-mixed ss exceptions mixed]
+         flow-conditions (apply concat all)
+         downstream (mapcat :flow/to flow-conditions)
+         compiled (c/compile-fc-norms flow-conditions :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil flow-conditions downstream)]
+     (is (not (seq (:flow results))))
+     (is (= :retry (:action results))))))
