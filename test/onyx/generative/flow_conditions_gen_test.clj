@@ -48,7 +48,8 @@
    base-gen
    (fn [v]
      (let [g (gen/return ::true-pred)
-           true-gen (gen/hash-map :flow/predicate g)]
+           true-gen (gen/hash-map :flow/predicate g
+                                  :pred/val (gen/return true))]
        (gen/fmap #(merge v %) true-gen)))))
 
 (defn false-flow-condition-gen [base-gen]
@@ -56,7 +57,8 @@
    base-gen
    (fn [v]
      (let [g (gen/return ::false-pred)
-           false-gen (gen/hash-map :flow/predicate g)]
+           false-gen (gen/hash-map :flow/predicate g
+                                   :pred/val (gen/return false))]
        (gen/fmap #(merge v %) false-gen)))))
 
 (defn short-circuit-flow-condition-gen [base-gen]
@@ -109,7 +111,7 @@
 (deftest conj-downstream-tasks-together
   (checking
    "It joins the :flow/to tasks together and limits selection"
-   (times 50)
+   (times 30)
    [flow-conditions
     (gen/not-empty
      (gen/vector (->> :a
@@ -128,7 +130,7 @@
 (deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
-   (times 20)
+   (times 30)
    [true-fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -150,7 +152,7 @@
 (deftest short-circuit
   (checking
    "It stops searching when it finds a short circuit true pred"
-   (times 20)
+   (times 30)
    [false-1
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -185,7 +187,7 @@
 (deftest retry-action
   (checking
    "Using a retry action with a true predicate flows to nil"
-   (times 20)
+   (times 30)
    [retry-false
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -227,3 +229,27 @@
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
+
+(deftest key-exclusion
+  (checking
+   "Matched predicates excluded keys are conj'ed together"
+   (times 30)
+   [mixed
+    (gen/vector
+     (gen/one-of [(->> :a
+                       (flow-condition-gen)
+                       (flow-to-tasks-gen)
+                       (true-flow-condition-gen))
+                  (->> :a
+                       (flow-condition-gen)
+                       (flow-to-tasks-gen)
+                       (false-flow-condition-gen))]))]
+   (let [downstream (mapcat :flow/to mixed)
+         compiled (c/compile-fc-norms mixed :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil mixed downstream)
+         matches (filter :pred/val mixed)
+         excluded-keys (mapcat :flow/exclude-keys matches)]
+     (prn excluded-keys)
+     (is (into #{} excluded-keys) (:exclusions results))
+     (is (nil? (:action results))))))
