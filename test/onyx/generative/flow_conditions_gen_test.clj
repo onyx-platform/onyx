@@ -99,74 +99,39 @@
     (is (thrown? clojure.lang.ExceptionInfo
                  (t/route-data nil nil wrapped-e nil [:a :b])))))
 
-(deftest limit-downstream-results
-  (checking
-   "The matching flow condition limits the downstream selection"
-   (times 50)
-   [fcs (gen/vector (->> :a
-                         (flow-condition-gen)
-                         (flow-to-tasks-gen)
-                         (true-flow-condition-gen))
-                    1)
-    other-downstream-tasks (gen/vector gen/keyword)]
-   (let [task :a
-         target-tasks (mapcat :flow/to fcs)
-         downstream (into other-downstream-tasks target-tasks)
-         compiled (c/compile-fc-norms fcs task)
-         results
-         (t/route-data
-          {:onyx.core/compiled-norm-fcs compiled} nil nil fcs downstream)]
-     (is (= (into #{} target-tasks) (:flow results)))
-     (is (nil? (:action results))))))
-
 (deftest conj-downstream-tasks-together
   (checking
-   "It joins the :flow/to tasks together"
+   "It joins the :flow/to tasks together and limits selection"
    (times 50)
-   [downstream (gen/not-empty (gen/vector gen/keyword))
-    size (gen/choose 0 (count downstream))
-    flow-conditions (gen/not-empty
-                     (gen/vector
-                      (gen/hash-map
-                       :flow/from (gen/return :a)
-                       :flow/to (gen/fmap #(vec (take size %)) (gen/shuffle downstream))
-                       :flow/predicate (gen/return ::true-pred))))]
+   [flow-conditions (gen/vector (->> :a
+                         (flow-condition-gen)
+                         (flow-to-tasks-gen)
+                         (true-flow-condition-gen)))
+    other-downstream-tasks (gen/vector gen/keyword)]
    (let [compiled (c/compile-fc-norms flow-conditions :a)
-         results
-         (t/route-data
-          {:onyx.core/compiled-norm-fcs compiled} nil nil flow-conditions downstream)]
-     (is (= (into #{} (mapcat :flow/to flow-conditions)) (:flow results)))
+         target-tasks (mapcat :flow/to flow-conditions)
+         downstream (into other-downstream-tasks target-tasks)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil flow-conditions downstream)]
+     (is (= (into #{} target-tasks) (:flow results)))
      (is (nil? (:action results))))))
-
-
-
-
 
 (deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
    (times 50)
-   [true-downstream (gen/fmap (fn [xs] (map (comp keyword str) xs)) (gen/not-empty (gen/vector gen/uuid)))
-    false-downstream (gen/fmap (fn [xs] (map (comp keyword str) xs)) (gen/not-empty (gen/vector gen/uuid)))
-    size (gen/choose 0 (count true-downstream))
-    true-flow-conditions (gen/not-empty
-                          (gen/vector
-                           (gen/hash-map
-                            :flow/from (gen/return :a)
-                            :flow/to (gen/fmap #(vec (take size %)) (gen/shuffle true-downstream))
-                            :flow/predicate (gen/return ::true-pred))))
-    false-flow-conditions (gen/not-empty
-                           (gen/vector
-                            (gen/hash-map
-                             :flow/from (gen/return :a)
-                             :flow/to (gen/fmap #(vec (take size %)) (gen/shuffle false-downstream))
-                             :flow/predicate (gen/return ::false-pred))))]
-   (let [flow-conditions (into true-flow-conditions false-flow-conditions)
-         downstream (into true-downstream false-downstream)
+   [true-fcs (gen/vector (->> :a
+                              (flow-condition-gen)
+                              (flow-to-tasks-gen)
+                              (true-flow-condition-gen)))
+    false-fcs (gen/vector (->> :a
+                               (flow-condition-gen)
+                               (flow-to-tasks-gen)
+                               (false-flow-condition-gen)))]
+   (let [flow-conditions (into true-fcs false-fcs)
+         downstream (mapcat :flow/to true-fcs false-fcs)
          compiled (c/compile-fc-norms flow-conditions :a)
-         results
-         (t/route-data
-          {:onyx.core/compiled-norm-fcs compiled} nil nil flow-conditions downstream)]
-     (is (= (into #{} (mapcat :flow/to true-flow-conditions)) (:flow results)))
-     (is (nil? (some (into #{} (mapcat :flow/to false-flow-conditions)) (:flow results))))
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil flow-conditions downstream)]
+     (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
