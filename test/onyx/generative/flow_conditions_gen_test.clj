@@ -125,7 +125,6 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
-     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest no-false-predicate-picks
@@ -148,7 +147,6 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
-     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest short-circuit
@@ -184,7 +182,6 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
-     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest retry-action
@@ -231,7 +228,6 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (not (seq (:flow results))))
-     (is (not (seq (:exclusions results))))
      (is (= :retry (:action results))))))
 
 (deftest key-exclusion
@@ -254,7 +250,6 @@
          results (t/route-data event nil nil mixed downstream)
          matches (filter :pred/val mixed)
          excluded-keys (mapcat :flow/exclude-keys matches)]
-     (prn excluded-keys)
      (is (into #{} excluded-keys) (:exclusions results))
      (is (nil? (:action results))))))
 
@@ -289,7 +284,6 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil fcs downstream)]
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
-     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest matching-none
@@ -323,5 +317,4 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil fcs downstream)]
      (is (not (seq (:flow/to results))))
-     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
