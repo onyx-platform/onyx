@@ -125,6 +125,7 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
+     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest no-false-predicate-picks
@@ -147,6 +148,7 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
+     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest short-circuit
@@ -182,6 +184,7 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
+     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
 
 (deftest retry-action
@@ -228,6 +231,7 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil flow-conditions downstream)]
      (is (not (seq (:flow results))))
+     (is (not (seq (:exclusions results))))
      (is (= :retry (:action results))))))
 
 (deftest key-exclusion
@@ -252,4 +256,72 @@
          excluded-keys (mapcat :flow/exclude-keys matches)]
      (prn excluded-keys)
      (is (into #{} excluded-keys) (:exclusions results))
+     (is (nil? (:action results))))))
+
+(deftest matching-all
+  (checking
+   "A :flow/to of :all that passes its predicate matches everything"
+   (times 30)
+   [false-all
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-all-gen)
+                     (false-flow-condition-gen)))
+    true-all
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-all-gen)
+                      (true-flow-condition-gen))))
+    mixed-all
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-all-gen)
+                     (maybe-predicate)))
+    mixed-none
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-none-gen)
+                     (maybe-predicate)))]
+   (let [fcs [false-all true-all mixed-all mixed-none]
+         downstream (mapcat :flow/to fcs)
+         compiled (c/compile-fc-norms fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil fcs downstream)]
+     (is (= (into #{} downstream) (into #{} (:flow/to results))))
+     (is (not (seq (:exclusions results))))
+     (is (nil? (:action results))))))
+
+(deftest matching-none
+  (checking
+   "A :flow/to of :none that passes its pred matches nothing"
+   (times 30)
+   [false-none
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-none-gen)
+                     (false-flow-condition-gen)))
+    true-none
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-none-gen)
+                      (true-flow-condition-gen))))
+    mixed-none
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-none-gen)
+                     (maybe-predicate)))
+    mixed
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (maybe-predicate)))]
+   (let [fcs [false-none true-none mixed-none mixed]
+         downstream (mapcat :flow/to fcs)
+         compiled (c/compile-fc-norms fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil fcs downstream)]
+     (is (not (seq (:flow/to results))))
+     (is (not (seq (:exclusions results))))
      (is (nil? (:action results))))))
