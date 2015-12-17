@@ -80,6 +80,13 @@
                                      (gen/return ::post-transform)]))]
        (gen/fmap #(merge v %) g)))))
 
+(defn post-transformation-flow-gen [base-gen]
+  (gen/bind
+   base-gen
+   (fn [v]
+     (let [g (gen/hash-map :flow/transform (gen/return ::post-transform))]
+       (gen/fmap #(merge v %) g)))))
+
 (defn retry-flow-condition-gen [base-gen]
   (gen/bind
    base-gen
@@ -317,4 +324,37 @@
          event {:onyx.core/compiled-norm-fcs compiled}
          results (t/route-data event nil nil fcs downstream)]
      (is (not (seq (:flow/to results))))
+     (is (nil? (:action results))))))
+
+(deftest post-transformation
+  (checking
+   "A :flow/post-transform is returned for exception predicates that define it"
+   (times 30)
+   [false-xform
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (exception-flow-condition-gen)
+                     (post-transformation-flow-gen)
+                     (false-flow-condition-gen)))
+    true-xform
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-tasks-gen)
+                      (exception-flow-condition-gen)
+                      (post-transformation-flow-gen)
+                      (true-flow-condition-gen))))
+    mixed
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (maybe-predicate)))]
+   (let [fcs [false-xform true-xform mixed]
+         downstream (mapcat :flow/to fcs)
+         compiled (c/compile-fc-norms fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled}
+         results (t/route-data event nil nil fcs downstream)
+         xform (:flow/post-transformation (first true-xform))]
+     (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
