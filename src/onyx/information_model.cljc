@@ -890,6 +890,13 @@
              :default 60000
              :added "0.8.0"}
 
+            :onyx.bookkeeper/disk-usage-threshold
+            {:doc "Fraction of the total utilized usable disk space to declare the disk full. The total available disk space is obtained with File.getUsableSpace(). The value of this parameter represents a percentage."
+             :optional? true
+             :type :double
+             :default 0.98
+             :added "0.8.4"}
+
             :onyx.peer/state-filter-impl
             {:doc "Choice of uniqueness key filtering implementation."
              :optional? true
@@ -1121,8 +1128,9 @@
     :onyx.bookkeeper/ledger-id-written-back-off
     :onyx.bookkeeper/ledger-password 
     :onyx.bookkeeper/client-throttle
-    :onyx.bookkeeper/write-buffer-size 
+    :onyx.bookkeeper/write-buffer-size
     :onyx.bookkeeper/client-timeout
+    :onyx.bookkeeper/disk-usage-threshold
     :onyx.peer/state-filter-impl 
     :onyx.rocksdb.filter/base-dir
     :onyx.rocksdb.filter/bloom-filter-bits 
