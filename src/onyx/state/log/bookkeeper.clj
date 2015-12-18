@@ -42,7 +42,7 @@
                (zk/ledgers-path (:onyx/id opts))
                (arg-or-default :onyx.bookkeeper/client-timeout opts)
                (arg-or-default :onyx.bookkeeper/client-throttle opts)))
-  ([zk-addr zk-root-path timeout disk-usage throttle]
+  ([zk-addr zk-root-path timeout throttle]
    (let [conf (doto (ClientConfiguration.)
                 (.setZkServers zk-addr)
                 (.setZkTimeout timeout)
