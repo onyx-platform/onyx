@@ -92,6 +92,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
+    {:git "git@onyx-elasticsearch:onyx-platform/onyx-elasticsearch.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-dashboard:onyx-platform/onyx-dashboard.git"
      :branch "compatibility"
      :release-branch "master"
