@@ -327,6 +327,7 @@
    (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
    (s/optional-key :onyx.bookkeeper/base-journal-dir) s/Str
    (s/optional-key :onyx.bookkeeper/base-ledger-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/disk-usage-threshold) (s/pred float?)
    s/Keyword s/Any})
 
 (def AeronIdleStrategy
@@ -363,7 +364,6 @@
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
-   (s/optional-key :onyx.bookkeeper/disk-usage-threshold) (s/pred float?)
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
    (s/optional-key :onyx.bookkeeper/ledger-id-written-back-off) PosInt
