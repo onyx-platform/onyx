@@ -1130,7 +1130,6 @@
     :onyx.bookkeeper/client-throttle
     :onyx.bookkeeper/write-buffer-size
     :onyx.bookkeeper/client-timeout
-    :onyx.bookkeeper/disk-usage-threshold
     :onyx.peer/state-filter-impl 
     :onyx.rocksdb.filter/base-dir
     :onyx.rocksdb.filter/bloom-filter-bits 
@@ -1141,9 +1140,14 @@
     :onyx.rocksdb.filter/num-ids-per-bucket
     :onyx.rocksdb.filter/rotation-check-interval-ms]
    :env-config
-   [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
+   [:onyx/id
+    :zookeeper/server?
+    :zookeeper.server/port
+    :zookeeper/address
     :onyx.bookkeeper/server? 
     :onyx.bookkeeper/delete-server-data?
     :onyx.bookkeeper/local-quorum?
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
-    :onyx.bookkeeper/base-journal-dir :onyx.bookkeeper/base-ledger-dir]})
+    :onyx.bookkeeper/base-journal-dir
+    :onyx.bookkeeper/base-ledger-dir
+    :onyx.bookkeeper/disk-usage-threshold]})
