@@ -4,7 +4,8 @@
             [clojure.test :refer [is]]
             [clojure.test.check.generators :as gen]
             [stateful-check.core :refer [specification-correct?]]
-            [onyx.messaging.acking-daemon :as a])
+            [onyx.messaging.acking-daemon :as a]
+            [onyx.api])
   (:import [java.util UUID]))
 
 (def max-state-size 10000)

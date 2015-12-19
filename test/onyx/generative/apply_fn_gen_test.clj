@@ -42,8 +42,6 @@
    "It generalizes with a bigger batch size for single returns"
    (times 20)
    [input (gen/vector (gen-segment))
-    ;; Uses a UUID as the key to ensure input -> output
-    ;; mapping is unique for all inputs
     output (gen/vector (gen/map gen/any gen/any)
                        (count input))]
    (let [mapping (zipmap (map :message input) output)
