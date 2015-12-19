@@ -5,7 +5,7 @@
             [clojure.test :refer :all]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            [onyx.peer.task-lifecycle :as t]
+            [onyx.flow-conditions.fc-routing :as r]
             [onyx.peer.task-compile :as c]
             [onyx.api]))
 
@@ -104,7 +104,7 @@
 (deftest nil-flow-conditions
   "No flow condition routes to all downstream tasks"
   (let [downstream [:a :b]
-        route (t/route-data nil nil nil nil downstream)]
+        route (r/route-data nil nil nil nil downstream)]
     (is (= downstream (:flow route)))
     (is (nil? (:action route)))))
 
@@ -113,7 +113,7 @@
   (let [e (ex-info "hih" {})
         wrapped-e (ex-info "" {:exception e})]
     (is (thrown? clojure.lang.ExceptionInfo
-                 (t/route-data nil nil wrapped-e nil [:a :b])))))
+                 (r/route-data nil nil wrapped-e nil [:a :b])))))
 
 (deftest conj-downstream-tasks-together
   (checking
@@ -130,7 +130,7 @@
          target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil flow-conditions downstream)]
+         results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -152,7 +152,7 @@
          downstream (mapcat :flow/to true-fcs false-fcs)
          compiled (c/compile-fc-norms flow-conditions :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil flow-conditions downstream)]
+         results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -187,7 +187,7 @@
          downstream (mapcat :flow/to flow-conditions)
          compiled (c/compile-fc-norms flow-conditions :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil flow-conditions downstream)]
+         results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
@@ -233,7 +233,7 @@
          downstream (mapcat :flow/to flow-conditions)
          compiled (c/compile-fc-norms flow-conditions :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil flow-conditions downstream)]
+         results (r/route-data event nil nil flow-conditions downstream)]
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
 
@@ -254,7 +254,7 @@
    (let [downstream (mapcat :flow/to mixed)
          compiled (c/compile-fc-norms mixed :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil mixed downstream)
+         results (r/route-data event nil nil mixed downstream)
          matches (filter :pred/val mixed)
          excluded-keys (mapcat :flow/exclude-keys matches)]
      (is (into #{} excluded-keys) (:exclusions results))
@@ -289,7 +289,7 @@
          downstream (mapcat :flow/to fcs)
          compiled (c/compile-fc-norms fcs :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil fcs downstream)]
+         results (r/route-data event nil nil fcs downstream)]
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
      (is (nil? (:action results))))))
 
@@ -322,7 +322,7 @@
          downstream (mapcat :flow/to fcs)
          compiled (c/compile-fc-norms fcs :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil fcs downstream)]
+         results (r/route-data event nil nil fcs downstream)]
      (is (not (seq (:flow/to results))))
      (is (nil? (:action results))))))
 
@@ -354,7 +354,7 @@
          downstream (mapcat :flow/to fcs)
          compiled (c/compile-fc-norms fcs :a)
          event {:onyx.core/compiled-norm-fcs compiled}
-         results (t/route-data event nil nil fcs downstream)
+         results (r/route-data event nil nil fcs downstream)
          xform (:flow/post-transformation (first true-xform))]
      (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
