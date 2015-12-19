@@ -91,11 +91,14 @@
                        {:window window :window-id window-id
                         :lower-extent lower :upper-extent upper})]
        (if (f event trigger args)
-         (do (refine-state event trigger)
-             ((:trigger/sync-fn trigger) event window-id lower upper state)
-             (if (refinement-destructive? event trigger)
-               (conj entries [window-id nil])
-               entries))
+         (let [window-metadata {:window-id window-id
+                                :lower-bound lower
+                                :upper-bound upper}]
+           (refine-state event trigger)
+           ((:trigger/sync-fn trigger) event window trigger window-metadata state)
+           (if (refinement-destructive? event trigger)
+             (conj entries [window-id nil])
+             entries))
          entries)))
    []
    window-ids))

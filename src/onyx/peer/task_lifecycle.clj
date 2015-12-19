@@ -21,8 +21,9 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
               [onyx.peer.transform :refer [apply-fn]]
+              [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [clj-tuple :as t]
               [onyx.interop]
@@ -65,53 +66,6 @@
 (defn sentinel-id [event]
   (:id (first (filter #(= :done (:message %))
                       (:onyx.core/batch event)))))
-
-(defn join-output-paths [all to-add downstream]
-  (cond (= to-add :all) (set downstream)
-        (= to-add :none) #{}
-        :else (into (set all) to-add)))
-
-(defn choose-output-paths
-  [event compiled-flow-conditions result message downstream]
-  (reduce
-   (fn [{:keys [flow exclusions] :as all} entry]
-     (cond ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
-           (if (:flow/short-circuit? entry)
-             (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
-                               (into (set exclusions) (:flow/exclude-keys entry))
-                               (:flow/post-transform entry)
-                               (:flow/action entry)))
-             (->Route (join-output-paths flow (:flow/to entry) downstream)
-                      (into (set exclusions) (:flow/exclude-keys entry))
-                      nil
-                      nil))
-
-           (= (:flow/action entry) :retry)
-           (->Route (join-output-paths flow (:flow/to entry) downstream)
-                    (into (set exclusions) (:flow/exclude-keys entry))
-                    nil
-                    nil)
-
-           :else all))
-   (->Route #{} #{} nil nil)
-   compiled-flow-conditions))
-
-(defn route-data
-  [event result message flow-conditions downstream]
-  (if (nil? flow-conditions)
-    (if (operation/exception? message)
-      (throw (:exception (ex-data message)))
-      (->Route downstream nil nil nil))
-    (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
-      (if (operation/exception? message)
-        (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result
-                               (:exception (ex-data message)) downstream)
-          (throw (:exception (ex-data message))))
-        (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
-          (if (seq compiled-norm-fcs)
-            (choose-output-paths event compiled-norm-fcs result message downstream)
-            (->Route downstream nil nil nil)))))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
@@ -158,7 +112,7 @@
 
 (defn add-from-leaf [event result egress-ids task->group-by-fn flow-conditions 
                      root leaves start-ack-val accum {:keys [message] :as leaf}]
-  (let [routes (route-data event result message flow-conditions egress-ids)
+  (let [routes (r/route-data event result message flow-conditions egress-ids)
         message* (flow-conditions-transform message routes egress-ids flow-conditions event)
         hash-group (hash-groups message* egress-ids task->group-by-fn)
         leaf* (if (= message message*)

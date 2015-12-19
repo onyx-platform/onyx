@@ -30,7 +30,7 @@
 
 (def test-state (atom {}))
 
-(defn update-atom! [event window-id lower-bound upper-bound state]
+(defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
   (swap! test-state (fn [s] (merge s state))))
 
 (def in-chan (atom nil))

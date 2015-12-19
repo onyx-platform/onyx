@@ -108,7 +108,7 @@
 
   (def test-state (atom []))
 
-  (defn update-atom! [event window-id lower-bound upper-bound state]
+  (defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
     (swap! test-state conj [lower-bound upper-bound state]))
 
   (def batch-num (atom 0))
