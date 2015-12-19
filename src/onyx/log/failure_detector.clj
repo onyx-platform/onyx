@@ -21,7 +21,8 @@
             (cond (and (= ch t-ch) (not (extensions/peer-exists? log peer-id)))
                   (extensions/write-log-entry
                    log
-                   {:fn :leave-cluster :args {:id peer-id}})
+                   {:fn :leave-cluster :args {:id peer-id}
+                    :peer-src peer-id})
 
                   (= ch t-ch)
                   (recur)))))

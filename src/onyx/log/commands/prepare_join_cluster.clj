@@ -76,7 +76,7 @@
                               (:observer diff))}}]))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
-  [{:keys [args]} :- LogEntry old new diff {:keys [monitoring] :as state}]
+  [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
    (cond (= (:id state) (:observer diff))
@@ -86,7 +86,9 @@
            (go (when (<! ch)
                  (extensions/write-log-entry
                   (:log state)
-                  {:fn :leave-cluster :args {:id (:subject diff)}}))
+                  {:fn :leave-cluster :args {:id (:subject diff)}
+                   :peer-src (:id state)
+                   :entry-src message-id}))
                (close! ch))
            (assoc state :watch-ch ch))
          ;; Handles the cases where a peer tries to attach to a dead
@@ -96,7 +98,9 @@
            (do
              (extensions/write-log-entry
               (:log state)
-              {:fn :leave-cluster :args {:id (:observer diff)}})
+              {:fn :leave-cluster :args {:id (:observer diff)}
+               :peer-src (:id state)
+               :entry-src message-id})
              state)
            (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
              (assoc state :failure-detector (component/start fd))))

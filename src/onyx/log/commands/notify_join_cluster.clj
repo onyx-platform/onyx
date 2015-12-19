@@ -36,7 +36,7 @@
           :args {:id (:observer (:args entry))}}]))
 
 (s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
-  [{:keys [args]} old new diff {:keys [monitoring] :as state}]
+  [{:keys [args message-id]} old new diff {:keys [monitoring] :as state}]
   (if (= (:id state) (:observer diff))
     (let [ch (chan 1)]
       (extensions/emit monitoring {:event :peer-notify-join :id (:id state)})
@@ -44,7 +44,9 @@
       (go (when (<! ch)
             (extensions/write-log-entry
              (:log state)
-             {:fn :leave-cluster :args {:id (:subject diff)}}))
+             {:fn :leave-cluster :args {:id (:subject diff)}
+              :entry-src message-id
+              :peer-src (:id state)}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
       (let [result-state (assoc state :watch-ch ch)]
