@@ -51,15 +51,14 @@
      (is (= input (map :root tree)))
      (is (= output (map :message (mapcat :leaves tree)))))))
 
-(deftest message-key-doesnt-get-overwritten
-  (let [input {:xxxxmessage 42}
-        f (fn [segment] {:output 30})
-        event {:onyx.core/batch [input]}
-        rets (t/apply-fn f false event)
-        tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
-    (prn tree)))
-
-(clojure.pprint/pprint
- (t/persistent-results! (:onyx.core/results (t/apply-fn (fn [x] []) false {:onyx.core/batch [{:x 1} {:x 2}]}))))
-
-;;; BUG: key :message
+(deftest parameterized-functions
+  (checking
+   "Functions can be parameterized via the event map"
+   (times 30)
+   [input (gen/vector (gen/hash-map :message (gen/map gen/any gen/any)))
+    params (gen/vector gen/any)]
+   (let [f (fn [& args] {:result (or (butlast args) [])})
+         event {:onyx.core/batch input :onyx.core/params params}
+         rets (t/apply-fn f false event)
+         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+     (is (every? (partial = params) (map :result (map :message (mapcat :leaves tree))))))))
