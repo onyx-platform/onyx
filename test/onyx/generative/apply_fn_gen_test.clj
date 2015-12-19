@@ -5,7 +5,8 @@
             [clojure.test :refer :all]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            [onyx.peer.task-lifecycle :as t]
+            [onyx.peer.transform :as t]
+            [onyx.peer.task-lifecycle :refer [persistent-results!]]
             [onyx.api]))
 
 (defn gen-segment []
@@ -20,7 +21,7 @@
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
          rets (t/apply-fn f false event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+         tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (:root (first tree))))
      (is (= output (:message (first (:leaves (first tree)))))))))
 
@@ -33,7 +34,7 @@
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
          rets (t/apply-fn f false event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+         tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (:root (first tree))))
      (is (= output (map :message (:leaves (first tree))))))))
 
@@ -48,7 +49,7 @@
          f (fn [segment] (get mapping segment))
          event {:onyx.core/batch input}
          rets (t/apply-fn f false event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+         tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (map :root tree)))
      (is (= output (map :message (mapcat :leaves tree)))))))
 
@@ -61,7 +62,7 @@
    (let [f (fn [& args] {:result (or (butlast args) [])})
          event {:onyx.core/batch input :onyx.core/params params}
          rets (t/apply-fn f false event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+         tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (every? (partial = params) (map :result (map :message (mapcat :leaves tree))))))))
 
 (deftest throws-exception
@@ -72,7 +73,7 @@
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
          rets (t/apply-fn f false event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))
+         tree (:tree (persistent-results! (:onyx.core/results rets)))
          messages (map :message (:leaves (first tree)))]
      (is (= input (map :root tree)))
      (is (every? #(= clojure.lang.ExceptionInfo (type %)) messages))
@@ -88,7 +89,7 @@
          f (fn [segment] (reset! called? true) output)
          event {:onyx.core/batch input}
          rets (t/apply-fn f true event)
-         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+         tree (:tree (persistent-results! (:onyx.core/results rets)))]
      (is (= input (map :root tree)))
      (is (= (map :message input) (map :message (mapcat :leaves tree))))
      (is @called?))))
