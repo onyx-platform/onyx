@@ -7,7 +7,8 @@
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [onyx.peer.transform :as t]
             [onyx.peer.task-lifecycle :refer [persistent-results!]]
-            [onyx.api]))
+            [onyx.api])
+  (:import [java.util UUID]))
 
 (defn gen-segment []
   (gen/hash-map :message (gen/map gen/any gen/any)))
@@ -42,7 +43,15 @@
   (checking
    "It generalizes with a bigger batch size for single returns"
    (times 20)
-   [input (gen/vector (gen-segment))
+   ;; Uses a unique mapping of keys to values to look up an
+   ;; input for an output with no collisions.
+   [input (gen/vector (gen/hash-map
+                       :message
+                       (gen/not-empty
+                        (gen/map
+                         (gen/fmap (fn [v] (UUID/randomUUID))
+                                   (gen/tuple))
+                         gen/any))))
     output (gen/vector (gen/map gen/any gen/any)
                        (count input))]
    (let [mapping (zipmap (map :message input) output)
