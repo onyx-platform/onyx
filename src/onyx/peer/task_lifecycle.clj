@@ -21,7 +21,7 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.types :refer [->Route ->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
               [onyx.peer.transform :refer [apply-fn]]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [clj-tuple :as t]
