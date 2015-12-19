@@ -8,11 +8,14 @@
             [onyx.peer.task-lifecycle :as t]
             [onyx.api]))
 
+(defn gen-segment []
+  (gen/hash-map :message (gen/map gen/any gen/any)))
+
 (deftest singe-segment-return
   (checking
    "A single returned segment attaches to its root"
    (times 30)
-   [input (gen/hash-map :message (gen/map gen/any gen/any))
+   [input (gen-segment)
     output (gen/map gen/any gen/any)]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
@@ -25,7 +28,7 @@
   (checking
    "Multiple segments can be returned, attached to their root"
    (times 30)
-   [input (gen/hash-map :message (gen/map gen/any gen/any))
+   [input (gen-segment)
     output (gen/vector (gen/map gen/any gen/any))]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
@@ -38,7 +41,7 @@
   (checking
    "It generalizes with a bigger batch size for single returns"
    (times 20)
-   [input (gen/vector (gen/hash-map :message (gen/not-empty (gen/map gen/uuid gen/any))))
+   [input (gen/vector (gen-segment))
     ;; Uses a UUID as the key to ensure input -> output
     ;; mapping is unique for all inputs
     output (gen/vector (gen/map gen/any gen/any)
@@ -55,7 +58,7 @@
   (checking
    "Functions can be parameterized via the event map"
    (times 30)
-   [input (gen/vector (gen/hash-map :message (gen/map gen/any gen/any)))
+   [input (gen/vector (gen-segment))
     params (gen/vector gen/any)]
    (let [f (fn [& args] {:result (or (butlast args) [])})
          event {:onyx.core/batch input :onyx.core/params params}
@@ -67,7 +70,7 @@
   (checking
    "Functions that throw exceptions pass the exception object back"
    (times 30)
-   [input (gen/vector (gen/hash-map :message (gen/map gen/any gen/any)))]
+   [input (gen/vector (gen-segment))]
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
          rets (t/apply-fn f false event)
@@ -76,3 +79,18 @@
      (is (= input (map :root tree)))
      (is (every? #(= clojure.lang.ExceptionInfo (type %)) messages))
      (is (every? #(= {:val 42} (ex-data (:exception %))) (map ex-data messages))))))
+
+(deftest bulk-functions
+  (checking
+   "Bulk functions call the function, but always return their inputs"
+   (times 30)
+   [input (gen/not-empty (gen/vector (gen-segment)))
+    output gen/any]
+   (let [called? (atom false)
+         f (fn [segment] (reset! called? true) output)
+         event {:onyx.core/batch input}
+         rets (t/apply-fn f true event)
+         tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
+     (is (= input (map :root tree)))
+     (is (= (map :message input) (map :message (mapcat :leaves tree))))
+     (is @called?))))
