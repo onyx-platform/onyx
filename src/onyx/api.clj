@@ -259,15 +259,14 @@
 (defn ^{:no-doc true} restart-peer [peer-system shutdown-ch]
   (let [result
         (try
-          (let [[v ch] (alts!! [shutdown-ch (timeout 0)] :priority true)]
-            (when (not= ch shutdown-ch)
+          (let [[v ch] (alts!! [shutdown-ch] :default true)]
+            (when-not (= ch shutdown-ch)
               (component/start peer-system)))
           (catch Throwable t
-            (warn t)
-            {:retry? true
-             :system (component/stop peer-system)}))]
-    (if (and (map? result) (:retry? result))
-      (recur (:system peer-system) shutdown-ch)
+            (warn t "error restarting peer system")
+            :retry))]
+    (if (= :retry result)
+      (recur peer-system shutdown-ch)
       result)))
 
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
