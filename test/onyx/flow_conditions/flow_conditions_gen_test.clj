@@ -22,79 +22,55 @@
    :flow/from (gen/return from-task)
    :flow/exclude-keys (gen/vector gen/keyword)))
 
+(defn merge-gen-maps [gen1 gen2]
+  (gen/bind gen1 
+            (fn [m]
+              (gen/fmap #(merge m %) gen2))))
+
 (defn flow-to-all-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/to (gen/return :all))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/return {:flow/to :all}) 
+                  base-gen))
 
 (defn flow-to-none-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/to (gen/return :none))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/return {:flow/to :none}) 
+                  base-gen))
 
 (defn flow-to-tasks-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/to (gen/vector gen/keyword))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/hash-map :flow/to (gen/vector gen/keyword))
+                  base-gen))
 
 (defn true-flow-condition-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/return ::true-pred)
-           true-gen (gen/hash-map :flow/predicate g
-                                  :pred/val (gen/return true))]
-       (gen/fmap #(merge v %) true-gen)))))
+  (merge-gen-maps (gen/return {:flow/predicate ::true-pred
+                               :pred/val true})
+                  base-gen))
 
 (defn false-flow-condition-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/return ::false-pred)
-           false-gen (gen/hash-map :flow/predicate g
-                                   :pred/val (gen/return false))]
-       (gen/fmap #(merge v %) false-gen)))))
+  (merge-gen-maps (gen/return {:flow/predicate ::false-pred
+                               :pred/val false})
+                  base-gen))
 
 (defn short-circuit-flow-condition-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/short-circuit? (gen/return true))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/return {:flow/short-circuit? true})
+                  base-gen))
 
 (defn exception-flow-condition-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map
-              :flow/thrown-exception? (gen/return true)
-              :flow/short-circuit? (gen/return true)
-              :flow/post-transform (gen/one-of
-                                    [(gen/return nil)
-                                     (gen/return ::post-transform)]))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/hash-map
+                    :flow/thrown-exception? (gen/return true)
+                    :flow/short-circuit? (gen/return true)
+                    :flow/post-transform (gen/one-of
+                                           [(gen/return nil)
+                                            (gen/return ::post-transform)]))
+                  base-gen))
 
 (defn post-transformation-flow-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/transform (gen/return ::post-transform))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/return {:flow/transform ::post-transform}) 
+                  base-gen))
 
 (defn retry-flow-condition-gen [base-gen]
-  (gen/bind
-   base-gen
-   (fn [v]
-     (let [g (gen/hash-map :flow/action (gen/return :retry)
-                           :flow/short-circuit? (gen/return true)
-                           :flow/to (gen/return nil))]
-       (gen/fmap #(merge v %) g)))))
+  (merge-gen-maps (gen/hash-map :flow/action (gen/return :retry)
+                                :flow/short-circuit? (gen/return true)
+                                :flow/to (gen/return nil))
+                  base-gen))
 
 (defn maybe-predicate [g]
   (gen/frequency
