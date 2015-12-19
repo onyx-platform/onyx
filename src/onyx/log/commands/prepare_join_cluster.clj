@@ -99,8 +99,7 @@
              (extensions/write-log-entry
               (:log state)
               {:fn :leave-cluster :args {:id (:observer diff)}
-               :peer-src (:id state)
-               :entry-src message-id})
+               :peer-src (:id state)})
              state)
            (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
              (assoc state :failure-detector (component/start fd))))
