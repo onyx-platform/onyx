@@ -1,4 +1,4 @@
-(ns onyx.generative.flow-conditions-gen-test
+(ns onyx.flow-conditions.flow-conditions-gen-test
   (:require [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]

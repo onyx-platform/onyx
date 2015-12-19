@@ -1,7 +1,8 @@
 (ns ^:no-doc onyx.peer.task-compile
   (:require [onyx.peer.operation :refer [kw->fn] :as operation]
-            [onyx.static.planning :refer [find-task build-pred-fn]]
+            [onyx.static.planning :refer [find-task]]
             [onyx.static.validation :as validation]
+            [onyx.flow-conditions.fc-compile :refer [build-pred-fn]]
             [onyx.windowing.aggregation :as agg]
             [onyx.windowing.window-extensions :as w]
             [onyx.state.state-extensions :as state-extensions]

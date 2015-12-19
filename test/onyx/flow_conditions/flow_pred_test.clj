@@ -1,6 +1,6 @@
-(ns onyx.flow-pred-test
+(ns onyx.flow-conditions.flow-pred-test
   (:require [clojure.test :refer [deftest is testing]]
-            [onyx.static.planning :refer [build-pred-fn]]))
+            [onyx.flow-conditions.fc-compile :refer [build-pred-fn]]))
 
 (def true-pred (constantly true))
 (def false-pred (constantly false))
