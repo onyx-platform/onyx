@@ -62,3 +62,17 @@
          rets (t/apply-fn f false event)
          tree (:tree (t/persistent-results! (:onyx.core/results rets)))]
      (is (every? (partial = params) (map :result (map :message (mapcat :leaves tree))))))))
+
+(deftest throws-exception
+  (checking
+   "Functions that throw exceptions pass the exception object back"
+   (times 30)
+   [input (gen/vector (gen/hash-map :message (gen/map gen/any gen/any)))]
+   (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
+         event {:onyx.core/batch input}
+         rets (t/apply-fn f false event)
+         tree (:tree (t/persistent-results! (:onyx.core/results rets)))
+         messages (map :message (:leaves (first tree)))]
+     (is (= input (map :root tree)))
+     (is (every? #(= clojure.lang.ExceptionInfo (type %)) messages))
+     (is (every? #(= {:val 42} (ex-data (:exception %))) (map ex-data messages))))))
