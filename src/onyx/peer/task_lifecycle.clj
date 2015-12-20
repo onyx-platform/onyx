@@ -603,22 +603,12 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows (c/resolve-windows filtered-windows)
-                           :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-read-batch-fn (c/compile-after-read-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-batch-fn (c/compile-after-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-task-fn (c/compile-after-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-ack-segment-fn (c/compile-after-ack-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
-                           :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
                            :onyx.core/compiled (->Compiled (c/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params task-map opts)
-                           :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
+                           :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
@@ -632,6 +622,10 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
+
+            pipeline-data (-> pipeline-data
+                              (c/flow-conditions->event-map flow-conditions (:name task))
+                              (c/lifecycles->event-map lifecycles (:name task)))
 
             pipeline (build-pipeline task-map pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)

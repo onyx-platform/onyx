@@ -100,10 +100,9 @@
                       (flow-to-tasks-gen)
                       (true-flow-condition-gen))))
     other-downstream-tasks (gen/vector gen/keyword)]
-   (let [compiled (c/compile-fc-norms flow-conditions :a)
-         target-tasks (mapcat :flow/to flow-conditions)
+   (let [target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} flow-conditions :a)
          results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
@@ -124,8 +123,7 @@
                      (false-flow-condition-gen)))]
    (let [flow-conditions (into true-fcs false-fcs)
          downstream (mapcat :flow/to true-fcs false-fcs)
-         compiled (c/compile-fc-norms flow-conditions :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} flow-conditions :a)
          results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
@@ -159,8 +157,7 @@
                      (maybe-predicate)))]
    (let [flow-conditions (into (into (into false-1 true-1) false-1) mixed-1)
          downstream (mapcat :flow/to flow-conditions)
-         compiled (c/compile-fc-norms flow-conditions :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} flow-conditions :a)
          results (r/route-data event nil nil flow-conditions downstream)]
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
@@ -205,8 +202,7 @@
    (let [all [retry-false retry-true retry-mixed ss exceptions mixed]
          flow-conditions (apply concat all)
          downstream (mapcat :flow/to flow-conditions)
-         compiled (c/compile-fc-norms flow-conditions :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} flow-conditions :a)
          results (r/route-data event nil nil flow-conditions downstream)]
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
@@ -226,8 +222,7 @@
                        (flow-to-tasks-gen)
                        (false-flow-condition-gen))]))]
    (let [downstream (mapcat :flow/to mixed)
-         compiled (c/compile-fc-norms mixed :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} mixed :a)
          results (r/route-data event nil nil mixed downstream)
          matches (filter :pred/val mixed)
          excluded-keys (mapcat :flow/exclude-keys matches)]
@@ -261,8 +256,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-all true-all mixed-all mixed-none]
          downstream (mapcat :flow/to fcs)
-         compiled (c/compile-fc-norms fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} fcs :a)
          results (r/route-data event nil nil fcs downstream)]
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
      (is (nil? (:action results))))))
@@ -294,8 +288,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-none true-none mixed-none mixed]
          downstream (mapcat :flow/to fcs)
-         compiled (c/compile-fc-norms fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} fcs :a)
          results (r/route-data event nil nil fcs downstream)]
      (is (not (seq (:flow/to results))))
      (is (nil? (:action results))))))
@@ -326,8 +319,7 @@
                      (maybe-predicate)))]
    (let [fcs [false-xform true-xform mixed]
          downstream (mapcat :flow/to fcs)
-         compiled (c/compile-fc-norms fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled}
+         event (c/flow-conditions->event-map {} fcs :a)
          results (r/route-data event nil nil fcs downstream)
          xform (:flow/post-transformation (first true-xform))]
      (is (= xform (:post-transformation results)))
@@ -348,10 +340,7 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         compiled-hp (c/compile-fc-norms fcs :a)
-         compiled-ex (c/compile-fc-exs fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled-hp
-                :onyx.core/compiled-ex-fcs compiled-ex}
+         event (c/flow-conditions->event-map {} fcs :a)
          routes (r/route-data event nil message fcs downstream)]
      (is (= message (r/flow-conditions-transform message routes fcs event))))))
 
@@ -370,10 +359,7 @@
    (let [inner-error (ex-info "original error" {})
          message (ex-info "exception" {:exception inner-error})
          downstream (mapcat :flow/to fcs)
-         compiled-hp (c/compile-fc-norms fcs :a)
-         compiled-ex (c/compile-fc-exs fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled-hp
-                :onyx.core/compiled-ex-fcs compiled-ex}
+         event (c/flow-conditions->event-map {} fcs :a)
          routes (r/route-data event nil message fcs downstream)
          transformed (reduce dissoc post-transformed-segment (:exclusions routes))]
      (is (= transformed (r/flow-conditions-transform message routes fcs event))))))
@@ -389,8 +375,7 @@
                      (maybe-predicate)))]
    (let [segment (zipmap (mapcat :flow/exclude-keys fcs) (repeat 0))
          downstream (mapcat :flow/to fcs)
-         compiled-hp (c/compile-fc-norms fcs :a)
-         event {:onyx.core/compiled-norm-fcs compiled-hp}
+         event (c/flow-conditions->event-map {} fcs :a)
          routes (r/route-data event nil segment fcs downstream)
          exclusions (mapcat :flow/exclude-keys (filter :pred/val fcs))
          filtered-segment (reduce dissoc segment exclusions)]
