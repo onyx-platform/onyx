@@ -17,60 +17,58 @@
   {true ::true-red
    false ::false-pred})
 
+(def post-transformed-segment {:transformed-segment 42})
+
+(defn post-transform [event segment e]
+  post-transformed-segment)
+
 (defn flow-condition-gen [from-task]
   (gen/hash-map
    :flow/from (gen/return from-task)
    :flow/exclude-keys (gen/vector gen/keyword)))
 
 (defn merge-gen-maps [gen1 gen2]
-  (gen/bind gen1 
-            (fn [m]
-              (gen/fmap #(merge m %) gen2))))
+  (gen/bind gen1 (fn [m] (gen/fmap #(merge m %) gen2))))
 
 (defn flow-to-all-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/to :all}) 
-                  base-gen))
+  (merge-gen-maps base-gen (gen/return {:flow/to :all})))
 
 (defn flow-to-none-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/to :none}) 
-                  base-gen))
+  (merge-gen-maps base-gen (gen/return {:flow/to :none})))
 
 (defn flow-to-tasks-gen [base-gen]
-  (merge-gen-maps (gen/hash-map :flow/to (gen/vector gen/keyword))
-                  base-gen))
+  (merge-gen-maps base-gen (gen/hash-map :flow/to (gen/vector gen/keyword))))
 
 (defn true-flow-condition-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/predicate ::true-pred
-                               :pred/val true})
-                  base-gen))
+  (merge-gen-maps base-gen
+                  (gen/return {:flow/predicate ::true-pred
+                               :pred/val true})))
 
 (defn false-flow-condition-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/predicate ::false-pred
-                               :pred/val false})
-                  base-gen))
+  (merge-gen-maps base-gen
+                  (gen/return {:flow/predicate ::false-pred
+                               :pred/val false})))
 
 (defn short-circuit-flow-condition-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/short-circuit? true})
-                  base-gen))
+  (merge-gen-maps base-gen (gen/return {:flow/short-circuit? true})))
 
 (defn exception-flow-condition-gen [base-gen]
-  (merge-gen-maps (gen/hash-map
-                    :flow/thrown-exception? (gen/return true)
-                    :flow/short-circuit? (gen/return true)
-                    :flow/post-transform (gen/one-of
-                                           [(gen/return nil)
-                                            (gen/return ::post-transform)]))
-                  base-gen))
+  (merge-gen-maps base-gen
+                  (gen/hash-map
+                   :flow/thrown-exception? (gen/return true)
+                   :flow/short-circuit? (gen/return true)
+                   :flow/post-transform (gen/one-of
+                                         [(gen/return nil)
+                                          (gen/return ::post-transform)]))))
 
 (defn post-transformation-flow-gen [base-gen]
-  (merge-gen-maps (gen/return {:flow/transform ::post-transform}) 
-                  base-gen))
+  (merge-gen-maps base-gen (gen/return {:flow/post-transform ::post-transform})))
 
 (defn retry-flow-condition-gen [base-gen]
-  (merge-gen-maps (gen/hash-map :flow/action (gen/return :retry)
+  (merge-gen-maps base-gen
+                  (gen/hash-map :flow/action (gen/return :retry)
                                 :flow/short-circuit? (gen/return true)
-                                :flow/to (gen/return nil))
-                  base-gen))
+                                :flow/to (gen/return nil))))
 
 (defn maybe-predicate [g]
   (gen/frequency
@@ -334,3 +332,47 @@
          xform (:flow/post-transformation (first true-xform))]
      (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
+
+(deftest post-transformation-no-invocation
+  (checking
+   "Post-transformations are not invoked when they are not matched"
+   (times 30)
+   [fcs
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-tasks-gen)
+                      (exception-flow-condition-gen)
+                      (post-transformation-flow-gen)
+                      (false-flow-condition-gen))))]
+   (let [inner-error (ex-info "original error" {})
+         message (ex-info "exception" {:exception inner-error})
+         downstream (mapcat :flow/to fcs)
+         compiled-hp (c/compile-fc-norms fcs :a)
+         compiled-ex (c/compile-fc-exs fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled-hp
+                :onyx.core/compiled-ex-fcs compiled-ex}
+         routes (r/route-data event nil message fcs downstream)]
+     (is (= message (r/flow-conditions-transform message routes fcs event))))))
+
+(deftest post-transformation-invocation
+  (checking
+   "Post-transformations are invoked when they are matched"
+   (times 20)
+   [fcs
+    (gen/not-empty
+     (gen/vector (->> :a
+                      (flow-condition-gen)
+                      (flow-to-tasks-gen)
+                      (exception-flow-condition-gen)
+                      (post-transformation-flow-gen)
+                      (true-flow-condition-gen))))]
+   (let [inner-error (ex-info "original error" {})
+         message (ex-info "exception" {:exception inner-error})
+         downstream (mapcat :flow/to fcs)
+         compiled-hp (c/compile-fc-norms fcs :a)
+         compiled-ex (c/compile-fc-exs fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled-hp
+                :onyx.core/compiled-ex-fcs compiled-ex}
+         routes (r/route-data event nil message fcs downstream)]
+     (is (= post-transformed-segment (r/flow-conditions-transform message routes fcs event))))))

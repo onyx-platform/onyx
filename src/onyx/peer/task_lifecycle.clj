@@ -66,15 +66,6 @@
   (:id (first (filter #(= :done (:message %))
                       (:onyx.core/batch event)))))
 
-(defn apply-post-transformation [message routes event]
-  (let [post-transformation (:post-transformation routes)
-        msg (if (and (operation/exception? message) post-transformation)
-              (let [data (ex-data message)
-                    f (operation/kw->fn post-transformation)]
-                (f event (:segment data) (:exception data)))
-              message)]
-    (reduce dissoc msg (:exclusions routes))))
-
 (defn hash-groups [message next-tasks task->group-by-fn]
   (if (not-empty task->group-by-fn)
     (reduce (fn [groups t]
@@ -83,12 +74,6 @@
                 groups))
             (t/hash-map)
             next-tasks)))
-
-(defn flow-conditions-transform
-  [message routes next-tasks flow-conditions event]
-  (if flow-conditions
-    (apply-post-transformation message routes event)
-    message))
 
 (defrecord AccumAckSegments [ack-val segments retries])
 
@@ -112,7 +97,7 @@
 (defn add-from-leaf [event result egress-ids task->group-by-fn flow-conditions 
                      root leaves start-ack-val accum {:keys [message] :as leaf}]
   (let [routes (r/route-data event result message flow-conditions egress-ids)
-        message* (flow-conditions-transform message routes egress-ids flow-conditions event)
+        message* (r/flow-conditions-transform message routes flow-conditions event)
         hash-group (hash-groups message* egress-ids task->group-by-fn)
         leaf* (if (= message message*)
                 leaf

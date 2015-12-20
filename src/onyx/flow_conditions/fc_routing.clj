@@ -48,3 +48,18 @@
           (if (seq compiled-norm-fcs)
             (choose-output-paths event compiled-norm-fcs result message downstream)
             (->Route downstream nil nil nil)))))))
+
+(defn apply-post-transformation [message routes event]
+  (let [post-transformation (:post-transformation routes)
+        msg (if (and (operation/exception? message) post-transformation)
+              (let [data (ex-data message)
+                    f (operation/kw->fn post-transformation)]
+                (f event (:segment data) (:exception data)))
+              message)]
+    (reduce dissoc msg (:exclusions routes))))
+
+(defn flow-conditions-transform
+  [message routes flow-conditions event]
+  (if flow-conditions
+    (apply-post-transformation message routes event)
+    message))
