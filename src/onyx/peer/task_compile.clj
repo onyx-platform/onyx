@@ -208,3 +208,29 @@
           (if unique-id
             (update new-state :filter state-extensions/apply-filter-id event unique-id)
             new-state))))))
+
+(defn flow-conditions->event-map [event flow-conditions task-name]
+  (-> event
+      (assoc :onyx.core/compiled-norm-fcs
+             (compile-fc-norms flow-conditions task-name))
+      (assoc :onyx.core/compiled-ex-fcs
+             (compile-fc-exs flow-conditions task-name))))
+
+(defn lifecycles->event-map [event lifecycles task-name]
+  (-> event
+      (assoc :onyx.core/compiled-start-task-fn
+             (compile-start-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-before-task-start-fn
+             (compile-before-task-start-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-before-batch-fn
+             (compile-before-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-read-batch-fn
+             (compile-after-read-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-batch-fn
+             (compile-after-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-task-fn
+             (compile-after-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-ack-segment-fn
+             (compile-after-ack-segment-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-retry-segment-fn
+             (compile-after-retry-segment-functions lifecycles task-name))))
