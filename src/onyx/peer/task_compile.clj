@@ -19,10 +19,10 @@
        (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
      conditions)))
 
-(defn compile-fc-norms [flow-conditions task-name]
+(defn compile-fc-happy-path [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
 
-(defn compile-fc-exs [flow-conditions task-name]
+(defn compile-fc-exception-path [flow-conditions task-name]
   (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
 (defn resolve-lifecycle-calls [calls]
@@ -212,9 +212,9 @@
 (defn flow-conditions->event-map [event flow-conditions task-name]
   (-> event
       (assoc :onyx.core/compiled-norm-fcs
-             (compile-fc-norms flow-conditions task-name))
+             (compile-fc-happy-path flow-conditions task-name))
       (assoc :onyx.core/compiled-ex-fcs
-             (compile-fc-exs flow-conditions task-name))))
+             (compile-fc-exception-path flow-conditions task-name))))
 
 (defn lifecycles->event-map [event lifecycles task-name]
   (-> event
