@@ -37,7 +37,7 @@
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
                                   [org.clojure/test.check "0.8.2"]
                                   [org.clojars.czan/stateful-check "0.3.1"]
-                                  [com.gfredericks/test.chuck "0.2.0"]
+                                  [com.gfredericks/test.chuck "0.2.3"]
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
