@@ -608,7 +608,7 @@
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params task-map opts)
-                           :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
+                           :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
