@@ -358,7 +358,7 @@
 (deftest post-transformation-invocation
   (checking
    "Post-transformations are invoked when they are matched"
-   (times 20)
+   (times 30)
    [fcs
     (gen/not-empty
      (gen/vector (->> :a
@@ -374,5 +374,24 @@
          compiled-ex (c/compile-fc-exs fcs :a)
          event {:onyx.core/compiled-norm-fcs compiled-hp
                 :onyx.core/compiled-ex-fcs compiled-ex}
-         routes (r/route-data event nil message fcs downstream)]
-     (is (= post-transformed-segment (r/flow-conditions-transform message routes fcs event))))))
+         routes (r/route-data event nil message fcs downstream)
+         transformed (reduce dissoc post-transformed-segment (:exclusions routes))]
+     (is (= transformed (r/flow-conditions-transform message routes fcs event))))))
+
+(deftest post-transformation-exclusions
+  (checking
+   "Key exclusions are applied during post transformation"
+   (times 30)
+   [fcs
+    (gen/vector (->> :a
+                     (flow-condition-gen)
+                     (flow-to-tasks-gen)
+                     (maybe-predicate)))]
+   (let [segment (zipmap (mapcat :flow/exclude-keys fcs) (repeat 0))
+         downstream (mapcat :flow/to fcs)
+         compiled-hp (c/compile-fc-norms fcs :a)
+         event {:onyx.core/compiled-norm-fcs compiled-hp}
+         routes (r/route-data event nil segment fcs downstream)
+         exclusions (mapcat :flow/exclude-keys (filter :pred/val fcs))
+         filtered-segment (reduce dissoc segment exclusions)]
+     (is (= filtered-segment (r/flow-conditions-transform segment routes fcs event))))))
