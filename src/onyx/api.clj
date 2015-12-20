@@ -1,6 +1,6 @@
 (ns onyx.api
   (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan alts!! >!! <!! close! alts!! timeout go]]
+            [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
@@ -256,6 +256,19 @@
                :else
                (recur v)))))))
 
+(defn ^{:no-doc true} restart-peer [peer-system shutdown-ch]
+  (let [result
+        (try
+          (let [[v ch] (alts!! [shutdown-ch] :default true)]
+            (when-not (= ch shutdown-ch)
+              (component/start peer-system)))
+          (catch Throwable t
+            (warn t "error restarting peer system")
+            :retry))]
+    (if (= :retry result)
+      (recur peer-system shutdown-ch)
+      result)))
+
 (defn ^{:no-doc true} peer-lifecycle [started-peer config shutdown-ch ack-ch]
   (try
     (loop [live @started-peer]
@@ -268,9 +281,9 @@
               (= ch restart-ch)
               (do (component/stop live)
                   (Thread/sleep (or (:onyx.peer/retry-start-interval config) 2000))
-                  (let [live (component/start live)]
-                    (reset! started-peer live)
-                    (recur live)))
+                  (when-let [live (restart-peer live shutdown-ch)]
+                    (do (reset! started-peer live)
+                        (recur live))))
               :else (throw (ex-info "Read from a channel with no response implementation" {})))))
     (catch Throwable e
       (fatal "Peer lifecycle threw an exception")

@@ -118,7 +118,7 @@ Example project: [flow-exclude-keys](https://github.com/onyx-platform/onyx-examp
 
 ### Predicate Composition
 
-One extraordinarily powerful feature of Flow Conditions is its composition characters. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and an athlete in `[:and :my.ns/female? :my.ns/athlete?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/athlete? :my/state-param]]` Parameters *may not* specify logical functions.
+One extraordinarily powerful feature of Flow Conditions is its composition characteristics. Predicates can be composed with logical `and`, `or`, and `not`. We use composition to check if the segment is both female and an athlete in `[:and :my.ns/female? :my.ns/athlete?]`. Logical function calls must be surrounded with brackets, and may be nested arbitrarily. Functions inside of logical operator calls may be parameterized, as in `[:and :my.ns/female? [:my.ns/athlete? :my/state-param]]` Parameters *may not* specify logical functions.
 
 Example project: [flow-predicate-composition](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/flow-predicate-composition)
 

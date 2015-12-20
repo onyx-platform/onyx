@@ -52,7 +52,7 @@
     {:n n :sum sum :average (/ sum n)}))
 
 (defn conj-super-aggregation [state-1 state-2 window]
-  (concat state-1 state-2))
+  (into state-1 state-2))
 
 (defn sum-super-aggregation [state-1 state-2 window]
   (+ state-1 state-2))
