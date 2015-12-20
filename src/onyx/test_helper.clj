@@ -99,6 +99,13 @@
        (finally
          (component/stop ~symbol-name)))))
 
+(defn feedback-exception!
+  "Feeds an exception that killed a job back to a client. 
+   Blocks until the job is complete."
+  [peer-config log job-id]
+  (when-not (onyx.api/await-job-completion peer-config job-id)
+    (throw (extensions/read-chunk log :exception job-id))) )
+
 (defrecord DummyInput []
   p-ext/Pipeline
   (write-batch
