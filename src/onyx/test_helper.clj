@@ -5,6 +5,7 @@
             [onyx.extensions :as extensions]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.system :as system]
             [onyx.api]))
 
 (defn playback-log [log replica ch timeout-ms]
@@ -102,9 +103,10 @@
 (defn feedback-exception!
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
-  [peer-config log job-id]
-  (when-not (onyx.api/await-job-completion peer-config job-id)
-    (throw (extensions/read-chunk log :exception job-id))) )
+  [peer-config job-id]
+  (let [client (component/start (system/onyx-client peer-config))] 
+    (when-not (onyx.api/await-job-completion peer-config job-id)
+      (throw (extensions/read-chunk (:log client) :exception job-id)))))
 
 (defrecord DummyInput []
   p-ext/Pipeline
