@@ -103,10 +103,15 @@
 (defn feedback-exception!
   "Feeds an exception that killed a job back to a client. 
    Blocks until the job is complete."
-  [peer-config job-id]
-  (let [client (component/start (system/onyx-client peer-config))] 
-    (when-not (onyx.api/await-job-completion peer-config job-id)
-      (throw (extensions/read-chunk (:log client) :exception job-id)))))
+  ([peer-config job-id]
+   (let [client (component/start (system/onyx-client peer-config))]
+     (try 
+       (feedback-exception! peer-config job-id (:log client))
+       (finally
+         (component/stop client)))))
+  ([peer-config job-id log]
+   (when-not (onyx.api/await-job-completion peer-config job-id)
+     (throw (extensions/read-chunk log :exception job-id)))))
 
 (defrecord DummyInput []
   p-ext/Pipeline
