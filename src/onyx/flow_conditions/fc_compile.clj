@@ -30,3 +30,18 @@
             (fn [xs]
               (apply (kw->fn op) (concat xs (map (fn [arg] (get entry arg)) more))))))))
 
+(defn only-relevant-branches [flow task]
+  (filter #(or (= (:flow/from %) task) (= :all %)) flow))
+
+(defn compile-flow-conditions [flow-conditions task-name f]
+  (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
+    (map
+     (fn [condition]
+       (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
+     conditions)))
+
+(defn compile-fc-happy-path [flow-conditions task-name]
+  (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
+
+(defn compile-fc-exception-path [flow-conditions task-name]
+  (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))

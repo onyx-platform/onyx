@@ -2,28 +2,12 @@
   (:require [onyx.peer.operation :refer [kw->fn] :as operation]
             [onyx.static.planning :refer [find-task]]
             [onyx.static.validation :as validation]
-            [onyx.flow-conditions.fc-compile :refer [build-pred-fn]]
+            [onyx.flow-conditions.fc-compile :as fc]
             [onyx.windowing.aggregation :as agg]
             [onyx.windowing.window-extensions :as w]
             [onyx.state.state-extensions :as state-extensions]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [clj-tuple :as t]))
-
-(defn only-relevant-branches [flow task]
-  (filter #(or (= (:flow/from %) task) (= :all %)) flow))
-
-(defn compile-flow-conditions [flow-conditions task-name f]
-  (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
-    (map
-     (fn [condition]
-       (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
-     conditions)))
-
-(defn compile-fc-happy-path [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
-
-(defn compile-fc-exception-path [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
 
 (defn resolve-lifecycle-calls [calls]
   (let [calls-map (var-get (kw->fn calls))]
@@ -234,9 +218,9 @@
 (defn flow-conditions->event-map [event flow-conditions task-name]
   (-> event
       (assoc :onyx.core/compiled-norm-fcs
-             (compile-fc-happy-path flow-conditions task-name))
+             (fc/compile-fc-happy-path flow-conditions task-name))
       (assoc :onyx.core/compiled-ex-fcs
-             (compile-fc-exception-path flow-conditions task-name))))
+             (fc/compile-fc-exception-path flow-conditions task-name))))
 
 (defn lifecycles->event-map [event lifecycles task-name]
   (-> event
