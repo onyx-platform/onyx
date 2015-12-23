@@ -24,6 +24,7 @@
               [onyx.compression.nippy]
               [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
               [onyx.peer.transform :refer [apply-fn]]
+              [onyx.peer.grouping :as g]
               [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [clj-tuple :as t]
@@ -64,15 +65,6 @@
   (:id (first (filter #(= :done (:message %))
                       (:onyx.core/batch event)))))
 
-(defn hash-groups [message next-tasks task->group-by-fn]
-  (if (not-empty task->group-by-fn)
-    (reduce (fn [groups t]
-              (if-let [group-fn (task->group-by-fn t)]
-                (assoc groups t (hash (group-fn message)))
-                groups))
-            (t/hash-map)
-            next-tasks)))
-
 (defrecord AccumAckSegments [ack-val segments retries])
 
 (defn add-segments [accum routes hash-group leaf]
@@ -96,7 +88,7 @@
                      root leaves start-ack-val accum {:keys [message] :as leaf}]
   (let [routes (r/route-data event result message flow-conditions egress-ids)
         message* (r/flow-conditions-transform message routes flow-conditions event)
-        hash-group (hash-groups message* egress-ids task->group-by-fn)
+        hash-group (g/hash-groups message* egress-ids task->group-by-fn)
         leaf* (if (= message message*)
                 leaf
                 (assoc leaf :message message*))]
@@ -543,8 +535,8 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows (c/resolve-windows filtered-windows)
-                           :onyx.core/compiled (->Compiled (c/task-map->grouping-fn task-map))
-                           :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
+                           :onyx.core/compiled (->Compiled (g/task-map->grouping-fn task-map))
+                           :onyx.core/task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
