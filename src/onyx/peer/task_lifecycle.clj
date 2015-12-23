@@ -11,6 +11,7 @@
               [onyx.static.uuid :as uuid]
               [onyx.messaging.acking-daemon :as acker]
               [onyx.peer.task-compile :as c]
+              [onyx.lifecycles.lifecycle-invoke :as lc]
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
@@ -34,10 +35,6 @@
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn windowed-task? [event]
-  (or (not-empty (:onyx.core/windows event))
-      (not-empty (:onyx.core/triggers event))))
-
 (defn call-with-lifecycle-handler [event phase handler-fn f & args]
   (try
     (apply f args)
@@ -45,25 +42,23 @@
       (let [action (handler-fn event phase t)]
         (cond (= action :kill)
               (throw t)
-
+              
               (= action :restart)
               (do (>!! (:onyx.core/restart-ch event) true)
                   (throw t))
-
+              
               :else
               (throw (ex-info
                       (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
                               action)
-                              {})))))))
+                      {})))))))
+
+(defn windowed-task? [event]
+  (or (not-empty (:onyx.core/windows event))
+      (not-empty (:onyx.core/triggers event))))
 
 (defn munge-start-lifecycle [event]
-  (let [rets
-        (call-with-lifecycle-handler
-         event
-         :lifecycle/start-task?
-         (:onyx.core/compiled-handle-exception-fn event)
-         (:onyx.core/compiled-start-task-fn event)
-         event)]
+  (let [rets (lc/invoke-start-task event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
                            (:onyx.core/id event))))
@@ -634,16 +629,8 @@
                           (not (munge-start-lifecycle pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
-            before-task-start-fn (fn [event]
-                                   (call-with-lifecycle-handler
-                                    event
-                                    :lifecycle/before-task-start
-                                    (:onyx.core/compiled-handle-exception-fn event)
-                                    (:onyx.core/compiled-before-task-start-fn event)
-                                    event))
-
             pipeline-data (-> pipeline-data
-                              before-task-start-fn
+                              lc/invoke-before-task-start
                               resolve-window-state
                               resolve-log
                               replay-windows-from-log
