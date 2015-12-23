@@ -217,8 +217,8 @@
 
 (defn tag-messages [task-type replica peer-replica-view id event]
   (if (= task-type :input)
-    (let [candidates (:acker-candidates @peer-replica-view)
-          _ (validate-ackable! candidates event)]
+    (let [candidates (:acker-candidates @peer-replica-view)]
+      (validate-ackable! candidates event)
       (update event
               :onyx.core/batch
               (fn [batch] 

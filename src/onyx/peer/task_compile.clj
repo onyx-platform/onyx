@@ -1,6 +1,5 @@
 (ns ^:no-doc onyx.peer.task-compile
   (:require [onyx.peer.operation :refer [kw->fn] :as operation]
-            [onyx.static.planning :refer [find-task]]
             [onyx.static.validation :as validation]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
