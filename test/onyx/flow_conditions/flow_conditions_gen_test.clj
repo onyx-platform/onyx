@@ -5,6 +5,7 @@
             [clojure.test :refer :all]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            [onyx.static.validation :as v]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.peer.task-compile :as c]
             [onyx.api]))
@@ -390,3 +391,33 @@
          exclusions (mapcat :flow/exclude-keys (filter :pred/val fcs))
          filtered-segment (reduce dissoc segment exclusions)]
      (is (= filtered-segment (r/flow-conditions-transform segment routes fcs event))))))
+
+(deftest none-placed-after-all
+  (checking
+    ":flow/to :none placed after :flow/to :all"
+    (times 50)
+    [fcs-all (gen/not-empty
+               (gen/vector (->> :a
+                                (flow-condition-gen)
+                                (flow-to-all-gen))))
+     fcs-none (gen/not-empty
+                (gen/vector (->> :a
+                                 (flow-condition-gen)
+                                 (flow-to-none-gen))))]
+    (let [fcs (into [] (concat fcs-none fcs-all))]
+      (is (thrown? Exception (v/validate-flow-conditions fcs []))))))
+
+(deftest none-placed-before-other
+  (checking
+    ":flow/to :none placed first if there is no :flow/to :all"
+    (times 50)
+    [fcs-other (gen/not-empty
+               (gen/vector (->> :a
+                                (flow-condition-gen)
+                                (flow-to-tasks-gen))))
+     fcs-none (gen/not-empty
+                (gen/vector (->> :a
+                                 (flow-condition-gen)
+                                 (flow-to-none-gen))))]
+    (let [fcs (into [] (concat fcs-other fcs-none))]
+      (is (thrown? Exception (v/validate-flow-conditions fcs []))))))
