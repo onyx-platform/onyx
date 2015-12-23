@@ -34,10 +34,6 @@
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn resolve-calling-params [task-map opts]
-  (into (vec (get (:onyx.peer/fn-params opts) (:onyx/name task-map)))
-        (map (fn [param] (get task-map param)) (:onyx/params task-map))))
-
 (defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
@@ -608,7 +604,6 @@
                            :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
-                           :onyx.core/params (resolve-calling-params task-map opts)
                            :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
@@ -626,6 +621,7 @@
                            :onyx.core/state state}
 
             pipeline-data (-> pipeline-data
+                              (c/task-params->event-map opts task-map)
                               (c/flow-conditions->event-map flow-conditions (:name task))
                               (c/lifecycles->event-map lifecycles (:name task)))
 

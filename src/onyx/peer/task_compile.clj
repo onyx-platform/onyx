@@ -145,3 +145,10 @@
              (lc/compile-after-retry-segment-functions lifecycles task-name))
       (assoc :onyx.core/compiled-handle-exception-fn
              (lc/compile-handle-exception-functions lifecycles task-name))))
+
+(defn task-params->event-map [event peer-config task-map]
+  (let [fn-params (:onyx.peer/fn-params peer-config)
+        params (into (vec (get fn-params (:onyx/name task-map)))
+                     (map (fn [param] (get task-map param))
+                          (:onyx/params task-map)))]
+    (assoc event :onyx.core/params params)))
