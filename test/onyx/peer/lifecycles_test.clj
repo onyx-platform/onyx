@@ -141,5 +141,5 @@
                   (partition 3 repeated-calls)))
       ;; Allow lifecycles to run more times in case the CI box is lagging
       ;; and we experience replays.
-      (is (<= (count repeated-calls) 40))
+      (is (<= (count repeated-calls) 200))
       (is (= 3 @started-task-counter)))))
