@@ -30,7 +30,7 @@
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
-(defn munge-start-lifecycle [event]
+(defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
@@ -144,19 +144,18 @@
                                    (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
     rets))
 
-(defn handle-backoff! [event]
+(defn read-batch [task-type replica peer-replica-view job-id pipeline event]
+  (if (and (= task-type :input)
+           (:backpressure? peer-replica-view))
+    (assoc event :onyx.core/batch (list))
+    (merge event (p-ext/read-batch pipeline event))))
+
+(defn back-off-after-read [event]
   (let [batch (:onyx.core/batch event)]
     (when (and (= (count batch) 1)
                (= (:message (first batch)) :done))
-      (Thread/sleep (:onyx.core/drained-back-off event)))))
-
-(defn read-batch [task-type replica peer-replica-view job-id pipeline event]
-  (if (and (= task-type :input) (:backpressure? peer-replica-view))
-    (assoc event :onyx.core/batch '())
-    (let [rets (merge event (p-ext/read-batch pipeline event))
-          rets (lc/invoke-after-read-batch rets)]
-      (handle-backoff! event)
-      rets)))
+      (Thread/sleep (:onyx.core/drained-back-off event)))
+    event))
 
 (defn validate-ackable! [peers event]
   (when-not (seq peers)
@@ -418,6 +417,8 @@
         (->> init-event
              (inject-batch-resources compiled-before-batch-fn pipeline)
              (read-batch task-type replica peer-replica-view job-id pipeline)
+             (lc/invoke-after-read-batch)
+             (back-off-after-read)
              (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
@@ -556,7 +557,7 @@
             restart-pred-fn (operation/resolve-restart-pred-fn task-map)
             ex-f (fn [e] (handle-exception log restart-pred-fn e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                          (not (munge-start-lifecycle pipeline-data)))
+                          (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (-> pipeline-data
