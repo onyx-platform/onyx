@@ -137,12 +137,8 @@
                     #(extensions/internal-retry-segment messenger event (:id root) site))))
   event)
 
-(defn inject-batch-resources [compiled-before-batch-fn pipeline event]
-  (let [rets (-> (lc/invoke-before-batch compiled-before-batch-fn event)
-                 (assoc :onyx.core/lifecycle-id (uuid/random-uuid)))]
-    (taoensso.timbre/trace (format "[%s / %s] Started a new batch"
-                                   (:onyx.core/id rets) (:onyx.core/lifecycle-id rets)))
-    rets))
+(defn gen-lifecycle-id [event]
+  (assoc event :onyx.core/lifecycle-id (uuid/random-uuid)))
 
 (defn read-batch [task-type replica peer-replica-view job-id pipeline event]
   (if (and (= task-type :input)
@@ -415,7 +411,8 @@
     (try
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
-             (inject-batch-resources compiled-before-batch-fn pipeline)
+             (gen-lifecycle-id)
+             (lc/invoke-before-batch compiled-before-batch-fn pipeline)
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (lc/invoke-after-read-batch)
              (back-off-after-read)
