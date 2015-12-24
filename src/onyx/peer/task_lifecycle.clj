@@ -294,13 +294,6 @@
                                    (count (:onyx.core/results rets))))
     rets))
 
-(defn close-batch-resources [event]
-  (let [rets (lc/invoke-after-batch event)]
-    (taoensso.timbre/trace (format "[%s / %s] Closed batch plugin resources"
-                                   (:onyx.core/id rets)
-                                   (:onyx.core/lifecycle-id rets)))
-    rets))
-
 (defn launch-aux-threads!
   [messenger {:keys [onyx.core/pipeline
                      onyx.core/compiled-after-ack-segment-fn
@@ -424,7 +417,7 @@
              (assign-windows compiled)
              (write-batch pipeline)
              (flow-retry-segments peer-replica-view state messenger monitoring)
-             (close-batch-resources)
+             (lc/invoke-after-batch)
              (ack-segments task-map peer-replica-view state messenger monitoring)))
       (catch Throwable e
         (ex-f e)))))
