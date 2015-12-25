@@ -19,7 +19,7 @@
               [onyx.windowing.aggregation :as agg]
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
-              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event ->CompiledGroupingFn]]
               [onyx.peer.transform :refer [apply-fn]]
               [onyx.peer.grouping :as g]
               [onyx.flow-conditions.fc-routing :as r]
@@ -488,8 +488,6 @@
 (defn new-task-information [peer-state task-state]
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
 
-(defrecord Compiled [grouping-fn])
-
 (defrecord TaskLifeCycle
   [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
    kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch task-monitoring task-information]
@@ -515,7 +513,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/compiled (->Compiled (g/task-map->grouping-fn task-map))
+                           :onyx.core/compiled (->CompiledGroupingFn (g/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
