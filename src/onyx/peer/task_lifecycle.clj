@@ -406,7 +406,7 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (gen-lifecycle-id)
-             (lc/invoke-before-batch compiled-before-batch-fn pipeline)
+             (lc/invoke-before-batch compiled-before-batch-fn)
              (read-batch task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
