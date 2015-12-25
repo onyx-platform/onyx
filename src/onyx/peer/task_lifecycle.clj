@@ -14,6 +14,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.windowing.window-compile :as wc]
               [onyx.windowing.window-extensions :as we]
               [onyx.windowing.aggregation :as agg]
               [onyx.triggers.triggers-api :as triggers]
@@ -198,7 +199,7 @@
   (when (windowed-task? event)
     (swap! window-state 
            (fn [wstate] 
-             (let [compiled-apply-fn (c/compile-apply-window-entry-fn event)
+             (let [compiled-apply-fn (wc/compile-apply-window-entry-fn event)
                    replayed-state (state-extensions/playback-log-entries state-log event wstate compiled-apply-fn)]
                (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))
@@ -472,7 +473,7 @@
           task (extensions/read-chunk log :task task-id)
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
-          filtered-windows (c/filter-windows windows (:name task))
+          filtered-windows (wc/filter-windows windows (:name task))
           triggers (extensions/read-chunk log :triggers job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
           task-map (find-task catalog (:name task))]
@@ -514,7 +515,6 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/windows (c/resolve-windows filtered-windows)
                            :onyx.core/compiled (->Compiled (g/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
@@ -538,7 +538,8 @@
             pipeline-data (-> pipeline-data
                               (c/task-params->event-map opts task-map)
                               (c/flow-conditions->event-map flow-conditions (:name task))
-                              (c/lifecycles->event-map lifecycles (:name task)))
+                              (c/lifecycles->event-map lifecycles (:name task))
+                              (c/windows->event-map filtered-windows))
 
             pipeline (build-pipeline task-map pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)
