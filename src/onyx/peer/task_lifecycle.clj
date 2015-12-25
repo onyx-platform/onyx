@@ -455,6 +455,7 @@
                                            (state-extensions/initialize-log log-impl pipeline)))))
 
 (defrecord TaskState [timeout-pool])
+
 (defrecord WindowState [filter state])
 
 (defn resolve-window-state [{:keys [onyx.core/peer-opts] :as pipeline}]
