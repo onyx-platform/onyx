@@ -13,12 +13,12 @@
   state)
 
 (defn annotate-reaction [{:keys [message-id]} id entry]
-  (let [peer-annotated (assoc entry :peer-src id)]
+  (let [peer-annotated (assoc entry :peer-parent id)]
     ;; Not all messages are derived from other messages.
     ;; For instance, :prepare-join-cluster is a "root"
     ;; message.
     (if message-id
-      (assoc peer-annotated :entry-src message-id)
+      (assoc peer-annotated :entry-parent message-id)
       peer-annotated)))
 
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn]

@@ -87,8 +87,8 @@
                  (extensions/write-log-entry
                   (:log state)
                   {:fn :leave-cluster :args {:id (:subject diff)}
-                   :peer-src (:id state)
-                   :entry-src message-id}))
+                   :peer-parent (:id state)
+                   :entry-parent message-id}))
                (close! ch))
            (assoc state :watch-ch ch))
          ;; Handles the cases where a peer tries to attach to a dead
@@ -99,7 +99,7 @@
              (extensions/write-log-entry
               (:log state)
               {:fn :leave-cluster :args {:id (:observer diff)}
-               :peer-src (:id state)})
+               :peer-parent (:id state)})
              state)
            (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
              (assoc state :failure-detector (component/start fd))))

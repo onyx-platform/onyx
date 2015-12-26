@@ -58,7 +58,7 @@
       (>!! (:outbox-ch state)
            {:fn :deleted-bookkeeper-log-ids
             :args {:logs delete-ids}
-            :peer-src (:id state)
-            :entry-src message-id})
+            :peer-parent (:id state)
+            :entry-parent message-id})
       (.close bk-client)))
   state)

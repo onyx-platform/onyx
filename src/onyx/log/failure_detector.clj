@@ -22,7 +22,7 @@
                   (extensions/write-log-entry
                    log
                    {:fn :leave-cluster :args {:id peer-id}
-                    :peer-src peer-id})
+                    :peer-parent peer-id})
 
                   (= ch t-ch)
                   (recur)))))

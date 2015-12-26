@@ -45,8 +45,8 @@
             (extensions/write-log-entry
              (:log state)
              {:fn :leave-cluster :args {:id (:subject diff)}
-              :entry-src message-id
-              :peer-src (:id state)}))
+              :entry-parent message-id
+              :peer-parent (:id state)}))
           (close! ch))
       (close! (or (:watch-ch state) (chan)))
       (let [result-state (assoc state :watch-ch ch)]

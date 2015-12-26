@@ -465,8 +465,8 @@
    :args {s/Any s/Any}
    (s/optional-key :message-id) s/Int
    (s/optional-key :created-at) s/Int
-   (s/optional-key :peer-src) s/Uuid
-   (s/optional-key :entry-src) s/Int})
+   (s/optional-key :peer-parent) s/Uuid
+   (s/optional-key :entry-parent) s/Int})
 
 (def Reactions 
   (s/maybe [LogEntry]))
