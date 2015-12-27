@@ -4,15 +4,19 @@
             [clojure.data :refer [diff]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
-            [taoensso.timbre :as timbre]
+            [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]))
 
 (s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
-  (-> replica
-      (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
-      (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
-      (update-in [:peer-sites] dissoc (:id args))))
+  (if-not (get (set (:peers replica)) (:id args))
+    (-> replica
+        (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
+        (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
+        (update-in [:peer-sites] dissoc (:id args)))
+    (do
+      ;(info "Ignoring abort for " args (:peers replica))
+      replica)))
 
 (s/defmethod extensions/replica-diff :abort-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]
@@ -25,7 +29,10 @@
 
 (s/defmethod extensions/reactions :abort-join-cluster :- Reactions
   [{:keys [args]} old new diff peer-args]
-  (when (and (= (:id args) (:id peer-args))
+  (when (and ;; not already joined
+             (not (get (set (:peers old)) (:id args)))
+             ;; and this is us
+             (= (:id args) (:id peer-args))
              (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)

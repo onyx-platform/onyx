@@ -9,11 +9,14 @@
             [onyx.extensions :as extensions]))
 
 (s/defmethod extensions/apply-log-entry :notify-join-cluster :- Replica
-  [{:keys [args]} :- LogEntry replica]
+  [{:keys [args] :as entry} :- LogEntry replica]
   (let [prepared (get (map-invert (:prepared replica)) (:observer args))]
-    (-> replica
-        (update-in [:accepted] merge {prepared (:observer args)})
-        (update-in [:prepared] dissoc prepared))))
+    (assert (not= prepared (:observer args)))
+    (if prepared 
+      (-> replica
+          (update-in [:accepted] merge {prepared (:observer args)})
+          (update-in [:prepared] dissoc prepared))
+      replica)))
 
 (s/defmethod extensions/replica-diff :notify-join-cluster :- ReplicaDiff
   [entry old new]
@@ -31,9 +34,15 @@
              (= (:id peer-args) (:observer diff)))
         [{:fn :accept-join-cluster
           :args diff}]
+        (get (set (:peers old)) (:observer (:args entry)))
+        (do
+          ;(info "Do nothing" entry new)
+          [])
         (= (:id peer-args) (:observer (:args entry)))
-        [{:fn :abort-join-cluster
-          :args {:id (:observer (:args entry))}}]))
+        (do
+          ;(info "aborrrrrt " entry new)
+          [{:fn :abort-join-cluster
+            :args {:id (:observer (:args entry))}}])))
 
 (s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
   [{:keys [args message-id]} old new diff {:keys [monitoring] :as state}]

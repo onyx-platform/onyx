@@ -10,6 +10,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [taoensso.timbre :as timbre :refer [info]]
             [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
@@ -582,6 +583,10 @@
                                        peer-config
                                        job-1
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
+              (assoc :spurious-notify {;:predicate (fn [replica entry]
+                                       ;               (some #{:p5} (:peers replica)))
+                                       :queue [{:fn :notify-join-cluster
+                                                :args {:observer :p5}}]})
               (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []

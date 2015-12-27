@@ -33,7 +33,7 @@
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))
-            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches)
+            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches #{joining-peer})
             sorted-candidates (sort (remove nil? candidates))]
         (if (seq sorted-candidates)
           (let [index (mod message-id (count sorted-candidates))
@@ -72,8 +72,9 @@
         (= (:id peer-args) (:observer diff))
         [{:fn :notify-join-cluster
           :args {:observer (:subject diff)
-                 :subject (or (get (:pairs new) (:observer diff))
-                              (:observer diff))}}]))
+                 ;:subject (or (get (:pairs new) (:observer diff))
+                 ;             (:observer diff))
+                 }}]))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]
