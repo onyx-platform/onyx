@@ -539,6 +539,8 @@
                                       :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
+    (is (empty? (:accepted replica)))
+    (is (empty? (:prepared replica)))
     (standard-invariants replica)
     (is (= 3 (count (:peer-state replica))))
     (is (= 3 (count (:peers replica))))))
@@ -560,11 +562,53 @@
           :log []
           :peer-choices []}))]
     (standard-invariants replica)
+    (is (empty? (:accepted replica)))
+    (is (empty? (:prepared replica)))
     (is (or (= 2 (count (:peer-state replica)))
             (= 3 (count (:peer-state replica)))))
     (is (or (= 2 (count (:peers replica)))
             (= 3 (count (:peers replica)))))))
 
+(deftest peer-spurious-notify
+  (checking
+    "Checking a spurious notify is handled correctly"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 9))
+              (assoc :job-1 {:queue [(api/create-submit-job-entry
+                                       job-1-id
+                                       peer-config
+                                       job-1
+                                       (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
+              ;; TODO, generate spurious entries
+              (assoc :spurious-prepare {:queue [{:fn :prepare-join-cluster
+                                                 :args {:joiner :p6}}]})
+              (assoc :spurious-notify {:queue [{:fn :notify-join-cluster
+                                                :args {:observer :p5}}]})
+              (assoc :spurious-abort {:queue [{:fn :abort-join-cluster
+                                               :args {:observer :p1}}]})
+              (assoc :spurious-accept {:queue [{:fn :accept-join-cluster
+                                                :args {:observer :p2
+                                                       :subject :p8
+                                                       :accepted-observer :p6
+                                                       :accepted-joiner :p2}}]})
+              (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
+              (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
+          :log []
+          :peer-choices []}))]
+    (standard-invariants replica)
+    (is (empty? (:accepted replica)))
+    (is (empty? (:prepared replica)))
+    ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
+    ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
+    ;; job must be able to go on
+    (is (>= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 7))))
 
 (deftest peer-leave-still-running
   (checking
@@ -583,20 +627,17 @@
                                        peer-config
                                        job-1
                                        (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]})
-              (assoc :spurious-notify {;:predicate (fn [replica entry]
-                                       ;               (some #{:p5} (:peers replica)))
-                                       :queue [{:fn :notify-join-cluster
-                                                :args {:observer :p5}}]})
               (assoc :leave-1 {:queue [{:fn :leave-cluster :args {:id :p1}}]})
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
     (standard-invariants replica)
+    (is (empty? (:accepted replica)))
+    (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
     ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
     ;; job must be able to go on
     (is (>= (apply + (map count (vals (get (:allocations replica) job-1-id)))) 7))))
-
 
 ;; Reproduce onyx-test scheduler issue
 (def inner-job-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
