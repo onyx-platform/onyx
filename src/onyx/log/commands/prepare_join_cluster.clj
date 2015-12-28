@@ -23,30 +23,42 @@
                                                      peer-site
                                                      (:peer-sites replica))))))
 
+(defn still-joining? [replica joiner]
+  (or (get (map-invert (:prepared replica)) joiner)
+      (get (map-invert (:accepted replica)) joiner)))
+
+(defn already-joined? [replica joiner]
+  (some #{joiner} (:peers replica)))
+
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
   (let [peers (:peers replica)
+        joiner (:joiner args)
         n (count peers)]
     (if (> n 0)
-      (let [joining-peer (:joiner args)
-            all-joined-peers (set (into (keys (:pairs replica)) peers))
+      (let [all-joined-peers (set (into (keys (:pairs replica)) peers))
             all-prepared-deps (set (keys (:prepared replica)))
             prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
             accepting-deps (set (keys (:accepted replica)))
-            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches #{joining-peer})
+            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches #{joiner})
             sorted-candidates (sort (remove nil? candidates))]
-        (if (seq sorted-candidates)
-          (let [index (mod message-id (count sorted-candidates))
-                watcher (nth sorted-candidates index)]
-            (-> replica
-                (update-in [:prepared] merge {watcher joining-peer})
-                (add-site-acker args)
-                (reconfigure-cluster-workload)))
-          replica))
+        (cond (already-joined? replica joiner)
+              replica
+              (still-joining? replica joiner)
+              replica
+              (seq sorted-candidates)
+              (let [index (mod message-id (count sorted-candidates))
+                    watcher (nth sorted-candidates index)]
+                (-> replica
+                    (update-in [:prepared] merge {watcher joiner})
+                    (add-site-acker args)
+                    (reconfigure-cluster-workload)))
+              :else
+              replica))
       (-> replica
-          (update-in [:peers] conj (:joiner args))
+          (update-in [:peers] conj joiner)
           (update-in [:peers] vec)
-          (assoc-in [:peer-state (:joiner args)] :idle)
+          (assoc-in [:peer-state joiner] :idle)
           (add-site-acker args)
           (reconfigure-cluster-workload)))))
 
@@ -65,13 +77,17 @@
 
 (s/defmethod extensions/reactions :prepare-join-cluster :- Reactions
   [entry :- LogEntry old new diff peer-args]
-  (cond (and (= (:id peer-args) (:joiner (:args entry)))
-             (nil? diff))
-        [{:fn :abort-join-cluster
-          :args {:id (:id peer-args)}}]
-        (= (:id peer-args) (:observer diff))
-        [{:fn :notify-join-cluster
-          :args {:observer (:subject diff)}}]))
+  (let [joiner (:joiner (:args entry))] 
+    (cond (already-joined? old joiner)
+          []
+          (still-joining? old joiner)
+          []
+          (and (= (:id peer-args) joiner) (nil? diff))
+          [{:fn :abort-join-cluster
+            :args {:id (:id peer-args)}}]
+          (= (:id peer-args) (:observer diff))
+          [{:fn :notify-join-cluster
+            :args {:observer (:subject diff)}}])))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]
