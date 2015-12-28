@@ -7,9 +7,12 @@
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]))
 
+(defn already-joined? [replica entry]
+  (some #{(:id (:args entry))} (:peers replica)))
+
 (s/defmethod extensions/apply-log-entry :abort-join-cluster :- Replica
-  [{:keys [args message-id]} :- LogEntry replica]
-  (if-not (get (set (:peers replica)) (:id args))
+  [{:keys [args] :as entry} :- LogEntry replica]
+  (if-not (already-joined? replica entry)
     (-> replica
         (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
         (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
@@ -26,12 +29,10 @@
       {:aborted (or (first prepared) (first accepted))})))
 
 (s/defmethod extensions/reactions :abort-join-cluster :- Reactions
-  [{:keys [args]} old new diff peer-args]
-  (when (and ;; not already joined
-             (not (get (set (:peers old)) (:id args)))
-             ;; and we are the peer in question
-             (= (:id args) (:id peer-args))
-             (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
+  [{:keys [args] :as entry} old new diff peer-args]
+  (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args))))
+             (not (already-joined? old entry))
+             (= (:id args) (:id peer-args)))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
              :peer-site (extensions/peer-site (:messenger peer-args))}}]))
