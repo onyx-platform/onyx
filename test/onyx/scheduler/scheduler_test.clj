@@ -129,3 +129,16 @@
          :min-required-peers {:j2 {:t2 100}}
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
+
+(deftest big-assignment
+  (let [peers (map #(keyword (str "p" %)) (range 100))
+        replica (reconfigure-cluster-workload
+                 {:jobs [:j1]
+                  :allocations {}
+                  :peers peers
+                  :tasks {:j1 [:t1]}
+                  :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+                  :job-scheduler :onyx.job-scheduler/balanced
+                  :messaging {:onyx.messaging/impl :aeron}})]
+    (is (= (into #{} peers)
+           (into #{} (get-in replica [:allocations :j1 :t1]))))))

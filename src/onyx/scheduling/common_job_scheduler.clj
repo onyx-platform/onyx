@@ -411,7 +411,7 @@
                 (assign-task-slot-ids peer->task))))))
     replica))
 
-;;; [ ] remove resource limits on nodes.
+;;; [x] remove resource limits on nodes.
 ;;; [x] add constant seed for generators
 ;;; [ ] Grouping recovery flux policy
 ;;; [x] handle planning not coming up with a solution
