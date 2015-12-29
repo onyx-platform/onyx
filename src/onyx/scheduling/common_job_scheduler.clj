@@ -393,6 +393,20 @@
           (let [vm (get peer->vm p)]
             (.addRunningVM mapping vm node)))))))
 
+(defn change-peer-state [new-replica original-replica peer->task]
+  (reduce-kv
+   (fn [result peer-id [job-id task-id]]
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (assoc-in result [:peer-state peer-id] :idle)
+         result)))
+   new-replica
+   peer->task))
+
+(defn change-peer-allocations [replica peer->task]
+  (let [allocations (reduce-kv #(update-in %1 %3 (comp vec conj) %2) {} peer->task)]
+    (assoc replica :allocations allocations)))
+
 (defn btr-place-scheduling [replica job-utilization]
   (if (seq (:jobs replica))
     (let [model (DefaultModel.)
@@ -413,10 +427,11 @@
             plan (.solve scheduler model constraints)]
         (when plan
           (let [result-model (.getResult plan)
-                peer->task (build-peer->task result-model peer->vm node->task)]
+                peer->task (build-peer->task result-model peer->vm node->task)
+                original-replica replica]
             (-> replica
-                (assoc :allocations (reduce-kv #(update-in %1 %3 (comp vec conj) %2) {} peer->task))
-                (assoc :peer-state (reduce #(assoc %1 %2 :idle) {} (:peers replica)))
+                (change-peer-allocations peer->task)
+                (change-peer-state original-replica peer->task)
                 (assign-task-resources peer->task)
                 (assign-task-slot-ids peer->task))))))
     replica))
@@ -427,7 +442,7 @@
 ;;; [x] handle planning not coming up with a solution
 ;;; [x] skip jobs that don't get enough peers.
 ;;; [x] don't try to allocate all the peers
-;;; [ ] don't make all peers idle
+;;; [x] don't make all peers idle
 ;;; [ ] don't change all task slots
 ;;; [ ] don't reallocate all task resources
 ;;; [x] fix jitter
@@ -441,8 +456,7 @@
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers replica job-claims spare-peers)
             updated-replica (btr-place-scheduling replica max-utilization)
-;            acker-replica (choose-ackers updated-replica jobs)
-            ]
+            acker-replica (choose-ackers updated-replica jobs)]
         (if (and updated-replica
                  (full-allocation? updated-replica max-utilization))
           updated-replica

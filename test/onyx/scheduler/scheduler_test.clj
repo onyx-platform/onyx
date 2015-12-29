@@ -177,3 +177,23 @@
          :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
+
+(deftest change-peer-state-for-moved-peers
+  (is
+   (= {:p1 :active :p2 :active :p3 :active
+       :p4 :active :p5 :active :p6 :idle}
+      (:peer-state
+       (reconfigure-cluster-workload
+        {:jobs [:j1]
+         :allocations {:j1 {:t1 [:p1 :p2]
+                            :t2 [:p3 :p4]
+                            :t3 [:p5]}}
+         :peers [:p1 :p2 :p3 :p4 :p5 :p6]
+         :peer-state {:p1 :active :p2 :active :p3 :active
+                      :p4 :active :p5 :active :p6 :idle}
+         :tasks {:j1 [:t1 :t2 :t3]}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+         :job-scheduler :onyx.job-scheduler/balanced
+         :messaging {:onyx.messaging/impl :aeron}})))))
+
+#_(run-tests)
