@@ -5,7 +5,7 @@
             [onyx.log.commands.common :as common]))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/balanced
-  [{:keys [jobs peers] :as replica}]
+  [{:keys [peers] :as replica} jobs]
   (if (seq jobs)
     (let [j (count jobs)
           p (count peers)

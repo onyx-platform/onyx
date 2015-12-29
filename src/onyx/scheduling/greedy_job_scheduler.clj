@@ -8,8 +8,8 @@
     (>= (count (get-in replica [:peers])) min-req)))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
-  [replica]
-  (if (seq (:jobs replica))
+  [replica jobs]
+  (if (seq jobs)
     (let [[active & passive] (:jobs replica)]
       (merge {active (count (:peers replica))} (zipmap passive (repeat 0))))
     {}))
