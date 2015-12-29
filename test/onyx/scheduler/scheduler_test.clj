@@ -142,3 +142,38 @@
                   :messaging {:onyx.messaging/impl :aeron}})]
     (is (= (into #{} peers)
            (into #{} (get-in replica [:allocations :j1 :t1]))))))
+
+(deftest grouping-sticky-peers
+  (is
+   (= {:j1 {:t1 [:p1 :p6] :t2 [:p2 :p3 :p4] :t3 [:p5]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:jobs [:j1]
+         :allocations {:j1 {:t1 [:p1]
+                            :t2 [:p2 :p3 :p4]
+                            :t3 [:p5]}}
+         :peers [:p1 :p2 :p3 :p4 :p5 :p6]
+         :tasks {:j1 [:t1 :t2 :t3]}
+         :flux-policies {:j1 {:t2 :kill}}
+         :task-saturation {:j1 {:t1 100 :t2 100 :t3 100}}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+         :job-scheduler :onyx.job-scheduler/balanced
+         :messaging {:onyx.messaging/impl :aeron}})))))
+
+(deftest grouping-recover-flux-policy
+  (is
+   (= {:j1 {:t1 [:p1] :t2 [:p2 :p3 :p5] :t3 [:p4]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:jobs [:j1]
+         :allocations {:j1 {:t1 [:p1]
+                            :t2 [:p2 :p3]
+                            :t3 [:p4]}}
+         :peers [:p1 :p2 :p3 :p4 :p5]
+         :tasks {:j1 [:t1 :t2 :t3]}
+         :flux-policies {:j1 {:t2 :recover}}
+         :task-saturation {:j1 {:t1 100 :t2 3 :t3 100}}
+         :min-required-peers {:j1 {:t2 3}}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+         :job-scheduler :onyx.job-scheduler/balanced
+         :messaging {:onyx.messaging/impl :aeron}})))))

@@ -9,7 +9,8 @@
             [taoensso.timbre :refer [info]])
   (:import [org.btrplace.model Model DefaultModel]
            [org.btrplace.model.view ShareableResource]
-           [org.btrplace.model.constraint Running Among RunningCapacity Quarantine]
+           [org.btrplace.model.constraint Running Among RunningCapacity
+            Quarantine Fence]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
 (defn job-upper-bound [replica job]
@@ -337,16 +338,25 @@
    (fn [[job-id task-id :as id]]
      (let [utilization (get task-utilization job-id 0)
            capacities (cts/task-distribute-peer-count replica job-id utilization)]
-       (RunningCapacity. (get task->node id) (get capacities task-id))))
+       (if (= (get-in replica [:flux-policies job-id task-id]) :recover)
+         (let [n-peers (get-in replica [:min-required-peers job-id task-id])]
+           (RunningCapacity. (get task->node id) n-peers))
+         (let [n-peers (get capacities task-id)]
+           (RunningCapacity. (get task->node id) n-peers)))))
    task-seq))
 
-(defn grouping-task-constraints [replica task-seq task->node]
+(defn grouping-task-constraints [replica task-seq task->node peer->vm]
   (reduce
    (fn [result [job-id task-id :as id]]
-     (if (and (get-in replica [:flux-policies job-id task-id])
-                (seq (get-in replica [:allocations job-id task-id])))
-       (conj result (Quarantine. (get task->node id)))
-       result))
+     (let [flux-policy (get-in replica [:flux-policies job-id task-id])
+           peers (seq (get-in replica [:allocations job-id task-id]))]
+       (cond (and (= flux-policy :recover) peers)
+             (into result (map #(Fence. (get peer->vm %)
+                                        [(get task->node id)])
+                               peers))
+             (and flux-policy peers)
+             (conj result (Quarantine. (get task->node id)))
+             :else result)))
    []
    task-seq))
 
@@ -398,7 +408,7 @@
       (let [node->task (build-node->task task->node)
             capacity-constraints (capacity-constraints replica job-utilization task-seq task->node)
             running-constraints (peer-running-constraints peer->vm)
-            grouping-constraints (grouping-task-constraints replica task-seq task->node)
+            grouping-constraints (grouping-task-constraints replica task-seq task->node peer->vm)
             constraints (into (into capacity-constraints running-constraints) grouping-constraints)
             plan (.solve scheduler model constraints)]
         (when plan
@@ -413,7 +423,7 @@
 
 ;;; [x] remove resource limits on nodes.
 ;;; [x] add constant seed for generators
-;;; [ ] Grouping recovery flux policy
+;;; [x] Grouping recovery flux policy
 ;;; [x] handle planning not coming up with a solution
 ;;; [x] skip jobs that don't get enough peers.
 ;;; [x] don't try to allocate all the peers
