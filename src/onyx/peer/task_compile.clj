@@ -9,7 +9,7 @@
             [clj-tuple :as t]))
 
 (defn only-relevant-branches [flow task]
-  (filter #(or (= (:flow/from %) task) (= :all %)) flow))
+  (filter #(or (= (:flow/from %) task) (= :all (:flow/from %))) flow))
 
 (defn compile-flow-conditions [flow-conditions task-name f]
   (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
