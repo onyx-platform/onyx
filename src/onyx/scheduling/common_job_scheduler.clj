@@ -10,7 +10,7 @@
   (:import [org.btrplace.model Model DefaultModel]
            [org.btrplace.model.view ShareableResource]
            [org.btrplace.model.constraint Running Among RunningCapacity Quarantine]
-           [org.btrplace.scheduler.choco DefaultChocoScheduler]))
+           [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
 (defn job-upper-bound [replica job]
   ;; We need to handle a special case here when figuring out the upper saturation limit.
@@ -282,7 +282,7 @@
 
 (defn build-peer->vm [replica model mapping job-utilization]
   (let [n-peers (n-peers-running replica job-utilization)
-        running-peers (reduce into (mapcat vals (vals (:allocations replica))))
+        running-peers (reduce into [] (mapcat vals (vals (:allocations replica))))
         allocated-vms (reduce
                        (fn [result peer-id]
                          (let [vm (.newVM model)]
@@ -386,7 +386,10 @@
 (defn btr-place-scheduling [replica job-utilization]
   (if (seq (:jobs replica))
     (let [model (DefaultModel.)
-          scheduler (DefaultChocoScheduler.)
+          ;; Hard code the random seed to make it deterministic
+          ;; across peers.
+          params (.setRandomSeed (DefaultParameters.) 1)
+          scheduler (DefaultChocoScheduler. params)
           mapping (.getMapping model)
           task-seq (unrolled-tasks replica job-utilization)
           peer->vm (build-peer->vm replica model mapping job-utilization)
@@ -409,10 +412,10 @@
     replica))
 
 ;;; [ ] remove resource limits on nodes.
-;;; [ ] add constant seed for generators
+;;; [x] add constant seed for generators
 ;;; [ ] Grouping recovery flux policy
 ;;; [x] handle planning not coming up with a solution
-;;; [ ] skip jobs that don't get enough peers.
+;;; [x] skip jobs that don't get enough peers.
 ;;; [x] don't try to allocate all the peers
 ;;; [ ] don't make all peers idle
 ;;; [ ] don't change all task slots

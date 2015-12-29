@@ -86,8 +86,8 @@
 
 (deftest even-distribution
   (is
-   (= {:j1 {:t1 [:p4] :t2 [:p2] :t3 [:p5]}
-       :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p1]}}
+   (= {:j1 {:t1 [:p6] :t2 [:p2] :t3 [:p1]}
+       :j2 {:t4 [:p5] :t5 [:p3] :t6 [:p4]}}
       (:allocations
        (reconfigure-cluster-workload
         {:jobs [:j1 :j2]
@@ -101,8 +101,8 @@
 
 (deftest prefer-earlier-job
   (is
-   (= {:j1 {:t1 [:p4 :p5] :t2 [:p2] :t3 [:p7]}
-       :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p1]}}
+   (= {:j1 {:t1 [:p6 :p7] :t2 [:p2] :t3 [:p1]}
+       :j2 {:t4 [:p5] :t5 [:p3] :t6 [:p4]}}
       (:allocations
        (reconfigure-cluster-workload
         {:jobs [:j1 :j2]
@@ -114,4 +114,18 @@
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
 
-#_(run-tests)
+(deftest skip-overloaded-jobs
+  (is
+   (= {:j1 {:t1 [:p4 :p5 :p6]}
+       :j3 {:t3 [:p1 :p2 :p3]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:jobs [:j1 :j2 :j3]
+         :peers [:p1 :p2 :p3 :p4 :p5 :p6]
+         :tasks {:j1 [:t1] :j2 [:t2] :j3 [:t3]}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced
+                           :j2 :onyx.task-scheduler/balanced
+                           :j3 :onyx.task-scheduler/balanced}
+         :min-required-peers {:j2 {:t2 100}}
+         :job-scheduler :onyx.job-scheduler/balanced
+         :messaging {:onyx.messaging/impl :aeron}})))))
