@@ -1,3 +1,7 @@
+#### 0.8.4
+
+- Bug fix: Fixed a bug where `:flow/from` -> `:all` didn't match compilation step. [#464](https://github.com/onyx-platform/onyx/issues/464)
+
 #### 0.8.3
 - **Breaking change**: Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`
 - New feature: Serialize the exception that kills a job to ZooKeeper
