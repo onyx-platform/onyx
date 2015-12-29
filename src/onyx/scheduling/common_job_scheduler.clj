@@ -411,7 +411,7 @@
 ;;; [ ] remove resource limits on nodes.
 ;;; [ ] add constant seed for generators
 ;;; [ ] Grouping recovery flux policy
-;;; [ ] handle planning not coming up with a solution
+;;; [x] handle planning not coming up with a solution
 ;;; [ ] skip jobs that don't get enough peers.
 ;;; [x] don't try to allocate all the peers
 ;;; [ ] don't make all peers idle
