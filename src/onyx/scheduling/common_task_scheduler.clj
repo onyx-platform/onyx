@@ -49,4 +49,5 @@
   [replica job n]
   (throw (ex-info (format "Task scheduler %s not recognized" (get-in replica [:task-schedulers job]))
                   {:task-scheduler (get-in replica [:task-schedulers job])
+                   :replica replica
                    :job job})))

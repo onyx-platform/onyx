@@ -461,9 +461,10 @@
             job-claims (job-claim-peers replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers replica job-claims spare-peers)
-            updated-replica (btr-place-scheduling replica max-utilization)
-            acker-replica (choose-ackers updated-replica jobs)]
-        (if (and updated-replica
-                 (full-allocation? updated-replica max-utilization))
-          updated-replica
+            updated-replica (btr-place-scheduling replica max-utilization)]
+        (if updated-replica
+          (let [acker-replica (choose-ackers updated-replica jobs)]
+            (if (full-allocation? acker-replica max-utilization)
+              acker-replica
+              (recur (butlast jobs))))
           (recur (butlast jobs)))))))

@@ -1,13 +1,13 @@
 (ns onyx.log.peer-rebalance-test
-  (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log get-counts load-config]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.api :as api]
             [schema.test]
-            [clojure.test :refer [deftest is testing use-fixtures]]
             [schema.core :as s]
-            [onyx.log.curator :as zk]))
+            [onyx.log.curator :as zk]
+            [onyx.api]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
@@ -77,4 +77,4 @@
 
     (onyx.api/shutdown-env env)
 
-    (onyx.api/shutdown-peer-group peer-group) ))
+    (onyx.api/shutdown-peer-group peer-group)))

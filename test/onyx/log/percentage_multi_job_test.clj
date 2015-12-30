@@ -69,12 +69,12 @@
              (map (partial apply +)
                   (get-counts replica-2 [j1 j2])))))
 
-(doseq [v-peer v-peers-1]
-  (onyx.api/shutdown-peer v-peer))
+    (doseq [v-peer v-peers-1]
+      (onyx.api/shutdown-peer v-peer))
 
-(doseq [v-peer v-peers-2]
-  (onyx.api/shutdown-peer v-peer))
+    (doseq [v-peer v-peers-2]
+      (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
+    (onyx.api/shutdown-env env)
 
-(onyx.api/shutdown-peer-group peer-group))) 
+    (onyx.api/shutdown-peer-group peer-group)))

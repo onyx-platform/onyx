@@ -195,5 +195,3 @@
          :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
-
-#_(run-tests)
