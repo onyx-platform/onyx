@@ -9,6 +9,10 @@
             [onyx.peer.task-compile :as c]
             [onyx.api]))
 
+(def min-vec-length 0)
+
+(def max-vec-length 15)
+
 (def true-pred (constantly true))
 
 (def false-pred (constantly false))
@@ -22,10 +26,16 @@
 (defn post-transform [event segment e]
   post-transformed-segment)
 
+(defn gen-sized-kw []
+  (gen/resize 10 gen/keyword))
+
+(defn gen-sized-vector []
+  (gen/vector (gen-sized-kw) min-vec-length max-vec-length))
+
 (defn flow-condition-gen [from-task]
   (gen/hash-map
    :flow/from (gen/return from-task)
-   :flow/exclude-keys (gen/vector gen/keyword)))
+   :flow/exclude-keys (gen-sized-vector)))
 
 (defn merge-gen-maps [gen1 gen2]
   (gen/bind gen1 (fn [m] (gen/fmap #(merge m %) gen2))))
@@ -37,7 +47,7 @@
   (merge-gen-maps base-gen (gen/return {:flow/to :none})))
 
 (defn flow-to-tasks-gen [base-gen]
-  (merge-gen-maps base-gen (gen/hash-map :flow/to (gen/vector gen/keyword))))
+  (merge-gen-maps base-gen (gen/hash-map :flow/to (gen-sized-vector))))
 
 (defn true-flow-condition-gen [base-gen]
   (merge-gen-maps base-gen
@@ -99,7 +109,7 @@
                       (flow-condition-gen)
                       (flow-to-tasks-gen)
                       (true-flow-condition-gen))))
-    other-downstream-tasks (gen/vector gen/keyword)]
+    other-downstream-tasks (gen-sized-vector)]
    (let [target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
          event (c/flow-conditions->event-map {} flow-conditions :a)
@@ -367,7 +377,7 @@
 (deftest post-transformation-exclusions
   (checking
    "Key exclusions are applied during post transformation"
-   (times 15)
+   (times 50)
    [fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
