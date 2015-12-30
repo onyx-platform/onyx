@@ -16,7 +16,7 @@
 (deftest singe-segment-return
   (checking
    "A single returned segment attaches to its root"
-   (times 20)
+   (times 5)
    [input (gen-segment)
     output (gen/map gen/any gen/any)]
    (let [f (fn [segment] output)
@@ -29,7 +29,7 @@
 (deftest multi-segment-return
   (checking
    "Multiple segments can be returned, attached to their root"
-   (times 20)
+   (times 5)
    [input (gen-segment)
     output (gen/vector (gen/map gen/any gen/any))]
    (let [f (fn [segment] output)
@@ -42,7 +42,7 @@
 (deftest multi-batch-size-single-rets
   (checking
    "It generalizes with a bigger batch size for single returns"
-   (times 20)
+   (times 5)
    ;; Uses a unique mapping of keys to values to look up an
    ;; input for an output with no collisions.
    [input (gen/vector (gen/hash-map
@@ -65,7 +65,7 @@
 (deftest parameterized-functions
   (checking
    "Functions can be parameterized via the event map"
-   (times 20)
+   (times 5)
    [input (gen/vector (gen-segment))
     params (gen/vector gen/any)]
    (let [f (fn [& args] {:result (or (butlast args) [])})
@@ -77,7 +77,7 @@
 (deftest throws-exception
   (checking
    "Functions that throw exceptions pass the exception object back"
-   (times 20)
+   (times 5)
    [input (gen/vector (gen-segment))]
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
@@ -91,7 +91,7 @@
 (deftest bulk-functions
   (checking
    "Bulk functions call the function, but always return their inputs"
-   (times 20)
+   (times 5)
    [input (gen/not-empty (gen/vector (gen-segment)))
     output gen/any]
    (let [called? (atom false)
