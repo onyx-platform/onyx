@@ -10,15 +10,20 @@
             [onyx.api])
   (:import [java.util UUID]))
 
+(defn segment-map []
+  (gen/map
+   (gen/resize 5 gen/any)
+   (gen/resize 5 gen/any)))
+
 (defn gen-segment []
-  (gen/hash-map :message (gen/map gen/any gen/any)))
+  (gen/hash-map :message (segment-map)))
 
 (deftest singe-segment-return
   (checking
    "A single returned segment attaches to its root"
-   (times 5)
+   (times 50)
    [input (gen-segment)
-    output (gen/map gen/any gen/any)]
+    output (segment-map)]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
          rets (t/apply-fn f false event)
@@ -29,9 +34,9 @@
 (deftest multi-segment-return
   (checking
    "Multiple segments can be returned, attached to their root"
-   (times 5)
+   (times 50)
    [input (gen-segment)
-    output (gen/vector (gen/map gen/any gen/any))]
+    output (gen/vector (segment-map))]
    (let [f (fn [segment] output)
          event {:onyx.core/batch [input]}
          rets (t/apply-fn f false event)
@@ -42,17 +47,16 @@
 (deftest multi-batch-size-single-rets
   (checking
    "It generalizes with a bigger batch size for single returns"
-   (times 5)
+   (times 50)
    ;; Uses a unique mapping of keys to values to look up an
    ;; input for an output with no collisions.
    [input (gen/vector (gen/hash-map
                        :message
                        (gen/not-empty
                         (gen/map
-                         (gen/fmap (fn [v] (UUID/randomUUID))
-                                   (gen/tuple))
-                         gen/any))))
-    output (gen/vector (gen/map gen/any gen/any)
+                         (gen/fmap (fn [v] (UUID/randomUUID)) (gen/tuple))
+                         (gen/resize 10 gen/any)))))
+    output (gen/vector (segment-map)
                        (count input))]
    (let [mapping (zipmap (map :message input) output)
          f (fn [segment] (get mapping segment))
@@ -65,9 +69,9 @@
 (deftest parameterized-functions
   (checking
    "Functions can be parameterized via the event map"
-   (times 5)
+   (times 50)
    [input (gen/vector (gen-segment))
-    params (gen/vector gen/any)]
+    params (gen/vector (gen/resize 10 gen/any))]
    (let [f (fn [& args] {:result (or (butlast args) [])})
          event {:onyx.core/batch input :onyx.core/params params}
          rets (t/apply-fn f false event)
@@ -77,7 +81,7 @@
 (deftest throws-exception
   (checking
    "Functions that throw exceptions pass the exception object back"
-   (times 5)
+   (times 50)
    [input (gen/vector (gen-segment))]
    (let [f (fn [segment] (throw (ex-info "exception" {:val 42})))
          event {:onyx.core/batch input}
@@ -91,9 +95,9 @@
 (deftest bulk-functions
   (checking
    "Bulk functions call the function, but always return their inputs"
-   (times 5)
+   (times 50)
    [input (gen/not-empty (gen/vector (gen-segment)))
-    output gen/any]
+    output (gen/resize 10 gen/any)]
    (let [called? (atom false)
          f (fn [segment] (reset! called? true) output)
          event {:onyx.core/batch input}

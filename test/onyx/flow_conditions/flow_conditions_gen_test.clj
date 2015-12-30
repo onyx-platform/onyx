@@ -9,6 +9,10 @@
             [onyx.peer.task-compile :as c]
             [onyx.api]))
 
+(def min-vec-length 0)
+
+(def max-vec-length 15)
+
 (def true-pred (constantly true))
 
 (def false-pred (constantly false))
@@ -22,10 +26,16 @@
 (defn post-transform [event segment e]
   post-transformed-segment)
 
+(defn gen-sized-kw []
+  (gen/resize 10 gen/keyword))
+
+(defn gen-sized-vector []
+  (gen/vector (gen-sized-kw) min-vec-length max-vec-length))
+
 (defn flow-condition-gen [from-task]
   (gen/hash-map
    :flow/from (gen/return from-task)
-   :flow/exclude-keys (gen/vector gen/keyword)))
+   :flow/exclude-keys (gen-sized-vector)))
 
 (defn merge-gen-maps [gen1 gen2]
   (gen/bind gen1 (fn [m] (gen/fmap #(merge m %) gen2))))
@@ -37,7 +47,7 @@
   (merge-gen-maps base-gen (gen/return {:flow/to :none})))
 
 (defn flow-to-tasks-gen [base-gen]
-  (merge-gen-maps base-gen (gen/hash-map :flow/to (gen/vector gen/keyword))))
+  (merge-gen-maps base-gen (gen/hash-map :flow/to (gen-sized-vector))))
 
 (defn true-flow-condition-gen [base-gen]
   (merge-gen-maps base-gen
@@ -89,7 +99,7 @@
     (is (thrown? clojure.lang.ExceptionInfo
                  (r/route-data nil nil wrapped-e nil [:a :b])))))
 
-#_(deftest conj-downstream-tasks-together
+(deftest conj-downstream-tasks-together
   (checking
    "It joins the :flow/to tasks together and limits selection"
    (times 15)
@@ -99,7 +109,7 @@
                       (flow-condition-gen)
                       (flow-to-tasks-gen)
                       (true-flow-condition-gen))))
-    other-downstream-tasks (gen/vector gen/keyword)]
+    other-downstream-tasks (gen-sized-vector)]
    (let [target-tasks (mapcat :flow/to flow-conditions)
          downstream (into other-downstream-tasks target-tasks)
          event (c/flow-conditions->event-map {} flow-conditions :a)
@@ -107,7 +117,7 @@
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-#_(deftest no-false-predicate-picks
+(deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
    (times 15)
@@ -128,7 +138,7 @@
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-#_(deftest short-circuit
+(deftest short-circuit
   (checking
    "It stops searching when it finds a short circuit true pred"
    (times 15)
@@ -162,7 +172,7 @@
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-#_(deftest retry-action
+(deftest retry-action
   (checking
    "Using a retry action with a true predicate flows to nil"
    (times 15)
@@ -207,7 +217,7 @@
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
 
-#_(deftest key-exclusion
+(deftest key-exclusion
   (checking
    "Matched predicates excluded keys are conj'ed together"
    (times 15)
@@ -229,7 +239,7 @@
      (is (into #{} excluded-keys) (:exclusions results))
      (is (nil? (:action results))))))
 
-#_(deftest matching-all
+(deftest matching-all
   (checking
    "A :flow/to of :all that passes its predicate matches everything"
    (times 15)
@@ -261,7 +271,7 @@
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
      (is (nil? (:action results))))))
 
-#_(deftest matching-none
+(deftest matching-none
   (checking
    "A :flow/to of :none that passes its pred matches nothing"
    (times 15)
@@ -293,7 +303,7 @@
      (is (not (seq (:flow/to results))))
      (is (nil? (:action results))))))
 
-#_(deftest post-transformation
+(deftest post-transformation
   (checking
    "A :flow/post-transform is returned for exception predicates that define it"
    (times 15)
@@ -325,7 +335,7 @@
      (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
 
-#_(deftest post-transformation-no-invocation
+(deftest post-transformation-no-invocation
   (checking
    "Post-transformations are not invoked when they are not matched"
    (times 15)
@@ -344,7 +354,7 @@
          routes (r/route-data event nil message fcs downstream)]
      (is (= message (r/flow-conditions-transform message routes fcs event))))))
 
-#_(deftest post-transformation-invocation
+(deftest post-transformation-invocation
   (checking
    "Post-transformations are invoked when they are matched"
    (times 15)
@@ -364,10 +374,10 @@
          transformed (reduce dissoc post-transformed-segment (:exclusions routes))]
      (is (= transformed (r/flow-conditions-transform message routes fcs event))))))
 
-#_(deftest post-transformation-exclusions
+(deftest post-transformation-exclusions
   (checking
    "Key exclusions are applied during post transformation"
-   (times 15)
+   (times 50)
    [fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
