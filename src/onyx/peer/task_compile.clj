@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.peer.task-compile
-  (:require [onyx.peer.operation :refer [kw->fn] :as operation]
+  (:require [clojure.set :refer [subset?]]
+            [onyx.peer.operation :refer [kw->fn] :as operation]
             [onyx.static.planning :refer [find-task]]
             [onyx.static.validation :as validation]
             [onyx.flow-conditions.fc-compile :refer [build-pred-fn]]
@@ -9,21 +10,30 @@
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [clj-tuple :as t]))
 
-(defn only-relevant-branches [flow task]
-  (filter #(or (= (:flow/from %) task) (= :all (:flow/from %))) flow))
+(defn egress-tasks [workflow task]
+  (map second (filter #(= (first %) task) workflow)))
 
-(defn compile-flow-conditions [flow-conditions task-name f]
-  (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
+(defn only-relevant-branches [flow-conditions workflow task]
+  (filter #(or (= (:flow/from %) task)
+               (and (= (:flow/from %) :all)
+                    (subset? (:flow/to %) (egress-tasks workflow task))))
+          flow-conditions))
+
+(defn compile-flow-conditions [flow-conditions workflow task-name f]
+  (let [branches (only-relevant-branches flow-conditions workflow task-name)
+        conditions (filter f branches)]
     (map
      (fn [condition]
        (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
      conditions)))
 
-(defn compile-fc-happy-path [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
+(defn compile-fc-happy-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           (comp not :flow/thrown-exception?)))
 
-(defn compile-fc-exception-path [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
+(defn compile-fc-exception-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           :flow/thrown-exception?))
 
 (defn resolve-lifecycle-calls [calls]
   (let [calls-map (var-get (kw->fn calls))]
@@ -210,11 +220,12 @@
             new-state))))))
 
 (defn flow-conditions->event-map [event flow-conditions task-name]
-  (-> event
-      (assoc :onyx.core/compiled-norm-fcs
-             (compile-fc-happy-path flow-conditions task-name))
-      (assoc :onyx.core/compiled-ex-fcs
-             (compile-fc-exception-path flow-conditions task-name))))
+  (let [workflow (:onyx.core/workflow event)]
+    (-> event
+        (assoc :onyx.core/compiled-norm-fcs
+               (compile-fc-happy-path flow-conditions workflow task-name))
+        (assoc :onyx.core/compiled-ex-fcs
+               (compile-fc-exception-path flow-conditions workflow task-name)))))
 
 (defn lifecycles->event-map [event lifecycles task-name]
   (-> event
