@@ -89,7 +89,7 @@
     (is (thrown? clojure.lang.ExceptionInfo
                  (r/route-data nil nil wrapped-e nil [:a :b])))))
 
-(deftest conj-downstream-tasks-together
+#_(deftest conj-downstream-tasks-together
   (checking
    "It joins the :flow/to tasks together and limits selection"
    (times 15)
@@ -107,7 +107,7 @@
      (is (= (into #{} target-tasks) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-(deftest no-false-predicate-picks
+#_(deftest no-false-predicate-picks
   (checking
    "It doesn't pick any downstream tasks with false predicates"
    (times 15)
@@ -128,7 +128,7 @@
      (is (= (into #{} (mapcat :flow/to true-fcs)) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-(deftest short-circuit
+#_(deftest short-circuit
   (checking
    "It stops searching when it finds a short circuit true pred"
    (times 15)
@@ -162,7 +162,7 @@
      (is (= (into #{} (:flow/to (first true-1))) (into #{} (:flow results))))
      (is (nil? (:action results))))))
 
-(deftest retry-action
+#_(deftest retry-action
   (checking
    "Using a retry action with a true predicate flows to nil"
    (times 15)
@@ -207,7 +207,7 @@
      (is (not (seq (:flow results))))
      (is (= :retry (:action results))))))
 
-(deftest key-exclusion
+#_(deftest key-exclusion
   (checking
    "Matched predicates excluded keys are conj'ed together"
    (times 15)
@@ -229,7 +229,7 @@
      (is (into #{} excluded-keys) (:exclusions results))
      (is (nil? (:action results))))))
 
-(deftest matching-all
+#_(deftest matching-all
   (checking
    "A :flow/to of :all that passes its predicate matches everything"
    (times 15)
@@ -261,7 +261,7 @@
      (is (= (into #{} downstream) (into #{} (:flow/to results))))
      (is (nil? (:action results))))))
 
-(deftest matching-none
+#_(deftest matching-none
   (checking
    "A :flow/to of :none that passes its pred matches nothing"
    (times 15)
@@ -293,7 +293,7 @@
      (is (not (seq (:flow/to results))))
      (is (nil? (:action results))))))
 
-(deftest post-transformation
+#_(deftest post-transformation
   (checking
    "A :flow/post-transform is returned for exception predicates that define it"
    (times 15)
@@ -325,7 +325,7 @@
      (is (= xform (:post-transformation results)))
      (is (nil? (:action results))))))
 
-(deftest post-transformation-no-invocation
+#_(deftest post-transformation-no-invocation
   (checking
    "Post-transformations are not invoked when they are not matched"
    (times 15)
@@ -344,7 +344,7 @@
          routes (r/route-data event nil message fcs downstream)]
      (is (= message (r/flow-conditions-transform message routes fcs event))))))
 
-(deftest post-transformation-invocation
+#_(deftest post-transformation-invocation
   (checking
    "Post-transformations are invoked when they are matched"
    (times 15)
@@ -364,7 +364,7 @@
          transformed (reduce dissoc post-transformed-segment (:exclusions routes))]
      (is (= transformed (r/flow-conditions-transform message routes fcs event))))))
 
-(deftest post-transformation-exclusions
+#_(deftest post-transformation-exclusions
   (checking
    "Key exclusions are applied during post transformation"
    (times 15)
