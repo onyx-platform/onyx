@@ -12,6 +12,15 @@
     (clojure.core.async/>!! outbox-ch reaction))
   state)
 
+(defn annotate-reaction [{:keys [message-id]} id entry]
+  (let [peer-annotated (assoc entry :peer-parent id)]
+    ;; Not all messages are derived from other messages.
+    ;; For instance, :prepare-join-cluster is a "root"
+    ;; message.
+    (if message-id
+      (assoc peer-annotated :entry-parent message-id)
+      peer-annotated)))
+
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn]
   (try
     (let [replica-atom (atom nil)
@@ -45,10 +54,11 @@
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-peer-view (extensions/peer-replica-view log entry replica new-replica peer-view diff state opts)
-                  new-state (extensions/fire-side-effects! entry replica new-replica diff state)]
+                  new-state (extensions/fire-side-effects! entry replica new-replica diff state)
+                  annotated-reactions (map (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)
-              (recur (send-to-outbox new-state reactions)))))))
+              (recur (send-to-outbox new-state annotated-reactions)))))))
     (catch Throwable e
       (taoensso.timbre/error e (str e) "Error in processing loop. Restarting.")
       (close! restart-ch))

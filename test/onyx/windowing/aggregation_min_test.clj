@@ -28,8 +28,7 @@
 
 (def test-state (atom []))
 
-(defn update-atom! [event window-id lower-bound upper-bound state]
-  (info "Called update atom")
+(defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
   (swap! test-state conj [lower-bound upper-bound state]))
 
 (def in-chan (atom nil))

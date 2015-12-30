@@ -1,28 +1,40 @@
 (ns ^:no-doc onyx.peer.task-compile
-  (:require [onyx.peer.operation :refer [kw->fn] :as operation]
-            [onyx.static.planning :refer [find-task build-pred-fn]]
+  (:require [clojure.set :refer [subset?]]
+            [onyx.peer.operation :refer [kw->fn] :as operation]
+            [onyx.static.planning :refer [find-task]]
             [onyx.static.validation :as validation]
+            [onyx.flow-conditions.fc-compile :refer [build-pred-fn]]
             [onyx.windowing.aggregation :as agg]
             [onyx.windowing.window-extensions :as w]
             [onyx.state.state-extensions :as state-extensions]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [clj-tuple :as t]))
 
-(defn only-relevant-branches [flow task]
-  (filter #(or (= (:flow/from %) task) (= :all %)) flow))
+(defn egress-tasks [workflow task]
+  (map second (filter #(= (first %) task) workflow)))
 
-(defn compile-flow-conditions [flow-conditions task-name f]
-  (let [conditions (filter f (only-relevant-branches flow-conditions task-name))]
+(defn only-relevant-branches [flow-conditions workflow task]
+  (filter #(or (= (:flow/from %) task)
+               (and (= (:flow/from %) :all)
+                    (subset? (into #{} (:flow/to %))
+                             (into #{} (egress-tasks workflow task)))))
+          flow-conditions))
+
+(defn compile-flow-conditions [flow-conditions workflow task-name f]
+  (let [branches (only-relevant-branches flow-conditions workflow task-name)
+        conditions (filter f branches)]
     (map
      (fn [condition]
        (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
      conditions)))
 
-(defn compile-fc-norms [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name (comp not :flow/thrown-exception?)))
+(defn compile-fc-happy-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           (comp not :flow/thrown-exception?)))
 
-(defn compile-fc-exs [flow-conditions task-name]
-  (compile-flow-conditions flow-conditions task-name :flow/thrown-exception?))
+(defn compile-fc-exception-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           :flow/thrown-exception?))
 
 (defn resolve-lifecycle-calls [calls]
   (let [calls-map (var-get (kw->fn calls))]
@@ -207,3 +219,30 @@
           (if unique-id
             (update new-state :filter state-extensions/apply-filter-id event unique-id)
             new-state))))))
+
+(defn flow-conditions->event-map [event flow-conditions task-name]
+  (let [workflow (:onyx.core/workflow event)]
+    (-> event
+        (assoc :onyx.core/compiled-norm-fcs
+               (compile-fc-happy-path flow-conditions workflow task-name))
+        (assoc :onyx.core/compiled-ex-fcs
+               (compile-fc-exception-path flow-conditions workflow task-name)))))
+
+(defn lifecycles->event-map [event lifecycles task-name]
+  (-> event
+      (assoc :onyx.core/compiled-start-task-fn
+             (compile-start-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-before-task-start-fn
+             (compile-before-task-start-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-before-batch-fn
+             (compile-before-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-read-batch-fn
+             (compile-after-read-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-batch-fn
+             (compile-after-batch-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-task-fn
+             (compile-after-task-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-ack-segment-fn
+             (compile-after-ack-segment-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-after-retry-segment-fn
+             (compile-after-retry-segment-functions lifecycles task-name))))

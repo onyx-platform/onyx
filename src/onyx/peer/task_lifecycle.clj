@@ -21,7 +21,9 @@
               [onyx.triggers.triggers-api :as triggers]
               [onyx.extensions :as extensions]
               [onyx.compression.nippy]
-              [onyx.types :refer [->Route ->Ack ->Results ->Result ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event]]
+              [onyx.peer.transform :refer [apply-fn]]
+              [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [clj-tuple :as t]
               [onyx.interop]
@@ -65,62 +67,6 @@
   (:id (first (filter #(= :done (:message %))
                       (:onyx.core/batch event)))))
 
-(defn join-output-paths [all to-add downstream]
-  (cond (= to-add :all) (set downstream)
-        (= to-add :none) #{}
-        :else (into (set all) to-add)))
-
-(defn choose-output-paths
-  [event compiled-flow-conditions result message downstream]
-  (reduce
-   (fn [{:keys [flow exclusions] :as all} entry]
-     (cond ((:flow/predicate entry) [event (:message (:root result)) message (map :message (:leaves result))])
-           (if (:flow/short-circuit? entry)
-             (reduced (->Route (join-output-paths flow (:flow/to entry) downstream)
-                               (into (set exclusions) (:flow/exclude-keys entry))
-                               (:flow/post-transform entry)
-                               (:flow/action entry)))
-             (->Route (join-output-paths flow (:flow/to entry) downstream)
-                      (into (set exclusions) (:flow/exclude-keys entry))
-                      nil
-                      nil))
-
-           (= (:flow/action entry) :retry)
-           (->Route (join-output-paths flow (:flow/to entry) downstream)
-                    (into (set exclusions) (:flow/exclude-keys entry))
-                    nil
-                    nil)
-
-           :else all))
-   (->Route #{} #{} nil nil)
-   compiled-flow-conditions))
-
-(defn route-data
-  [event result message flow-conditions downstream]
-  (if (nil? flow-conditions)
-    (if (operation/exception? message)
-      (throw (:exception (ex-data message)))
-      (->Route downstream nil nil nil))
-    (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
-      (if (operation/exception? message)
-        (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result
-                               (:exception (ex-data message)) downstream)
-          (throw (:exception (ex-data message))))
-        (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
-          (if (seq compiled-norm-fcs)
-            (choose-output-paths event compiled-norm-fcs result message downstream)
-            (->Route downstream nil nil nil)))))))
-
-(defn apply-post-transformation [message routes event]
-  (let [post-transformation (:post-transformation routes)
-        msg (if (and (operation/exception? message) post-transformation)
-              (let [data (ex-data message)
-                    f (operation/kw->fn post-transformation)]
-                (f event (:segment data) (:exception data)))
-              message)]
-    (reduce dissoc msg (:exclusions routes))))
-
 (defn hash-groups [message next-tasks task->group-by-fn]
   (if (not-empty task->group-by-fn)
     (reduce (fn [groups t]
@@ -129,12 +75,6 @@
                 groups))
             (t/hash-map)
             next-tasks)))
-
-(defn flow-conditions-transform
-  [message routes next-tasks flow-conditions event]
-  (if flow-conditions
-    (apply-post-transformation message routes event)
-    message))
 
 (defrecord AccumAckSegments [ack-val segments retries])
 
@@ -157,8 +97,8 @@
 
 (defn add-from-leaf [event result egress-ids task->group-by-fn flow-conditions 
                      root leaves start-ack-val accum {:keys [message] :as leaf}]
-  (let [routes (route-data event result message flow-conditions egress-ids)
-        message* (flow-conditions-transform message routes egress-ids flow-conditions event)
+  (let [routes (r/route-data event result message flow-conditions egress-ids)
+        message* (r/flow-conditions-transform message routes flow-conditions event)
         hash-group (hash-groups message* egress-ids task->group-by-fn)
         leaf* (if (= message message*)
                 leaf
@@ -277,64 +217,6 @@
                 (remove (fn [v] (= :done (:message v)))
                         batch))))
     event))
-
-(defn collect-next-segments [f input]
-  (let [segments (try (f input)
-                      (catch Throwable e
-                        (ex-info "Segment threw exception"
-                                 {:exception e :segment input})))]
-    (if (sequential? segments) segments (t/vector segments))))
-
-(defn apply-fn-single [f {:keys [onyx.core/batch] :as event}]
-  (assoc
-   event
-   :onyx.core/results
-    (->Results (doall
-                 (map
-                   (fn [segment]
-                     (let [segments (collect-next-segments f (:message segment))
-                           leaves (map (fn [message]
-                                         (-> segment
-                                             (assoc :message message)
-                                             ;; not actually required, but it's safer
-                                             (assoc :ack-val nil)))
-                                       segments)]
-                       (->Result segment leaves)))
-                   batch))
-               (transient (t/vector))
-               (transient (t/vector))
-               (transient (t/vector)))))
-
-(defn apply-fn-bulk [f {:keys [onyx.core/batch] :as event}]
-  ;; Bulk functions intentionally ignore their outputs.
-  (let [segments (map :message batch)]
-    (when (seq segments) (f segments))
-    (assoc
-      event
-      :onyx.core/results
-      (->Results (doall
-                   (map
-                     (fn [segment]
-                       (->Result segment (t/vector (assoc segment :ack-val nil))))
-                     batch))
-                 (transient (t/vector))
-                 (transient (t/vector))
-                 (transient (t/vector))))))
-
-(defn curry-params [f params]
-  (reduce partial f params))
-
-(defn apply-fn [f bulk? event]
-  (let [g (curry-params f (:onyx.core/params event))
-        rets
-        (if bulk?
-          (apply-fn-bulk g event)
-          (apply-fn-single g event))]
-    (taoensso.timbre/trace (format "[%s / %s] Applied fn to %s segments"
-                                   (:onyx.core/id rets)
-                                   (:onyx.core/lifecycle-id rets)
-                                   (count (:onyx.core/results rets))))
-    rets))
 
 (defn replay-windows-from-log
   [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
@@ -664,22 +546,12 @@
                            :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/windows (c/resolve-windows filtered-windows)
-                           :onyx.core/compiled-start-task-fn (c/compile-start-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-task-start-fn (c/compile-before-task-start-functions lifecycles (:name task))
-                           :onyx.core/compiled-before-batch-fn (c/compile-before-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-read-batch-fn (c/compile-after-read-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-batch-fn (c/compile-after-batch-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-task-fn (c/compile-after-task-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-ack-segment-fn (c/compile-after-ack-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-after-retry-segment-fn (c/compile-after-retry-segment-functions lifecycles (:name task))
-                           :onyx.core/compiled-norm-fcs (c/compile-fc-norms flow-conditions (:name task))
-                           :onyx.core/compiled-ex-fcs (c/compile-fc-exs flow-conditions (:name task))
                            :onyx.core/compiled (->Compiled (c/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (c/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
                            :onyx.core/params (resolve-calling-params task-map opts)
-                           :onyx.core/drained-back-off (or (:onyx.peer/drained-back-off opts) 400)
+                           :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                            :onyx.core/log log
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
@@ -693,6 +565,10 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
+
+            pipeline-data (-> pipeline-data
+                              (c/flow-conditions->event-map flow-conditions (:name task))
+                              (c/lifecycles->event-map lifecycles (:name task)))
 
             pipeline (build-pipeline task-map pipeline-data)
             pipeline-data (assoc pipeline-data :onyx.core/pipeline pipeline)

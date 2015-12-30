@@ -55,7 +55,7 @@
           (add-ack state message-id ack-val (:completion-id ack)))))
 
 (defn ack-segment [ack-state completion-ch ack]
-  (let [rets (swap! ack-state (fn [as] (update-ack-state as ack)))]
+  (let [rets (swap! ack-state update-ack-state ack)]
     (when (:completed? rets)
       (>!! completion-ch
            {:id (:id ack)
@@ -68,6 +68,9 @@
       (recur)))
   (timbre/info "Stopped Ack Messages Loop"))
 
+(defn init-state []
+  (atom (->AckState {} false)))
+
 (defrecord AckingDaemon [opts ack-state acking-ch completion-ch timeout-ch]
   component/Lifecycle
 
@@ -77,7 +80,7 @@
           completion-ch (chan completion-buffer-size)
           acking-buffer-size (arg-or-default :onyx.messaging/completion-buffer-size opts)
           acking-ch (chan acking-buffer-size)
-          state (atom (->AckState {} false))
+          state (init-state)
           ack-segments-fut (future (ack-segments-loop state acking-ch completion-ch))
           timeout-fut (future (clear-messages-loop state opts))]
       (assoc component

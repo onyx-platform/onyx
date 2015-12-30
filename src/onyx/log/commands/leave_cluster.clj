@@ -71,7 +71,9 @@
              (go (when (<! ch)
                    (extensions/write-log-entry
                     (:log state)
-                    {:fn :leave-cluster :args {:id (:subject updated-watch)}}))
+                    {:fn :leave-cluster :args {:id (:subject updated-watch)}
+                     :entry-parent message-id
+                     :peer-parent (:id state)}))
                  (close! ch))
              (close! (or (:watch-ch state) (chan)))
              (assoc state :watch-ch ch))
