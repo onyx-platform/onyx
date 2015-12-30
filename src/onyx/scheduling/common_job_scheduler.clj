@@ -360,29 +360,35 @@
    []
    task-seq))
 
-(defn assign-task-resources [replica peer->task]
+(defn assign-task-resources [new-replica original-replica peer->task]
   (reduce-kv
    (fn [result peer-id [job-id task-id]]
-     (update-in result [:peer-sites peer-id]
-                (fn [peer-site]
-                  (let [resources (extensions/assign-task-resources
-                                   result
-                                   peer-id
-                                   task-id
-                                   peer-site
-                                   (:peer-sites result))]
-                    (merge peer-site resources)))))
-   replica
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (update-in result [:peer-sites peer-id]
+                    (fn [peer-site]
+                      (let [resources (extensions/assign-task-resources
+                                       result
+                                       peer-id
+                                       task-id
+                                       peer-site
+                                       (:peer-sites result))]
+                        (merge peer-site resources))))
+         result)))
+   new-replica
    peer->task))
 
-(defn assign-task-slot-ids [replica peer->task]
+(defn assign-task-slot-ids [new-replica original-replica peer->task]
   (reduce-kv
    (fn [result peer-id [job-id task-id]]
-     (update-in result [:task-slot-ids job-id task-id]
-                (fn [slot-ids]
-                  (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
-                    (assoc slot-ids peer-id slot-id)))))
-   replica
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (update-in result [:task-slot-ids job-id task-id]
+                    (fn [slot-ids]
+                      (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
+                        (assoc slot-ids peer-id slot-id))))
+         result)))
+   new-replica
    peer->task))
 
 (defn build-current-model [replica mapping task->node peer->vm]
@@ -432,8 +438,8 @@
             (-> replica
                 (change-peer-allocations peer->task)
                 (change-peer-state original-replica peer->task)
-                (assign-task-resources peer->task)
-                (assign-task-slot-ids peer->task))))))
+                (assign-task-resources original-replica peer->task)
+                (assign-task-slot-ids original-replica peer->task))))))
     replica))
 
 ;;; [x] remove resource limits on nodes.
@@ -443,8 +449,8 @@
 ;;; [x] skip jobs that don't get enough peers.
 ;;; [x] don't try to allocate all the peers
 ;;; [x] don't make all peers idle
-;;; [ ] don't change all task slots
-;;; [ ] don't reallocate all task resources
+;;; [x] don't change all task slots
+;;; [x] don't reallocate all task resources
 ;;; [x] fix jitter
 
 (defn reconfigure-cluster-workload [replica]
