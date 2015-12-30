@@ -16,7 +16,8 @@
 (defn only-relevant-branches [flow-conditions workflow task]
   (filter #(or (= (:flow/from %) task)
                (and (= (:flow/from %) :all)
-                    (subset? (:flow/to %) (egress-tasks workflow task))))
+                    (subset? (into #{} (:flow/to %))
+                             (into #{} (egress-tasks workflow task)))))
           flow-conditions))
 
 (defn compile-flow-conditions [flow-conditions workflow task-name f]
