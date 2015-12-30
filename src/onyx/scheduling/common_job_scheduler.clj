@@ -365,15 +365,28 @@
    (fn [result peer-id [job-id task-id]]
      (let [prev-task (get-in original-replica [:allocations job-id task-id])]
        (if-not (some #{peer-id} prev-task)
-         (update-in result [:peer-sites peer-id]
-                    (fn [peer-site]
-                      (let [resources (extensions/assign-task-resources
-                                       result
-                                       peer-id
-                                       task-id
-                                       peer-site
-                                       (:peer-sites result))]
-                        (merge peer-site resources))))
+         (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
+           (if prev-allocation
+             (-> result
+                 (update-in [:peer-sites] dissoc peer-id)
+                 (update-in [:peer-sites peer-id]
+                            (fn [peer-site]
+                              (let [resources (extensions/assign-task-resources
+                                               result
+                                               peer-id
+                                               task-id
+                                               peer-site
+                                               (:peer-sites result))]
+                                (merge peer-site resources)))))
+             (update-in result [:peer-sites peer-id]
+                        (fn [peer-site]
+                          (let [resources (extensions/assign-task-resources
+                                           result
+                                           peer-id
+                                           task-id
+                                           peer-site
+                                           (:peer-sites result))]
+                            (merge peer-site resources))))))
          result)))
    new-replica
    peer->task))
@@ -383,10 +396,18 @@
    (fn [result peer-id [job-id task-id]]
      (let [prev-task (get-in original-replica [:allocations job-id task-id])]
        (if-not (some #{peer-id} prev-task)
-         (update-in result [:task-slot-ids job-id task-id]
-                    (fn [slot-ids]
-                      (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
-                        (assoc slot-ids peer-id slot-id))))
+         (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
+           (if prev-allocation
+             (-> result
+                 (update-in [:task-slot-ids (:job prev-allocation) (:task prev-allocation)] dissoc peer-id)
+                 (update-in [:task-slot-ids job-id task-id]
+                            (fn [slot-ids]
+                              (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
+                                (assoc slot-ids peer-id slot-id)))))
+             (update-in result [:task-slot-ids job-id task-id]
+                        (fn [slot-ids]
+                          (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
+                            (assoc slot-ids peer-id slot-id))))))
          result)))
    new-replica
    peer->task))
@@ -454,17 +475,18 @@
 ;;; [x] fix jitter
 
 (defn reconfigure-cluster-workload [replica]
-  (loop [jobs (:jobs replica)]
+  (loop [jobs (:jobs replica)
+         current-replica replica]
     (if (not (seq jobs))
-      replica
-      (let [job-offers (job-offer-n-peers replica jobs)
-            job-claims (job-claim-peers replica job-offers)
+      current-replica
+      (let [job-offers (job-offer-n-peers current-replica jobs)
+            job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
-            max-utilization (claim-spare-peers replica job-claims spare-peers)
-            updated-replica (btr-place-scheduling replica max-utilization)]
+            max-utilization (claim-spare-peers current-replica job-claims spare-peers)
+            updated-replica (btr-place-scheduling current-replica max-utilization)]
         (if updated-replica
           (let [acker-replica (choose-ackers updated-replica jobs)]
             (if (full-allocation? acker-replica max-utilization)
-              acker-replica
-              (recur (butlast jobs))))
-          (recur (butlast jobs)))))))
+              (deallocate-starved-jobs acker-replica)
+              (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
+          (recur (butlast jobs) (remove-job current-replica (butlast jobs))))))))

@@ -68,7 +68,13 @@
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
     (testing "peers balanced on 2 jobs" 
-      (is (= [[2 2 2] [2 2 2]] (get-counts replica [j1 j2]))))
+      (is (= [{(:id (:a (:task-ids j1))) 2
+               (:id (:b (:task-ids j1))) 2
+               (:id (:c (:task-ids j1))) 2}
+              {(:id (:d (:task-ids j2))) 2
+               (:id (:e (:task-ids j2))) 2
+               (:id (:f (:task-ids j2))) 2}]
+             (get-counts replica [j1 j2]))))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

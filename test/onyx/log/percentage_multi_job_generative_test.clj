@@ -89,6 +89,8 @@
             :peer-choices []}))]
       (standard-invariants replica)
       (is (= #{:active} (set (vals (:peer-state replica)))))
-      (is (= [14 6] 
+      (is (= [14 6]
              (map (partial apply +)
-                  (get-counts replica [{:job-id job-1-id} {:job-id job-2-id}])))))))
+                  (map vals (get-counts replica
+                                        [{:job-id job-1-id}
+                                         {:job-id job-2-id}]))))))))

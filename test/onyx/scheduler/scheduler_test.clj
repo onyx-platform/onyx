@@ -195,3 +195,17 @@
          :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
+
+(deftest promote-to-first-task
+  (is
+   (= {:j1 {:t1 [:p1 :p3] :t2 [:p2]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:jobs [:j1]
+         :allocations {:j1 {:t1 [:p1]
+                            :t2 [:p2 :p3]}}
+         :peers [:p1 :p2 :p3]
+         :tasks {:j1 [:t1 :t2]}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+         :job-scheduler :onyx.job-scheduler/balanced
+         :messaging {:onyx.messaging/impl :aeron}})))))
