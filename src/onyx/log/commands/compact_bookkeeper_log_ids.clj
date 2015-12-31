@@ -57,6 +57,8 @@
                (warn "Deleting ledger that no longer exists." e))))
       (>!! (:outbox-ch state)
            {:fn :deleted-bookkeeper-log-ids
-            :args {:logs delete-ids}})
+            :args {:logs delete-ids}
+            :peer-parent (:id state)
+            :entry-parent message-id})
       (.close bk-client)))
   state)

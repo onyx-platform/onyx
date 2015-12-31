@@ -280,6 +280,8 @@
    :trigger/on s/Keyword
    :trigger/sync s/Keyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
+   (s/optional-key :trigger/pred) s/Keyword
+   (s/optional-key :trigger/watermark-percentage) double
    (s/optional-key :trigger/doc) s/Str
    (s/optional-key :trigger/period) [(s/one PosInt "trigger period") 
                                      (s/one TriggerPeriod "threshold type")]
@@ -465,7 +467,9 @@
   {:fn s/Keyword
    :args {s/Any s/Any}
    (s/optional-key :message-id) s/Int
-   (s/optional-key :created-at) s/Int})
+   (s/optional-key :created-at) s/Int
+   (s/optional-key :peer-parent) s/Uuid
+   (s/optional-key :entry-parent) s/Int})
 
 (def Reactions 
   (s/maybe [LogEntry]))
