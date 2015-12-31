@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.8.3-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.8.4-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -90,6 +90,11 @@
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-bookkeeper:onyx-platform/onyx-bookkeeper.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-elasticsearch:onyx-platform/onyx-elasticsearch.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"

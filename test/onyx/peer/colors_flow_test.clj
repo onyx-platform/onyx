@@ -206,7 +206,8 @@
                           :flow/predicate :onyx.peer.colors-flow-test/orange?}
 
                          {:flow/from :all
-                          :flow/to [:all-out]
+                          :flow/short-circuit? true
+                          :flow/to [:red-out :green-out :blue-out :all-out]
                           :flow/predicate :onyx.peer.colors-flow-test/constantly-true}]
 
         lifecycles [{:lifecycle/task :colors-in

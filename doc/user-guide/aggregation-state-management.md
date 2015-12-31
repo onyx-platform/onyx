@@ -32,8 +32,8 @@ summing values, though it can be used to build more complex state machines.
  :onyx/batch-size 20}
 
 ;; Window definition
-{:window/id :sum-all-ages
- :window/task :identity
+{:window/id :sum-all-ages-window
+ :window/task :sum-all-ages
  :window/type :global
  :window/aggregation [:your-sum-ns/sum :age]
  :window/window-key :event-time

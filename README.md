@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.8.3-SNAPSHOT"]
+[org.onyxplatform/onyx "0.8.4-SNAPSHOT"]
 ```
 
 ### Build Status
@@ -39,6 +39,7 @@ onyx-sql  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-sql/tree/0.
 onyx-bookkeeper  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-bookkeeper/tree/master)
 onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master)
 onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master)
+onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master)
 
 ### Companies Running Onyx in Production
 
@@ -51,26 +52,26 @@ onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-dur
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.8.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.8.3-SNAPSHOT
+### User Guide 0.8.4-SNAPSHOT
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 - [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
 
-### Developer's Guide 0.8.3-SNAPSHOT
+### Developer's Guide 0.8.4-SNAPSHOT
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.8.3-SNAPSHOT
+### API Docs 0.8.4-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.3-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.4-SNAPSHOT).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.3-SNAPSHOT` goes with `onyx` version `0.8.3-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.3-SNAPSHOT.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.4-SNAPSHOT` goes with `onyx` version `0.8.4-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.4-SNAPSHOT.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
@@ -80,13 +81,13 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-bookkeeper`](https://github.com/onyx-platform/onyx-bookkeeper)
 - [`onyx-seq`](https://github.com/onyx-platform/onyx-seq)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
+- [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 
 ### 3rd Party plugin listing
 
 Unofficial plugins have not been vetted.
-- [`onyx-elasticsearch`](https://github.com/LiaisonTechnologies/onyx-elasticsearch)
 - [`onyx-rethink`](https://github.com/cddr/onyx-rethink)
 
 ### Offical Dashboard and Metrics
@@ -127,6 +128,7 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Juho Teperi](https://github.com/Deraen)
 - [Nicolas Ha](https://github.com/nha)
 - [Andrew Meredith](https://github.com/kendru)
+- [Bridget Hillyer](https://github.com/bridgethillyer)
 
 #### Acknowledgements
 
