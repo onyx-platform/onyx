@@ -28,7 +28,7 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :b
-                    :onyx/fn :onyx.log.two-job-test/my-inc
+                    :onyx/fn ::my-inc
                     :onyx/type :function
                     :onyx/batch-size 20}
 
@@ -45,7 +45,7 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :e
-                    :onyx/fn :onyx.log.two-job-test/my-inc
+                    :onyx/fn ::my-inc
                     :onyx/type :function
                     :onyx/batch-size 20}
 
@@ -67,7 +67,7 @@
         ch (chan n-peers)
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
-    (testing "peers balanced on 2 jobs" 
+    (testing "peers balanced on 2 jobs"
       (is (= [{(:id (:a (:task-ids j1))) 2
                (:id (:b (:task-ids j1))) 2
                (:id (:c (:task-ids j1))) 2}

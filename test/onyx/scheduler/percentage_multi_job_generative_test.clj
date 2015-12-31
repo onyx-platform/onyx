@@ -50,7 +50,7 @@
                           :onyx/batch-size 20}]
                :task-scheduler :onyx.task-scheduler/balanced}] 
     (checking
-      "Checking percentage multi job test, replicates onyx.log.percentage-multi-job-test"
+      "Checking percentage multi job test, replicates onyx.scheduling.percentage-multi-job-test"
       (times 50)
       [{:keys [replica log peer-choices]}
        (log-gen/apply-entries-gen
