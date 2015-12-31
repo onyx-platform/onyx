@@ -9,7 +9,7 @@
             [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
   (:import [org.btrplace.model Model DefaultModel]
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence]
-           [org.btrplace.scheduler.choco DefaultChocoScheduler]))
+           [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
 (defn job-upper-bound [replica job]
   ;; We need to handle a special case here when figuring out the upper saturation limit.

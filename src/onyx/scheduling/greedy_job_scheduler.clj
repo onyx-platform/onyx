@@ -10,7 +10,7 @@
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
   [replica jobs]
   (if (seq jobs)
-    (let [[active & passive] (:jobs replica)]
+    (let [[active & passive] jobs]
       (merge {active (count (:peers replica))} (zipmap passive (repeat 0))))
     {}))
 
