@@ -243,7 +243,7 @@
          (if-let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
            (-> result
                (update-in [:peer-sites] dissoc peer-id)
-               (update-peer-site result task-id peer-id))
+               (update-peer-site task-id peer-id))
            (update-peer-site result task-id peer-id))
          result)))
    new-replica
@@ -265,7 +265,7 @@
                  prev-task-id (:task prev-allocation)]
              (-> result
                  (update-in [:task-slot-ids prev-job-id prev-task-id] dissoc peer-id)
-                 (update-slot-id-for-peer result job-id task-id peer-id)))
+                 (update-slot-id-for-peer job-id task-id peer-id)))
            (update-slot-id-for-peer result job-id task-id peer-id))
          result)))
    new-replica

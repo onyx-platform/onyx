@@ -26,13 +26,14 @@
    we try to. It's a best effort, though, so if it's not possible
    we proceed anyway."
   [replica peers]
-  (let [preferences (map (fn [peer]
-                           (let [colocated-peers (find-physically-colocated-peers replica peer)
-                                 statuses (map #(let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) %)]
-                                                  (exempt-from-acker? replica job task))
-                                               colocated-peers)]
-                             (some #{true} statuses)))
-                         peers)]
+  (let [preferences
+        (map (fn [peer]
+               (let [colocated-peers (find-physically-colocated-peers replica peer)
+                     statuses (map #(let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) %)]
+                                      (exempt-from-acker? replica job task))
+                                   colocated-peers)]
+                 (some #{true} statuses)))
+             peers)]
     (->> peers
          (map list preferences)
          (sort-by first)
