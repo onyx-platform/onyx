@@ -50,21 +50,40 @@
   (filter #(or (= (:lifecycle/task %) :all)
                (= (:lifecycle/task %) task-name)) lifecycles))
 
+(defn resolve-lifecycle-functions [lifecycles phase invoker]
+  (remove
+   nil?
+   (map
+    (fn [lifecycle]
+      (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
+        (when-let [g (get calls-map phase)]
+          (invoker lifecycle g))))
+    lifecycles)))
+
 (defn compile-start-task-functions [lifecycles task-name]
   (let [matched (select-applicable-lifecycles lifecycles task-name)
-        fs
-        (remove
-         nil?
-         (map
-          (fn [lifecycle]
-            (let [calls-map (resolve-lifecycle-calls (:lifecycle/calls lifecycle))]
-              (when-let [g (:lifecycle/start-task? calls-map)]
-                (fn [x] (g x lifecycle)))))
-          matched))]
+        fs (resolve-lifecycle-functions matched
+                                        :lifecycle/start-task?
+                                        (fn [lifecycle f]
+                                          (fn [event]
+                                            (f event lifecycle))))]
     (fn [event]
       (if (seq fs)
         (every? true? ((apply juxt fs) event))
         true))))
+
+(defn compile-lifecycle-handle-exception-functions [lifecycles task-name]
+  (let [matched (select-applicable-lifecycles lifecycles task-name)
+        fs (resolve-lifecycle-functions matched
+                                        :lifecycle/handle-exception
+                                        (fn [lifecycle f]
+                                          (fn [event phase e]
+                                            (f event lifecycle phase e))))]
+    (fn [event phase e]
+      (if (seq fs)
+        (let [results ((apply juxt fs) event phase e)]
+          (or (first (filter (partial not= :defer) results)) :kill))
+        :kill))))
 
 (defn compile-lifecycle-functions [lifecycles task-name kw]
   (let [matched (select-applicable-lifecycles lifecycles task-name)]
@@ -111,6 +130,9 @@
 
 (defn compile-after-retry-segment-functions [lifecycles task-name]
   (compile-ack-retry-lifecycle-functions lifecycles task-name :lifecycle/after-retry-segment))
+
+(defn compile-handle-exception-functions [lifecycles task-name]
+  (compile-lifecycle-handle-exception-functions lifecycles task-name))
 
 (defn task-map->grouping-fn [task-map]
   (if-let [group-key (:onyx/group-by-key task-map)]
@@ -245,4 +267,6 @@
       (assoc :onyx.core/compiled-after-ack-segment-fn
              (compile-after-ack-segment-functions lifecycles task-name))
       (assoc :onyx.core/compiled-after-retry-segment-fn
-             (compile-after-retry-segment-functions lifecycles task-name))))
+             (compile-after-retry-segment-functions lifecycles task-name))
+      (assoc :onyx.core/compiled-handle-exception-fn
+             (compile-handle-exception-functions lifecycles task-name))))
