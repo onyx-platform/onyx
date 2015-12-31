@@ -115,17 +115,17 @@
         v-peers (onyx.api/start-peers n-peers peer-group)
         ch (chan n-peers)
 
-        replica-1 (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)
+        replica-1 (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 6000)
         counts-1 (get-counts replica-1 [j1 j2])
         _ (>!! a-chan :done)
         _ (close! a-chan)
 
-        replica-2 (playback-log (:log env) replica-1 ch 2000)
+        replica-2 (playback-log (:log env) replica-1 ch 6000)
         counts-2 (get-counts replica-2 [j1 j2])
         _ (>!! c-chan :done)
         _ (close! c-chan)
 
-        replica-3 (playback-log (:log env) replica-2 ch 2000)
+        replica-3 (playback-log (:log env) replica-2 ch 6000)
         counts-3 (get-counts replica-3 [j1 j2])
         _ (close! b-chan)
         _ (close! d-chan)]
