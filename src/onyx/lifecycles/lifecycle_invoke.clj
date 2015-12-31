@@ -11,7 +11,9 @@
 
               (= action :restart)
               (do (>!! (:onyx.core/restart-ch event) true)
-                  (throw t))
+                  (throw (ex-info "Jumping out of task lifecycle for a clean restart."
+                                  {:onyx.core/lifecycle-restart? true
+                                   :original-exception t})))
 
               :else
               (throw (ex-info

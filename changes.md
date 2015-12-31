@@ -1,6 +1,21 @@
+#### 0.8.4
+
+- Bug fix: Fixed a bug where `:flow/from` -> `:all` didn't match compilation step. [#464](https://github.com/onyx-platform/onyx/issues/464)
+
 #### 0.8.3
-- Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`.
-- Fixed method dispatch bug for punctuation triggers.
+- **Breaking change**: Removed `:onyx.messaging.aeron/inter-service-timeout-ns` peer config setting. Client liveness timeout is now completely set via java property: `aeron.client.liveness.timeout`
+- New feature: Serialize the exception that kills a job to ZooKeeper
+- New monitoring metrics: `zookeeper-write-exception` and `zookeeper-read-exception`
+- New peer configuration parameter: `onyx.zookeeper/prepare-failure-detection-interval`
+- Bug fix: Fixed method dispatch bug for punctuation triggers
+- Bug fix: Fixed `:trigger/pred` not being in the validation schema
+- Bug fix: Fixed `:trigger/watermark-percentage` not being in the validation schema
+- Bug fix: Fixed issue where peers would not reconnect after losing connection to ZooKeeper.
+- Bug fix: Fixed race condition where ephemeral node would not release in time, deadlocking peers on start up.
+- Enhancement: Added extra schema validation to the `onyx.api` public functions
+- Enhancement: Added `:added` keys to the information model
+- Dependency change: Upgraded `org.apache.bookkeeper/bookkeeper-server` to `4.3.2`
+- Dependency change: Upgraded `uk.co.real-logic/aeron-all` to `0.2.2`
 
 #### 0.8.2
 - Changed job specification returned by onyx.api/submit-job. task-ids are now keyed by task name.

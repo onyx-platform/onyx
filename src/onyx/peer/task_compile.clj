@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.peer.task-compile
-  (:require [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+  (:require [clojure.set :refer [subset?]]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
@@ -21,11 +22,12 @@
   (assoc event :onyx.core/windows (wc/resolve-windows windows)))
 
 (defn flow-conditions->event-map [event flow-conditions task-name]
-  (-> event
-      (assoc :onyx.core/compiled-norm-fcs
-             (fc/compile-fc-happy-path flow-conditions task-name))
-      (assoc :onyx.core/compiled-ex-fcs
-             (fc/compile-fc-exception-path flow-conditions task-name))))
+  (let [workflow (:onyx.core/workflow event)]
+    (-> event
+        (assoc :onyx.core/compiled-norm-fcs
+               (fc/compile-fc-happy-path flow-conditions workflow task-name))
+        (assoc :onyx.core/compiled-ex-fcs
+               (fc/compile-fc-exception-path flow-conditions workflow task-name)))))
 
 (defn lifecycles->event-map [event lifecycles task-name]
   (-> event
