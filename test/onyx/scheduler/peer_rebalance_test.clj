@@ -1,4 +1,4 @@
-(ns onyx.log.peer-rebalance-test
+(ns onyx.scheduler.peer-rebalance-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]

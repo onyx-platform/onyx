@@ -1,4 +1,4 @@
-(ns onyx.log.percentage-multi-job-generative-test
+(ns onyx.scheduler.percentage-multi-job-generative-test
   (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]

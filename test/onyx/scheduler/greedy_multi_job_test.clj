@@ -1,4 +1,4 @@
-(ns onyx.log.greedy-multi-job-test
+(ns onyx.scheduler.greedy-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log get-counts]]

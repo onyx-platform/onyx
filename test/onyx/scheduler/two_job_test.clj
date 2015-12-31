@@ -1,4 +1,4 @@
-(ns onyx.log.two-job-test
+(ns onyx.scheduler.two-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.plugin.core-async :refer [take-segments!]]

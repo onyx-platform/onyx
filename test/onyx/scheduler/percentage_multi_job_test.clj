@@ -1,4 +1,4 @@
-(ns onyx.log.percentage-multi-job-test
+(ns onyx.scheduler.percentage-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.plugin.core-async :refer [take-segments!]]
