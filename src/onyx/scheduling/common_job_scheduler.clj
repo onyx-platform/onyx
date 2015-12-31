@@ -57,10 +57,6 @@
   (fn [replica jobs n]
     (:job-scheduler replica)))
 
-(defmulti sort-job-priority
-  (fn [replica jobs]
-    (:job-scheduler replica)))
-
 (defmethod job-offer-n-peers :default
   [replica jobs]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
@@ -71,29 +67,8 @@
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
-(defmethod sort-job-priority :default
-  [replica jobs]
-  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
-                  {:job-scheduler (:job-scheduler replica)})))
-
 (defn replica->job-peers [replica job-id]
   (apply concat (vals (get-in replica [:allocations job-id]))))
-
-(defn current-job-allocations [replica]
-  (into {}
-        (map (fn [j]
-               {j (count (remove nil? (replica->job-peers replica j)))})
-             (:jobs replica))))
-
-(defn current-task-allocations [replica]
-  (into
-   {}
-   (map (fn [j]
-          {j (into {}
-                   (map (fn [t]
-                          {t (count (remove nil? (get-in replica [:allocations j t])))})
-                        (get-in replica [:tasks j])))})
-        (:jobs replica))))
 
 (defn job-claim-peers [replica job-offers]
   (reduce-kv
@@ -104,63 +79,6 @@
        (assoc all j 0)))
    {}
    job-offers))
-
-(defn reallocate-peers [origin-replica displaced-peers max-utilization]
-  (loop [peer-pool displaced-peers
-         replica origin-replica]
-    (let [candidate-jobs (remove
-                          nil?
-                          (mapcat
-                           (fn [job]
-                             (let [current (get (current-task-allocations replica) job)
-                                   desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job 0))
-                                   tasks (get-in replica [:tasks job])]
-                               (map (fn [t]
-                                      (when (< (get current t 0) (get desired t))
-                                        [job t]))
-                                    tasks)))
-                           (sort-job-priority replica (:jobs replica))))]
-      (if (and (seq peer-pool) (seq candidate-jobs))
-        (recur (rest peer-pool)
-               (let [peer (first peer-pool)
-                     [job-id task-id] (first candidate-jobs)]
-                 (-> replica
-                     (common/remove-peers peer)
-                     (assoc-in [:peer-state peer] :idle)
-                     (update-in [:peer-sites peer] (fn [peer-site] 
-                                                     (merge peer-site 
-                                                            (extensions/assign-task-resources replica
-                                                                                              peer
-                                                                                              task-id
-                                                                                              peer-site
-                                                                                              (:peer-sites replica)))))
-                     (update-in [:allocations job-id task-id]
-                                (fn [allocation]
-                                  (vec (conj allocation peer))))
-                     (update-in [:task-slot-ids job-id task-id]
-                                (fn [slot-ids]
-                                  (let [slot-id (first 
-                                                  (remove (set (vals slot-ids))
-                                                          (range)))]
-                                    (assoc slot-ids peer slot-id)))))))
-        replica))))
-
-(defn find-unused-peers [replica]
-  (let [used-peers (apply concat (mapcat vals (vals (get-in replica [:allocations]))))]
-    (clojure.set/difference (set (:peers replica)) (set used-peers))))
-
-(defn find-displaced-peers [replica current-allocations max-util]
-  (distinct
-   (concat
-    (find-unused-peers replica)
-    (remove
-     nil?
-     (mapcat
-      (fn [job]
-        (let [overflow (- (get current-allocations job 0) (get max-util job 0))]
-          (when (pos? overflow)
-            (cts/drop-peers replica job overflow))))
-      (:jobs replica))))))
 
 (defn exempt-from-acker? [replica job task]
   (or (some #{task} (get-in replica [:exempt-tasks job]))
@@ -258,14 +176,6 @@
          (reduced false))))
    true
    (keys utilization)))
-
-(defmulti equivalent-allocation?
-  (fn [replica replica-new]
-    (:job-scheduler replica)))
-
-(defmethod equivalent-allocation? :default
-  [_ _]
-  false)
 
 (defn unrolled-tasks [replica task-utilization]
   (mapcat
@@ -462,17 +372,6 @@
                 (assign-task-resources original-replica peer->task)
                 (assign-task-slot-ids original-replica peer->task))))))
     replica))
-
-;;; [x] remove resource limits on nodes.
-;;; [x] add constant seed for generators
-;;; [x] Grouping recovery flux policy
-;;; [x] handle planning not coming up with a solution
-;;; [x] skip jobs that don't get enough peers.
-;;; [x] don't try to allocate all the peers
-;;; [x] don't make all peers idle
-;;; [x] don't change all task slots
-;;; [x] don't reallocate all task resources
-;;; [x] fix jitter
 
 (defn reconfigure-cluster-workload [replica]
   (loop [jobs (:jobs replica)
