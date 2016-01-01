@@ -293,8 +293,8 @@
   (let [allocations (reduce-kv #(update-in %1 %3 (comp vec conj) %2) {} peer->task)]
     (assoc replica :allocations allocations)))
 
-(defn btr-place-scheduling [replica job-utilization capacities]
-  (if (seq (:jobs replica))
+(defn btr-place-scheduling [replica jobs job-utilization capacities]
+  (if (seq jobs)
     (let [model (DefaultModel.)
           ;; Hard code the random seed to make it deterministic
           ;; across peers.
@@ -332,7 +332,7 @@
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)
-            updated-replica (btr-place-scheduling current-replica max-utilization planned-capacities)]
+            updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
         (if updated-replica
           (let [acker-replica (choose-ackers updated-replica jobs)]
             (if (full-allocation? acker-replica max-utilization planned-capacities)
