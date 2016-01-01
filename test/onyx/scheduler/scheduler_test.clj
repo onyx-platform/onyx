@@ -209,3 +209,22 @@
          :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
          :messaging {:onyx.messaging/impl :aeron}})))))
+
+(deftest percentage-grouping-task-tilt
+  (is
+   (= {:j1 {:t1 [:p2 :p4]
+            :t2 [:p3 :p9 :p10 :p6]
+            :t3 [:p5 :p8 :p1 :p7]}}
+    (:allocations
+     (reconfigure-cluster-workload
+      {:job-scheduler :onyx.job-scheduler/greedy
+       :task-percentages {:j1 {:t1 20 :t2 30 :t3 50}}
+       :peers [:p7 :p10 :p9 :p1 :p2 :p6 :p4 :p3 :p5 :p8]
+       :min-required-peers {:j1 {:t1 1 :t2 4 :t3 1}}
+       :jobs [:j1]
+       :tasks {:j1 [:t1 :t2 :t3]}
+       :flux-policies {:j1 {:t2 :kill}}
+       :messaging {:onyx.messaging/impl :dummy-messenger}
+       :allocations {:j1 {}}
+       :task-schedulers {:j1 :onyx.task-scheduler/percentage}
+       :task-saturation {:j1 {:t1 1000 :t2 4 :t3 1000}}})))))
