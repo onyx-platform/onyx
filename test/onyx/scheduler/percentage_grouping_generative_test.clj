@@ -1,19 +1,17 @@
 (ns onyx.scheduler.percentage-grouping-generative-test
-  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.log.generators :as log-gen]
-            [onyx.extensions :as extensions]
-            [onyx.system]
-            [onyx.api :as api]
-            [onyx.static.planning :as planning]
-            [onyx.test-helper :refer [job-allocation-counts]]
+  (:require [clojure.test :refer :all]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test :refer :all]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
+            [onyx.log.replica-invariants :refer [standard-invariants]]
+            [onyx.log.generators :as log-gen]
+            [onyx.test-helper :refer [job-allocation-counts]]
+            [onyx.static.planning :as planning]
+            [onyx.api :as api]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 

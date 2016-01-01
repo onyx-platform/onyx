@@ -21,6 +21,25 @@
            (update-in task [:pct] / total))
          tasks)))
 
+(defn remove-grouping-tasks [replica job-id allocations]
+  (remove
+   (fn [[planned-task allocation]]
+     (not (nil? (get-in replica [:flux-policies job-id (:task planned-task)]))))
+   allocations))
+
+(defn reduce-overallocated-peers
+  "Turns down the number of peers for tasks where
+   we overallocated. This can happen if a grouping task
+   is allocated a higher number of peers than its percentage
+   value requests. Other tasks must give up peers to compensate.
+   Tasks with the highest peer count are prioritized to be
+   reduced first."
+  [replica job-id planned-allocations]
+  (let [sorted-allocations (reverse (sort-by second planned-allocations))
+        non-grouping-tasks (remove-grouping-tasks replica job-id sorted-allocations)
+        target-task (update-in (first non-grouping-tasks) [1] dec)]
+    (merge planned-allocations target-task)))
+
 (defn largest-remainder-allocations
   "Allocates remaining peers to the tasks with the largest remainder.
   e.g. 3 tasks pct allocated 3.5, 1.75, 1.75 -> 3, 2, 2"
@@ -50,6 +69,9 @@
                         (take remaining)
                         (map (juxt first (constantly 1)))
                         (into {}))
+        full-allocated (if (neg? remaining)
+                         (reduce-overallocated-peers replica job full-allocated)
+                         full-allocated)
         final-allocations (merge-with + full-allocated remainders)]
     (mapv (fn [[task allocation]]
             (assoc task :allocation (int allocation)))
