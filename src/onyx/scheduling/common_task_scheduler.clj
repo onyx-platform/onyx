@@ -25,3 +25,7 @@
                   {:task-scheduler (get-in replica [:task-schedulers job])
                    :replica replica
                    :job job})))
+
+(defmethod task-constraints :default
+  [replica peer->vm task->node job-id]
+  [])

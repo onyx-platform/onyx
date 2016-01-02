@@ -27,7 +27,7 @@
 
 (deftest jitter-on-add-peer
   (is
-   (= {:j1 {:t1 [:p4 :p5] :t2 [:p2] :t3 [:p7]}
+   (= {:j1 {:t1 [:p4 :p7] :t2 [:p2] :t3 [:p5]}
        :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p1]}}
       (:allocations
        (reconfigure-cluster-workload
@@ -86,8 +86,8 @@
 
 (deftest even-distribution
   (is
-   (= {:j1 {:t1 [:p6] :t2 [:p2] :t3 [:p1]}
-       :j2 {:t4 [:p5] :t5 [:p3] :t6 [:p4]}}
+   (= {:j1 {:t1 [:p5] :t2 [:p2] :t3 [:p1]}
+       :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p4]}}
       (:allocations
        (reconfigure-cluster-workload
         {:jobs [:j1 :j2]
@@ -101,8 +101,8 @@
 
 (deftest prefer-earlier-job
   (is
-   (= {:j1 {:t1 [:p6 :p7] :t2 [:p2] :t3 [:p1]}
-       :j2 {:t4 [:p5] :t5 [:p3] :t6 [:p4]}}
+   (= {:j1 {:t1 [:p5 :p7] :t2 [:p2] :t3 [:p1]}
+       :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p4]}}
       (:allocations
        (reconfigure-cluster-workload
         {:jobs [:j1 :j2]
@@ -212,19 +212,19 @@
 
 (deftest percentage-grouping-task-tilt
   (is
-   (= {:j1 {:t1 [:p2 :p4]
-            :t2 [:p3 :p9 :p10 :p6]
-            :t3 [:p5 :p8 :p1 :p7]}}
-    (:allocations
-     (reconfigure-cluster-workload
-      {:job-scheduler :onyx.job-scheduler/greedy
-       :task-percentages {:j1 {:t1 20 :t2 30 :t3 50}}
-       :peers [:p7 :p10 :p9 :p1 :p2 :p6 :p4 :p3 :p5 :p8]
-       :min-required-peers {:j1 {:t1 1 :t2 4 :t3 1}}
-       :jobs [:j1]
-       :tasks {:j1 [:t1 :t2 :t3]}
-       :flux-policies {:j1 {:t2 :kill}}
-       :messaging {:onyx.messaging/impl :dummy-messenger}
-       :allocations {:j1 {}}
-       :task-schedulers {:j1 :onyx.task-scheduler/percentage}
-       :task-saturation {:j1 {:t1 1000 :t2 4 :t3 1000}}})))))
+   (= {:j1 {:t1 [:p5 :p8]
+            :t2 [:p1 :p7 :p10 :p6]
+            :t3 [:p2 :p4 :p3 :p9]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:job-scheduler :onyx.job-scheduler/greedy
+         :task-percentages {:j1 {:t1 20 :t2 30 :t3 50}}
+         :peers [:p7 :p10 :p9 :p1 :p2 :p6 :p4 :p3 :p5 :p8]
+         :min-required-peers {:j1 {:t1 1 :t2 4 :t3 1}}
+         :jobs [:j1]
+         :tasks {:j1 [:t1 :t2 :t3]}
+         :flux-policies {:j1 {:t2 :kill}}
+         :messaging {:onyx.messaging/impl :aeron}
+         :allocations {:j1 {}}
+         :task-schedulers {:j1 :onyx.task-scheduler/percentage}
+         :task-saturation {:j1 {:t1 1000 :t2 4 :t3 1000}}})))))
