@@ -1,4 +1,4 @@
-(ns onyx.log.percentage-multi-job-test
+(ns onyx.scheduler.percentage-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -60,21 +60,21 @@
         replica-2 (playback-log (:log env) replica ch 10000)]
 
     (testing "70/30% split for percentage job scheduler succeeded"
-      (is (= [7 3] 
+      (is (= [7 3]
              (map (partial apply +)
-                  (get-counts replica [j1 j2])))))
+                  (map vals (get-counts replica [j1 j2]))))))
 
     (testing "70/30% split for percentage job scheduler succeeded after rebalance"
       (is (= [14 6] 
              (map (partial apply +)
-                  (get-counts replica-2 [j1 j2])))))
+                  (map vals (get-counts replica-2 [j1 j2]))))))
 
-(doseq [v-peer v-peers-1]
-  (onyx.api/shutdown-peer v-peer))
+    (doseq [v-peer v-peers-1]
+      (onyx.api/shutdown-peer v-peer))
 
-(doseq [v-peer v-peers-2]
-  (onyx.api/shutdown-peer v-peer))
+    (doseq [v-peer v-peers-2]
+      (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-env env)
+    (onyx.api/shutdown-env env)
 
-(onyx.api/shutdown-peer-group peer-group))) 
+    (onyx.api/shutdown-peer-group peer-group)))

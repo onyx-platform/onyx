@@ -3,7 +3,7 @@
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.extensions :as extensions]
-            [onyx.test-helper :refer [with-test-env load-config playback-log get-counts]]
+            [onyx.test-helper :refer [with-test-env load-config playback-log]]
             [onyx.api]))
 
 (def n-messages 100)

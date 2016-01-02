@@ -5,7 +5,7 @@
             [onyx.log.commands.common :as common]))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/balanced
-  [{:keys [jobs peers] :as replica}]
+  [{:keys [peers] :as replica} jobs]
   (if (seq jobs)
     (let [j (count jobs)
           p (count peers)
@@ -18,12 +18,6 @@
        {}
        (map vector jobs (range))))
     {}))
-
-(defmethod cjs/sort-job-priority :onyx.job-scheduler/balanced
-  [replica jobs]
-  (sort-by (juxt #(common/job-peer-count replica %)
-                 #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
-           (:jobs replica)))
 
 ;; filter out saturated, then sort by is-covered? (yes before no),
 ;; then by number of allocated peers
@@ -42,15 +36,6 @@
        (remove (fn [[job-id peer-count]]
                  (>= peer-count (cjs/job-upper-bound replica job-id))))
        (ffirst)))
-
-(defmethod cjs/equivalent-allocation? :onyx.job-scheduler/balanced
-  [replica replica-new]
-  (= (sort (map (fn [[job-id _]]
-                  (common/job-peer-count replica job-id))
-                (:allocations replica)))
-     (sort (map (fn [[job-id _]]
-                  (common/job-peer-count replica-new job-id))
-                (:allocations replica-new)))))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/balanced
   [replica jobs n]

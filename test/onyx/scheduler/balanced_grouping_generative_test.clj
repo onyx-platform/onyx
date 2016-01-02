@@ -1,4 +1,4 @@
-(ns onyx.log.percentage-grouping-generative-test
+(ns onyx.scheduler.balanced-grouping-generative-test
   (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
@@ -11,9 +11,11 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
+            [onyx.log.commands.common :as common]
             [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
-            [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            [taoensso.timbre :refer [info]]))
 
 (def onyx-id (java.util.UUID/randomUUID))
 
@@ -32,7 +34,6 @@
               :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
               :onyx/medium :dummy
-              :onyx/percentage 20
               :onyx/batch-size 20}
 
              {:onyx/name :b
@@ -42,18 +43,16 @@
               :onyx/min-peers 4
               :onyx/max-peers 4
               :onyx/flux-policy :kill
-              :onyx/percentage 30
               :onyx/batch-size 20}
 
              {:onyx/name :c
               :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
               :onyx/medium :dummy
-              :onyx/percentage 50
               :onyx/batch-size 20}]
-   :task-scheduler :onyx.task-scheduler/percentage})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def job-2-id #uuid "60180f08-60b9-4584-9900-93dbbe2c3905")
+(def job-2-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
 
 (def job-2
   {:workflow [[:a :b] [:b :c]]
@@ -61,25 +60,22 @@
               :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
               :onyx/medium :dummy
-              :onyx/percentage 20
               :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
               :onyx/type :function
               :onyx/group-by-kw :mock-key
-              :onyx/min-peers 4
-              :onyx/flux-policy :kill
-              :onyx/percentage 60
+              :onyx/min-peers 10
+              :onyx/flux-policy :continue
               :onyx/batch-size 20}
 
              {:onyx/name :c
               :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
               :onyx/medium :dummy
-              :onyx/percentage 20
               :onyx/batch-size 20}]
-   :task-scheduler :onyx.task-scheduler/percentage})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def job-3-id #uuid "5813d2ec-c486-4428-833d-e8373910ae14")
 
@@ -89,27 +85,24 @@
               :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
               :onyx/medium :dummy
-              :onyx/percentage 20
               :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
               :onyx/type :function
               :onyx/group-by-kw :mock-key
-              :onyx/min-peers 10
-              :onyx/percentage 50
-              :onyx/flux-policy :continue
+              :onyx/min-peers 2
+              :onyx/flux-policy :kill
               :onyx/batch-size 20}
 
              {:onyx/name :c
               :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
               :onyx/medium :dummy
-              :onyx/percentage 30
               :onyx/batch-size 20}]
-   :task-scheduler :onyx.task-scheduler/percentage})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def job-4-id #uuid "c4774cac-57d0-4993-b19e-3d1de20e61ca")
+(def job-4-id #uuid "60180f08-60b9-4584-9900-93dbbe2c3905")
 
 (def job-4
   {:workflow [[:a :b] [:b :c]]
@@ -117,26 +110,22 @@
               :onyx/plugin :onyx.test-helper/dummy-input
               :onyx/type :input
               :onyx/medium :dummy
-              :onyx/percentage 25
-              :onyx/max-peers 1
               :onyx/batch-size 20}
 
              {:onyx/name :b
               :onyx/fn :mock/fn
               :onyx/type :function
               :onyx/group-by-kw :mock-key
-              :onyx/min-peers 3
-              :onyx/percentage 50
-              :onyx/flux-policy :continue
+              :onyx/min-peers 4
+              :onyx/flux-policy :kill
               :onyx/batch-size 20}
 
              {:onyx/name :c
               :onyx/plugin :onyx.test-helper/dummy-output
               :onyx/type :output
               :onyx/medium :dummy
-              :onyx/percentage 25
               :onyx/batch-size 20}]
-   :task-scheduler :onyx.task-scheduler/percentage})
+   :task-scheduler :onyx.task-scheduler/balanced})
 
 (deftest min-peers-one-job-upper-bound
   (let [rets (api/create-submit-job-entry
@@ -145,8 +134,7 @@
               job-1
               (planning/discover-tasks (:catalog job-1) (:workflow job-1)))]
     (checking
-     "Checking that exactly 4 peers are assigned to task B, and that the extra 10%
-      needed to get 4 peers for B are taken from task C."
+     "Checking that exactly 4 peers are assigned to task B."
      (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
@@ -154,24 +142,24 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
                          :job-1 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
        (standard-invariants replica)
-       (is (= 2 (count (get (get (:allocations replica) job-1-id) t1))))
+       (is (= 1 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
-       (is (= 4 (count (get (get (:allocations replica) job-1-id) t3))))))))
+       (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
 
 (deftest min-peers-one-job-no-upper-bound
   (let [rets (api/create-submit-job-entry
-              job-2-id
+              job-4-id
               peer-config
-              job-2
-              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
+              job-4
+              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
     (checking
-     "Checking that 6 tasks are assigned to B."
+     "Checking at least 4 tasks are assigned to B."
      (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
@@ -179,24 +167,29 @@
         {:replica {:job-scheduler :onyx.job-scheduler/greedy
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
-         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
-                         :job-2 {:queue [rets]})
+         :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 14))
+                         :job-4 {:queue [rets]})
          :log []
          :peer-choices []}))]
-     (let [[t1 t2 t3] (:tasks (:args rets))
-           c1 (count (get (get (:allocations replica) job-2-id) t1))
-           c2 (count (get (get (:allocations replica) job-2-id) t2))
-           c3 (count (get (get (:allocations replica) job-2-id) t3))]
+     (let [[t1 t2 t3] (:tasks (:args rets))]
        (standard-invariants replica)
-       (is (>= c2 4))
-       (is (= 10 (+ c1 c2 c3)))))))
+       ;; If the job is submitted first, the second case occurs. Otherwise the first
+       ;; case pins task B to 4 peers.
+       (is
+        (= true
+           (or (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+                    (= 4 (count (get (get (:allocations replica) job-4-id) t2)))
+                    (= 5 (count (get (get (:allocations replica) job-4-id) t3))))
+               (and (= 5 (count (get (get (:allocations replica) job-4-id) t1)))
+                    (= 5 (count (get (get (:allocations replica) job-4-id) t2)))
+                    (= 4 (count (get (get (:allocations replica) job-4-id) t3)))))))))))
 
 (deftest min-peers-not-enough-peers
   (let [rets (api/create-submit-job-entry
-              job-3-id
+              job-2-id
               peer-config
-              job-3
-              (planning/discover-tasks (:catalog job-3) (:workflow job-3)))]
+              job-2
+              (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
      "Checking no peers are ever allocated to this job since this job needs at least
       12 peers to run."
@@ -208,38 +201,47 @@
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 6))
-                         :job-3 {:queue [rets]})
+                         :job-2 {:queue [rets]})
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
        (standard-invariants replica)
-       (is (= 0 (count (get (get (:allocations replica) job-3-id) t1))))
-       (is (= 0 (count (get (get (:allocations replica) job-3-id) t2))))
-       (is (= 0 (count (get (get (:allocations replica) job-3-id) t3))))))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
 
-(deftest min-and-max-peers-compose
-  (let [rets (api/create-submit-job-entry
-              job-4-id
-              peer-config
-              job-4
-              (planning/discover-tasks (:catalog job-4) (:workflow job-4)))]
+(deftest combined-jobs
+  (let [job-1-rets (api/create-submit-job-entry
+                    job-1-id
+                    peer-config
+                    job-1
+                    (planning/discover-tasks (:catalog job-1) (:workflow job-1)))
+        job-2-rets (api/create-submit-job-entry
+                    job-2-id
+                    peer-config
+                    job-2
+                    (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]
     (checking
-     "Checking that using min and max peers in the same catalog works together"
+     "Checking peers are allocated to job 1 even though job 2 is submitted and can't start."
      (times 50)
      [{:keys [replica log peer-choices]}
       (log-gen/apply-entries-gen
        (gen/return
-        {:replica {:job-scheduler :onyx.job-scheduler/greedy
+        {:replica {:job-scheduler :onyx.job-scheduler/balanced
                    :messaging {:onyx.messaging/impl :dummy-messenger}}
          :message-id 0
          :entries (assoc (log-gen/generate-join-queues (log-gen/generate-peer-ids 10))
-                         :job-4 {:queue [rets]})
+                         :job-1 {:queue [job-1-rets]}
+                         :job-2 {:queue [job-2-rets]})
          :log []
          :peer-choices []}))]
-     (let [[t1 t2 t3] (:tasks (:args rets))]
+     (let [[t1 t2 t3] (:tasks (:args job-1-rets))
+           [t4 t5 t6] (:tasks (:args job-2-rets))]
        (standard-invariants replica)
-       (is (= 1 (count (get (get (:allocations replica) job-4-id) t1))))
-       (is (<= 3 (count (get (get (:allocations replica) job-4-id) t2))))
-       (is (>= 6 (count (get (get (:allocations replica) job-4-id) t3))))
-       (is (= 9 (+ (count (get (get (:allocations replica) job-4-id) t2))
-                   (count (get (get (:allocations replica) job-4-id) t3)))))))))
+       (is (= 3 (count (get (get (:allocations replica) job-1-id) t1))))
+       (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
+       (is (= 3 (count (get (get (:allocations replica) job-1-id) t3))))
+
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t4))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t5))))
+       (is (= 0 (count (get (get (:allocations replica) job-2-id) t6))))))))

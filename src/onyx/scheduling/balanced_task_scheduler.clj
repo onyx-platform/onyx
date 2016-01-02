@@ -3,26 +3,6 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]))
 
-(defmethod cts/drop-peers :onyx.task-scheduler/balanced
-  [replica job n]
-  (first
-   (reduce
-    (fn [[peers-to-drop allocations] _]
-      (let [max-peers (->> allocations
-                           (remove (fn [[task peers]]
-                                     (= (count peers) (get-in replica [:min-required-peers job task] 1))))
-                           (sort-by (fn [[task peers]]
-                                      (count peers)))
-                           reverse
-                           first
-                           second
-                           count)
-            task-most-peers (ffirst (filter (fn [x] (= max-peers (count (second x)))) allocations))]
-        [(conj peers-to-drop (last (allocations task-most-peers)))
-         (update-in allocations [task-most-peers] butlast)]))
-    [[] (cts/filter-grouped-tasks replica job (get-in replica [:allocations job]))]
-    (range n))))
-
 (defn reuse-spare-peers [replica job tasks spare-peers]
   (loop [task-seq (into #{} (get-in replica [:tasks job]))
          results tasks

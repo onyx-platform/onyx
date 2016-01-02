@@ -14,12 +14,6 @@
       (throw (ex-info "Onyx is only supported when running on Java 8 or later." 
                       {:version version})))))
 
-(defn task-dispatch-validator [task]
-  (when (= (:onyx/name task)
-           (:onyx/type task))
-    (throw (Exception. (str "Task " (:onyx/name task)
-                            " cannot use the same value for :onyx/name as :onyx/type.")))))
-
 (defn name-and-type-not-equal [entry]
   (when (= (:onyx/name entry) (:onyx/type entry))
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))

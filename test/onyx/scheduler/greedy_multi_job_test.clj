@@ -1,4 +1,4 @@
-(ns onyx.log.greedy-multi-job-test
+(ns onyx.scheduler.greedy-multi-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.test-helper :refer [playback-log get-counts]]
@@ -79,23 +79,23 @@
                     :onyx/doc "Writes segments to a core.async channel"}]
 
         lifecycles-1 [{:lifecycle/task :a
-                       :lifecycle/calls :onyx.log.greedy-multi-job-test/a-calls}
+                       :lifecycle/calls ::a-calls}
                       {:lifecycle/task :a
                        :lifecycle/calls :onyx.plugin.core-async/reader-calls
                        :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :b
-                       :lifecycle/calls :onyx.log.greedy-multi-job-test/b-calls}
+                       :lifecycle/calls ::b-calls}
                       {:lifecycle/task :b
                        :lifecycle/calls :onyx.plugin.core-async/writer-calls
                        :core.async/allow-unsafe-concurrency? true}]
 
         lifecycles-2 [{:lifecycle/task :c
-                       :lifecycle/calls :onyx.log.greedy-multi-job-test/c-calls}
+                       :lifecycle/calls ::c-calls}
                       {:lifecycle/task :c
                        :lifecycle/calls :onyx.plugin.core-async/reader-calls
                        :core.async/allow-unsafe-concurrency? true}
                       {:lifecycle/task :d
-                       :lifecycle/calls :onyx.log.greedy-multi-job-test/d-calls}
+                       :lifecycle/calls ::d-calls}
                       {:lifecycle/task :d
                        :lifecycle/calls :onyx.plugin.core-async/writer-calls
                        :core.async/allow-unsafe-concurrency? true}]
@@ -115,35 +115,35 @@
         v-peers (onyx.api/start-peers n-peers peer-group)
         ch (chan n-peers)
 
-        replica-1 (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)
+        replica-1 (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 6000)
         counts-1 (get-counts replica-1 [j1 j2])
         _ (>!! a-chan :done)
         _ (close! a-chan)
 
-        replica-2 (playback-log (:log env) replica-1 ch 2000)
+        replica-2 (playback-log (:log env) replica-1 ch 6000)
         counts-2 (get-counts replica-2 [j1 j2])
         _ (>!! c-chan :done)
         _ (close! c-chan)
 
-
-        replica-3 (playback-log (:log env) replica-2 ch 2000)
+        replica-3 (playback-log (:log env) replica-2 ch 6000)
         counts-3 (get-counts replica-3 [j1 j2])
         _ (close! b-chan)
         _ (close! d-chan)]
 
     (testing  "5 peers were allocated to job 1, task A, 5 peers were allocated to job 1, task B"
-      (is (or (= (sort counts-1) [[0 0]] [5 5])
-              (= (sort counts-1) [[] [5 5]]))))
+      (is (= [{(:id (:a (:task-ids j1))) 5
+               (:id (:b (:task-ids j1))) 5}
+              {}]
+             counts-1)))
 
     (testing "5 peers were reallocated to job 2, task C, 5 peers were reallocated to job 2, task D"
-      (is (or (= (sort counts-2) [[0 0] [5 5]])
-              (= (sort counts-2) [[] [5 5]]))))
+      (is (= [{}
+              {(:id (:c (:task-ids j2))) 5
+               (:id (:d (:task-ids j2))) 5}]
+             counts-2)))
 
-    (testing "No peers are executing any tasks" 
-      (is 
-        (or (= counts-3 [[0 0] [0 0]])
-            (= counts-3 [[] []]))))
-
+    (testing "No peers are executing any tasks"
+      (is (= [{} {}] counts-3)))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

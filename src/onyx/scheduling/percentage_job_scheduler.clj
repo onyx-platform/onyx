@@ -3,12 +3,12 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
-(defn sort-jobs-by-pct [replica]
+(defn sort-jobs-by-pct [replica jobs]
     (let [indexed
           (map-indexed
            (fn [k j]
              {:position k :job j :pct (get-in replica [:percentages j])})
-           (reverse (:jobs replica)))]
+           (reverse jobs))]
       (reverse (sort-by (juxt :pct :position) indexed))))
 
 (defn min-allocations [jobs n-peers]
@@ -29,18 +29,12 @@
    jobs))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/percentage
-  [replica]
+  [replica jobs]
   (let [n-peers (count (:peers replica))
-        sorted-jobs (sort-jobs-by-pct replica)
+        sorted-jobs (sort-jobs-by-pct replica jobs)
         jobs-to-use (drop-jobs-overflow sorted-jobs)
         init-allocations (min-allocations jobs-to-use n-peers)]
     (into {} (map (fn [j] {(:job j) (:capacity j)}) init-allocations))))
-
-(defmethod cjs/sort-job-priority :onyx.job-scheduler/percentage
-  [replica jobs]
-  (sort-by (juxt #(common/job-peer-count replica %)
-                 #(.indexOf ^clojure.lang.PersistentVector (vec (:jobs replica)) %))
-           (:jobs replica)))
 
 (defn desired-allocation [replica job]
   (* (count (:peers replica))

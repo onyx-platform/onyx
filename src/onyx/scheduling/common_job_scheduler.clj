@@ -6,7 +6,10 @@
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [onyx.scheduling.common-task-scheduler :as cts]
-            [taoensso.timbre :refer [info]]))
+            [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
+  (:import [org.btrplace.model Model DefaultModel]
+           [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence]
+           [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
 (defn job-upper-bound [replica job]
   ;; We need to handle a special case here when figuring out the upper saturation limit.
@@ -44,51 +47,32 @@
 (defn job-coverable? [replica job n]
   (>= n (job-lower-bound replica job)))
 
+(defn job->planned-task-capacity [replica jobs-ids utilization]
+  (reduce
+   (fn [result job-id]
+     (let [job-capacity (get utilization job-id 0)
+           task-capacity (cts/task-distribute-peer-count replica job-id job-capacity)]
+       (assoc result job-id task-capacity)))
+   {}
+   jobs-ids))
+
 (defmulti job-offer-n-peers
-  (fn [replica]
+  (fn [replica jobs]
     (:job-scheduler replica)))
 
 (defmulti claim-spare-peers
   (fn [replica jobs n]
     (:job-scheduler replica)))
 
-(defmulti sort-job-priority
-  (fn [replica jobs]
-    (:job-scheduler replica)))
-
 (defmethod job-offer-n-peers :default
-  [replica]
+  [replica jobs]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
 
 (defmethod claim-spare-peers :default
-  [replica]
+  [replica jobs n]
   (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
                   {:job-scheduler (:job-scheduler replica)})))
-
-(defmethod sort-job-priority :default
-  [replica]
-  (throw (ex-info (format "Job scheduler %s not recognized" (:job-scheduler replica))
-                  {:job-scheduler (:job-scheduler replica)})))
-
-(defn replica->job-peers [replica job-id]
-  (apply concat (vals (get-in replica [:allocations job-id]))))
-
-(defn current-job-allocations [replica]
-  (into {}
-        (map (fn [j]
-               {j (count (remove nil? (replica->job-peers replica j)))})
-             (:jobs replica))))
-
-(defn current-task-allocations [replica]
-  (into
-   {}
-   (map (fn [j]
-          {j (into {}
-                   (map (fn [t]
-                          {t (count (remove nil? (get-in replica [:allocations j t])))})
-                        (get-in replica [:tasks j])))})
-        (:jobs replica))))
 
 (defn job-claim-peers [replica job-offers]
   (reduce-kv
@@ -100,121 +84,8 @@
    {}
    job-offers))
 
-(defn reallocate-peers [origin-replica displaced-peers max-utilization]
-  (loop [peer-pool displaced-peers
-         replica origin-replica]
-    (let [candidate-jobs (remove
-                          nil?
-                          (mapcat
-                           (fn [job]
-                             (let [current (get (current-task-allocations replica) job)
-                                   desired (cts/task-distribute-peer-count origin-replica job (get max-utilization job 0))
-                                   tasks (get-in replica [:tasks job])]
-                               (map (fn [t]
-                                      (when (< (get current t 0) (get desired t))
-                                        [job t]))
-                                    tasks)))
-                           (sort-job-priority replica (:jobs replica))))]
-      (if (and (seq peer-pool) (seq candidate-jobs))
-        (recur (rest peer-pool)
-               (let [peer (first peer-pool)
-                     [job-id task-id] (first candidate-jobs)]
-                 (-> replica
-                     (common/remove-peers peer)
-                     (assoc-in [:peer-state peer] :idle)
-                     (update-in [:peer-sites peer] (fn [peer-site] 
-                                                     (merge peer-site 
-                                                            (extensions/assign-task-resources replica
-                                                                                              peer
-                                                                                              task-id
-                                                                                              peer-site
-                                                                                              (:peer-sites replica)))))
-                     (update-in [:allocations job-id task-id]
-                                (fn [allocation]
-                                  (vec (conj allocation peer))))
-                     (update-in [:task-slot-ids job-id task-id]
-                                (fn [slot-ids]
-                                  (let [slot-id (first 
-                                                  (remove (set (vals slot-ids))
-                                                          (range)))]
-                                    (assoc slot-ids peer slot-id)))))))
-        replica))))
-
-(defn find-unused-peers [replica]
-  (let [used-peers (apply concat (mapcat vals (vals (get-in replica [:allocations]))))]
-    (clojure.set/difference (set (:peers replica)) (set used-peers))))
-
-(defn find-displaced-peers [replica current-allocations max-util]
-  (distinct
-   (concat
-    (find-unused-peers replica)
-    (remove
-     nil?
-     (mapcat
-      (fn [job]
-        (let [overflow (- (get current-allocations job 0) (get max-util job 0))]
-          (when (pos? overflow)
-            (cts/drop-peers replica job overflow))))
-      (:jobs replica))))))
-
-(defn exempt-from-acker? [replica job task]
-  (or (some #{task} (get-in replica [:exempt-tasks job]))
-      (and (get-in replica [:acker-exclude-inputs job])
-           (some #{task} (get-in replica [:input-tasks job])))
-      (and (get-in replica [:acker-exclude-outputs job])
-           (some #{task} (get-in replica [:output-tasks job])))))
-
-(defn find-physically-colocated-peers
-  "Takes replica and a peer. Returns a set of peers, exluding this peer,
-   that reside on the same physical machine."
-  [replica peer]
-  (let [peers (remove (fn [p] (= p peer)) (:peers replica))
-        peer-site (extensions/get-peer-site replica peer)]
-    (filter
-     (fn [p]
-       (= (extensions/get-peer-site replica p) peer-site))
-     peers)))
-
-(defn sort-acker-candidates
-  "We try to be smart about which ackers we pick. If we can avoid
-   colocating an acker and any peers executing an exempt task,
-   we try to. It's a best effort, though, so if it's not possible
-   we proceed anyway."
-  [replica peers]
-  (let [preferences (map (fn [peer]
-                           (let [colocated-peers (find-physically-colocated-peers replica peer)
-                                 statuses (map #(let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) %)]
-                                                  (exempt-from-acker? replica job task))
-                                               colocated-peers)]
-                             (some #{true} statuses)))
-                         peers)]
-    (->> peers
-         (map list preferences)
-         (sort-by first)
-         (map second))))
-
-(defn choose-acker-candidates [replica peers]
-  (sort-acker-candidates
-   replica
-   (remove
-    (fn [p]
-      (let [{:keys [job task]} (common/peer->allocated-job (:allocations replica) p)]
-        (exempt-from-acker? replica job task)))
-    peers)))
-
-(defn choose-ackers [replica]
-  (reduce
-   (fn [result job]
-     (let [peers (sort (replica->job-peers replica job))
-           pct (or (get-in result [:acker-percentage job]) 10)
-           n (int (Math/ceil (* 0.01 pct (count peers))))
-           candidates (choose-acker-candidates result peers)]
-       (assoc-in result [:ackers job] (vec (take n candidates)))))
-   replica
-   (:jobs replica)))
-
 (defn remove-job [replica job]
-  (let [peers (sort (replica->job-peers replica job))]
+  (let [peers (sort (common/replica->job-peers replica job))]
     (-> replica
         (update-in [:allocations] dissoc job)
         (update-in [:task-slot-ids] dissoc job)
@@ -240,23 +111,231 @@
    replica
    (:jobs replica)))
 
-(defmulti equivalent-allocation?
-  (fn [replica replica-new]
-    (:job-scheduler replica)))
+(defn full-allocation? [replica utilization planned-capacities]
+  (reduce
+   (fn [result job-id]
+     (let [tasks (get-in replica [:tasks job-id])
+           capacities (get planned-capacities job-id)]
+       (if (every?
+            #(= (count (get-in replica [:allocations job-id %]))
+                (get capacities %))
+            tasks)
+         true
+         (reduced false))))
+   true
+   (keys utilization)))
 
-(defmethod equivalent-allocation? :default
-  [_ _]
-  false)
+(defn unrolled-tasks [replica task-utilization]
+  (mapcat
+   (fn [job-id]
+     (map #(-> [job-id %]) (get-in replica [:tasks job-id])))
+   (keys task-utilization)))
+
+(defn n-peers-running [job-utilization capacities]
+  (reduce
+   (fn [sum job-id]
+     (let [n (get job-utilization job-id 0)]
+       (+ sum (apply + (vals (get capacities job-id))))))
+   0
+   (keys job-utilization)))
+
+(defn add-ready-vm-to-mapping [model running-peers]
+  (let [mapping (.getMapping model)]
+    (reduce
+     (fn [result peer-id]
+       (let [vm (.newVM model)]
+         (.addReadyVM mapping vm)
+         (assoc result peer-id vm)))
+     {}
+     running-peers)))
+
+(defn build-peer->vm [replica model job-utilization capacities]
+  (let [n-peers (n-peers-running job-utilization capacities)
+        running-peers (reduce into [] (mapcat vals (vals (:allocations replica))))
+        allocated-vms (add-ready-vm-to-mapping model running-peers)]
+    (if (< (count running-peers) n-peers)
+      (let [n-more-required (- n-peers (count running-peers))
+            unused-peers (remove #(some #{%} running-peers) (:peers replica))
+            extra-peers (take n-more-required unused-peers)]
+        (into allocated-vms (add-ready-vm-to-mapping model extra-peers)))
+      allocated-vms)))
+
+(defn build-job-and-task->node [model task-seq]
+  (let [mapping (.getMapping model)]
+    (reduce
+     (fn [result [job-id task-id]]
+       (let [node (.newNode model)]
+         (.addOnlineNode mapping node)
+         (assoc result [job-id task-id] node)))
+     {}
+     task-seq)))
+
+(defn build-node->task [task->node]
+  (reduce-kv
+   (fn [result job-and-task-ids node]
+     (assoc result node job-and-task-ids))
+   {}
+   task->node))
+
+(defn build-peer->task [result-model peer->vm node->task]
+  (reduce-kv
+   (fn [all peer-id btr-vm]
+     (let [node (.getVMLocation (.getMapping result-model) btr-vm)]
+       (assoc all peer-id (get node->task node))))
+   {}
+   peer->vm))
+
+(defn peer-running-constraints [peer->vm]
+  (map #(Running. %) (vals peer->vm)))
+
+(defn capacity-constraints [replica task-utilization task-seq task->node planned-capacities]
+  (map
+   (fn [[job-id task-id :as id]]
+     (let [utilization (get task-utilization job-id 0)
+           capacities (get planned-capacities job-id)]
+       (if (= (get-in replica [:flux-policies job-id task-id]) :recover)
+         ;; :recover mode tries to bring its peer count back to its original
+         ;; number of peers - which is reliably captured in :min-required-peers.
+         (let [n-peers (get-in replica [:min-required-peers job-id task-id])]
+           (RunningCapacity. (get task->node id) n-peers))
+         (let [n-peers (get capacities task-id)]
+           (RunningCapacity. (get task->node id) n-peers)))))
+   task-seq))
+
+(defn grouping-task-constraints [replica task-seq task->node peer->vm]
+  (reduce
+   (fn [result [job-id task-id :as id]]
+     (let [flux-policy (get-in replica [:flux-policies job-id task-id])
+           peers (seq (get-in replica [:allocations job-id task-id]))]
+       (cond (and (= flux-policy :recover) peers)
+             ;; BtrPlace Fence constraint means we can add more
+             ;; peers to this task, but the peers we already added
+             ;; cannot leave this task.
+             (into result (map #(Fence. (get peer->vm %)
+                                        [(get task->node id)])
+                               peers))
+             (and flux-policy peers)
+             ;; BtrPlace Quarantine constraint means no new peers
+             ;; can be added or removed from this task. We set
+             ;; the peers that are already on this task by
+             ;; registering them directly through the Mapping.
+             (conj result (Quarantine. (get task->node id)))
+             :else result)))
+   []
+   task-seq))
+
+(defn update-peer-site [replica task-id peer-id]
+  (update-in replica [:peer-sites peer-id]
+             (fn [peer-site]
+               (let [resources (extensions/assign-task-resources
+                                replica
+                                peer-id
+                                task-id
+                                peer-site
+                                (:peer-sites replica))]
+                 (merge peer-site resources)))))
+
+(defn assign-task-resources [new-replica original-replica peer->task]
+  (reduce-kv
+   (fn [result peer-id [job-id task-id]]
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (if-let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
+           (-> result
+               (update-in [:peer-sites] dissoc peer-id)
+               (update-peer-site task-id peer-id))
+           (update-peer-site result task-id peer-id))
+         result)))
+   new-replica
+   peer->task))
+
+(defn update-slot-id-for-peer [replica job-id task-id peer-id]
+  (update-in replica [:task-slot-ids job-id task-id]
+             (fn [slot-ids]
+               (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
+                 (assoc slot-ids peer-id slot-id)))))
+
+(defn assign-task-slot-ids [new-replica original-replica peer->task]
+  (reduce-kv
+   (fn [result peer-id [job-id task-id]]
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (if-let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
+           (let [prev-job-id (:job prev-allocation)
+                 prev-task-id (:task prev-allocation)]
+             (-> result
+                 (update-in [:task-slot-ids prev-job-id prev-task-id] dissoc peer-id)
+                 (update-slot-id-for-peer job-id task-id peer-id)))
+           (update-slot-id-for-peer result job-id task-id peer-id))
+         result)))
+   new-replica
+   peer->task))
+
+(defn build-current-model [replica mapping task->node peer->vm]
+  (doseq [j (:jobs replica)]
+    (doseq [t (keys (get-in replica [:allocations j]))]
+      (let [node (get task->node [j t])]
+        (doseq [p (get-in replica [:allocations j t])]
+          (let [vm (get peer->vm p)]
+            (.addRunningVM mapping vm node)))))))
+
+(defn change-peer-state [new-replica original-replica peer->task]
+  (reduce-kv
+   (fn [result peer-id [job-id task-id]]
+     (let [prev-task (get-in original-replica [:allocations job-id task-id])]
+       (if-not (some #{peer-id} prev-task)
+         (assoc-in result [:peer-state peer-id] :idle)
+         result)))
+   new-replica
+   peer->task))
+
+(defn change-peer-allocations [replica peer->task]
+  (let [allocations (reduce-kv #(update-in %1 %3 (comp vec conj) %2) {} peer->task)]
+    (assoc replica :allocations allocations)))
+
+(defn btr-place-scheduling [replica jobs job-utilization capacities]
+  (if (seq jobs)
+    (let [model (DefaultModel.)
+          ;; Hard code the random seed to make it deterministic
+          ;; across peers.
+          params (.setRandomSeed (DefaultParameters.) 1)
+          scheduler (DefaultChocoScheduler. params)
+          mapping (.getMapping model)
+          task-seq (unrolled-tasks replica job-utilization)
+          peer->vm (build-peer->vm replica model job-utilization capacities)
+          task->node (build-job-and-task->node model task-seq)]
+      (build-current-model replica mapping task->node peer->vm)
+      (let [node->task (build-node->task task->node)
+            capacity-constraints (capacity-constraints replica job-utilization task-seq task->node capacities)
+            running-constraints (peer-running-constraints peer->vm)
+            grouping-constraints (grouping-task-constraints replica task-seq task->node peer->vm)
+            constraints (into (into capacity-constraints running-constraints) grouping-constraints)
+            plan (.solve scheduler model constraints)]
+        (when plan
+          (let [result-model (.getResult plan)
+                peer->task (build-peer->task result-model peer->vm node->task)
+                original-replica replica]
+            (-> replica
+                (change-peer-allocations peer->task)
+                (change-peer-state original-replica peer->task)
+                (assign-task-resources original-replica peer->task)
+                (assign-task-slot-ids original-replica peer->task))))))
+    replica))
 
 (defn reconfigure-cluster-workload [replica]
-  (let [job-offers (job-offer-n-peers replica)
-        job-claims (job-claim-peers replica job-offers)
-        spare-peers (apply + (vals (merge-with - job-offers job-claims)))
-        max-utilization (claim-spare-peers replica job-claims spare-peers)
-        current-allocations (current-job-allocations replica)
-        peers-to-displace (find-displaced-peers replica current-allocations max-utilization)
-        updated-replica (choose-ackers (reallocate-peers replica peers-to-displace max-utilization))
-        final-replica (deallocate-starved-jobs updated-replica)]
-    (if (equivalent-allocation? replica final-replica)
-      replica
-      final-replica)))
+  (loop [jobs (:jobs replica)
+         current-replica replica]
+    (if (not (seq jobs))
+      current-replica
+      (let [job-offers (job-offer-n-peers current-replica jobs)
+            job-claims (job-claim-peers current-replica job-offers)
+            spare-peers (apply + (vals (merge-with - job-offers job-claims)))
+            max-utilization (claim-spare-peers current-replica job-claims spare-peers)
+            planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)
+            updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
+        (if updated-replica
+          (let [acker-replica (choose-ackers updated-replica jobs)]
+            (if (full-allocation? acker-replica max-utilization planned-capacities)
+              (deallocate-starved-jobs acker-replica)
+              (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
+          (recur (butlast jobs) (remove-job current-replica (butlast jobs))))))))
