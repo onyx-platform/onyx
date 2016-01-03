@@ -179,12 +179,15 @@
     (get task-capacities task-id)))
 
 (defn capacity-constraints [replica task-utilization task-seq task->node planned-capacities]
-  (map
-   (fn [[job-id task-id :as id]]
-     (let [utilization (get task-utilization job-id 0)
-           capacities (get planned-capacities job-id)
-           n (calculate-capacity replica capacities task->node id)]
-       (RunningCapacity. (get task->node id) n)))
+  (reduce
+   (fn [result [job-id task-id :as id]]
+     (if-not (= (get-in replica [:task-schedulers job-id]) :onyx.task-scheduler/colocated)
+       (let [utilization (get task-utilization job-id 0)
+             capacities (get planned-capacities job-id)
+             n (calculate-capacity replica capacities task->node id)]
+         (conj result (RunningCapacity. (get task->node id) n))))
+     result)
+   []
    task-seq))
 
 (defn grouping-task-constraints [replica task-seq task->node peer->vm]
@@ -318,6 +321,7 @@
                                                                     0
                                                                     task-seq))
                                                                 0)))
+            constraints (into constraints (mapcat #(cts/task-constraints replica jobs peer->vm task->node no-op-node %) jobs))
             plan (.solve scheduler model constraints)]
         (when plan
           (let [result-model (.getResult plan)
@@ -339,6 +343,7 @@
             job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
+            _ (prn max-utilization)
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)
             updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
         (if updated-replica
