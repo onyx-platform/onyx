@@ -23,10 +23,9 @@
   [replica job-id n]
   (let [task-ids (get-in replica [:tasks job-id])
         capacity (count task-ids)
-        site->peers-mapping (large-enough-sites (site->peers replica) capacity)]
-    (if (seq site->peers-mapping)
-      (zipmap task-ids (repeat (int (/ n capacity))))
-      (zipmap task-ids (repeat 0)))))
+        site->peers-mapping (large-enough-sites (site->peers replica) capacity)
+        n-candidate-peers (apply + (map count (vals site->peers-mapping)))]
+    (zipmap task-ids (repeat (int (/ n-candidate-peers capacity))))))
 
 (defn ban-smaller-sites [replica jobs peer->vm task->node large-sites]
   (let [sites (keys large-sites)
@@ -35,11 +34,21 @@
         nodes (mapcat (fn [job-id] (map (fn [task-id] (task->node [job-id task-id])) (get-in replica [:tasks job-id]))) jobs)]
     (map #(Ban. (peer->vm %) nodes) peer-ids)))
 
+(defn non-colocated-tasks [replica jobs]
+  (reduce
+   (fn [result job-id]
+     (if (not= (get-in replica [:task-schedulers job-id]) :onyx.task-scheduler/colocated)
+       (into result (map (fn [task-id] [job-id task-id]) (get-in replica [:tasks job-id])))
+       result))
+   []
+   jobs))
+
 (defmethod cts/task-constraints :onyx.task-scheduler/colocated
   [replica jobs peer->vm task->node no-op-node job-id]
   (let [task-ids (get-in replica [:tasks job-id])
         capacity (count task-ids)
-        site->peers-mapping (large-enough-sites (site->peers replica) capacity)]
+        site->peers-mapping (large-enough-sites (site->peers replica) capacity)
+        unrestricted-tasks (conj (map task->node (non-colocated-tasks replica jobs)) no-op-node)]
     (into
      (reduce-kv
       (fn [result peer-site peer-ids]
@@ -49,10 +58,10 @@
                     (fn [peers]
                       (SplitAmong. (map (comp vector peer->vm) peers)
                                    (conj (map #(vector (get task->node [job-id %])) task-ids)
-                                         [no-op-node])))
+                                         unrestricted-tasks)))
                     peer-sets)]
           (if (not= (count (last all-peer-sets)) capacity)
-            (into result (into rets (map #(Fence. (peer->vm %) [no-op-node]) (last all-peer-sets))))
+            (into result (into rets (map #(Fence. (peer->vm %) unrestricted-tasks) (last all-peer-sets))))
             (into result rets))))
       []
       site->peers-mapping)
