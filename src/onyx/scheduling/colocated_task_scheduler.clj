@@ -3,7 +3,7 @@
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions])
-  (:import [org.btrplace.model.constraint SplitAmong Ban]))
+  (:import [org.btrplace.model.constraint Fence SplitAmong Ban]))
 
 (defn site->peers [replica]
   (group-by
@@ -43,10 +43,17 @@
     (into
      (reduce-kv
       (fn [result peer-site peer-ids]
-        (conj result
-              (SplitAmong. (map (comp vector peer->vm) peer-ids)
-                           (conj (map #(vector (get task->node [job-id %])) task-ids)
-                                 [no-op-node]))))
+        (let [peer-sets (partition capacity peer-ids)
+              all-peer-sets (partition-all capacity peer-ids)
+              rets (map
+                    (fn [peers]
+                      (SplitAmong. (map (comp vector peer->vm) peers)
+                                   (conj (map #(vector (get task->node [job-id %])) task-ids)
+                                         [no-op-node])))
+                    peer-sets)]
+          (if (not= (count (last all-peer-sets)) capacity)
+            (into result (into rets (map #(Fence. (peer->vm %) [no-op-node]) (last all-peer-sets))))
+            (into result rets))))
       []
       site->peers-mapping)
      (ban-smaller-sites replica jobs peer->vm task->node site->peers-mapping))))
