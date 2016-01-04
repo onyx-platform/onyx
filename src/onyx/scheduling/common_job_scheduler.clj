@@ -324,8 +324,7 @@
                                                                     0
                                                                     task-seq))
                                                                 0)))
-            constraints (into constraints (mapcat #(cts/task-constraints replica jobs peer->vm task->node no-op-node %) jobs))
-;            _ (clojure.pprint/pprint constraints)
+            constraints (into constraints (mapcat #(cts/task-constraints replica jobs (get capacities % 0) peer->vm task->node no-op-node %) jobs))
             plan (.solve scheduler model constraints)]
         (when plan
           (let [result-model (.getResult plan)

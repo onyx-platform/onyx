@@ -16,7 +16,7 @@
     (get-in replica [:task-schedulers job-id])))
 
 (defmulti task-constraints
-  (fn [replica jobs peer->vm task->node no-op-node job-id]
+  (fn [replica jobs task-capacities peer->vm task->node no-op-node job-id]
     (get-in replica [:task-schedulers job-id])))
 
 (defmethod task-distribute-peer-count :default
@@ -27,5 +27,5 @@
                    :job job})))
 
 (defmethod task-constraints :default
-  [replica jobs peer->vm task->node no-op-node job-id]
+  [replica jobs task-capacities peer->vm task->node no-op-node job-id]
   [])

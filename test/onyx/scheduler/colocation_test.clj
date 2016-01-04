@@ -6,7 +6,7 @@
 (deftest colocate-tasks-on-a-single-machine
   (is
    (=
-    {:j1 {:t1 [:p4] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p4] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -41,7 +41,7 @@
 (deftest colocate-on-two-machines
   (is
    (=
-    {:j1 {:t1 [:p3 :p5] :t2 [:p1 :p6] :t3 [:p2 :p4]}}
+    {:j1 {:t1 [:p3 :p6] :t2 [:p2 :p4] :t3 [:p1 :p5]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -60,7 +60,7 @@
 (deftest ban-small-machines
   (is
    (=
-    {:j1 {:t1 [:p3 :p5] :t2 [:p1 :p6] :t3 [:p2 :p4]}}
+    {:j1 {:t1 [:p3 :p6] :t2 [:p2 :p4] :t3 [:p1 :p5]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -81,9 +81,9 @@
 (deftest colocate-on-three-machines
   (is
    (=
-    {:j1 {:t1 [:p3 :p5 :p9]
-          :t2 [:p1 :p6 :p8]
-          :t3 [:p2 :p4 :p7]}}
+    {:j1 {:t1 [:p3 :p6 :p7]
+          :t2 [:p2 :p4 :p9]
+          :t3 [:p1 :p5 :p8]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -105,7 +105,7 @@
 (deftest one-peer-not-in-multiple-not-used
   (is
    (=
-    {:j1 {:t1 [:p3] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -122,7 +122,7 @@
 (deftest two-peers-not-in-multiple-not-used
   (is
    (=
-    {:j1 {:t1 [:p3] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -140,7 +140,7 @@
 (deftest greedy-job-scheduler-pins-to-colocated-job
   (is
    (=
-    {:j1 {:t1 [:p3] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -160,7 +160,7 @@
 (deftest smaller-machines-are-dismissed
   (is
    (=
-    {:j1 {:t1 [:p3] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -179,7 +179,7 @@
 (deftest greedy-scheduler-excludes-other-elligible-jobs
   (is
    (=
-    {:j1 {:t1 [:p3] :t2 [:p1] :t3 [:p2]}}
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
     (:allocations
      (reconfigure-cluster-workload
       {:messaging {:onyx.messaging/impl :aeron}
@@ -218,3 +218,23 @@
                     :p4 {:aeron/external-addr :b}
                     :p5 {:aeron/external-addr :b}
                     :p6 {:aeron/external-addr :c}}})))))
+
+(deftest obeys-min-peers-constraint
+  (is
+   (=
+    {:j1 {:t1 [:p3] :t2 [:p2] :t3 [:p1]}}
+    (:allocations
+     (reconfigure-cluster-workload
+      {:messaging {:onyx.messaging/impl :aeron}
+       :job-scheduler :onyx.job-scheduler/greedy
+       :task-schedulers {:j1 :onyx.task-scheduler/colocated}
+       :peers [:p1 :p2 :p3 :p4 :p5 :p6]
+       :jobs [:j1]
+       :tasks {:j1 [:t1 :t2 :t3]}
+       :task-saturation {:j1 {:t1 1}}
+       :peer-sites {:p1 {:aeron/external-addr :a}
+                    :p2 {:aeron/external-addr :a}
+                    :p3 {:aeron/external-addr :a}
+                    :p4 {:aeron/external-addr :b}
+                    :p5 {:aeron/external-addr :b}
+                    :p6 {:aeron/external-addr :b}}})))))
