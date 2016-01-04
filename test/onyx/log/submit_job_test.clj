@@ -1,12 +1,12 @@
 (ns onyx.log.submit-job-test
-  (:require [onyx.extensions :as extensions]
-            [onyx.log.entry :refer [create-log-entry]]
-            [onyx.system]
-            [onyx.log.replica :as replica]
+  (:require [clojure.test :refer :all]
             [schema.test]
-            [clojure.test :refer [deftest is testing use-fixtures]]))
-
-;(use-fixtures :once schema.test/validate-schemas)
+            [onyx.extensions :as extensions]
+            [onyx.log.entry :refer [create-log-entry]]
+            [onyx.log.replica :as replica]
+            [onyx.messaging.dummy-messenger]
+            [onyx.system]
+            [onyx.api]))
 
 (deftest submit-job-log-test
   (let [entry (create-log-entry :submit-job {:id :a :tasks [:t1]
@@ -31,7 +31,8 @@
                                              :saturation 42})
         old-replica (merge replica/base-replica 
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
-                            :job-scheduler :onyx.job-scheduler/greedy :jobs [:b]
+                            :job-scheduler :onyx.job-scheduler/greedy
+                            :jobs [:b]
                             :task-schedulers {:b :onyx.task-scheduler/balanced}
                             :tasks {:b [:t1 :t2]}})
         f (partial extensions/apply-log-entry (assoc entry :message-id 0))
@@ -58,8 +59,3 @@
         diff (rep-diff old-replica new-replica)]
     (is (= [] (rep-reactions old-replica new-replica diff {:id :p1})))
     (is (= [] (rep-reactions old-replica new-replica diff {:id :p2})))))
-
-
-
-
-

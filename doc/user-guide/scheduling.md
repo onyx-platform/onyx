@@ -10,19 +10,16 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
   - [Job Schedulers](#job-schedulers)
     - [Greedy Job Scheduler](#greedy-job-scheduler)
     - [Balanced Robin Job Scheduler](#balanced-robin-job-scheduler)
-    - [Balanced Rebalancing Strategy](#balanced-rebalancing-strategy)
     - [Percentage Job Scheduler](#percentage-job-scheduler)
-    - [Percentage Rebalancing Strategy](#percentage-rebalancing-strategy)
   - [Task Schedulers](#task-schedulers)
     - [Balanced Task Scheduler](#balanced-task-scheduler)
     - [Percentage Task Scheduler](#percentage-task-scheduler)
-  - [Examples](#examples)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Allocating Peers to Jobs and Tasks
 
-In a masterless design, there is no single entity that assigns tasks to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" to distribute the workload across the cluster. Onyx ships job and task allocation policies. End users will be able to change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.
+In a masterless design, there is no single entity that assigns tasks to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" to distribute the workload across the cluster. Onyx ships out-of-the-box job and task allocation policies. End users can change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.
 
 #### Job Schedulers
 
@@ -30,7 +27,7 @@ Each running Onyx instance is configured with exactly one job scheduler. The pur
 
 ##### Greedy Job Scheduler
 
-The Greedy job scheduler allocates *all peers* to each job in the order that it was submitted. For example, suppose you had 100 virtual peers and you submitted two jobs - job A and job B. With a Greedy scheduler, *all* 100 peers would be allocated to job A. When (if) job A completes, all 100 peers will then execute tasks for job B. This *probably* isn't desirable when you're running streaming workflows, since they theoretically never end.
+The Greedy job scheduler allocates *all peers* to each job in the order that it was submitted. For example, suppose you had 100 virtual peers and you submitted two jobs - job A and job B. With a Greedy scheduler, *all* 100 peers would be allocated to job A. If job A completes, all 100 peers will then execute tasks for job B. This *probably* isn't desirable when you're running streaming workflows, since they theoretically never end.
 
 To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/greedy` in the Peer Options.
 
@@ -52,58 +49,35 @@ If a job is completed or otherwise canceled, *all* of the peers executed that ta
 
 ##### Balanced Robin Job Scheduler
 
-The Balanced job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Balanced scheduler, job A would be allocated peer 1, job B would be allocated peer 2, job A would be allocated peer 3, and so on. In the end, both jobs will end up with 50 virtual peers allocated to each. Balanced begins allocating by selecting the first job submitted.
+The Balanced job scheduler allocates peers in a rotating fashion to jobs that were submitted. For example, suppose that you had 100 virtual peers (virtual peer 1, virtual peer 2, ... virtual peer 100) and you submitted two jobs - job A and job B. With a Balanced scheduler, both jobs will end up with 50 virtual peers allocated to each. This scheduler begins allocating by selecting the first job submitted.
 
 To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/balanced` in the Peer Options.
 
 **Peer Addition**
 
-In the event that a peer joins the cluster while the Balanced scheduler is running, that new peer will be allocated to the job *next* in the balanced sequence. The local replica has a reference to the job ID of the previous job that a peer was allocated for.
+In the event that a peer joins the cluster while the Balanced scheduler is running, that new peer will be allocated to the job that most evenly balances the cluster according to a the number of jobs divided by the number of peers. If there is a tie, the new peer is added to the earliest submitted job.
 
 **Peer Removal**
 
-In the event that a peer leaves the cluster while the Balanced scheduler is running, the peers across *all* jobs will be rebalanced to evenly distribute the workflow. At most, one peer will change jobs to rebalance the workload.
+In the event that a peer leaves the cluster while the Balanced scheduler is running, the peers across *all* jobs will be rebalanced to evenly distribute the workflow.
 
 **Job Addition**
 
-If a job is submitted while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A has all 100 peers executing its task, and job B is submitted, 50 peers will move from job A to job B.
+If a job is submitted while this scheduler is running, the entire cluster will be rebalanced. For example, if job A has all 100 peers executing its task, and job B is submitted, 50 peers will move from job A to job B.
 
 **Job Removal**
 
-If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced. This will result in *at least one* peer changing jobs to rebalance the cluster. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
-
-##### Balanced Rebalancing Strategy
-
-When a job is added or removed in Onyx, the balanced peer allocation needs to change to ensure that all jobs receive about the same amount of resources. When an even number of virtual peers cannot be distributed across the cluster (8 virtual peers, 3 jobs of 2 tasks each), the *fraction* of peers that is left is allocated balanced, starting with the oldest job, working forward. Consider the following scenario:
-
-- There are 8 virtual peers running
-- There are 2 jobs, A and B, each using 4 virtual peers each
-- Job C is submitted
-- Onyx must rebalance and allocate 3 peers to A, 3 peers to B, and 2 peers to C
-
-The algorithm works as follows:
-
-- let J be the number of jobs executing
-- let P be the number of virtual peers in the cluster
-- every job will be allocated *at least* `P / J` virtual peers (integer division)
-- let R be the `(remainder of (P / J)) / J`
-- let N be the numerator of R
-- the first N jobs to be submitted will be allocated exactly `(P / J) + 1` peers
-- let K be the original number of peers executing this job
-- if `(P / J)` or `(P / J) + 1` (depending on the job) is less than K, this job reassigns `K - (P / J)` or `K - (P / J) + 1)` peers to the new job that was submitted
-- exactly which peers are released from a job depends on the Task Scheduler for that job
+If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced. For example, if job A, B, and C had 20 peers executing each of its tasks (60 peers total), and job C finished, job A would gain 10 peers, and job B would gain 10 peers.
 
 ##### Percentage Job Scheduler
 
-The Percentage job scheduler allows jobs to be submitted with a percentage value. The percentage value indicates what percentage of the cluster will be allocated to this job. The use case for this scheduler is for when you have a static number of jobs and a varying number of peers. For example, if you have 2 jobs - A and B, you'd give each of this percentage values - say 70% and 30%, respectively. If you had 100 virtual peers running, 70 would be allocated to A, and 30 to B. If you then added 100 more peers to the cluster, job A would be allocated 140 peers, and job B 30. This dynamically scaling is a big step forward over statically configuring slots, which is normal in ecosystems like Hadoop.
+The Percentage job scheduler allows jobs to be submitted with a percentage value. The percentage value indicates what percentage of the cluster will be allocated to this job. The use case for this scheduler is for when you have a static number of jobs and a varying number of peers. For example, if you have 2 jobs - A and B, you'd give each of this percentage values - say 70% and 30%, respectively. If you had 100 virtual peers running, 70 would be allocated to A, and 30 to B. If you then added 100 more peers to the cluster, job A would be allocated 140 peers, and job B 30. This dynamically scaling is a big step forward over statically configuring slots, which is normal in ecosystems like Hadoop and Storm.
 
 If there aren't enough peers to satisfy the percentage values of all the jobs, this scheduler will allocate with priority to jobs with the highest percentage value. When percentage values are equal, the earliest submitted job will get priority. In the event that jobs are submitted, and the total percentage value exceeds 100%, the earliest submitted jobs that do not exceed 100% will receive peers. Jobs that go beyond it will not receive peers. For example, if you submitted jobs A, B, and C with 70%, 30%, and 20% respectively, jobs A and B would receive peers, and C will not be allocated any peers until either A or B completes.
 
 If the total percentages of all submitted jobs doesn't sum up to 100%, the job with the highest percentage value will receive the extra peers. When percentage values are equal, the earliest submitted job will get priority.
 
-If the algorithm determines that any job should receive a number of peers that is less than 1 (a decimal value), that job receives no peers. This value is floored, and is described in more detail below.
-
-This scheduler does not compose with using `:onyx/max-peers` set on all tasks. The strict upper bound on the number of peers will be respected.
+If the algorithm determines that any job should receive a number of peers that is less than the minimum number it needs to execute, that job receives no peers.
 
 To use this scheduler, set key `:onyx.peer/job-scheduler` to `:onyx.job-scheduler/percentage` in the Peer Options.
 
@@ -122,27 +96,6 @@ If a job is submitted while this scheduler is running, the entire cluster will b
 **Job Removal**
 
 If a job is completed or otherwise canceled while this scheduler is running, the entire cluster will be rebalanced.
-
-##### Percentage Rebalancing Strategy
-
-When a job or peer are added or removed, the Percentage job scheduler needs to dynamically adjust which peers are allocated to which jobs.
-
-The algorithm works as follows:
-
-- let P be the number of virtual peers in the cluster
-- let S be the jobs sorted from highest to lowest by percentage, subsorted by submit time, earliest first
-- let J be the first n jobs in S who's percentage values do not exceed 100%
-- For each job in J, in order:
-  - let this job be J'
-  - J' will be allocated *at least* (floor (P * J's % value))
-- let X be the sum of all allocations for all J' values
-- Allocate P - X *more* peers to the first job in J
-
-And now, for the reassignment phase:
-- for each job J' in J
-- let K be the original number of peers executing this job at current
-- if the current number of peers executing this job exceeds the new assigned amount, this job reassigns the difference to another job
-- exactly which peers are released from a job depends on the Task Scheduler for that job
 
 #### Task Schedulers
 
@@ -173,7 +126,3 @@ To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/percentag
 **Peer Removal**
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler rebalances all the peers for even distribution.
-
-#### Examples
-
-- [Example 1: 3 node cluster, 1 job, Greedy job scheduler, Balanced task scheduler](/doc/design/allocate-examples/example-1.md)

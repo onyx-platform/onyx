@@ -206,7 +206,8 @@
    (s/optional-key :lifecycle/after-batch) Function
    (s/optional-key :lifecycle/after-task-stop) Function
    (s/optional-key :lifecycle/after-ack-segment) Function
-   (s/optional-key :lifecycle/after-retry-segment) Function})
+   (s/optional-key :lifecycle/after-retry-segment) Function
+   (s/optional-key :lifecycle/handle-exception) Function})
 
 (def FlowAction
   (s/enum :retry))

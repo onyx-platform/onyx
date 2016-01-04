@@ -1,4 +1,4 @@
-(ns onyx.log.two-job-test
+(ns onyx.scheduler.two-job-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [onyx.extensions :as extensions]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -28,7 +28,7 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :b
-                    :onyx/fn :onyx.log.two-job-test/my-inc
+                    :onyx/fn ::my-inc
                     :onyx/type :function
                     :onyx/batch-size 20}
 
@@ -45,7 +45,7 @@
                     :onyx/batch-size 20}
 
                    {:onyx/name :e
-                    :onyx/fn :onyx.log.two-job-test/my-inc
+                    :onyx/fn ::my-inc
                     :onyx/type :function
                     :onyx/batch-size 20}
 
@@ -67,8 +67,14 @@
         ch (chan n-peers)
         replica (playback-log (:log env) (extensions/subscribe-to-log (:log env) ch) ch 2000)]
 
-    (testing "peers balanced on 2 jobs" 
-      (is (= [[2 2 2] [2 2 2]] (get-counts replica [j1 j2]))))
+    (testing "peers balanced on 2 jobs"
+      (is (= [{(:id (:a (:task-ids j1))) 2
+               (:id (:b (:task-ids j1))) 2
+               (:id (:c (:task-ids j1))) 2}
+              {(:id (:d (:task-ids j2))) 2
+               (:id (:e (:task-ids j2))) 2
+               (:id (:f (:task-ids j2))) 2}]
+             (get-counts replica [j1 j2]))))
 
     (doseq [v-peer v-peers]
       (onyx.api/shutdown-peer v-peer))

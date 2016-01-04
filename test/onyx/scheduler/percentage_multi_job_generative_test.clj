@@ -1,4 +1,4 @@
-(ns onyx.log.percentage-multi-job-generative-test
+(ns onyx.scheduler.percentage-multi-job-generative-test
   (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
             [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
@@ -50,7 +50,7 @@
                           :onyx/batch-size 20}]
                :task-scheduler :onyx.task-scheduler/balanced}] 
     (checking
-      "Checking percentage multi job test, replicates onyx.log.percentage-multi-job-test"
+      "Checking percentage multi job test, replicates onyx.scheduling.percentage-multi-job-test"
       (times 50)
       [{:keys [replica log peer-choices]}
        (log-gen/apply-entries-gen
@@ -89,6 +89,8 @@
             :peer-choices []}))]
       (standard-invariants replica)
       (is (= #{:active} (set (vals (:peer-state replica)))))
-      (is (= [14 6] 
+      (is (= [14 6]
              (map (partial apply +)
-                  (get-counts replica [{:job-id job-1-id} {:job-id job-2-id}])))))))
+                  (map vals (get-counts replica
+                                        [{:job-id job-1-id}
+                                         {:job-id job-2-id}]))))))))

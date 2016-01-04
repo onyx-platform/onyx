@@ -8,9 +8,9 @@
     (>= (count (get-in replica [:peers])) min-req)))
 
 (defmethod cjs/job-offer-n-peers :onyx.job-scheduler/greedy
-  [replica]
-  (if (seq (:jobs replica))
-    (let [[active & passive] (:jobs replica)]
+  [replica jobs]
+  (if (seq jobs)
+    (let [[active & passive] jobs]
       (merge {active (count (:peers replica))} (zipmap passive (repeat 0))))
     {}))
 
@@ -22,10 +22,3 @@
   ;; them. Return the same job claims since nothing will change.
   ;;
   jobs)
-
-(defmethod cjs/sort-job-priority :onyx.job-scheduler/greedy
-  [replica jobs]
-  ;; We only care about the first job in a Greedy scheduler.
-  (if-let [x (first jobs)]
-    (vector x)
-    []))
