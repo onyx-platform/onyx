@@ -1,4 +1,4 @@
-(ns onyx.scheduler.colocation-task
+(ns onyx.scheduler.colocation-test
   (:require [clojure.test :refer :all]
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [onyx.api]))
