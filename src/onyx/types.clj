@@ -24,6 +24,8 @@
 
 (defrecord Result [root leaves])
 
+(defrecord CompiledGroupingFn [grouping-fn])
+
 (defrecord Link [link timestamp])
 
 (defrecord MonitorEvent [event])
