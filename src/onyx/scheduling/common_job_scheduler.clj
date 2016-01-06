@@ -171,16 +171,14 @@
 (defn peer-running-constraints [peer->vm]
   (map #(Running. %) (vals peer->vm)))
 
-(defn calculate-capacity
-  [replica task-capacities task->node [job-id task-id :as id]]
+(defn calculate-capacity [replica task-capacities task->node [job-id task-id :as id]]
   (if (= (get-in replica [:flux-policies job-id task-id]) :recover)
     ;; :recover mode tries to bring its peer count back to its original
     ;; number of peers - which is reliably captured in :min-required-peers.
     (get-in replica [:min-required-peers job-id task-id])
     (get task-capacities task-id)))
 
-(defn capacity-constraints
-  [replica job-utilization task-seq task->node planned-capacities]
+(defn capacity-constraints [replica job-utilization task-seq task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
      (cond (zero? (get job-utilization job-id))
@@ -190,7 +188,6 @@
            (let [capacities (get planned-capacities job-id)
                  n (calculate-capacity replica capacities task->node id)]
              (conj result (RunningCapacity. (get task->node id) n)))
-
            :else
            result))
    []
@@ -298,26 +295,6 @@
          peer->task)]
     (assoc replica :allocations allocations)))
 
-(defn n-unused-peers [replica task-seq capacities]
-  (max (- (count (:peers replica))
-          (reduce
-           (fn [result [job-id task-id :as id]]
-             (let [task-capacity (get capacities job-id)
-                   capacity (get task-capacity task-id)]
-               (+ result capacity)))
-           0
-           task-seq))
-       0))
-
-(defn no-op-constraints [replica task-seq capacities no-op-node]
-  [(RunningCapacity. no-op-node (n-unused-peers replica task-seq capacities))])
-
-(defn task-constraints [replica jobs capacities peer->vm task->node no-op-node]
-  (mapcat
-   #(cts/task-constraints
-     replica jobs (get capacities % 0) peer->vm task->node no-op-node %)
-   jobs))
-
 (defn btr-place-scheduling [replica jobs job-utilization capacities]
   (if (seq jobs)
     (let [model (DefaultModel.)
@@ -333,12 +310,21 @@
       (.addOnlineNode mapping no-op-node)
       (build-current-model replica mapping task->node peer->vm)
       (let [node->task (build-node->task task->node)
-            capacity-cts (capacity-constraints replica job-utilization task-seq task->node capacities)
-            running-cts (peer-running-constraints peer->vm)
-            grouping-cts (grouping-task-constraints replica task-seq task->node peer->vm)
-            no-op-cts (no-op-constraints replica task-seq capacities no-op-node)
-            task-cts (task-constraints replica jobs capacities peer->vm task->node no-op-node)
-            constraints (reduce into [capacity-cts running-cts grouping-cts no-op-cts task-cts])
+            capacity-constraints (capacity-constraints replica job-utilization task-seq task->node capacities)
+            running-constraints (peer-running-constraints peer->vm)
+            grouping-constraints (grouping-task-constraints replica task-seq task->node peer->vm)
+            constraints (into (into capacity-constraints running-constraints) grouping-constraints)
+            constraints (conj constraints
+                              (RunningCapacity. no-op-node (max (- (count (:peers replica))
+                                                                   (reduce
+                                                                    (fn [result [job-id task-id :as id]]
+                                                                      (let [task-capacity (get capacities job-id)
+                                                                            capacity (get task-capacity task-id)]
+                                                                        (+ result capacity)))
+                                                                    0
+                                                                    task-seq))
+                                                                0)))
+            constraints (into constraints (mapcat #(cts/task-constraints replica jobs (get capacities % 0) peer->vm task->node no-op-node %) jobs))
             plan (.solve scheduler model constraints)]
         (when plan
           (let [result-model (.getResult plan)
