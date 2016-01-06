@@ -14,6 +14,7 @@ Onyx offers fine-grained control of how many peers are allocated to particular j
   - [Task Schedulers](#task-schedulers)
     - [Balanced Task Scheduler](#balanced-task-scheduler)
     - [Percentage Task Scheduler](#percentage-task-scheduler)
+    - [Colocation Task Scheduler](#colocation-task-scheduler)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -126,3 +127,19 @@ To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/percentag
 **Peer Removal**
 
 If a peer fails, or is otherwise removed from the cluster, the Task scheduler rebalances all the peers for even distribution.
+
+##### Colocation Task Scheduler
+
+The Colocation Schedule takes all of the tasks for a job and, if possible, assigns them to the peers on a single physical machine represented by the same peer group. If a job has 4 tasks and the cluster is one machine with 5 peers, 4 peers will become active. If that machine had 8 peers, all 8 would become active as this schedule operates in peer chunks that are divisible by the task size. If more machines are capable of executing the entire job, they will also be used.
+
+This scheduler is useful for dramatically increasing performance of jobs where the latency is bound by the network of transmitting data across tasks. Using this scheduler with peer short circuiting will ensure that data never needs to cross the network. Onyx's usual fault tolerancy mechanisms are still used to ensure that data is processed in the presence of machine failure.
+
+To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/colcocated`.
+
+**Peer Addition**
+
+If a peer is added to the cluster and its machine is capable of executing all the tasks for this job, the entire machine will be used - provided that it falls into the pool of peers elligible to execute this job, per the job scheduler's perogative.
+
+**Peer Removal*
+
+If a peer is removed, all the peers associated with this job's tasks for this chunk of peers will stop executing their tasks.
