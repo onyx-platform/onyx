@@ -20,7 +20,10 @@
    site->peers-mapping))
 
 (defn global-saturation-lower-bound [replica job-id task-ids]
-  (let [saturation-values (remove nil? (map #(get-in replica [:task-saturation job-id %]) task-ids))]
+  (let [saturation-values
+        (remove nil?
+                (map #(get-in replica [:task-saturation job-id %])
+                     task-ids))]
     (if (seq saturation-values)
       (apply min saturation-values)
       Double/POSITIVE_INFINITY)))
@@ -31,21 +34,38 @@
         capacity (count task-ids)
         site->peers-mapping (large-enough-sites (site->peers replica) capacity)
         n-candidate-peers (apply + (map count (vals site->peers-mapping)))
-        lower-bound (global-saturation-lower-bound replica job-id task-ids)]
-    (zipmap task-ids (repeat (min lower-bound (int (/ n-candidate-peers capacity)))))))
+        lower-bound (global-saturation-lower-bound replica job-id task-ids)
+        upper-bound (int (/ n-candidate-peers capacity))]
+    (zipmap task-ids (repeat (min lower-bound upper-bound)))))
 
 (defn ban-smaller-sites [replica jobs peer->vm task->node large-sites rejected]
   (let [sites (keys large-sites)
-        peer-ids (into ((group-by #(some #{(extensions/get-peer-site replica %)} sites) (:peers replica)) nil) rejected)
-        jobs (filter #(= (get-in replica [:task-schedulers %]) :onyx.task-scheduler/colocated) jobs)
-        nodes (mapcat (fn [job-id] (map (fn [task-id] (task->node [job-id task-id])) (get-in replica [:tasks job-id]))) jobs)]
+        peer-ids (into
+                  ((group-by #(some #{(extensions/get-peer-site replica %)} sites)
+                             (:peers replica))
+                   nil)
+                  rejected)
+        jobs (filter #(= (get-in replica [:task-schedulers %])
+                         :onyx.task-scheduler/colocated)
+                     jobs)
+        nodes (mapcat
+               (fn [job-id]
+                 (map
+                  (fn [task-id]
+                    (task->node [job-id task-id]))
+                  (get-in replica [:tasks job-id])))
+               jobs)]
     (map #(Ban. (peer->vm %) nodes) peer-ids)))
 
 (defn non-colocated-tasks [replica jobs]
   (reduce
    (fn [result job-id]
-     (if (not= (get-in replica [:task-schedulers job-id]) :onyx.task-scheduler/colocated)
-       (into result (map (fn [task-id] [job-id task-id]) (get-in replica [:tasks job-id])))
+     (if (not= (get-in replica [:task-schedulers job-id])
+               :onyx.task-scheduler/colocated)
+       (into result
+             (map
+              (fn [task-id] [job-id task-id])
+              (get-in replica [:tasks job-id])))
        result))
    []
    jobs))
@@ -56,10 +76,12 @@
    (fn [{:keys [selected rejected] :as result} site peer-ids]
      (if (>= (count selected) total)
        (update-in result [:rejected] into peer-ids)
-       (let [difference (- total (count selected))]
+       (let [difference (- total (count selected))
+             sel (take difference (drop-last (mod (count peer-ids) size) peer-ids))
+             rej (take-last (mod (count peer-ids) size) peer-ids)]
          (-> result
-             (update-in [:selected] into (take difference (drop-last (mod (count peer-ids) size) peer-ids)))
-             (update-in [:rejected] into (take-last (mod (count peer-ids) size) peer-ids))))))
+             (update-in [:selected] into sel)
+             (update-in [:rejected] into rej)))))
    {:selected []
     :rejected []}
    site->peers))
@@ -77,8 +99,10 @@
     (into
      (reduce
       (fn [result peer-ids]
-        (conj result (SplitAmong. (map (comp vector peer->vm) peer-ids)
-                                  (map #(vector (get task->node [job-id %])) task-ids))))
+        (conj result
+              (SplitAmong.
+               (map (comp vector peer->vm) peer-ids)
+               (map #(vector (get task->node [job-id %])) task-ids))))
       []
       (partition capacity selected))
      (ban-smaller-sites replica jobs peer->vm task->node site->peers-mapping rejected))))
