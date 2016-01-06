@@ -82,3 +82,7 @@
       []
       (partition capacity selected))
      (ban-smaller-sites replica jobs peer->vm task->node site->peers-mapping rejected))))
+
+(defmethod cts/assign-capacity-constraint? :onyx.task-scheduler/colocated
+  [replica job-id]
+  false)
