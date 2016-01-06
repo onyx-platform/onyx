@@ -186,7 +186,7 @@
      (cond (zero? (get job-utilization job-id))
            (conj result (RunningCapacity. (get task->node id) 0))
 
-           (cts/assign-capacity-constraint? replica job-id)
+           (not= (get-in replica [:task-schedulers job-id]) :onyx.task-scheduler/colocated)
            (let [capacities (get planned-capacities job-id)
                  n (calculate-capacity replica capacities task->node id)]
              (conj result (RunningCapacity. (get task->node id) n)))
