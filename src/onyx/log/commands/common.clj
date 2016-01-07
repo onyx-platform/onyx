@@ -75,7 +75,7 @@
             deallocated (update-in replica [:allocations (:job prev) (:task prev)] remove-f)]
         ;; Avoids making a key path to nil if there was no task slot
         ;; for this peer.
-        (if (get-in replica [:task-slot-ids (:jobs prev) (:task-prev id)])
+        (if (get-in replica [:task-slot-ids (:job prev) (:task prev) id])
           (update-in deallocated [:task-slot-ids (:job prev) (:task prev)] dissoc id)
           deallocated))
       replica)))
