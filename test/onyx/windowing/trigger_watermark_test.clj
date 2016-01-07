@@ -38,4 +38,22 @@
     (is
      (not
       (api/trigger-fire? event trigger {:window window :segment segment
-                                        :upper-extent (inc t)})))))
+                                        :upper-extent (inc t)}))))
+
+  (let [n 1.0
+        window {:window/id :collect-segments
+                :window/task :identity
+                :window/type :global
+                :window/aggregation :onyx.windowing.aggregation/count
+                :window/window-key :double-number}
+        trigger {:trigger/window-id :collect-segments
+                 :trigger/refinement :accumulating
+                 :trigger/on :watermark
+                 :trigger/sync ::no-op
+                 :trigger/id :trigger-id}
+        segment {:double-number n}
+        event {}]
+    (is
+      (not
+        (api/trigger-fire? event trigger {:window window :segment segment
+                                          :upper-extent (inc n)})))))
