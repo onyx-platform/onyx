@@ -61,7 +61,7 @@
       (:allocations
        (reconfigure-cluster-workload
         {:jobs [:j1]
-         :allocations {:j1 {:t1 []}}
+         :allocations {}
          :peers [:p1 :p2 :p3]
          :tasks {:j1 [:t1]}
          :min-required-peers {:j1 {:t1 10}}
@@ -228,3 +228,21 @@
          :allocations {:j1 {}}
          :task-schedulers {:j1 :onyx.task-scheduler/percentage}
          :task-saturation {:j1 {:t1 1000 :t2 4 :t3 1000}}})))))
+
+(deftest max-peers-jitter
+  (is
+   (= {:j1 {:t2 [:p1] :t3 [:p2] :t1 [:p5]}}
+      (:allocations
+       (reconfigure-cluster-workload
+        {:job-scheduler :onyx.job-scheduler/greedy
+         :saturation {:j1 3}
+         :peers [:p1 :p2 :p3 :p4 :p5]
+         :min-required-peers {:j1 {:t1 1 :t2 1 :t3 1}}
+         :task-slot-ids {:j1 {:t2 {:p1 0} :t3 {:p2 0} :t1 {:p5 0}}}
+         :jobs [:j1]
+         :tasks {:j1 [:t1 :t2 :t3]}
+         :messaging {:onyx.messaging/impl :aeron}
+         :allocations {:j1 {:t2 [:p1] :t3 [:p2] :t1 [:p5]}}
+         :peer-state {:p1 :active :p2 :idle :p3 :idle :p4 :idle :p5 :idle}
+         :task-schedulers {:j1 :onyx.task-scheduler/balanced}
+         :task-saturation {:j1 {:t1 1 :t2 1 :t3 1}}})))))

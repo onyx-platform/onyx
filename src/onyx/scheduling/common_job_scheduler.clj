@@ -341,6 +341,17 @@
                 (assign-task-slot-ids original-replica peer->task))))))
     replica))
 
+(defn actual-usage [replica jobs]
+  (reduce
+   (fn [result job-id]
+     (reduce-kv
+      (fn [inner-result task-id peers]
+        (assoc-in inner-result [job-id task-id] (count peers)))
+      result
+      (get-in replica [:allocations job-id])))
+   {}
+   jobs))
+
 (defn reconfigure-cluster-workload [replica]
   (loop [jobs (:jobs replica)
          current-replica replica]
@@ -350,11 +361,13 @@
             job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
             max-utilization (claim-spare-peers current-replica job-claims spare-peers)
-            planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)
-            updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
-        (if updated-replica
-          (let [acker-replica (choose-ackers updated-replica jobs)]
-            (if (full-allocation? acker-replica max-utilization planned-capacities)
-              (deallocate-starved-jobs acker-replica)
-              (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
-          (recur (butlast jobs) (remove-job current-replica (butlast jobs))))))))
+            planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)]
+        (if (= planned-capacities (actual-usage current-replica jobs))
+          current-replica
+          (let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
+            (if updated-replica
+              (let [acker-replica (choose-ackers updated-replica jobs)]
+                (if (full-allocation? acker-replica max-utilization planned-capacities)
+                  (deallocate-starved-jobs acker-replica)
+                  (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
+              (recur (butlast jobs) (remove-job current-replica (butlast jobs))))))))))
