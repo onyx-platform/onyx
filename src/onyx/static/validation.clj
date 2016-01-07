@@ -65,24 +65,26 @@
        (take 3)
        (map (fn [suggestion] (keyword (subs suggestion 1))))))
 
+(defn suggest-on-model [model-name key]
+  (let [model (get-in model [model-name :model])
+        choices (not-empty (get-in model [(.value key) :choices]))]
+    (suggest-similar-keys (.value key)
+                          (or choices (keys model)))))
+
 (defn describe-value [k v]
   (if (= schema.utils.ValidationError (type v))
-    (let [doc (dissoc (get-in model [:catalog-entry :model k]) :doc)]
+    (let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
       (cond
-        (sequential? (:choices doc))
-        {:cause "Unsupported value"
-         :data {k (.value v)}
-         :suggestions (suggest-similar-keys (.value v) (:choices doc))
-         :documentation doc}
-
         doc
         {:cause "Unsupported value"
          :data {k (.value v)}
+         :suggestions (suggest-on-model :catalog-entry v)
          :documentation doc}
 
         :else
         {:cause "Unsupported value"
          :data {k (.value v)}
+         :suggestions (suggest-on-model :catalog-entry v)
          :value (.value v)}
 
         ))
@@ -94,8 +96,10 @@
           (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
             {:cause "Unsupported combination of task-map keys."
              :key (.value k)
-             :documentation doc} 
+             :suggestions (suggest-on-model :catalog-entry k)
+             :documentation doc}
             {:cause "Unsupported onyx task-map key."
+             :suggestions (suggest-on-model :catalog-entry k)
              :key (.value k)})
           :else
           k)

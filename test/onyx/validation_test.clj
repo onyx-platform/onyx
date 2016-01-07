@@ -120,6 +120,23 @@
           :onyx/type :output
           :onyx/batch-size 2}]
 
+        unsupported-key
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/bogus-key :onyx/bogus-value
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
         bad-input-plugin
         [{:onyx/name :in
           :onyx/plugin :ab
@@ -209,6 +226,9 @@
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog unsupported-language :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog unsupported-key :workflow workflow
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
