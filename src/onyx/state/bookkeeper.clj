@@ -30,6 +30,7 @@
           ;; allow loopback? only if running a local quorum
           allow-loopback? (boolean (arg-or-default :onyx.bookkeeper/local-quorum? env-config))
           disk-usage-threshold (arg-or-default :onyx.bookkeeper/disk-usage-threshold env-config)
+          disk-usage-warn-threshold (arg-or-default :onyx.bookkeeper/disk-usage-warn-threshold env-config)
           server-id (str onyx-id "_" port)
           journal-dir (str base-journal-dir "/" server-id)
           ledger-dir (str base-ledger-dir "/" server-id)
@@ -40,7 +41,8 @@
                         (.setJournalDirName journal-dir)
                         (.setLedgerDirNames (into-array String [ledger-dir]))
                         (.setAllowLoopback allow-loopback?)
-                        (.setDiskUsageThreshold disk-usage-threshold))
+                        (.setDiskUsageThreshold disk-usage-threshold)
+                        (.setDiskUsageWarnThreshold disk-usage-warn-threshold))
           server (BookieServer. server-conf)
           _ (info "Starting BookKeeper server on port" port)
           _ (.start server)]

@@ -1039,6 +1039,13 @@
              :optional? true
              :type :double
              :default 0.98
+             :added "0.8.4"}
+
+            :onyx.bookkeeper/disk-usage-warn-threshold
+            {:doc "Fraction of the total utilized usable disk space to warn about disk usage. The value of this parameter represents a percentage. It needs to lower or equal than the :onyx.bookkeeper/disk-usage-threshold"
+             :optional? true
+             :type :double
+             :default 0.95
              :added "0.8.4"}}}})
 
 (def model-display-order
@@ -1150,4 +1157,5 @@
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
     :onyx.bookkeeper/base-journal-dir
     :onyx.bookkeeper/base-ledger-dir
-    :onyx.bookkeeper/disk-usage-threshold]})
+    :onyx.bookkeeper/disk-usage-threshold
+    :onyx.bookkeeper/disk-usage-warn-threshold]})

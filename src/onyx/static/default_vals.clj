@@ -27,6 +27,7 @@
    :onyx.bookkeeper/base-ledger-dir "/tmp/bookkeeper_ledger"
    :onyx.bookkeeper/client-timeout 60000
    :onyx.bookkeeper/disk-usage-threshold 0.98
+   :onyx.bookkeeper/disk-usage-warn-threshold 0.95
    :onyx.bookkeeper/client-throttle 30000
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
    :onyx.bookkeeper/ledger-ensemble-size 3
