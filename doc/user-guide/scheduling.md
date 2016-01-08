@@ -132,7 +132,7 @@ If a peer fails, or is otherwise removed from the cluster, the Task scheduler re
 
 The Colocation Schedule takes all of the tasks for a job and, if possible, assigns them to the peers on a single physical machine represented by the same peer group. If a job has 4 tasks and the cluster is one machine with 5 peers, 4 peers will become active. If that machine had 8 peers, all 8 would become active as this schedule operates in peer chunks that are divisible by the task size. If more machines are capable of executing the entire job, they will also be used.
 
-This scheduler is useful for dramatically increasing performance of jobs where the latency is bound by the network of transmitting data across tasks. Using this scheduler with peer short circuiting will ensure that data never needs to cross the network. Onyx's usual fault tolerancy mechanisms are still used to ensure that data is processed in the presence of machine failure.
+This scheduler is useful for dramatically increasing performance of jobs where the latency is bound by the network of transmitting data across tasks. Using this scheduler with peer short circuiting will ensure that segments are never serialized and never cross the network between tasks (with the exception of grouping tasks). Onyx's usual fault tolerancy mechanisms are still used to ensure that data is processed in the presence of machine failure.
 
 To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/colcocated`.
 
