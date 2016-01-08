@@ -4,11 +4,13 @@
             [clojure.test :refer [deftest is]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
-            [onyx.windowing.window-id :refer [wids extents]]))
+            [onyx.windowing.window-id :refer [wids extents]]
+            [onyx.api]))
 
 (deftest fixed-windows
   (checking
-   "one segment per fixed window" 100000
+   "one segment per fixed window"
+   (times 500)
    [w-range-and-slide gen/s-pos-int
     w-attr gen/pos-int]
    (let [w-key :window-key
@@ -18,7 +20,8 @@
 
 (deftest sliding-windows
   (checking
-   "a segment in a multiple sliding windows" 100000
+   "a segment in a multiple sliding windows"
+   (times 500)
    [w-slide gen/s-pos-int
     multiple gen/s-pos-int
     w-attr gen/pos-int]
@@ -29,7 +32,8 @@
 
 (deftest inverse-functions
   (checking
-   "values produced by extents are matched by wids" 10000
+   "values produced by extents are matched by wids"
+   (times 500)
    ;; Bound the window size to 10 to keep the each test iteration quick.
    [w-slide (gen/resize 10 gen/s-pos-int)
     multiple gen/s-pos-int
