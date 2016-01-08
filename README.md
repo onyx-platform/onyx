@@ -129,6 +129,8 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Nicolas Ha](https://github.com/nha)
 - [Andrew Meredith](https://github.com/kendru)
 - [Bridget Hillyer](https://github.com/bridgethillyer)
+- [Ivan Mushketyk](https://github.com/mushketyk)
+- [Jochen Rau](https://github.com/jocrau)
 
 #### Acknowledgements
 
