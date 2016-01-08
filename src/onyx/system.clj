@@ -40,6 +40,7 @@
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
+            [onyx.scheduling.colocated-task-scheduler]
             [onyx.windowing.units]
             [onyx.windowing.window-extensions]
             [onyx.windowing.aggregation]

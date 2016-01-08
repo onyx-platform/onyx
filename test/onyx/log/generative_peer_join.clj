@@ -158,7 +158,7 @@
 (deftest balanced-task-balancing
   (checking
     "Checking Balanced allocation causes peers to be evenly over tasks"
-    50
+    (times 50)
     [{:keys [replica log peer-choices]}
      (log-gen/apply-entries-gen
        (gen/return

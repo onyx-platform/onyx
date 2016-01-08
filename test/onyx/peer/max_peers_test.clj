@@ -82,5 +82,3 @@
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
         (is (= expected (set (butlast results))))
         (is (= :done (last results)))))))
-
-

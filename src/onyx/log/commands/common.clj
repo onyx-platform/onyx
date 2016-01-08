@@ -71,11 +71,15 @@
 (defn remove-peers [replica id]
   (let [prev (get (allocations->peers (:allocations replica)) id)]
     (if (and (:job prev) (:task prev))
-      (let [remove-f #(vec (remove (partial = id) %))]
-        (-> replica
-            (update-in [:allocations (:job prev) (:task prev)] remove-f)
-            (update-in [:task-slot-ids (:job prev) (:task prev)] dissoc id)))
+      (let [remove-f #(vec (remove (partial = id) %))
+            deallocated (update-in replica [:allocations (:job prev) (:task prev)] remove-f)]
+        ;; Avoids making a key path to nil if there was no task slot
+        ;; for this peer.
+        (if (get-in replica [:task-slot-ids (:job prev) (:task prev) id])
+          (update-in deallocated [:task-slot-ids (:job prev) (:task prev)] dissoc id)
+          deallocated))
       replica)))
+
 
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])

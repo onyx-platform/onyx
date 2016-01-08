@@ -1,6 +1,5 @@
 (ns onyx.api
-  (:require [clojure.string :refer [split]]
-            [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go promise-chan]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go promise-chan]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info warn fatal error]]
             [onyx.log.entry :refer [create-log-entry]]
