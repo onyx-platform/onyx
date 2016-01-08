@@ -1047,7 +1047,21 @@
              :type :string
              :default "/tmp/bookkeeper_ledger"
              :optional? true
-             :added "0.8.0"}}}})
+             :added "0.8.0"}
+
+            :onyx.bookkeeper/disk-usage-threshold
+            {:doc "Fraction of the total utilized usable disk space to declare the disk full. The value of this parameter represents a percentage."
+             :optional? true
+             :type :double
+             :default 0.98
+             :added "0.8.4"}
+
+            :onyx.bookkeeper/disk-usage-warn-threshold
+            {:doc "Fraction of the total utilized usable disk space to warn about disk usage. The value of this parameter represents a percentage. It needs to lower or equal than the :onyx.bookkeeper/disk-usage-threshold"
+             :optional? true
+             :type :double
+             :default 0.95
+             :added "0.8.4"}}}})
 
 (def model-display-order
   {:catalog-entry
@@ -1137,7 +1151,7 @@
     :onyx.bookkeeper/ledger-id-written-back-off
     :onyx.bookkeeper/ledger-password 
     :onyx.bookkeeper/client-throttle
-    :onyx.bookkeeper/write-buffer-size 
+    :onyx.bookkeeper/write-buffer-size
     :onyx.bookkeeper/client-timeout
     :onyx.peer/state-filter-impl 
     :onyx.rocksdb.filter/base-dir
@@ -1149,9 +1163,15 @@
     :onyx.rocksdb.filter/num-ids-per-bucket
     :onyx.rocksdb.filter/rotation-check-interval-ms]
    :env-config
-   [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
+   [:onyx/id
+    :zookeeper/server?
+    :zookeeper.server/port
+    :zookeeper/address
     :onyx.bookkeeper/server? 
     :onyx.bookkeeper/delete-server-data?
     :onyx.bookkeeper/local-quorum?
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
-    :onyx.bookkeeper/base-journal-dir :onyx.bookkeeper/base-ledger-dir]})
+    :onyx.bookkeeper/base-journal-dir
+    :onyx.bookkeeper/base-ledger-dir
+    :onyx.bookkeeper/disk-usage-threshold
+    :onyx.bookkeeper/disk-usage-warn-threshold]})

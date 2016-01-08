@@ -330,6 +330,8 @@
    (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
    (s/optional-key :onyx.bookkeeper/base-journal-dir) s/Str
    (s/optional-key :onyx.bookkeeper/base-ledger-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/disk-usage-threshold) (s/pred float?)
+   (s/optional-key :onyx.bookkeeper/disk-usage-warn-threshold) (s/pred float?)
    s/Keyword s/Any})
 
 (def AeronIdleStrategy
