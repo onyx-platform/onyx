@@ -11,7 +11,8 @@
 (defn peer-site [peer-replica-view peer-id]
   (get (:peer-sites @peer-replica-view) peer-id))
 
-(defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates peer-sites job-id task-id catalog task])
+(defrecord PeerReplicaView
+    [backpressure? pick-peer-fns pick-acker-fn peer-sites job-id task-id catalog task])
 
 (defn build-pick-peer-fn
   [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id]
@@ -38,6 +39,16 @@
           :else
           (fn [hash-group]
             (choose-f hash-group)))))
+
+(defn build-pick-acker-fn [replica job-id my-peer-id candidates]
+  (if (not (seq candidates))
+    (fn []
+      (throw
+       (ex-info
+        (format
+         "Job %s does not have enough peers capable of acking. Raise the limit via the job parameter :acker/percentage." job-id)
+        {})))
+    (cts/choose-acker replica job-id my-peer-id candidates)))
 
 (defmethod extensions/peer-replica-view :default 
   [log entry old-replica new-replica diff old-view state opts]
@@ -69,6 +80,7 @@
                                                              receivable-peers slot-id->peer-id)))))
                                (into {}))
             job-ackers (get ackers job-id)
+            pick-acker-fn (build-pick-acker-fn new-replica job-id peer-id job-ackers)
             ;; Really should only use peers that are on egress tasks, and input tasks
             ;; all other tasks are non receivable from this peer
             peer-sites-peers (into (reduce into #{} (vals receivable-peers)) 
@@ -78,5 +90,5 @@
                                       (let [peer-site (-> new-replica :peer-sites (get id))] 
                                         (extensions/connection-spec messenger id nil peer-site)))
                                     peer-sites-peers))]
-        (->PeerReplicaView backpressure? pick-peer-fns job-ackers peer-sites job-id task-id catalog task))
+        (->PeerReplicaView backpressure? pick-peer-fns pick-acker-fn peer-sites job-id task-id catalog task))
       (->PeerReplicaView nil nil nil nil nil nil nil nil))))

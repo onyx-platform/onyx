@@ -155,22 +155,15 @@
       (handle-backoff! event)
       rets)))
 
-(defn validate-ackable! [peers event]
-  (when-not (seq peers)
-    (do (warn (format "[%s] This job no longer has peers capable of acking. This job will now pause execution." (:onyx.core/id event)))
-        (throw (ex-info "Not enough acker peers" {:peers peers})))))
-
 (defn tag-messages [task-type replica peer-replica-view id event]
   (if (= task-type :input)
-    (let [candidates (:acker-candidates @peer-replica-view)]
-      (validate-ackable! candidates event)
-      (update event
-              :onyx.core/batch
-              (fn [batch] 
-                (map (fn [segment]
-                       (add-acker-id (rand-nth candidates)
-                                     (add-completion-id id segment)))
-                     batch))))
+    (update event
+            :onyx.core/batch
+            (fn [batch]
+              (map (fn [segment]
+                     (add-acker-id ((:pick-acker-fn @peer-replica-view))
+                                   (add-completion-id id segment)))
+                   batch)))
     event))
 
 (defn add-messages-to-timeout-pool [task-type state event]
