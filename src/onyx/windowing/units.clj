@@ -106,8 +106,3 @@
   ICoerceKey
   (coerce-key [this units]
     (to-standard-units this units)))
-
-(extend-type java.lang.Double
-  ICoerceKey
-  (coerce-key [this units]
-    (to-standard-units this units)))
