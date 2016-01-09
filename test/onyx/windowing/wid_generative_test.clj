@@ -12,9 +12,7 @@
    "one segment per fixed window"
    (times 500)
    [w-range-and-slide gen/s-pos-int
-    w-attr (gen/one-of [gen/pos-int
-                        (gen/double* {:min 0 :infinite? false
-                                      :NaN? false})])]
+    w-attr gen/pos-int]
    (let [w-key :window-key
          segment {:window-key w-attr}
          buckets (wids 0 w-range-and-slide w-range-and-slide w-key segment)]
@@ -26,9 +24,7 @@
    (times 500)
    [w-slide gen/s-pos-int
     multiple gen/s-pos-int
-    w-attr (gen/one-of [gen/pos-int
-                        (gen/double* {:min 0 :infinite? false
-                                      :NaN? false})])]
+    w-attr gen/pos-int]
    (let [w-key :window-key
          segment {:window-key w-attr}
          buckets (wids 0 (* multiple w-slide) w-slide w-key segment)]
@@ -44,8 +40,7 @@
     extent-id gen/pos-int]
    (let [w-key :window-key
          values (extents 0 (* multiple w-slide) w-slide extent-id)]
-     (is (every?
-          (fn [k]
-            (some #{extent-id}
-                  (map long (wids 0 (* multiple w-slide) w-slide w-key {:window-key k}))))
-          values)))))
+     (is (every? #(some #{extent-id}
+                        (wids 0 (* multiple w-slide) w-slide w-key {:window-key %}))
+                 values)))))
+
