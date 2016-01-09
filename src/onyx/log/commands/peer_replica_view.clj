@@ -1,6 +1,7 @@
 (ns onyx.log.commands.peer-replica-view
   (:require [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
@@ -12,8 +13,10 @@
 
 (defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates peer-sites job-id task-id catalog task])
 
-(defn build-pick-peer-fn [task-id task-map egress-peers slot-id->peer-id]
-  (let [out-peers (egress-peers task-id)] 
+(defn build-pick-peer-fn
+  [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id]
+  (let [out-peers (egress-peers task-id)
+        choose-f (cts/choose-downstream-peers replica job-id my-peer-id out-peers)]
     (cond (empty? out-peers)
           (fn [_] nil)
 
@@ -33,8 +36,8 @@
           (throw (ex-info "Unhandled grouping-task flux-policy." task-map))
 
           :else
-          (fn [_]
-            (rand-nth out-peers)))))
+          (fn [hash-group]
+            (choose-f hash-group)))))
 
 (defmethod extensions/peer-replica-view :default 
   [log entry old-replica new-replica diff old-view state opts]
@@ -59,8 +62,11 @@
                                (map (fn [[task-name task-id]]
                                       (let [task-map (planning/find-task catalog task-name)
                                             slot-id->peer-id (map-invert (get slot-ids task-id))] 
-                                        (vector task-id 
-                                                (build-pick-peer-fn task-id task-map receivable-peers slot-id->peer-id)))))
+                                        (vector
+                                         task-id
+                                         (build-pick-peer-fn new-replica job-id
+                                                             peer-id task-id task-map
+                                                             receivable-peers slot-id->peer-id)))))
                                (into {}))
             job-ackers (get ackers job-id)
             ;; Really should only use peers that are on egress tasks, and input tasks

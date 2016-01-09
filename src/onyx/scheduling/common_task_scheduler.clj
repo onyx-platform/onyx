@@ -23,6 +23,10 @@
   (fn [replica job-id]
     (get-in replica [:task-schedulers job-id])))
 
+(defmulti choose-downstream-peers
+  (fn [replica job-id this-peer downstream-peers]
+    (get-in replica [:task-schedulers job-id])))
+
 (defmethod task-distribute-peer-count :default
   [replica job n]
   (throw (ex-info (format "Task scheduler %s not recognized" (get-in replica [:task-schedulers job]))
@@ -37,3 +41,8 @@
 (defmethod assign-capacity-constraint? :default
   [replica job-id]
   true)
+
+(defmethod choose-downstream-peers :default
+  [replica job-id this-peer downstream-peers]
+  (fn [hash-group]
+    (rand-nth downstream-peers)))

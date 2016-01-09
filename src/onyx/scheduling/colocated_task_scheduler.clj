@@ -110,3 +110,12 @@
 (defmethod cts/assign-capacity-constraint? :onyx.task-scheduler/colocated
   [replica job-id]
   false)
+
+(defmethod cts/choose-downstream-peers :onyx.task-scheduler/colocated
+  [replica job-id this-peer downstream-peers]
+  (let [my-site (extensions/get-peer-site replica this-peer)
+        colocated-peers
+        (filter #(= my-site (extensions/get-peer-site replica %))
+                downstream-peers)]
+    (fn [hash-group]
+      (rand-nth colocated-peers))))
