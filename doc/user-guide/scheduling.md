@@ -136,6 +136,8 @@ This scheduler is useful for dramatically increasing performance of jobs where t
 
 To use, set `:task-scheduler` in `submit-job` to `:onyx.task-scheduler/colcocated`.
 
+To use colocation, but to disable the scheduler's affinity to always send segments to a local peer, set `:onyx.task-scheduler.colocated/only-send-local?` to `false` in the peer config. This is desirable when optimal performance depends on the uniformity of tasks being evenly assigned to machines in your cluster, but strictly local execution is not helpful for performance.
+
 **Peer Addition**
 
 If a peer is added to the cluster and its machine is capable of executing all the tasks for this job, the entire machine will be used - provided that it falls into the pool of peers elligible to execute this job, per the job scheduler's perogative.

@@ -83,7 +83,9 @@
    :onyx.messaging/ack-daemon-clear-interval 15000
 
    ;; windowing defaults
-   :onyx.windowing/min-value 0})
+   :onyx.windowing/min-value 0
+
+   :onyx.task-scheduler.colocated/only-send-local? true})
 
 (defn arg-or-default [k opts]
   {:post [(not (nil? %))]}

@@ -15,9 +15,9 @@
     [backpressure? pick-peer-fns pick-acker-fn peer-sites job-id task-id catalog task])
 
 (defn build-pick-peer-fn
-  [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id]
+  [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id peer-config]
   (let [out-peers (egress-peers task-id)
-        choose-f (cts/choose-downstream-peers replica job-id my-peer-id out-peers)]
+        choose-f (cts/choose-downstream-peers replica job-id peer-config my-peer-id out-peers)]
     (cond (empty? out-peers)
           (fn [_] nil)
 
@@ -40,7 +40,7 @@
           (fn [hash-group]
             (choose-f hash-group)))))
 
-(defn build-pick-acker-fn [replica job-id my-peer-id candidates]
+(defn build-pick-acker-fn [replica job-id my-peer-id candidates peer-config]
   (if (not (seq candidates))
     (fn []
       (throw
@@ -48,10 +48,10 @@
         (format
          "Job %s does not have enough peers capable of acking. Raise the limit via the job parameter :acker/percentage." job-id)
         {})))
-    (cts/choose-acker replica job-id my-peer-id candidates)))
+    (cts/choose-acker replica job-id peer-config my-peer-id candidates)))
 
 (defmethod extensions/peer-replica-view :default 
-  [log entry old-replica new-replica diff old-view state opts]
+  [log entry old-replica new-replica diff old-view state peer-config]
   (let [peer-id (:id state)
         messenger (:messenger state)
         allocations (:allocations new-replica)
@@ -77,10 +77,11 @@
                                          task-id
                                          (build-pick-peer-fn new-replica job-id
                                                              peer-id task-id task-map
-                                                             receivable-peers slot-id->peer-id)))))
+                                                             receivable-peers slot-id->peer-id
+                                                             peer-config)))))
                                (into {}))
             job-ackers (get ackers job-id)
-            pick-acker-fn (build-pick-acker-fn new-replica job-id peer-id job-ackers)
+            pick-acker-fn (build-pick-acker-fn new-replica job-id peer-id job-ackers peer-config)
             ;; Really should only use peers that are on egress tasks, and input tasks
             ;; all other tasks are non receivable from this peer
             peer-sites-peers (into (reduce into #{} (vals receivable-peers)) 

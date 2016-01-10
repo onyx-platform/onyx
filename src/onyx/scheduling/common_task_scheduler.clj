@@ -24,11 +24,11 @@
     (get-in replica [:task-schedulers job-id])))
 
 (defmulti choose-downstream-peers
-  (fn [replica job-id this-peer downstream-peers]
+  (fn [replica job-id peer-config this-peer downstream-peers]
     (get-in replica [:task-schedulers job-id])))
 
 (defmulti choose-acker
-  (fn [replica job-id this-peer candidates]
+  (fn [replica job-id peer-config this-peer candidates]
     (get-in replica [:task-schedulers job-id])))
 
 (defmethod task-distribute-peer-count :default
@@ -47,11 +47,11 @@
   true)
 
 (defmethod choose-downstream-peers :default
-  [replica job-id this-peer downstream-peers]
+  [replica job-id peer-config this-peer downstream-peers]
   (fn [hash-group]
     (rand-nth downstream-peers)))
 
 (defmethod choose-acker :default
-  [replica job-id this-peer candidates]
+  [replica job-id peer-config this-peer candidates]
   (fn []
     (rand-nth candidates)))

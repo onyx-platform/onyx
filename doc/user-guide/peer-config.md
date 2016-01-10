@@ -236,7 +236,6 @@ The Aeron idle strategy to use between when polling for new messages. Currently,
 
 The Aeron idle strategy to use between when offering messages to another peer. Currently, two choices `:high-restart-latency` and `:low-restart-latency` can be chosen. low-restart-latency may result in lower latency message, at the cost of higher CPU usage or potentially reduced throughput.
 
-
 ### Peer Full Example
 
 ```clojure

@@ -115,20 +115,25 @@
   (let [my-site (extensions/get-peer-site replica this-peer)]
     (filter #(= my-site (extensions/get-peer-site replica %)) other-peers)))
 
+(defn choose-candidates [replica peer-config this-peer downstream-peers]
+  (if (:onyx.task-scheduler.colocated/only-send-local? peer-config)
+    (find-colocated-peers replica this-peer downstream-peers)
+    downstream-peers))
+
 (defmethod cts/choose-downstream-peers :onyx.task-scheduler/colocated
-  [replica job-id this-peer downstream-peers]
-  (let [candidates (find-colocated-peers replica this-peer downstream-peers)]
+  [replica job-id peer-config this-peer downstream-peers]
+  (let [candidates (choose-candidates replica peer-config this-peer downstream-peers)]
     (fn [hash-group]
       (rand-nth candidates))))
 
 (defmethod cts/choose-acker :onyx.task-scheduler/colocated
-  [replica job-id this-peer candidates]
-  (let [choices (find-colocated-peers replica this-peer candidates)]
-    (if (not (seq choices))
+  [replica job-id peer-config this-peer ackers]
+  (let [candidates (choose-candidates replica peer-config this-peer ackers)]
+    (if (not (seq candidates))
       (throw
        (ex-info
         (format
          "Job %s does not have an acker per machine, which is needed for the colocated task scheduler. Raise the limit via the job parameter :acker/percentage." job-id)
         {}))
       (fn []
-        (rand-nth choices)))))
+        (rand-nth candidates)))))
