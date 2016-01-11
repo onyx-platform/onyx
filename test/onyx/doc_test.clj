@@ -40,7 +40,7 @@
                       (schema-keys schema/partial-fn-task))))))
 
 (deftest peer-config-test
-  (is (= (set (keys (:model (:peer-config model)))) 
+  (is (= (set (keys (:model (:peer-config model))))
          (set (schema-keys schema/PeerConfig)))))
 
 (deftest lifecycle-call-test

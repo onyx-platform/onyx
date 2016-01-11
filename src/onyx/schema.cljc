@@ -406,6 +406,7 @@
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
+   (s/optional-key :onyx.messaging.aeron/media-driver) s/Str
    (s/optional-key :onyx.windowing/min-value) s/Int
    s/Keyword s/Any})
 
