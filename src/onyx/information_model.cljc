@@ -671,6 +671,13 @@
              :default 1000
              :added "0.8.3"}
 
+            :onyx.task-scheduler.colocated/only-send-local?
+            {:doc "When this peer is running a task for a job with a colocated task scheduler and this value is true, this peer will only send messages to segments local to its machine. It is desirable to set this to false when you want tasks to be perfectly uniformly spread over the machines in your cluster, but do not want jobs to run entirely locally."
+             :optional? true
+             :type :boolean
+             :default true
+             :added "0.8.4"}
+
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
              :optional? true
@@ -1161,7 +1168,8 @@
     :onyx.rocksdb.filter/peer-block-cache-size
     :onyx.rocksdb.filter/num-buckets 
     :onyx.rocksdb.filter/num-ids-per-bucket
-    :onyx.rocksdb.filter/rotation-check-interval-ms]
+    :onyx.rocksdb.filter/rotation-check-interval-ms
+    :onyx.task-scheduler.colocated/only-send-local?]
    :env-config
    [:onyx/id
     :zookeeper/server?
