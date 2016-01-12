@@ -8,7 +8,7 @@ This section outlines how Onyx programs execute behavior. Onyx uses plain Clojur
 
 - [Functional Transformation](#functional-transformation)
 - [Function Parameterization](#function-parameterization)
-- [Grouping & Aggregation](#grouping-&-aggregation)
+- [Grouping & Aggregation](#grouping-aggregation)
 - [Group By Key](#group-by-key)
 - [Group By Function](#group-by-function)
 - [Flux Policies](#flux-policies)
