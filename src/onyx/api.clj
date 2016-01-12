@@ -336,6 +336,7 @@
   ([env-config]
    (start-env env-config {:monitoring :no-op}))
   ([env-config monitoring-config]
+   (validator/validate-java-version)
    (validator/validate-env-config env-config)
    (component/start (system/onyx-development-env env-config monitoring-config))))
 
