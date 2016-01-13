@@ -28,7 +28,7 @@
                  [com.stuartsierra/component "0.3.0"]
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.10.0"]
-                 [uk.co.real-logic/aeron-all "0.2.2"]
+                 [uk.co.real-logic/aeron-all "0.2.3"]
                  [prismatic/schema "1.0.3"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]
