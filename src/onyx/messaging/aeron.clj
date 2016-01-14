@@ -178,13 +178,21 @@
                                     (catch Throwable e (fatal e))))]
     {:conn conn :subscription subscription :subscriber-fut subscriber-fut}))
 
+(defn get-threading-model
+  [media-driver]
+  (cond (= media-driver "dedicated") ThreadingMode/DEDICATED
+        (= media-driver "shared") ThreadingMode/SHARED
+        (= media-driver "shared-network") ThreadingMode/SHARED_NETWORK))
+
 (defrecord AeronPeerGroup [opts publication-pool subscribers subscriber-count compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
     (let [embedded-driver? (arg-or-default :onyx.messaging.aeron/embedded-driver? opts)
+          threading-mode (get-threading-model (arg-or-default :onyx.messaging.aeron/media-driver opts))
+
           media-driver-context (if embedded-driver?
-                                 (MediaDriver$Context.))
+                                 (-> (MediaDriver$Context.) (.threadingMode threading-mode)) )
           media-driver (if embedded-driver?
                          (MediaDriver/launch media-driver-context))
 

@@ -831,6 +831,13 @@
              :default 1000
              :added "0.8.0"}
 
+            :onyx.messaging.aeron/media-driver
+            {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
+             :optional? true
+             :type :string
+             :default "shared"
+             :added "0.9.0"}
+
             :onyx.peer/state-log-impl
             {:doc "Choice of state persistence implementation."
              :optional? true
@@ -1149,6 +1156,7 @@
     :onyx.messaging.aeron/poll-idle-strategy
     :onyx.messaging.aeron/offer-idle-strategy 
     :onyx.messaging.aeron/publication-creation-timeout
+    :onyx.messaging.aeron/media-driver
     :onyx.peer/state-log-impl
     :onyx.bookkeeper/read-batch-size 
     :onyx.bookkeeper/write-batch-size
