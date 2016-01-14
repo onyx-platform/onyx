@@ -369,7 +369,7 @@
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
       (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
-      (do (warn e "Uncaught exception throw inside task lifecycle.")
+      (do (warn e "Handling uncaught exception thrown inside task lifecycle.")
           (if (restart-pred-fn e)
             (>!! restart-ch true)
             (let [entry (entry/create-log-entry :kill-job {:job job-id})]

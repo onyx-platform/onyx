@@ -16,8 +16,10 @@
 
 (defn write-to-pub [^Publication pub ^IdleStrategy send-idle-strategy msg]
   (loop [result ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))]
-    (when (neg? result) 
-      (.idle send-idle-strategy 0)
+    (when (neg? result)
+      (if (= result Publication/CLOSED)
+        (throw (IllegalStateException. "Publication has been closed"))
+        (.idle send-idle-strategy 0))
       (recur ^long (.offer ^Publication pub (:buf msg) (:start msg) (:end msg))))))
 
 (defn write-from-buffer [publication-manager pending-ch send-idle-strategy]

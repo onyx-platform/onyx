@@ -831,6 +831,14 @@
              :default 1000
              :added "0.8.0"}
 
+            :onyx.messaging.aeron/embedded-media-driver-threading
+            {:doc "Threading mode to use with the embedded media driver."
+             :optional? true
+             :type :keyword
+             :choices [:dedicated :shared :shared-network]
+             :default :shared
+             :added "0.9.0"}
+
             :onyx.peer/state-log-impl
             {:doc "Choice of state persistence implementation."
              :optional? true
@@ -1144,6 +1152,7 @@
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/embedded-driver?
+    :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy
