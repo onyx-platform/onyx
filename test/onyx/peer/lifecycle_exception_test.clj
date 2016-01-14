@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.test-helper :refer [load-config with-test-env feedback-exception!]]
             [onyx.api]))
 
 (def n-messages 100)
@@ -129,6 +129,6 @@
         (doseq [n (range n-messages)]
           (>!! @in-chan {:n n}))
 
-        (onyx.api/await-job-completion peer-config job-id)
+        (feedback-exception! peer-config job-id (:log (:env test-env)))
         ;; Made it to the end with a successful job completion.
-        (is (= true true))))))
+        (is true)))))
