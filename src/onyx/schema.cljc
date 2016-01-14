@@ -206,7 +206,8 @@
    (s/optional-key :lifecycle/after-batch) Function
    (s/optional-key :lifecycle/after-task-stop) Function
    (s/optional-key :lifecycle/after-ack-segment) Function
-   (s/optional-key :lifecycle/after-retry-segment) Function})
+   (s/optional-key :lifecycle/after-retry-segment) Function
+   (s/optional-key :lifecycle/handle-exception) Function})
 
 (def FlowAction
   (s/enum :retry))
@@ -329,6 +330,8 @@
    (s/optional-key :onyx.bookkeeper/local-quorum-ports) [s/Int]
    (s/optional-key :onyx.bookkeeper/base-journal-dir) s/Str
    (s/optional-key :onyx.bookkeeper/base-ledger-dir) s/Str
+   (s/optional-key :onyx.bookkeeper/disk-usage-threshold) (s/pred float?)
+   (s/optional-key :onyx.bookkeeper/disk-usage-warn-threshold) (s/pred float?)
    s/Keyword s/Any})
 
 (def AeronIdleStrategy
@@ -404,6 +407,7 @@
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
+   (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
    s/Keyword s/Any})
 
 (def PeerId

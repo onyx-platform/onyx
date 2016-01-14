@@ -5,6 +5,7 @@
             [clojure.test :refer :all]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            [onyx.static.validation :as v]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.peer.task-compile :as c]
             [onyx.api]))
@@ -59,7 +60,7 @@
                   (gen/return {:flow/predicate ::false-pred
                                :pred/val false})))
 
-(defn short-circuit-flow-condition-gen [base-gen]
+(defn flow-short-circuit-condition-gen [base-gen]
   (merge-gen-maps base-gen (gen/return {:flow/short-circuit? true})))
 
 (defn exception-flow-condition-gen [base-gen]
@@ -147,19 +148,19 @@
                      (flow-condition-gen)
                      (flow-to-tasks-gen)
                      (false-flow-condition-gen)
-                     (short-circuit-flow-condition-gen)))
+                     (flow-short-circuit-condition-gen)))
     true-1
     (gen/not-empty (gen/vector (->> :a
                                     (flow-condition-gen)
                                     (flow-to-tasks-gen)
                                     (true-flow-condition-gen)
-                                    (short-circuit-flow-condition-gen))))
+                                    (flow-short-circuit-condition-gen))))
     false-2
     (gen/vector (->> :a
                      (flow-condition-gen)
                      (flow-to-tasks-gen)
                      (false-flow-condition-gen)
-                     (short-circuit-flow-condition-gen)))
+                     (flow-short-circuit-condition-gen)))
     mixed-1
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -196,7 +197,7 @@
     (gen/vector (->> :a
                      (flow-condition-gen)
                      (flow-to-tasks-gen)
-                     (short-circuit-flow-condition-gen)
+                     (flow-short-circuit-condition-gen)
                      (maybe-predicate)))
     exceptions
     (gen/vector (->> :a
@@ -390,3 +391,48 @@
          exclusions (mapcat :flow/exclude-keys (filter :pred/val fcs))
          filtered-segment (reduce dissoc segment exclusions)]
      (is (= filtered-segment (r/flow-conditions-transform segment routes fcs event))))))
+
+(deftest none-placed-after-all
+  (checking
+    ":flow/to :none placed after :flow/to :all"
+    (times 50)
+    [fcs-all (gen/not-empty
+               (gen/vector (->> :a
+                                (flow-condition-gen)
+                                (flow-to-all-gen))))
+     fcs-none (gen/not-empty
+                (gen/vector (->> :a
+                                 (flow-condition-gen)
+                                 (flow-to-none-gen))))]
+    (let [fcs (into [] (concat fcs-none fcs-all))]
+      (is (thrown? Exception (v/validate-flow-conditions fcs []))))))
+
+(deftest none-placed-before-other
+  (checking
+    ":flow/to :none placed first if there is no :flow/to :all"
+    (times 50)
+    [fcs-other (gen/not-empty
+               (gen/vector (->> :a
+                                (flow-condition-gen)
+                                (flow-to-tasks-gen))))
+     fcs-none (gen/not-empty
+                (gen/vector (->> :a
+                                 (flow-condition-gen)
+                                 (flow-to-none-gen))))]
+    (let [fcs (into [] (concat fcs-other fcs-none))]
+      (is (thrown? Exception (v/validate-flow-conditions fcs []))))))
+
+
+(deftest short-circuit-placed-before-other
+  (checking
+    ":flow/short-circuit? true should be placed before other conditions"
+    (times 50)
+    [fcs-other (gen/not-empty
+                 (gen/vector (->> :a
+                                  (flow-condition-gen))))
+     fcs-short-circuit (gen/not-empty
+                        (gen/vector (->> :a
+                                         (flow-condition-gen)
+                                         (flow-short-circuit-condition-gen ))))]
+    (let [fcs (into [] (concat fcs-other fcs-short-circuit))]
+      (is (thrown? Exception (v/validate-flow-conditions fcs []))))))

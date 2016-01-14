@@ -519,7 +519,12 @@
             :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
                                             :type :function
                                             :optional? true
-                                            :added "0.8.0"}}}
+                                            :added "0.8.0"}
+
+            :lifecycle/handle-exception {:doc "If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `:kill`, `:restart` or `:defer` indicating whether the job should be killed, the task restarted, or the decision defered to the next lifecycle exception handler, if another is defined. If all handlers `:defer`, the default behavior is `:kill`."
+                                            :type :function
+                                            :optional? true
+                                            :added "0.8.3"}}}
 
    :peer-config
    {:summary "All options available to configure the virtual peers and development environment."
@@ -665,6 +670,13 @@
              :type :integer
              :default 1000
              :added "0.8.3"}
+
+            :onyx.task-scheduler.colocated/only-send-local?
+            {:doc "When this peer is running a task for a job with a colocated task scheduler and this value is true, this peer will only send messages to segments local to its machine. It is desirable to set this to false when you want tasks to be perfectly uniformly spread over the machines in your cluster, but do not want jobs to run entirely locally."
+             :optional? true
+             :type :boolean
+             :default true
+             :added "0.8.4"}
 
             :onyx.messaging/inbound-buffer-size
             {:doc "Number of messages to buffer in the core.async channel for received segments."
@@ -1042,7 +1054,21 @@
              :type :string
              :default "/tmp/bookkeeper_ledger"
              :optional? true
-             :added "0.8.0"}}}})
+             :added "0.8.0"}
+
+            :onyx.bookkeeper/disk-usage-threshold
+            {:doc "Fraction of the total utilized usable disk space to declare the disk full. The value of this parameter represents a percentage."
+             :optional? true
+             :type :double
+             :default 0.98
+             :added "0.8.4"}
+
+            :onyx.bookkeeper/disk-usage-warn-threshold
+            {:doc "Fraction of the total utilized usable disk space to warn about disk usage. The value of this parameter represents a percentage. It needs to lower or equal than the :onyx.bookkeeper/disk-usage-threshold"
+             :optional? true
+             :type :double
+             :default 0.95
+             :added "0.8.4"}}}})
 
 (def model-display-order
   {:catalog-entry
@@ -1093,7 +1119,8 @@
     :lifecycle/after-batch 
     :lifecycle/after-task-stop 
     :lifecycle/after-ack-segment 
-    :lifecycle/after-retry-segment]
+    :lifecycle/after-retry-segment
+    :lifecycle/handle-exception]
    :peer-config
    [:onyx/id :onyx.peer/job-scheduler :zookeeper/address
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
@@ -1131,7 +1158,7 @@
     :onyx.bookkeeper/ledger-id-written-back-off
     :onyx.bookkeeper/ledger-password 
     :onyx.bookkeeper/client-throttle
-    :onyx.bookkeeper/write-buffer-size 
+    :onyx.bookkeeper/write-buffer-size
     :onyx.bookkeeper/client-timeout
     :onyx.peer/state-filter-impl 
     :onyx.rocksdb.filter/base-dir
@@ -1141,11 +1168,18 @@
     :onyx.rocksdb.filter/peer-block-cache-size
     :onyx.rocksdb.filter/num-buckets 
     :onyx.rocksdb.filter/num-ids-per-bucket
-    :onyx.rocksdb.filter/rotation-check-interval-ms]
+    :onyx.rocksdb.filter/rotation-check-interval-ms
+    :onyx.task-scheduler.colocated/only-send-local?]
    :env-config
-   [:zookeeper/server? :zookeeper.server/port :onyx/id :zookeeper/address
+   [:onyx/id
+    :zookeeper/server?
+    :zookeeper.server/port
+    :zookeeper/address
     :onyx.bookkeeper/server? 
     :onyx.bookkeeper/delete-server-data?
     :onyx.bookkeeper/local-quorum?
     :onyx.bookkeeper/local-quorum-ports :onyx.bookkeeper/port
-    :onyx.bookkeeper/base-journal-dir :onyx.bookkeeper/base-ledger-dir]})
+    :onyx.bookkeeper/base-journal-dir
+    :onyx.bookkeeper/base-ledger-dir
+    :onyx.bookkeeper/disk-usage-threshold
+    :onyx.bookkeeper/disk-usage-warn-threshold]})

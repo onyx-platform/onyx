@@ -36,26 +36,7 @@ Example project: [filtering](https://github.com/onyx-platform/onyx-examples/tree
 
 #### Function Parameterization
 
-A function can be parameterized before a job is submitted to Onyx. The segment is always the last argument to the function. If more than one of these options are used, the arguments are concatenated in the order that this documentation section lists them. There are three ways to parameterize a function:
-
-- Via the `:onyx.peer/fn-params` peer configuration
-
-```clojure
-(def peer-opts
-  {...
-   :onyx.peer/fn-params {:my-fn-name [:my-args-here]}})
-```
-
-The function is then invoked with `(partial f :my-args-here)`.
-
-- Via the `:onyx.core/params` in the `before-task-start` lifecycle hook
-
-```clojure
-(defn before-task-start-hook [event lifecycle]
-  {:onyx.core/params [:my-args-here]})
-```
-
-The function is then invoked with `(partial f :my-args-here)`.
+A function can be parameterized before a job is submitted to Onyx. The segment is always the last argument to the function. There are multiple ways to paramerize a function, and they can be used in combination.
 
 - Via the catalog `:onyx/params` entry
 
@@ -69,6 +50,30 @@ The function is then invoked with `(partial f :my-args-here)`.
 ```
 
 The function is then invoked with `(partial f "abc" "def")`. The order is controlled by the vector of `:onyx/params`.
+
+- Via `:onyx.core/params` in the `before-task-start` lifecycle hook
+
+```clojure
+(defn before-task-start-hook [event lifecycle]
+  {:onyx.core/params [42]})
+```
+
+The function is then invoked with `(partial f 42)`.
+
+Using this approach "hard sets" the parameters list. Other parameters may already exist in `onyx.core/params`. If you want to retain those parameter, concat them together and return the new value on `onyx.core/params`.
+
+- Via the `:onyx.peer/fn-params` peer configuration
+
+```clojure
+(def peer-opts
+  {...
+   :onyx.peer/fn-params {:my-fn-name [64]}})
+```
+
+The function is then invoked with `(partial f 64)`.
+
+This approach is useful for parameterizing a task regardless of which job it is in. If both `onyx.peer/fn-params` and `:onyx/params` are set for the same task, they are concatenated together, with `fn-params` coming first.
+
 
 Example projects: [parameterized](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/parameterized), [interface-injection](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/interface-injection), [catalog-parameters](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/catalog-parameters)
 

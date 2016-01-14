@@ -17,8 +17,11 @@
 
 (defn job-allocation-counts [replica job-info]
   (if-let [allocations (get-in replica [:allocations (:job-id job-info)])]
-    (mapv count (vals allocations))
-    []))
+    (reduce-kv (fn [result task-id peers]
+                 (assoc result task-id (count peers)))
+               {}
+               allocations)
+    {}))
 
 (defn get-counts [replica job-infos]
   (mapv (partial job-allocation-counts replica) job-infos))

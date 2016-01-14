@@ -4,7 +4,8 @@
             [onyx.static.default-vals :refer [defaults]]
             [onyx.schema :as schema]
             [schema.core :as s]
-            [onyx.information-model :refer [model model-display-order]]))
+            [onyx.information-model :refer [model model-display-order]]
+            [onyx.api]))
 
 (deftest missing-documentation-test
   (is (empty? (remove (apply merge (map :model (vals model))) 

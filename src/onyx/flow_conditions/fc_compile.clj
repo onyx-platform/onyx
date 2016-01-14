@@ -1,5 +1,6 @@
 (ns onyx.flow-conditions.fc-compile
-  (:require [onyx.peer.operation :refer [kw->fn]]))
+  (:require [clojure.set :refer [subset?]]
+            [onyx.peer.operation :refer [kw->fn]]))
 
 (defn pred-fn? [expr]
   (and (keyword? expr)
@@ -30,3 +31,28 @@
             (fn [xs]
               (apply (kw->fn op) (concat xs (map (fn [arg] (get entry arg)) more))))))))
 
+(defn egress-tasks [workflow task]
+  (map second (filter #(= (first %) task) workflow)))
+
+(defn only-relevant-branches [flow-conditions workflow task]
+  (filter #(or (= (:flow/from %) task)
+               (and (= (:flow/from %) :all)
+                    (subset? (into #{} (:flow/to %))
+                             (into #{} (egress-tasks workflow task)))))
+          flow-conditions))
+
+(defn compile-flow-conditions [flow-conditions workflow task-name f]
+  (let [branches (only-relevant-branches flow-conditions workflow task-name)
+        conditions (filter f branches)]
+    (map
+     (fn [condition]
+       (assoc condition :flow/predicate (build-pred-fn (:flow/predicate condition) condition)))
+     conditions)))
+
+(defn compile-fc-happy-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           (comp not :flow/thrown-exception?)))
+
+(defn compile-fc-exception-path [flow-conditions workflow task-name]
+  (compile-flow-conditions flow-conditions workflow task-name
+                           :flow/thrown-exception?))

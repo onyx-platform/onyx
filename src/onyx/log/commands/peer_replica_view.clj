@@ -1,6 +1,7 @@
 (ns onyx.log.commands.peer-replica-view
   (:require [clojure.set :refer [union difference map-invert]]
             [clojure.data :refer [diff]]
+            [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
             [taoensso.timbre :refer [info warn]]
@@ -10,10 +11,13 @@
 (defn peer-site [peer-replica-view peer-id]
   (get (:peer-sites @peer-replica-view) peer-id))
 
-(defrecord PeerReplicaView [backpressure? pick-peer-fns acker-candidates peer-sites job-id task-id catalog task])
+(defrecord PeerReplicaView
+    [backpressure? pick-peer-fns pick-acker-fn peer-sites job-id task-id catalog task])
 
-(defn build-pick-peer-fn [task-id task-map egress-peers slot-id->peer-id]
-  (let [out-peers (egress-peers task-id)] 
+(defn build-pick-peer-fn
+  [replica job-id my-peer-id task-id task-map egress-peers slot-id->peer-id peer-config]
+  (let [out-peers (egress-peers task-id)
+        choose-f (cts/choose-downstream-peers replica job-id peer-config my-peer-id out-peers)]
     (cond (empty? out-peers)
           (fn [_] nil)
 
@@ -33,11 +37,21 @@
           (throw (ex-info "Unhandled grouping-task flux-policy." task-map))
 
           :else
-          (fn [_]
-            (rand-nth out-peers)))))
+          (fn [hash-group]
+            (choose-f hash-group)))))
+
+(defn build-pick-acker-fn [replica job-id my-peer-id candidates peer-config]
+  (if (not (seq candidates))
+    (fn []
+      (throw
+       (ex-info
+        (format
+         "Job %s does not have enough peers capable of acking. Raise the limit via the job parameter :acker/percentage." job-id)
+        {})))
+    (cts/choose-acker replica job-id peer-config my-peer-id candidates)))
 
 (defmethod extensions/peer-replica-view :default 
-  [log entry old-replica new-replica diff old-view state opts]
+  [log entry old-replica new-replica diff old-view state peer-config]
   (let [peer-id (:id state)
         messenger (:messenger state)
         allocations (:allocations new-replica)
@@ -59,10 +73,15 @@
                                (map (fn [[task-name task-id]]
                                       (let [task-map (planning/find-task catalog task-name)
                                             slot-id->peer-id (map-invert (get slot-ids task-id))] 
-                                        (vector task-id 
-                                                (build-pick-peer-fn task-id task-map receivable-peers slot-id->peer-id)))))
+                                        (vector
+                                         task-id
+                                         (build-pick-peer-fn new-replica job-id
+                                                             peer-id task-id task-map
+                                                             receivable-peers slot-id->peer-id
+                                                             peer-config)))))
                                (into {}))
             job-ackers (get ackers job-id)
+            pick-acker-fn (build-pick-acker-fn new-replica job-id peer-id job-ackers peer-config)
             ;; Really should only use peers that are on egress tasks, and input tasks
             ;; all other tasks are non receivable from this peer
             peer-sites-peers (into (reduce into #{} (vals receivable-peers)) 
@@ -72,5 +91,5 @@
                                       (let [peer-site (-> new-replica :peer-sites (get id))] 
                                         (extensions/connection-spec messenger id nil peer-site)))
                                     peer-sites-peers))]
-        (->PeerReplicaView backpressure? pick-peer-fns job-ackers peer-sites job-id task-id catalog task))
+        (->PeerReplicaView backpressure? pick-peer-fns pick-acker-fn peer-sites job-id task-id catalog task))
       (->PeerReplicaView nil nil nil nil nil nil nil nil))))

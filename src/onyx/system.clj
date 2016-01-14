@@ -1,5 +1,6 @@
 (ns onyx.system
-  (:require [com.stuartsierra.component :as component]
+  (:require [clojure.core.async :refer [chan close!]]
+            [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info]]
             [onyx.static.logging-configuration :as logging-config]
             [onyx.peer.virtual-peer :refer [virtual-peer]]
@@ -12,6 +13,10 @@
             [onyx.monitoring.custom-monitoring]
             [onyx.log.zookeeper :refer [zookeeper]]
             [onyx.state.bookkeeper :refer [multi-bookie-server]]
+            [onyx.state.log.bookkeeper]
+            [onyx.state.log.none]
+            [onyx.state.filter.set]
+            [onyx.state.filter.rocksdb]
             [onyx.log.commands.prepare-join-cluster]
             [onyx.log.commands.accept-join-cluster]
             [onyx.log.commands.abort-join-cluster]
@@ -35,6 +40,7 @@
             [onyx.scheduling.percentage-job-scheduler]
             [onyx.scheduling.balanced-task-scheduler]
             [onyx.scheduling.percentage-task-scheduler]
+            [onyx.scheduling.colocated-task-scheduler]
             [onyx.windowing.units]
             [onyx.windowing.window-extensions]
             [onyx.windowing.aggregation]
@@ -44,9 +50,10 @@
             [onyx.triggers.punctuation]
             [onyx.triggers.watermark]
             [onyx.triggers.percentile-watermark]
+            [onyx.compression.nippy]
             [onyx.plugin.core-async]
-            [clojure.core.async :refer [chan close!]]
-            [onyx.extensions :as extensions]))
+            [onyx.extensions :as extensions]
+            [onyx.interop]))
 
 (defn rethrow-component [f]
   (try

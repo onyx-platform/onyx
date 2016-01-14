@@ -21,6 +21,25 @@
            (update-in task [:pct] / total))
          tasks)))
 
+(defn remove-grouping-tasks [replica job-id allocations]
+  (remove
+   (fn [[planned-task allocation]]
+     (not (nil? (get-in replica [:flux-policies job-id (:task planned-task)]))))
+   allocations))
+
+(defn reduce-overallocated-peers
+  "Turns down the number of peers for tasks where
+   we overallocated. This can happen if a grouping task
+   is allocated a higher number of peers than its percentage
+   value requests. Other tasks must give up peers to compensate.
+   Tasks with the highest peer count are prioritized to be
+   reduced first."
+  [replica job-id planned-allocations]
+  (let [sorted-allocations (reverse (sort-by second planned-allocations))
+        non-grouping-tasks (remove-grouping-tasks replica job-id sorted-allocations)
+        target-task (update-in (first non-grouping-tasks) [1] dec)]
+    (merge planned-allocations target-task)))
+
 (defn largest-remainder-allocations
   "Allocates remaining peers to the tasks with the largest remainder.
   e.g. 3 tasks pct allocated 3.5, 1.75, 1.75 -> 3, 2, 2"
@@ -50,6 +69,9 @@
                         (take remaining)
                         (map (juxt first (constantly 1)))
                         (into {}))
+        full-allocated (if (neg? remaining)
+                         (reduce-overallocated-peers replica job full-allocated)
+                         full-allocated)
         final-allocations (merge-with + full-allocated remainders)]
     (mapv (fn [[task allocation]]
             (assoc task :allocation (int allocation)))
@@ -74,41 +96,6 @@
             unallocated-tasks (remove cutoff-oversaturated candidate-tasks)]
         (merge (percentage-balanced-taskload replica job unallocated-tasks n-remaining-peers)
                cutoff-oversaturated)))))
-
-(defn sort-by-saturation [replica job tasks]
-  (sort-by
-   (fn [t]
-     (- (or (count (get-in replica [:allocations job t])) 0)
-        (get-in replica [:min-required-peers job t])))
-   tasks))
-
-(defmethod cts/drop-peers :onyx.task-scheduler/percentage
-  [replica job n]
-  (let [tasks (keys (get-in replica [:allocations job]))
-        current (apply + (map count (vals (get-in replica [:allocations job]))))
-        balanced (percentage-balanced-taskload replica job tasks (- current n))
-        tasks (cts/filter-grouped-tasks replica job balanced)
-        candidates
-        (into
-         {}
-         (map
-          (fn [[k v]]
-            {k (take-last n (get-in replica [:allocations job k]))}) tasks))]
-    (loop [k 0
-           pool candidates
-           peers []]
-      (if (or (>= k n) (not (seq pool)))
-        peers
-        (let [max-task (first
-                        (reverse
-                         (map first (sort-by
-                                     (juxt
-                                      (fn [[k v]] (- (count v) (:allocation (get balanced k))))
-                                      (fn [[k v]] (.indexOf ^clojure.lang.PersistentVector
-                                                           (vec (get-in replica [:tasks job])) k)))
-                                     pool))))
-              target (last (get-in pool [max-task]))]
-          (recur (inc k) (update-in pool [max-task] (comp vec butlast)) (conj peers target)))))))
 
 (defmethod cts/task-distribute-peer-count :onyx.task-scheduler/percentage
   [replica job n]

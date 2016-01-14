@@ -106,10 +106,6 @@ Feel free to use it anywhere. You can find [a few different versions here](https
 
 A simple `lein test` will run the full suite for Onyx core.
 
-#### Commit rights
-
-Anyone who has a patch accepted may request commit rights. Please do so inside the pull request post-merge.
-
 #### Contributor list
 
 - [Michael Drogalis](https://github.com/MichaelDrogalis)
@@ -129,6 +125,8 @@ Anyone who has a patch accepted may request commit rights. Please do so inside t
 - [Nicolas Ha](https://github.com/nha)
 - [Andrew Meredith](https://github.com/kendru)
 - [Bridget Hillyer](https://github.com/bridgethillyer)
+- [Ivan Mushketyk](https://github.com/mushketyk)
+- [Jochen Rau](https://github.com/jocrau)
 
 #### Acknowledgements
 

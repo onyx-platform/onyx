@@ -25,7 +25,9 @@
    :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
    :onyx.bookkeeper/base-journal-dir "/tmp/bookkeeper_journal"
    :onyx.bookkeeper/base-ledger-dir "/tmp/bookkeeper_ledger"
-   :onyx.bookkeeper/client-timeout 60000 
+   :onyx.bookkeeper/client-timeout 60000
+   :onyx.bookkeeper/disk-usage-threshold 0.98
+   :onyx.bookkeeper/disk-usage-warn-threshold 0.95
    :onyx.bookkeeper/client-throttle 30000
    :onyx.bookkeeper/ledger-password "INSECUREDEFAULTPASSWORD" 
    :onyx.bookkeeper/ledger-ensemble-size 3
@@ -81,7 +83,9 @@
    :onyx.messaging/ack-daemon-clear-interval 15000
 
    ;; windowing defaults
-   :onyx.windowing/min-value 0})
+   :onyx.windowing/min-value 0
+
+   :onyx.task-scheduler.colocated/only-send-local? true})
 
 (defn arg-or-default [k opts]
   {:post [(not (nil? %))]}

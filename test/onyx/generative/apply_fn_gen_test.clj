@@ -6,6 +6,7 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [onyx.peer.transform :as t]
+            [onyx.peer.task-compile :as c]
             [onyx.peer.task-lifecycle :refer [persistent-results!]]
             [onyx.api])
   (:import [java.util UUID]))
@@ -106,3 +107,19 @@
      (is (= input (map :root tree)))
      (is (= (map :message input) (map :message (mapcat :leaves tree))))
      (is @called?))))
+
+(deftest supplied-params
+  (checking
+   "Supplied parameters concat in the right order"
+   (times 30)
+   [fn-params (gen/vector gen/any)
+    catalog-params (gen/hash-map gen/keyword gen/any)]
+   (let [task-name :a
+         catalog-param-keys (keys catalog-params)
+         catalog-param-vals (map #(get catalog-params %) catalog-param-keys)
+         peer-config {:onyx.peer/fn-params {task-name fn-params}}
+         task-map (merge {:onyx/name task-name} {:onyx/params catalog-param-keys}
+                         catalog-params)
+         event (c/task-params->event-map {} peer-config task-map)]
+     (is (= (into fn-params catalog-param-vals)
+            (:onyx.core/params event))))))

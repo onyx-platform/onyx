@@ -9,7 +9,7 @@
   (let [replica-job-ids (mapcat (fn [k] 
                                   (keys (replica k))) 
                                 [:allocations :task-slot-ids 
-                                 :ackers :task-metadata :allocations])]
+                                 :ackers :task-metadata])]
     (testing "all job ids are valid active jobs"
       (is (empty? (remove (set jobs) replica-job-ids))))))
 
@@ -24,8 +24,7 @@
             (map keys [peer-state peer-sites prepared accepted pairs])))
 
     (testing "slot ids only allocated once" 
-      (is (= slot-id-peers
-             (distinct slot-id-peers))))
+      (is (= slot-id-peers (distinct slot-id-peers))))
     (is (empty? (remove (set peers) slot-id-peers)))
     (is (empty? (reduce dissoc peer-allocations peers)))))
 
