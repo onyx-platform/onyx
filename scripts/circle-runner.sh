@@ -10,7 +10,7 @@ else
 fi
 
 if [ $BR == "master" ]; then
-	export TEST_CHECK_FACTOR=5
+	export TEST_CHECK_FACTOR=3
 fi
 
 i=0
