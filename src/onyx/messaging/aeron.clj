@@ -192,7 +192,10 @@
           threading-mode (get-threading-model (arg-or-default :onyx.messaging.aeron/embedded-media-driver-threading opts))
 
           media-driver-context (if embedded-driver?
-                                 (-> (MediaDriver$Context.) (.threadingMode threading-mode)) )
+                                 (-> (MediaDriver$Context.) 
+                                     (.threadingMode threading-mode)
+                                     (.dirsDeleteOnStart true)))
+
           media-driver (if embedded-driver?
                          (MediaDriver/launch media-driver-context))
 
