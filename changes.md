@@ -1,3 +1,9 @@
+#### 0.8.5
+- Fixed bug introduced by a breaking change in Aeron 0.2.2 where we would retry a send to a closed publication.
+- Fix a number of bugs found by Jepsen #453, #462, #437
+- Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
+- Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
+
 #### 0.8.4
 
 - **Breaking change**: Changed the signature of trigger sync function.
