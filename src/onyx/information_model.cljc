@@ -831,11 +831,12 @@
              :default 1000
              :added "0.8.0"}
 
-            :onyx.messaging.aeron/media-driver
-            {:doc "Timeout after a number of ms on attempting to create an Aeron publication"
+            :onyx.messaging.aeron/embedded-media-driver-threading
+            {:doc "Threading mode to use with the embedded media driver."
              :optional? true
-             :type :string
-             :default "shared"
+             :type :keyword
+             :choices [:dedicated :shared :shared-network]
+             :default :shared
              :added "0.9.0"}
 
             :onyx.peer/state-log-impl

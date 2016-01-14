@@ -72,7 +72,7 @@
    :onyx.messaging.aeron/subscriber-count 2
    :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging.aeron/publication-creation-timeout 1000
-   :onyx.messaging.aeron/media-driver "shared"
+   :onyx.messaging.aeron/embedded-media-driver-threading :shared
    :onyx.messaging/allow-short-circuit? true
    :onyx.messaging/inbound-buffer-size 50000
    :onyx.messaging/completion-buffer-size 10000

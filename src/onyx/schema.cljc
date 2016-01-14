@@ -401,12 +401,12 @@
    (s/optional-key :onyx.messaging/compress-fn) Function
    (s/optional-key :onyx.messaging/allow-short-circuit?) s/Bool
    (s/optional-key :onyx.messaging.aeron/embedded-driver?) s/Bool
+   (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
    (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
-   (s/optional-key :onyx.messaging.aeron/media-driver) s/Str
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
    s/Keyword s/Any})
