@@ -1152,12 +1152,12 @@
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/embedded-driver?
+    :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy
     :onyx.messaging.aeron/offer-idle-strategy 
     :onyx.messaging.aeron/publication-creation-timeout
-    :onyx.messaging.aeron/media-driver
     :onyx.peer/state-log-impl
     :onyx.bookkeeper/read-batch-size 
     :onyx.bookkeeper/write-batch-size
