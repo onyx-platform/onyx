@@ -1,3 +1,7 @@
+general:
+  artifacts:
+    - onyx.log
+
 test:
   override:
     - ./scripts/circle-runner.sh aeron:
