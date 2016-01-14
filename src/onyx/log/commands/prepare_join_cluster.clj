@@ -71,10 +71,7 @@
           :args {:id (:id peer-args)}}]
         (= (:id peer-args) (:observer diff))
         [{:fn :notify-join-cluster
-          :args {:observer (:subject diff)
-                 ;:subject (or (get (:pairs new) (:observer diff))
-                 ;             (:observer diff))
-                 }}]))
+          :args {:observer (:subject diff)}}]))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]

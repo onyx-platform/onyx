@@ -35,14 +35,10 @@
         [{:fn :accept-join-cluster
           :args diff}]
         (get (set (:peers old)) (:observer (:args entry)))
-        (do
-          ;(info "Do nothing" entry new)
-          [])
+        []
         (= (:id peer-args) (:observer (:args entry)))
-        (do
-          ;(info "aborrrrrt " entry new)
-          [{:fn :abort-join-cluster
-            :args {:id (:observer (:args entry))}}])))
+        [{:fn :abort-join-cluster
+          :args {:id (:observer (:args entry))}}]))
 
 (s/defmethod extensions/fire-side-effects! :notify-join-cluster :- State
   [{:keys [args message-id]} old new diff {:keys [monitoring] :as state}]

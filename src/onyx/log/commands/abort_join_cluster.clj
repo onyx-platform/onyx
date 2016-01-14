@@ -14,9 +14,7 @@
         (update-in [:prepared] dissoc (get (map-invert (:prepared replica)) (:id args)))
         (update-in [:accepted] dissoc (get (map-invert (:accepted replica)) (:id args)))
         (update-in [:peer-sites] dissoc (:id args)))
-    (do
-      ;(info "Ignoring abort for " args (:peers replica))
-      replica)))
+    replica))
 
 (s/defmethod extensions/replica-diff :abort-join-cluster :- ReplicaDiff
   [entry :- LogEntry old new]
@@ -31,7 +29,7 @@
   [{:keys [args]} old new diff peer-args]
   (when (and ;; not already joined
              (not (get (set (:peers old)) (:id args)))
-             ;; and this is us
+             ;; and we are the peer in question
              (= (:id args) (:id peer-args))
              (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args)))))
     [{:fn :prepare-join-cluster
