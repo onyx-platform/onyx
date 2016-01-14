@@ -25,7 +25,7 @@
                  [org.btrplace/scheduler-api "0.42"]
                  [org.btrplace/scheduler-choco "0.42"]
                  [com.stuartsierra/dependency "0.2.0"]
-                 [com.stuartsierra/component "0.3.0"]
+                 [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.10.0"]
                  [uk.co.real-logic/aeron-all "0.2.3"]

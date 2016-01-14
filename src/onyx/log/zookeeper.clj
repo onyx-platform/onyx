@@ -273,7 +273,8 @@
          (trace e)
          (>!! ch e))
        (catch Throwable e
-         (fatal e))))
+         (fatal e)
+         (>!! ch e))))
     (<!! rets)))
 
 (defmethod extensions/write-chunk [ZooKeeper :catalog]
