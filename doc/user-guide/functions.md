@@ -2,24 +2,6 @@
 
 This section outlines how Onyx programs execute behavior. Onyx uses plain Clojure functions to carry out distributed activity. You have the option of performing grouping and aggregation on each function.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Functional Transformation](#functional-transformation)
-- [Function Parameterization](#function-parameterization)
-- [Grouping & Aggregation](#grouping-aggregation)
-- [Group By Key](#group-by-key)
-- [Group By Function](#group-by-function)
-- [Flux Policies](#flux-policies)
-  - [Continue Policy](#continue-policy)
-  - [Kill Policy](#kill-policy)
-  - [Recover Policy](#recover-policy)
-- [Bulk Functions](#bulk-functions)
-- [Leaf Functions](#leaf-functions)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 #### Functional Transformation
 
 A Function is a construct that takes a segment as a parameter and outputs a segment or a seq of segments. Functions are meant to literally transform a single unit of data in a functional manner. The following is an example of a function:

@@ -2,22 +2,6 @@
 
 In this chapter, I'll enumerate and explain the reasons why we built Onyx.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [An Information Model](#an-information-model)
-- [Temporal Decoupling](#temporal-decoupling)
-- [Elimination of Macros](#elimination-of-macros)
-- [Plain Clojure Functions](#plain-clojure-functions)
-- [Testing Without Mocking](#testing-without-mocking)
-- [Easy Parameterization of Workflows](#easy-parameterization-of-workflows)
-- [Transparent Code Reuse for Batch and Streaming](#transparent-code-reuse-for-batch-and-streaming)
-- [Aspect Orientation](#aspect-orientation)
-- [AOT Nothing](#aot-nothing)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 #### An Information Model
 
 Information models are often superior to APIs, and almost always better than DSLs. The hyper-flexibility of a data structure literal allows Onyx workflows and catalogs to be constructed *at a distance*, meaning on another machine, in a different language, by another program, etc.

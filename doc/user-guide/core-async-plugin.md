@@ -1,19 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [onyx-core-async](#onyx-core-async)
-    - [Installation](#installation)
-    - [Functions](#functions)
-      - [read-from-chan](#read-from-chan)
-      - [write-to-chan](#write-to-chan)
-    - [Utility Functions](#utility-functions)
-      - [`take-segments!`](#take-segments!)
-    - [Contributing](#contributing)
-    - [License](#license)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## onyx-core-async
 
 Onyx plugin providing read and write facilities for Clojure core.async.

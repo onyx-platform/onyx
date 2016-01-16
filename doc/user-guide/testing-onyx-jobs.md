@@ -2,17 +2,6 @@
 
 In this chapter, we'll cover what you need to know about testing your Onyx application code.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Overview](#overview)
-  - [Automatic Resource Clean up](#automatic-resource-clean-up)
-  - [Code Reloading](#code-reloading)
-  - [In-Memory I/O](#in-memory-io)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Overview
 
 Onyx eschews customized abstractions for describing distributed programs. As a consequence, application code written on top of Onyx ends up being regular Clojure functions and data structures. Onyx remains out of the way, and you're free to test your functions as you would any other Clojure program. It's also useful to roll up your entire job and test it as it will run in production. This section is dedicated to giving you a set of idioms and tools for working with Onyx jobs during the development phase.

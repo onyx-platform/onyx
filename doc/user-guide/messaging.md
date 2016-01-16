@@ -1,21 +1,5 @@
 ## Messaging
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Messaging](#messaging)
-  - [Background](#background)
-  - [Messaging Implementations](#messaging-implementations)
-    - [Aeron Messaging](#aeron-messaging)
-      - [Subscription (Connection) Multiplexing](#subscription-connection-multiplexing)
-      - [Connection Short Circuiting](#connection-short-circuiting)
-      - [Port Use](#port-use)
-      - [Media Driver](#media-driver)
-      - [Configuration Options](#configuration-options)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Background
 
 The messaging layer takes care of the direct peer to peer transfer of segment

@@ -2,33 +2,6 @@
 
 Onyx ships with two distinct APIs to accommodate different needs. A description of each follows.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Core API](#core-api)
-    - [`start-env`](#start-env)
-    - [`start-peer-group`](#start-peer-group)
-    - [`start-peers`](#start-peers)
-    - [`submit-job`](#submit-job)
-    - [`await-job-completion`](#await-job-completion)
-    - [`gc`](#gc)
-    - [`kill-job`](#kill-job)
-    - [`subscribe-to-log`](#subscribe-to-log)
-    - [`shutdown-peer`](#shutdown-peer)
-    - [`shutdown-peer-group`](#shutdown-peer-group)
-    - [`shutdown-env`](#shutdown-env)
-- [Peer Pipeline API](#peer-pipeline-api)
-    - [`read-batch`](#read-batch)
-    - [`write-batch`](#write-batch)
-    - [`seal-resource`](#seal-resource)
-    - [`ack-segment`](#ack-segment)
-    - [`retry-segment`](#retry-segment)
-    - [`pending?`](#pending)
-    - [`drained?`](#drained)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Core API
 
 The [Core API](https://github.com/onyx-platform/onyx/blob/0.6.x/src/onyx/api.clj) is used to start/stop resources, jobs, and monitor job progress. It's accessible through the `onyx.api` namespace.
