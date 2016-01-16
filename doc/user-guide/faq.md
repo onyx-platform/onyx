@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Frequently Asked Questions
 
 ##### What does Onyx use internally for compression by default?

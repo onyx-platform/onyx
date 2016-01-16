@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Peer Configuration
 
 The chapter describes the all options available to configure the virtual peers and development environment.

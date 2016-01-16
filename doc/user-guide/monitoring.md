@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Monitoring
 
 When setting up an Onyx cluster in production, it's helpful to know what Onyx itself is doing. Onyx exposes a set of callbacks that are triggered on certain actions.

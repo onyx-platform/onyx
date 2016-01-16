@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Environment
 
 In this chapter, we'll discuss what you need to set up a develop and production environment.

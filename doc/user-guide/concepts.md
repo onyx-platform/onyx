@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Concepts
 
 We'll take a quick overview of some terms you'll see in the rest of this user guide.

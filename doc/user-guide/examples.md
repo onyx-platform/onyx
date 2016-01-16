@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Examples
 
 ### Examples Project

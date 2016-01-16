@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## onyx-core-async
 
 Onyx plugin providing read and write facilities for Clojure core.async.

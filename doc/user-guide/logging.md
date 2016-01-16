@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Logging
 
 This chapter details how to inspect and modify the logs that Onyx produces.

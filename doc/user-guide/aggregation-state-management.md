@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Aggregation / State Management
 
 This section discusses state management and fault tolerance used in windowing/streaming joins.

@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Plugins
 
 Plugins serve as an abstract to compose mechanisms for getting data in and out of Onyx. See the README.md of the project for a list of official Onyx plugins, or keep reading to roll your own.

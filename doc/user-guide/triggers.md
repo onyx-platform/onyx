@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Triggers
 
 In this section, we talk about Triggers. Triggers are a feature that interact with *Windows*. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli.
