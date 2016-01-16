@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Messaging
+categories: [user-guide-page]
 ---
 
 ## Messaging

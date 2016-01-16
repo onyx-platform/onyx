@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Performance Tuning
+categories: [user-guide-page]
 ---
 
 ## Performance Tuning

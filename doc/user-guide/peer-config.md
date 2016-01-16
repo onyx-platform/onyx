@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Peer Configuration
+categories: [user-guide-page]
 ---
 
 ## Peer Configuration

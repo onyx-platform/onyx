@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Functions
+categories: [user-guide-page]
 ---
 
 ## Functions

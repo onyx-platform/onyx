@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Examples
+categories: [user-guide-page]
 ---
 
 ## Examples

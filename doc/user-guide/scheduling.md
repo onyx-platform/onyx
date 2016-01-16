@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Scheduling
+categories: [user-guide-page]
 ---
 
 ## Scheduling

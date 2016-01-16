@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Information Model
+categories: [user-guide-page]
 ---
 
 ## Information Model

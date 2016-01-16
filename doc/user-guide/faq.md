@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: FAQ
+categories: [user-guide-page]
 ---
 
 ## Frequently Asked Questions

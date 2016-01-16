@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Subscription
+categories: [user-guide-page]
 ---
 
 ## Event Subscription

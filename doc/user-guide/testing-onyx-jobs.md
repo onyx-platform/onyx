@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Testing Onyx Jobs
+categories: [user-guide-page]
 ---
 
 ## Testing Onyx Jobs

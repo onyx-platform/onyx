@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Flow Conditions
+categories: [user-guide-page]
 ---
 
 ## Flow Conditions
