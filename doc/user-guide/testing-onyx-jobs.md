@@ -1,5 +1,5 @@
 ---
-layout: default
+layout: user_guide_page
 ---
 
 ## Testing Onyx Jobs
