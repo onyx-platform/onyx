@@ -93,7 +93,7 @@
              :added "0.8.0"}
 
             :onyx/params
-            {:doc "A vector of keys to obtain from the task map, and inject into the parameters of the function defined in :onyx/fn."
+            {:doc "A vector of keys to obtain from the task map, and inject into the initial parameters of the function defined in :onyx/fn. The segment will be injected as the final parameter to the onyx/fn."
              :type :vector
              :tags [:function]
              :optional? true
