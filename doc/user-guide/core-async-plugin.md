@@ -98,13 +98,3 @@ Again, as with `read-from-chan`, there's a little extra to do since core.async h
 This additional function is provided as a utility for removing segments
 from a channel until `:done` is found. After `:done` is encountered, all prior segments,
 including `:done`, are returned in a seq.
-
-#### Contributing
-
-Pull requests into the master branch are welcomed.
-
-#### License
-
-Copyright © 2015 Michael Drogalis
-
-Distributed under the Eclipse Public License, the same as Clojure.
