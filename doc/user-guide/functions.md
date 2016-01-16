@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Functions
 
 This section outlines how Onyx programs execute behavior. Onyx uses plain Clojure functions to carry out distributed activity. You have the option of performing grouping and aggregation on each function.

@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Lifecycles
 
 Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable.

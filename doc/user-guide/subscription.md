@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Event Subscription
 
 Onyx's log-based design provides open-ended access to react to all coordination events. This section describes how to tap into these notifications.

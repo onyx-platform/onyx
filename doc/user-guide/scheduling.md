@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Scheduling
 
 Onyx offers fine-grained control of how many peers are allocated to particular jobs and tasks. This section outlines how to use the built-in schedulers.

@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Windowing and Aggregation
 
 This section discusses a feature called windowing. Windows allow you to group and accrue data into possibly overlapping buckets.  Windows are intimately related to the Triggers feature. When you're finished reading this section, head over to the Triggers chapter next.

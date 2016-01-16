@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## APIs
 
 Onyx ships with two distinct APIs to accommodate different needs. A description of each follows.

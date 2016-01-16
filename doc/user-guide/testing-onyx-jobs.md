@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Testing Onyx Jobs
 
 In this chapter, we'll cover what you need to know about testing your Onyx application code.

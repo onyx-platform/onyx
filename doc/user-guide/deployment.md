@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Deployment
 
 Onyx has no built-in mechanism for deployment. Rather, we let you deploy at your comfort. We'll describe some approaches to doing this.

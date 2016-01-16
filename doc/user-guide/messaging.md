@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Messaging
 
 ### Background

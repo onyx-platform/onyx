@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Performance Tuning
 
 This chapter details a few tips for getting your Onyx cluster to run as fast as possible.

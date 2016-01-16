@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 ## Information Model
 
 This section specifies what a valid catalog, workflow, and flow conditions look like.
