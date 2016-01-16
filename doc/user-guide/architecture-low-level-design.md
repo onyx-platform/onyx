@@ -1,5 +1,5 @@
 ---
-layout: default
+layout: user_guide_page
 ---
 
 ## Onyx's Architecture and Low Level Design
