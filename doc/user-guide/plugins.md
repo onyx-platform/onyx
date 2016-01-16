@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Plugins
+categories: [user-guide-page]
 ---
 
 ## Plugins

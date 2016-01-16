@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Architecture
+categories: [user-guide-page]
 ---
 
 ## Onyx's Architecture and Low Level Design

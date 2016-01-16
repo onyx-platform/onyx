@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Monitoring
+categories: [user-guide-page]
 ---
 
 ## Monitoring

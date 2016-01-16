@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Windowing
+categories: [user-guide-page]
 ---
 
 ## Windowing and Aggregation

@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Logging
+categories: [user-guide-page]
 ---
 
 ## Logging

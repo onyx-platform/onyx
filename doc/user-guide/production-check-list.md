@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Production Checklist
+categories: [user-guide-page]
 ---
 
 ## Production Check List

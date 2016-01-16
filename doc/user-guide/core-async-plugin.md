@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: core.async Plugin
+categories: [user-guide-page]
 ---
 
 ## onyx-core-async

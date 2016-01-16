@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Concepts
+categories: [user-guide-page]
 ---
 
 ## Concepts

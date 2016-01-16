@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: APIs
+categories: [user-guide-page]
 ---
 
 ## APIs

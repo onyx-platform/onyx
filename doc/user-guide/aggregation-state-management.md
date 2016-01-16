@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Aggregation and State
+categories: [user-guide-page]
 ---
 
 ## Aggregation / State Management

@@ -1,3 +1,9 @@
+---
+layout: user_guide_page
+title: What does it Offer?
+categories: [user-guide-page]
+---
+
 ## What does Onyx offer?
 
 In this chapter, I'll enumerate and explain the reasons why we built Onyx.

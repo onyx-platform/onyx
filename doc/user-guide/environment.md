@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Environment
+categories: [user-guide-page]
 ---
 
 ## Environment

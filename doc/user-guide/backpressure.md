@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Backpressure
+categories: [user-guide-page]
 ---
 
 ## Backpressure

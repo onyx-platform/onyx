@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Triggers
+categories: [user-guide-page]
 ---
 
 ## Triggers

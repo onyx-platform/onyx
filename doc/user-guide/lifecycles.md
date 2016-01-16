@@ -1,5 +1,7 @@
 ---
 layout: user_guide_page
+title: Lifecycles
+categories: [user-guide-page]
 ---
 
 ## Lifecycles
