@@ -1,3 +1,11 @@
+(let [min-version "1.8"
+      version (System/getProperty "java.vm.specification.version")] 
+  (when-not (or (= version min-version) 
+                (pos? (.compareTo version min-version)))
+    (throw (ex-info (format "Onyx is only supported when running on Java %s or later." min-version) 
+                    {:min-version min-version
+                     :version version}))))
+
 (ns onyx.api
   (:require [clojure.core.async :refer [chan >!! <!! close! alts!! timeout go promise-chan]]
             [com.stuartsierra.component :as component]
@@ -299,7 +307,6 @@
   ([n {:keys [config] :as peer-group} monitoring-config]
    (when-not (= (type peer-group) onyx.system.OnyxPeerGroup)
      (throw (Exception. (str "start-peers must supplied with a peer-group not a " (type peer-group)))))
-   (validator/validate-java-version)
    (doall
     (map
      (fn [_]
@@ -347,7 +354,6 @@
 (defn ^{:added "0.6.0"} start-peer-group
   "Starts a peer group for use in cases where an env is not started (e.g. distributed mode)"
   [peer-config]
-  (validator/validate-java-version)
   (validator/validate-peer-config peer-config)
   (component/start (system/onyx-peer-group peer-config)))
 

@@ -8,12 +8,6 @@
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  Lifecycle EnvConfig PeerConfig FlowCondition]]))
 
-(defn validate-java-version []
-  (let [version (System/getProperty "java.runtime.version")] 
-    (when-not (pos? (.compareTo version "1.8.0"))
-      (throw (ex-info "Onyx is only supported when running on Java 8 or later." 
-                      {:version version})))))
-
 (defn name-and-type-not-equal [entry]
   (when (= (:onyx/name entry) (:onyx/type entry))
     (throw (ex-info "Task's :onyx/name and :onyx/type cannot be equal" {:task entry}))))
