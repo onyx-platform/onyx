@@ -2,15 +2,6 @@
 
 This chapter details a few tips for getting your Onyx cluster to run as fast as possible.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Onyx](#onyx)
-- [ZooKeeper](#zookeeper)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Onyx
 
 - Use Clojure 1.7. This version of Clojure has some dramatic performance enhancements compared to 1.6.

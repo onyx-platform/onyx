@@ -2,24 +2,6 @@
 
 This section covers flow conditions. Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Motivating Example](#motivating-example)
-- [Predicate Function Signatures](#predicate-function-signatures)
-- [Predicate Parameters](#predicate-parameters)
-- [Key Exclusion](#key-exclusion)
-- [Predicate Composition](#predicate-composition)
-- [Match All/None](#match-allnone)
-- [Short Circuiting](#short-circuiting)
-- [Exceptions](#exceptions)
-- [Post-transform](#post-transform)
-- [Actions](#actions)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Summary
 
 Workflows specify the structure of your computation as a directed, acyclic graph. A workflow describes all *possible* routes that a segment can take as it enters your workflow. On the other hand, we often have the need to specify how an *individual* segment moves throughout your workflow. Many times, a segment conditionally moves from one task to another. This is a concept that Onyx takes apart and turns into its own idea, independent of the rest of your computation. They're called Flow Conditions. It should be mentioned straight away that Flow Conditions are entirely optional, and your program can ignore them entirely if you'd like. Omitting them leads to the default behavior, which sends a segment to all immediate downstream tasks.

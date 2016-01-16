@@ -2,15 +2,6 @@
 
 Onyx's log-based design provides open-ended access to react to all coordination events. This section describes how to tap into these notifications.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Explanation](#explanation)
-- [Subscribing to the Log](#subscribing-to-the-log)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Explanation
 
 Onyx uses an internal log to totally order all coordination events across nodes in the cluster. This log is maintained as a directory of sequentially ordered znodes in ZooKeeper. It's often of interest to watch the events as they are written to the log. For instance, you may want to know when a particular task is completed, or when a peer joins or leaves the cluster. You can use the log subscriber to do just that.

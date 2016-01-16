@@ -2,25 +2,6 @@
 
 In this section, we talk about Triggers. Triggers are a feature that interact with *Windows*. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Trigger Types](#trigger-types)
-  - [`:timer`](#timer)
-  - [`:segment`](#segment)
-  - [`:punctuation`](#punctuation)
-  - [`:watermark`](#watermark)
-  - [`:percentile-watermark`](#percentile-watermark)
-- [Refinement Modes](#refinement-modes)
-  - [`:accumulating`](#accumulating)
-  - [`:discarding`](#discarding)
-- [Syncing](#syncing)
-- [Trigger Specification](#trigger-specification)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Summary
 
 Windows capture data over time and place segments into discrete, possibly overlapping buckets. By itself, this is a relatively useless concept. In order to harness the information that has been captured and rolled up, we need to *move* it somewhere. Triggers let us interact with the state in each extent of a window.

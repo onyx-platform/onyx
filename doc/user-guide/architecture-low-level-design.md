@@ -2,34 +2,6 @@
 
 This chapter outlines how Onyx works on the inside to meet the required properties of a distributed data processing system. This is not a formal proof nor an iron-clad specification for other implementations of Onyx. I will do my best to be transparent about how everything is working under the hood - good and bad. If something doesn't make sense, *keep moving*. There are inevitable forward references.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-  - [High Level Components](#high-level-components)
-    - [Peer](#peer)
-    - [Virtual Peer](#virtual-peer)
-    - [ZooKeeper](#zookeeper)
-    - [Aeron](#aeron)
-    - [The Log](#the-log)
-    - [The Inbox and Outbox](#the-inbox-and-outbox)
-  - [Applying Log Entries](#applying-log-entries)
-  - [Joining the Cluster](#joining-the-cluster)
-    - [3-Phase Cluster Join Strategy](#3-phase-cluster-join-strategy)
-    - [Examples](#examples)
-  - [Dead peer removal](#dead-peer-removal)
-    - [Peer Failure Detection Strategy](#peer-failure-detection-strategy)
-    - [Peer Failure Detection Thread](#peer-failure-detection-thread)
-    - [Examples](#examples-1)
-  - [Messaging](#messaging)
-    - [The Algorithm](#the-algorithm)
-    - [Acking Daemon](#acking-daemon)
-    - [Phases of Execution](#phases-of-execution)
-  - [Garbage collection](#garbage-collection)
-- [Command Reference](#command-reference)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### High Level Components
 
 #### Peer

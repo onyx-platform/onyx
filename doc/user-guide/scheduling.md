@@ -2,22 +2,6 @@
 
 Onyx offers fine-grained control of how many peers are allocated to particular jobs and tasks. This section outlines how to use the built-in schedulers.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Allocating Peers to Jobs and Tasks](#allocating-peers-to-jobs-and-tasks)
-  - [Job Schedulers](#job-schedulers)
-    - [Greedy Job Scheduler](#greedy-job-scheduler)
-    - [Balanced Robin Job Scheduler](#balanced-robin-job-scheduler)
-    - [Percentage Job Scheduler](#percentage-job-scheduler)
-  - [Task Schedulers](#task-schedulers)
-    - [Balanced Task Scheduler](#balanced-task-scheduler)
-    - [Percentage Task Scheduler](#percentage-task-scheduler)
-    - [Colocation Task Scheduler](#colocation-task-scheduler)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Allocating Peers to Jobs and Tasks
 
 In a masterless design, there is no single entity that assigns tasks to peers. Instead, peers need to contend for tasks to execute as jobs are submitted to Onyx. Conversely, as peers are added to the cluster, the peers must "shift" to distribute the workload across the cluster. Onyx ships out-of-the-box job and task allocation policies. End users can change the levels of fairness that each job gets with respect to cluster power. And remember, one virtual peer executes *at most* one task.

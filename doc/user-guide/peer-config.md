@@ -2,43 +2,6 @@
 
 The chapter describes the all options available to configure the virtual peers and development environment.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Base Configuration](#base-configuration)
-- [Environment Only](#environment-only)
-- [Peer Only](#peer-only)
-  - [Base Configuration](#base-configuration-1)
-    - [`:onyx.peer/inbox-capacity`](#onyxpeerinbox-capacity)
-    - [`:onyx.peer/outbox-capacity`](#onyxpeeroutbox-capacity)
-    - [`:onyx.peer/retry-start-interval`](#onyxpeerretry-start-interval)
-    - [`:onyx.peer/drained-back-off`](#onyxpeerdrained-back-off)
-    - [`:onyx:onyx.peer/peer-not-ready-back-off`](#onyxonyxpeerpeer-not-ready-back-off)
-    - [`:onyx:onyx.peer/job-not-ready-back-off`](#onyxonyxpeerjob-not-ready-back-off)
-    - [`:onyx.peer/join-failure-back-off`](#onyxpeerjoin-failure-back-off)
-    - [`:onyx.peer/fn-params`](#onyxpeerfn-params)
-    - [`:onyx.peer/zookeeper-timeout`](#onyxpeerzookeeper-timeout)
-    - [`:onyx.peer/backpressure-low-water-pct`](#onyxpeerbackpressure-low-water-pct)
-    - [`:onyx.peer/backpressure-high-water-pct`](#onyxpeerbackpressure-high-water-pct)
-    - [`:onyx.peer/backpressure-check-interval`](#onyxpeerbackpressure-check-interval)
-    - [`:onyx.messaging/inbound-buffer-size`](#onyxmessaginginbound-buffer-size)
-    - [`:onyx.messaging/completion-buffer-size`](#onyxmessagingcompletion-buffer-size)
-    - [`:onyx.messaging/release-ch-buffer-size`](#onyxmessagingrelease-ch-buffer-size)
-    - [`:onyx.messaging/retry-ch-buffer-size`](#onyxmessagingretry-ch-buffer-size)
-    - [`:onyx.messaging/peer-link-gc-interval`](#onyxmessagingpeer-link-gc-interval)
-    - [`:onyx.messaging/peer-link-idle-timeout`](#onyxmessagingpeer-link-idle-timeout)
-    - [`:onyx.messaging/ack-daemon-timeout`](#onyxmessagingack-daemon-timeout)
-    - [`:onyx.messaging/ack-daemon-clear-interval`](#onyxmessagingack-daemon-clear-interval)
-    - [`:onyx.messaging/decompress-fn`](#onyxmessagingdecompress-fn)
-    - [`:onyx.messaging/compress-fn`](#onyxmessagingcompress-fn)
-    - [`:onyx.messaging/impl`](#onyxmessagingimpl)
-    - [`:onyx.messaging/bind-addr`](#onyxmessagingbind-addr)
-    - [`:onyx.messaging/peer-port`](#onyxmessagingpeer-port)
-- [Peer Full Example](#peer-full-example)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Base Configuration
 
 | key name                      | type       |

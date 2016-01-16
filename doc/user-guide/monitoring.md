@@ -2,17 +2,6 @@
 
 When setting up an Onyx cluster in production, it's helpful to know what Onyx itself is doing. Onyx exposes a set of callbacks that are triggered on certain actions.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Monitoring Hooks](#monitoring-hooks)
-- [Callback Specification](#callback-specification)
-- [Registering Callbacks](#registering-callbacks)
-- [Monitoring Events](#monitoring-events)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ### Monitoring Hooks
 
 When you're taking Onyx to production, it's not enough to know what your application-specific code is doing. You need to have insight into how Onyx is operating internally to be able to tune performance at an optimal level. Onyx allows you to register callbacks that are invoked when critical sections of code are exexcuted in Onyx, returning a map that includes latency and data load size if appropriate.
