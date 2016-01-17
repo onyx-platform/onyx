@@ -103,5 +103,10 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-starter:onyx-platform/onyx-starter.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})
