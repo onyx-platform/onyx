@@ -52,12 +52,11 @@ onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-ela
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.8.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.8.4
+### Docs 0.8.4
 
-- [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
-- [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
-- [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
-- [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
+- [User Guide Table of Contents](http://www.onyxplatform.org/docs)
+- [API docs](http://www.onyxplatform.org/docs/api)
+- [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet)
 
 ### Developer's Guide 0.8.4
 
