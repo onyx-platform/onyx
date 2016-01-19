@@ -133,13 +133,13 @@ The algorithm works as follows:
 
 #### Examples
 
-- [Example 1: 3 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-1.md)
-- [Example 2: 3 node cluster, 2 peers successfully join](/doc/design/join-examples/example-2.md)
-- [Example 3: 2 node cluster, 1 peer successfully joins, 1 aborts](/doc/design/join-examples/example-3.md)
-- [Example 4: 1 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-4.md)
-- [Example 5: 0 node cluster, 1 peer successfully joins](/doc/design/join-examples/example-5.md)
-- [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 3-phase join](/doc/design/join-examples/example-6.md)
-- [Example 7: 3 node cluster, 1 peer dies while joining](/doc/design/join-examples/example-7.md)
+- [Example 1: 3 node cluster, 1 peer successfully joins](join-examples/example-1.md)
+- [Example 2: 3 node cluster, 2 peers successfully join](join-examples/example-2.md)
+- [Example 3: 2 node cluster, 1 peer successfully joins, 1 aborts](join-examples/example-3.md)
+- [Example 4: 1 node cluster, 1 peer successfully joins](join-examples/example-4.md)
+- [Example 5: 0 node cluster, 1 peer successfully joins](join-examples/example-5.md)
+- [Example 6: 3 node cluster, 1 peer fails to join due to 1 peer dying during 3-phase join](join-examples/example-6.md)
+- [Example 7: 3 node cluster, 1 peer dies while joining](join-examples/example-7.md)
 
 ### Dead peer removal
 
@@ -178,8 +178,8 @@ There is a window of time (inbetween when a peer prepares to join the cluster an
 
 #### Examples
 
-- [Example 1: 4 node cluster, 1 peer crashes](/doc/design/leave-examples/example-1.md)
-- [Example 2: 4 node cluster, 2 peers instantaneously crash](/doc/design/leave-examples/example-2.md)
+- [Example 1: 4 node cluster, 1 peer crashes](leave-examples/example-1.md)
+- [Example 2: 4 node cluster, 2 peers instantaneously crash](leave-examples/example-2.md)
 
 ### Messaging
 
