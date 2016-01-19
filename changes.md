@@ -3,6 +3,7 @@
 - Fix a number of bugs found by Jepsen #453, #462, #437
 - Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
 - Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
+- Enhancement: Upgraded to Clojure 1.8.0
 
 #### 0.8.4
 
