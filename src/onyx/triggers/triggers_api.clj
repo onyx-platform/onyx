@@ -94,7 +94,7 @@
          (let [window-metadata {:window-id window-id
                                 :lower-bound lower
                                 :upper-bound upper
-                                :opts opts}]
+                                :context (:context opts)}]
            (refine-state event trigger)
            ((:trigger/sync-fn trigger) event window trigger window-metadata state)
            (if (refinement-destructive? event trigger)
