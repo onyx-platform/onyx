@@ -22,6 +22,8 @@
                  [org.rocksdb/rocksdbjni "4.0"]
                  [org.slf4j/slf4j-api "1.7.12"]
                  [org.slf4j/slf4j-nop "1.7.12"]
+                 [clj-http "2.0.1"]
+                 [cheshire "5.5.0"]
                  [org.btrplace/scheduler-api "0.42"]
                  [org.btrplace/scheduler-choco "0.42"]
                  [com.stuartsierra/dependency "0.2.0"]

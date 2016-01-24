@@ -30,7 +30,7 @@
              [edge-validator]]))
 
 (def Language
-  (s/enum :java :clojure))
+  (s/enum :java :clojure :ruby))
 
 (def PosInt 
   (s/pred pos? 'pos?))

@@ -1,7 +1,9 @@
 (ns onyx.peer.operation
   (:require [onyx.extensions :as extensions]
             [onyx.types :refer [->Link]]
-            [taoensso.timbre :refer [info warn]]))
+            [taoensso.timbre :refer [info warn]]
+            [clj-http.client :as client]
+            [cheshire.core :refer [generate-string parse-string]]))
 
 (defn get-method-java [class-name method-name]
   (let [ms (filter #(= (.getName %) method-name)
@@ -43,11 +45,19 @@
   [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
   true)
 
+(defn build-fn-non-jvm [function-string]
+  (let [f (str function-string)]
+    (fn [segment]
+      (let [resp (client/post "http://127.0.0.1:4567/bridget-fn"
+                              {:body (generate-string segment)})]
+        (parse-string (:body resp) true)))))
+
 (defn resolve-task-fn [entry]
   (let [f (if (or (:onyx/fn entry)
                   (= (:onyx/type entry) :function))
             (case (:onyx/language entry)
               :java (build-fn-java (:onyx/fn entry))
+              :ruby (build-fn-non-jvm (:onyx/fn entry))
               (kw->fn (:onyx/fn entry))))]
     (or f identity)))
 
