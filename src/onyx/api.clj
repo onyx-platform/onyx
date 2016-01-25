@@ -37,6 +37,15 @@
        (or (:onyx/min-peers (planning/find-task catalog (:name task))) 1)})
     tasks)))
 
+(defn ^{:no-doc true} required-tags [catalog tasks]
+  (reduce
+   (fn [result [catalog-entry task]]
+     (if-let [tags (:onyx/required-tags catalog-entry)]
+       (assoc result (:id task) tags)
+       result))
+   {}
+   (map vector catalog tasks)))
+
 (defn ^{:no-doc true} flux-policies [catalog tasks]
   (->> tasks
        (map (fn [task]
@@ -118,6 +127,7 @@
         input-task-ids (find-input-tasks (:catalog job) tasks)
         output-task-ids (find-output-tasks (:catalog job) tasks)
         exempt-task-ids (find-exempt-tasks tasks (:acker/exempt-tasks job))
+        required-tags (required-tags (:catalog job) tasks)
         args {:id id
               :tasks task-ids
               :task-scheduler scheduler
@@ -128,6 +138,7 @@
               :inputs input-task-ids
               :outputs output-task-ids
               :exempt-tasks exempt-task-ids
+              :required-tags required-tags
               :acker-percentage (or (:acker/percentage job) 1)
               :acker-exclude-inputs (or (:acker/exempt-input-tasks? job) false)
               :acker-exclude-outputs (or (:acker/exempt-output-tasks? job) false)}
