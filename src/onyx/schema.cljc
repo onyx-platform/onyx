@@ -63,6 +63,7 @@
    (s/optional-key :onyx/max-peers) PosInt
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
+   (s/optional-key :onyx/required-tags) [s/Keyword]
    UnsupportedTaskMapKey s/Any})
 
 (def FluxPolicy 
@@ -367,6 +368,7 @@
    (s/optional-key :onyx.peer/backpressure-high-water-pct) s/Int
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
+   (s/optional-key :onyx.peer/tags) [s/Keyword]
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
