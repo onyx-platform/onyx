@@ -371,7 +371,7 @@
       (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
       (do (warn e "Handling uncaught exception thrown inside task lifecycle.")
           (if (restart-pred-fn e)
-            (>!! restart-ch true)
+            (close! restart-ch)
             (let [entry (entry/create-log-entry :kill-job {:job job-id})]
               (extensions/write-chunk log :exception e job-id)
               (>!! outbox-ch entry)))))))
