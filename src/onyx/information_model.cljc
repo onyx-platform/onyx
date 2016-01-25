@@ -1116,7 +1116,8 @@
     :onyx/flux-policy
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/restart-pred-fn]
+    :onyx/restart-pred-fn
+    :onyx/required-tags]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
@@ -1152,6 +1153,7 @@
     :onyx.peer/backpressure-check-interval
     :onyx.peer/backpressure-low-water-pct
     :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
+    :onyx.peer/tags
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
