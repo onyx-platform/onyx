@@ -375,7 +375,7 @@
    (s/optional-key :onyx.bookkeeper/ledger-quorum-size) PosInt
    (s/optional-key :onyx.bookkeeper/write-batch-size) PosInt
    (s/optional-key :onyx.bookkeeper/write-buffer-size) PosInt
-   (s/optional-key :onyx.bookkeeper/write-batch-timeout) PosInt
+   (s/optional-key :onyx.bookkeeper/write-batch-backoff) PosInt
    (s/optional-key :onyx.bookkeeper/read-batch-size) PosInt
    (s/optional-key :onyx.rocksdb.filter/base-dir) s/Str
    (s/optional-key :onyx.rocksdb.filter/bloom-filter-bits) PosInt
