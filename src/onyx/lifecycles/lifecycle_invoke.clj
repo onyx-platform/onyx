@@ -22,69 +22,48 @@
                               action)
                       {})))))))
 
-(defn invoke-start-task [event compiled]
-  (restartable-invocation
-   event
-   :lifecycle/start-task?
-   (:compiled-handle-exception-fn compiled)
-   (:compiled-start-task-fn compiled)
-   event))
+(defn invoke-lifecycle-gen [phase compiled-key]
+  (fn invoke-lifecycle [compiled event] 
+    (restartable-invocation
+      event
+      phase
+      (:compiled-handle-exception-fn compiled)
+      (compiled-key compiled)
+      event)))
 
-(defn invoke-before-task-start [event compiled]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/before-task-start
-    (:compiled-handle-exception-fn compiled)
-    (:compiled-before-task-start-fn compiled)
-    event)))
+(def invoke-start-task
+  (invoke-lifecycle-gen :lifecycle/start-task? :compiled-start-task-fn))
 
-(defn invoke-before-batch [compiled event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/before-batch
-    (:compiled-handle-exception-fn compiled)
-    (:compiled-before-batch-fn compiled)
-    event)))
+(def invoke-before-task-start
+  (invoke-lifecycle-gen :lifecycle/before-task-start :compiled-before-task-start-fn))
 
-(defn invoke-after-read-batch [compiled event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/after-read-batch
-    (:compiled-handle-exception-fn compiled)
-    (:compiled-after-read-batch-fn compiled)
-    event)))
+(def invoke-after-read-batch
+  (invoke-lifecycle-gen :lifecycle/after-read-batch :compiled-after-read-batch-fn))
 
-(defn invoke-after-batch [compiled event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/after-batch
-    (:compiled-handle-exception-fn compiled)
-    (:compiled-after-batch-fn compiled)
-    event)))
+(def invoke-before-batch
+  (invoke-lifecycle-gen :lifecycle/before-batch :compiled-before-batch-fn))
 
-(defn invoke-read-batch
-  [f compiled task-type replica peer-replica-view job-id pipeline event]
-  (restartable-invocation
-   event
-   :lifecycle/read-batch
-   (:compiled-handle-exception-fn compiled)
-   f
-   task-type replica peer-replica-view job-id pipeline event))
+(def invoke-after-batch
+  (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
 
-(defn invoke-write-batch [f compiled pipeline event]
-  (restartable-invocation
-   event
-   :lifecycle/write-batch
-   (:compiled-handle-exception-fn compiled)
-   f pipeline event))
+(defn invoke-task-lifecycle-gen [phase]
+  (fn invoke-task-lifecycle [f compiled event] 
+    (restartable-invocation
+      event
+      phase
+      (:compiled-handle-exception-fn compiled)
+      f
+      compiled
+      event)))
+
+(def invoke-assign-windows
+  (invoke-task-lifecycle-gen :lifecycle/assign-windows))
+
+(def invoke-read-batch
+  (invoke-task-lifecycle-gen :lifecycle/read-batch))
+
+(def invoke-write-batch
+  (invoke-task-lifecycle-gen :lifecycle/write-batch))
 
 (defn invoke-after-ack [event compiled message-id ack-rets]
   (restartable-invocation
@@ -106,19 +85,10 @@
    message-id
    retry-rets))
 
-(defn invoke-assign-windows
-  [f compiled event]
-  (restartable-invocation
-   event
-   :lifecycle/assign-windows
-   (:compiled-handle-exception-fn compiled)
-   f
-   compiled event))
-
+;; This function intentionally does not execute
+;; the lifecycle as a restartable-invocation. If
+;; the task reaches this stage, it is already considered
+;; complete. Restarting the task would cause the peer
+;; to deadlock.
 ; (defn invoke-after-task-stop [event]
-;   ;; This function intentionally does not execute
-;   ;; the lifecycle as a restartable-invocation. If
-;   ;; the task reaches this stage, it is already considered
-;   ;; complete. Restarting the task would cause the peer
-;   ;; to deadlock.
 ;   (merge event ((:onyx.core/compiled-after-task-fn event) event)))
