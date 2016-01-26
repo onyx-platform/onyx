@@ -1,3 +1,6 @@
+#### 0.8.6
+- Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with onyx users on 1.7.0
+
 #### 0.8.5
 - MAJOR: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
 - MAJOR: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).

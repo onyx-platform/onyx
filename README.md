@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.8.5"]
+[org.onyxplatform/onyx "0.8.6"]
 ```
 
 ### Build Status
@@ -52,25 +52,25 @@ onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-ela
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.8.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.8.5
+### User Guide 0.8.6
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
 - [API docs](http://www.onyxplatform.org/docs/api)
 - [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet)
 
-### Developer's Guide 0.8.5
+### Developer's Guide 0.8.6
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.8.5
+### API Docs 0.8.6
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.5).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.6).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.5` goes with `onyx` version `0.8.5`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.5.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.6` goes with `onyx` version `0.8.6`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.6.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
