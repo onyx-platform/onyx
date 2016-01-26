@@ -48,7 +48,7 @@ A function that takes four arguments - an event map, a message id, the return of
 
 #### Handle Exception
 
-If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed.
+If an exception is thrown during any lifecycle execution except `after-task-stop`, one or more lifecycle handlers may be defined. If present, the exception will be caught and passed to this function,  which takes 4 arguments - an event map, the matching lifecycle map, the keyword lifecycle name from which the exception was thrown, and the exception object. This function must return `true` or `false` indicating whether the job should be restarted. If any exception handling function defined for this task returns `false`, the job is killed. The lifecycle that is provided to the exception will be one of the standard ones defined here - plus a few extras that are intentionally *not* definable: `:lifecycle/read-batch`, and `:lifecycle/write-batch`.
 
 ### Example
 
