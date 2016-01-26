@@ -1,8 +1,9 @@
 #### 0.8.5
-- MAJOR: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks #504
-- MAJOR: fixed bug causing peers to stop checkpointing to state/windowed log #390
-- MAJOR: fixed a number of peer join bugs found by onyx-jepsen #453, #462, #437
-- Improved performance, especially for windowed tasks #500
+- MAJOR: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
+- MAJOR: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).
+- MAJOR: fixed a number of peer join bugs found by onyx-jepsen [#453](https://github.com/onyx-platform/onyx/issues/453), [#462](https://github.com/onyx-platform/onyx/issues/462), [#437](https://github.com/onyx-platform/onyx/issues/437).
+
+- Improved performance, especially for windowed tasks [#500](https://github.com/onyx-platform/onyx/issues/500)
 - Fixed bug introduced by a breaking change in Aeron 0.2.2 where we would retry a send to a closed publication.
 - Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
 - Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
