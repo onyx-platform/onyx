@@ -1,14 +1,12 @@
+---
+layout: user_guide_page
+title: Aggregation and State
+categories: [user-guide-page]
+---
+
 ## Aggregation / State Management
 
 This section discusses state management and fault tolerance used in windowing/streaming joins.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Summary
 

@@ -1,24 +1,12 @@
+---
+layout: user_guide_page
+title: Flow Conditions
+categories: [user-guide-page]
+---
+
 ## Flow Conditions
 
 This section covers flow conditions. Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Motivating Example](#motivating-example)
-- [Predicate Function Signatures](#predicate-function-signatures)
-- [Predicate Parameters](#predicate-parameters)
-- [Key Exclusion](#key-exclusion)
-- [Predicate Composition](#predicate-composition)
-- [Match All/None](#match-allnone)
-- [Short Circuiting](#short-circuiting)
-- [Exceptions](#exceptions)
-- [Post-transform](#post-transform)
-- [Actions](#actions)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Summary
 
@@ -172,6 +160,10 @@ And the predicate might be:
 (defn handle-error? [event old ex-obj all-new]
   (= (type ex-obj) java.lang.NullPointerException))
 ```
+
+This will only restrict the flow from `:input-stream` to `:error-task` when an exception is thrown - see the discussion of Short Circuiting above. When an
+exception is not thrown, the default behaviour will apply. For example, if there are later flow conditions, they will apply. If not will flow through to
+all tasks if there are no other flow conditions for that task.
 
 ### Post-transform
 

@@ -1,22 +1,12 @@
+---
+layout: user_guide_page
+title: Lifecycles
+categories: [user-guide-page]
+---
+
 ## Lifecycles
 
 Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Lifecycle Phases](#lifecycle-phases)
-  - [Before task set up](#before-task-set-up)
-  - [Before task execution](#before-task-execution)
-  - [Before segment batch start](#before-segment-batch-start)
-  - [After read segment batch](#after-read-segment-batch)
-  - [After segment batch start](#after-segment-batch-start)
-  - [After task execution](#after-task-execution)
-- [Example](#example)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Summary
 

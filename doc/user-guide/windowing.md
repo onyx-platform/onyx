@@ -1,29 +1,12 @@
+---
+layout: user_guide_page
+title: Windowing
+categories: [user-guide-page]
+---
+
 ## Windowing and Aggregation
 
 This section discusses a feature called windowing. Windows allow you to group and accrue data into possibly overlapping buckets.  Windows are intimately related to the Triggers feature. When you're finished reading this section, head over to the Triggers chapter next.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Window Types](#window-types)
-  - [Fixed Windows](#fixed-windows)
-  - [Sliding Windows](#sliding-windows)
-  - [Global Windows](#global-windows)
-  - [Session Windows](#session-windows)
-- [Units](#units)
-- [Aggregation](#aggregation)
-  - [`:onyx.windowing.aggregation/conj`](#onyxwindowingaggregationconj)
-  - [`:onyx.windowing.aggregation/count`](#onyxwindowingaggregationcount)
-  - [`:onyx.windowing.aggregation/sum`](#onyxwindowingaggregationsum)
-  - [`:onyx.windowing.aggregation/min`](#onyxwindowingaggregationmin)
-  - [`:onyx.windowing.aggregation/max`](#onyxwindowingaggregationmax)
-  - [`:onyx.windowing.aggregation/average`](#onyxwindowingaggregationaverage)
-  - [Grouping](#grouping)
-- [Window Specification](#window-specification)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Summary
 

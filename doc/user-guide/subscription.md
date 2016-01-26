@@ -1,15 +1,12 @@
+---
+layout: user_guide_page
+title: Subscription
+categories: [user-guide-page]
+---
+
 ## Event Subscription
 
 Onyx's log-based design provides open-ended access to react to all coordination events. This section describes how to tap into these notifications.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Explanation](#explanation)
-- [Subscribing to the Log](#subscribing-to-the-log)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Explanation
 

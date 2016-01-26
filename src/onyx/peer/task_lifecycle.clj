@@ -369,9 +369,9 @@
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
       (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
-      (do (warn e "Uncaught exception throw inside task lifecycle.")
+      (do (warn e "Handling uncaught exception thrown inside task lifecycle.")
           (if (restart-pred-fn e)
-            (>!! restart-ch true)
+            (close! restart-ch)
             (let [entry (entry/create-log-entry :kill-job {:job job-id})]
               (extensions/write-chunk log :exception e job-id)
               (>!! outbox-ch entry)))))))
@@ -463,7 +463,7 @@
 
 (defrecord TaskInformation 
   [id log job-id task-id 
-   catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
+   workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
@@ -471,11 +471,12 @@
           flow-conditions (extensions/read-chunk log :flow-conditions job-id)
           windows (extensions/read-chunk log :windows job-id)
           filtered-windows (wc/filter-windows windows (:name task))
+          workflow (extensions/read-chunk log :workflow job-id)
           triggers (extensions/read-chunk log :triggers job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
-             :catalog catalog :task task :flow-conditions flow-conditions :windows windows 
+             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions :windows windows 
              :filtered-windows filtered-windows :triggers triggers :lifecycles lifecycles :task-map task-map)))
   (stop [component]
     (assoc component 
@@ -492,7 +493,7 @@
 
   (start [component]
     (try
-      (let [{:keys [catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]} task-information
+      (let [{:keys [workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]} task-information
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
             input-retry-timeout (arg-or-default :onyx/input-retry-timeout task-map)
@@ -508,7 +509,7 @@
                            :onyx.core/task-id task-id
                            :onyx.core/task (:name task)
                            :onyx.core/catalog catalog
-                           :onyx.core/workflow (extensions/read-chunk log :workflow job-id)
+                           :onyx.core/workflow workflow 
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/compiled (->CompiledGroupingFn (g/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids task))

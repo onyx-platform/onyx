@@ -1,17 +1,12 @@
+---
+layout: user_guide_page
+title: Monitoring
+categories: [user-guide-page]
+---
+
 ## Monitoring
 
 When setting up an Onyx cluster in production, it's helpful to know what Onyx itself is doing. Onyx exposes a set of callbacks that are triggered on certain actions.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Monitoring Hooks](#monitoring-hooks)
-- [Callback Specification](#callback-specification)
-- [Registering Callbacks](#registering-callbacks)
-- [Monitoring Events](#monitoring-events)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Monitoring Hooks
 

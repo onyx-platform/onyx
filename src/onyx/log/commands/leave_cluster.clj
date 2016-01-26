@@ -48,34 +48,41 @@
      :updated-watch {:observer observer
                      :subject subject}}))
 
+(defn abort? [replica state {:keys [args]}]
+  (or (= (:id state) (get (:prepared replica) (:id args)))
+      (= (:id state) (get (:accepted replica) (:id args)))))
+
 (s/defmethod extensions/reactions :leave-cluster :- Reactions
-  [{:keys [args]} old new diff state]
-  (when (or (= (:id state) (get (:prepared old) (:id args)))
-            (= (:id state) (get (:accepted old) (:id args))))
+  [entry old new diff state]
+  (when (abort? old state entry)
     [{:fn :abort-join-cluster
       :args {:id (:id state)}}]))
 
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
-  [{:keys [message-id args]} old new {:keys [updated-watch] :as diff} state]
-  (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
-    (common/start-new-lifecycle
-     old new diff
-     (cond (common/should-seal? new job state message-id)
-           (>!! (:seal-ch (:task-state state)) true)
+  [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]
+  (if (and (= (:id state) (:id args)) 
+           (not (abort? old state entry)))
+    (do (close! (:restart-ch state))
+        state)
+    (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
+      (common/start-new-lifecycle
+        old new diff
+        (cond (common/should-seal? new job state message-id)
+              (>!! (:seal-ch (:task-state state)) true)
 
-           (and (= (:id state) (:observer updated-watch))
-                (not= (:observer updated-watch) (:subject updated-watch)))
+              (and (= (:id state) (:observer updated-watch))
+                   (not= (:observer updated-watch) (:subject updated-watch)))
 
-           (let [ch (chan 1)]
-             (extensions/on-delete (:log state) (:subject updated-watch) ch)
-             (go (when (<! ch)
-                   (extensions/write-log-entry
-                    (:log state)
-                    {:fn :leave-cluster :args {:id (:subject updated-watch)}
-                     :entry-parent message-id
-                     :peer-parent (:id state)}))
-                 (close! ch))
-             (close! (or (:watch-ch state) (chan)))
-             (assoc state :watch-ch ch))
+              (let [ch (chan 1)]
+                (extensions/on-delete (:log state) (:subject updated-watch) ch)
+                (go (when (<! ch)
+                      (extensions/write-log-entry
+                        (:log state)
+                        {:fn :leave-cluster :args {:id (:subject updated-watch)}
+                         :entry-parent message-id
+                         :peer-parent (:id state)}))
+                    (close! ch))
+                (close! (or (:watch-ch state) (chan)))
+                (assoc state :watch-ch ch))
 
-           :else state))))
+              :else state)))))

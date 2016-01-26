@@ -1,17 +1,12 @@
+---
+layout: user_guide_page
+title: Testing Onyx Jobs
+categories: [user-guide-page]
+---
+
 ## Testing Onyx Jobs
 
 In this chapter, we'll cover what you need to know about testing your Onyx application code.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Overview](#overview)
-  - [Automatic Resource Clean up](#automatic-resource-clean-up)
-  - [Code Reloading](#code-reloading)
-  - [In-Memory I/O](#in-memory-io)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Overview
 

@@ -1,18 +1,12 @@
+---
+layout: user_guide_page
+title: Deployment
+categories: [user-guide-page]
+---
+
 ## Deployment
 
 Onyx has no built-in mechanism for deployment. Rather, we let you deploy at your comfort. We'll describe some approaches to doing this.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Deployment Style](#deployment-style)
-  - [Shared File System](#shared-file-system)
-  - [Docker](#docker)
-  - [Mesos and Marathon](#mesos-and-marathon)
-  - [Kubernetes](#kubernetes)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Deployment Style
 

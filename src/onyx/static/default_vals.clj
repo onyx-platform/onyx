@@ -36,7 +36,7 @@
    ; number of state entries to write to a single bookeeper entry
    :onyx.bookkeeper/write-batch-size 20
    :onyx.bookkeeper/write-buffer-size 10000
-   :onyx.bookkeeper/write-batch-timeout 50
+   :onyx.bookkeeper/write-batch-backoff 50
    ; number of bookkeeper entries to read at a time
    ; effective batch read of state entries is write-batch-size * read-batch-size
    :onyx.bookkeeper/read-batch-size 50
@@ -72,6 +72,7 @@
    :onyx.messaging.aeron/subscriber-count 2
    :onyx.messaging.aeron/write-buffer-size 1000
    :onyx.messaging.aeron/publication-creation-timeout 1000
+   :onyx.messaging.aeron/embedded-media-driver-threading :shared
    :onyx.messaging/allow-short-circuit? true
    :onyx.messaging/inbound-buffer-size 50000
    :onyx.messaging/completion-buffer-size 10000

@@ -5,6 +5,7 @@
             [onyx.log.commands.common :refer [peer->allocated-job]]
             [onyx.extensions :as extensions]
             [onyx.api :as api]
+            [taoensso.timbre :as timbre :refer [info]]
             [clojure.set :refer [intersection]]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
@@ -23,6 +24,9 @@
                        (vals (or (:accepted replica) {}))))
     ;; joining peer's prepared/accepted may have been removed
     ;; by a leave cluster but the joining peer is still there
+    (and (not (peerless-entry? entry))
+         (:observer (:args entry)))
+    (conj (:observer (:args entry)))
     (and (not (peerless-entry? entry))
          (:id (:args entry)))
     (conj (:id (:args entry)))

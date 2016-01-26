@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.8.4"
+(defproject org.onyxplatform/onyx "0.8.5"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -11,7 +11,7 @@
                              :username :env
                              :password :env
                              :sign-releases false}}
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.374"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
@@ -25,18 +25,18 @@
                  [org.btrplace/scheduler-api "0.42"]
                  [org.btrplace/scheduler-choco "0.42"]
                  [com.stuartsierra/dependency "0.2.0"]
-                 [com.stuartsierra/component "0.3.0"]
+                 [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
                  [com.taoensso/nippy "2.10.0"]
-                 [uk.co.real-logic/aeron-all "0.2.3"]
+                 [uk.co.real-logic/aeron-all "0.9"]
                  [prismatic/schema "1.0.3"]
                  [log4j/log4j "1.2.17"]
-                 [clj-tuple "0.2.2"]
-                 [table "0.5.0"]]
+                 [clj-tuple "0.2.2"]]
   :aot [onyx.interop]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
   :profiles {:dev {:aot ^:replace []
                    :dependencies [[org.clojure/tools.nrepl "0.2.11"]
+                                  [table "0.5.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [mdrogalis/stateful-check "0.3.2"]
                                   [com.gfredericks/test.chuck "0.2.3"]
@@ -100,6 +100,16 @@
      :release-script "scripts/release.sh"
      :merge "master"}
     {:git "git@onyx-dashboard:onyx-platform/onyx-dashboard.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-starter:onyx-platform/onyx-starter.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
+     :merge "master"}
+    {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"

@@ -1,25 +1,12 @@
+---
+layout: user_guide_page
+title: Environment
+categories: [user-guide-page]
+---
+
 ## Environment
 
 In this chapter, we'll discuss what you need to set up a develop and production environment.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Environment](#environment)
-  - [Development Environment](#development-environment)
-    - [Dependencies](#dependencies)
-    - [Explanation](#explanation)
-    - [ZooKeeper](#zookeeper)
-      - [Environment Launch of In-Memory ZooKeeper](#environment-launch-of-in-memory-zookeeper)
-      - [Peer Connection to In-Memory ZooKeeper](#peer-connection-to-in-memory-zookeeper)
-    - [Example](#example)
-  - [Production Environment](#production-environment)
-    - [Dependencies](#dependencies-1)
-    - [Explanation](#explanation-1)
-    - [Example](#example-1)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Development Environment
 

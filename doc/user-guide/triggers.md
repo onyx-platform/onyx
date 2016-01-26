@@ -1,25 +1,12 @@
+---
+layout: user_guide_page
+title: Triggers
+categories: [user-guide-page]
+---
+
 ## Triggers
 
 In this section, we talk about Triggers. Triggers are a feature that interact with *Windows*. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli.
-
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](http://doctoc.herokuapp.com/)*
-
-- [Summary](#summary)
-- [Trigger Types](#trigger-types)
-  - [`:timer`](#timer)
-  - [`:segment`](#segment)
-  - [`:punctuation`](#punctuation)
-  - [`:watermark`](#watermark)
-  - [`:percentile-watermark`](#percentile-watermark)
-- [Refinement Modes](#refinement-modes)
-  - [`:accumulating`](#accumulating)
-  - [`:discarding`](#discarding)
-- [Syncing](#syncing)
-- [Trigger Specification](#trigger-specification)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ### Summary
 

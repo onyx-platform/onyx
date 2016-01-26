@@ -93,7 +93,7 @@
              :added "0.8.0"}
 
             :onyx/params
-            {:doc "A vector of keys to obtain from the task map, and inject into the parameters of the function defined in :onyx/fn."
+            {:doc "A vector of keys to obtain from the task map, and inject into the initial parameters of the function defined in :onyx/fn. The segment will be injected as the final parameter to the onyx/fn."
              :type :vector
              :tags [:function]
              :optional? true
@@ -831,6 +831,14 @@
              :default 1000
              :added "0.8.0"}
 
+            :onyx.messaging.aeron/embedded-media-driver-threading
+            {:doc "Threading mode to use with the embedded media driver."
+             :optional? true
+             :type :keyword
+             :choices [:dedicated :shared :shared-network]
+             :default :shared
+             :added "0.9.0"}
+
             :onyx.peer/state-log-impl
             {:doc "Choice of state persistence implementation."
              :optional? true
@@ -853,13 +861,13 @@
              :default 20
              :added "0.8.0"}
 
-            :onyx.bookkeeper/write-batch-timeout
-            {:doc "Maximum amount of time to wait while batching BookKeeper writes, before writing the batch to BookKeeper. In case of a full batch read, timeout will not be hit."
+            :onyx.bookkeeper/write-batch-backoff
+            {:doc "Maximum amount of time to backoff after receiving state entries to write to BookKeeper."
              :unit :milliseconds
              :optional? true
              :type :integer
              :default 50
-             :added "0.8.0"}
+             :added "0.8.5"}
 
             :onyx.bookkeeper/ledger-ensemble-size
             {:doc "The number of BookKeeper instances over which entries will be striped. For example, if you have an ledger-ensemble-size of 3, and a ledger-quorum-size of 2, the first write will be written to server1 and server2, the second write will be written to server2, and server3, etc."
@@ -1144,6 +1152,7 @@
     :onyx.messaging/external-addr :onyx.messaging/peer-port
     :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/embedded-driver?
+    :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging.aeron/subscriber-count
     :onyx.messaging.aeron/write-buffer-size
     :onyx.messaging.aeron/poll-idle-strategy
@@ -1152,7 +1161,7 @@
     :onyx.peer/state-log-impl
     :onyx.bookkeeper/read-batch-size 
     :onyx.bookkeeper/write-batch-size
-    :onyx.bookkeeper/write-batch-timeout 
+    :onyx.bookkeeper/write-batch-backoff
     :onyx.bookkeeper/ledger-ensemble-size
     :onyx.bookkeeper/ledger-quorum-size
     :onyx.bookkeeper/ledger-id-written-back-off
