@@ -70,23 +70,20 @@
     event)))
 
 (defn invoke-read-batch
-  [event f task-type replica peer-replica-view job-id pipeline]
+  [f task-type replica peer-replica-view job-id pipeline event]
   (restartable-invocation
    event
    :lifecycle/read-batch
    (:onyx.core/compiled-handle-exception-fn event)
    f
-   event
-   task-type replica peer-replica-view job-id pipeline))
+   task-type replica peer-replica-view job-id pipeline event))
 
-(defn invoke-write-batch [event f pipeline]
+(defn invoke-write-batch [f pipeline event]
   (restartable-invocation
    event
    :lifecycle/write-batch
    (:onyx.core/compiled-handle-exception-fn event)
-   f
-   event
-   pipeline))
+   f pipeline event))
 
 (defn invoke-after-ack [event compiled-lifecycle message-id ack-rets]
   (restartable-invocation
