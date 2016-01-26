@@ -4,6 +4,7 @@
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.windowing.window-compile :as wc]))
 
 (defn filter-triggers [triggers windows]
@@ -14,7 +15,7 @@
 (defn resolve-triggers [triggers]
   (map
    #(assoc %
-      :trigger/id (java.util.UUID/randomUUID)
+      :trigger/id (random-uuid)
       :trigger/sync-fn (kw->fn (:trigger/sync %)))
    triggers))
 
@@ -27,27 +28,27 @@
         (assoc :onyx.core/compiled-norm-fcs
                (fc/compile-fc-happy-path flow-conditions workflow task-name))
         (assoc :onyx.core/compiled-ex-fcs
-               (fc/compile-fc-exception-path flow-conditions workflow task-name)))))
+               (fc/compile-fc-exception-path flow-conditions workflow task-name))))) 
 
-(defn lifecycles->event-map [event lifecycles task-name]
-  (-> event
-      (assoc :onyx.core/compiled-start-task-fn
+(defn lifecycles->compiled [compiled lifecycles task-name]
+  (-> compiled
+      (assoc :compiled-start-task-fn
              (lc/compile-start-task-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-before-task-start-fn
+      (assoc :compiled-before-task-start-fn
              (lc/compile-before-task-start-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-before-batch-fn
+      (assoc :compiled-before-batch-fn
              (lc/compile-before-batch-task-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-after-read-batch-fn
+      (assoc :compiled-after-read-batch-fn
              (lc/compile-after-read-batch-task-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-after-batch-fn
+      (assoc :compiled-after-batch-fn
              (lc/compile-after-batch-task-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-after-task-fn
+      (assoc :compiled-after-task-fn
              (lc/compile-after-task-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-after-ack-segment-fn
+      (assoc :compiled-after-ack-segment-fn
              (lc/compile-after-ack-segment-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-after-retry-segment-fn
+      (assoc :compiled-after-retry-segment-fn
              (lc/compile-after-retry-segment-functions lifecycles task-name))
-      (assoc :onyx.core/compiled-handle-exception-fn
+      (assoc :compiled-handle-exception-fn
              (lc/compile-handle-exception-functions lifecycles task-name))))
 
 (defn task-params->event-map [event peer-config task-map]

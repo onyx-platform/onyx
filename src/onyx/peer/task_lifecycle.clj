@@ -32,7 +32,7 @@
       (not-empty (:onyx.core/triggers event))))
 
 (defn start-lifecycle? [event]
-  (let [rets (lc/invoke-start-task event)]
+  (let [rets (lc/invoke-start-task event (:onyx.core/compiled event))]
     (when-not (:onyx.core/start-lifecycle? rets)
       (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
                            (:onyx.core/id event))))
@@ -151,7 +151,7 @@
   (if (and (= task-type :input) (:backpressure? peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [rets (merge event (p-ext/read-batch pipeline event))
-          rets (lc/invoke-after-read-batch rets)]
+          rets (lc/invoke-after-read-batch (:onyx.core/compiled event) rets)]
       (handle-backoff! event)
       rets)))
 
@@ -291,8 +291,7 @@
 
 (defn launch-aux-threads!
   [messenger {:keys [onyx.core/pipeline
-                     onyx.core/compiled-after-ack-segment-fn
-                     onyx.core/compiled-after-retry-segment-fn
+                     onyx.core/compiled
                      onyx.core/messenger-buffer
                      onyx.core/monitoring
                      onyx.core/replica
@@ -307,7 +306,7 @@
            (when v
              (cond (= ch release-ch)
                    (->> (p-ext/ack-segment pipeline event v)
-                        (lc/invoke-after-ack event compiled-after-ack-segment-fn v))
+                        (lc/invoke-after-ack event compiled v))
 
                    (= ch completion-ch)
                    (let [{:keys [id peer-id]} v
@@ -319,7 +318,7 @@
 
                    (= ch retry-ch)
                    (->> (p-ext/retry-segment pipeline event v)
-                        (lc/invoke-after-retry event compiled-after-retry-segment-fn v))
+                        (lc/invoke-after-retry event compiled v))
 
                    (= ch seal-ch)
                    (do
@@ -332,7 +331,7 @@
        (fatal e)))))
 
 (defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
-                                               onyx.core/compiled-after-retry-segment-fn]
+                                               onyx.core/compiled]
                                         :as event}
                              input-retry-timeout task-kill-ch]
   (go
@@ -346,7 +345,7 @@
                 (when (p-ext/pending? pipeline event m)
                   (taoensso.timbre/trace (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
-                       (lc/invoke-after-retry event compiled-after-retry-segment-fn m))))
+                       (lc/invoke-after-retry event compiled m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
@@ -386,7 +385,6 @@
            onyx.core/peer-replica-view
            onyx.core/state
            onyx.core/compiled
-           onyx.core/compiled-before-batch-fn
            onyx.core/task->group-by-fn
            onyx.core/flow-conditions
            onyx.core/serialized-task
@@ -403,17 +401,17 @@
       (while (first (alts!! [seal-ch kill-ch] :default true))
         (->> init-event
              (gen-lifecycle-id)
-             (lc/invoke-before-batch compiled-before-batch-fn)
-             (lc/invoke-read-batch read-batch task-type replica peer-replica-view job-id pipeline)
+             (lc/invoke-before-batch compiled)
+             (lc/invoke-read-batch read-batch compiled task-type replica peer-replica-view job-id pipeline)
              (tag-messages task-type replica peer-replica-view id)
              (add-messages-to-timeout-pool task-type state)
              (process-sentinel task-type pipeline monitoring)
              (apply-fn fn bulk?)
              (build-new-segments egress-ids task->group-by-fn flow-conditions)
-             (assign-windows compiled)
-             (lc/invoke-write-batch write-batch pipeline)
+             (lc/invoke-assign-windows assign-windows compiled)
+             (lc/invoke-write-batch write-batch compiled pipeline)
              (flow-retry-segments peer-replica-view state messenger monitoring)
-             (lc/invoke-after-batch)
+             (lc/invoke-after-batch compiled)
              (ack-segments task-map peer-replica-view state messenger monitoring)))
       (catch Throwable e
         (ex-f e)))))
@@ -511,7 +509,7 @@
                            :onyx.core/catalog catalog
                            :onyx.core/workflow workflow 
                            :onyx.core/flow-conditions flow-conditions
-                           :onyx.core/compiled (->CompiledGroupingFn (g/task-map->grouping-fn task-map))
+                           :onyx.core/compiled (->Compiled (g/task-map->grouping-fn task-map))
                            :onyx.core/task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids task))
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
@@ -534,7 +532,7 @@
             pipeline-data (-> pipeline-data
                               (c/task-params->event-map opts task-map)
                               (c/flow-conditions->event-map flow-conditions (:name task))
-                              (c/lifecycles->event-map lifecycles (:name task))
+                              (update :onyx.core/compiled c/lifecycles->compiled lifecycles (:name task))
                               (c/windows->event-map filtered-windows))
 
             pipeline (build-pipeline task-map pipeline-data)
@@ -547,7 +545,7 @@
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (-> pipeline-data
-                              lc/invoke-before-task-start
+                              (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                               resolve-window-state
                               resolve-log
                               replay-windows-from-log
@@ -608,7 +606,7 @@
         (when (exactly-once-task? event)
           (state-extensions/close-filter (:filter @window-state) event)))
 
-      ((:onyx.core/compiled-after-task-fn event) event))
+      ((:compiled-after-task-fn (:onyx.core/compiled event)) event))
 
     (assoc component
       :pipeline nil
