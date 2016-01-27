@@ -1,3 +1,7 @@
+#### 0.8.7
+- trigger notification :task-complete has been renamed to :peer-stopped, as it occurs whenever a peer is shutdown, not just when the task has been completed
+
+
 #### 0.8.6
 - Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with onyx users on 1.7.0
 

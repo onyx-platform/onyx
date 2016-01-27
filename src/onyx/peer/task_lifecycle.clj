@@ -589,7 +589,7 @@
 
       ;; Fire all triggers on task completion.
       (doseq [t (:onyx.core/triggers event)]
-        (triggers/fire-trigger! event (:onyx.core/window-state event) t {:context :task-complete}))
+        (triggers/fire-trigger! event (:onyx.core/window-state event) t {:context :task-lifecycle-stopped}))
 
       ;; Ensure task operations are finished before closing peer connections
       (close! (:seal-ch component))
