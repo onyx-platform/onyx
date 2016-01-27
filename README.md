@@ -24,7 +24,7 @@
 Available on Clojars:
 
 ```
-[org.onyxplatform/onyx "0.8.5-SNAPSHOT"]
+[org.onyxplatform/onyx "0.8.7-SNAPSHOT"]
 ```
 
 ### Build Status
@@ -52,26 +52,26 @@ onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-ela
 
 Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](https://github.com/onyx-platform/onyx-starter) and [walkthrough](https://github.com/onyx-platform/onyx-starter/blob/0.8.x/WALKTHROUGH.md). You can also boot into preloaded a Leiningen [application template](https://github.com/onyx-platform/onyx-template).
 
-### User Guide 0.8.5-SNAPSHOT
+### User Guide 0.8.7-SNAPSHOT
 
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
 - [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
 
-### Developer's Guide 0.8.5-SNAPSHOT
+### Developer's Guide 0.8.7-SNAPSHOT
 
 - [Branch Policy](doc/developers-guide/branch-policy.md)
 - [Release Checklist](doc/developers-guide/release-checklist.md)
 - [Deployment Process](doc/developers-guide/deployment-process.md)
 
-### API Docs 0.8.5-SNAPSHOT
+### API Docs 0.8.7-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.5-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.7-SNAPSHOT).
 
 ### Official plugin listing
 
-Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.5-SNAPSHOT` goes with `onyx` version `0.8.5-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.5-SNAPSHOT.1`).
+Official plugins are vetted by Michael Drogalis. Ensure in your project that plugin versions directly correspond to the same Onyx version (e.g. `onyx-core-async` version `0.8.7-SNAPSHOT` goes with `onyx` version `0.8.7-SNAPSHOT`). Fixes to plugins can be applied using a 4th versioning identifier (e.g. `0.8.7-SNAPSHOT.1`).
 
 - [`onyx-core-async`](doc/user-guide/core-async-plugin.md)
 - [`onyx-kafka`](https://github.com/onyx-platform/onyx-kafka)
