@@ -378,7 +378,7 @@
 (deftest post-transformation-exclusions
   (checking
    "Key exclusions are applied during post transformation"
-   (times 50)
+   (times 15)
    [fcs
     (gen/vector (->> :a
                      (flow-condition-gen)
@@ -395,7 +395,7 @@
 (deftest none-placed-after-all
   (checking
     ":flow/to :none placed after :flow/to :all"
-    (times 50)
+    (times 15)
     [fcs-all (gen/not-empty
                (gen/vector (->> :a
                                 (flow-condition-gen)
@@ -410,7 +410,7 @@
 (deftest none-placed-before-other
   (checking
     ":flow/to :none placed first if there is no :flow/to :all"
-    (times 50)
+    (times 15)
     [fcs-other (gen/not-empty
                (gen/vector (->> :a
                                 (flow-condition-gen)
@@ -426,7 +426,7 @@
 (deftest short-circuit-placed-before-other
   (checking
     ":flow/short-circuit? true should be placed before other conditions"
-    (times 50)
+    (times 15)
     [fcs-other (gen/not-empty
                  (gen/vector (->> :a
                                   (flow-condition-gen))))
