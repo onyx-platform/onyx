@@ -110,7 +110,7 @@
    :real/postcondition (fn [state] true)
    :initial-state #'init-state})
 
-(deftest log-test-correct
+#_(deftest log-test-correct
   (with-redefs [log-bk/assign-bookkeeper-log-id-spin (fn [event new-ledger-id]
                                                        (swap! bookkeeper-peer-state update :ledger-ids conj new-ledger-id))
                 log-bk/event->ledger-ids (fn [event] 
