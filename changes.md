@@ -1,3 +1,10 @@
+#### 0.8.7
+- trigger notification :task-complete has been renamed to :peer-stopped, as it occurs whenever a peer is shutdown, not just when the task has been completed
+- reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
+- Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
+- Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
+
+
 #### 0.8.6
 - Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with onyx users on 1.7.0
 

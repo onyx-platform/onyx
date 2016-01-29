@@ -432,7 +432,7 @@
 
             :trigger/threshold
             {:doc "A segment trigger will fire every threshold of segments."
-             :required-when ["`:trigger/on` is `:segments`"]
+             :required-when ["`:trigger/on` is `:segment`"]
              :type [:integer :elements]
              :example [5 :elements]
              :optional? true

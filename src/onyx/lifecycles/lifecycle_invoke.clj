@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-invoke
-  (:require [clojure.core.async :refer [>!!]]))
+  (:require [clojure.core.async :refer [>!!]]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
 (defn restartable-invocation [event phase handler-fn f & args]
   (try
@@ -21,78 +22,73 @@
                               action)
                       {})))))))
 
-(defn invoke-start-task [event]
-  (restartable-invocation
-   event
-   :lifecycle/start-task?
-   (:onyx.core/compiled-handle-exception-fn event)
-   (:onyx.core/compiled-start-task-fn event)
-   event))
+(defn invoke-lifecycle-gen [phase compiled-key]
+  (fn invoke-lifecycle [compiled event] 
+    (restartable-invocation
+      event
+      phase
+      (:compiled-handle-exception-fn compiled)
+      (compiled-key compiled)
+      event)))
 
-(defn invoke-before-task-start [event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/before-task-start
-    (:onyx.core/compiled-handle-exception-fn event)
-    (:onyx.core/compiled-before-task-start-fn event)
-    event)))
+(def invoke-start-task
+  (invoke-lifecycle-gen :lifecycle/start-task? :compiled-start-task-fn))
 
-(defn invoke-before-batch [compiled-lifecycle event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/before-batch
-    (:onyx.core/compiled-handle-exception-fn event)
-    compiled-lifecycle
-    event)))
+(def invoke-before-task-start
+  (invoke-lifecycle-gen :lifecycle/before-task-start :compiled-before-task-start-fn))
 
-(defn invoke-after-read-batch [event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/after-read-batch
-    (:onyx.core/compiled-handle-exception-fn event)
-    (:onyx.core/compiled-after-read-batch-fn event)
-    event)))
+(def invoke-after-read-batch
+  (invoke-lifecycle-gen :lifecycle/after-read-batch :compiled-after-read-batch-fn))
 
-(defn invoke-after-batch [event]
-  (merge
-   event
-   (restartable-invocation
-    event
-    :lifecycle/after-batch
-    (:onyx.core/compiled-handle-exception-fn event)
-    (:onyx.core/compiled-after-batch-fn event)
-    event)))
+(def invoke-before-batch
+  (invoke-lifecycle-gen :lifecycle/before-batch :compiled-before-batch-fn))
 
-(defn invoke-after-ack [event compiled-lifecycle message-id ack-rets]
+(def invoke-after-batch
+  (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
+
+(defn invoke-task-lifecycle-gen [phase]
+  (fn invoke-task-lifecycle [f compiled event] 
+    (restartable-invocation
+      event
+      phase
+      (:compiled-handle-exception-fn compiled)
+      f
+      compiled
+      event)))
+
+(def invoke-assign-windows
+  (invoke-task-lifecycle-gen :lifecycle/assign-windows))
+
+(def invoke-read-batch
+  (invoke-task-lifecycle-gen :lifecycle/read-batch))
+
+(def invoke-write-batch
+  (invoke-task-lifecycle-gen :lifecycle/write-batch))
+
+(defn invoke-after-ack [event compiled message-id ack-rets]
   (restartable-invocation
    event
    :lifecycle/after-ack-segment
-   (:onyx.core/compiled-handle-exception-fn event)
-   compiled-lifecycle
+   (:compiled-handle-exception-fn compiled)
+   (:compiled-after-ack-segment-fn compiled)
    event
    message-id
    ack-rets))
 
-(defn invoke-after-retry [event compiled-lifecycle message-id retry-rets]
+(defn invoke-after-retry [event compiled message-id retry-rets]
   (restartable-invocation
    event
    :lifecycle/after-retry-segment
-   (:onyx.core/compiled-handle-exception-fn event)
-   compiled-lifecycle
+   (:compiled-handle-exception-fn compiled)
+   (:compiled-after-retry-segment-fn compiled)
    event
    message-id
    retry-rets))
 
-(defn invoke-after-task-stop [event]
-  ;; This function intentionally does not execute
-  ;; the lifecycle as a restartable-invocation. If
-  ;; the task reaches this stage, it is already considered
-  ;; complete. Restarting the task would cause the peer
-  ;; to deadlock.
-  (merge event ((:onyx.core/compiled-after-task-fn event) event)))
+;; This function intentionally does not execute
+;; the lifecycle as a restartable-invocation. If
+;; the task reaches this stage, it is already considered
+;; complete. Restarting the task would cause the peer
+;; to deadlock.
+; (defn invoke-after-task-stop [event]
+;   (merge event ((:onyx.core/compiled-after-task-fn event) event)))

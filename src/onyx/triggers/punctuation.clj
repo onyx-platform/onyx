@@ -13,7 +13,7 @@
 
 (defmethod api/trigger-notifications :punctuation
   [event trigger]
-  #{:new-segment :task-complete})
+  #{:new-segment :task-lifecycle-stopped})
 
 (defmethod api/trigger-fire? :punctuation
   [{:keys [onyx.triggers/punctuation-preds] :as event} trigger

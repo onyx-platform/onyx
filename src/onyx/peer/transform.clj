@@ -49,8 +49,10 @@
 (defn curry-params [f params]
   (reduce partial f params))
 
-(defn apply-fn [f bulk? event]
-  (let [g (curry-params f (:onyx.core/params event))
+(defn apply-fn [compiled event]
+  (let [f (:fn compiled)
+        bulk? (:bulk? compiled)
+        g (curry-params f (:onyx.core/params event))
         rets
         (if bulk?
           (apply-fn-bulk g event)

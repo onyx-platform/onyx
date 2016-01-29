@@ -211,7 +211,24 @@
              ;; the peers that are already on this task by
              ;; registering them directly through the Mapping.
              (conj result (Quarantine. (get task->node id)))
+
              :else result)))
+   []
+   task-seq))
+
+(defn anti-jitter-constraints
+  "Reduces the amount of 'jitter' - that is unnecessary movement
+   from a peer between tasks. If the actual capacity is the same
+   as the planned capacity, we shouldn't reallocate the peers.
+   BtrPlace has a Quarantine constraint that lets us express just
+   that."
+  [replica task-seq task->node planned-capacities]
+  (reduce
+   (fn [result [job-id task-id :as id]]
+     (if (= (get-in planned-capacities [job-id task-id])
+            (count (get-in replica [:allocations job-id task-id])))
+       (conj result (Quarantine. (get task->node id)))
+       result))
    []
    task-seq))
 
@@ -329,7 +346,8 @@
              [(capacity-constraints replica job-utilization task-seq task->node capacities)
               (peer-running-constraints peer->vm)
               (grouping-task-constraints replica task-seq task->node peer->vm)
-              (mapcat #(cts/task-constraints replica jobs (get capacities % 0) peer->vm task->node no-op-node %) jobs)
+              (anti-jitter-constraints replica task-seq task->node capacities)
+              (mapcat #(cts/task-constraints replica jobs (get capacities %) peer->vm task->node no-op-node %) jobs)
               [(RunningCapacity. no-op-node (n-no-op-tasks replica capacities task-seq))]])
             plan (.solve scheduler model constraints)]
         (when plan
