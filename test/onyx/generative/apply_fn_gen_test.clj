@@ -111,14 +111,15 @@
 (deftest supplied-params
   (checking
    "Supplied parameters concat in the right order"
-   (times 30)
-   [fn-params (gen/vector gen/any)
-    catalog-params (gen/hash-map gen/keyword gen/any)]
+   (times 15)
+   [fn-params (gen/vector (gen/resize 10 gen/any))
+    catalog-params (gen/hash-map gen/keyword (gen/resize 10 gen/any))]
    (let [task-name :a
          catalog-param-keys (keys catalog-params)
          catalog-param-vals (map #(get catalog-params %) catalog-param-keys)
          peer-config {:onyx.peer/fn-params {task-name fn-params}}
-         task-map (merge {:onyx/name task-name} {:onyx/params catalog-param-keys}
+         task-map (merge {:onyx/name task-name
+                          :onyx/params catalog-param-keys}
                          catalog-params)
          event (c/task-params->event-map {:onyx.core/peer-opts peer-config :onyx.core/task-map task-map})]
      (is (= (into fn-params catalog-param-vals)
