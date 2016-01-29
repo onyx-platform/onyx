@@ -48,4 +48,9 @@ else
 
   git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
+  git checkout develop
+  git merge master
+  git push
+  git checkout master
+
 fi
