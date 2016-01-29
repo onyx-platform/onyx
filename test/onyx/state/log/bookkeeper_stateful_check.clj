@@ -30,7 +30,7 @@
 (def peer-config (assoc (:peer-config config) 
                         :onyx/id id
                         :onyx.bookkeeper/write-batch-size 2 
-                        :onyx.bookkeeper/write-batch-timeout 5))
+                        :onyx.bookkeeper/write-batch-backoff 5))
 
 (def bookkeeper-peer-state (atom nil))
 
@@ -110,7 +110,7 @@
    :real/postcondition (fn [state] true)
    :initial-state #'init-state})
 
-#_(deftest log-test-correct
+(deftest log-test-correct
   (with-redefs [log-bk/assign-bookkeeper-log-id-spin (fn [event new-ledger-id]
                                                        (swap! bookkeeper-peer-state update :ledger-ids conj new-ledger-id))
                 log-bk/event->ledger-ids (fn [event] 
