@@ -3,6 +3,7 @@
 - reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
 - Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
 - Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
+- **Breaking change** No longer AOT compile onyx.interop. This will be done in [onyx-java](https://github.com/onyx-platform/onyx-java) for use by other languages.
 
 
 #### 0.8.6
