@@ -384,7 +384,7 @@
                                                :optional? true
                                                :added "0.8.0"}}}
    :trigger-entry
-   {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety stimuli."
+   {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety of stimuli."
     :link nil
     :model {:trigger/window-id
             {:doc "The name of a `:window/id` window to fire the trigger against."
