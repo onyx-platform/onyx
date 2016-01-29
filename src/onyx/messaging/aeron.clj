@@ -24,9 +24,8 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronMessenger
-    [peer-group messaging-group publication-group short-circuitable?
-     publications virtual-peers acking-daemon acking-ch send-idle-strategy
-     compress-f]
+    [peer-group messaging-group publication-group short-circuitable? publication-pool
+     virtual-peers acking-daemon acking-ch send-idle-strategy compress-f]
   component/Lifecycle
 
   (start [component]
@@ -380,8 +379,8 @@
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
 (defmethod extensions/internal-ack-segments AeronMessenger
-  [messenger event {:keys [acker-id] :as conn-spec} acks]
-  (if ((:short-circuitable? messenger) (:channel conn-spec))
+  [messenger event {:keys [acker-id channel] :as conn-spec} acks]
+  (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (lookup-channels messenger acker-id) acks)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-acker-messages acker-id acks)
