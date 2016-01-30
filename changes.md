@@ -1,3 +1,7 @@
+#### 0.8.8
+
+- Fixed a problem with a file in Onyx's test suite that was causing problems for the release process. No functional changes in this release.
+
 #### 0.8.7
 - trigger notification :task-complete has been renamed to :task-lifecycle-stopped, as it occurs whenever a task lifecycle is stopped, not necessarily when the task has been completed
 - reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
