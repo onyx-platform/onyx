@@ -49,7 +49,11 @@
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
-                                    "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}}
+                                    "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
+             :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
+             :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
+  :test-selectors {:default (constantly true)
+                   :smoke :smoke}
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
