@@ -35,29 +35,75 @@
             (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
+(defn levenshtein [str1 str2]
+  (let [str1 (or (not-empty str1))
+        ^chars arr1 (into-array Character/TYPE str1)
+        ^chars arr2 (into-array Character/TYPE str2)
+        n (alength arr1)
+        m (alength arr2)
+        col-dim (unchecked-inc (max m n))
+        col (int-array col-dim)
+        prev-col-dim (unchecked-inc m)
+        prev-col (int-array col-dim (range prev-col-dim))]
+    (dotimes [i n]
+      (aset col 0 (unchecked-inc i))
+      (dotimes [j m]
+        (aset col
+              (unchecked-inc j)
+              (min
+                (min (unchecked-inc (aget col j))
+                     (unchecked-inc (aget prev-col (unchecked-inc j))))
+                (unchecked-add-int (aget prev-col j)
+                                   (if (= (aget arr1 i) (aget arr2 j)) 0 1)))))
+      (dotimes [i prev-col-dim]
+        (aset prev-col i (aget col i))))
+    (aget col m)))
+
+(defn suggest-similar-keys [key dictionary]
+  (->> (map str dictionary)
+       (sort-by (partial levenshtein (str key)))
+       (take 3)
+       (map (fn [suggestion] (keyword (subs suggestion 1))))))
+
+(defn suggest-on-model [model-name key]
+  (let [model (get-in model [model-name :model])
+        choices (not-empty (get-in model [(.value key) :choices]))]
+    (suggest-similar-keys (.value key)
+                          (or choices (keys model)))))
+
+(defn describe-value [k v]
+  (if (= schema.utils.ValidationError (type v))
+    (let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
+      (cond
+        doc
+        {:cause "Unsupported value"
+         :data {k (.value v)}
+         :suggestions (suggest-on-model :catalog-entry v)
+         :documentation doc}
+
+        :else
+        {:cause "Unsupported value"
+         :data {k (.value v)}
+         :suggestions (suggest-on-model :catalog-entry v)
+         :value (.value v)}
+
+        ))
+    v))
+
 (defn describe-cause [k]
   (if (= schema.utils.ValidationError (type k))
     (cond (= onyx.schema/UnsupportedTaskMapKey (.schema k))
-          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)] 
-            {:cause "Unsupported combination of task-map keys." 
+          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
+            {:cause "Unsupported combination of task-map keys."
              :key (.value k)
-             :documentation doc} 
+             :suggestions (suggest-on-model :catalog-entry k)
+             :documentation doc}
             {:cause "Unsupported onyx task-map key."
+             :suggestions (suggest-on-model :catalog-entry k)
              :key (.value k)})
           :else
           k)
     k))
-
-(defn describe-value [k v]
-  (if (= schema.utils.ValidationError (type v))
-    (if-let [doc (dissoc (get-in model [:catalog-entry :model k]) :doc)] 
-      {:cause "Unsupported value" 
-       :data {k (.value v)}
-       :documentation doc} 
-      {:cause "Unsupported value"
-       :data {k (.value v)}
-       :value (.value v)})
-    v)) 
 
 (defn improve-issue [m]
   (into {}
@@ -91,13 +137,18 @@
                           {:explanation friendly-exception})))))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
-  (when-let [missing-names (->> workflow
-                                (mapcat identity)
-                                (remove (set (map :onyx/name catalog)))
-                                seq)]
-    (throw (Exception. (str "Catalog is missing :onyx/name values "
-                            "for the following workflow keywords: "
-                            (apply str (interpose ", " missing-names)))))))
+  (let [catalog-keys (set (map :onyx/name catalog))
+        workflow-keys (apply concat workflow)
+        missing-keys (remove catalog-keys workflow-keys)]
+    (when (seq missing-keys)
+      (let [suggestions (into {} (map (fn [missing-key]
+                                        [missing-key (suggest-similar-keys missing-key catalog-keys)]))
+                              missing-keys)]
+        (throw (ex-info
+                 (str "Catalog is missing :onyx/name values "
+                      "for the following workflow keywords: ")
+                 {:missing-keys missing-keys
+                  :suggestions suggestions}))))))
 
 (defn validate-workflow-no-dupes [{:keys [workflow]}]
   (when-not (= (count workflow)

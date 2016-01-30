@@ -103,6 +103,40 @@
           :onyx/type :output
           :onyx/batch-size 2}]
 
+        unsupported-language
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/language :bogus
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
+        unsupported-key
+        [{:onyx/name :in
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :input
+          :onyx/batch-size 2}
+         {:onyx/name :intermediate
+          :onyx/fn :a/fn-path
+          :onyx/bogus-key :onyx/bogus-value
+          :onyx/type :function
+          :onyx/batch-size 2}
+         {:onyx/name :out
+          :onyx/plugin :a/b
+          :onyx/medium :some-medium
+          :onyx/type :output
+          :onyx/batch-size 2}]
+
         bad-input-plugin
         [{:onyx/name :in
           :onyx/plugin :ab
@@ -189,6 +223,12 @@
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-fn-ns-form :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog unsupported-language :workflow workflow
+                                                               :task-scheduler :onyx.task-scheduler/balanced})))
+
+      (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog unsupported-key :workflow workflow
                                                                :task-scheduler :onyx.task-scheduler/balanced})))
 
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog bad-input-plugin :workflow workflow
@@ -355,7 +395,7 @@
                               :onyx/flux-policy :recover
                               :onyx/batch-size 40})))
 
-    (is (s/validate os/TaskMap 
+    (is (s/validate os/TaskMap
                              {:onyx/name :sum-balance
                               :onyx/fn :onyx.peer.fn-grouping-test/sum-balance
                               :onyx/type :function
