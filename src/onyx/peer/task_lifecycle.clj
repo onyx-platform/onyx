@@ -551,7 +551,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception log (constantly false) e restart-ch outbox-ch job-id)
+        (handle-exception log e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
