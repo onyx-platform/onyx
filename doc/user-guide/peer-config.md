@@ -187,7 +187,7 @@ A boolean denoting whether to allow virtual peers to short circuit networked mes
 
 ##### `:onyx.messaging.aeron/embedded-driver?`
 
-A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
+A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](https://github.com/onyx-platform/onyx/blob/0.8.8/src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally.
 
 ##### `:onyx.messaging.aeron/subscriber-count`
 
