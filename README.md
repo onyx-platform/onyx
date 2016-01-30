@@ -57,7 +57,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 - [User Guide HTML](http://onyx-platform.gitbooks.io/onyx/content/)
 - [User Guide PDF](https://www.gitbook.com/download/pdf/book/onyx-platform/onyx)
 - [User Guide Website](http://onyx-platform.gitbooks.io/onyx)
-- [Cheat Sheet](http://www.onyxplatform.org/cheat-sheet.html)
+- [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/0.8.9-SNAPSHOT)
 
 ### Developer's Guide 0.8.9-SNAPSHOT
 
@@ -67,7 +67,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### API Docs 0.8.9-SNAPSHOT
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.9-SNAPSHOT).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.8.9-SNAPSHOT).
 
 ### Official plugin listing
 
