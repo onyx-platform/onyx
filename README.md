@@ -55,8 +55,8 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 ### User Guide 0.8.8
 
 - [User Guide Table of Contents](http://www.onyxplatform.org/docs)
-- [API docs](http://www.onyxplatform.org/docs/api)
-- [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet)
+- [API docs](http://www.onyxplatform.org/docs/api/0.8.8)
+- [Cheat Sheet](http://www.onyxplatform.org/docs/cheat-sheet/0.8.8)
 
 ### Developer's Guide 0.8.8
 
