@@ -41,7 +41,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [lonocloud/lein-unison "0.1.11"]
+                             [lonocloud/lein-unison "0.1.12"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars  {*warn-on-reflection* true
                                                *assert* false
@@ -115,5 +115,11 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
+     :project-file :discover
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "release.sh"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})
