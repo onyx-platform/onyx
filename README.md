@@ -66,7 +66,7 @@ Feeling impatient? Hit the ground running ASAP with the [onyx-starter repo](http
 
 ### API Docs 0.8.8
 
-Code level API documentation [can be found here](http://www.onyxplatform.org/api/0.8.8).
+Code level API documentation [can be found here](http://www.onyxplatform.org/docs/api/0.8.8).
 
 ### Official plugin listing
 
