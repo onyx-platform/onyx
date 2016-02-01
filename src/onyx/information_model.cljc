@@ -407,7 +407,16 @@
              :added "0.8.0"}
 
             :trigger/sync
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a map with keys (`:window-id`, `:lower-bound`, `:upper-bound`), and the window state as an immutable value. Its return value is ignored. This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database."
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a map with keys (`:window-id`, `:lower-bound`, `:upper-bound`, `:context`) representing window metadata, and the window state as an immutable value. Its return value is ignored. The window metadata keys represent the following:
+
+- `:window-id`: a unique ID representing this concrete instance of a window. The ID is only unique among windows for a particular `:window/id` in the Onyx job.
+- `:lower-bound` - The lowermost value of any window key for a segment that belongs to this window
+- `:upper-bound` - The uppermost value of any window key for a segment that belongs to this window
+- `:context` - a keyword representing the context that caused this trigger to fire
+
+ This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once *per window instance*. In other words, if a fixed window exists with 5 instances, the firing of a Timer trigger will call the sync function 5 times.
+
+You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
              :type :keyword
              :optional? false
              :added "0.8.0"}

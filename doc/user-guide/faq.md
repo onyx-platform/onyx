@@ -23,7 +23,7 @@ Onyx requires that for each task in a workflow, at least one vpeer is started. F
 
 #### How can I filter segments from being output from my tasks?
 
-Use [Flow Conditions](doc/user-guide/flow-conditions.md) or return an empty vector from your `:onyx/fn`.
+Use [Flow Conditions]({{ "/flow-conditions.html" | prepend: page.dir | prepend: site.baseurl }}) or return an empty vector from your `:onyx/fn`.
 
 
 #### uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected

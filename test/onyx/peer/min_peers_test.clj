@@ -26,7 +26,7 @@
 (defn my-inc [{:keys [n] :as segment}]
   (assoc segment :n (inc n)))
 
-(deftest min-peers-test
+(deftest ^:smoke min-peers-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)

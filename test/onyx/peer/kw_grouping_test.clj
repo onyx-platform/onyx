@@ -43,7 +43,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest kw-grouping
+(deftest ^:smoke kw-grouping
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)

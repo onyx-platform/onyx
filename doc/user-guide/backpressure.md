@@ -15,7 +15,7 @@ freshest segments are likely to make it through the entire workflow, and be
 fully acked, input segments are still likely to be retried.
 
 One important form of backpressure, is the
-[:onyx/max-pending](https://github.com/onyx-platform/onyx/blob/master/doc/user-guide/information-model.md#maps-with-onyxtype-set-to-input-may-optionally-have-these-keys),
+[:onyx/max-pending]({{ "/information-model.html" | prepend: page.dir | prepend: site.baseurl }}),
 task parameter, which may be configured on input tasks. Input tasks will only
 produce new segments if there are fewer than max-pending pending (i.e. not
 fully acked) input segments.
@@ -36,5 +36,5 @@ a backpressure-off log message. If no peers allocated to a job are currently
 set to backpressure, then peers allocated to input tasks will resume reading
 from their input sources.
 
-Refer to [Peer Config](peer-config.md) for information regarding the default
-backpressure settings, and how to override them.
+Refer to [Peer Config]({{ "/peer-config.html" | prepend: page.dir | prepend: site.baseurl }})
+for information regarding the default backpressure settings, and how to override them.
