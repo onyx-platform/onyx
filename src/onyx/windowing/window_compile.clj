@@ -75,11 +75,11 @@
                              state 
                              (map list (rest log-entry) windows)))]
     (fn [state entry]
-      ;if (compacted-reset? entry)
-      ;  (unpack-compacted state entry event)
+      (if (compacted-reset? entry)
+        (unpack-compacted state entry event)
         (let [unique-id (first entry)
               _ (trace "Playing back entries for segment with id:" unique-id)
               new-state (extents-fn state entry)]
           (if unique-id
             (update new-state :filter s/apply-filter-id event unique-id)
-            new-state)))))
+            new-state))))))
