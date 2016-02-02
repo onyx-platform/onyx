@@ -55,33 +55,31 @@
                        (fn [ext-state grp-key new-value] 
                          new-value))
         apply-window-entries 
-        (fn [state [{:keys [window/id aggregate/apply-state-update] :as window} window-entries]]
+        (fn [state [window-entries {:keys [window/id aggregate/apply-state-update] :as window}]]
           (reduce (fn [state* [extent extent-entry grp-key]]
-                    (let [state** (update-in state*
-                                             [:state id extent]
-                                             (fn [ext-state] 
-                                               (let [state-value (a/default-state-value (get-state-fn ext-state grp-key) window)
-                                                     new-state-value (apply-state-update state-value extent-entry)] 
-                                                 (set-state-fn ext-state grp-key new-state-value))))]
+                    (if (nil? extent-entry)
                       ;; Destructive triggers turn the state to nil,
                       ;; prune these out of the window state to avoid
                       ;; inflating memory consumption.
-                      (if (nil? (get (get (:state state**) id) extent))
-                        (update-in state** [:state id] dissoc extent)
-                        state**)))
+                      (update-in state* [:state id] dissoc extent)
+                      (update-in state* 
+                                 [:state id extent]
+                                 (fn [ext-state] 
+                                   (let [state-value (a/default-state-value (get-state-fn ext-state grp-key) window)
+                                         new-state-value (apply-state-update state-value extent-entry)] 
+                                     (set-state-fn ext-state grp-key new-state-value))))))
                   state
                   window-entries))
-
         extents-fn (fn [state log-entry] 
                      (reduce apply-window-entries 
                              state 
                              (map list (rest log-entry) windows)))]
     (fn [state entry]
-      (if (compacted-reset? entry)
-        (unpack-compacted state entry event)
+      ;if (compacted-reset? entry)
+      ;  (unpack-compacted state entry event)
         (let [unique-id (first entry)
               _ (trace "Playing back entries for segment with id:" unique-id)
               new-state (extents-fn state entry)]
           (if unique-id
             (update new-state :filter s/apply-filter-id event unique-id)
-            new-state))))))
+            new-state)))))
