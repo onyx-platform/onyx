@@ -44,9 +44,6 @@
 
 (defn compile-apply-window-entry-fn [{:keys [onyx.core/task-map onyx.core/windows] :as event}]
   (let [grouped-task? (g/grouped-task? task-map)
-        id->apply-state-update (into {}
-                                     (map (juxt :window/id :aggregate/apply-state-update)
-                                          windows))
         get-state-fn (if grouped-task? 
                        (fn [ext-state grp-key] 
                          (get ext-state grp-key)) 
@@ -58,15 +55,13 @@
                        (fn [ext-state grp-key new-value] 
                          new-value))
         apply-window-entries 
-        (fn [state [{:keys [window/id] :as window} window-entries]]
+        (fn [state [{:keys [window/id aggregate/apply-state-update] :as window} window-entries]]
           (reduce (fn [state* [extent extent-entry grp-key]]
                     (let [state** (update-in state*
                                              [:state id extent]
                                              (fn [ext-state] 
                                                (let [state-value (a/default-state-value (get-state-fn ext-state grp-key) window)
-                                                     apply-fn (id->apply-state-update id)
-                                                     _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
-                                                     new-state-value (apply-fn state-value extent-entry)] 
+                                                     new-state-value (apply-state-update state-value extent-entry)] 
                                                  (set-state-fn ext-state grp-key new-state-value))))]
                       ;; Destructive triggers turn the state to nil,
                       ;; prune these out of the window state to avoid
