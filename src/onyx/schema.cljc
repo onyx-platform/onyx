@@ -1,5 +1,6 @@
 (ns onyx.schema
-  (:require [schema.core :as s]))
+  (:require [schema.core :as s]
+            [onyx.information-model :as i]))
 
 (def NamespacedKeyword
   (s/pred (fn [kw]
@@ -48,6 +49,11 @@
 (def UnsupportedTaskMapKey
   (build-allowed-key-ns :onyx))
 
+(defn deprecated [key-seq]
+  (s/pred
+   (fn [_]
+     (throw (ex-info (:deprecation-doc (get-in i/model key-seq)) {})))))
+
 (def base-task-map
   {:onyx/name TaskName
    :onyx/type (s/enum :input :output :function)
@@ -55,7 +61,8 @@
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
    (s/optional-key :onyx/deduplicate?) s/Bool
-   (s/optional-key :onyx/restart-pred-fn) s/Keyword
+   (s/optional-key :onyx/restart-pred-fn)
+   (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
    (s/optional-key :onyx/batch-timeout) PosInt
    (s/optional-key :onyx/doc) s/Str

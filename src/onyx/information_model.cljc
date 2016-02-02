@@ -90,7 +90,9 @@
              :tags [:fault-tolerance]
              :restrictions ["Must resolve to a function on the classpath at runtime."]
              :optional? true
-             :added "0.8.0"}
+             :added "0.8.0"
+             :deprecated-version "0.8.9"
+             :deprecation-doc ":onyx/restart-pred-fn has been removed from Onyx. A more general and powerful feature has been added instead, named Lifecycle Exceptions. See the docs for :lifecycle/handle-exception to switch over."}
 
             :onyx/params
             {:doc "A vector of keys to obtain from the task map, and inject into the initial parameters of the function defined in :onyx/fn. The segment will be injected as the final parameter to the onyx/fn."

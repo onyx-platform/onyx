@@ -63,8 +63,8 @@
     [1442115900000 1442116199999 {37 1}]
     [1442115000000 1442115299999 {60 1}]})
 
-(defn restartable? [e] 
-  true)
+(defn restartable? [event lifecycle lifecycle-name e]
+  :restart)
 
 (defrecord MonitoringStats
   [zookeeper-write-log-entry
@@ -127,7 +127,7 @@
            ; give the peer a bit of time to write the chunks out and ack the batches,
            ; since we want to ensure that the batches aren't re-read on restart
            (Thread/sleep 7000)
-           (throw (ex-info "Restartable" {:restartable? true})))
+           (throw (ex-info "Restart me!" {})))
          {}))})
 
   (def compaction-finished? (atom false))
@@ -145,6 +145,9 @@
 
   (def in-calls
     {:lifecycle/before-task-start inject-in-ch})
+
+  (def identity-calls
+    {:lifecycle/handle-exception restartable?})
 
   (def out-calls
     {:lifecycle/before-task-start inject-out-ch})
@@ -177,7 +180,6 @@
          {:onyx/name :identity
           :onyx/fn :clojure.core/identity
           :onyx/group-by-key :age ;; irrelevant because only one peer
-          :onyx/restart-pred-fn ::restartable?
           :onyx/uniqueness-key :id
           :onyx/min-peers 1
           :onyx/max-peers 1
@@ -215,6 +217,8 @@
           :lifecycle/calls ::in-calls}
          {:lifecycle/task :in
           :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+         {:lifecycle/task :identity
+          :lifecycle/calls ::identity-calls}
          {:lifecycle/task :out
           :lifecycle/calls ::out-calls}
          {:lifecycle/task :identity
