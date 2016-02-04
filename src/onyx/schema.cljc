@@ -475,7 +475,8 @@
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
    :exhausted-inputs {JobId #{TaskId}}
-   :required-tags {JobId {TaskId [s/Keyword]}}})
+   :required-tags {JobId {TaskId [s/Keyword]}}
+   :peer-tags {PeerId [s/Keyword]}})
 
 (def LogEntry
   {:fn s/Keyword
