@@ -1,6 +1,6 @@
 (ns onyx.scheduling.common-job-scheduler
   (:require [clojure.core.async :refer [chan go >! <! close! >!!]]
-            [clojure.set :refer [union difference map-invert]]
+            [clojure.set :refer [union difference subset?]]
             [clojure.data :refer [diff]]
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
@@ -8,7 +8,7 @@
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
   (:import [org.btrplace.model Model DefaultModel]
-           [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence]
+           [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
 (defn job-upper-bound [replica job]
@@ -306,6 +306,39 @@
            task-seq))
        0))
 
+(defn unconstrained-tasks [replica jobs]
+  (mapcat
+   (fn [job]
+     (filter
+      (fn [task]
+        (not (seq (get-in replica [:required-tags job task]))))
+      (get-in replica [:tasks job])))
+   jobs))
+
+(defn constrainted-tasks-for-peer [replica jobs peer-tags]
+  (mapcat
+   (fn [job]
+     (filter
+      (fn [task]
+        (let [tags (get-in replica [:required-tags job task])]
+          (and (seq tags)
+               (subset? (into #{} tags)
+                        (into #{} peer-tags)))))
+      (get-in replica [:tasks job])))
+   jobs))
+
+(defn task-tagged-constraints [replica peers peer->vm task->node jobs]
+  (let [utasks (unconstrained-tasks replica jobs)]
+    (map
+     (fn [peer]
+       (let [peer-tags (get-in replica [:peer-tags peer])
+             ctasks (constrainted-tasks-for-peer replica jobs peer-tags)]
+         (Among.
+          [(peer->vm peer)]
+          [(map task->node ctasks)
+           (map task->node utasks)])))
+     (filter #(seq (get-in replica [:peer-tags %])) peers))))
+
 (defn btr-place-scheduling [replica jobs job-utilization capacities]
   (if (seq jobs)
     (let [model (DefaultModel.)
@@ -325,6 +358,7 @@
             (reduce
              into
              [(capacity-constraints replica job-utilization task-seq task->node capacities)
+              (task-tagged-constraints replica (:peers replica) peer->vm task->node jobs)
               (peer-running-constraints peer->vm)
               (grouping-task-constraints replica task-seq task->node peer->vm)
               (mapcat #(cts/task-constraints replica jobs (get capacities % 0) peer->vm task->node no-op-node %) jobs)
