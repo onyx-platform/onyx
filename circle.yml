@@ -4,9 +4,11 @@ general:
 
 test:
   override:
-    - ./scripts/circle-runner.sh aeron:
+    - ./scripts/circle-runner.sh aeron clojure-1.7 :all:
         timeout: 480
         parallel: true
+    - ./scripts/circle-runner.sh aeron clojure-1.8 :smoke:
+        timeout: 120
 
 machine:
   java:
@@ -17,7 +19,7 @@ dependencies:
     - sudo pip install awscli
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
-    - curl https://gist.githubusercontent.com/MichaelDrogalis/cc7fc9e42da1fa1004b7/raw/f11d4f115f261e03945504c72d13609b61bee3dd/gistfile1.txt >> ~/.ssh/config
+    - curl https://gist.githubusercontent.com/MichaelDrogalis/cc7fc9e42da1fa1004b7/raw/2e6066ef9d605de0adbd0e5828019da4fba46ef2/gistfile1.txt >> ~/.ssh/config
 
 notify:
   webhooks:

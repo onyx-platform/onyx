@@ -50,13 +50,18 @@
 
 (defn describe-value [k v]
   (if (= schema.utils.ValidationError (type v))
-    (if-let [doc (dissoc (get-in model [:catalog-entry :model k]) :doc)] 
-      {:cause "Unsupported value" 
-       :data {k (.value v)}
-       :documentation doc} 
-      {:cause "Unsupported value"
-       :data {k (.value v)}
-       :value (.value v)})
+    (let [entry (get-in model [:catalog-entry :model k])]
+      (if-let [deprecation-doc (:deprecation-doc entry)]
+        {:cause deprecation-doc
+         :data {k (.value v)}
+         :deprecated-version (:deprecated-version entry)}
+        (if-let [doc (dissoc entry :doc)]
+          {:cause "Unsupported value"
+           :data {k (.value v)}
+           :documentation doc}
+          {:cause "Unsupported value"
+           :data {k (.value v)}
+           :value (.value v)})))
     v)) 
 
 (defn improve-issue [m]

@@ -30,7 +30,7 @@
 (def peer-config (assoc (:peer-config config) 
                         :onyx/id id
                         :onyx.bookkeeper/write-batch-size 2 
-                        :onyx.bookkeeper/write-batch-timeout 5))
+                        :onyx.bookkeeper/write-batch-backoff 5))
 
 (def bookkeeper-peer-state (atom nil))
 

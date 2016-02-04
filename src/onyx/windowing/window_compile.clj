@@ -44,34 +44,36 @@
 
 (defn compile-apply-window-entry-fn [{:keys [onyx.core/task-map onyx.core/windows] :as event}]
   (let [grouped-task? (g/grouped-task? task-map)
-        id->apply-state-update (into {}
-                                     (map (juxt :window/id :aggregate/apply-state-update)
-                                          windows))
-        extents-fn (fn [state entry] 
-                     (reduce (fn [state' [window-entries {:keys [window/id] :as window}]]
-                               (reduce (fn [state'' [extent entry grp-key]]
-                                         (let [state'''
-                                               (update-in state'' 
-                                                          [:state id extent]
-                                                          (fn [ext-state] 
-                                                            (let [state-value (-> (if grouped-task? (get ext-state grp-key) ext-state)
-                                                                                  (a/default-state-value window))
-                                                                  apply-fn (id->apply-state-update id)
-                                                                  _ (assert apply-fn (str "Apply fn does not exist for window-id " id))
-                                                                  new-state-value (apply-fn state-value entry)] 
-                                                              (if grouped-task?
-                                                                (assoc ext-state grp-key new-state-value)
-                                                                new-state-value))))]
-                                           ;; Destructive triggers turn the state to nil,
-                                           ;; prune these out of the window state to avoid
-                                           ;; inflating memory consumption.
-                                           (if (nil? (get (get (:state state''') id) extent))
-                                             (update-in state''' [:state id] dissoc extent)
-                                             state''')))
-                                       state'
-                                       window-entries))
-                             state
-                             (map list (rest entry) windows)))]
+        get-state-fn (if grouped-task? 
+                       (fn [ext-state grp-key] 
+                         (get ext-state grp-key)) 
+                       (fn [ext-state grp-key] 
+                         ext-state))
+        set-state-fn (if grouped-task?
+                       (fn [ext-state grp-key new-value] 
+                         (assoc ext-state grp-key new-value))
+                       (fn [ext-state grp-key new-value] 
+                         new-value))
+        apply-window-entries 
+        (fn [state [window-entries {:keys [window/id aggregate/apply-state-update] :as window}]]
+          (reduce (fn [state* [extent extent-entry grp-key]]
+                    (if (nil? extent-entry)
+                      ;; Destructive triggers turn the state to nil,
+                      ;; prune these out of the window state to avoid
+                      ;; inflating memory consumption.
+                      (update-in state* [:state id] dissoc extent)
+                      (update-in state* 
+                                 [:state id extent]
+                                 (fn [ext-state] 
+                                   (let [state-value (a/default-state-value (get-state-fn ext-state grp-key) window)
+                                         new-state-value (apply-state-update state-value extent-entry)] 
+                                     (set-state-fn ext-state grp-key new-state-value))))))
+                  state
+                  window-entries))
+        extents-fn (fn [state log-entry] 
+                     (reduce apply-window-entries 
+                             state 
+                             (map list (rest log-entry) windows)))]
     (fn [state entry]
       (if (compacted-reset? entry)
         (unpack-compacted state entry event)

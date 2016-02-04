@@ -10,7 +10,7 @@ else
 fi
 
 if [ $BR == "master" ]; then
-	export TEST_CHECK_FACTOR=5
+	export TEST_CHECK_FACTOR=3
 fi
 
 i=0
@@ -34,14 +34,15 @@ files+=" "$TEST_NSES_GENERATIVE
 
 echo "Running " $files
 
-export TEST_TRANSPORT_IMPL=$1 
+export TEST_TRANSPORT_IMPL=$1
+export CLOJURE_PROFILE=$2
+export TEST_SELECTOR=$3
 
 ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
-#lein with-profile dev,circle-ci jammin 360 midje $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
-lein with-profile dev,circle-ci test $files |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
+lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files $TEST_SELECTOR |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
 
 EXIT_CODE=${PIPESTATUS[0]}
 

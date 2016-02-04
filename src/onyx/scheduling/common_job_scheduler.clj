@@ -211,7 +211,24 @@
              ;; the peers that are already on this task by
              ;; registering them directly through the Mapping.
              (conj result (Quarantine. (get task->node id)))
+
              :else result)))
+   []
+   task-seq))
+
+(defn anti-jitter-constraints
+  "Reduces the amount of 'jitter' - that is unnecessary movement
+   from a peer between tasks. If the actual capacity is the same
+   as the planned capacity, we shouldn't reallocate the peers.
+   BtrPlace has a Quarantine constraint that lets us express just
+   that."
+  [replica task-seq task->node planned-capacities]
+  (reduce
+   (fn [result [job-id task-id :as id]]
+     (if (= (get-in planned-capacities [job-id task-id])
+            (count (get-in replica [:allocations job-id task-id])))
+       (conj result (Quarantine. (get task->node id)))
+       result))
    []
    task-seq))
 
@@ -241,30 +258,32 @@
 (defn update-slot-id-for-peer [replica job-id task-id peer-id]
   (update-in replica [:task-slot-ids job-id task-id]
              (fn [slot-ids]
-               (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
-                 (assoc slot-ids peer-id slot-id)))))
+               (if (and slot-ids (slot-ids peer-id))
+                 ;; already allocated
+                 slot-ids
+                 (let [slot-id (first (remove (set (vals slot-ids)) (range)))]
+                   (assoc slot-ids peer-id slot-id))))))
 
-(defn assign-task-slot-ids [new-replica original-replica peer->task]
+(defn unassign-task-slot-ids [new-replica original-replica peer->task]
   (reduce-kv
-   (fn [result peer-id [job-id task-id]]
-     (if (and job-id task-id)
-       (let [prev-task (get-in original-replica [:allocations job-id task-id])]
-         (if-not (some #{peer-id} prev-task)
-           (if-let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
-             (let [prev-job-id (:job prev-allocation)
-                   prev-task-id (:task prev-allocation)]
-               (-> result
-                   (update-in [:task-slot-ids prev-job-id prev-task-id] dissoc peer-id)
-                   (update-slot-id-for-peer job-id task-id peer-id)))
-             (update-slot-id-for-peer result job-id task-id peer-id))
-           result))
-       (if-let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
-         (let [prev-job-id (:job prev-allocation)
-               prev-task-id (:task prev-allocation)]
-           (update-in result [:task-slot-ids prev-job-id prev-task-id] dissoc peer-id))
-         result)))
-   new-replica
-   peer->task))
+    (fn [result peer-id [job-id task-id]]
+      (let [prev-allocation (common/peer->allocated-job (:allocations original-replica) peer-id)]
+        (if (and (or (nil? task-id) 
+                     (not (= (:task prev-allocation) task-id)))
+                 (get (:task-slot-ids new-replica) (:job prev-allocation)))
+          (update-in result [:task-slot-ids (:job prev-allocation) (:task prev-allocation)] dissoc peer-id)
+          result)))
+    new-replica
+    peer->task))
+
+(defn assign-task-slot-ids [new-replica original peer->task]
+  (reduce-kv
+    (fn [result peer-id [job-id task-id]]
+      (if (and job-id task-id)
+        (update-slot-id-for-peer result job-id task-id peer-id)
+        result))
+    (unassign-task-slot-ids new-replica original peer->task)
+    peer->task))
 
 (defn build-current-model [replica mapping task->node peer->vm]
   (doseq [j (:jobs replica)]
@@ -361,7 +380,8 @@
               (task-tagged-constraints replica (:peers replica) peer->vm task->node jobs)
               (peer-running-constraints peer->vm)
               (grouping-task-constraints replica task-seq task->node peer->vm)
-              (mapcat #(cts/task-constraints replica jobs (get capacities % 0) peer->vm task->node no-op-node %) jobs)
+              (anti-jitter-constraints replica task-seq task->node capacities)
+              (mapcat #(cts/task-constraints replica jobs (get capacities %) peer->vm task->node no-op-node %) jobs)
               [(RunningCapacity. no-op-node (n-no-op-tasks replica capacities task-seq))]])
             plan (.solve scheduler model constraints)]
         (when plan

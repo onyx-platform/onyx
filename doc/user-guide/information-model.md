@@ -36,7 +36,6 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |`:onyx/max-peers`      | `integer`  | `> 0`                |            |                                                                       |
 |`:onyx/n-peers`        | `integer`  | `> 0`                |            | Expands to make `:onyx/min-peers` and `:onyx/max-peers this value     |
 |`:onyx/language`       | `keyword`  | `:clojure`, `:java`  | `:clojure` | Affects `:onyx/fn` and `:onyx/plugin` function and plugin resolution  |
-|`:onyx/restart-pred-fn`| `keyword`  | `any`                |            | Keyword pointing to function taking an exception which returns a boolean for whether a peer is restartable following that exception  |
 |`:onyx/doc`            | `string`   |                      |            | A docstring for this task                                             |
 
 ##### Maps with `:onyx/type` set to `:input` or `:output` must have these keys

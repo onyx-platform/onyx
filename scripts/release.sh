@@ -31,8 +31,8 @@ else
   git add doc
   git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml
   git tag $NEW_VERSION
-  git push origin $NEW_VERSION
   git push origin master
+  git push origin $NEW_VERSION
 
   # Merge artifacts into release branch.
   git checkout $NEW_BRANCH
@@ -48,4 +48,9 @@ else
 
   git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
+  git checkout develop
+  git merge master
+  git push
+  git checkout master
+
 fi

@@ -1,9 +1,29 @@
+#### 0.8.8
+
+- Fixed a problem with a file in Onyx's test suite that was causing problems for the release process. No functional changes in this release.
+
+#### 0.8.7
+- trigger notification :task-complete has been renamed to :task-lifecycle-stopped, as it occurs whenever a task lifecycle is stopped, not necessarily when the task has been completed
+- reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
+- Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
+- Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
+- **Breaking change** No longer AOT compile onyx.interop. This will be done in [onyx-java](https://github.com/onyx-platform/onyx-java) for use by other languages.
+
+
+#### 0.8.6
+- Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with onyx users on 1.7.0
+
 #### 0.8.5
+- MAJOR: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
+- MAJOR: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).
+- MAJOR: fixed a number of peer join bugs found by onyx-jepsen [#453](https://github.com/onyx-platform/onyx/issues/453), [#462](https://github.com/onyx-platform/onyx/issues/462), [#437](https://github.com/onyx-platform/onyx/issues/437).
+
+- Improved performance, especially for windowed tasks [#500](https://github.com/onyx-platform/onyx/issues/500)
 - Fixed bug introduced by a breaking change in Aeron 0.2.2 where we would retry a send to a closed publication.
-- Fix a number of bugs found by Jepsen #453, #462, #437
 - Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
 - Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
 - Enhancement: Upgraded to Clojure 1.8.0
+- Enhancement: Upgraded to Aeron 0.9
 
 #### 0.8.4
 
