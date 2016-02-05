@@ -328,7 +328,7 @@
 
 (def EnvConfig
   {:zookeeper/address s/Str
-   :onyx/id (deprecated [:env-config :model :onyx/id])
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
    :onyx/tenancy-id TenancyId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
@@ -357,7 +357,7 @@
 
 (def PeerConfig
   {:zookeeper/address s/Str
-   :onyx/id (deprecated [:env-config :model :onyx/id])
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
    :onyx/tenancy-id TenancyId
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
