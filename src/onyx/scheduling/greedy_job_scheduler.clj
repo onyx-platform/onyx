@@ -1,5 +1,6 @@
 (ns onyx.scheduling.greedy-job-scheduler
-  (:require [onyx.scheduling.common-job-scheduler :as cjs]
+  (:require [clojure.set :refer [subset?]]
+            [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.log.commands.common :as common]))
 
@@ -11,7 +12,8 @@
   [replica jobs]
   (if (seq jobs)
     (let [[active & passive] jobs]
-      (merge {active (count (:peers replica))} (zipmap passive (repeat 0))))
+      (merge {active (cjs/n-qualified-peers replica (:peers replica) active)}
+             (zipmap passive (repeat 0))))
     {}))
 
 (defmethod cjs/claim-spare-peers :onyx.job-scheduler/greedy

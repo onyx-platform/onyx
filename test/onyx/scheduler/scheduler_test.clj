@@ -39,8 +39,7 @@
          :task-schedulers {:j1 :onyx.task-scheduler/balanced
                            :j2 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
-         :messaging {:onyx.messaging/impl :aeron}}))))
-  )
+         :messaging {:onyx.messaging/impl :aeron}})))))
 
 (deftest underwhelm-peers
   (is

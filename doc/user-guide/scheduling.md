@@ -135,3 +135,41 @@ If a peer is added to the cluster and its machine is capable of executing all th
 **Peer Removal*
 
 If a peer is removed, all the peers associated with this job's tasks for this chunk of peers will stop executing their tasks.
+
+### Tags
+
+It's often the case that a set of machines in your cluster are privileged in some way. Perhaps they are running special hardware, or they live in a specific data center, or they have a license to use a proprietary database. Sometimes, you'll have Onyx jobs that require tasks to run on a predetermined set of machines. Tags are a feature that let peers denote "capabilities". Tasks may declare which tags peers must have in order to be selected to execute them.
+
+#### Peers
+
+To declare a peer as having special capabilities, use a vector of keywords in the Peer Configuration under key `:onyx.peer/tags`. For example, if you wanted to declare that a peer has a license for its JVM to communicate with Datomic, you might add this to your Peer Configuation:
+
+```clojure
+{...
+ :onyx/id "my-cluster"
+ :onyx.peer/tags [:datomic]
+ ...
+}
+```
+
+You can specify multiple tags. The default is no tags (`[]`), in which case this peer can execute any tasks that do not require tags.
+
+#### Tasks
+
+Now that we have a means for expressing which peers can do which kinds of things, we'll need a way to express which tasks require which capabilities. We do this in the catalog. Any task can use the key `:onyx/required-tags` with a vector of keywords as a value. Any peer that executes this task is garunteed to have `:onyx/required-tags` as a subset of its `:onyx.peer/tags`.
+
+For example, to declare that task `:read-datoms` must be executed by a peer that can talk to Datomic, you might write:
+
+```clojure
+[{:onyx/name :read-datoms
+  :onyx/plugin :onyx.plugin.datomic/read-datoms
+  :onyx/type :input
+  :onyx/medium :datomic
+  :onyx/required-tags [:datomic] ;; <- Add this!
+  :datomic/uri db-uri
+  ...
+  :onyx/batch-size batch-size
+  :onyx/doc "Reads a sequence of datoms from the d/datoms API"}
+ ...
+]
+```

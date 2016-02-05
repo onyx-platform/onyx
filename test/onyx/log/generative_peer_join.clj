@@ -303,7 +303,6 @@
     (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
     (is (= (sort [1 1 1]) (sort (map count (vals (get (:allocations replica) job-max-peers-id))))))))
 
-
 (def job-min-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
 (def job-min-peers

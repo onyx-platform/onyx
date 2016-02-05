@@ -59,6 +59,7 @@
           (update-in [:peers] conj joiner)
           (update-in [:peers] vec)
           (assoc-in [:peer-state joiner] :idle)
+          (assoc-in [:peer-tags joiner] (:tags args))
           (add-site-acker args)
           (reconfigure-cluster-workload)))))
 

@@ -209,7 +209,14 @@
              :tags [:aggregation :windows]
              :optionally-allowed-when ["A window is defined on this task."]
              :required-when ["A Window is defined on this task and there is no possible :onyx/uniqueness-key to on the segment to deduplicate with."]
-             :added "0.8.0"}}}
+             :added "0.8.0"}
+
+            :onyx/required-tags
+            {:doc "When set, only allows peers which have *all* tags listed in this key in their :onyx.peer/tags configuration. This is used for preventing peers without certain user defined capibilities from executing particular tasks. A concrete use case would be only allowing peers with a database license key to execute a specific task."
+             :type [:keyword]
+             :default []
+             :optional? true
+             :added "0.8.9"}}}
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
@@ -643,6 +650,13 @@ You can use lifecycles to supply any stateful connections necessary to sync your
              :optional? true
              :default 60
              :added "0.8.0"}
+
+            :onyx.peer/tags
+            {:doc "Tags which denote the capabilities of this peer in terms of user-defined functionality."
+             :type [:keyword]
+             :optional? true
+             :default []
+             :added "0.8.9"}
 
             :onyx.windowing/min-value
             {:doc "A default strict minimum value that `:window/window-key` can ever be. Note, this is generally best configured individually via :window/min-value in the task map."
@@ -1113,7 +1127,8 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :onyx/flux-policy
     :onyx/uniqueness-key
     :onyx/deduplicate?
-    :onyx/restart-pred-fn]
+    :onyx/restart-pred-fn
+    :onyx/required-tags]
    :flow-conditions-entry
    [:flow/from :flow/to :flow/predicate :flow/exclude-keys :flow/short-circuit?
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
@@ -1149,6 +1164,7 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :onyx.peer/backpressure-check-interval
     :onyx.peer/backpressure-low-water-pct
     :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
+    :onyx.peer/tags
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms
     :onyx.zookeeper/backoff-max-retries :onyx.messaging/inbound-buffer-size
