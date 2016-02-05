@@ -11,6 +11,18 @@
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
+(defn n-qualified-peers [replica peers job]
+  (let [tasks (get-in replica [:tasks job])
+        task-tags (map (partial into #{}) (map #(get-in replica [:required-tags job %]) tasks))]
+    (reduce
+     (fn [n p]
+       (let [peer-tags (into #{} (get-in replica [:peer-tags p]))]
+         (if (some (fn [tt] (subset? tt peer-tags)) task-tags)
+             n
+             (dec n))))
+     (count peers)
+     peers)))
+
 (defn job-upper-bound [replica job]
   ;; We need to handle a special case here when figuring out the upper saturation limit.
   ;; If this is a job with a grouped task that has already been allocated,
@@ -328,22 +340,28 @@
 (defn unconstrained-tasks [replica jobs]
   (mapcat
    (fn [job]
-     (filter
-      (fn [task]
-        (not (seq (get-in replica [:required-tags job task]))))
-      (get-in replica [:tasks job])))
+     (remove
+      nil?
+      (map
+       (fn [task]
+         (when (not (seq (get-in replica [:required-tags job task])))
+           [job task]))
+       (get-in replica [:tasks job]))))
    jobs))
 
 (defn constrainted-tasks-for-peer [replica jobs peer-tags]
   (mapcat
    (fn [job]
-     (filter
-      (fn [task]
-        (let [tags (get-in replica [:required-tags job task])]
-          (and (seq tags)
-               (subset? (into #{} tags)
-                        (into #{} peer-tags)))))
-      (get-in replica [:tasks job])))
+     (remove
+      nil?
+      (map
+       (fn [task]
+         (let [tags (get-in replica [:required-tags job task])]
+           (when (and (seq tags)
+                      (subset? (into #{} tags)
+                               (into #{} peer-tags)))
+             [job task])))
+       (get-in replica [:tasks job]))))
    jobs))
 
 (defn task-tagged-constraints [replica peers peer->vm task->node jobs]
@@ -357,6 +375,15 @@
           [(map task->node ctasks)
            (map task->node utasks)])))
      (filter #(seq (get-in replica [:peer-tags %])) peers))))
+
+(defn no-tagged-peers-constraints [replica peers peer->vm task->node jobs no-op-node]
+  (let [utasks (conj (map task->node (unconstrained-tasks replica jobs)) no-op-node)]
+    (map
+     (fn [peer]
+       (Among.
+        [(peer->vm peer)]
+        [utasks]))
+     (filter #(not (seq (get-in replica [:peer-tags %]))) peers))))
 
 (defn btr-place-scheduling [replica jobs job-utilization capacities]
   (if (seq jobs)
@@ -378,6 +405,7 @@
              into
              [(capacity-constraints replica job-utilization task-seq task->node capacities)
               (task-tagged-constraints replica (:peers replica) peer->vm task->node jobs)
+              (no-tagged-peers-constraints replica (:peers replica) peer->vm task->node jobs no-op-node)
               (peer-running-constraints peer->vm)
               (grouping-task-constraints replica task-seq task->node peer->vm)
               (anti-jitter-constraints replica task-seq task->node capacities)
