@@ -551,7 +551,15 @@ You can use lifecycles to supply any stateful connections necessary to sync your
             {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :optional? false
-             :added "0.8.0"}
+             :added "0.8.0"
+             :deprecated-version "0.9.0"
+             :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
+
+            :onyx/tenancy-id
+            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+             :type [:one-of [:string :uuid]]
+             :optional? false
+             :added "0.9.0"}
 
             :onyx.peer/job-scheduler 
             {:doc "Each running Onyx instance is configured with exactly one job scheduler. The purpose of the job scheduler is to coordinate which jobs peers are allowed to volunteer to execute."
@@ -1025,12 +1033,20 @@ You can use lifecycles to supply any stateful connections necessary to sync your
              :required-when ["The `:zookeeper/server?` is `true`."]
              :added "0.8.0"}
 
+            :onyx/tenancy-id
+            {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
+             :type [:one-of [:string :uuid]]
+             :optional? false
+             :added "0.9.0"}
+
             :onyx/id 
             {:doc "The ID for the cluster that the peers will coordinate via. Provides a way to provide strong, multi-tenant isolation of peers."
              :type [:one-of [:string :uuid]]
              :required-when ["`:onyx.bookkeeper/server?` is `true`."]
              :optional? true
-             :added "0.8.0"}
+             :added "0.8.0"
+             :deprecated-version "0.9.0"
+             :deprecation-doc ":onyx/id has been renamed :onyx/tenancy-id for clarity. Update all :onyx/id keys accordingly."}
 
             :zookeeper/address
             {:doc "The addresses of the ZooKeeper servers to use for coordination e.g. 192.168.1.1:2181,192.168.1.2:2181"
@@ -1156,7 +1172,9 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :lifecycle/after-retry-segment
     :lifecycle/handle-exception]
    :peer-config
-   [:onyx/id :onyx.peer/job-scheduler :zookeeper/address
+   [:onyx/tenancy-id
+    :onyx.peer/job-scheduler
+    :zookeeper/address
     :onyx.peer/inbox-capacity :onyx.peer/outbox-capacity
     :onyx.peer/retry-start-interval :onyx.peer/join-failure-back-off
     :onyx.peer/drained-back-off :onyx.peer/peer-not-ready-back-off
@@ -1205,9 +1223,10 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :onyx.rocksdb.filter/num-buckets 
     :onyx.rocksdb.filter/num-ids-per-bucket
     :onyx.rocksdb.filter/rotation-check-interval-ms
-    :onyx.task-scheduler.colocated/only-send-local?]
+    :onyx.task-scheduler.colocated/only-send-local?
+    :onyx/id]
    :env-config
-   [:onyx/id
+   [:onyx/tenancy-id
     :zookeeper/server?
     :zookeeper.server/port
     :zookeeper/address
@@ -1218,4 +1237,5 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :onyx.bookkeeper/base-journal-dir
     :onyx.bookkeeper/base-ledger-dir
     :onyx.bookkeeper/disk-usage-threshold
-    :onyx.bookkeeper/disk-usage-warn-threshold]})
+    :onyx.bookkeeper/disk-usage-warn-threshold
+    :onyx/id]})
