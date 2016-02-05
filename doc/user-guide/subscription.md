@@ -19,7 +19,7 @@ The following is a complete example to pretty print all events as they are writt
 ```clojure
 (def peer-config
   {:zookeeper/address "127.0.0.1:2181"
-   :onyx/id onyx-id
+   :onyx/tenancy-id onyx-id
    :onyx.peer/job-scheduler :onyx.job-scheduler/round-robin})
 
 (def ch (chan 100))

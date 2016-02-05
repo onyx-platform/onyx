@@ -12,12 +12,12 @@
         config (load-config)
         env-config
         (assoc (:env-config config)
-               :onyx/id id
+               :onyx/tenancy-id id
                :onyx.log/config {:appenders {:standard-out {:enabled? false}
                                              :spit {:enabled? false}}})
         peer-config
         (assoc (:peer-config config)
-               :onyx/id id
+               :onyx/tenancy-id id
                :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
         env (onyx.api/start-env env-config)
         workflow

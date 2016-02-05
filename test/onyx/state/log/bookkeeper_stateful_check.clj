@@ -25,10 +25,10 @@
 
 (def config (load-config))
 
-(def env-config (assoc (:env-config config) :onyx/id id))
+(def env-config (assoc (:env-config config) :onyx/tenancy-id id))
 
 (def peer-config (assoc (:peer-config config) 
-                        :onyx/id id
+                        :onyx/tenancy-id id
                         :onyx.bookkeeper/write-batch-size 2 
                         :onyx.bookkeeper/write-batch-backoff 5))
 

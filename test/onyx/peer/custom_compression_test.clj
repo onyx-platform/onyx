@@ -29,9 +29,9 @@
 (deftest compression
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config)
-                           :onyx/id id
+                           :onyx/tenancy-id id
                            :onyx.messaging/decompress-fn #(read-string (String. % "UTF-8"))
                            :onyx.messaging/compress-fn #(.getBytes (pr-str %)))
         batch-size 20

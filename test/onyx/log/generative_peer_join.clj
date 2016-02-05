@@ -18,7 +18,7 @@
 (def onyx-id (java.util.UUID/randomUUID))
 
 (def peer-config
-  {:onyx/id onyx-id
+  {:onyx/tenancy-id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
 (def messenger (dummy-messenger {}))

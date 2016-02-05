@@ -16,7 +16,7 @@
 (def onyx-id (java.util.UUID/randomUUID))
 
 (def peer-config
-  {:onyx/id onyx-id
+  {:onyx/tenancy-id onyx-id
    :onyx.messaging/impl :dummy-messenger})
 
 (def messenger (dummy-messenger {}))
@@ -26,7 +26,7 @@
 (def job-1
   {:workflow [[:a :b] [:b :c]]
    :catalog [{:onyx/name :a
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -38,7 +38,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :c
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -50,7 +50,7 @@
 (def job-2
   {:workflow [[:d :e] [:e :f]]
    :catalog [{:onyx/name :d
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -62,7 +62,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :f
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -74,7 +74,7 @@
 (def job-3
   {:workflow [[:g :h] [:h :i]]
    :catalog [{:onyx/name :g
-              :onyx/ident :onyx.plugin.core-async/input
+              :onyx/plugin :onyx.plugin.core-async/input
               :onyx/type :input
               :onyx/medium :core.async
               :onyx/batch-size 20
@@ -86,7 +86,7 @@
               :onyx/batch-size 20}
 
              {:onyx/name :i
-              :onyx/ident :onyx.plugin.core-async/output
+              :onyx/plugin :onyx.plugin.core-async/output
               :onyx/type :output
               :onyx/medium :core.async
               :onyx/batch-size 20

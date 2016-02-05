@@ -19,7 +19,7 @@
 
 (def config (load-config))
 
-(def peer-config (assoc (:peer-config config) :onyx/id id))
+(def peer-config (assoc (:peer-config config) :onyx/tenancy-id id))
 
 (def gen-segment
   (gen/hash-map :some-key gen/any-printable))
@@ -139,7 +139,7 @@
               (component/stop recv-messenger)
               (component/stop send-messenger)))))))
 
-(def peer-config-aeron (assoc (:peer-config config) :onyx/id id :onyx.messaging/impl :aeron))
+(def peer-config-aeron (assoc (:peer-config config) :onyx/tenancy-id id :onyx.messaging/impl :aeron))
 
 #_(deftest aeron-gen-test
   (let [peer-group (onyx.api/start-peer-group peer-config-aeron)]
