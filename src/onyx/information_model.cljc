@@ -216,7 +216,7 @@
              :type [:keyword]
              :default []
              :optional? true
-             :added "0.8.5"}}}
+             :added "0.8.9"}}}
 
    :flow-conditions-entry
    {:summary "Flow conditions are used for isolating logic about whether or not segments should pass through different tasks in a workflow, and support a rich degree of composition with runtime parameterization."
@@ -656,7 +656,7 @@ You can use lifecycles to supply any stateful connections necessary to sync your
              :type [:keyword]
              :optional? true
              :default []
-             :added "0.8.5"}
+             :added "0.8.9"}
 
             :onyx.windowing/min-value
             {:doc "A default strict minimum value that `:window/window-key` can ever be. Note, this is generally best configured individually via :window/min-value in the task map."
