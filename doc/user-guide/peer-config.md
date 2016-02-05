@@ -43,6 +43,7 @@ The chapter describes the all options available to configure the virtual peers a
 |`:onyx.peer/peer-not-ready-back-off`        | `int`      | `2000`                             |
 |`:onyx.peer/job-not-ready-back-off`         | `int`      | `500`                              |
 |`:onyx.peer/fn-params`                      | `map`      | `{}`                               |
+|`:onyx.peer/tags`                           | `vector`   | `[]`                               |
 |`:onyx.peer/backpressure-check-interval`    | `int`      | `10`                               |
 |`:onyx.peer/backpressure-low-water-pct`     | `int`      | `30`                               |
 |`:onyx.peer/backpressure-high-water-pct`    | `int`      | `60`                               |
@@ -103,7 +104,9 @@ A map of keywords to vectors. Keywords represent task names, vectors represent t
 to the function represented by the task. For example, `{:add [42]}` for task `:add` will call the function
 underlying `:add` with `(f 42 <segment>)`.
 
+##### `:onyx.peer/tags`
 
+Tags which denote the capabilities of this peer in terms of user-defined functionality. Must be specified as a vector of keywords. This is used in combination with `:onyx/required-tags` in the catalog to force tasks to run on certain sets of machines.
 
 ##### `:onyx.zookeeper/backoff-base-sleep-time-ms`
 
