@@ -27,9 +27,8 @@
              pick-peer-fns (:pick-peer-fns @peer-replica-view)
              grouped (group-by #(t/vector (:route %) (:hash-group %)) segments)]
          (run! (fn [[[route hash-group] segs]]
-                 (let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))
-                       target (pick-peer-fn hash-group)]
-                   (when target
+                 (when-let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))]
+                   (when-let [target (pick-peer-fn hash-group)]
                      (when-let [site (peer-site peer-replica-view target)]
                        (onyx.extensions/send-messages messenger event site segs)))))
                grouped))))
