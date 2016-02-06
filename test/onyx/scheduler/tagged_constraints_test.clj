@@ -271,7 +271,7 @@
       (is (some (into #{} task-a-peers) #{:p9 :p10}))
       (is (some (into #{} task-f-peers) #{:p9 :p10}))))))
 
-#_(deftest peer-leave-tagged-deallocate
+(deftest peer-leave-tagged-deallocate
   (let [job-1-id "job-1"
         job-1 {:workflow [[:a :b] [:b :c]]
                :catalog [{:onyx/name :a
