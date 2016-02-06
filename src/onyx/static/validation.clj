@@ -168,19 +168,22 @@
     (schema/validate FlowCondition entry)))
 
 (defn validate-flow-connections [flow-schema workflow]
-  (let [all (into #{} (concat (map first workflow) (map second workflow)))]
-    (doseq [entry flow-schema]
-      (let [from (:flow/from entry)]
-        (when-not (or (some #{from} all) (= from :all))
-          (throw (ex-info ":flow/from value doesn't name a node in the workflow"
-                          {:entry entry}))))
+  (let [task->egress-edges (reduce (fn [m [from to]]
+                                     (update m from (fn [v]
+                                                      (conj (set v) to))))
+                                   {}
+                                   workflow)
+        all-tasks (into (set (map first workflow)) (map second workflow))]
+    (doseq [{:keys [flow/from flow/to] :as entry} flow-schema]
+      (when-not (or (all-tasks from) (= from :all))
+        (throw (ex-info ":flow/from value doesn't name a node in the workflow"
+                        {:entry entry})))
 
-      (let [to (:flow/to entry)]
-        (when-not (or (= :all to)
-                      (= :none to)
-                      (clojure.set/subset? to all))
-          (throw (ex-info ":flow/to value doesn't name a node in the workflow, :all, or :none"
-                          {:entry entry})))))))
+      (when-not (or (= :all to)
+                    (= :none to)
+                    (every? (fn [t] ((task->egress-edges from) t)) to))
+        (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
+                        {:entry entry}))))))
 
 (defn validate-peer-config [peer-config]
   (schema/validate PeerConfig peer-config))
