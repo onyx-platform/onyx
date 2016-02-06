@@ -451,10 +451,9 @@
             planned-capacities (job->planned-task-capacity current-replica jobs max-utilization)]
         (if (= planned-capacities (actual-usage current-replica jobs))
           current-replica
-          (let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
-            (if updated-replica
-              (let [acker-replica (choose-ackers updated-replica jobs)]
-                (if (full-allocation? acker-replica max-utilization planned-capacities)
-                  (deallocate-starved-jobs acker-replica)
-                  (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
-              (recur (butlast jobs) (remove-job current-replica (butlast jobs))))))))))
+          (if-let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
+            (let [acker-replica (choose-ackers updated-replica jobs)]
+              (if (full-allocation? acker-replica max-utilization planned-capacities)
+                (deallocate-starved-jobs acker-replica)
+                (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
+            (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))
