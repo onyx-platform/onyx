@@ -51,6 +51,7 @@
                     watcher (nth sorted-candidates index)]
                 (-> replica
                     (update-in [:prepared] merge {watcher joiner})
+                    (assoc-in [:peer-tags joiner] (:tags args))
                     (add-site-acker args)
                     (reconfigure-cluster-workload)))
               :else

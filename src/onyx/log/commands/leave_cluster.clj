@@ -37,6 +37,7 @@
         (update-in [:pairs] #(if-not (seq pair) (dissoc % observer) %))
         (update-in [:peer-state] dissoc id)
         (update-in [:peer-sites] dissoc id)
+        (update-in [:peer-tags] dissoc id)
         (common/remove-peers id)
         (reconfigure-cluster-workload))))
 
