@@ -79,14 +79,15 @@
 
 (s/defmethod extensions/reactions :prepare-join-cluster :- Reactions
   [entry :- LogEntry old new diff peer-args]
-  (let [joiner (:joiner (:args entry))] 
+  (let [joiner (:joiner (:args entry))]
     (cond (already-joined? old joiner)
           []
           (still-joining? old joiner)
           []
           (and (= (:id peer-args) joiner) (nil? diff))
           [{:fn :abort-join-cluster
-            :args {:id (:id peer-args)}}]
+            :args {:id (:id peer-args)
+                   :tags (:tags (:args entry))}}]
           (= (:id peer-args) (:observer diff))
           [{:fn :notify-join-cluster
             :args {:observer (:subject diff)}}])))
