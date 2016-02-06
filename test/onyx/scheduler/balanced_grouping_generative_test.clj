@@ -242,7 +242,7 @@
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t6))))))))
 
 (deftest recover-slots
-  (let [grouping-slot-job-id "job-1"
+  (let [grouping-slot-job-id "grouping-job-1"
         grouping-slot-job
         {:workflow [[:a :b] [:b :c]]
          :catalog [{:onyx/name :a
@@ -288,7 +288,7 @@
          :message-id 0
          :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
                       (assoc :job-1 {:queue [job-1-rets]})
-                      (assoc :job-2 {:queue [job-2-rets {:fn :kill-job :args {:job job-2-rets}}]})
+                      (assoc :job-2 {:queue [job-2-rets {:fn :kill-job :args {:job job-2-id}}]})
                       (assoc :leave-1 {:predicate (fn [replica entry]
                                                     (some #{:p1} (:peers replica)))
                                        :queue [{:fn :leave-cluster :args {:id :p1}}]})

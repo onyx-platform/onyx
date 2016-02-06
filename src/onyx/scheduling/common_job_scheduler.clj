@@ -449,7 +449,7 @@
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))
-      current-replica
+      (deallocate-starved-jobs current-replica)
       (let [job-offers (job-offer-n-peers current-replica jobs)
             job-claims (job-claim-peers current-replica job-offers)
             spare-peers (apply + (vals (merge-with - job-offers job-claims)))
