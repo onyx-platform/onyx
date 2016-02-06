@@ -8,7 +8,6 @@
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [onyx.log.generators :as log-gen]
             [onyx.test-helper :refer [job-allocation-counts get-counts]]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [onyx.static.planning :as planning]
             [onyx.api]))
 
@@ -258,7 +257,6 @@
                            :queue [{:fn :leave-cluster :args {:id :p2}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (let [task-a-id (name->task-id (:catalog job-1) job-entry-1 :a)
           task-f-id (name->task-id (:catalog job-2) job-entry-2 :f)
           task-a-peers (get-in replica [:allocations job-1-id task-a-id])
@@ -321,7 +319,6 @@
                              :queue [{:fn :leave-cluster :args {:id :p4}}]})
             :log []
             :peer-choices []}))]
-      (standard-invariants replica)
       (is (= #{} (set (remove (comp nil? val) (:peer-tags replica)))))
         (is (= 3 (count (:peers replica))))
         (is (= [0]
@@ -415,7 +412,6 @@
                                   :queue [{:fn :leave-cluster :args {:id :p1}}]})
             :log []
             :peer-choices []}))]
-      (standard-invariants replica)
       (is (= 18 (count (:peers replica))))
       (is (= [[3 3 3] [3 3 3]]
              (map vals

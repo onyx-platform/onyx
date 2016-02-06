@@ -5,6 +5,7 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
+            [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
   (:import [org.btrplace.model Model DefaultModel]
@@ -440,6 +441,11 @@
    jobs))
 
 (defn reconfigure-cluster-workload [replica]
+  {:post [(invariants/allocations-invariant %)
+          (invariants/slot-id-invariant %)
+          (invariants/all-peers-invariant %)
+          (invariants/all-tasks-have-non-zero-peers %)
+          (invariants/active-job-invariant %)]}
   (loop [jobs (:jobs replica)
          current-replica replica]
     (if (not (seq jobs))

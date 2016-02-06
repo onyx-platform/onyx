@@ -12,7 +12,6 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [onyx.log.commands.common :as common]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [taoensso.timbre :refer [info]]))
@@ -147,7 +146,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
@@ -172,7 +170,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        ;; If the job is submitted first, the second case occurs. Otherwise the first
        ;; case pins task B to 4 peers.
        (is
@@ -205,7 +202,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
@@ -237,7 +233,6 @@
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))
            [t4 t5 t6] (:tasks (:args job-2-rets))]
-       (standard-invariants replica)
        (is (= 3 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 3 (count (get (get (:allocations replica) job-1-id) t3))))
@@ -315,7 +310,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))]
-       (standard-invariants replica)
        (is (= #{0 1 2 3} (set (vals (get-in replica [:task-slot-ids grouping-slot-job-id t2])))))
        (is (= 6 (count (:peers replica))))
        (is (= 1 (count (get (get (:allocations replica) grouping-slot-job-id) t1))))

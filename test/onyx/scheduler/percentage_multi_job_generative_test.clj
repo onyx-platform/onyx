@@ -10,7 +10,6 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
@@ -87,7 +86,6 @@
                                               (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
             :log []
             :peer-choices []}))]
-      (standard-invariants replica)
       (is (= #{:active} (set (vals (:peer-state replica)))))
       (is (= [14 6]
              (map (partial apply +)
