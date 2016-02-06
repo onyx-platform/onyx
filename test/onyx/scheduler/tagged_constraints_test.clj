@@ -19,6 +19,7 @@
         {:jobs [:j1]
          :allocations {}
          :peers [:p1 :p2 :p3]
+         :peer-state {:p1 :idle :p2 :idle :p3 :idle}
          :tasks {:j1 [:t1 :t2 :t3]}
          :task-schedulers {:j1 :onyx.task-scheduler/balanced
                            :j2 :onyx.task-scheduler/balanced}
@@ -145,6 +146,9 @@
                             :t2 [:p3 :p4 :p5]
                             :t3 [:p8]}}
          :peers [:p1 :p3 :p4 :p5 :p7 :p8]
+         :peer-state {:p1 :idle :p2 :idle :p3 :active
+                      :p4 :active :p5 :active :p6 :idle
+                      :p7 :active :p8 :active}
          :tasks {:j1 [:t1 :t2 :t3]
                  :j2 [:t4 :t5 :t6]}
          :task-schedulers {:j1 :onyx.task-scheduler/balanced
