@@ -57,7 +57,8 @@
   [entry old new diff state]
   (when (abort? old state entry)
     [{:fn :abort-join-cluster
-      :args {:id (:id state)}}]))
+      :args {:id (:id state)
+             :tags (get-in old [:peer-tags (:id state)])}}]))
 
 (s/defmethod extensions/fire-side-effects! :leave-cluster :- State
   [{:keys [args message-id] :as entry} old new {:keys [updated-watch] :as diff} state]

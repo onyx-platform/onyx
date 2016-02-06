@@ -46,7 +46,8 @@
              (nil? diff)
              (= (:id state) accepted-joiner))
       [{:fn :abort-join-cluster
-        :args {:id accepted-joiner}}]
+        :args {:id accepted-joiner
+               :tags (get-in old [:peer-tags accepted-joiner])}}]
       [])))
 
 (defn register-acker [state diff new]

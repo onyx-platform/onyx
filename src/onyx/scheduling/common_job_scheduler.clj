@@ -228,18 +228,50 @@
    []
    task-seq))
 
+(defn unconstrained-tasks [replica jobs]
+  (mapcat
+   (fn [job]
+     (remove
+      nil?
+      (map
+       (fn [task]
+         (when (not (seq (get-in replica [:required-tags job task])))
+           [job task]))
+       (get-in replica [:tasks job]))))
+   jobs))
+
+(defn constrainted-tasks-for-peer [replica jobs peer-tags]
+  (mapcat
+   (fn [job]
+     (remove
+      nil?
+      (map
+       (fn [task]
+         (let [tags (get-in replica [:required-tags job task])]
+           (when (and (seq tags)
+                      (subset? (into #{} tags)
+                               (into #{} peer-tags)))
+             [job task])))
+       (get-in replica [:tasks job]))))
+   jobs))
+
 (defn anti-jitter-constraints
   "Reduces the amount of 'jitter' - that is unnecessary movement
    from a peer between tasks. If the actual capacity is the same
    as the planned capacity, we shouldn't reallocate the peers.
-   BtrPlace has a Quarantine constraint that lets us express just
+   BtrPlace has a Fence constraint that lets us express just
    that."
-  [replica task-seq task->node planned-capacities]
+  [replica jobs task-seq peer->vm task->node planned-capacities]
   (reduce
    (fn [result [job-id task-id :as id]]
      (if (= (get-in planned-capacities [job-id task-id])
             (count (get-in replica [:allocations job-id task-id])))
-       (conj result (Quarantine. (get task->node id)))
+       (into result (map
+                     (fn [p]
+                       (let [ctasks (constrainted-tasks-for-peer replica jobs (get-in replica [:peer-tags p]))]
+                         (Fence. (peer->vm p)
+                                 (into #{} (map task->node (conj ctasks id))))))
+                     (get-in replica [:allocations job-id task-id])))
        result))
    []
    task-seq))
@@ -337,33 +369,6 @@
            task-seq))
        0))
 
-(defn unconstrained-tasks [replica jobs]
-  (mapcat
-   (fn [job]
-     (remove
-      nil?
-      (map
-       (fn [task]
-         (when (not (seq (get-in replica [:required-tags job task])))
-           [job task]))
-       (get-in replica [:tasks job]))))
-   jobs))
-
-(defn constrainted-tasks-for-peer [replica jobs peer-tags]
-  (mapcat
-   (fn [job]
-     (remove
-      nil?
-      (map
-       (fn [task]
-         (let [tags (get-in replica [:required-tags job task])]
-           (when (and (seq tags)
-                      (subset? (into #{} tags)
-                               (into #{} peer-tags)))
-             [job task])))
-       (get-in replica [:tasks job]))))
-   jobs))
-
 (defn task-tagged-constraints [replica peers peer->vm task->node jobs]
   (let [utasks (unconstrained-tasks replica jobs)]
     (map
@@ -408,7 +413,7 @@
               (no-tagged-peers-constraints replica (:peers replica) peer->vm task->node jobs no-op-node)
               (peer-running-constraints peer->vm)
               (grouping-task-constraints replica task-seq task->node peer->vm)
-              (anti-jitter-constraints replica task-seq task->node capacities)
+              (anti-jitter-constraints replica jobs task-seq peer->vm task->node capacities)
               (mapcat #(cts/task-constraints replica jobs (get capacities %) peer->vm task->node no-op-node %) jobs)
               [(RunningCapacity. no-op-node (n-no-op-tasks replica capacities task-seq))]])
             plan (.solve scheduler model constraints)]
