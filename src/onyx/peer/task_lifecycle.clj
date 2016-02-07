@@ -361,7 +361,8 @@
 (defn handle-exception [log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
-      (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
+      (do (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
+          (close! restart-ch))
       (do (warn e "Handling uncaught exception thrown inside task lifecycle - killing this job.")
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
