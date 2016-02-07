@@ -43,7 +43,7 @@ onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-ela
 learn-onyx| `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
 onyx-examples| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
 
-- `stable`: stable, released content
+- `release`: stable, released content
 - `unstable`: unreleased content
 - `compatibility`: edge, unstable, unreleased content depending on core `master`
 
