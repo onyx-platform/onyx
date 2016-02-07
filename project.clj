@@ -41,7 +41,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [lonocloud/lein-unison "0.1.12"]
+                             [lonocloud/lein-unison "0.1.13"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars  {*warn-on-reflection* true
                                                *assert* false
