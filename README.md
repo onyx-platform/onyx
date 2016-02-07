@@ -29,7 +29,7 @@ Available on Clojars:
 
 ### Build Status
 
-Component | `0.8.x`| `master` | `compatibility`
+Component | `release`| `unstable` | `compatibility`
 ----------|--------|----------|----------------
 onyx core | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx/tree/master) | `-`
 onyx-kafka| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-kafka/tree/compatibility)
@@ -40,13 +40,12 @@ onyx-bookkeeper  | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-book
 onyx-seq| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-seq/tree/compatibility)
 onyx-durable-queue| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-durable-queue/tree/compatibility)
 onyx-elasticsearch| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-elasticsearch/tree/compatibility)
-learn-onyx*| `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
+learn-onyx| `-` | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/answers) | [![Circle CI](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/learn-onyx/tree/compatibility)
 onyx-examples| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.8.x.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/0.8.x) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/master) | [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility.svg?style=svg)](https://circleci.com/gh/onyx-platform/onyx-examples/tree/compatibility)
 
-- `0.8.x`: stable, released content
-- `master`: stable, unreleased content
+- `stable`: stable, released content
+- `unstable`: unreleased content
 - `compatibility`: edge, unstable, unreleased content depending on core `master`
-- `*`: "master" branch for learn-onyx building on `answers` branch. `master` reserved for workshop challenges
 
 ### Companies Running Onyx in Production
 
