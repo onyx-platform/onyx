@@ -41,7 +41,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [lonocloud/lein-unison "0.1.11"]
+                             [lonocloud/lein-unison "0.1.12"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars  {*warn-on-reflection* true
                                                *assert* false
@@ -49,7 +49,11 @@
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"
-                                    "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}}
+                                    "-XX:StartFlightRecording=duration=1080s,filename=recording.jfr"]}
+             :clojure-1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
+             :clojure-1.8 {:dependencies [[org.clojure/clojure "1.8.0"]]}}
+  :test-selectors {:default (constantly true)
+                   :smoke :smoke}
   :unison
   {:repos
    [{:git "git@onyx-kafka:onyx-platform/onyx-kafka.git"
@@ -111,5 +115,11 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "scripts/release.sh"
+     :merge "master"}
+    {:git "git@onyx-examples:onyx-platform/onyx-examples.git"
+     :project-file :discover
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "release.sh"
      :merge "master"}]}
   :codox {:output-dir "doc/api"})

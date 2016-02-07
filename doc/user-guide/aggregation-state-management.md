@@ -11,7 +11,7 @@ This section discusses state management and fault tolerance used in windowing/st
 ### Summary
 
 Onyx provides the ability to perform updates to a state machine for segments
-which are calculated over [windows] (doc/user-guide/windowing.md). For example,
+which are calculated over [windows]({{ "/windowing.html" | prepend: page.dir | prepend: site.baseurl }}). For example,
 a grouping task may accumulate incoming values for a number of keys over
 windows of 5 minutes. This feature is commonly used for aggregations, such as
 summing values, though it can be used to build more complex state machines.

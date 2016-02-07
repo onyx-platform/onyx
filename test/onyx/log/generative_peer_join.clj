@@ -11,7 +11,6 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [taoensso.timbre :as timbre :refer [info]]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
@@ -118,8 +117,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
                          (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
@@ -151,7 +148,6 @@
                                           {:fn :kill-job :args {:job job-2-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= 8 (apply + (map count (vals (get (:allocations replica) job-1-id))))))
     (is (= 0 (apply + (map count (vals (get (:allocations replica) job-2-id))))))))
@@ -179,7 +175,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-2-id)))))))
@@ -207,7 +202,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
@@ -244,7 +238,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
@@ -299,10 +292,8 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (standard-invariants replica)
     (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
     (is (= (sort [1 1 1]) (sort (map count (vals (get (:allocations replica) job-max-peers-id))))))))
-
 
 (def job-min-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -352,7 +343,6 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (standard-invariants replica)
     (is (= (sort [2 2 2]) (sort (map count (vals (get (:allocations replica) job-min-peers-id))))))
     (is (= (sort [:active :active :active :active :active :active]) (sort (vals (:peer-state replica)))))))
 
@@ -391,7 +381,6 @@
                                             {:fn :kill-job :args {:job job-3-id}}]})
             :log []
             :peer-choices []})))]
-    (standard-invariants replica)
     (let [peer-state-group (group-by val (:peer-state replica))]
       (is (= 12 (count (:active peer-state-group))))
       (is (= 8 (count (:idle peer-state-group))))
@@ -505,7 +494,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is
       (= [1 4 3]
@@ -541,7 +529,6 @@
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
-    (standard-invariants replica)
     (is (= 3 (count (:peer-state replica))))
     (is (= 3 (count (:peers replica))))))
 
@@ -561,7 +548,6 @@
                                               :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     (is (or (= 2 (count (:peer-state replica)))
@@ -602,7 +588,6 @@
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
@@ -631,7 +616,6 @@
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
@@ -730,7 +714,6 @@
                                             (planning/discover-tasks (:catalog outer-job) (:workflow outer-job)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (running? (map count (vals (get (:allocations replica) inner-job-id)))))
     (is (running? (map count (vals (get (:allocations replica) outer-job-id)))))))
@@ -832,7 +815,6 @@
                      (filter #(= (count %) 1) 
                              (vals (val (first (:task-slot-ids replica)))))))))
     
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated

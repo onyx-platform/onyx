@@ -54,6 +54,7 @@
         (assoc-in [:acker-percentage (:id args)] (:acker-percentage args))
         (assoc-in [:acker-exclude-inputs (:id args)] (:acker-exclude-inputs args))
         (assoc-in [:acker-exclude-outputs (:id args)] (:acker-exclude-outputs args))
+        (assoc-in [:required-tags (:id args)] (:required-tags args))
         (job-scheduler-replica-update entry)
         (task-scheduler-replica-update entry)
         (reconfigure-cluster-workload))

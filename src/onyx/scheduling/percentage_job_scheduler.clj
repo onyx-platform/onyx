@@ -34,7 +34,12 @@
         sorted-jobs (sort-jobs-by-pct replica jobs)
         jobs-to-use (drop-jobs-overflow sorted-jobs)
         init-allocations (min-allocations jobs-to-use n-peers)]
-    (into {} (map (fn [j] {(:job j) (:capacity j)}) init-allocations))))
+    (into {}
+          (map
+           (fn [j]
+             (let [qualified (cjs/n-qualified-peers replica (:peers replica) (:job j))]
+               {(:job j) (min qualified (:capacity j))}))
+           init-allocations))))
 
 (defn desired-allocation [replica job]
   (* (count (:peers replica))
