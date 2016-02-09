@@ -1,7 +1,7 @@
 #### 0.8.9
 
 - **Breaking change**: Removed `:onyx/restart-pred-fn` feature, which has been deprecated in favor of the new `:lifecycle/handle-exception` feature.
-- New feature: Task Constraints are a new feature that allow peers to tag themselves indicating user-defined capabilities. Onyx's scheduler will only allocate peers with tags that match a task to be executed.
+- New feature: Task Constraints are a new feature that allow peers to tag themselves indicating user-defined capabilities. Onyx's scheduler will only allocate peers with tags that match a task to be executed. This composes with all existing scheduler features.
 - Bug fix: Fixed a bug where a job would continue running even if it didn't have enough peers to cover all the tasks.
 
 #### 0.8.8
