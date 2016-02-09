@@ -380,8 +380,8 @@
         (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
 
 (defrecord TaskInformation 
-  [id log job-id task-id 
-   workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
+    [id log job-id task-id 
+     workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]
   component/Lifecycle
   (start [component]
     (let [catalog (extensions/read-chunk log :catalog job-id)
@@ -394,27 +394,36 @@
           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
+          metadata (extensions/read-chunk log :job-metadata job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
              :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions 
              :windows windows :filtered-windows filtered-windows :triggers triggers :filtered-triggers filtered-triggers 
-             :lifecycles lifecycles :task-map task-map)))
+             :lifecycles lifecycles :task-map task-map :metadata metadata)))
   (stop [component]
     (assoc component 
-           :catalog nil :task nil :flow-conditions nil :windows nil 
-           :filtered-windows nil :triggers nil :lifecycles nil :task-map nil)))
+           :catalog nil
+           :task nil
+           :flow-conditions nil
+           :windows nil 
+           :filtered-windows nil
+           :triggers nil
+           :lifecycles nil
+           :metadata nil
+           :task-map nil)))
 
 (defn new-task-information [peer-state task-state]
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
 
 (defrecord TaskLifeCycle
-  [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
-   kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch task-monitoring task-information]
+    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch
+     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
     (try
-      (let [{:keys [workflow catalog task flow-conditions windows filtered-windows triggers filtered-triggers lifecycles task-map]} task-information
+      (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
+                    triggers filtered-triggers lifecycles task-map metadata]} task-information
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
             input-retry-timeout (arg-or-default :onyx/input-retry-timeout task-map)
@@ -430,9 +439,10 @@
                            :onyx.core/task-id task-id
                            :onyx.core/task (:name task)
                            :onyx.core/catalog catalog
-                           :onyx.core/workflow workflow 
+                           :onyx.core/workflow workflow
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/lifecycles lifecycles
+                           :onyx.core/metadata metadata
                            :onyx.core/compiled (map->Compiled {})
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
@@ -472,11 +482,11 @@
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (->> pipeline-data
-                              (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
-                              resolve-filter-state
-                              resolve-log
-                              replay-windows-from-log
-                              (start-window-state-thread! ex-f))]
+                               (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
+                               resolve-filter-state
+                               resolve-log
+                               replay-windows-from-log
+                               (start-window-state-thread! ex-f))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
@@ -509,35 +519,35 @@
       (info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
       (info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
     (when-let [event (:pipeline-data component)]
-        (when-not (empty? (:onyx.core/triggers event))
-          (>!! (:onyx.core/state-ch event) [:task-lifecycle-stopped event #()]))
+      (when-not (empty? (:onyx.core/triggers event))
+        (>!! (:onyx.core/state-ch event) [:task-lifecycle-stopped event #()]))
 
-        (stop-window-state-thread! event)
+      (stop-window-state-thread! event)
 
-        ;; Ensure task operations are finished before closing peer connections
-        (close! (:seal-ch component))
-        (<!! (:task-lifecycle-ch component))
-        (close! (:task-kill-ch component))
+      ;; Ensure task operations are finished before closing peer connections
+      (close! (:seal-ch component))
+      (<!! (:task-lifecycle-ch component))
+      (close! (:task-kill-ch component))
 
-        (<!! (:input-retry-segments-ch component))
-        (<!! (:aux-ch component))
+      (<!! (:input-retry-segments-ch component))
+      (<!! (:aux-ch component))
 
 
-        (when-let [state-log (:onyx.core/state-log event)] 
-          (state-extensions/close-log state-log event))
+      (when-let [state-log (:onyx.core/state-log event)] 
+        (state-extensions/close-log state-log event))
 
-        (when-let [filter-state (:onyx.core/filter-state event)] 
-          (when (exactly-once-task? event)
-            (state-extensions/close-filter @filter-state event)))
+      (when-let [filter-state (:onyx.core/filter-state event)] 
+        (when (exactly-once-task? event)
+          (state-extensions/close-filter @filter-state event)))
 
       ((:compiled-after-task-fn (:onyx.core/compiled event)) event))
 
     (assoc component
-      :pipeline-data nil
-      :seal-ch nil
-      :aux-ch nil
-      :input-retry-segments-ch nil
-      :task-lifecycle-ch nil)))
+           :pipeline-data nil
+           :seal-ch nil
+           :aux-ch nil
+           :input-retry-segments-ch nil
+           :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [peer-state task-state]
   (map->TaskLifeCycle (merge peer-state task-state)))
