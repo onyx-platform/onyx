@@ -41,6 +41,9 @@
 (defn triggers-path [prefix]
   (str (prefix-path prefix) "/triggers"))
 
+(defn job-metadata-path [prefix]
+  (str (prefix-path prefix) "/job-metadata"))
+
 (defn task-path [prefix]
   (str (prefix-path prefix) "/task"))
 
@@ -106,6 +109,7 @@
       (zk/create conn (lifecycles-path onyx-id) :persistent? true)
       (zk/create conn (windows-path onyx-id) :persistent? true)
       (zk/create conn (triggers-path onyx-id) :persistent? true)
+      (zk/create conn (job-metadata-path onyx-id) :persistent? true)
       (zk/create conn (task-path onyx-id) :persistent? true)
       (zk/create conn (sentinel-path onyx-id) :persistent? true)
       (zk/create conn (chunk-path onyx-id) :persistent? true)
@@ -349,6 +353,18 @@
                   :latency % :bytes (count bytes)}]
         (extensions/emit monitoring args)))))
 
+(defmethod extensions/write-chunk [ZooKeeper :job-metadata]
+  [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (measure-latency
+     #(clean-up-broken-connections
+       (fn []
+         (let [node (str (job-metadata-path prefix) "/" id)]
+           (zk/create conn node :persistent? true :data bytes))))
+     #(let [args {:event :zookeeper-write-job-metadata :id id
+                  :latency % :bytes (count bytes)}]
+        (extensions/emit monitoring args)))))
+
 (defmethod extensions/write-chunk [ZooKeeper :task]
   [{:keys [conn opts prefix monitoring] :as log} kw chunk id]
   (let [bytes (zookeeper-compress chunk)]
@@ -484,6 +500,16 @@
        (let [node (str (triggers-path prefix) "/" id)]
          (zookeeper-decompress (:data (zk/data conn node))))))
    #(let [args {:event :zookeeper-read-triggers :id id :latency %}]
+      (extensions/emit monitoring args))))
+
+(defmethod extensions/read-chunk [ZooKeeper :job-metadata]
+  [{:keys [conn opts prefix monitoring] :as log} kw id & _]
+  (measure-latency
+   #(clean-up-broken-connections
+     (fn []
+       (let [node (str (job-metadata-path prefix) "/" id)]
+         (zookeeper-decompress (:data (zk/data conn node))))))
+   #(let [args {:event :zookeeper-read-job-metadata :id id :latency %}]
       (extensions/emit monitoring args))))
 
 (defmethod extensions/read-chunk [ZooKeeper :task]

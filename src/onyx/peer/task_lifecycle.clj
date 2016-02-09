@@ -446,14 +446,30 @@
           workflow (extensions/read-chunk log :workflow job-id)
           triggers (extensions/read-chunk log :triggers job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
+          metadata (extensions/read-chunk log :job-metadata job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
-             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions :windows windows 
-             :filtered-windows filtered-windows :triggers triggers :lifecycles lifecycles :task-map task-map)))
+             :workflow workflow
+             :catalog catalog
+             :task task
+             :flow-conditions flow-conditions
+             :windows windows
+             :filtered-windows filtered-windows
+             :triggers triggers
+             :lifecycles lifecycles
+             :metadata metadata
+             :task-map task-map)))
   (stop [component]
     (assoc component 
-           :catalog nil :task nil :flow-conditions nil :windows nil 
-           :filtered-windows nil :triggers nil :lifecycles nil :task-map nil)))
+           :catalog nil
+           :task nil
+           :flow-conditions nil
+           :windows nil 
+           :filtered-windows nil
+           :triggers nil
+           :lifecycles nil
+           :metadata nil
+           :task-map nil)))
 
 (defn new-task-information [peer-state task-state]
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
@@ -465,7 +481,9 @@
 
   (start [component]
     (try
-      (let [{:keys [workflow catalog task flow-conditions windows filtered-windows triggers lifecycles task-map]} task-information
+      (let [{:keys [workflow catalog task flow-conditions windows
+                    filtered-windows triggers lifecycles metadata task-map]}
+            task-information
             ;; Number of buckets in the timeout pool is covered over a 60 second
             ;; interval, moving each bucket back 60 seconds / N buckets
             input-retry-timeout (arg-or-default :onyx/input-retry-timeout task-map)
@@ -481,9 +499,10 @@
                            :onyx.core/task-id task-id
                            :onyx.core/task (:name task)
                            :onyx.core/catalog catalog
-                           :onyx.core/workflow workflow 
+                           :onyx.core/workflow workflow
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/lifecycles lifecycles
+                           :onyx.core/metadata metadata
                            :onyx.core/compiled (map->Compiled {})
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
