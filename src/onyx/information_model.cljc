@@ -591,10 +591,10 @@ You can use lifecycles to supply any stateful connections necessary to sync your
              :added "0.8.0"}
 
             :onyx.peer/join-failure-back-off
-            {:doc "Number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted."
+            {:doc "Mean number of ms to wait before trying to rejoin the cluster after a previous join attempt has aborted."
              :type :integer
              :unit :milliseconds
-             :default 250
+             :default 500
              :optional? true
              :added "0.8.0"}
 

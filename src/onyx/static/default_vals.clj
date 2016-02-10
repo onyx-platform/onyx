@@ -59,6 +59,7 @@
    :onyx.peer/drained-back-off 400
    :onyx.peer/job-not-ready-back-off 500
    :onyx.peer/peer-not-ready-back-off 500
+   :onyx.peer/join-failure-back-off 500
    :onyx.peer/backpressure-check-interval 10
    :onyx.peer/backpressure-low-water-pct 30
    :onyx.peer/backpressure-high-water-pct 60
