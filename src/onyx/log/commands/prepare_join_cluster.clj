@@ -30,6 +30,12 @@
 (defn already-joined? [replica joiner]
   (some #{joiner} (:peers replica)))
 
+(defn disallowed-candidates [{:keys [peers pairs accepted prepared] :as replica}]
+  (let [all-prepared-deps (keys prepared)
+        prep-watches (map (fn [dep] (get (map-invert pairs) dep)) all-prepared-deps)
+        accepting-deps (keys accepted)]
+    (set (concat all-prepared-deps accepting-deps prep-watches))))
+
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
   (let [peers (:peers replica)
@@ -37,10 +43,7 @@
         n (count peers)]
     (if (> n 0)
       (let [all-joined-peers (set (into (keys (:pairs replica)) peers))
-            all-prepared-deps (set (keys (:prepared replica)))
-            prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
-            accepting-deps (set (keys (:accepted replica)))
-            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches #{joiner})
+            candidates (difference all-joined-peers (disallowed-candidates replica) #{joiner})
             sorted-candidates (sort (remove nil? candidates))]
         (cond (already-joined? replica joiner)
               replica
@@ -99,12 +102,12 @@
    (cond ;; Handles the cases where all peers are actually dead.
          ;; This can happen if a single node cluster comes down
          ;; and is rebooted. We pick a predictably-random peer
-         ;; and knock it down if it's not up. This garuntees
+         ;; and knock it down if it's not up. This guarantees
          ;; progress even if the cluster has experiences total failure.
          (and (= (:id state) (:subject diff)) (nil? diff))
-         (let [candidates (keys (:prepared new))
-               k (mod message-id (count candidates))
-               target (nth candidates k)]
+         (let [disallowed (disallowed-candidates new)
+               k (mod message-id (count disallowed))
+               target (nth disallowed k)]
            (when-not (extensions/peer-exists? log target)
              (extensions/write-log-entry
               (:log state)
