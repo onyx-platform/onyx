@@ -93,10 +93,25 @@
             :args {:observer (:subject diff)}}])))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
-  [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]
+  [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
-   (cond (= (:id state) (:observer diff))
+   (cond ;; Handles the cases where all peers are actually dead.
+         ;; This can happen if a single node cluster comes down
+         ;; and is rebooted. We pick a predictably-random peer
+         ;; and knock it down if it's not up. This garuntees
+         ;; progress even if the cluster has experiences total failure.
+         (and (= (:id state) (:subject diff)) (nil? diff))
+         (let [candidates (keys (:prepared new))
+               k (mod message-id (count candidates))
+               target (nth candidates k)]
+           (when-not (extensions/peer-exists? log target)
+             (extensions/write-log-entry
+              (:log state)
+              {:fn :leave-cluster :args {:id target}
+               :entry-parent message-id})))
+
+         (= (:id state) (:observer diff))
          (let [ch (chan 1)]
            (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
            (extensions/on-delete (:log state) (:subject diff) ch)
