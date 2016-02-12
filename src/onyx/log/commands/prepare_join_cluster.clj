@@ -112,7 +112,8 @@
              (extensions/write-log-entry
                (:log state)
                {:fn :leave-cluster :args {:id target}
-                :entry-parent message-id})))
+                :entry-parent message-id}))
+           state)
 
          (= (:id state) (:observer diff))
          (let [ch (chan 1)]
