@@ -30,6 +30,12 @@
 (defn already-joined? [replica joiner]
   (some #{joiner} (:peers replica)))
 
+(defn disallowed-candidates [{:keys [peers pairs accepted prepared] :as replica}]
+  (let [all-prepared-deps (keys prepared)
+        prep-watches (map (fn [dep] (get (map-invert pairs) dep)) all-prepared-deps)
+        accepting-deps (keys accepted)]
+    (concat all-prepared-deps accepting-deps prep-watches)))
+
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
   (let [peers (:peers replica)
@@ -37,10 +43,7 @@
         n (count peers)]
     (if (> n 0)
       (let [all-joined-peers (set (into (keys (:pairs replica)) peers))
-            all-prepared-deps (set (keys (:prepared replica)))
-            prep-watches (set (map (fn [dep] (get (map-invert (:pairs replica)) dep)) all-prepared-deps))
-            accepting-deps (set (keys (:accepted replica)))
-            candidates (difference all-joined-peers all-prepared-deps accepting-deps prep-watches #{joiner})
+            candidates (difference all-joined-peers (set (disallowed-candidates replica)) #{joiner})
             sorted-candidates (sort (remove nil? candidates))]
         (cond (already-joined? replica joiner)
               replica
@@ -93,10 +96,25 @@
             :args {:observer (:subject diff)}}])))
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
-  [{:keys [args message-id]} :- LogEntry old new diff {:keys [monitoring] :as state}]
+  [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
   (common/start-new-lifecycle
    old new diff
-   (cond (= (:id state) (:observer diff))
+   (cond ;; Handles the cases where all peers are actually dead.
+         ;; This can happen if a single node cluster comes down
+         ;; and is rebooted. We pick a predictably-random peer
+         ;; and knock it down if it's not up. This guarantees
+         ;; progress even if the cluster has experiences total failure.
+         (and (= (:id state) (:joiner args)) (nil? diff))
+         (let [disallowed (distinct (disallowed-candidates new))
+               k (mod message-id (count disallowed))
+               target (nth disallowed k)]
+           (when-not (extensions/peer-exists? log target)
+             (extensions/write-log-entry
+               (:log state)
+               {:fn :leave-cluster :args {:id target}
+                :entry-parent message-id})))
+
+         (= (:id state) (:observer diff))
          (let [ch (chan 1)]
            (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
            (extensions/on-delete (:log state) (:subject diff) ch)
