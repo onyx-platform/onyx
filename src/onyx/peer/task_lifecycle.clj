@@ -25,6 +25,7 @@
               [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [onyx.state.state-extensions :as state-extensions]
+              [onyx.static.logging :as logger]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn windowed-task? [event]
@@ -34,8 +35,11 @@
 (defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
-                           (:onyx.core/id event))))
+      (logger/info-from-task
+       event
+       (format
+        "[%s] Peer chose not to start the task yet. Backing off and retrying..."
+        (:onyx.core/id event))))
     rets))
 
 (defn add-acker-id [id m]
@@ -358,12 +362,12 @@
           event
           (:onyx.core/triggers event)))
 
-(defn handle-exception [log e restart-ch outbox-ch job-id]
+(defn handle-exception [event log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
       (do (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
           (close! restart-ch))
-      (do (warn e "Handling uncaught exception thrown inside task lifecycle - killing this job.")
+      (do (warn e (logger/exception-msg event "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
@@ -412,7 +416,11 @@
                                  Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
-        (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
+        (throw (ex-info
+                (logger/exception-msg
+                 pipeline-data
+                 "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?")
+                {:symbol kw :exception e}))))))
 
 (defn exactly-once-task? [event]
   (boolean (get-in event [:onyx.core/task-map :onyx/uniqueness-key])))
@@ -457,7 +465,7 @@
              :filtered-windows filtered-windows
              :triggers triggers
              :lifecycles lifecycles
-             :metadata metadata
+             :metadata (or metadata {})
              :task-map task-map)))
   (stop [component]
     (assoc component 
@@ -491,7 +499,6 @@
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
             state (atom (->TaskState r-seq))
 
-            _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
             _ (validate-pending-timeout pending-timeout opts)
 
             pipeline-data {:onyx.core/id id
@@ -522,6 +529,8 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
+            _ (logger/info-from-task pipeline-data "Warming up task lifecycle")
+
             add-pipeline (fn [event]
                            (assoc event 
                                   :onyx.core/pipeline 
@@ -535,7 +544,7 @@
                                add-pipeline
                                c/task->event-map)
 
-            ex-f (fn [e] (handle-exception log e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception pipeline-data log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -554,11 +563,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
+            (logger/info-from-task pipeline-data "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
             (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
-        (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
+        (logger/info-from-task pipeline-data "Enough peers are active, starting the task")
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
@@ -576,8 +585,8 @@
 
   (stop [component]
     (if-let [task-name (:onyx.core/task (:pipeline-data component))]
-      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
-      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
+      (logger/info-from-task (:pipeline-data component) "Stopping task lifecycle")
+      (logger/warn-from-task (:pipeline-data component) "Stopping task lifecycle, failed to initialize task set up"))
     (when-let [event (:pipeline-data component)]
 
       ;; Fire all triggers on task completion.
