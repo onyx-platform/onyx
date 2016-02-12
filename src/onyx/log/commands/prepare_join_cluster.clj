@@ -34,7 +34,7 @@
   (let [all-prepared-deps (keys prepared)
         prep-watches (map (fn [dep] (get (map-invert pairs) dep)) all-prepared-deps)
         accepting-deps (keys accepted)]
-    (set (concat all-prepared-deps accepting-deps prep-watches))))
+    (concat all-prepared-deps accepting-deps prep-watches)))
 
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]
@@ -43,7 +43,7 @@
         n (count peers)]
     (if (> n 0)
       (let [all-joined-peers (set (into (keys (:pairs replica)) peers))
-            candidates (difference all-joined-peers (disallowed-candidates replica) #{joiner})
+            candidates (difference all-joined-peers (set (disallowed-candidates replica)) #{joiner})
             sorted-candidates (sort (remove nil? candidates))]
         (cond (already-joined? replica joiner)
               replica
@@ -104,15 +104,15 @@
          ;; and is rebooted. We pick a predictably-random peer
          ;; and knock it down if it's not up. This guarantees
          ;; progress even if the cluster has experiences total failure.
-         (and (= (:id state) (:subject diff)) (nil? diff))
-         (let [disallowed (disallowed-candidates new)
+         (and (= (:id state) (:joiner args)) (nil? diff))
+         (let [disallowed (distinct (disallowed-candidates new))
                k (mod message-id (count disallowed))
                target (nth disallowed k)]
            (when-not (extensions/peer-exists? log target)
              (extensions/write-log-entry
-              (:log state)
-              {:fn :leave-cluster :args {:id target}
-               :entry-parent message-id})))
+               (:log state)
+               {:fn :leave-cluster :args {:id target}
+                :entry-parent message-id})))
 
          (= (:id state) (:observer diff))
          (let [ch (chan 1)]
