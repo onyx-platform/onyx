@@ -32,4 +32,4 @@ We are less familiar with Kubernetes as it's a bit younger than Mesos and Marath
 
 #### Production Check List
 
-A production check list is included in the [Environment documentation](doc/user-guide/environment.md). 
+A production check list is included in the [Environment documentation]({{ "/environment.html" | prepend: page.dir | prepend: site.baseurl }}).

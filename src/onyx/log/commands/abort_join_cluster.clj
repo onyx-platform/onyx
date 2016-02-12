@@ -35,6 +35,7 @@
              (= (:id args) (:id peer-args)))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
+             :tags (:tags args)
              :peer-site (extensions/peer-site (:messenger peer-args))}}]))
 
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State

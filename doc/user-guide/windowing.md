@@ -12,8 +12,6 @@ This section discusses a feature called windowing. Windows allow you to group an
 
 Windowing splits up a possibly unbounded data set into finite, possibly overlapping portions. Windows allow us create aggregations over distinct portions of a stream, rather than stalling and waiting for the entire data data set to arrive. In Onyx, Windows strictly describe how data is accrued. When you want to *do* something with the windowed data, you use a Trigger. See the chapter on Triggers for more information. Onyx's windowing mechanisms are strong enough to handle stream disorder. If your data arrives in an order that isn't "logical" (for example, `:event-time` keys moving backwards in time), Onyx can sort out the appropriate buckets to put the data in.
 
-We used a significant amount of academic and industrial research to implement these features. If you're interested, we documented and summarized a portion of the papers we used [here](../design/proposals/windowing.md).
-
 ### Window Types
 
 The topic of windows has been widely explored in the literature. There are different *types* of windows. Currently, Onyx supports Fixed, Sliding, Global, and Session windows. We will now explain the supported window types.

@@ -10,7 +10,7 @@ Plugins serve as an abstract to compose mechanisms for getting data in and out o
 
 ### Interfaces
 
-In order to implement a plugin, one or more protocols need to be implemented from the [Pipeline Extensions API](../../src/onyx/peer/pipeline_extensions.clj). Reader plugins will implement PipelineInput and Pipeline. Writer plugins will implement Pipeline. See the docstrings for instructions on implementation.
+In order to implement a plugin, one or more protocols need to be implemented from the [Pipeline Extensions API](https://github.com/onyx-platform/onyx/blob/0.8.8/src/onyx/peer/pipeline_extensions.clj). Reader plugins will implement PipelineInput and Pipeline. Writer plugins will implement Pipeline. See the docstrings for instructions on implementation.
 
 ### Templates
 
@@ -21,8 +21,7 @@ To help move past the boilerplate of creating new plugins, use Leiningen with [`
 Often virtual peers allocated to a task may need to coordinate with respect to
 allocating work. For example, a Kafka reader task may need to assign partitions
 to different peers on the same topic.  The Onyx mechanism for coordinating
-peers is the
-[log](https://github.com/onyx-platform/onyx/blob/master/doc/user-guide/architecture-low-level-design.md#the-log).
+peers is the [log]({{ "/architecture-low-level-design.html" | prepend: page.dir | prepend: site.baseurl }})
 The Onyx log is extensible by plugins, by implementing several extensions defmethods.
 
 For example:

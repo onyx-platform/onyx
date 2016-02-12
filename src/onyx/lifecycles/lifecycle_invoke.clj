@@ -1,5 +1,5 @@
 (ns ^:no-doc onyx.lifecycles.lifecycle-invoke
-  (:require [clojure.core.async :refer [>!!]]
+  (:require [clojure.core.async :refer [>!! close!]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
 (defn restartable-invocation [event phase handler-fn f & args]
@@ -11,10 +11,9 @@
               (throw t)
 
               (= action :restart)
-              (do (>!! (:onyx.core/restart-ch event) true)
-                  (throw (ex-info "Jumping out of task lifecycle for a clean restart."
-                                  {:onyx.core/lifecycle-restart? true
-                                   :original-exception t})))
+              (throw (ex-info "Jumping out of task lifecycle for a clean restart."
+                              {:onyx.core/lifecycle-restart? true
+                               :original-exception t}))
 
               :else
               (throw (ex-info

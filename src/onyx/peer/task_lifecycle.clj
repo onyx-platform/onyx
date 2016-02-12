@@ -358,16 +358,15 @@
           event
           (:onyx.core/triggers event)))
 
-(defn handle-exception [log restart-pred-fn e restart-ch outbox-ch job-id]
+(defn handle-exception [log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
-      (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
-      (do (warn e "Handling uncaught exception thrown inside task lifecycle.")
-          (if (restart-pred-fn e)
-            (close! restart-ch)
-            (let [entry (entry/create-log-entry :kill-job {:job job-id})]
-              (extensions/write-chunk log :exception e job-id)
-              (>!! outbox-ch entry)))))))
+      (do (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
+          (close! restart-ch))
+      (do (warn e "Handling uncaught exception thrown inside task lifecycle - killing this job.")
+          (let [entry (entry/create-log-entry :kill-job {:job job-id})]
+            (extensions/write-chunk log :exception e job-id)
+            (>!! outbox-ch entry))))))
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
@@ -517,8 +516,7 @@
                                add-pipeline
                                c/task->event-map)
 
-            restart-pred-fn (operation/resolve-restart-pred-fn task-map)
-            ex-f (fn [e] (handle-exception log restart-pred-fn e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -554,7 +552,7 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception log (constantly false) e restart-ch outbox-ch job-id)
+        (handle-exception log e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]

@@ -24,8 +24,8 @@
   (format "udp://%s:%s" addr port))
 
 (defrecord AeronMessenger
-    [peer-group messaging-group publication-group short-circuitable? publication-pool
-     virtual-peers acking-daemon acking-ch send-idle-strategy compress-f]
+  [peer-group messaging-group publication-group short-circuitable? publications virtual-peers 
+   acking-daemon send-idle-strategy compress-f monitoring publication-pool short-ids acking-ch]
   component/Lifecycle
 
   (start [component]
@@ -351,8 +351,9 @@
 
 (defn ack-segments-short-circuit [ch acks]
   (when ch
-    (doseq [ack acks]
-      (>!! ch ack))))
+    (run! (fn [ack]
+            (>!! ch ack))
+          acks)))
 
 (defn complete-message-short-circuit [ch completion-id]
   (when ch
@@ -385,7 +386,7 @@
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-acker-messages acker-id acks)
           size (.capacity buf)]
-      (extensions/emit (:onyx.core/monitoring event) (->MonitorEventBytes :peer-send-bytes size))
+      (extensions/emit (:monitoring messenger) (->MonitorEventBytes :peer-send-bytes size))
       (pubm/write pub-man buf 0 size))))
 
 (defmethod extensions/internal-complete-segment AeronMessenger
@@ -400,7 +401,6 @@
   [messenger event retry-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (retry-segment-short-circuit (:retry-ch (lookup-channels messenger peer-task-id)) retry-id)
-    (let [idle-strategy (:send-idle-strategy messenger)
-          pub-man (get-publication (:publication-pool messenger) conn-spec)
+    (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
           buf (protocol/build-retry-msg-buf peer-task-id retry-id)]
       (pubm/write pub-man buf 0 protocol/retry-msg-length))))

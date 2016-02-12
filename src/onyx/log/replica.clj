@@ -31,4 +31,6 @@
    :killed-jobs []
    :state-logs {} 
    :state-logs-marked #{}
-   :task-slot-ids {}})
+   :task-slot-ids {}
+   :required-tags {}
+   :peer-tags {}})
