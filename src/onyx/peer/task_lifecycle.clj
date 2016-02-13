@@ -189,13 +189,14 @@
     event))
 
 (defn replay-windows-from-log
-  [{:keys [onyx.core/window-state onyx.core/state-log] :as event}]
+  [{:keys [onyx.core/window-state onyx.core/state-log onyx.core/task-information]
+    :as event}]
   (when (windowed-task? event)
     (swap! window-state 
            (fn [wstate] 
              (let [compiled-apply-fn (wc/compile-apply-window-entry-fn event)
                    replayed-state (state-extensions/playback-log-entries state-log event wstate compiled-apply-fn)]
-               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
+               (logger/task-log-trace task-information (str "Replayed state: " replayed-state))
                replayed-state))))
   event)
 
@@ -282,12 +283,12 @@
           (:acks results)))))
   event)
 
-(defn write-batch [{:keys [pipeline]} event]
+(defn write-batch
+  [{:keys [pipeline]} {:keys [onyx.core/task-information] :as event}]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
-    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
-                                   (:onyx.core/id rets)
-                                   (:onyx.core/lifecycle-id rets)
-                                   (count (:onyx.core/results rets))))
+    (logger/task-log-trace
+     task-information
+     (format "Wrote %s segments" (count (:onyx.core/results rets))))
     rets))
 
 (defn launch-aux-threads!
@@ -329,10 +330,11 @@
                        (>!! outbox-ch entry))))
              (recur)))))
      (catch Throwable e
-       (fatal e (logger/exception-msg (:onyx.core/task-info event) "Internal error. Failed to read core.async channels"))))))
+       (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
 
 (defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
-                                               onyx.core/compiled]
+                                               onyx.core/compiled
+                                               onyx.core/task-information]
                                         :as event}
                              input-retry-timeout task-kill-ch]
   (go
@@ -344,7 +346,7 @@
             (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
-                  (taoensso.timbre/trace (format "Input retry message %s" m))
+                  (logger/task-log-trace task-information (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
                        (lc/invoke-after-retry event compiled m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
@@ -410,15 +412,10 @@
                            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
                              (f pipeline-data)))]
             (or pipeline
-                (throw (ex-info "Failure to resolve plugin builder fn.
-                                 Did you require the file that contains this symbol?" {:kw kw})))))
+                (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
-        (throw (ex-info
-                (logger/exception-msg
-                 pipeline-data
-                 "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?")
-                {:symbol kw :exception e}))))))
+        (throw e)))))
 
 (defn exactly-once-task? [event]
   (boolean (get-in event [:onyx.core/task-map :onyx/uniqueness-key])))
