@@ -35,11 +35,9 @@
 (defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (logger/info-from-task
-       event
-       (format
-        "[%s] Peer chose not to start the task yet. Backing off and retrying..."
-        (:onyx.core/id event))))
+      (logger/task-log-info
+       (:onyx.core/task-information event)
+       "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
 (defn add-acker-id [id m]
@@ -331,7 +329,7 @@
                        (>!! outbox-ch entry))))
              (recur)))))
      (catch Throwable e
-       (fatal e)))))
+       (fatal e (logger/exception-msg (:onyx.core/task-info event) "Internal error. Failed to read core.async channels"))))))
 
 (defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
                                                onyx.core/compiled]
@@ -362,12 +360,12 @@
           event
           (:onyx.core/triggers event)))
 
-(defn handle-exception [event log e restart-ch outbox-ch job-id]
+(defn handle-exception [task-info log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
-      (do (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
+      (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (close! restart-ch))
-      (do (warn e (logger/exception-msg event "Handling uncaught exception thrown inside task lifecycle - killing this job."))
+      (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
@@ -518,6 +516,7 @@
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/monitoring task-monitoring
+                           :onyx.core/task-information task-information
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-ch
                            :onyx.core/restart-ch restart-ch
@@ -529,7 +528,7 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
 
-            _ (logger/info-from-task pipeline-data "Warming up task lifecycle")
+            _ (logger/task-log-info task-information "Warming up task lifecycle")
 
             add-pipeline (fn [event]
                            (assoc event 
@@ -544,7 +543,7 @@
                                add-pipeline
                                c/task->event-map)
 
-            ex-f (fn [e] (handle-exception pipeline-data log e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
                           (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
@@ -563,11 +562,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
-            (logger/info-from-task pipeline-data "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
+            (logger/task-log-info task-information "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
             (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
-        (logger/info-from-task pipeline-data "Enough peers are active, starting the task")
+        (logger/task-log-info task-information "Enough peers are active, starting the task")
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
@@ -580,13 +579,13 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception log e restart-ch outbox-ch job-id)
+        (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
     (if-let [task-name (:onyx.core/task (:pipeline-data component))]
-      (logger/info-from-task (:pipeline-data component) "Stopping task lifecycle")
-      (logger/warn-from-task (:pipeline-data component) "Stopping task lifecycle, failed to initialize task set up"))
+      (logger/task-log-info (:task-information component) "Stopping task lifecycle")
+      (logger/task-log-warn (:task-information component) "Stopping task lifecycle, failed to initialize task set up"))
     (when-let [event (:pipeline-data component)]
 
       ;; Fire all triggers on task completion.
