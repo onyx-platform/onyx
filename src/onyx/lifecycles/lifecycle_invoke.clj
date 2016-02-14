@@ -46,13 +46,14 @@
   (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
 
 (defn invoke-task-lifecycle-gen [phase]
-  (fn invoke-task-lifecycle [f compiled event] 
+  (fn invoke-task-lifecycle [f compiled task-information event]
     (restartable-invocation
       event
       phase
       (:compiled-handle-exception-fn compiled)
       f
       compiled
+      task-information
       event)))
 
 (def invoke-assign-windows

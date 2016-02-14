@@ -32,11 +32,11 @@
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
-(defn start-lifecycle? [event]
+(defn start-lifecycle? [event task-information]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (logger/task-log-info
-       (:onyx.core/task-information event)
+       task-information
        "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
@@ -148,7 +148,8 @@
                (= (:message (first batch)) :done))
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
-(defn read-batch [{:keys [peer-replica-view task-type pipeline job-id] :as compiled} event]
+(defn read-batch
+  [{:keys [peer-replica-view task-type pipeline job-id] :as compiled} task-information event]
   (if (and (= task-type :input) (:backpressure? @peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [rets (merge event (p-ext/read-batch pipeline event))
@@ -189,8 +190,7 @@
     event))
 
 (defn replay-windows-from-log
-  [{:keys [onyx.core/window-state onyx.core/state-log onyx.core/task-information]
-    :as event}]
+  [task-information {:keys [onyx.core/window-state onyx.core/state-log] :as event}]
   (when (windowed-task? event)
     (swap! window-state 
            (fn [wstate] 
@@ -229,7 +229,7 @@
               extents)))) 
 
 (defn assign-windows
-  [{:keys [peer-replica-view] :as compiled} {:keys [onyx.core/windows] :as event}]
+  [{:keys [peer-replica-view] :as compiled} task-information {:keys [onyx.core/windows] :as event}]
   (when (seq windows)
     (let [{:keys [onyx.core/monitoring onyx.core/state onyx.core/messenger 
                   onyx.core/triggers onyx.core/windows onyx.core/task-map onyx.core/window-state 
@@ -284,7 +284,7 @@
   event)
 
 (defn write-batch
-  [{:keys [pipeline]} {:keys [onyx.core/task-information] :as event}]
+  [{:keys [pipeline]} task-information event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
     (logger/task-log-trace
      task-information
@@ -374,20 +374,22 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [onyx.core/compiled] :as init-event} seal-ch kill-ch ex-f]
+  [{:keys [onyx.core/compiled onyx.core/task-information]
+    :as init-event}
+   seal-ch kill-ch ex-f]
   (try
     (while (first (alts!! [seal-ch kill-ch] :default true))
       (->> init-event
            (gen-lifecycle-id)
            (lc/invoke-before-batch compiled)
-           (lc/invoke-read-batch read-batch compiled)
+           (lc/invoke-read-batch read-batch compiled task-information)
            (tag-messages compiled)
            (add-messages-to-timeout-pool compiled)
            (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
-           (lc/invoke-assign-windows assign-windows compiled)
-           (lc/invoke-write-batch write-batch compiled)
+           (lc/invoke-assign-windows assign-windows compiled task-information)
+           (lc/invoke-write-batch write-batch compiled task-information)
            (flow-retry-segments compiled)
            (lc/invoke-after-batch compiled)
            (ack-segments compiled)))
@@ -542,14 +544,14 @@
 
             ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                          (not (start-lifecycle? pipeline-data)))
+                          (not (start-lifecycle? pipeline-data task-information)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (->> pipeline-data
                               (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                               resolve-window-state
                               resolve-log
-                              replay-windows-from-log
+                              (replay-windows-from-log task-information)
                               (c/resolve-window-triggers triggers filtered-windows)
                               setup-triggers)]
 
