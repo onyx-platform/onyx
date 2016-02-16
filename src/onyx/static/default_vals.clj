@@ -36,7 +36,7 @@
    ; number of state entries to write to a single bookeeper entry
    :onyx.bookkeeper/write-batch-size 20
    :onyx.bookkeeper/write-buffer-size 10000
-   :onyx.bookkeeper/write-batch-timeout 50
+   :onyx.bookkeeper/write-batch-backoff 50
    ; number of bookkeeper entries to read at a time
    ; effective batch read of state entries is write-batch-size * read-batch-size
    :onyx.bookkeeper/read-batch-size 50
@@ -59,6 +59,7 @@
    :onyx.peer/drained-back-off 400
    :onyx.peer/job-not-ready-back-off 500
    :onyx.peer/peer-not-ready-back-off 500
+   :onyx.peer/join-failure-back-off 500
    :onyx.peer/backpressure-check-interval 10
    :onyx.peer/backpressure-low-water-pct 30
    :onyx.peer/backpressure-high-water-pct 60

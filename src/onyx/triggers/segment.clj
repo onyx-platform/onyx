@@ -14,7 +14,7 @@
 
 (defmethod api/trigger-notifications :segment
   [event trigger]
-  #{:new-segment :task-complete})
+  #{:new-segment :task-lifecycle-stopped})
 
 (defmethod api/trigger-fire? :segment
   [{:keys [onyx.core/window-state] :as event} trigger {:keys [segment]}]

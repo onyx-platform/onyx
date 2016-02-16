@@ -11,7 +11,14 @@ if [[ "$#" -ne 3 ]]; then
 else
   # Update to release version.
   git checkout master
-  git pull --rebase
+
+  git remote update
+  git status -uno|grep up-to-date
+
+  if [[ $? != 0 ]]; then
+	  echo "master is not up to date with remote. Please pull / merge with master first"
+	  exit 1
+  fi
 
   OLD_VERSION=`lein pprint :version|sed s/\"//g`
   NEW_VERSION=$1
@@ -31,8 +38,8 @@ else
   git add doc
   git commit -m "Release version $NEW_VERSION." project.clj README.md doc circle.yml
   git tag $NEW_VERSION
-  git push origin $NEW_VERSION
   git push origin master
+  git push origin $NEW_VERSION
 
   # Merge artifacts into release branch.
   git checkout $NEW_BRANCH
@@ -48,4 +55,9 @@ else
 
   git commit -m "Prepare for next release cycle." project.clj README.md
   git push origin master
+  git checkout develop
+  git merge master
+  git push
+  git checkout master
+
 fi

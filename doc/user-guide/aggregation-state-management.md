@@ -11,7 +11,7 @@ This section discusses state management and fault tolerance used in windowing/st
 ### Summary
 
 Onyx provides the ability to perform updates to a state machine for segments
-which are calculated over [windows] (doc/user-guide/windowing.md). For example,
+which are calculated over [windows]({{ "/windowing.html" | prepend: page.dir | prepend: site.baseurl }}). For example,
 a grouping task may accumulate incoming values for a number of keys over
 windows of 5 minutes. This feature is commonly used for aggregations, such as
 summing values, though it can be used to build more complex state machines.
@@ -120,15 +120,18 @@ order that they were written, the full state will be recovered. Partial updates
 ensure that only minimal update data is written for each segment processed,
 while remaining correct on peer failure.
 
-### Exactly Once Data Processing
+### Exactly Once Aggregation Updates
 
-Exactly once data processing is supported via Onyx's filtering feature. When a
+Exactly once aggregation updates are supported via Onyx's filtering feature. When a
 task's catalog has `:onyx/uniqueness-key` set, this key is looked up in the
 segment and used as an ID key to determine whether the segment has been seen
 before. If it has previously been processed, and state updates have been
 persisted, then the segment is not re-processed. This key is persisted to the
-state log along with the window changelog updates, so that previously seen keys
+state log transactionally with the window changelog updates, so that previously seen keys
 can be recovered in case of a peer failure.
+
+**See the section "Exactly Once Side-Effects" for discussion of why
+side-effects are impossible to achieve Exactly Once**.
             
 #### Considerations
 

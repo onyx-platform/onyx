@@ -11,7 +11,6 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [taoensso.timbre :as timbre :refer [info]]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
@@ -118,8 +117,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [allocs (vector (apply + (map count (vals (get (:allocations replica) job-1-id))))
                          (apply + (map count (vals (get (:allocations replica) job-2-id)))))]
@@ -151,7 +148,6 @@
                                           {:fn :kill-job :args {:job job-2-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= 8 (apply + (map count (vals (get (:allocations replica) job-1-id))))))
     (is (= 0 (apply + (map count (vals (get (:allocations replica) job-2-id))))))))
@@ -179,7 +175,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [1 1 1] (map count (vals (get (:allocations replica) job-2-id)))))))
@@ -207,7 +202,6 @@
                                             (planning/discover-tasks (:catalog job-2) (:workflow job-2)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (let [j1-allocations (map (fn [t] (get-in replica [:allocations job-1-id t])) (get-in replica [:tasks job-1-id]))
           j2-allocations (map (fn [t] (get-in replica [:allocations job-2-id t])) (get-in replica [:tasks job-2-id]))]
@@ -244,7 +238,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-1-id)))))
     (is (= [2 2 2] (map count (vals (get (:allocations replica) job-2-id)))))
@@ -299,10 +292,8 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (standard-invariants replica)
     (is (= (sort [:active :active :active :idle :idle :idle]) (sort (vals (:peer-state replica)))))
     (is (= (sort [1 1 1]) (sort (map count (vals (get (:allocations replica) job-max-peers-id))))))))
-
 
 (def job-min-peers-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 
@@ -352,7 +343,6 @@
             :log []
             :peer-choices []})
          (gen/elements [:onyx.job-scheduler/balanced :onyx.job-scheduler/greedy :onyx.job-scheduler/percentage])))]
-    (standard-invariants replica)
     (is (= (sort [2 2 2]) (sort (map count (vals (get (:allocations replica) job-min-peers-id))))))
     (is (= (sort [:active :active :active :active :active :active]) (sort (vals (:peer-state replica)))))))
 
@@ -391,7 +381,6 @@
                                             {:fn :kill-job :args {:job job-3-id}}]})
             :log []
             :peer-choices []})))]
-    (standard-invariants replica)
     (let [peer-state-group (group-by val (:peer-state replica))]
       (is (= 12 (count (:active peer-state-group))))
       (is (= 8 (count (:idle peer-state-group))))
@@ -505,7 +494,6 @@
                                           {:fn :kill-job :args {:job job-3-id}}]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is
       (= [1 4 3]
@@ -541,7 +529,6 @@
           :peer-choices []}))]
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
-    (standard-invariants replica)
     (is (= 3 (count (:peer-state replica))))
     (is (= 3 (count (:peers replica))))))
 
@@ -561,7 +548,6 @@
                                               :args {:id :p1}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     (is (or (= 2 (count (:peer-state replica)))
@@ -602,7 +588,6 @@
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
@@ -631,7 +616,6 @@
               (assoc :leave-2 {:queue [{:fn :leave-cluster :args {:id :p2}}]}))
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (empty? (:accepted replica)))
     (is (empty? (:prepared replica)))
     ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
@@ -730,7 +714,110 @@
                                             (planning/discover-tasks (:catalog outer-job) (:workflow outer-job)))]})
           :log []
           :peer-choices []}))]
-    (standard-invariants replica)
     (is (= #{:active} (set (vals (:peer-state replica)))))
     (is (running? (map count (vals (get (:allocations replica) inner-job-id)))))
     (is (running? (map count (vals (get (:allocations replica) outer-job-id)))))))
+
+
+(def slot-id-job-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
+
+(def slot-id-job
+  {:workflow [[:a :b] [:b :c] [:c :d] [:d :e] [:e :f] [:f :g]]
+   :catalog [{:onyx/name :a
+              :onyx/plugin :onyx.plugin.core-async/input
+              :onyx/type :input
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Reads segments from a core.async channel"}
+
+             {:onyx/name :b
+              :onyx/fn :mock/fn
+              :onyx/n-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :c
+              :onyx/fn :mock/fn
+              :onyx/n-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :d
+              :onyx/fn :mock/fn
+              :onyx/n-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :e
+              :onyx/fn :mock/fn
+              :onyx/n-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :f
+              :onyx/fn :mock/fn
+              :onyx/n-peers 1
+              :onyx/type :function
+              :onyx/batch-size 20}
+
+             {:onyx/name :g
+              :onyx/plugin :onyx.plugin.core-async/output
+              :onyx/type :output
+              :onyx/n-peers 1
+              :onyx/medium :core.async
+              :onyx/batch-size 20
+              :onyx/doc "Writes segments to a core.async channel"}]
+   :task-scheduler :onyx.task-scheduler/balanced})
+
+(deftest slot-id-after-peer-leave
+  (checking
+    "Checking peer leave is correctly performed"
+    (times 50)
+    [{:keys [replica log peer-choices]}
+     (log-gen/apply-entries-gen
+       (gen/return
+         {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                    :messaging {:onyx.messaging/impl :dummy-messenger}}
+          :message-id 0
+          :entries
+          (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 14))
+              (assoc :job-1 {:queue [(api/create-submit-job-entry
+                                       slot-id-job-id
+                                       peer-config
+                                       slot-id-job
+                                       (planning/discover-tasks (:catalog slot-id-job) (:workflow slot-id-job)))]})
+              (assoc :leave-1 {:predicate (fn [replica entry]
+                                            (some #{:p1} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :p1}}]})
+              (assoc :leave-2 {:predicate (fn [replica entry]
+                                            (some #{:p2} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :p2}}]})
+              (assoc :leave-3 {:predicate (fn [replica entry]
+                                            (some #{:p3} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :p3}}]})
+              (assoc :leave-4 {:predicate (fn [replica entry]
+                                            (some #{:p4} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :p4}}]})
+              (assoc :leave-5 {:predicate (fn [replica entry]
+                                            (some #{:p5} (:peers replica)))
+                               :queue [{:fn :leave-cluster :args {:id :p5}}]}))
+          :log []
+          :peer-choices []}))]
+
+    ;; check that task :a has more than one peer on it so we don't get confused
+    (is (not 
+          (empty? 
+            (filter #(> (count %) 1) 
+                    (vals (val (first (:task-slot-ids replica))))))))
+
+    (is (= #{'(0)}
+           (set (map vals 
+                     (filter #(= (count %) 1) 
+                             (vals (val (first (:task-slot-ids replica)))))))))
+    
+    (is (empty? (:accepted replica)))
+    (is (empty? (:prepared replica)))
+    ;; peers may have left before they joined, so there should be at LEAST 7 peers allocated
+    ;; since there are enough peers to handle 2 peers leaving without a task being deallocated the
+    ;; job must be able to go on
+    (is (>= (apply + (map count (vals (get (:allocations replica) slot-id-job-id)))) 7))))

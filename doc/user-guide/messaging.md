@@ -10,13 +10,13 @@ categories: [user-guide-page]
 
 The messaging layer takes care of the direct peer to peer transfer of segment
 batches, acks, segment completion and segment retries to the relevant virtual
-peers. The messaging layer design document can be found at
-[design/messaging.md](../design/messaging.md).
+peers. The messaging layer design document can be found at the
+[Messaging section]({{ "/messaging.html" | prepend: page.dir | prepend: site.baseurl }}).
 
 ### Messaging Implementations
 
 The Onyx messaging implementation is pluggable and alternative implementations
-can be selected via the `:onyx.messaging/impl` [peer-config](peer-config.md#onyxmessagingimpl).
+can be selected via the `:onyx.messaging/impl` [peer-config]({{ "/peer-config.html" | prepend: page.dir | prepend: site.baseurl }}).
 
 #### Aeron Messaging
 
@@ -40,7 +40,7 @@ perform deserialization.  Therefore, subscribers may become CPU bound by the
 amount of deserializaton work that needs to be performed. In order to reduce
 this effect, multiple subscribers can be instantiated per node.  This can be
 tuned via `:onyx.messaging.aeron/subscriber-count` in
-[peer-config](peer-config.md#onyxmessagingaeronsubscriber-count). As increasing
+[peer-config]({{ "/peer-config.html" | prepend: page.dir | prepend: site.baseurl }}). As increasing
 the number of subscribers may lead back to an undesirable growth in the number
 of connections between nodes, each node will only choose one subscription to
 communicate through. The choice of subscriber is calculated via a hash of the combined IPs of the
@@ -57,7 +57,7 @@ use of Aeron and directly communicate the message without any use of the
 network and without any serialization. Therefore, performance benchmarks
 performed on a single node can be very misleading.
 
-The [peer-config](peer-config.md#onyxmessagingallow-short-circuit) option, `:onyx.messaging/allow-short-circuit?`
+The [peer-config]({{ "/peer-config.html" | prepend: page.dir | prepend: site.baseurl }}) option, `:onyx.messaging/allow-short-circuit?`
 is provided for the purposes of more realistic performance testing on a single node.
 
 ##### Port Use
@@ -70,7 +70,7 @@ The Aeron messaging implementation will use the port configured via
 Aeron requires a media driver to be used on each node. Onyx provides an
 embedded media driver for local testing, however use of the embedded driver is
 not recommended in production. The embedded driver can be configured via the
-`:onyx.messaging.aeron/embedded-driver?` [peer-config](peer-config.md#onyxmessagingaeronembedded-driver) option.
+`:onyx.messaging.aeron/embedded-driver?` [peer-config]({{ "/peer-config.html" | prepend: page.dir | prepend: site.baseurl }}) option.
 
 When using Aeron messaging in production, a media driver should be created in
 another java process. You can do this via the following code snippet, or by using the [Aeron distribution](https://github.com/real-logic/Aeron#media-driver-packaging).

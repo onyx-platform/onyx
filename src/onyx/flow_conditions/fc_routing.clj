@@ -1,5 +1,6 @@
 (ns onyx.flow-conditions.fc-routing
   (:require [onyx.peer.operation :as operation]
+            [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.types :refer [->Route]]))
 
 (defn join-output-paths [all to-add downstream]
@@ -33,21 +34,18 @@
    compiled-flow-conditions))
 
 (defn route-data
-  [event result message flow-conditions downstream]
+  [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
   (if (nil? flow-conditions)
     (if (operation/exception? message)
       (throw (:exception (ex-data message)))
-      (->Route downstream nil nil nil))
-    (let [compiled-ex-fcs (:onyx.core/compiled-ex-fcs event)]
-      (if (operation/exception? message)
-        (if (seq compiled-ex-fcs)
-          (choose-output-paths event compiled-ex-fcs result
-                               (:exception (ex-data message)) downstream)
-          (throw (:exception (ex-data message))))
-        (let [compiled-norm-fcs (:onyx.core/compiled-norm-fcs event)]
-          (if (seq compiled-norm-fcs)
-            (choose-output-paths event compiled-norm-fcs result message downstream)
-            (->Route downstream nil nil nil)))))))
+      (->Route egress-ids nil nil nil))
+    (if (operation/exception? message)
+      (if (seq compiled-ex-fcs)
+        (choose-output-paths event compiled-ex-fcs result (:exception (ex-data message)) egress-ids)
+        (throw (:exception (ex-data message))))
+      (if (seq compiled-norm-fcs)
+        (choose-output-paths event compiled-norm-fcs result message egress-ids)
+        (->Route egress-ids nil nil nil)))))
 
 (defn apply-post-transformation [message routes event]
   (let [post-transformation (:post-transformation routes)
@@ -59,7 +57,7 @@
     (reduce dissoc msg (:exclusions routes))))
 
 (defn flow-conditions-transform
-  [message routes flow-conditions event]
-  (if flow-conditions
+  [message routes event compiled]
+  (if (:flow-conditions compiled)
     (apply-post-transformation message routes event)
     message))

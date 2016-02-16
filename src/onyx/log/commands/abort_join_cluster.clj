@@ -4,6 +4,7 @@
             [clojure.data :refer [diff]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
+            [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]))
 
@@ -35,11 +36,13 @@
              (= (:id args) (:id peer-args)))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
+             :tags (:tags args)
              :peer-site (extensions/peer-site (:messenger peer-args))}}]))
 
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
   [{:keys [args]} old new diff state]
   ;; Abort back-off/retry
   (when (= (:id args) (:id state))
-    (Thread/sleep (or (:onyx.peer/join-failure-back-off (:opts state)) 250)))
+    ;; Back off for a randomized time, mean :onyx.peer/join-failure-back-off
+    (Thread/sleep (rand-int (* 2 (arg-or-default :onyx.peer/join-failure-back-off (:opts state))))))
   state)

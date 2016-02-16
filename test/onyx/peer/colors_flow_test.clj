@@ -85,7 +85,7 @@
    (fn retry-count-inc [event message-id rets lifecycle]
      (swap! retry-counter inc))})
 
-(deftest colors-flow
+(deftest ^:smoke colors-flow
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/id id)

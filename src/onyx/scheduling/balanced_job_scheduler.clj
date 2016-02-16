@@ -14,7 +14,11 @@
           max-peers (inc min-peers)]
       (reduce
        (fn [all [job k]]
-         (assoc all job (if (< k n) max-peers min-peers)))
+         (let [qualified-peers (cjs/n-qualified-peers replica peers job)]
+           (assoc all job
+                  (if (< k n)
+                    (min qualified-peers max-peers)
+                    (min qualified-peers min-peers)))))
        {}
        (map vector jobs (range))))
     {}))

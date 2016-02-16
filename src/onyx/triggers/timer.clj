@@ -32,7 +32,7 @@
 
 (defmethod api/trigger-notifications :timer
   [event trigger]
-  #{:timer :task-complete})
+  #{:timer :task-lifecycle-stopped})
 
 (defmethod api/trigger-fire? :timer
   [event trigger args]

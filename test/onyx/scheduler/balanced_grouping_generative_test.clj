@@ -12,7 +12,6 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]
             [onyx.log.commands.common :as common]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [taoensso.timbre :refer [info]]))
@@ -147,7 +146,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 1 (count (get (get (:allocations replica) job-1-id) t3))))))))
@@ -172,7 +170,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        ;; If the job is submitted first, the second case occurs. Otherwise the first
        ;; case pins task B to 4 peers.
        (is
@@ -205,7 +202,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t3))))))))
@@ -237,7 +233,6 @@
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args job-1-rets))
            [t4 t5 t6] (:tasks (:args job-2-rets))]
-       (standard-invariants replica)
        (is (= 3 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 3 (count (get (get (:allocations replica) job-1-id) t3))))
@@ -245,3 +240,78 @@
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t4))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t5))))
        (is (= 0 (count (get (get (:allocations replica) job-2-id) t6))))))))
+
+(deftest recover-slots
+  (let [grouping-slot-job-id "grouping-job-1"
+        grouping-slot-job
+        {:workflow [[:a :b] [:b :c]]
+         :catalog [{:onyx/name :a
+                    :onyx/plugin :onyx.test-helper/dummy-input
+                    :onyx/type :input
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}
+
+                   {:onyx/name :b
+                    :onyx/fn :mock/fn
+                    :onyx/type :function
+                    :onyx/group-by-kw :mock-key
+                    :onyx/min-peers 4
+                    :onyx/max-peers 4
+                    :onyx/flux-policy :recover
+                    :onyx/batch-size 20}
+
+                   {:onyx/name :c
+                    :onyx/plugin :onyx.test-helper/dummy-output
+                    :onyx/type :output
+                    :onyx/medium :dummy
+                    :onyx/batch-size 20}]
+         :task-scheduler :onyx.task-scheduler/balanced}
+        job-1-rets (api/create-submit-job-entry
+                     grouping-slot-job-id
+                     peer-config
+                     grouping-slot-job
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))
+        job-2-id "grouping-job-2"
+        job-2-rets (api/create-submit-job-entry
+                     job-2-id
+                     peer-config
+                     grouping-slot-job
+                     (planning/discover-tasks (:catalog grouping-slot-job) (:workflow grouping-slot-job)))]
+    (checking
+     "Checking grouping task recovers slots, and job1 continues running when peers leave, and job2 is killed"
+     (times 50)
+     [{:keys [replica log peer-choices]}
+      (log-gen/apply-entries-gen
+       (gen/return
+        {:replica {:job-scheduler :onyx.job-scheduler/balanced
+                   :messaging {:onyx.messaging/impl :dummy-messenger}}
+         :message-id 0
+         :entries (-> (log-gen/generate-join-queues (log-gen/generate-peer-ids 12))
+                      (assoc :job-1 {:queue [job-1-rets]})
+                      (assoc :job-2 {:queue [job-2-rets {:fn :kill-job :args {:job job-2-id}}]})
+                      (assoc :leave-1 {:predicate (fn [replica entry]
+                                                    (some #{:p1} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p1}}]})
+                      (assoc :leave-2 {:predicate (fn [replica entry]
+                                                    (some #{:p2} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p2}}]})
+                      (assoc :leave-3 {:predicate (fn [replica entry]
+                                                    (some #{:p3} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p3}}]})
+                      (assoc :leave-4 {:predicate (fn [replica entry]
+                                                    (some #{:p4} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p4}}]})
+                      (assoc :leave-5 {:predicate (fn [replica entry]
+                                                    (some #{:p5} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p5}}]})
+                      (assoc :leave-6 {:predicate (fn [replica entry]
+                                                    (some #{:p6} (:peers replica)))
+                                       :queue [{:fn :leave-cluster :args {:id :p6}}]}))
+         :log []
+         :peer-choices []}))]
+     (let [[t1 t2 t3] (:tasks (:args job-1-rets))]
+       (is (= #{0 1 2 3} (set (vals (get-in replica [:task-slot-ids grouping-slot-job-id t2])))))
+       (is (= 6 (count (:peers replica))))
+       (is (= 1 (count (get (get (:allocations replica) grouping-slot-job-id) t1))))
+       (is (= 4 (count (get (get (:allocations replica) grouping-slot-job-id) t2))))
+       (is (= 1 (count (get (get (:allocations replica) grouping-slot-job-id) t3))))))))

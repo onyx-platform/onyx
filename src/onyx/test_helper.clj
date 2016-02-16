@@ -8,6 +8,50 @@
             [onyx.system :as system]
             [onyx.api]))
 
+(defn feedback-exception!
+  "Feeds an exception that killed a job back to a client. 
+   Blocks until the job is complete."
+  ([peer-config job-id]
+   (let [client (component/start (system/onyx-client peer-config))]
+     (try 
+       (feedback-exception! peer-config job-id (:log client))
+       (finally
+         (component/stop client)))))
+  ([peer-config job-id log]
+   (when-not (onyx.api/await-job-completion peer-config job-id)
+     (throw (extensions/read-chunk log :exception job-id)))))
+
+
+(defn find-task [catalog task-name]
+  (let [matches (filter #(= task-name (:onyx/name %)) catalog)]
+    (when-not (seq matches)
+      (throw (ex-info (format "Couldn't find task %s in catalog" task-name)
+                      {:catalog catalog :task-name task-name})))
+    (first matches)))
+
+(defn n-peers
+  "Takes a workflow and catalog, returns the minimum number of peers
+   needed to execute this job."
+  [{:keys[catalog workflow] :as job}]
+  (let [task-set (into #{} (apply concat workflow))]
+    (reduce
+     (fn [sum t]
+       (+ sum (or (:onyx/min-peers (find-task catalog t)) 1)))
+     0 task-set)))
+
+(defn validate-enough-peers!  
+  "Checks that the test environment will start enough peers to start the job.  Do
+  not use this validation function in production as it does not check for the
+  number of peers running over a cluster, and the number of peers that has joined
+  is subject to change as nodes come online and go offline." 
+  [test-env job]
+  (let [required-peers (n-peers job)] 
+    (when (< (:n-peers test-env) required-peers)
+      (throw (ex-info (format "test-env requires at least %s peers to start the job" required-peers)
+                      {:job job
+                       :n-peers (:n-peers test-env)
+                       :required-n-peers required-peers})))))
+
 (defn playback-log [log replica ch timeout-ms]
   (loop [replica replica]
     (if-let [entry (first (alts!! [ch (timeout timeout-ms)]))]
@@ -102,19 +146,6 @@
          (Thread/interrupted))
        (finally
          (component/stop ~symbol-name)))))
-
-(defn feedback-exception!
-  "Feeds an exception that killed a job back to a client. 
-   Blocks until the job is complete."
-  ([peer-config job-id]
-   (let [client (component/start (system/onyx-client peer-config))]
-     (try 
-       (feedback-exception! peer-config job-id (:log client))
-       (finally
-         (component/stop client)))))
-  ([peer-config job-id log]
-   (when-not (onyx.api/await-job-completion peer-config job-id)
-     (throw (extensions/read-chunk log :exception job-id)))))
 
 (defrecord DummyInput []
   p-ext/Pipeline
