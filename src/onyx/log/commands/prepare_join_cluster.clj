@@ -34,7 +34,7 @@
   (let [all-prepared-deps (keys prepared)
         prep-watches (map (fn [dep] (get (map-invert pairs) dep)) all-prepared-deps)
         accepting-deps (keys accepted)]
-    (concat all-prepared-deps accepting-deps prep-watches)))
+    (remove nil? (concat all-prepared-deps accepting-deps prep-watches))))
 
 (s/defmethod extensions/apply-log-entry :prepare-join-cluster :- Replica
   [{:keys [args message-id]} :- LogEntry replica]

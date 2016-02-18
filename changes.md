@@ -1,3 +1,7 @@
+#### 0.8.11
+
+- Bug fix: Fix list of disallowed joining peers. Previous patch did not account for the single-peer, single machine cluster state.
+
 #### 0.8.10
 - Bug fix: fix peer join issue which occurs when cluster is in a stuck state, and dead peers need to be evicted.
 
