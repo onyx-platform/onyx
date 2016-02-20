@@ -34,7 +34,7 @@ This section specifies what a valid catalog, workflow, and flow conditions look 
 |-----------------------|------------|----------------------|------------|-----------------------------------------------------------------------|
 |`:onyx/batch-timeout`  | `integer`  | `> 0`                | `1000`     |                                                                       |
 |`:onyx/max-peers`      | `integer`  | `> 0`                |            |                                                                       |
-|`:onyx/n-peers`        | `integer`  | `> 0`                |            | Expands to make `:onyx/min-peers` and `:onyx/max-peers this value     |
+|`:onyx/n-peers`        | `integer`  | `> 0`                |            | Expands to make `:onyx/min-peers` and `:onyx/max-peers` this value    |
 |`:onyx/language`       | `keyword`  | `:clojure`, `:java`  | `:clojure` | Affects `:onyx/fn` and `:onyx/plugin` function and plugin resolution  |
 |`:onyx/required-tags`  | `vector`   |                      | `[]`       | A vector of tags that peers executing this task must have             |
 |`:onyx/doc`            | `string`   |                      |            | A docstring for this task                                             |
