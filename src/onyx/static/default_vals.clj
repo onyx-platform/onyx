@@ -11,8 +11,6 @@
    ;; task defaults
    :onyx/batch-timeout 50
 
-   :onyx/trigger-timer-resolution 10
-
    ;; zookeeper defaults
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000
@@ -56,6 +54,7 @@
    :onyx.rocksdb.filter/num-ids-per-bucket 10000000
 
    ;; peer defaults
+   :onyx.peer/trigger-timer-resolution 10
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400

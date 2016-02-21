@@ -696,6 +696,13 @@
              :default []
              :added "0.8.9"}
 
+            :onyx.peer/trigger-timer-resolution
+            {:doc "The resolution of the timer firing state-events that are not caused by segments arriving."
+             :type :integer
+             :optional? true
+             :default 10
+             :added "0.9.0"}
+
             :onyx.windowing/min-value
             {:doc "A default strict minimum value that `:window/window-key` can ever be. Note, this is generally best configured individually via :window/min-value in the task map."
              :type :integer
@@ -1203,6 +1210,7 @@
     :onyx.peer/backpressure-check-interval
     :onyx.peer/backpressure-low-water-pct
     :onyx.peer/backpressure-high-water-pct :onyx.windowing/min-value
+    :onyx.peer/trigger-timer-resolution
     :onyx.peer/tags
     :onyx.zookeeper/backoff-base-sleep-time-ms
     :onyx.zookeeper/backoff-max-sleep-time-ms

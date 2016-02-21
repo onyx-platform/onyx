@@ -283,7 +283,7 @@
 
 (defn process-state-loop [{:keys [onyx.core/state-ch onyx.core/compiled onyx.core/peer-opts] :as event} ex-f]
   (try 
-    (let [timer-resolution (arg-or-default :onyx/trigger-timer-resolution peer-opts)] 
+    (let [timer-resolution (arg-or-default :onyx.peer/trigger-timer-resolution peer-opts)] 
       (loop [timer-tick-ch (timeout timer-resolution)]
         (let [[[event-type task-event ack-batch] ch] (alts!! [timer-tick-ch state-ch] :priority true)] 
           (cond (= ch state-ch)

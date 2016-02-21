@@ -454,6 +454,7 @@
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
+   (s/optional-key :onyx.peer/trigger-timer-resolution) PosInt
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
