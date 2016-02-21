@@ -34,8 +34,8 @@
 (defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (timbre/info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
-                           (:onyx.core/id event))))
+      (info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
+                    (:onyx.core/id event))))
     rets))
 
 (defn add-acker-id [id m]
@@ -282,10 +282,10 @@
 
 (defn write-batch [{:keys [pipeline]} event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
-    (taoensso.timbre/trace (format "[%s / %s] Wrote %s segments"
-                                   (:onyx.core/id rets)
-                                   (:onyx.core/lifecycle-id rets)
-                                   (count (:onyx.core/results rets))))
+    (trace (format "[%s / %s] Wrote %s segments"
+                   (:onyx.core/id rets)
+                   (:onyx.core/lifecycle-id rets)
+                   (count (:onyx.core/results rets))))
     rets))
 
 (defn launch-aux-threads!
@@ -342,7 +342,7 @@
             (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
-                  (taoensso.timbre/trace (format "Input retry message %s" m))
+                  (trace (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
                        (lc/invoke-after-retry event compiled m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
@@ -473,7 +473,7 @@
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
             state (atom (->TaskState r-seq))
 
-            _ (taoensso.timbre/info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
+            _ (info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
             _ (validate-pending-timeout pending-timeout opts)
 
             pipeline-data {:onyx.core/id id
@@ -535,11 +535,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
-            (taoensso.timbre/info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
+            (info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
             (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
-        (taoensso.timbre/info (format "[%s] Enough peers are active, starting the task" id))
+        (info (format "[%s] Enough peers are active, starting the task" id))
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
@@ -557,8 +557,8 @@
 
   (stop [component]
     (if-let [task-name (:onyx.core/task (:pipeline-data component))]
-      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
-      (taoensso.timbre/info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
+      (info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
+      (info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
     (when-let [event (:pipeline-data component)]
 
       ;; Fire all triggers on task completion.
