@@ -329,7 +329,7 @@
                              "`:window/type` is set to `:session`"]
              :added "0.8.0"}
 
-            :window/min-key
+            :window/min-value
             {:doc "A globally minimum value that values of `:window/window-key` will never be less than. This is used for calculating materialized aggregates for windows in a space efficient manner."
              :type :integer
              :optional? true
