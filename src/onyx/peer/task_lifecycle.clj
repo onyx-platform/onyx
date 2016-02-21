@@ -237,8 +237,7 @@
                    apply-fn (fn [ws [unique-id window-logs]]
                               (if exactly-once? 
                                 (swap! filter-state state-extensions/apply-filter-id event unique-id))
-                              (mapv (fn [w log] 
-                                      (ws/play-entry w log)) ws window-logs))
+                              (mapv ws/play-entry ws window-logs))
                    replayed-state (state-extensions/playback-log-entries state-log event windows-state apply-fn)]
                (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
                replayed-state))))

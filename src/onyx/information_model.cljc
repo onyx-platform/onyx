@@ -700,7 +700,7 @@
             {:doc "The resolution of the timer firing state-events that are not caused by segments arriving."
              :type :integer
              :optional? true
-             :default 10
+             :default 100
              :added "0.9.0"}
 
             :onyx.windowing/min-value

@@ -77,9 +77,10 @@
               ks)))
 
   (log-entries [this]
-    (doall (map (juxt (comp :group-key :state-event) 
-                      log-entries) 
-                event-results)))
+    (->> event-results
+         (map (juxt (comp :group-key :state-event) log-entries))
+         (remove (comp empty? second))
+         (doall)))
 
   (state [this]
     state)
@@ -267,11 +268,11 @@
         log-entry (keep second rs)]
     (state-extensions/store-log-entry state-log task-event success-fn log-entry)))
 
-(defn process-other [compiled {:keys [task-event] :as state-event}]
+(defn process-event [compiled {:keys [task-event] :as state-event}]
   (let [{:keys [onyx.core/windows-state onyx.core/state-log]} task-event
         new-ws (swap! windows-state fire-state-event state-event)
         log-entry (remove empty? (map log-entries new-ws))]
-    (when (empty? log-entry) 
+    (when-not (empty? log-entry) 
       ;; nil filter-id as this is not in response to a segment
       (state-extensions/store-log-entry state-log task-event (fn []) (list nil log-entry)))))
 
@@ -279,7 +280,7 @@
   [compiled {:keys [event-type task-event] :as state-event}]
   (if (= event-type :new-segment) 
     (process-segment compiled state-event)
-    (process-other compiled state-event)))
+    (process-event compiled state-event)))
 
 (defn process-state-loop [{:keys [onyx.core/state-ch onyx.core/compiled onyx.core/peer-opts] :as event} ex-f]
   (try 
