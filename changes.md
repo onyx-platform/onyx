@@ -1,3 +1,11 @@
+#### 0.9.0
+- **Breaking change** :aggregation/fn was renamed to :aggregation/create-state-update
+- **Breaking change** changed the signatures of the following aggregation function types: default-window-state, apply-state-update, super-aggregation-fn. All now take the window as the first argument.
+- **Breaking change** changed the internal messaging functions to no longer supply the event map.
+  Note, this will break any plugins that manually manage the ack count, such as
+  plugins using async callbacks.
+- Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
+
 #### 0.8.11
 
 - Bug fix: Fix list of disallowed joining peers. Previous patch did not account for the single-peer, single machine cluster state.

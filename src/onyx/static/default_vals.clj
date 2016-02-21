@@ -11,6 +11,8 @@
    ;; task defaults
    :onyx/batch-timeout 50
 
+   :onyx/trigger-timer-resolution 10
+
    ;; zookeeper defaults
    :onyx.zookeeper/backoff-base-sleep-time-ms 1000
    :onyx.zookeeper/backoff-max-sleep-time-ms 30000

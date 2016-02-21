@@ -141,7 +141,7 @@
              :added "0.8.0"}
 
             :onyx/max-pending
-            {:doc "The maximum number of segments that a peer executing an input task will allow in its internal pending message pool. If this pool is filled to capacity, it will not accept new segments - exhibiting backpressure to upstream message produces."
+            {:doc "The maximum number of segments that a peer executing an input task will allow in its internal pending message pool. If this pool is filled to capacity, it will not accept new segments - exhibiting backpressure to upstream message producers."
              :type :integer
              :default 10000
              :tags [:input :plugin :latency :backpressure :fault-tolerance]
@@ -380,18 +380,45 @@
                                :type :function
                                :optional? true
                                :added "0.8.0"}
-            :aggregation/fn {:doc "Fn (state, window, segment) to generate a serializable state machine update."
-                             :type :function
-                             :optional? false
-                             :added "0.8.0"}
-            :aggregation/apply-state-update {:doc "Fn (state, entry) to apply state machine update entry to a state."
+            :aggregation/create-state-update {:doc "Fn (window, state, segment) to generate a serializable state machine update."
+                                              :type :function
+                                              :optional? false
+                                              :added "0.8.0"}
+            :aggregation/apply-state-update {:doc "Fn (window, state, entry) to apply state machine update entry to a state."
                                              :type :function
                                              :optional? false
                                              :added "0.8.0"}
-            :aggregation/super-aggregation-fn {:doc "Fn (state-1, state-2, window) to combine two states in the case of two windows being merged, e.g. session windows."
+            :aggregation/super-aggregation-fn {:doc "Fn (window, state-1, state-2) to combine two states in the case of two windows being merged, e.g. session windows."
                                                :type :function
                                                :optional? true
                                                :added "0.8.0"}}}
+
+   :state-refinement
+   {:summary "Onyx provides the ability to perform state refinements after triggers fired."
+    :link nil
+    :model {:refinement/create-state-update {:doc "Fn (trigger, state, state-event) to generate a serializable state machine update."
+                                              :type :function
+                                              :optional? false
+                                              :added "0.0.0"}
+            :refinement/apply-state-update {:doc "Fn (trigger, state, entry) to apply the refinement state machine update entry to a state."
+                                             :type :function
+                                             :optional? false
+                                             :added "0.8.0"}}}
+   :trigger
+   {:summary "Implement different trigger behaviours e.g. timers, segments, etc."
+    :link nil
+    :model {:trigger/init-state {:doc "Fn (trigger) to initialise the state of the trigger."
+                                 :type :function
+                                 :optional? false
+                                 :added "0.9.0"}
+            :trigger/next-state {:doc "Fn (trigger, state-event) update the trigger state in response to a state event with the following keys: `:grouped?`, `:group-key`, `:lower-bound`, `:upper-bound`, `:event-type`, `:segment`, `:next-state`, `:trigger-update`."
+                                 :type :function
+                                 :optional? false
+                                 :added "0.9.0"}
+            :trigger/trigger-fire? {:doc "Fn (trigger, trigger-state, state-event) returns a boolean that defines whether the trigger's sync function will be called."
+                                    :type :function
+                                    :optional? false
+                                    :added "0.9.0"}}}
    :trigger-entry
    {:summary "Triggers are a feature that interact with Windows. Windows capture and bucket data over time. Triggers let you release the captured data over a variety of stimuli."
     :link nil
@@ -403,45 +430,50 @@
              :added "0.8.0"}
 
             :trigger/refinement
-            {:doc "The refinement mode to use when firing the trigger against a window. When set to `:accumulating`, the window contents remain. When set to `:discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
+            {:doc "The refinement mode to use when firing the trigger against a window. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. Onyx comes with a handful of refinements built in, such as accumulating and discarding refinements. When set to `:onyx.triggers.refinements/accumulating`, the window contents remain. When set to `:onyx.triggers.refinements/discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
              :type :keyword
-             :choices [:accumulating :discarding]
              :optional? false
              :added "0.8.0"}
 
             :trigger/on
-            {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers."
+            {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers. Takes a fully qualified, namespaced keyword resolving to the trigger definition. The following triggers are included with onyx: :onyx.triggers/segment, :onyx.triggers/timer, :onyx.triggers/punctuation, :onyx.triggers/watermark, :onyx.triggers/percentile-watermark"
              :type :keyword
              :optional? false
              :added "0.8.0"}
 
             :trigger/sync
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a map with keys (`:window-id`, `:lower-bound`, `:upper-bound`, `:context`) representing window metadata, and the window state as an immutable value. Its return value is ignored. The window metadata keys represent the following:
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, the window state as an immutable value, and an opts map with keys (`:window/extent->bounds`, `:refinement/entry`, `:refinement/new-state`, `:context`). Its return value is ignored. 
 
-- `:window-id`: a unique ID representing this concrete instance of a window. The ID is only unique among windows for a particular `:window/id` in the Onyx job.
-- `:lower-bound` - The lowermost value of any window key for a segment that belongs to this window
-- `:upper-bound` - The uppermost value of any window key for a segment that belongs to this window
-- `:context` - a keyword representing the context that caused this trigger to fire
+                  The window metadata keys represent the following:
 
- This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once *per window instance*. In other words, if a fixed window exists with 5 instances, the firing of a Timer trigger will call the sync function 5 times.
+                  - `:grouped?`: A boolean for whether the window state is grouped by key.
+                  - `:group-key`: The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used.
+                  - `:lower-bound`: Lower bound is the lower most value of any window key for a segment that belongs to this window. 
+                  - `:upper-bound`: Upper bound is the uppermost value of any window key for a segment that belongs to this window.
+                  - `:event-type`: The event that caused the trigger to be checked to be fired.
+                  - `:segment`: The segment that caused this trigger to be fired, if any.
+                  - `:next-state` - The window state that will be set after the refinement update is applied.
+                  - `:trigger-update` - The refinement state update that will be applied to the window state.
 
-You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
+                  This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once for each trigger.
+
+                  You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
              :type :keyword
              :optional? false
              :added "0.8.0"}
 
             :trigger/pred
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
+            {:doc "Used with the trigger :onyx.triggers/punctuation. A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
              :type :keyword
              :optional? false}
 
             :trigger/watermark-percentage
-            {:doc "A double between 0.0 and 1.0, both inclusive, representing a percentage greater than the lower bound of a window. If an segment is seen with a value for a windowing key greater than this percentage, the trigger fires."
+            {:doc "Used with the trigger :onyx.triggers/percentile-watermark. A double between 0.0 and 1.0, both inclusive, representing a percentage greater than the lower bound of a window. If an segment is seen with a value for a windowing key greater than this percentage, the trigger fires."
              :type :double
              :optional? false}
 
             :trigger/period
-            {:doc "A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
+            {:doc "Used with the trigger :onyx.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
              :required-when ["`:trigger/on` is `:timer`"]
              :choices [:milliseconds :seconds :minutes :hours :days]
@@ -449,7 +481,7 @@ You can use lifecycles to supply any stateful connections necessary to sync your
              :added "0.8.0"}
 
             :trigger/threshold
-            {:doc "A segment trigger will fire every threshold of segments."
+            {:doc "Used with the trigger :onyx.triggers/segment. A segment trigger will fire every threshold of segments."
              :required-when ["`:trigger/on` is `:segment`"]
              :type [:integer :elements]
              :example [5 :elements]
@@ -466,6 +498,12 @@ You can use lifecycles to supply any stateful connections necessary to sync your
             :trigger/doc
             {:doc "A docstring for this trigger."
              :type :string
+             :optional? true
+             :added "0.8.0"}
+            
+            :trigger/id
+            {:doc "An internal id that will be added to the trigger map for use within the trigger if none exists."
+             :type :any
              :optional? true
              :added "0.8.0"}}}
 
@@ -1134,12 +1172,13 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :flow/thrown-exception?  :flow/post-transform :flow/action :flow/doc]
    :window-entry
    [:window/id :window/task :window/type :window/aggregation :window/window-key
-    :window/min-key :window/session-key :window/range :window/slide
+    :window/min-value :window/session-key :window/range :window/slide
     :window/init :window/timeout-gap :window/doc]
    :state-aggregation
-   [:aggregation/init :aggregation/fn :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
+   [:aggregation/init :aggregation/create-state-update 
+    :aggregation/apply-state-update :aggregation/super-aggregation-fn] 
    :trigger-entry
-   [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync
+   [:trigger/window-id :trigger/refinement :trigger/on :trigger/sync :trigger/id
     :trigger/period :trigger/threshold :trigger/pred :trigger/watermark-percentage :trigger/fire-all-extents?
     :trigger/doc] 
    :lifecycle-entry
@@ -1206,6 +1245,8 @@ You can use lifecycles to supply any stateful connections necessary to sync your
     :onyx.rocksdb.filter/num-ids-per-bucket
     :onyx.rocksdb.filter/rotation-check-interval-ms
     :onyx.task-scheduler.colocated/only-send-local?]
+   :trigger [:trigger/init-state :trigger/next-state :trigger/trigger-fire?]
+   :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
    :env-config
    [:onyx/id
     :zookeeper/server?

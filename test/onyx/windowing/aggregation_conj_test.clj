@@ -70,8 +70,9 @@
 
 (def test-state (atom []))
 
-(defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
-  (swap! test-state conj [lower-bound upper-bound state]))
+(defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as state-event} extent-state]
+  (when-not (= :task-lifecycle-stopped event-type)
+    (swap! test-state conj [lower-bound upper-bound extent-state])))
 
 (def in-chan (atom nil))
 
@@ -132,9 +133,9 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :accumulating
-          :trigger/on :segment
+          :trigger/refinement :onyx.triggers.refinements/accumulating
           :trigger/fire-all-extents? true
+          :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
 
@@ -153,22 +154,24 @@
     (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
-      (onyx.api/submit-job
-       peer-config
-       {:catalog catalog
-        :workflow workflow
-        :lifecycles lifecycles
-        :windows windows
-        :triggers triggers
-        :task-scheduler :onyx.task-scheduler/balanced})
-      
-      (doseq [i input]
-        (>!! @in-chan i))
-      (>!! @in-chan :done)
+      (let [job (onyx.api/submit-job
+                  peer-config
+                  {:catalog catalog
+                   :workflow workflow
+                   :lifecycles lifecycles
+                   :windows windows
+                   :triggers triggers
+                   :task-scheduler :onyx.task-scheduler/balanced})]
 
-      (close! @in-chan)
+        (doseq [i input]
+          (>!! @in-chan i))
+        (>!! @in-chan :done)
 
-      (let [results (take-segments! @out-chan)]
-        (is (= (into #{} input) (into #{} (butlast results))))
-        (is (= :done (last results)))
-        (is (= expected-windows @test-state))))))
+        (close! @in-chan)
+
+        (let [results (take-segments! @out-chan)]
+          (onyx.api/await-job-completion peer-config (:job-id job))
+          (Thread/sleep 1000)
+          (is (= (into #{} input) (into #{} (butlast results))))
+          (is (= :done (last results)))
+          (is (= expected-windows @test-state)))))))
