@@ -126,7 +126,7 @@
     (when-let [site (peer-site peer-replica-view acker-id)]
       (emit-latency :peer-ack-segments
                     monitoring
-                    #(extensions/internal-ack-segments messenger event site acks))))
+                    #(extensions/internal-ack-segments messenger site acks))))
   event)
 
 (defn flow-retry-segments [{:keys [peer-replica-view state messenger monitoring] :as compiled} {:keys [onyx.core/results] :as event}]
@@ -134,7 +134,7 @@
     (when-let [site (peer-site peer-replica-view (:completion-id root))]
       (emit-latency :peer-retry-segment
                     monitoring
-                    #(extensions/internal-retry-segment messenger event (:id root) site))))
+                    #(extensions/internal-retry-segment messenger (:id root) site))))
   event)
 
 (defn gen-lifecycle-id [event]
@@ -313,7 +313,7 @@
                      (when site 
                        (emit-latency :peer-complete-segment
                                      monitoring
-                                     #(extensions/internal-complete-segment messenger event id site))))
+                                     #(extensions/internal-complete-segment messenger id site))))
 
                    (= ch retry-ch)
                    (->> (p-ext/retry-segment pipeline event v)
