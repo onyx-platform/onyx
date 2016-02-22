@@ -95,7 +95,9 @@
                                    segment (i/segment reader-val)
                                    segment-id (i/segment-id reader-val)]
                               (reset! reader reader-val)
-                              (let [write-result (>!! read-ch (t/input (random-uuid) segment segment-id))
+                              (let [write-result (if segment 
+                                                   (>!! read-ch (t/input (random-uuid) segment segment-id))
+                                                   :backoff)
                                     reader-val* (u/process-completed! reader-val complete-ch)]
                                 (when (and write-result (not= :done segment))
                                   (let [reader-val** (i/next-state reader-val*)]

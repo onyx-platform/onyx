@@ -9,9 +9,9 @@
               "Pure function that returns the full checkpoint state, that allows the plugin state to be recovered.
               This checkpoint value will be passed in to recover when restarting the task and recovering the plugin's state.")
   (segment-id [this]
-              "Returns the segment id or offset for the value last read from the input medium")
+              "Returns the segment id or offset for the value last read from the input medium. Return nil if no segment is available.")
   (segment [this]
-           "Returns the segment last read from the input medium")
+           "Returns the segment last read from the input medium. Return nil if no segment is available.")
   (next-state [this]
               "Moves reader to the next state. Returns the reader in the updated state")
   (recover [this checkpoint]
