@@ -252,21 +252,25 @@
                          (swap! filter-state state-extensions/apply-filter-id task-event unique-id))
                        (if process?
                          (let [_ (st-ack/prepare acking-state unique-id fused-ack)
-                               updated (swap! windows-state fire-state-event state-event**)] 
-                           (swap! windows-state clean-windows-states)
+                               updated (swap! windows-state fire-state-event state-event**)
+                               _ (swap! windows-state clean-windows-states)] 
                            (list #(st-ack/ack acking-state unique-id fused-ack)
                                  (list unique-id (doall (map log-entries updated)))))
                          (list #(st-ack/defer acking-state unique-id fused-ack)))))
                    (:leaves leaf)))
                (:tree results)
                (:acks results)))
+        ack-fns (doall (map first rs))
         success-fn (fn [] 
                      (run! (fn [f] (f)) (map first rs))
+                     (run! (fn [f] (f)) ack-fns)
                      (emit-latency-value :window-log-write-entry 
                                          monitoring 
                                          (- (System/currentTimeMillis) start-time)))
         log-entry (keep second rs)]
     (state-extensions/store-log-entry state-log task-event success-fn log-entry)))
+    (when-not (empty? log-entry)
+      (state-extensions/store-log-entry state-log task-event success-fn log-entry))))
 
 (defn process-event [compiled {:keys [task-event] :as state-event}]
   (let [{:keys [onyx.core/windows-state onyx.core/state-log]} task-event
