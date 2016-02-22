@@ -1,7 +1,7 @@
 (ns onyx.triggers.trigger-percentile-watermark-test
   (:require [clojure.test :refer [deftest is]]
             [onyx.peer.window-state :refer [map->StateEvent]]
-            [onyx.triggers]
+            [onyx.triggers.triggers]
             [onyx.api]))
 
 (deftest percentile-watermark-test

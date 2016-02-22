@@ -1,7 +1,7 @@
 (ns onyx.triggers.trigger-watermark-test
   (:require [clojure.test :refer [deftest is]]
             [onyx.peer.window-state :refer [map->StateEvent]]
-            [onyx.triggers]
+            [onyx.triggers.triggers]
             [onyx.api]))
 
 (deftest watermark-test

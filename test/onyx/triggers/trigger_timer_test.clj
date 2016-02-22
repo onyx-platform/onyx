@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is use-fixtures]]
             [onyx.windowing.aggregation]
             [onyx.triggers.refinements]
-            [onyx.triggers]
+            [onyx.triggers.triggers]
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
