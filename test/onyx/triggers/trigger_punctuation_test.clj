@@ -41,7 +41,7 @@
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
                    :trigger/refinement :onyx.triggers.refinements/accumulating
-                   :trigger/on :onyx.triggers/punctuation
+                   :trigger/on :onyx.triggers.triggers/punctuation
                    :trigger/pred ::true-pred
                    :trigger/sync ::fire
                    :trigger/id :trigger-id}]

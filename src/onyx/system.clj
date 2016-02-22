@@ -44,7 +44,7 @@
             [onyx.windowing.units]
             [onyx.windowing.window-extensions]
             [onyx.windowing.aggregation]
-            [onyx.triggers]
+            [onyx.triggers.triggers]
             [onyx.triggers.refinements]
             [onyx.compression.nippy]
             [onyx.plugin.core-async]

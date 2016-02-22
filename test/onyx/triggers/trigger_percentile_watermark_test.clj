@@ -21,10 +21,12 @@
         segment {:event-time t}
         event {}]
 
-    (is (onyx.triggers/percentile-watermark-fire? trigger nil (map->StateEvent {:window window 
-                                                                                :segment segment
-                                                                                :lower-bound (- t 75)
-                                                                                :upper-bound (+ t 25)}))))
+    (is (onyx.triggers.triggers/percentile-watermark-fire? trigger 
+                                                           nil 
+                                                           (map->StateEvent {:window window 
+                                                                             :segment segment
+                                                                             :lower-bound (- t 75)
+                                                                             :upper-bound (+ t 25)}))))
 
   (let [t 1444443468904
         window {:window/id :collect-segments
@@ -43,7 +45,8 @@
         event {}]
     (is
      (not
-       (onyx.triggers/percentile-watermark-fire? trigger nil (map->StateEvent {:window window 
-                                                                               :segment segment
-                                                                               :lower-bound (- t 25)
-                                                                               :upper-bound (+ t 75)}))))))
+       (onyx.triggers.triggers/percentile-watermark-fire? trigger nil 
+                                                          (map->StateEvent {:window window 
+                                                                            :segment segment
+                                                                            :lower-bound (- t 25)
+                                                                            :upper-bound (+ t 75)}))))))

@@ -19,9 +19,10 @@
                  :trigger/id :trigger-id}
         segment {:event-time t}
         event {}]
-    (is (onyx.triggers/watermark-fire? trigger nil (map->StateEvent {:window window 
-                                                                     :segment segment
-                                                                     :upper-bound (dec t)}))))
+    (is (onyx.triggers.triggers/watermark-fire? trigger nil 
+                                                (map->StateEvent {:window window 
+                                                                  :segment segment
+                                                                  :upper-bound (dec t)}))))
 
   (let [t (System/currentTimeMillis)
         window {:window/id :collect-segments
@@ -39,6 +40,7 @@
         event {}]
     (is
      (not
-       (onyx.triggers/watermark-fire? trigger nil (map->StateEvent {:window window 
-                                                                    :segment segment
-                                                                    :upper-bound (inc t)}))))))
+       (onyx.triggers.triggers/watermark-fire? trigger nil 
+                                               (map->StateEvent {:window window 
+                                                                 :segment segment
+                                                                 :upper-bound (inc t)}))))))

@@ -223,7 +223,7 @@
         triggers
         [{:trigger/window-id :collect-segments
           :trigger/refinement :onyx.triggers.refinements/accumulating
-          :trigger/on :onyx.triggers/segment
+          :trigger/on :onyx.triggers.triggers/segment
           ;; Align threshhold with batch-size since we'll be restarting
           :trigger/threshold [1 :elements]
           :trigger/sync ::update-atom!}]

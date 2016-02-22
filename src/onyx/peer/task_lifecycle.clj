@@ -34,7 +34,7 @@
       (not-empty (:onyx.core/triggers event))))
 
 (defn exactly-once-task? [event]
-  (boolean (get-in event [:onyx.core/task-map :onyx/uniqueness-key])))
+  (contains? (:onyx.core/task-map event) :onyx/uniqueness-key))
 
 (defn resolve-log [{:keys [onyx.core/peer-opts] :as pipeline}]
   (let [log-impl (arg-or-default :onyx.peer/state-log-impl peer-opts)] 
