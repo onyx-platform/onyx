@@ -399,11 +399,11 @@
     :model {:refinement/create-state-update {:doc "Fn (trigger, state, state-event) to generate a serializable state machine update."
                                               :type :function
                                               :optional? false
-                                              :added "0.0.0"}
+                                              :added "0.9.0"}
             :refinement/apply-state-update {:doc "Fn (trigger, state, entry) to apply the refinement state machine update entry to a state."
                                              :type :function
                                              :optional? false
-                                             :added "0.8.0"}}}
+                                             :added "0.9.0"}}}
    :trigger
    {:summary "Implement different trigger behaviours e.g. timers, segments, etc."
     :link nil
