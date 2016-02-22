@@ -268,7 +268,6 @@
                                          monitoring 
                                          (- (System/currentTimeMillis) start-time)))
         log-entry (keep second rs)]
-    (state-extensions/store-log-entry state-log task-event success-fn log-entry)))
     (when-not (empty? log-entry)
       (state-extensions/store-log-entry state-log task-event success-fn log-entry))))
 
