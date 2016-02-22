@@ -475,8 +475,8 @@
                               (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                               resolve-filter-state
                               resolve-log
-                              (start-window-state-thread! ex-f)
-                              replay-windows-from-log)]
+                              replay-windows-from-log
+                              (start-window-state-thread! ex-f))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
 
