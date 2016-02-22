@@ -3,9 +3,15 @@
             [onyx.static.validation :as validation]
             [onyx.windowing.window-extensions :as w]
             [onyx.windowing.aggregation :as a]
-            [onyx.state.state-extensions :as s]
+            [onyx.state.state-extensions :as st]
+            [onyx.schema :refer [TriggerState Trigger Window Event WindowState]]
+            [onyx.peer.window-state :as ws]
+            [onyx.types :refer [map->TriggerState]]
             [onyx.peer.operation :refer [kw->fn]]
-            [onyx.peer.grouping :as g]))
+            [onyx.static.planning :refer [only]]
+            [onyx.static.uuid :refer [random-uuid]]
+            [onyx.peer.grouping :as g]
+            [schema.core :as s]))
 
 (defn filter-windows [windows task]
   (filter #(= (:window/task %) task) windows))
@@ -17,7 +23,7 @@
 (defn unpack-compacted [state {:keys [filter-snapshot extent-state]} event]
   (-> state
       (assoc :state extent-state)
-      (update :filter s/restore-filter event filter-snapshot)))
+      (update :filter st/restore-filter event filter-snapshot)))
 
 (defn resolve-window-init [window calls]
   (if-not (:aggregation/init calls)
@@ -27,59 +33,64 @@
       (constantly (:window/init window)))
     (:aggregation/init calls)))
 
-(defn resolve-windows [windows]
-  (map
-   (fn [window]
-     (let [agg (:window/aggregation window)
-           agg-var (if (sequential? agg) (first agg) agg)
-           calls (var-get (kw->fn agg-var))]
-       (validation/validate-state-aggregation-calls calls)
-       (assoc window
-              :aggregate/record (w/windowing-record window)
-              :aggregate/init (resolve-window-init window calls)
-              :aggregate/fn (:aggregation/fn calls)
-              :aggregate/super-agg-fn (:aggregation/super-aggregation-fn calls)
-              :aggregate/apply-state-update (:aggregation/apply-state-update calls))))
-   windows))
+(defn filter-ns-key-map [m ns-str]
+  (->> m
+       (filter (fn [[k _]] (= ns-str (namespace k))))
+       (map (fn [[k v]] [(keyword (name k)) v]))
+       (into {})))
 
-(defn compile-apply-window-entry-fn [{:keys [onyx.core/task-map onyx.core/windows] :as event}]
-  (let [grouped-task? (g/grouped-task? task-map)
-        get-state-fn (if grouped-task? 
-                       (fn [ext-state grp-key] 
-                         (get ext-state grp-key)) 
-                       (fn [ext-state grp-key] 
-                         ext-state))
-        set-state-fn (if grouped-task?
-                       (fn [ext-state grp-key new-value] 
-                         (assoc ext-state grp-key new-value))
-                       (fn [ext-state grp-key new-value] 
-                         new-value))
-        apply-window-entries 
-        (fn [state [window-entries {:keys [window/id aggregate/apply-state-update] :as window}]]
-          (reduce (fn [state* [extent extent-entry grp-key]]
-                    (if (nil? extent-entry)
-                      ;; Destructive triggers turn the state to nil,
-                      ;; prune these out of the window state to avoid
-                      ;; inflating memory consumption.
-                      (update-in state* [:state id] dissoc extent)
-                      (update-in state* 
-                                 [:state id extent]
-                                 (fn [ext-state] 
-                                   (let [state-value (a/default-state-value (get-state-fn ext-state grp-key) window)
-                                         new-state-value (apply-state-update state-value extent-entry)] 
-                                     (set-state-fn ext-state grp-key new-state-value))))))
-                  state
-                  window-entries))
-        extents-fn (fn [state log-entry] 
-                     (reduce apply-window-entries 
-                             state 
-                             (map list (rest log-entry) windows)))]
-    (fn [state entry]
-      (if (compacted-reset? entry)
-        (unpack-compacted state entry event)
-        (let [unique-id (first entry)
-              _ (trace "Playing back entries for segment with id:" unique-id)
-              new-state (extents-fn state entry)]
-          (if unique-id
-            (update new-state :filter s/apply-filter-id event unique-id)
-            new-state))))))
+(s/defn resolve-trigger :- TriggerState
+  [{:keys [trigger/sync trigger/refinement trigger/on trigger/window-id] :as trigger} :- Trigger]
+  (let [refinement-calls (var-get (kw->fn refinement))
+        trigger-calls (var-get (kw->fn on))]
+    (validation/validate-refinement-calls refinement-calls)
+    (validation/validate-trigger-calls trigger-calls)
+    (let [trigger (assoc trigger :trigger/id (random-uuid))
+          f-init-state (:trigger/init-state trigger-calls)] 
+      (-> trigger
+          (filter-ns-key-map "trigger")
+          (assoc :trigger trigger)
+          (assoc :sync-fn (kw->fn sync))
+          (assoc :state (f-init-state trigger))
+          (assoc :init-state f-init-state)
+          (assoc :next-trigger-state (:trigger/next-state trigger-calls))
+          (assoc :trigger-fire? (:trigger/trigger-fire? trigger-calls))
+          (assoc :create-state-update (:refinement/create-state-update refinement-calls))
+          (assoc :apply-state-update (:refinement/apply-state-update refinement-calls))
+          map->TriggerState))))
+
+(defn build-window-state [task-map m]
+  (if (g/grouped-task? task-map)
+    (let [ungrouped (ws/map->WindowUngrouped m)] 
+      (assoc (ws/map->WindowGrouped m)
+             :grouping-fn (g/task-map->grouping-fn task-map)
+             :new-window-state-fn (fn [] 
+                                    (update ungrouped 
+                                            :trigger-states
+                                            #(mapv (fn [ts] 
+                                                     (assoc ts :state ((:init-state ts) (:trigger ts))))
+                                                   %)))))             
+    (ws/map->WindowUngrouped m)))
+
+(s/defn resolve-window-state :- WindowState
+  [window :- Window all-triggers :- [Trigger] task-map]
+  (let [agg (:window/aggregation window)
+        agg-var (if (sequential? agg) (first agg) agg)
+        calls (var-get (kw->fn agg-var))
+        _ (validation/validate-state-aggregation-calls calls)
+        init-fn (resolve-window-init window calls)
+        window-triggers (->> all-triggers 
+                             (filter #(= (:window/id window) (:trigger/window-id %)))
+                             (mapv resolve-trigger))]
+    (build-window-state task-map 
+                        {:window-extension (-> window
+                                               (filter-ns-key-map "window")
+                                               ((w/windowing-builder window))
+                                               (assoc :window window))
+                         :trigger-states window-triggers
+                         :window window
+                         :state {} 
+                         :init-fn init-fn
+                         :create-state-update (:aggregation/create-state-update calls)
+                         :super-agg-fn (:aggregation/super-aggregation-fn calls)
+                         :apply-state-update (:aggregation/apply-state-update calls)})))

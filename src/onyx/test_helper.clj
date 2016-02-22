@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! alts!! timeout <!! close! sliding-buffer]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [info warn trace fatal error] :as timbre]
+            [schema.core :as s]
             [onyx.extensions :as extensions]
             [onyx.peer.function :as function]
             [onyx.peer.pipeline-extensions :as p-ext]
@@ -141,7 +142,7 @@
                                                           :peer-config ~peer-config
                                                           :monitoring-config ~monitoring-config}))]
      (try
-       ~@body
+       (s/with-fn-validation ~@body)
        (catch InterruptedException e#
          (Thread/interrupted))
        (finally

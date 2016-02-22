@@ -54,6 +54,7 @@
    :onyx.rocksdb.filter/num-ids-per-bucket 10000000
 
    ;; peer defaults
+   :onyx.peer/trigger-timer-resolution 100
    :onyx.peer/inbox-capacity 1000
    :onyx.peer/outbox-capacity 1000
    :onyx.peer/drained-back-off 400
