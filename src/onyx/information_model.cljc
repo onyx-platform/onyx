@@ -831,7 +831,7 @@
              :added "0.8.0"}
 
             :onyx.messaging/bind-addr
-            {:doc "An IP address to bind the peer to for messaging. Defaults to `nil`. When `nil`, Onyx binds to it's external IP to the result of calling `http://checkip.amazonaws.com`."
+            {:doc "An IP address to bind the peer to for messaging. Defaults to `nil`. On AWS EC2, it's generally enough to configure this to the result of `(slurp http://169.254.169.254/latest/meta-data/local-ipv4)`"
              :optional? false
              :type :string
              :default nil
