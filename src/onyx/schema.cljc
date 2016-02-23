@@ -68,7 +68,7 @@
    (s/optional-key :onyx/restart-pred-fn)
    (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
-   (s/optional-key :onyx/batch-timeout) PosInt
+   (s/optional-key :onyx/batch-timeout) SPosInt
    (s/optional-key :onyx/doc) s/Str
    (s/optional-key :onyx/bulk?) s/Bool
    (s/optional-key :onyx/max-peers) PosInt
