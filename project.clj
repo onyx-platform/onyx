@@ -101,6 +101,11 @@
      :release-branch "master"
      :release-script "scripts/release.sh"
      :merge "master"}
+    {:git "git@onyx-amazon-sqs:onyx-platform/onyx-amazon-sqs.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "scripts/release.sh"
+     :merge "master"}
     {:git "git@onyx-dashboard:onyx-platform/onyx-dashboard.git"
      :branch "compatibility"
      :release-branch "master"
