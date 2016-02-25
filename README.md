@@ -88,6 +88,7 @@ Official plugins are vetted by Michael Drogalis. Ensure in your project that plu
 - [`onyx-seq`](https://github.com/onyx-platform/onyx-seq)
 - [`onyx-durable-queue`](https://github.com/onyx-platform/onyx-durable-queue)
 - [`onyx-elasticsearch`](https://github.com/onyx-platform/onyx-elasticsearch)
+- [`onyx-amazon-sqs`](https://github.com/onyx-platform/onyx-amazon-sqs)
 
 Generate plugin templates through Leiningen with [`onyx-plugin`](https://github.com/onyx-platform/onyx-plugin).
 
