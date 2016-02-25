@@ -54,7 +54,7 @@ onyx-examples| [![Circle CI](https://circleci.com/gh/onyx-platform/onyx-examples
 <img src="doc/images/indaba.png" height"40%" width="40%">
 <img src="doc/images/think-topic.png" height="40%" width="30%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="doc/images/yapster.svg" height="15%" width="15%">
+<img src="doc/images/yapster.png" height="15%" width="15%">
 
 ### Quick Start Guide
 
