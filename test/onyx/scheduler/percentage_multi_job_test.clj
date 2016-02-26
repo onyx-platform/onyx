@@ -17,14 +17,6 @@
    :onyx.peer/job-scheduler :onyx.job-scheduler/percentage})
 
 (deftest log-percentage-multi-job
-  (let [onyx-id (java.util.UUID/randomUUID)
-        config (load-config)
-        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
-        peer-config (assoc (:peer-config config)
-                           :onyx/tenancy-id onyx-id
-                           :onyx.peer/job-scheduler :onyx.job-scheduler/percentage)
-        env (onyx.api/start-env env-config)
-        peer-group (onyx.api/start-peer-group peer-config)
   (let [job-1-id "job-1"
         job-1 {:workflow [[:a :b]]
                :catalog [{:onyx/name :a
