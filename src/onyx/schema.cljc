@@ -401,12 +401,13 @@
    (s/optional-key :acker/exempt-output-tasks?) s/Bool
    (s/optional-key :acker/exempt-tasks) [s/Keyword]})
 
-(def ClusterId
+(def TenancyId
   (s/either s/Uuid s/Str))
 
 (def EnvConfig
   {:zookeeper/address s/Str
-   :onyx/id ClusterId
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
    (s/optional-key :onyx.bookkeeper/server?) s/Bool
@@ -434,7 +435,8 @@
 
 (def PeerConfig
   {:zookeeper/address s/Str
-   :onyx/id ClusterId
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str

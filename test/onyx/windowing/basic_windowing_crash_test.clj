@@ -171,9 +171,9 @@
 
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
-                           :onyx/id id
+                           :onyx/tenancy-id id
                            ;; Write for every batch to ensure compaction occurs
                            :onyx.bookkeeper/write-batch-size 1)
         batch-size 5 

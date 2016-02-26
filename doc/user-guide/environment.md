@@ -36,7 +36,7 @@ We strongly recommend you run through this checklist before you do so, as it wil
 - [ ] **Setup production ZooKeeper**: A full [ZooKeeper ensemble](https://zookeeper.apache.org/) should be used in lieu of the testing ZooKeeper embedded in Onyx.
 - [ ] **Increase maximum ZK connections** Onyx establishes a large number of ZooKeeper connections, in which case you will see an exception like the following: `WARN org.apache.zookeeper.server.NIOServerCnxn: Too many connections from /127.0.0.1 - max is 10`. Increase the number of connections in zoo.cfg, via `maxClientCnxns`. This should be set to a number moderately larger than the number of virtual peers that you will start.
 - [ ] **Configure ZooKeeper address to point an ensemble**: `:zookeeper/address` should be set in your peer-config e.g. `:zookeeper/address "server1:2181,server2:2181,server3:2181"`.
-- [ ] **Ensure all nodes are using the same `:onyx/id`**: `:onyx/id` in the peer-config is used to denote which cluster a virtual peer should join. If all your nodes do not use the same `:onyx/id`, they will not be a part of the same cluster and will not run the same jobs. Any jobs submitted a cluster must also use the same `:onyx/id` to ensure that cluster runs the job.
+- [ ] **Ensure all nodes are using the same `:onyx/tenancy-id`**: `:onyx/tenancy-id` in the peer-config is used to denote which cluster a virtual peer should join. If all your nodes do not use the same `:onyx/tenancy-id`, they will not be a part of the same cluster and will not run the same jobs. Any jobs submitted a cluster must also use the same `:onyx/tenancy-id` to ensure that cluster runs the job.
 - [ ] **Do not use core async tasks**: switch all input or output tasks from core.async as it is a not a suitable medium for multi-node use and will result in many issues when used in this way. The [Kafka plugin](https://github.com/onyx-platform/onyx-kafka) is one recommended alternative.
 - [ ] **Test on a single node with without short circuiting**: when `:onyx.messaging/allow-short-circuit?` is `true`, Aeron messaging will be short circuited completely. To test messaging on a local mode as if it's in production, set `:onyx.messaging/allow-short-circuit? false`.
 - [ ] **Ensure short circuiting is enabled in production**: short circuiting improves performance by locally messaging where possible. Ensure `:onyx.messaging/allow-short-circuit? true` is set in the peer-config on production.
@@ -67,11 +67,11 @@ Here's an example of using ZooKeeper in-memory, with some non-ZooKeeper required
   {:zookeeper/address "127.0.0.1:2182"
    :zookeeper/server? true
    :zookeeper.server/port 2182
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def peer-opts
   {:zookeeper/address "127.0.0.1:2182"
-   :onyx/id id})
+   :onyx/tenancy-id id})
 ```
 ### Networking / Firewall
 

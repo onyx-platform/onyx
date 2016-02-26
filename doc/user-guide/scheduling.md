@@ -146,7 +146,7 @@ To declare a peer as having special capabilities, use a vector of keywords in th
 
 ```clojure
 {...
- :onyx/id "my-cluster"
+ :onyx/tenancy-id "my-cluster"
  :onyx.peer/tags [:datomic]
  ...
 }

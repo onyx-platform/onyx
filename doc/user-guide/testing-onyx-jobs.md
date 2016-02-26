@@ -24,8 +24,8 @@ In practice, this looks something like the following:
 (deftest my-onyx-job-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)]
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
     (with-test-env [test-env [3 env-config peer-config]]
       (let [catalog ...
             workflow ...

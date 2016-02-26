@@ -20,7 +20,7 @@
 (defrecord Bookie [env-config port log]
   component/Lifecycle
   (component/start [component]
-    (let [onyx-id (:onyx/id env-config)
+    (let [onyx-id (:onyx/tenancy-id env-config)
           ledgers-root-path (ozk/ledgers-path onyx-id)
           ledgers-available-path (ozk/ledgers-available-path onyx-id)
           _ (zk/create (:conn log) ledgers-root-path :persistent? true) 
