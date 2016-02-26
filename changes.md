@@ -1,29 +1,48 @@
+#### 0.9.0
+- **Breaking change** :aggregation/fn was renamed to :aggregation/create-state-update
+- **Breaking change** changed the signatures of the following aggregation function types: default-window-state, apply-state-update, super-aggregation-fn. All now take the window as the first argument.
+- **Breaking change** changed the internal messaging functions to no longer supply the event map.
+  Note, this will break any plugins that manually manage the ack count, such as
+  plugins using async callbacks.
+- Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
+
+#### 0.8.11
+
+- Bug fix: Fix list of disallowed joining peers. Previous patch did not account for the single-peer, single machine cluster state.
+
+#### 0.8.10
+- Bug fix: fix peer join issue which occurs when cluster is in a stuck state, and dead peers need to be evicted.
+
+#### 0.8.9
+
+- **Breaking change**: Removed `:onyx/restart-pred-fn` feature, which has been deprecated in favor of the new `:lifecycle/handle-exception` feature.
+- New feature: Task Constraints are a new feature that allow peers to tag themselves indicating user-defined capabilities. Onyx's scheduler will only allocate peers with tags that match a task to be executed. This composes with all existing scheduler features.
+- Bug fix: Fixed a bug where a job would continue running even if it didn't have enough peers to cover all the tasks.
+
 #### 0.8.8
 
 - Fixed a problem with a file in Onyx's test suite that was causing problems for the release process. No functional changes in this release.
 
 #### 0.8.7
-- trigger notification :task-complete has been renamed to :task-lifecycle-stopped, as it occurs whenever a task lifecycle is stopped, not necessarily when the task has been completed
-- reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
-- Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
-- Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
-- **Breaking change** No longer AOT compile onyx.interop. This will be done in [onyx-java](https://github.com/onyx-platform/onyx-java) for use by other languages.
-
+- **Breaking change**: No longer AOT compile onyx.interop. This will be done in [onyx-java](https://github.com/onyx-platform/onyx-java) for use by other languages.
+- Bug fix: Fix bug where shutdown resulted in NPE when trying to delete a non-existent Aeron directory when not using the embedded driver.
+- Bug fix: Fix issues in handle-exception lifecycle where it wouldn't handle exceptions in read-batch/write-batch/assign-windows [#505](https://github.com/onyx-platform/onyx/issues/491)
+- Enhancement: trigger notification :task-complete has been renamed to :task-lifecycle-stopped, as it occurs whenever a task lifecycle is stopped, not necessarily when the task has been completed
+- Enhancement: reduce unnecessary peer reallocation in Onyx's scheduler [#503](https://github.com/onyx-platform/onyx/issues/503)
 
 #### 0.8.6
-- Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with onyx users on 1.7.0
+- Dependency change: Revert back to Clojure 1.7.0, as 1.8.0 was causing issues with Onyx users on 1.7.0
 
 #### 0.8.5
-- MAJOR: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
-- MAJOR: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).
-- MAJOR: fixed a number of peer join bugs found by onyx-jepsen [#453](https://github.com/onyx-platform/onyx/issues/453), [#462](https://github.com/onyx-platform/onyx/issues/462), [#437](https://github.com/onyx-platform/onyx/issues/437).
-
-- Improved performance, especially for windowed tasks [#500](https://github.com/onyx-platform/onyx/issues/500)
-- Fixed bug introduced by a breaking change in Aeron 0.2.2 where we would retry a send to a closed publication.
-- Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
-- Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
-- Enhancement: Upgraded to Clojure 1.8.0
-- Enhancement: Upgraded to Aeron 0.9
+- MAJOR bug fix: fixed bug causing slot-ids to be misallocated, which will affect recovery for state/windowed tasks [#504](https://github.com/onyx-platform/onyx/issues/504)
+- MAJOR bug fix: fixed bug causing peers to stop checkpointing to state/windowed log [#390](https://github.com/onyx-platform/onyx/issues/390).
+- MAJOR bug fix: fixed a number of peer join bugs found by onyx-jepsen [#453](https://github.com/onyx-platform/onyx/issues/453), [#462](https://github.com/onyx-platform/onyx/issues/462), [#437](https://github.com/onyx-platform/onyx/issues/437).
+- Bug fix: Fixed bug introduced by a breaking change in Aeron 0.2.2 where we would retry a send to a closed publication.
+- Enhancement: Improved performance, especially for windowed tasks [#500](https://github.com/onyx-platform/onyx/issues/500)
+- Enhancement: Switch embedded aeron media driver to use SHARED mode by default, which is more robust on small peers.
+- Enhancement: Embedded media driver now cleans up its directory to resolve version incompatibilities encountered by users on upgrading.
+- Dependency change: Upgraded to Clojure 1.8.0
+- Dependency change: Upgraded to Aeron 0.9
 
 #### 0.8.4
 

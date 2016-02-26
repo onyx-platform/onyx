@@ -50,7 +50,8 @@
       (is (= {:a :e :b :f :c :g} (:prepared new-replica)))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d}}] 
+               :args {:id :d
+                      :tags nil}}]
              reactions)))
 
     (let [old-replica (merge replica/base-replica 
@@ -92,5 +93,6 @@
       (is (= old-replica new-replica))
       (is (= nil diff))
       (is (= [{:fn :abort-join-cluster
-               :args {:id :d}}] 
+               :args {:id :d
+                      :tags nil}}]
              reactions)))))

@@ -364,7 +364,7 @@
     (>!! ch retry-id)))
 
 (defmethod extensions/send-messages AeronMessenger
-  [messenger event {:keys [peer-task-id channel] :as conn-spec} batch]
+  [messenger {:keys [peer-task-id channel] :as conn-spec} batch]
   (if ((:short-circuitable? messenger) channel)
     (send-messages-short-circuit (:inbound-ch (lookup-channels messenger peer-task-id)) batch)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
@@ -372,7 +372,7 @@
       (pubm/write pub-man buf 0 (.capacity buf)))))
 
 (defmethod extensions/internal-ack-segment AeronMessenger
-  [messenger event {:keys [acker-id channel] :as conn-spec} ack]
+  [messenger {:keys [acker-id channel] :as conn-spec} ack]
   (if ((:short-circuitable? messenger) channel)
     (ack-segment-short-circuit (lookup-channels messenger acker-id) ack)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)]
@@ -380,8 +380,8 @@
         (pubm/write pub-man buf 0 protocol/ack-msg-length)))))
 
 (defmethod extensions/internal-ack-segments AeronMessenger
-  [messenger event {:keys [acker-id] :as conn-spec} acks]
-  (if ((:short-circuitable? messenger) (:channel conn-spec))
+  [messenger {:keys [acker-id channel] :as conn-spec} acks]
+  (if ((:short-circuitable? messenger) channel)
     (ack-segments-short-circuit (lookup-channels messenger acker-id) acks)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-acker-messages acker-id acks)
@@ -390,7 +390,7 @@
       (pubm/write pub-man buf 0 size))))
 
 (defmethod extensions/internal-complete-segment AeronMessenger
-  [messenger event completion-id {:keys [peer-task-id channel] :as conn-spec}]
+  [messenger completion-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (complete-message-short-circuit (:release-ch (lookup-channels messenger peer-task-id)) completion-id)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
@@ -398,7 +398,7 @@
       (pubm/write pub-man buf 0 protocol/completion-msg-length))))
 
 (defmethod extensions/internal-retry-segment AeronMessenger
-  [messenger event retry-id {:keys [peer-task-id channel] :as conn-spec}]
+  [messenger retry-id {:keys [peer-task-id channel] :as conn-spec}]
   (if ((:short-circuitable? messenger) channel)
     (retry-segment-short-circuit (:retry-ch (lookup-channels messenger peer-task-id)) retry-id)
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)

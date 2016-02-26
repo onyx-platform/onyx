@@ -7,7 +7,6 @@
             [com.gfredericks.test.chuck :refer [times]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.log.replica-invariants :refer [standard-invariants]]
             [onyx.log.generators :as log-gen]
             [onyx.test-helper :refer [job-allocation-counts]]
             [onyx.static.planning :as planning]
@@ -157,7 +156,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 2 (count (get (get (:allocations replica) job-1-id) t1))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t2))))
        (is (= 4 (count (get (get (:allocations replica) job-1-id) t3))))))))
@@ -185,7 +183,6 @@
            c1 (count (get (get (:allocations replica) job-2-id) t1))
            c2 (count (get (get (:allocations replica) job-2-id) t2))
            c3 (count (get (get (:allocations replica) job-2-id) t3))]
-       (standard-invariants replica)
        (is (>= c2 4))
        (is (= 10 (+ c1 c2 c3)))))))
 
@@ -210,7 +207,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t1))))
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t2))))
        (is (= 0 (count (get (get (:allocations replica) job-3-id) t3))))))))
@@ -235,7 +231,6 @@
          :log []
          :peer-choices []}))]
      (let [[t1 t2 t3] (:tasks (:args rets))]
-       (standard-invariants replica)
        (is (= 1 (count (get (get (:allocations replica) job-4-id) t1))))
        (is (<= 3 (count (get (get (:allocations replica) job-4-id) t2))))
        (is (>= 6 (count (get (get (:allocations replica) job-4-id) t3))))

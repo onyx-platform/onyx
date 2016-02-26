@@ -4,12 +4,12 @@
             [onyx.log.commands.common :as common]))
 
 (defn sort-jobs-by-pct [replica jobs]
-    (let [indexed
-          (map-indexed
-           (fn [k j]
-             {:position k :job j :pct (get-in replica [:percentages j])})
-           (reverse jobs))]
-      (reverse (sort-by (juxt :pct :position) indexed))))
+  (let [indexed
+        (map-indexed
+         (fn [k j]
+           {:position k :job j :pct (get-in replica [:percentages j])})
+         (reverse jobs))]
+    (reverse (sort-by (juxt :pct :position) indexed))))
 
 (defn min-allocations [jobs n-peers]
   (mapv

@@ -80,7 +80,6 @@
           deallocated))
       replica)))
 
-
 (defn all-inputs-exhausted? [replica job]
   (let [all (get-in replica [:input-tasks job])
         exhausted (get-in replica [:exhausted-inputs job])]

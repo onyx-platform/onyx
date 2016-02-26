@@ -155,17 +155,28 @@
                   g
                   (apply-entries-gen (apply-entry-gen g)))))))
 
-(defn build-join-entry [peer-id]
-  {:fn :prepare-join-cluster
-   :args {:peer-site (extensions/peer-site messenger)
-          :joiner peer-id}})
+(defn build-join-entry
+  ([peer-id]
+   (build-join-entry peer-id {}))
+  ([peer-id more-args]
+   {:fn :prepare-join-cluster
+    :args (merge {:peer-site (extensions/peer-site messenger)
+                  :joiner peer-id}
+                 more-args)}))
 
-(defn generate-join-queues [peer-ids]
-  (zipmap peer-ids
-          (map (fn [peer]
-                 {:queue [(build-join-entry peer)]})
-               peer-ids)))
+(defn generate-join-queues
+  ([peer-ids]
+   (generate-join-queues peer-ids {}))
+  ([peer-ids more-join-args]
+   (zipmap peer-ids
+           (map (fn [peer]
+                  {:queue [(build-join-entry peer more-join-args)]})
+                peer-ids))))
 
-(defn generate-peer-ids [n]
-  (map #(keyword (str "p" %))
-       (range 1 (inc n))))
+;; Start at peer ID n, then generate m more ids
+(defn generate-peer-ids
+  ([n]
+   (generate-peer-ids 1 n))
+  ([n m]
+   (map #(keyword (str "p" %))
+        (range n (+ n m)))))

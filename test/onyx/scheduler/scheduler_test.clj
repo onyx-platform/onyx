@@ -17,6 +17,10 @@
           {:jobs [:j1 :j2]
            :allocations initial-allocations
            :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7 :p8 :p9 :p10]
+           :peer-state {:p1 :active :p2 :active :p3 :active
+                        :p4 :active :p5 :active :p6 :active
+                        :p7 :active :p8 :active :p9 :active
+                        :p10 :active}
            :tasks {:j1 [:t1 :t2 :t3]
                    :j2 [:t4 :t5]}
            :saturation {:j1 5 :j2 5}
@@ -35,6 +39,9 @@
          :allocations {:j1 {:t1 [:p4] :t2 [:p2] :t3 [:p7]}
                        :j2 {:t4 [:p6] :t5 [:p3] :t6 [:p1]}}
          :peers [:p1 :p2 :p3 :p4 :p5 :p6 :p7]
+         :peer-state {:p1 :active :p2 :active :p3 :active
+                      :p4 :active :p5 :idle :p6 :active
+                      :p7 :active}
          :tasks {:j1 [:t1 :t2 :t3] :j2 [:t4 :t5 :t6]}
          :task-schedulers {:j1 :onyx.task-scheduler/balanced
                            :j2 :onyx.task-scheduler/balanced}
@@ -153,6 +160,8 @@
                             :t2 [:p2 :p3 :p4]
                             :t3 [:p5]}}
          :peers [:p1 :p2 :p3 :p4 :p5 :p6]
+         :peer-state {:p1 :active :p2 :active :p3 :active
+                      :p4 :active :p5 :active :p6 :idle}
          :tasks {:j1 [:t1 :t2 :t3]}
          :flux-policies {:j1 {:t2 :kill}}
          :task-saturation {:j1 {:t1 100 :t2 100 :t3 100}}
@@ -170,6 +179,8 @@
                             :t2 [:p2 :p3]
                             :t3 [:p4]}}
          :peers [:p1 :p2 :p3 :p4 :p5]
+         :peer-state {:p1 :active :p2 :active :p3 :active
+                      :p4 :active :p5 :idle}
          :tasks {:j1 [:t1 :t2 :t3]}
          :flux-policies {:j1 {:t2 :recover}}
          :task-saturation {:j1 {:t1 100 :t2 3 :t3 100}}
@@ -205,6 +216,7 @@
          :allocations {:j1 {:t1 [:p1]
                             :t2 [:p2 :p3]}}
          :peers [:p1 :p2 :p3]
+         :peer-state {:p1 :active :p2 :active :p3 :active}
          :tasks {:j1 [:t1 :t2]}
          :task-schedulers {:j1 :onyx.task-scheduler/balanced}
          :job-scheduler :onyx.job-scheduler/balanced
