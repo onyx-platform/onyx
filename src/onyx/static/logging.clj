@@ -21,7 +21,12 @@
                        :task-name (:name (:task task-info))
                        :peer-id (:id task-info)}
          error-keys (merge helpful-keys d)
-         msg (str msg " -> " (.getMessage ^clojure.lang.ExceptionInfo e))]
+         msg (format "%s -> Exception type: %s. Exception message: %s"
+                     msg
+                     ;; Uses the long form to get the class name on purpose.
+                     ;; (str (type ...)) prefixes "class" in the string.
+                     (.getName ^java.lang.Class (.getClass ^clojure.lang.ExceptionInfo e))
+                     (.getMessage ^clojure.lang.ExceptionInfo e))]
      (ex-info msg error-keys (.getCause ^clojure.lang.ExceptionInfo e)))))
 
 (defn task-log-trace [task-information msg]

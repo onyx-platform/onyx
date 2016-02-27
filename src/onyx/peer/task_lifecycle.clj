@@ -67,11 +67,11 @@
     (while (poll! state-ch))
     (<!! state-thread-ch)))
 
-(s/defn start-lifecycle? [event :- Event task-information]
+(s/defn start-lifecycle? [event :- Event]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (logger/task-log-info
-       task-information
+       (:onyx.core/task-information (:onyx.core/compiled event))
        "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
@@ -188,8 +188,8 @@
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
 (defn read-batch
-  [{:keys [peer-replica-view task-type pipeline job-id] :as compiled}
-   task-information event]
+  [{:keys [peer-replica-view task-type pipeline job-id task-information] :as compiled}
+   event]
   (if (and (= task-type :input) (:backpressure? @peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [rets (merge event (p-ext/read-batch pipeline event))
@@ -233,8 +233,8 @@
     event))
 
 (s/defn replay-windows-from-log :- Event
-  [task-information
-   {:keys [onyx.core/windows-state onyx.core/filter-state onyx.core/state-log] :as event} :- Event]
+  [{:keys [onyx.core/task-information onyx.core/windows-state
+           onyx.core/filter-state onyx.core/state-log] :as event} :- Event]
   (when (windowed-task? event)
     (swap! windows-state 
            (fn [windows-state] 
@@ -250,8 +250,7 @@
 
 (s/defn write-batch :- Event 
   [{:keys [pipeline]}
-   task-information
-   event :- Event]
+   {:keys [onyx.core/task-information] :as event} :- Event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
     (logger/task-log-trace
      task-information
@@ -330,7 +329,7 @@
             (>!! outbox-ch entry))))))
 
 (s/defn assign-windows :- Event
-  [compiled task-information {:keys [onyx.core/windows] :as event}]
+  [compiled {:keys [onyx.core/windows] :as event}]
   (when-not (empty? windows)
     (let [{:keys [tree acks]} (:onyx.core/results event)]
       (when-not (empty? tree)
@@ -348,14 +347,14 @@
       (->> init-event
            (gen-lifecycle-id)
            (lc/invoke-before-batch compiled)
-           (lc/invoke-read-batch read-batch compiled task-information)
+           (lc/invoke-read-batch read-batch compiled)
            (tag-messages compiled)
            (add-messages-to-timeout-pool compiled)
            (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
-           (lc/invoke-assign-windows assign-windows compiled task-information)
-           (lc/invoke-write-batch write-batch compiled task-information)
+           (lc/invoke-assign-windows assign-windows compiled)
+           (lc/invoke-write-batch write-batch compiled)
            (flow-retry-segments compiled)
            (lc/invoke-after-batch compiled)
            (ack-segments compiled)))
@@ -486,14 +485,14 @@
 
             ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                          (not (start-lifecycle? pipeline-data task-information)))
+                          (not (start-lifecycle? pipeline-data)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (->> pipeline-data
                                (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                                resolve-filter-state
                                resolve-log
-                               (replay-windows-from-log task-information)
+                               replay-windows-from-log
                                (start-window-state-thread! ex-f))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))

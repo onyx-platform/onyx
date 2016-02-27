@@ -38,9 +38,11 @@
                 (assoc :compiled-norm-fcs (fc/compile-fc-happy-path flow-conditions workflow task))
                 (assoc :compiled-ex-fcs (fc/compile-fc-exception-path flow-conditions workflow task)))))) 
 
-(defn task->event-map [{:keys [onyx.core/task-map onyx.core/id onyx.core/pipeline onyx.core/job-id 
-                               onyx.core/catalog onyx.core/serialized-task onyx.core/messenger 
-                               onyx.core/monitoring onyx.core/state onyx.core/peer-replica-view] :as event}]
+(defn task->event-map
+  [{:keys [onyx.core/task-map onyx.core/id onyx.core/pipeline onyx.core/job-id
+           onyx.core/catalog onyx.core/serialized-task onyx.core/messenger
+           onyx.core/monitoring onyx.core/state onyx.core/peer-replica-view
+           onyx.core/task-information] :as event}]
   (update event 
           :onyx.core/compiled 
           (fn [compiled] 
@@ -60,7 +62,8 @@
                 (assoc :peer-replica-view peer-replica-view)
                 (assoc :grouping-fn (g/task-map->grouping-fn task-map))
                 (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids serialized-task)))
-                (assoc :egress-ids (keys (:egress-ids serialized-task)))))))
+                (assoc :egress-ids (keys (:egress-ids serialized-task)))
+                (assoc :task-information task-information)))))
 
 (defn lifecycles->event-map [{:keys [onyx.core/lifecycles onyx.core/task] :as event}]
   (update event 
