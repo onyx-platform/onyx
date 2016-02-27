@@ -24,6 +24,7 @@
               [onyx.peer.grouping :as g]
               [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
+              [onyx.static.logging :as logger]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
@@ -66,11 +67,12 @@
     (while (poll! state-ch))
     (<!! state-thread-ch)))
 
-(s/defn start-lifecycle? [event :- Event]
+(s/defn start-lifecycle? [event :- Event task-information]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
-      (info (format "[%s] Peer chose not to start the task yet. Backing off and retrying..."
-                    (:onyx.core/id event))))
+      (logger/task-log-info
+       task-information
+       "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
 (defn add-acker-id [id m]
@@ -185,7 +187,9 @@
                (= (:message (first batch)) :done))
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
-(defn read-batch [{:keys [peer-replica-view task-type pipeline job-id] :as compiled} event]
+(defn read-batch
+  [{:keys [peer-replica-view task-type pipeline job-id] :as compiled}
+   task-information event]
   (if (and (= task-type :input) (:backpressure? @peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [rets (merge event (p-ext/read-batch pipeline event))
@@ -229,7 +233,8 @@
     event))
 
 (s/defn replay-windows-from-log :- Event
-  [{:keys [onyx.core/windows-state onyx.core/filter-state onyx.core/state-log] :as event} :- Event]
+  [task-information
+   {:keys [onyx.core/windows-state onyx.core/filter-state onyx.core/state-log] :as event} :- Event]
   (when (windowed-task? event)
     (swap! windows-state 
            (fn [windows-state] 
@@ -239,18 +244,18 @@
                                 (swap! filter-state state-extensions/apply-filter-id event unique-id))
                               (mapv ws/play-entry ws window-logs))
                    replayed-state (state-extensions/playback-log-entries state-log event windows-state apply-fn)]
-               (trace (:onyx.core/task-id event) "replayed state:" replayed-state)
+               (logger/task-log-trace task-information (format "Replayed state: %s" replayed-state))
                replayed-state))))
   event)
 
 (s/defn write-batch :- Event 
-  [{:keys [pipeline]} 
+  [{:keys [pipeline]}
+   task-information
    event :- Event]
   (let [rets (merge event (p-ext/write-batch pipeline event))]
-    (trace (format "[%s / %s] Wrote %s segments"
-                   (:onyx.core/id rets)
-                   (:onyx.core/lifecycle-id rets)
-                   (count (:onyx.core/results rets))))
+    (logger/task-log-trace
+     task-information
+     (format "Wrote %s segments" (count (:onyx.core/results rets))))
     rets))
 
 (defn launch-aux-threads!
@@ -292,10 +297,11 @@
                        (>!! outbox-ch entry))))
              (recur)))))
      (catch Throwable e
-       (fatal e)))))
+       (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
 
 (defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
-                                               onyx.core/compiled]
+                                               onyx.core/compiled
+                                               onyx.core/task-information]
                                         :as event}
                              input-retry-timeout task-kill-ch]
   (go
@@ -307,24 +313,24 @@
             (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
               (doseq [m tail]
                 (when (p-ext/pending? pipeline event m)
-                  (trace (format "Input retry message %s" m))
+                  (logger/task-log-trace task-information (format "Input retry message %s" m))
                   (->> (p-ext/retry-segment pipeline event m)
                        (lc/invoke-after-retry event compiled m))))
               (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
               (recur))))))))
 
-(defn handle-exception [log e restart-ch outbox-ch job-id]
+(defn handle-exception [task-info log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
-      (do (warn (:original-exception data) "Caught exception inside task lifecycle. Rebooting the task.")
+      (do (warn (logger/merge-error-keys (:original-exception data) task-info "Caught exception inside task lifecycle. Rebooting the task."))
           (close! restart-ch))
-      (do (warn e "Handling uncaught exception thrown inside task lifecycle - killing this job.")
+      (do (warn (logger/merge-error-keys e task-info "Handling uncaught exception thrown inside task lifecycle - killing this job."))
           (let [entry (entry/create-log-entry :kill-job {:job job-id})]
             (extensions/write-chunk log :exception e job-id)
             (>!! outbox-ch entry))))))
 
 (s/defn assign-windows :- Event
-  [compiled {:keys [onyx.core/windows] :as event}]
+  [compiled task-information {:keys [onyx.core/windows] :as event}]
   (when-not (empty? windows)
     (let [{:keys [tree acks]} (:onyx.core/results event)]
       (when-not (empty? tree)
@@ -335,20 +341,21 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [onyx.core/compiled] :as init-event} seal-ch kill-ch ex-f]
+  [{:keys [onyx.core/compiled onyx.core/task-information] :as init-event}
+   seal-ch kill-ch ex-f]
   (try
     (while (first (alts!! [seal-ch kill-ch] :default true))
       (->> init-event
            (gen-lifecycle-id)
            (lc/invoke-before-batch compiled)
-           (lc/invoke-read-batch read-batch compiled)
+           (lc/invoke-read-batch read-batch compiled task-information)
            (tag-messages compiled)
            (add-messages-to-timeout-pool compiled)
            (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
-           (lc/invoke-assign-windows assign-windows compiled)
-           (lc/invoke-write-batch write-batch compiled)
+           (lc/invoke-assign-windows assign-windows compiled task-information)
+           (lc/invoke-write-batch write-batch compiled task-information)
            (flow-retry-segments compiled)
            (lc/invoke-after-batch compiled)
            (ack-segments compiled)))
@@ -373,11 +380,10 @@
                            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
                              (f pipeline-data)))]
             (or pipeline
-                (throw (ex-info "Failure to resolve plugin builder fn.
-                                 Did you require the file that contains this symbol?" {:kw kw})))))
+                (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
-        (throw (ex-info "Failed to resolve or build plugin on the classpath, did you require/import the file that contains this plugin?" {:symbol kw :exception e}))))))
+        (throw e)))))
 
 (defrecord TaskInformation 
     [id log job-id task-id 
@@ -394,7 +400,7 @@
           filtered-triggers (filterv #(window-ids (:trigger/window-id %)) triggers)
           workflow (extensions/read-chunk log :workflow job-id)
           lifecycles (extensions/read-chunk log :lifecycles job-id)
-          metadata (extensions/read-chunk log :job-metadata job-id)
+          metadata (or (extensions/read-chunk log :job-metadata job-id) {})
           task-map (find-task catalog (:name task))]
       (assoc component 
              :workflow workflow :catalog catalog :task task :task-name (:name task) :flow-conditions flow-conditions
@@ -431,7 +437,6 @@
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
             state (atom (->TaskState r-seq))
 
-            _ (info (format "[%s] Warming up Task LifeCycle for job %s, task %s" id job-id (:name task)))
             _ (validate-pending-timeout pending-timeout opts)
 
             pipeline-data {:onyx.core/id id
@@ -442,7 +447,7 @@
                            :onyx.core/workflow workflow
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/lifecycles lifecycles
-                           :onyx.core/metadata (or metadata {})
+                           :onyx.core/metadata metadata
                            :onyx.core/compiled (map->Compiled {})
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task
@@ -451,6 +456,7 @@
                            :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/monitoring task-monitoring
+                           :onyx.core/task-information task-information
                            :onyx.core/outbox-ch outbox-ch
                            :onyx.core/seal-ch seal-ch
                            :onyx.core/restart-ch restart-ch
@@ -461,6 +467,8 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/state state}
+
+            _ (logger/task-log-info task-information "Warming up task lifecycle")
 
             add-pipeline (fn [event]
                            (assoc event 
@@ -476,16 +484,16 @@
                                add-pipeline
                                c/task->event-map)
 
-            ex-f (fn [e] (handle-exception log e restart-ch outbox-ch job-id))
+            ex-f (fn [e] (handle-exception task-information log e restart-ch outbox-ch job-id))
             _ (while (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                          (not (start-lifecycle? pipeline-data)))
+                          (not (start-lifecycle? pipeline-data task-information)))
                 (Thread/sleep (arg-or-default :onyx.peer/peer-not-ready-back-off opts)))
 
             pipeline-data (->> pipeline-data
                                (lc/invoke-before-task-start (:onyx.core/compiled pipeline-data))
                                resolve-filter-state
                                resolve-log
-                               replay-windows-from-log
+                               (replay-windows-from-log task-information)
                                (start-window-state-thread! ex-f))]
 
         (>!! outbox-ch (entry/create-log-entry :signal-ready {:id id}))
@@ -494,11 +502,11 @@
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
                      (or (not (common/job-covered? replica-state job-id))
                          (not (common/any-ackers? replica-state job-id))))
-            (info (format "[%s] Not enough virtual peers have warmed up to start the task yet, backing off and trying again..." id))
+            (logger/task-log-info task-information "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
             (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
 
-        (info (format "[%s] Enough peers are active, starting the task" id))
+        (logger/task-log-info task-information "Enough peers are active, starting the task")
 
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
@@ -511,13 +519,14 @@
                  :input-retry-segments-ch input-retry-segments-ch
                  :aux-ch aux-ch)))
       (catch Throwable e
-        (handle-exception log e restart-ch outbox-ch job-id)
+        (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
 
   (stop [component]
     (if-let [task-name (:onyx.core/task (:pipeline-data component))]
-      (info (format "[%s] Stopping Task LifeCycle for %s" id task-name))
-      (info (format "[%s] Stopping Task LifeCycle, failed to initialize task set up." id)))
+      (logger/task-log-info (:task-information component) "Stopping task lifecycle")
+      (logger/task-log-warn (:task-information component) "Stopping task lifecycle, failed to initialize task set up"))
+
     (when-let [event (:pipeline-data component)]
       (when-not (empty? (:onyx.core/triggers event))
         (>!! (:onyx.core/state-ch event) [:task-lifecycle-stopped event #()]))
@@ -531,7 +540,6 @@
 
       (<!! (:input-retry-segments-ch component))
       (<!! (:aux-ch component))
-
 
       (when-let [state-log (:onyx.core/state-log event)] 
         (state-extensions/close-log state-log event))
