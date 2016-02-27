@@ -280,19 +280,22 @@
       (state-extensions/store-log-entry state-log task-event (fn []) (list nil log-entry)))))
 
 (defn process-state 
-  [compiled {:keys [event-type task-event] :as state-event}]
+  [compiled task-information {:keys [event-type task-event] :as state-event}]
   (if (= event-type :new-segment) 
     (process-segment compiled state-event)
     (process-event compiled state-event)))
 
-(defn process-state-loop [{:keys [onyx.core/state-ch onyx.core/compiled onyx.core/peer-opts] :as event} ex-f]
+(defn process-state-loop
+  [{:keys [onyx.core/state-ch onyx.core/compiled onyx.core/task-information onyx.core/peer-opts] :as event} ex-f]
   (try 
     (let [timer-resolution (arg-or-default :onyx.peer/trigger-timer-resolution peer-opts)] 
       (loop [timer-tick-ch (timeout timer-resolution)]
         (let [[[event-type task-event ack-batch] ch] (alts!! [timer-tick-ch state-ch] :priority true)] 
           (cond (= ch state-ch)
                 (when event-type 
-                  (lc/invoke-assign-windows process-state compiled (new-state-event event-type task-event))
+                  (lc/invoke-assign-windows
+                   process-state compiled
+                   task-information (new-state-event event-type task-event))
                   ;; It's safe to ack the batch as it has been processed by the process event loop
                   ;; Will only ack if the batch has not been acked by ack-segments in the task lifecycle
                   (ack-batch)
@@ -300,7 +303,9 @@
 
                 (= ch timer-tick-ch)
                 (do 
-                  (lc/invoke-assign-windows process-state compiled (new-state-event :timer-tick event))
+                  (lc/invoke-assign-windows
+                   process-state compiled
+                   task-information (new-state-event :timer-tick event))
                   (recur (timeout timer-resolution)))))))
     (catch Throwable t
       (ex-f t)

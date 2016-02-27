@@ -60,10 +60,10 @@
               (reset! peer-view-atom new-peer-view)
               (recur (send-to-outbox new-state annotated-reactions)))))))
     (catch Throwable e
-      (taoensso.timbre/error e (str e) "Error in processing loop. Restarting.")
+      (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
       (close! restart-ch))
     (finally
-     (taoensso.timbre/info "Fell out of processing loop"))))
+      (taoensso.timbre/info (format "Peer %s: finished of processing loop" id)))))
 
 (defn outbox-loop [id log outbox-ch restart-ch]
   (try
@@ -72,10 +72,10 @@
         (extensions/write-log-entry log entry)
         (recur)))
     (catch Throwable e
-      (taoensso.timbre/info "Error writing log entry. Restarting." e)
+      (taoensso.timbre/warn e (format "Peer %s: error writing log entry. Restarting." id))
       (close! restart-ch))
     (finally
-     (taoensso.timbre/info "Fell out of outbox loop"))))
+      (taoensso.timbre/info (format "Peer %s: finished outbox loop" id)))))
 
 (defrecord VirtualPeer [opts task-component-fn]
   component/Lifecycle
