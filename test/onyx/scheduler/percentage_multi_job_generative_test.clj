@@ -14,7 +14,7 @@
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]))
 
 (deftest percentage-multi-job-test
-  (let [percentages-peer-config {:onyx/id #uuid "9fd09779-749b-4668-b373-bdf3eeb98a8f"
+  (let [percentages-peer-config {:onyx/tenancy-id #uuid "9fd09779-749b-4668-b373-bdf3eeb98a8f"
                                  :onyx.messaging/impl :dummy-messenger
                                  :onyx.peer/job-scheduler :onyx.job-scheduler/percentage}
         job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608"

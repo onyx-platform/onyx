@@ -1,34 +1,35 @@
 (ns ^:no-doc onyx.peer.task-compile
   (:require [clojure.set :refer [subset?]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
+            [schema.core :as s]
+            [onyx.schema :refer [Trigger Window TriggerState WindowExtension Event]]
             [onyx.peer.operation :refer [kw->fn]]
             [onyx.flow-conditions.fc-compile :as fc]
             [onyx.lifecycles.lifecycle-compile :as lc]
             [onyx.peer.grouping :as g]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.state.ack :as state-ack]
+            [onyx.static.validation :as validation]
+            [onyx.triggers.refinements]
             [onyx.windowing.window-compile :as wc]))
 
-(defn filter-triggers [triggers windows]
+(defn windows->event-map [windows triggers {:keys [onyx.core/task-map] :as event}]
+  (assoc event 
+         :onyx.core/windows windows
+         :onyx.core/windows-state (atom (mapv #(wc/resolve-window-state % triggers task-map) windows))))
+
+(s/defn filter-triggers 
+  [windows :- [WindowExtension]
+   triggers :- [Trigger]]
   (filter #(some #{(:trigger/window-id %)}
-                 (map :window/id windows))
+                 (map :id windows))
           triggers))
 
-(defn resolve-triggers [triggers]
-  (map
-   #(assoc %
-      :trigger/id (random-uuid)
-      :trigger/sync-fn (kw->fn (:trigger/sync %)))
-   triggers))
+(defn triggers->event-map [triggers {:keys [onyx.core/windows] :as event}]
+  (assoc event :onyx.core/triggers (mapv wc/resolve-trigger triggers)))
 
-(defn resolve-window-triggers [triggers windows event]
-  (merge
-   event
-   {:onyx.core/triggers (resolve-triggers (filter-triggers triggers windows))}))
-
-(defn windows->event-map [windows event]
-  (assoc event :onyx.core/windows (wc/resolve-windows windows)))
-
-(defn flow-conditions->event-map [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event}]
+(s/defn flow-conditions->event-map 
+  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event} :- Event]
   (update event 
           :onyx.core/compiled 
           (fn [compiled] 
@@ -47,10 +48,13 @@
                 (assoc :pipeline pipeline)
                 (assoc :messenger messenger)
                 (assoc :monitoring monitoring)
+                (assoc :acking-state (state-ack/new-ack-state task-map peer-replica-view messenger))
                 (assoc :job-id job-id)
                 (assoc :id id)
                 (assoc :state state)
                 (assoc :bulk? (:onyx/bulk? task-map))
+                (assoc :uniqueness-task? (contains? task-map :onyx/uniqueness-key))
+                (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
                 (assoc :fn (:onyx.core/fn event))
                 (assoc :task-type (:onyx/type task-map))
                 (assoc :peer-replica-view peer-replica-view)

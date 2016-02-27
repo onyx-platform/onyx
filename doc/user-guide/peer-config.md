@@ -12,7 +12,7 @@ The chapter describes the all options available to configure the virtual peers a
 
 | key name                      | type       |
 |-------------------------------|------------|
-|`:onyx/id`                     |  `any`     |
+|`:onyx/tenancy-id`                     |  `any`     |
 |`:zookeeper/address`           |  `string`  |
 
 
@@ -212,7 +212,7 @@ The Aeron idle strategy to use between when offering messages to another peer. C
 
 ```clojure
 (def peer-opts
-  {:onyx/id "df146eb8-fd6e-4903-847e-9e748ca08021"
+  {:onyx/tenancy-id "df146eb8-fd6e-4903-847e-9e748ca08021"
    :zookeeper/address "127.0.0.1:2181"
    :onyx.peer/inbox-capacity 2000
    :onyx.peer/outbox-capacity 2000

@@ -11,7 +11,14 @@ if [[ "$#" -ne 3 ]]; then
 else
   # Update to release version.
   git checkout master
-  git pull --rebase
+
+  git remote update
+  git status -uno|grep up-to-date
+
+  if [[ $? != 0 ]]; then
+	  echo "master is not up to date with remote. Please pull / merge with master first"
+	  exit 1
+  fi
 
   OLD_VERSION=`lein pprint :version|sed s/\"//g`
   NEW_VERSION=$1

@@ -15,7 +15,7 @@
 (deftest curator-tests 
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         base-path (str "/" onyx-id "/ab")
         base-path2 (str "/" onyx-id "/ab2")
         env (onyx.api/start-env env-config)]

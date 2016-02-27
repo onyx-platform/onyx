@@ -88,8 +88,8 @@
 (deftest ^:smoke colors-flow
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
         batch-size 10
 
         catalog [{:onyx/name :colors-in

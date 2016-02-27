@@ -48,8 +48,8 @@
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         batch-size 20
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)]
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
     (let [catalog-1
           [{:onyx/name :in-1
             :onyx/plugin :onyx.plugin.core-async/input

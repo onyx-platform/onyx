@@ -18,7 +18,7 @@
 (deftest log-notify-test
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
         _ (extensions/write-chunk (:log env) :job-scheduler {:job-scheduler :onyx.job-scheduler/greedy} nil)
         _ (extensions/write-chunk (:log env) :messaging {:onyx.messaging/impl :dummy-messaging} nil)

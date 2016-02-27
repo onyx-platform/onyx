@@ -14,8 +14,8 @@
 (deftest log-log-test-1
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id onyx-id)
-        peer-config (assoc (:peer-config config) :onyx/id onyx-id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)
         scheduler :onyx.job-scheduler/balanced
         env (onyx.api/start-env env-config)]
     (try
@@ -33,7 +33,7 @@
 (deftest log-log-test-2 
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         env (onyx.api/start-env env-config)
         scheduler :onyx.job-scheduler/balanced
         entries 10000

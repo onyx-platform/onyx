@@ -13,9 +13,9 @@
 (deftest log-two-job
   (let [onyx-id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id onyx-id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
         peer-config (assoc (:peer-config config)
-                           :onyx/id onyx-id
+                           :onyx/tenancy-id onyx-id
                            :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
         env (onyx.api/start-env env-config)
         peer-group (onyx.api/start-peer-group peer-config)

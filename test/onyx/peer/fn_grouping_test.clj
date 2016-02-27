@@ -47,8 +47,8 @@
 (deftest function-grouping
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
 
         workflow [[:in :sum-balance]
                   [:sum-balance :out]]

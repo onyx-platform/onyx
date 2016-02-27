@@ -29,9 +29,9 @@
 (deftest messaging-short-circuit-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
-                           :onyx/id id 
+                           :onyx/tenancy-id id 
                            :onyx.messaging/allow-short-circuit? true)
         batch-size 20
         catalog [{:onyx/name :in

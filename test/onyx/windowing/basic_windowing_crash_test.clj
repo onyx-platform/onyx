@@ -18,6 +18,15 @@
   ;; ensure some duplicates are around and interdispersed
   [{:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
    {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+   {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
    ; Exact dupe
    {:id 2  :age 12 :event-time #inst "2015-09-13T03:04:00.829-00:00"}
    ; Exact dupe
@@ -50,18 +59,25 @@
 
 (defn output->final-counts [window-counts]
   (let [grouped (group-by (juxt first second) window-counts)]
-    (set (map (fn get-latest [[k v]]
-                (last (sort-by #(apply + (vals (nth % 2))) v)))
+    (set (map (fn get-latest [[[bounds k] all]]
+                [bounds k (last (sort (map last all)))])
               grouped)))) 
 
 (def expected-windows
-  #{[1442114700000 1442114999999 {49 1}]
-    [1442113500000 1442113799999 {3 2, 64 1, 53 2, 52 2, 24 1}]
-    [1442114100000 1442114399999 {35 2}]
-    [1442116500000 1442116799999 {22 1, 83 1}]
-    [1442113200000 1442113499999 {21 1, 12 2, 15 1}]
-    [1442115900000 1442116199999 {37 1}]
-    [1442115000000 1442115299999 {60 1}]})
+  #{[[1442115000000 1442115299999] 60 1]
+    [[1442113200000 1442113499999] 21 1]
+    [[1442113500000 1442113799999] 64 1]
+    [[1442113500000 1442113799999] 3 2]
+    [[1442116500000 1442116799999] 83 1]
+    [[1442115900000 1442116199999] 37 1]
+    [[1442113500000 1442113799999] 52 2]
+    [[1442114100000 1442114399999] 35 2]
+    [[1442113500000 1442113799999] 53 2]
+    [[1442113200000 1442113499999] 15 1]
+    [[1442114700000 1442114999999] 49 1]
+    [[1442113500000 1442113799999] 24 1]
+    [[1442113200000 1442113499999] 12 2]
+    [[1442116500000 1442116799999] 22 1]})
 
 (defn restartable? [event lifecycle lifecycle-name e]
   :restart)
@@ -108,8 +124,9 @@
 
   (def test-state (atom []))
 
-  (defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
-    (swap! test-state conj [lower-bound upper-bound state]))
+  (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
+    (when-not (= :task-lifecycle-stopped event-type)
+      (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
   (def batch-num (atom 0))
 
@@ -117,9 +134,9 @@
     {:lifecycle/before-batch 
      (fn [event lifecycle]
        (case (swap! batch-num inc)
-         2 
-         (do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
-             (Thread/sleep 7000))
+         ;2 
+         ;(do (state-extensions/compact-log (:onyx.core/state-log event) event @(:onyx.core/window-state event))
+         ;    (Thread/sleep 7000))
          ;; compactions happen at a check in between log entries writing, so we need to wait for two cycles
          ;; before crashing
          4
@@ -154,9 +171,9 @@
 
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) 
-                           :onyx/id id
+                           :onyx/tenancy-id id
                            ;; Write for every batch to ensure compaction occurs
                            :onyx.bookkeeper/write-batch-size 1)
         batch-size 5 
@@ -205,9 +222,8 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :accumulating
-          :trigger/on :segment
-          :trigger/fire-all-extents? true
+          :trigger/refinement :onyx.triggers.refinements/accumulating
+          :trigger/on :onyx.triggers.triggers/segment
           ;; Align threshhold with batch-size since we'll be restarting
           :trigger/threshold [1 :elements]
           :trigger/sync ::update-atom!}]

@@ -15,8 +15,8 @@
   (testing "peers all join and watch each other"
     (let [config (load-config)
           onyx-id (java.util.UUID/randomUUID)
-          env-config (assoc (:env-config config) :onyx/id onyx-id)
-          peer-config (assoc (:peer-config config) :onyx/id onyx-id)
+          env-config (assoc (:env-config config) :onyx/tenancy-id onyx-id)
+          peer-config (assoc (:peer-config config) :onyx/tenancy-id onyx-id)
           n-peers 20]
 
       (with-test-env [test-env [n-peers env-config peer-config]]
