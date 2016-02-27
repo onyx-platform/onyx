@@ -397,7 +397,7 @@
           metadata (extensions/read-chunk log :job-metadata job-id)
           task-map (find-task catalog (:name task))]
       (assoc component 
-             :workflow workflow :catalog catalog :task task :flow-conditions flow-conditions 
+             :workflow workflow :catalog catalog :task task :task-name (:name task) :flow-conditions flow-conditions
              :windows windows :filtered-windows filtered-windows :triggers triggers :filtered-triggers filtered-triggers 
              :lifecycles lifecycles :task-map task-map :metadata metadata)))
   (stop [component]
@@ -442,7 +442,7 @@
                            :onyx.core/workflow workflow
                            :onyx.core/flow-conditions flow-conditions
                            :onyx.core/lifecycles lifecycles
-                           :onyx.core/metadata metadata
+                           :onyx.core/metadata (or metadata {})
                            :onyx.core/compiled (map->Compiled {})
                            :onyx.core/task-map task-map
                            :onyx.core/serialized-task task

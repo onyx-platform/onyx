@@ -54,7 +54,8 @@
         old-replica (merge replica/base-replica
                            {:messaging {:onyx.messaging/impl :dummy-messenger}
                             :job-scheduler :onyx.job-scheduler/balanced
-                            :peers [:p1 :p2]})
+                            :peers [:p1 :p2]
+                            :peer-state {:p1 :idle :p2 :idle}})
         new-replica (f old-replica)
         diff (rep-diff old-replica new-replica)]
     (is (= [] (rep-reactions old-replica new-replica diff {:id :p1})))
