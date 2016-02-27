@@ -254,10 +254,7 @@
   (let [rets (merge event (p-ext/write-batch pipeline event))]
     (logger/task-log-trace
      task-information
-     (format "[%s / %s] Wrote %s segments"
-             (:onyx.core/id rets)
-             (:onyx.core/lifecycle-id rets)
-             (count (:onyx.core/results rets))))
+     (format "Wrote %s segments" (count (:onyx.core/results rets))))
      rets))
 
 (defn launch-aux-threads!
@@ -410,6 +407,7 @@
              :workflow workflow
              :catalog catalog
              :task task
+             :task-name (:name task)
              :flow-conditions flow-conditions
              :windows windows
              :filtered-windows filtered-windows
