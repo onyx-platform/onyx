@@ -71,7 +71,7 @@
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (logger/task-log-info
-       (:onyx.core/task-information (:onyx.core/compiled event))
+       (:onyx.core/task-information event)
        "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
