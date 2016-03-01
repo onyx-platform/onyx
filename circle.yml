@@ -19,7 +19,7 @@ dependencies:
     - sudo pip install awscli
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
-    - curl https://gist.githubusercontent.com/MichaelDrogalis/cc7fc9e42da1fa1004b7/raw/f8ebb7cc6ea12190c4288dc4aac25d64b226dd0e/gistfile1.txt >> ~/.ssh/config
+    - curl https://gist.githubusercontent.com/lbradstreet/13b19b5998b02cbf666e/raw/ab259e37d4bb3eb75a36180a67a055aeaeb8cf40/releasegist.txt >> ~/.ssh/config
 
 notify:
   webhooks:
