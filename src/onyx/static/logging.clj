@@ -1,8 +1,7 @@
-(ns ^:no-doc onyx.static.logging
-  (:require [taoensso.timbre :refer [trace info warn fatal error]]))
+(ns ^:no-doc onyx.static.logging)
 
 (defn log-prefix [task-info]
-  (format "Job %s %s - Task %s %s - Peer %s - "
+  (format "Job %s %s - Task %s %s - Peer %s -"
           (:job-id task-info)
           (:metadata task-info)
           (:task-id task-info)
@@ -28,15 +27,6 @@
                      (.getName ^java.lang.Class (.getClass ^clojure.lang.ExceptionInfo e))
                      (.getMessage ^clojure.lang.ExceptionInfo e))]
      (ex-info msg error-keys (.getCause ^clojure.lang.ExceptionInfo e)))))
-
-(defn task-log-trace [task-information msg]
-  (trace (str (log-prefix task-information) msg)))
-
-(defn task-log-info [task-information msg]
-  (info (str (log-prefix task-information) msg)))
-
-(defn task-log-warn [task-information msg]
-  (warn (str (log-prefix task-information) msg)))
 
 (defn exception-msg [task-information msg]
   (str (log-prefix task-information) msg))

@@ -35,7 +35,7 @@
      compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
      egress-ids flow-conditions fn grouping-fn id job-id messenger
      monitoring uniqueness-task? uniqueness-key peer-replica-view
-     pipeline state task->group-by-fn task-type acking-state task-information])
+     log-prefix pipeline state task->group-by-fn task-type acking-state task-information])
 
 (defrecord TriggerState 
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 

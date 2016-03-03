@@ -10,6 +10,7 @@
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.state.ack :as state-ack]
             [onyx.static.validation :as validation]
+            [onyx.static.logging :as logging]
             [onyx.triggers.refinements]
             [onyx.windowing.window-compile :as wc]))
 
@@ -42,11 +43,12 @@
   [{:keys [onyx.core/task-map onyx.core/id onyx.core/pipeline onyx.core/job-id
            onyx.core/catalog onyx.core/serialized-task onyx.core/messenger
            onyx.core/monitoring onyx.core/state onyx.core/peer-replica-view
-           onyx.core/task-information] :as event}]
+           onyx.core/log-prefix onyx.core/task-information] :as event}]
   (update event 
           :onyx.core/compiled 
           (fn [compiled] 
             (-> compiled
+                (assoc :log-prefix log-prefix)
                 (assoc :pipeline pipeline)
                 (assoc :messenger messenger)
                 (assoc :monitoring monitoring)
