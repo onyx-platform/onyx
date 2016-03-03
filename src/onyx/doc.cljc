@@ -1,4 +1,4 @@
-(ns onyx.information-model
+(ns onyx.doc
   (:require [onyx.information-model]))
 
 (defn lookup-categories [model kw] 
