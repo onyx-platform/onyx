@@ -1,5 +1,5 @@
 (ns onyx.doc
-  (:require [onyx.information-model]))
+  (:require [onyx.information-model :refer [model]]))
 
 (defn lookup-categories [model kw] 
   (->> (keys model)
