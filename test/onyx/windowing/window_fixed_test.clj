@@ -40,8 +40,9 @@
 
 (def test-state (atom []))
 
-(defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
-  (swap! test-state conj [lower-bound upper-bound state]))
+(defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
+  (when-not (= :task-lifecycle-stopped event-type)
+    (swap! test-state conj [lower-bound upper-bound extent-state]))) 
 
 (def in-chan (atom nil))
 
@@ -62,8 +63,8 @@
 (deftest fixed-windows-segment-trigger
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
         batch-size 20
         workflow
         [[:in :identity] [:identity :out]]
@@ -102,8 +103,8 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :accumulating
-          :trigger/on :segment
+          :trigger/refinement :onyx.triggers.refinements/accumulating
+          :trigger/on :onyx.triggers.triggers/segment
           :trigger/fire-all-extents? true
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]

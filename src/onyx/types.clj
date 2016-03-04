@@ -2,10 +2,13 @@
 
 (defrecord Event [monitoring metrics])
 
-(defrecord Leaf [message id acker-id completion-id ack-val hash-group route])
+(defrecord Leaf [message id offset acker-id completion-id ack-val hash-group route])
 
-(defn input [id message]
-  (->Leaf message id nil nil nil nil nil))
+(defn input 
+  ([id message offset]
+   (->Leaf message id offset nil nil nil nil nil))
+  ([id message]
+   (->Leaf message id nil nil nil nil nil nil)))
 
 (defrecord Route [flow exclusions post-transformation action])
 
@@ -16,9 +19,9 @@
 (defrecord Ack [id completion-id ack-val ref-count timestamp]
   RefCounted
   (inc-count! [this]
-    (swap! (:ref-count this) inc))
+    (swap! ref-count inc))
   (dec-count! [this]
-    (zero? (swap! (:ref-count this) dec))))
+    (zero? (swap! ref-count dec))))
 
 (defrecord Results [tree acks segments retries])
 
@@ -28,7 +31,11 @@
                      compiled-after-retry-segment-fn compiled-after-task-fn compiled-before-batch-fn compiled-before-task-start-fn 
                      compiled-ex-fcs compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn 
                      egress-ids flow-conditions fn grouping-fn id job-id messenger monitoring 
-                     peer-replica-view pipeline state task->group-by-fn task-type])
+                     uniqueness-task? uniqueness-key peer-replica-view pipeline state task->group-by-fn task-type acking-state])
+
+(defrecord TriggerState 
+  [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 
+   period threshold sync-fn id init-state create-state-update apply-state-update])
 
 (defrecord Link [link timestamp])
 

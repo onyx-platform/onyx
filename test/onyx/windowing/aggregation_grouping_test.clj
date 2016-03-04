@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [taoensso.timbre :refer [info]]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
@@ -30,8 +31,12 @@
 
 (def test-state (atom {}))
 
-(defn update-atom! [event window trigger {:keys [window-id upper-bound lower-bound]} state]
-  (swap! test-state (fn [s] (merge s state))))
+(def fire-count (atom {}))
+
+(defn update-atom! 
+  [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
+  (swap! fire-count update (vector lower-bound group-key) (fn [v] (inc (or v 0))))
+  (swap! test-state merge {group-key extent-state}))
 
 (def in-chan (atom nil))
 
@@ -52,8 +57,8 @@
 (deftest count-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
         batch-size 20
         workflow
         [[:in :identity] [:identity :out]]
@@ -93,10 +98,10 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :discarding
-          :trigger/on :timer
+          :trigger/refinement :onyx.triggers.refinements/accumulating
           :trigger/fire-all-extents? true
-          :trigger/period [3 :seconds]
+          :trigger/on :onyx.triggers.triggers/timer
+          :trigger/period [5 :seconds]
           :trigger/sync ::update-atom!}]
 
         lifecycles
@@ -114,25 +119,27 @@
     (reset! test-state {})
 
     (with-test-env [test-env [5 env-config peer-config]]
-      (onyx.api/submit-job
-       peer-config
-       {:catalog catalog
-        :workflow workflow
-        :lifecycles lifecycles
-        :windows windows
-        :triggers triggers
-        :task-scheduler :onyx.task-scheduler/balanced})
+      (let [job (onyx.api/submit-job
+                  peer-config
+                  {:catalog catalog
+                   :workflow workflow
+                   :lifecycles lifecycles
+                   :windows windows
+                   :triggers triggers
+                   :task-scheduler :onyx.task-scheduler/balanced})]
 
-      (doseq [i input]
-        (>!! @in-chan i))
+        (doseq [i input]
+          (>!! @in-chan i))
 
-      ;;; Let's the triggers fire periodically.
-      (Thread/sleep 10000)
+        ;;; Let's the triggers fire periodically.
+        (Thread/sleep 10000)
 
-      (>!! @in-chan :done)
-      (close! @in-chan)
+        (>!! @in-chan :done)
+        (close! @in-chan)
 
-      (let [results (take-segments! @out-chan)]
-        (is (= (into #{} input) (into #{} (butlast results))))
-        (is (= :done (last results)))
-        (is (= expected-windows @test-state))))))
+        (let [results (take-segments! @out-chan)]
+          (onyx.api/await-job-completion peer-config (:job-id job))
+          (is (#{2 3} (apply max (vals @fire-count))))
+          (is (= (into #{} input) (into #{} (butlast results))))
+          (is (= :done (last results)))
+          (is (= expected-windows @test-state)))))))

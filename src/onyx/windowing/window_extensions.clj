@@ -1,13 +1,13 @@
 (ns onyx.windowing.window-extensions
   (:require [onyx.windowing.units :refer [to-standard-units coerce-key] :as units]
             [onyx.windowing.window-id :as wid]
-            [onyx.static.default-vals :as d]))
+            [onyx.static.default-vals :as d]
+            [taoensso.timbre :refer [info]]))
 
-(defn window-id-impl-extents [window w-range w-slide segment]
-  (let [window-id (:window/id window)
-        units (units/standard-units-for (last (:window/range window)))
-        min-value (or (:window/min-value window) 0)]
-    (wid/wids min-value w-range w-slide (:window/window-key window) segment)))
+(defn window-id-impl-extents [range min-value window-key w-range w-slide segment]
+  (let [units (units/standard-units-for (last range))
+        min-value (or min-value 0)]
+    (wid/wids min-value w-range w-slide window-key segment)))
 
 (defprotocol IWindow
   (speculate-update [this extents segment]
@@ -32,55 +32,56 @@
     "Returns a vector of two elements. The first is the lower bound that this window
      id accepts, and the second is the upper."))
 
-(deftype FixedWindow [window]
+(defrecord FixedWindow 
+  [id task type aggregation init window-key min-value range slide timeout-gap session-key doc window]
   IWindow
   (speculate-update [this extents segment]
     extents)
 
   (extents [this all-extents segment]
-    (let [w-range (apply units/to-standard-units (:window/range window))]
-      (window-id-impl-extents window w-range w-range segment)))
+    (let [w-range (apply units/to-standard-units range)]
+      (window-id-impl-extents range min-value window-key w-range w-range segment)))
 
   (merge-extents [this extents super-agg-fn segment]
     extents)
 
   (uniform-units [this segment]
-    (let [units (units/standard-units-for (last (:window/range window)))
-          k (:window/window-key window)]
-      (update segment k units/coerce-key units)))
+    (let [units (units/standard-units-for (last range))]
+      (update segment window-key units/coerce-key units)))
 
   (bounds [this window-id]
-    (let [win-min (or (:window/min-value window) (get d/defaults :onyx.windowing/min-value))
-          w-range (apply to-standard-units (:window/range window))]
+    (let [win-min (or min-value (get d/defaults :onyx.windowing/min-value))
+          w-range (apply to-standard-units range)]
       [(wid/extent-lower win-min w-range w-range window-id)
        (wid/extent-upper win-min w-range window-id)])))
 
-(deftype SlidingWindow [window]
+(defrecord SlidingWindow 
+  [id task type aggregation init window-key min-value range slide timeout-gap session-key doc window]
   IWindow
   (speculate-update [this extents segment]
     extents)
 
   (extents [this all-extents segment]
-    (let [w-range (apply units/to-standard-units (:window/range window))
-          w-slide (apply units/to-standard-units (:window/slide window))]
-      (window-id-impl-extents window w-range w-slide segment)))
+    (let [w-range (apply units/to-standard-units range)
+          w-slide (apply units/to-standard-units slide)]
+      (window-id-impl-extents range min-value window-key w-range w-slide segment)))
 
   (merge-extents [this extents super-agg-fn segment]
     extents)
 
   (uniform-units [this segment]
-    (let [units (units/standard-units-for (last (:window/range window)))
-          k (:window/window-key window)]
-      (update segment k units/coerce-key units)))
+    (let [units (units/standard-units-for (last range))]
+      (update segment window-key units/coerce-key units)))
 
   (bounds [this window-id]
-    (let [win-min (or (:window/min-value window) (get d/defaults :onyx.windowing/min-value))
-          w-range (apply to-standard-units (:window/range window))
-          w-slide (apply to-standard-units (or (:window/slide window) (:window/range window)))]
+    (let [win-min (or min-value (get d/defaults :onyx.windowing/min-value))
+          w-range (apply to-standard-units range)
+          w-slide (apply to-standard-units (or slide range))]
       [(wid/extent-lower win-min w-range w-slide window-id)
        (wid/extent-upper win-min w-slide window-id)])))
 
-(deftype GlobalWindow [window]
+(defrecord GlobalWindow 
+  [id task type aggregation init window-key min-value range slide timeout-gap session-key doc window]
   IWindow
   (speculate-update [this extents segment]
     extents)
@@ -103,15 +104,14 @@
 (defn super-aggregate [window super-agg-fn extents extent-1 all-extents]
   (reduce
    (fn [all e]
-     (super-agg-fn all (get extents e) window))
+     (super-agg-fn window all (get extents e)))
    (get extents extent-1) all-extents))
 
-(deftype SessionWindow [window]
+(defrecord SessionWindow 
+  [id task type aggregation init window-key min-value range slide timeout-gap session-key doc window]
   IWindow
   (speculate-update [this extents segment]
-    (let [window-key (:window/window-key window)
-          session-key (:window/session-key window)
-          gap (apply units/to-standard-units (:window/timeout-gap window))]
+    (let [gap (apply units/to-standard-units timeout-gap)]
       (reduce-kv
        (fn [all s v]
          (if (and (= (:session-key s) (get segment session-key))
@@ -125,22 +125,20 @@
        extents)))
 
   (extents [this all-extents segment]
-    (let [window-key (:window/window-key window)
-          session-key (:window/session-key window)
-          sessions (filter
+    (let [sessions (filter
                     (fn [s]
                       (and (= (:session-key s) (get segment session-key))
                            (>= (get segment window-key) (:session-lower-bound s))
                            (<= (get segment window-key) (:session-upper-bound s))))
                     all-extents)]
-      (if (seq sessions)
-        sessions
+      (if (empty? sessions)
         [{:session-key (get segment session-key)
           :session-lower-bound (get segment window-key)
-          :session-upper-bound (get segment window-key)}])))
+          :session-upper-bound (get segment window-key)}]
+        sessions)))
 
   (merge-extents [this extents super-agg-fn segment]
-    (let [session-key (get segment (:window/session-key window))]
+    (let [session-key (get segment session-key)]
       (loop [ks (sort-by :session-lower-bound (filter #(= (:session-key %) session-key) (keys extents)))
              results (into {} (filter (fn [[e v]] (not= (:session-key e) session-key)) extents))]
         (if-not (seq ks)
@@ -160,28 +158,27 @@
               (recur (rest ks) (assoc results (first ks) (or (get extents (first ks)) (get results (first ks)))))))))))
 
   (uniform-units [this segment]
-    (let [units (units/standard-units-for (last (:window/timeout-gap window)))
-          k (:window/window-key window)]
-      (update segment k units/coerce-key units)))
+    (let [units (units/standard-units-for (last timeout-gap))]
+      (update segment window-key units/coerce-key units)))
 
   (bounds [this window-id]
     [(:session-lower-bound window-id)
      (:session-upper-bound window-id)]))
 
-(defmulti windowing-record
+(defmulti windowing-builder
   "Given a window, return the concrete type to perform
    operations against."
   (fn [window]
     (:window/type window)))
 
-(defmethod windowing-record :fixed
-  [window] (FixedWindow. window))
+(defmethod windowing-builder :fixed
+  [window] map->FixedWindow)
 
-(defmethod windowing-record :sliding
-  [window] (SlidingWindow. window))
+(defmethod windowing-builder :sliding
+  [window] map->SlidingWindow)
 
-(defmethod windowing-record :global
-  [window] (GlobalWindow. window))
+(defmethod windowing-builder :global
+  [window] map->GlobalWindow)
 
-(defmethod windowing-record :session
-  [window] (SessionWindow. window))
+(defmethod windowing-builder :session
+  [window] map->SessionWindow)

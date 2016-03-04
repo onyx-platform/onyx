@@ -30,7 +30,7 @@
                  (when-let [pick-peer-fn (get pick-peer-fns (get egress-tasks route))]
                    (when-let [target (pick-peer-fn hash-group)]
                      (when-let [site (peer-site peer-replica-view target)]
-                       (onyx.extensions/send-messages messenger event site segs)))))
+                       (onyx.extensions/send-messages messenger site segs)))))
                grouped))))
    {}))
 

@@ -40,7 +40,7 @@
 (defn bookkeeper
   ([opts]
    (bookkeeper (:zookeeper/address opts)
-               (zk/ledgers-path (:onyx/id opts))
+               (zk/ledgers-path (:onyx/tenancy-id opts))
                (arg-or-default :onyx.bookkeeper/client-timeout opts)
                (arg-or-default :onyx.bookkeeper/client-throttle opts)))
   ([zk-addr zk-root-path timeout throttle]
@@ -122,38 +122,6 @@
                                 (fn [] 
                                   (close! (:onyx.core/restart-ch event))))))))))
 
-(defn take-write-batch [batch-size batch-ch]
-  (loop [entries [] ack-fns [] i 0]
-    (if (< i batch-size)
-      (let [[entry ack-fn] (poll! batch-ch)]
-        (if entry
-          (recur (conj entries entry)
-                 (conj ack-fns ack-fn)
-                 (inc i))
-          [entries ack-fns]))
-      [entries ack-fns])))
-
-(defn process-batches [{:keys [ledger-handle next-ledger-handle batch-ch] :as log}
-                       {:keys [onyx.core/kill-ch onyx.core/task-kill-ch onyx.core/peer-opts] :as event}]
-  (thread
-    (let [batch-size (arg-or-default :onyx.bookkeeper/write-batch-size peer-opts)
-          batch-backoff (arg-or-default :onyx.bookkeeper/write-batch-backoff peer-opts)]
-      (loop [[batch ack-fns] (take-write-batch batch-size batch-ch)]
-        ;; Safe point to transition to the next ledger handle
-        (when @next-ledger-handle
-          (compaction-transition log event))
-        (if (empty? batch)
-          (Thread/sleep batch-backoff)
-          (.asyncAddEntry ^LedgerHandle @ledger-handle 
-                          ^bytes (nippy/window-log-compress batch)
-                          HandleWriteCallback
-                          (list (fn [] (run! (fn [f] (f)) ack-fns))
-                                (fn [] (close! (:onyx.core/restart-ch event))))))
-        (if (and (not (closed? kill-ch))
-                 (not (closed? task-kill-ch)))
-          (recur (take-write-batch batch-size batch-ch)))))
-          (info "BookKeeper: shutting down batch processing")))
-
 (defn assign-bookkeeper-log-id-spin [{:keys [onyx.core/peer-opts
                                              onyx.core/job-id onyx.core/task-id
                                              onyx.core/kill-ch onyx.core/task-kill-ch
@@ -185,8 +153,7 @@
         next-ledger-handle nil] 
     (assign-bookkeeper-log-id-spin event new-ledger-id)
     (info "Ledger id" new-ledger-id "published")
-    (doto (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle) batch-ch)
-      (process-batches event))))
+    (->BookKeeperLog bk-client (atom ledger-handle) (atom next-ledger-handle) batch-ch)))
 
 (defn playback-batch-entry [state apply-entry-fn batch]
   (reduce apply-entry-fn state batch))
@@ -280,4 +247,8 @@
 
 (defmethod state-extensions/store-log-entry onyx.state.log.bookkeeper.BookKeeperLog
   [{:keys [ledger-handle next-ledger-handle batch-ch] :as log} event ack-fn entry]
-  (>!! batch-ch (list entry ack-fn)))
+  (.asyncAddEntry ^LedgerHandle @ledger-handle 
+                  ^bytes (nippy/window-log-compress entry)
+                  HandleWriteCallback
+                  (list ack-fn
+                        (fn [] (close! (:onyx.core/restart-ch event))))))

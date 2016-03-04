@@ -30,8 +30,8 @@
 (deftest test-multiple-ackers
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
-        env-config (assoc (:env-config config) :onyx/id id)
-        peer-config (assoc (:peer-config config) :onyx/id id)]
+        env-config (assoc (:env-config config) :onyx/tenancy-id id)
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
     (with-test-env [test-env [4 env-config peer-config]]
       (let [batch-size 40
             catalog [{:onyx/name :in

@@ -9,7 +9,8 @@
           'keyword-namespaced?))
 
 (def Function
-  (s/pred fn? 'fn?))
+  (s/either (s/pred var? 'var?)
+            (s/pred fn? 'fn?)))
 
 (def TaskName
   (s/pred (fn [v]
@@ -35,6 +36,9 @@
 
 (def PosInt 
   (s/pred pos? 'pos?))
+
+(def Record
+  (s/pred record? 'record?))
 
 (def SPosInt 
   (s/pred (fn [v] (>= v 0)) 'spos?))
@@ -64,7 +68,7 @@
    (s/optional-key :onyx/restart-pred-fn)
    (deprecated [:catalog-entry :model :onyx/restart-pred-fn])
    (s/optional-key :onyx/language) Language
-   (s/optional-key :onyx/batch-timeout) PosInt
+   (s/optional-key :onyx/batch-timeout) SPosInt
    (s/optional-key :onyx/doc) s/Str
    (s/optional-key :onyx/bulk?) s/Bool
    (s/optional-key :onyx/max-peers) PosInt
@@ -258,7 +262,7 @@
    :window/aggregation (s/either s/Keyword [s/Keyword])
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/window-key) s/Any
-   (s/optional-key :window/min-key) SPosInt
+   (s/optional-key :window/min-value) s/Int
    (s/optional-key :window/range) Unit
    (s/optional-key :window/slide) Unit
    (s/optional-key :window/timeout-gap) Unit
@@ -266,8 +270,30 @@
    (s/optional-key :window/doc) s/Str
    UnsupportedWindowKey s/Any})
 
+(def StateAggregationCall
+  {(s/optional-key :aggregation/init) Function
+   :aggregation/create-state-update Function
+   :aggregation/apply-state-update Function
+   (s/optional-key :aggregation/super-aggregation-fn) Function})
+
+(def WindowExtension
+  (s/both Record
+          {:window Window
+           :id s/Keyword
+           :task TaskName
+           :type WindowType
+           :aggregation (s/either s/Keyword [s/Keyword])
+           (s/optional-key :init) (s/maybe s/Any)
+           (s/optional-key :window-key) (s/maybe s/Any)
+           (s/optional-key :min-value) (s/maybe SPosInt)
+           (s/optional-key :range) (s/maybe Unit)
+           (s/optional-key :slide) (s/maybe Unit)
+           (s/optional-key :timeout-gap) (s/maybe Unit)
+           (s/optional-key :session-key) (s/maybe s/Any)
+           (s/optional-key :doc) (s/maybe s/Str)}))
+
 (def TriggerRefinement
-  (s/enum :accumulating :discarding))
+  NamespacedKeyword)
 
 (def TriggerPeriod 
   (s/enum :milliseconds :seconds :minutes :hours :days
@@ -282,32 +308,84 @@
                 (not (= "trigger" (namespace k)))))
           'unsupported-trigger-key))
 
+(def TriggerPeriod
+  [(s/one PosInt "trigger period") 
+   (s/one TriggerPeriod "threshold type")])
+
+(def TriggerThreshold 
+  [(s/one PosInt "number elements") 
+   (s/one TriggerThreshold "threshold type")])
+
 (def Trigger
   {:trigger/window-id s/Keyword
    :trigger/refinement TriggerRefinement
-   :trigger/on s/Keyword
-   :trigger/sync s/Keyword
+   :trigger/on NamespacedKeyword
+   :trigger/sync NamespacedKeyword
    (s/optional-key :trigger/fire-all-extents?) s/Bool
-   (s/optional-key :trigger/pred) s/Keyword
+   (s/optional-key :trigger/pred) NamespacedKeyword
    (s/optional-key :trigger/watermark-percentage) double
    (s/optional-key :trigger/doc) s/Str
-   (s/optional-key :trigger/period) [(s/one PosInt "trigger period") 
-                                     (s/one TriggerPeriod "threshold type")]
-   (s/optional-key :trigger/threshold) [(s/one PosInt "number elements") 
-                                        (s/one TriggerThreshold "threshold type")]
+   (s/optional-key :trigger/period) TriggerPeriod
+   (s/optional-key :trigger/threshold) TriggerThreshold
+   (s/optional-key :trigger/id) s/Any
    UnsupportedTriggerKey s/Any})
 
-(def StateAggregationCall
-  {(s/optional-key :aggregation/init) Function
-   :aggregation/fn Function
-   :aggregation/apply-state-update Function
-   (s/optional-key :aggregation/super-aggregation-fn) Function})
+(def RefinementCall
+  {:refinement/create-state-update Function
+   :refinement/apply-state-update Function})
+
+(def TriggerCall
+  {:trigger/init-state Function
+   :trigger/next-state Function 
+   :trigger/trigger-fire? Function})
+
+(def TriggerState
+  (s/both Record
+          {:window-id s/Keyword
+           :refinement TriggerRefinement
+           :on s/Keyword
+           :sync s/Keyword
+           :fire-all-extents? (s/maybe s/Bool)
+           :pred (s/maybe s/Keyword)
+           :watermark-percentage (s/maybe double)
+           :doc (s/maybe s/Str)
+           :period (s/maybe TriggerPeriod)
+           :threshold (s/maybe TriggerThreshold) 
+           :sync-fn (s/maybe Function)
+           :state s/Any
+           :id s/Any
+           :trigger Trigger
+           :init-state Function
+           :trigger-fire? Function
+           :next-trigger-state Function
+           :create-state-update Function
+           :apply-state-update Function}))
+
+(def StateEvent s/Any)
+
+(def WindowState
+  (s/both Record 
+          {:window-extension WindowExtension
+           :trigger-states [TriggerState]
+           :window Window
+           :state {s/Any s/Any}
+           :state-event StateEvent
+           :event-results [StateEvent]
+           :init-fn Function
+           :create-state-update Function
+           :apply-state-update Function
+           :super-agg-fn (s/maybe Function)
+           (s/optional-key :new-window-state-fn) Function
+           (s/optional-key :grouping-fn) (s/either s/Keyword Function)}))
 
 (def JobScheduler
   NamespacedKeyword)
 
 (def TaskScheduler
   NamespacedKeyword)
+
+(def Event 
+  {s/Any s/Any})
 
 (def Job
   {:catalog Catalog
@@ -323,12 +401,13 @@
    (s/optional-key :acker/exempt-output-tasks?) s/Bool
    (s/optional-key :acker/exempt-tasks) [s/Keyword]})
 
-(def ClusterId
+(def TenancyId
   (s/either s/Uuid s/Str))
 
 (def EnvConfig
   {:zookeeper/address s/Str
-   :onyx/id ClusterId
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
    (s/optional-key :zookeeper/server?) s/Bool
    (s/optional-key :zookeeper.server/port) s/Int
    (s/optional-key :onyx.bookkeeper/server?) s/Bool
@@ -356,7 +435,8 @@
 
 (def PeerConfig
   {:zookeeper/address s/Str
-   :onyx/id ClusterId
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
    :onyx.peer/job-scheduler JobScheduler
    :onyx.messaging/impl Messaging
    :onyx.messaging/bind-addr s/Str
@@ -376,6 +456,7 @@
    (s/optional-key :onyx.peer/state-log-impl) StateLogImpl
    (s/optional-key :onyx.peer/state-filter-impl) StateFilterImpl
    (s/optional-key :onyx.peer/tags) [s/Keyword]
+   (s/optional-key :onyx.peer/trigger-timer-resolution) PosInt
    (s/optional-key :onyx.bookkeeper/client-timeout) PosInt
    (s/optional-key :onyx.bookkeeper/client-throttle) PosInt
    (s/optional-key :onyx.bookkeeper/ledger-password) s/Str
