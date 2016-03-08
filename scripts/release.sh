@@ -42,7 +42,7 @@ else
   git push origin $NEW_VERSION
 
   # Merge artifacts into release branch.
-  git checkout $NEW_BRANCH
+  git checkout -b $NEW_BRANCH
   git merge --no-edit master
   git push origin $NEW_BRANCH
 
