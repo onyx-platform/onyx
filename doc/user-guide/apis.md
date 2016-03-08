@@ -26,7 +26,7 @@ Starts N virtual peers to execute tasks. In a production environment, you should
 
 ##### `submit-job`
 
-Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, and `:task-scheduler`. Returns a map of `:job-id` and `:task-ids`, which map to a UUID and vector of maps respectively.
+Submits a job to Onyx to be scheduled for execution. Takes a map with keys `:catalog`, `:workflow`, `:flow-conditions`, `:windows`, `:triggers`, `:metadata`, and `:task-scheduler`. Returns a map of `:job-id` and `:task-ids`, which map to a UUID and vector of maps respectively. `:metadata` is a map of values that must serialize to EDN. `:metadata` will be logged with all task output, and is useful for identifying a particular task based on something other than its name or ID.
 
 ##### `await-job-completion`
 

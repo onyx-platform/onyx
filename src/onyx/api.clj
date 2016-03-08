@@ -170,6 +170,7 @@
      (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
      (extensions/write-chunk (:log client) :windows (:windows job) id)
      (extensions/write-chunk (:log client) :triggers (:triggers job) id)
+     (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
      (doseq [task tasks]
        (extensions/write-chunk (:log client) :task task id))

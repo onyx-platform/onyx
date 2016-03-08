@@ -390,6 +390,9 @@
 (def Event 
   {s/Any s/Any})
 
+(def JobMetadata
+  {s/Keyword s/Any})
+
 (def Job
   {:catalog Catalog
    :workflow Workflow
@@ -399,6 +402,7 @@
    (s/optional-key :windows) [Window]
    (s/optional-key :triggers) [Trigger]
    (s/optional-key :lifecycles) [Lifecycle]
+   (s/optional-key :metadata) JobMetadata
    (s/optional-key :acker/percentage) s/Int
    (s/optional-key :acker/exempt-input-tasks?) s/Bool
    (s/optional-key :acker/exempt-output-tasks?) s/Bool
