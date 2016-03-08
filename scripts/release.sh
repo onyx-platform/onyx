@@ -41,8 +41,10 @@ else
   git push origin master
   git push origin $NEW_VERSION
 
+  git branch $NEW_BRANCH || true
+
   # Merge artifacts into release branch.
-  git checkout -b $NEW_BRANCH
+  git checkout $NEW_BRANCH
   git merge --no-edit master
   git push origin $NEW_BRANCH
 
