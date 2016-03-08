@@ -31,6 +31,14 @@ else
   sed -i.bak "s/$OLD_VERSION/$NEW_VERSION/g" README.md
   sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" README.md
   sed -i.bak "s/$OLD_BRANCH/$NEW_BRANCH/g" circle.yml
+
+
+  if [[ $(grep $NEW_BRANCH circle.yml) -eq 1 ]]; then
+	  echo "You did not supply the correct old release branch. Hard resetting and exiting"
+	  git reset HEAD --hard
+	  exit 1
+  fi
+
   git rm -rf doc/api
   lein doc
 
