@@ -33,4 +33,4 @@ deployment:
       - git config --global user.name "OnyxBot"
       - lein deploy
       - lein unison update-projects
-      - lein unison release-projects 0.8.x
+      - lein unison release-projects 0.9.x
