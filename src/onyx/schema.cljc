@@ -272,10 +272,10 @@
      (s/optional-key :window/timeout-gap) Unit
      (s/optional-key :window/session-key) s/Any
      (s/optional-key :window/doc) s/Str
-     UnsupportedWindowKey s/Any})
-  (fn [v] (and (#{:fixed :sliding} (:window/type v))
-	       (:window/range v)))
-  ":window/range must be defined for :fixed or :sliding window")
+     UnsupportedWindowKey s/Any}
+    (fn [v] (and (#{:fixed :sliding} (:window/type v))
+                 (:window/range v)))
+    ":window/range must be defined for :fixed or :sliding window"))
 
 (def StateAggregationCall
   {(s/optional-key :aggregation/init) Function
