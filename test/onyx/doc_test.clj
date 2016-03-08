@@ -54,7 +54,7 @@
 
 (deftest window-test
   (is (= (set (keys (:model (:window-entry model)))) 
-         (set (schema-keys schema/Window)))))
+         (set (schema-keys schema/WindowBase)))))
 
 (deftest trigger-test
   (is (= (set (keys (:model (:trigger-entry model)))) 

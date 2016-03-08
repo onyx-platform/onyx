@@ -258,23 +258,27 @@
                 (not (= "window" (namespace k)))))
           'unsupported-window-key))
 
+(def WindowBase
+  {:window/id s/Keyword
+   :window/task TaskName
+   :window/type WindowType
+   :window/aggregation (s/either s/Keyword [s/Keyword])
+   (s/optional-key :window/init) s/Any
+   (s/optional-key :window/window-key) s/Any
+   (s/optional-key :window/min-value) s/Int
+   (s/optional-key :window/range) Unit
+   (s/optional-key :window/slide) Unit
+   (s/optional-key :window/timeout-gap) Unit
+   (s/optional-key :window/session-key) s/Any
+   (s/optional-key :window/doc) s/Str
+   UnsupportedWindowKey s/Any})
+
 (def Window
   (s/constrained 
-    {:window/id s/Keyword
-     :window/task TaskName
-     :window/type WindowType
-     :window/aggregation (s/either s/Keyword [s/Keyword])
-     (s/optional-key :window/init) s/Any
-     (s/optional-key :window/window-key) s/Any
-     (s/optional-key :window/min-value) s/Int
-     (s/optional-key :window/range) Unit
-     (s/optional-key :window/slide) Unit
-     (s/optional-key :window/timeout-gap) Unit
-     (s/optional-key :window/session-key) s/Any
-     (s/optional-key :window/doc) s/Str
-     UnsupportedWindowKey s/Any}
-    (fn [v] (and (#{:fixed :sliding} (:window/type v))
-                 (:window/range v)))
+    WindowBase
+    (fn [v] (if (#{:fixed :sliding} (:window/type v))
+              (:window/range v)
+              true))
     ":window/range must be defined for :fixed or :sliding window"))
 
 (def StateAggregationCall
