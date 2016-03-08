@@ -10,7 +10,7 @@
 
 (def Function
   (s/either (s/pred var? 'var?)
-            (s/pred fn? 'fn?)))
+            (s/pred ifn? 'ifn?)))
 
 (def TaskName
   (s/pred (fn [v]
