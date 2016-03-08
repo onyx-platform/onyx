@@ -285,7 +285,9 @@
     (process-segment compiled state-event)
     (process-event compiled state-event)))
 
-(defn process-state-loop [{:keys [onyx.core/state-ch onyx.core/compiled onyx.core/peer-opts] :as event} ex-f]
+(defn process-state-loop
+  [{:keys [onyx.core/state-ch onyx.core/compiled
+           onyx.core/peer-opts] :as event} ex-f]
   (try 
     (let [timer-resolution (arg-or-default :onyx.peer/trigger-timer-resolution peer-opts)] 
       (loop [timer-tick-ch (timeout timer-resolution)]
