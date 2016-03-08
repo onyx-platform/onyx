@@ -72,7 +72,8 @@
                                    {:catalog catalog
                                     :workflow workflow
                                     :lifecycles lifecycles
-                                    :task-scheduler :onyx.task-scheduler/balanced})
+                                    :task-scheduler :onyx.task-scheduler/balanced
+                                    :metadata {:job-name :click-stream}})
             results (take-segments! @out-chan)]
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]

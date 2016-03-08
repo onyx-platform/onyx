@@ -39,8 +39,7 @@
 (defn exception? [e]
   (instance? java.lang.Throwable e))
 
-(defn start-lifecycle?
-  [{:keys [onyx.core/queue onyx.core/ingress-queues onyx.core/task-map]}]
+(defn start-lifecycle? [event]
   true)
 
 (defn resolve-task-fn [entry]

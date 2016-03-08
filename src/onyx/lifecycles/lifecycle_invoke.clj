@@ -22,7 +22,7 @@
                       {})))))))
 
 (defn invoke-lifecycle-gen [phase compiled-key]
-  (fn invoke-lifecycle [compiled event] 
+  (fn invoke-lifecycle [compiled event]
     (restartable-invocation
       event
       phase
@@ -46,7 +46,7 @@
   (invoke-lifecycle-gen :lifecycle/after-batch :compiled-after-batch-fn))
 
 (defn invoke-task-lifecycle-gen [phase]
-  (fn invoke-task-lifecycle [f compiled event] 
+  (fn invoke-task-lifecycle [f compiled event]
     (restartable-invocation
       event
       phase

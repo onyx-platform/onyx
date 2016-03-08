@@ -11,6 +11,9 @@
    zookeeper-write-workflow
    zookeeper-write-flow-conditions
    zookeeper-write-lifecycles
+   zookeeper-write-windows
+   zookeeper-write-triggers
+   zookeeper-write-job-metadata
    zookeeper-write-task
    zookeeper-write-chunk
    zookeeper-write-job-scheduler
@@ -22,6 +25,9 @@
    zookeeper-read-workflow
    zookeeper-read-flow-conditions
    zookeeper-read-lifecycles
+   zookeeper-read-windows
+   zookeeper-read-triggers
+   zookeeper-read-job-metadata
    zookeeper-read-task
    zookeeper-read-chunk
    zookeeper-read-origin
@@ -64,4 +70,3 @@
 (defmethod extensions/monitoring-agent :custom
   [monitoring-config]
   (map->CustomMonitoringAgent monitoring-config))
-
