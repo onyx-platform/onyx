@@ -97,12 +97,15 @@
                 (:onyx/min-peers entry)))
         (= (:onyx/max-peers entry) 1))))
 
+(def FnPath
+  (s/either NamespacedKeyword s/Keyword))
+
 (def FluxPolicyNPeers
   (s/pred valid-min-peers-max-peers-n-peers? 'valid-flux-policy-min-max-n-peers))
 
 (def partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
-   (s/optional-key :onyx/group-by-fn) NamespacedKeyword
+   (s/optional-key :onyx/group-by-fn) FnPath
    :onyx/flux-policy FluxPolicy})
 
 (defn grouping-task? [task-map]
@@ -114,7 +117,7 @@
   {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
-   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)
+   (s/optional-key :onyx/fn) FnPath
    (s/optional-key :onyx/input-retry-timeout) PosInt 
    (s/optional-key :onyx/pending-timeout) PosInt 
    (s/optional-key :onyx/max-pending) PosInt})
@@ -123,7 +126,7 @@
   {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
-   (s/optional-key :onyx/fn) (s/either NamespacedKeyword s/Keyword)})
+   (s/optional-key :onyx/fn) FnPath})
 
 (def NonNamespacedKeyword 
   (s/pred (fn [v]
@@ -133,11 +136,11 @@
 
 (def partial-java-plugin
   {:onyx/plugin NonNamespacedKeyword
-   (s/optional-key :onyx/fn) s/Keyword})
+   (s/optional-key :onyx/fn) FnPath})
 
 (def partial-clojure-plugin
   {:onyx/plugin NamespacedKeyword
-   (s/optional-key :onyx/fn) NamespacedKeyword})
+   (s/optional-key :onyx/fn) FnPath})
 
 (def partial-fn-task
   {:onyx/fn (s/either NamespacedKeyword s/Keyword)
