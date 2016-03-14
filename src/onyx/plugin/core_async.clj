@@ -1,6 +1,7 @@
 (ns onyx.plugin.core-async
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout go <! alts! close!]]
             [onyx.peer.function :as function]
+            [clojure.set :refer [join]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults]]
             [onyx.static.uuid :as uuid]
@@ -147,3 +148,36 @@
            (if (and v (not= v :done))
              (recur (conj ret v))
              (conj ret :done))))))))
+
+(def channels (atom {}))
+
+(def default-channel-size 1000)
+
+(defn get-channel
+  ([id] (get-channel id default-channel-size))
+  ([id size]
+   (if-let [id (get @channels id)]
+     id
+     (do (swap! channels assoc id (chan size))
+         (get-channel id)))))
+
+(defn inject-in-ch
+  [_ lifecycle]
+  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+(defn inject-out-ch
+  [_ lifecycle]
+  {:core.async/chan (get-channel (:core.async/id lifecycle))})
+
+(def in-calls
+  {:lifecycle/before-task-start inject-in-ch})
+
+(def out-calls
+  {:lifecycle/before-task-start inject-out-ch})
+
+(defn get-core-async-channels
+  [{:keys [catalog lifecycles]}]
+  (let [lifecycle-catalog-join (join catalog lifecycles {:onyx/name :lifecycle/task})]
+    (reduce (fn [acc item]
+              (assoc acc
+                     (:onyx/name item)
+                     (get-channel (:core.async/id item)))) {} (filter :core.async/id lifecycle-catalog-join))))
