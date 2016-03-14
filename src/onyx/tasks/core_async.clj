@@ -1,4 +1,4 @@
-(ns onyx.plugin.core-async-tasks
+(ns onyx.tasks.core-async
   (:require [clojure.core.async :refer [chan]]
             [onyx.schema :as os]
             [onyx.plugin.core-async]
