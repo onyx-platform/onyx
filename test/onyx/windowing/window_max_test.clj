@@ -34,8 +34,8 @@
                 :window/window-key :event-time
                 :window/init 0}
         triggers [] #_[{:trigger/window-id :collect-segments
-                   :trigger/refinement :onyx.triggers.refinements/accumulating
-                   :trigger/on :onyx.triggers.triggers/segment
+                   :trigger/refinement :onyx.refinements/accumulating
+                   :trigger/on :onyx.triggers/segment
                    :trigger/threshold [15 :elements]
                    :trigger/sync ::update-atom!}]
         window-state (wc/resolve-window-state window triggers)
@@ -83,8 +83,8 @@
 		:window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
                    ;:trigger/refinement :onyx.triggers.refinements/discarding
-                   :trigger/refinement :onyx.triggers.refinements/accumulating
-                   :trigger/on :onyx.triggers.triggers/segment
+                   :trigger/refinement :onyx.refinements/accumulating
+                   :trigger/on :onyx.triggers/segment
                    :trigger/threshold [5 :elements]
                    :trigger/sync ::update-atom!}]
 	window-state (wc/resolve-window-state window triggers task-map)

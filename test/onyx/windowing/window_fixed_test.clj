@@ -103,8 +103,8 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.triggers.refinements/accumulating
-          :trigger/on :onyx.triggers.triggers/segment
+          :trigger/refinement :onyx.refinements/accumulating
+          :trigger/on :onyx.triggers/segment
           :trigger/fire-all-extents? true
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
