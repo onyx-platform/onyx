@@ -8,7 +8,7 @@
 
 (s/defn input
   ([task-name :- s/Keyword opts]
-   (input-task task-name opts default-channel-size))
+   (input task-name opts default-channel-size))
   ([task-name :- s/Keyword opts chan-size]
    {:task {:task-map (merge {:onyx/name task-name
                              :onyx/plugin :onyx.plugin.core-async/input
@@ -28,7 +28,7 @@
 
 (s/defn output
   ([task-name :- s/Keyword opts]
-   (output-task task-name opts default-channel-size))
+   (output task-name opts default-channel-size))
   ([task-name :- s/Keyword opts chan-size]
    {:task {:task-map (merge {:onyx/name task-name
                              :onyx/plugin :onyx.plugin.core-async/output
