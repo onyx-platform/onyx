@@ -1,7 +1,7 @@
 (ns onyx.triggers.trigger-punctuation-test
   (:require [clojure.test :refer [deftest is use-fixtures]]
             [onyx.windowing.aggregation]
-            [onyx.triggers.refinements]
+            [onyx.refinements]
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
@@ -40,8 +40,8 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   :trigger/refinement :onyx.triggers.refinements/accumulating
-                   :trigger/on :onyx.triggers.triggers/punctuation
+                   :trigger/refinement :onyx.refinements/accumulating
+                   :trigger/on :onyx.triggers/punctuation
                    :trigger/pred ::true-pred
                    :trigger/sync ::fire
                    :trigger/id :trigger-id}]

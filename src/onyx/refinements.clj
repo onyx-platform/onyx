@@ -1,4 +1,4 @@
-(ns onyx.triggers.refinements
+(ns onyx.refinements
   (:require [onyx.schema :refer [Trigger]]
             [schema.core :as s]))
 

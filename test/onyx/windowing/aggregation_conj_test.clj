@@ -133,9 +133,9 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.triggers.refinements/accumulating
+          :trigger/refinement :onyx.refinements/accumulating
           :trigger/fire-all-extents? true
-          :trigger/on :onyx.triggers.triggers/segment
+          :trigger/on :onyx.triggers/segment
           :trigger/threshold [5 :elements]
           :trigger/sync ::update-atom!}]
 

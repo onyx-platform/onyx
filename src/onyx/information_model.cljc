@@ -430,13 +430,13 @@
              :added "0.8.0"}
 
             :trigger/refinement
-            {:doc "The refinement mode to use when firing the trigger against a window. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. Onyx comes with a handful of refinements built in, such as accumulating and discarding refinements. When set to `:onyx.triggers.refinements/accumulating`, the window contents remain. When set to `:onyx.triggers.refinements/discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
+            {:doc "The refinement mode to use when firing the trigger against a window. A fully qualified, namespaced keyword pointing to a symbol on the classpath at runtime. This symbol must be a map with keys as further specified by the refinement information model. Onyx comes with a handful of refinements built in, such as accumulating and discarding refinements. When set to `:onyx.refinements/accumulating`, the window contents remain. When set to `:onyx.refinements/discarding`, the window contents are destroyed, resetting the window to the initial aggregation value. The initial value is set lazily so expired windows do not unnecessarily consume memory."
              :type :keyword
              :optional? false
              :added "0.8.0"}
 
             :trigger/on
-            {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers. Takes a fully qualified, namespaced keyword resolving to the trigger definition. The following triggers are included with onyx: :onyx.triggers.triggers/segment, :onyx.triggers/timer, :onyx.triggers/punctuation, :onyx.triggers/watermark, :onyx.triggers/percentile-watermark"
+            {:doc "The event to trigger in reaction to, such as a segment with a special feature, or on a timer. See the User Guide for the full list of prepackaged Triggers. Takes a fully qualified, namespaced keyword resolving to the trigger definition. The following triggers are included with onyx: :onyx.triggers/segment, :onyx.triggers/timer, :onyx.triggers/punctuation, :onyx.triggers/watermark, :onyx.triggers/percentile-watermark"
              :type :keyword
              :optional? false
              :added "0.8.0"}
@@ -463,17 +463,17 @@
              :added "0.8.0"}
 
             :trigger/pred
-            {:doc "Used with the trigger :onyx.triggers.triggers/punctuation. A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
+            {:doc "Used with the trigger :onyx.triggers/punctuation. A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, this window-id, the lower bound of this window, the upper bound of this window, and the segment. This function should return true if the trigger should fire, and false otherwise."
              :type :keyword
              :optional? false}
 
             :trigger/watermark-percentage
-            {:doc "Used with the trigger :onyx.triggers.triggers/percentile-watermark. A double between 0.0 and 1.0, both inclusive, representing a percentage greater than the lower bound of a window. If an segment is seen with a value for a windowing key greater than this percentage, the trigger fires."
+            {:doc "Used with the trigger :onyx.triggers/percentile-watermark. A double between 0.0 and 1.0, both inclusive, representing a percentage greater than the lower bound of a window. If an segment is seen with a value for a windowing key greater than this percentage, the trigger fires."
              :type :double
              :optional? false}
 
             :trigger/period
-            {:doc "Used with the trigger :onyx.triggers.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
+            {:doc "Used with the trigger :onyx.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
              :required-when ["`:trigger/on` is `:timer`"]
              :choices [:milliseconds :seconds :minutes :hours :days]
@@ -481,7 +481,7 @@
              :added "0.8.0"}
 
             :trigger/threshold
-            {:doc "Used with the trigger :onyx.triggers.triggers/segment. A segment trigger will fire every threshold of segments."
+            {:doc "Used with the trigger :onyx.triggers/segment. A segment trigger will fire every threshold of segments."
              :required-when ["`:trigger/on` is `:segment`"]
              :type [:integer :elements]
              :example [5 :elements]
