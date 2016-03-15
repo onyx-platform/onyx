@@ -6,7 +6,7 @@
 
 (def default-channel-size 1000)
 
-(s/defn input-task
+(s/defn input
   ([task-name :- s/Keyword opts]
    (input-task task-name opts default-channel-size))
   ([task-name :- s/Keyword opts chan-size]
@@ -26,7 +26,7 @@
     :schema {:task-map os/TaskMap
              :lifecycles [os/Lifecycle]}}))
 
-(s/defn output-task
+(s/defn output
   ([task-name :- s/Keyword opts]
    (output-task task-name opts default-channel-size))
   ([task-name :- s/Keyword opts chan-size]
