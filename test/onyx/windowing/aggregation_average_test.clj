@@ -90,8 +90,8 @@
 
         triggers
         [{:trigger/window-id :collect-segments
-          :trigger/refinement :onyx.triggers.refinements/accumulating
-          :trigger/on :onyx.triggers.triggers/segment
+          :trigger/refinement :onyx.refinements/accumulating
+          :trigger/on :onyx.triggers/segment
           :trigger/threshold [15 :elements]
           :trigger/sync ::update-atom!}]
 

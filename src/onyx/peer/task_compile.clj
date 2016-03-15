@@ -11,7 +11,7 @@
             [onyx.state.ack :as state-ack]
             [onyx.static.validation :as validation]
             [onyx.static.logging :as logging]
-            [onyx.triggers.refinements]
+            [onyx.refinements]
             [onyx.windowing.window-compile :as wc]))
 
 (defn windows->event-map [windows triggers {:keys [onyx.core/task-map] :as event}]

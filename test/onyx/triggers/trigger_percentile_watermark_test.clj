@@ -1,7 +1,7 @@
 (ns onyx.triggers.trigger-percentile-watermark-test
   (:require [clojure.test :refer [deftest is]]
             [onyx.peer.window-state :refer [map->StateEvent]]
-            [onyx.triggers.triggers]
+            [onyx.triggers]
             [onyx.api]))
 
 (deftest percentile-watermark-test
@@ -13,20 +13,20 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
-                 :trigger/refinement :onyx.triggers.refinements/accumulating
-                 :trigger/on :percentile-watermark
+                 :trigger/refinement :onyx.refinements/accumulating
+                 :trigger/on :onyx.triggers/percentile-watermark
                  :trigger/watermark-percentage 0.50
                  :trigger/sync ::no-op
                  :trigger/id :trigger-id}
         segment {:event-time t}
         event {}]
 
-    (is (onyx.triggers.triggers/percentile-watermark-fire? trigger 
-                                                           nil 
-                                                           (map->StateEvent {:window window 
-                                                                             :segment segment
-                                                                             :lower-bound (- t 75)
-                                                                             :upper-bound (+ t 25)}))))
+    (is (onyx.triggers/percentile-watermark-fire? trigger 
+                                                  nil 
+                                                  (map->StateEvent {:window window 
+                                                                    :segment segment
+                                                                    :lower-bound (- t 75)
+                                                                    :upper-bound (+ t 25)}))))
 
   (let [t 1444443468904
         window {:window/id :collect-segments
@@ -36,8 +36,8 @@
                 :window/window-key :event-time
                 :window/range [5 :minutes]}
         trigger {:trigger/window-id :collect-segments
-                 :trigger/refinement :onyx.triggers.refinements/accumulating
-                 :trigger/on :percentile-watermark
+                 :trigger/refinement :onyx.refinements/accumulating
+                 :trigger/on :onyx.triggers/percentile-watermark
                  :trigger/watermark-percentage 0.50
                  :trigger/sync ::no-op
                  :trigger/id :trigger-id}
@@ -45,8 +45,8 @@
         event {}]
     (is
      (not
-       (onyx.triggers.triggers/percentile-watermark-fire? trigger nil 
-                                                          (map->StateEvent {:window window 
-                                                                            :segment segment
-                                                                            :lower-bound (- t 25)
-                                                                            :upper-bound (+ t 75)}))))))
+      (onyx.triggers/percentile-watermark-fire? trigger nil 
+                                                (map->StateEvent {:window window 
+                                                                  :segment segment
+                                                                  :lower-bound (- t 25)
+                                                                  :upper-bound (+ t 75)}))))))

@@ -1,7 +1,7 @@
 (ns onyx.windowing.window-max-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [onyx.windowing.aggregation]
-            [onyx.triggers.refinements]
+            [onyx.refinements]
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
@@ -82,7 +82,6 @@
 		:window/window-key :event-time
 		:window/range [5 :minutes]}
         triggers [{:trigger/window-id :collect-segments
-                   ;:trigger/refinement :onyx.triggers.refinements/discarding
                    :trigger/refinement :onyx.refinements/accumulating
                    :trigger/on :onyx.triggers/segment
                    :trigger/threshold [5 :elements]
