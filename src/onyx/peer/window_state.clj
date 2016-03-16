@@ -128,39 +128,39 @@
     (let [{:keys [trigger-state extent]} state-event 
           {:keys [sync-fn trigger create-state-update apply-state-update]} trigger-state
           extent-state (get state extent)
+          state-event (assoc state-event :extent-state extent-state)
           entry (create-state-update trigger extent-state state-event)
           new-extent-state (apply-state-update trigger extent-state entry)
-          [lower-bound upper-bound] (we/bounds window-extension extent)
-          state-event* (-> state-event
-                           (assoc :window window)
-                           (assoc :lower-bound lower-bound)
-                           (assoc :upper-bound upper-bound)
-                           (assoc :extent-state extent-state)
-                           (assoc :trigger-update entry)
-                           (assoc :next-state new-extent-state))]
-      (sync-fn (:task-event state-event*) window trigger state-event* extent-state)
+          state-event (-> state-event
+                          (assoc :next-state new-extent-state)
+                          (assoc :trigger-update entry))]
+      (sync-fn (:task-event state-event) window trigger state-event extent-state)
       (assoc this 
              :state (assoc state extent new-extent-state)
              :event-results (if (= extent-state new-extent-state)
                               event-results
-                              (conj event-results state-event*)))))
+                              (conj event-results state-event)))))
 
   (trigger [this]
     (let [{:keys [trigger-index trigger-state]} state-event
           {:keys [trigger next-trigger-state trigger-fire? fire-all-extents?]} trigger-state 
           new-trigger-state (next-trigger-state trigger (:state trigger-state) state-event)
           ;; TODO, scope this via :trigger/scope 
-          fire? (trigger-fire? trigger new-trigger-state state-event)
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
-          fire-extents (if fire? 
-                         (if fire-all? 
-                           (keys state)
-                           (:extents state-event))
-                         [])]
+          fire-extents (if fire-all? 
+                         (keys state)
+                         (:extents state-event))]
       (reduce (fn [t extent] 
-                (trigger-extent (assoc t 
-                                       :state-event 
-                                       (assoc state-event :extent extent))))
+                (let [[lower-bound upper-bound] (we/bounds window-extension extent)
+                      state-event (-> state-event
+                                      (assoc :window window)
+                                      (assoc :lower-bound lower-bound)
+                                      (assoc :upper-bound upper-bound))]
+                  (if (trigger-fire? trigger new-trigger-state state-event)
+                    (trigger-extent (assoc t 
+                                           :state-event 
+                                           (assoc state-event :extent extent)))   
+                    t)))
               (assoc-in this [:trigger-states trigger-index :state] new-trigger-state)
               fire-extents)))
 
