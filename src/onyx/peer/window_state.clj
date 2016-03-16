@@ -36,7 +36,9 @@
   (play-entry [this entry]))
 
 (defrecord StateEvent 
-  [event-type task-event segment grouped? group-key lower-bound upper-bound log-type trigger-update aggregation-update window next-state])
+    [event-type task-event segment grouped? group-key
+     lower-bound upper-bound log-type trigger-update
+     aggregation-update window next-state])
 
 (s/defn new-state-event 
   [event-type task-event :- Event]
