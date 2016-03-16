@@ -44,12 +44,18 @@
                (arg-or-default :onyx.bookkeeper/client-timeout opts)
                (arg-or-default :onyx.bookkeeper/client-throttle opts)))
   ([zk-addr zk-root-path timeout throttle]
-   (let [conf (doto (ClientConfiguration.)
-                (.setZkServers zk-addr)
-                (.setZkTimeout timeout)
-                (.setThrottleValue throttle)
-                (.setZkLedgersRootPath zk-root-path))]
-     (BookKeeper. conf))))
+   (try
+    (let [conf (doto (ClientConfiguration.)
+                 (.setZkServers zk-addr)
+                 (.setZkTimeout timeout)
+                 (.setThrottleValue throttle)
+                 (.setZkLedgersRootPath zk-root-path))]
+      (BookKeeper. conf))
+    (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+      (throw (ex-info "Error locating BookKeeper cluster via ledger path. Check that BookKeeper has been started via start-env by setting `:onyx.bookkeeper/server? true` in env-config, or is setup at the correct path." 
+                      {:zookeeper-addr zk-addr
+                       :zookeeper-path zk-root-path}
+                      nne))))))
 
 (def digest-type 
   (BookKeeper$DigestType/MAC))
