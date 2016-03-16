@@ -18,8 +18,6 @@
   {:fire-time s/Int :fire? s/Bool})
 
 (defn exceeds-watermark? [window upper-extent-bound segment]
-  (prn window)
-  (prn (:window/window-key window) "::" segment)
   (let [watermark (get segment (:window/window-key window))]
     (>= (coerce-key watermark :milliseconds) upper-extent-bound)))
 
@@ -107,26 +105,20 @@
   (:fire? trigger-state))
 
 (s/defn watermark-fire?
-  [trigger :- Trigger trigger-state {:keys [upper-bound segment extent window] :as trigger-event}]
-  (prn (keys trigger-event))
-  (prn (:window trigger-event))
-  (prn "--")
+  [trigger :- Trigger trigger-state {:keys [upper-bound event-type segment window] :as trigger-event}]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
-  (if segment
-    (exceeds-watermark? window upper-bound segment)
-    true))
+  (or (and segment (exceeds-watermark? window upper-bound segment))
+      (= event-type :task-lifecycle-stopped)))
 
 (s/defn percentile-watermark-fire? 
-  [trigger :- Trigger trigger-state {:keys [lower-bound upper-bound segment extent window]} :- StateEvent]
+  [trigger :- Trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]} :- StateEvent]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
-  (if segment
-    (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment)
-    true))
+  (or (and segment (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment))
+      (= event-type :task-lifecycle-stopped)))
 
 ;;; Top level vars to bundle the functions together
-
 (def segment
   {:trigger/init-state segment-init-state
    :trigger/next-state segment-next-state 
