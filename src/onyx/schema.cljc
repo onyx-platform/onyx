@@ -9,8 +9,8 @@
           'keyword-namespaced?))
 
 (def Function
-  (s/either (s/pred var? 'var?)
-            (s/pred ifn? 'ifn?)))
+  (s/cond-pre (s/pred var? 'var?)
+              (s/pred ifn? 'ifn?)))
 
 (def TaskName
   (s/pred (fn [v]
@@ -23,30 +23,26 @@
   (= (count edge) 2))
 
 (def ^{:private true} edge-validator
-  (s/->Both [(s/pred vector? 'vector?)
-             (s/pred edge-two-nodes? 'edge-two-nodes?)
-             [TaskName]]))
+  (s/constrained [TaskName] (fn [edge]
+                              (and (= (count edge) 2)
+                                   (vector? edge))) 'edge-two-nodes?))
 
 (def Workflow
-  (s/->Both [(s/pred vector? 'vector?)
-             [edge-validator]]))
+  (s/constrained [edge-validator] vector? 'vector?))
 
 (def Language
   (s/enum :java :clojure))
 
-(def PosInt 
-  (s/pred pos? 'pos?))
+(def PosInt
+  (s/constrained s/Int pos? 'pos?))
 
-(def Record
-  (s/pred record? 'record?))
-
-(def SPosInt 
-  (s/pred (fn [v] (>= v 0)) 'spos?))
+(def SPosInt
+  (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
 (defn build-allowed-key-ns [nspace]
   (s/pred (fn [k]
             (or (not (keyword? k))
-                (not (= (name nspace) 
+                (not (= (name nspace)
                         (namespace k)))))
           'unsupported-key-combination))
 
@@ -77,31 +73,11 @@
    (s/optional-key :onyx/required-tags) [s/Keyword]
    UnsupportedTaskMapKey s/Any})
 
-(def FluxPolicy 
+(def FluxPolicy
   (s/enum :continue :kill :recover))
 
-(defn valid-min-peers-max-peers-n-peers? [entry]
-  (case (:onyx/flux-policy entry)
-    :continue 
-    (or (:onyx/n-peers entry)
-        (:onyx/min-peers entry)
-        (= (:onyx/max-peers entry) 1))
-    :kill 
-    (or (:onyx/n-peers entry)
-        (:onyx/min-peers entry)
-        (= (:onyx/max-peers entry) 2))
-    :recover
-    (or (:onyx/n-peers entry)
-        (and (:onyx/max-peers entry)
-             (= (:onyx/max-peers entry) 
-                (:onyx/min-peers entry)))
-        (= (:onyx/max-peers entry) 1))))
-
 (def FnPath
-  (s/either NamespacedKeyword s/Keyword))
-
-(def FluxPolicyNPeers
-  (s/pred valid-min-peers-max-peers-n-peers? 'valid-flux-policy-min-max-n-peers))
+  (s/cond-pre NamespacedKeyword s/Keyword))
 
 (def partial-grouping-task
   {(s/optional-key :onyx/group-by-key) s/Any
@@ -114,21 +90,21 @@
            (not (nil? (:onyx/group-by-fn task-map))))))
 
 (def partial-input-task
-  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
+  {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
    (s/optional-key :onyx/fn) FnPath
-   (s/optional-key :onyx/input-retry-timeout) PosInt 
-   (s/optional-key :onyx/pending-timeout) PosInt 
+   (s/optional-key :onyx/input-retry-timeout) PosInt
+   (s/optional-key :onyx/pending-timeout) PosInt
    (s/optional-key :onyx/max-pending) PosInt})
 
 (def partial-output-task
-  {:onyx/plugin (s/either NamespacedKeyword s/Keyword)
+  {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :output)
    (s/optional-key :onyx/fn) FnPath})
 
-(def NonNamespacedKeyword 
+(def NonNamespacedKeyword
   (s/pred (fn [v]
             (and (keyword? v)
                  (not (namespace v))))
@@ -143,8 +119,8 @@
    (s/optional-key :onyx/fn) FnPath})
 
 (def partial-fn-task
-  {:onyx/fn (s/either NamespacedKeyword s/Keyword)
-   (s/optional-key :onyx/plugin) (s/either NamespacedKeyword s/Keyword)})
+  {:onyx/fn (s/cond-pre NamespacedKeyword s/Keyword)
+   (s/optional-key :onyx/plugin) (s/cond-pre NamespacedKeyword s/Keyword)})
 
 (def partial-clojure-fn-task
   {:onyx/fn NamespacedKeyword})
@@ -155,40 +131,63 @@
 (defn java? [task-map]
   (= :java (:onyx/language task-map)))
 
-(def OutputTaskSchema 
+(defn valid-min-peers-max-peers-n-peers? [entry]
+  (case (:onyx/flux-policy entry)
+    :continue
+    (or (:onyx/n-peers entry)
+        (:onyx/min-peers entry)
+        (= (:onyx/max-peers entry) 1))
+    :kill
+    (or (:onyx/n-peers entry)
+        (:onyx/min-peers entry)
+        (= (:onyx/max-peers entry) 2))
+    :recover
+    (or (:onyx/n-peers entry)
+        (and (:onyx/max-peers entry)
+             (= (:onyx/max-peers entry)
+                (:onyx/min-peers entry)))
+        (= (:onyx/max-peers entry) 1))))
+
+(def OutputTaskSchema
   (let [base-output-schema (merge base-task-map partial-output-task)
         base-output-grouping (merge base-output-schema partial-grouping-task)
         java-output-grouping (merge base-output-grouping partial-java-plugin)
         clojure-output-grouping (merge base-output-grouping partial-clojure-plugin)]
     (s/conditional grouping-task?
-                   (s/conditional java? 
-                                  (s/->Both [FluxPolicyNPeers java-output-grouping])
+                   (s/conditional java?
+                                  (s/constrained java-output-grouping
+                                                 valid-min-peers-max-peers-n-peers?
+                                                 'valid-flux-policy-min-max-n-peers)
                                   :else
-                                  (s/->Both [FluxPolicyNPeers clojure-output-grouping]))
-                   :else 
+                                  (s/constrained clojure-output-grouping
+                                                 valid-min-peers-max-peers-n-peers?
+                                                 'valid-flux-policy-min-max-n-peers))
+                   :else
                    (s/conditional java?
                                   (merge base-output-schema partial-java-plugin)
                                   :else
                                   (merge base-output-schema partial-clojure-plugin)))))
 
-(def InputTaskSchema 
-  (let [base-input-schema (merge base-task-map partial-input-task)] 
+(def InputTaskSchema
+  (let [base-input-schema (merge base-task-map partial-input-task)]
     (s/conditional java?
                    (merge base-input-schema partial-java-plugin)
                    :else
                    base-input-schema)))
 
 (def FunctionTaskSchema
-  (let [base-function-task (merge base-task-map partial-fn-task)]
+  (let [base-function-task (merge base-task-map partial-fn-task)
+        java-function-task (merge base-function-task partial-grouping-task partial-java-fn-task)
+        clojure-function-task (merge base-function-task partial-grouping-task partial-clojure-fn-task)]
     (s/conditional grouping-task?
                    (s/conditional java?
-                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
-                                                                     partial-grouping-task
-                                                                     partial-java-fn-task)])
+                                  (s/constrained java-function-task
+                                                 valid-min-peers-max-peers-n-peers?
+                                                 'valid-flux-policy-min-max-n-peers)
                                   :else
-                                  (s/->Both [FluxPolicyNPeers (merge base-function-task
-                                                                     partial-grouping-task
-                                                                     partial-clojure-fn-task)]))
+                                  (s/constrained clojure-function-task
+                                                 valid-min-peers-max-peers-n-peers?
+                                                 'valid-flux-policy-min-max-n-peers))
                    :else
                    (s/conditional java?
                                   (merge base-function-task partial-java-fn-task)
@@ -196,7 +195,7 @@
                                   (merge base-function-task partial-clojure-fn-task)))))
 
 (def TaskMap
-  (s/conditional #(= (:onyx/type %) :input) 
+  (s/conditional #(= (:onyx/type %) :input)
                  InputTaskSchema
                  #(= (:onyx/type %) :output)
                  OutputTaskSchema
@@ -235,8 +234,8 @@
 
 (def FlowCondition
   {:flow/from s/Keyword
-   :flow/to (s/either s/Keyword [s/Keyword])
-   :flow/predicate (s/either s/Keyword [s/Any])
+   :flow/to (s/cond-pre s/Keyword [s/Keyword])
+   :flow/predicate (s/cond-pre s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
    (s/optional-key :flow/action) FlowAction
@@ -262,7 +261,7 @@
   {:window/id s/Keyword
    :window/task TaskName
    :window/type WindowType
-   :window/aggregation (s/either s/Keyword [s/Keyword])
+   :window/aggregation (s/cond-pre s/Keyword [s/Keyword])
    (s/optional-key :window/init) s/Any
    (s/optional-key :window/window-key) s/Any
    (s/optional-key :window/min-value) s/Int
@@ -288,25 +287,26 @@
    (s/optional-key :aggregation/super-aggregation-fn) Function})
 
 (def WindowExtension
-  (s/both Record
-          {:window Window
-           :id s/Keyword
-           :task TaskName
-           :type WindowType
-           :aggregation (s/either s/Keyword [s/Keyword])
-           (s/optional-key :init) (s/maybe s/Any)
-           (s/optional-key :window-key) (s/maybe s/Any)
-           (s/optional-key :min-value) (s/maybe SPosInt)
-           (s/optional-key :range) (s/maybe Unit)
-           (s/optional-key :slide) (s/maybe Unit)
-           (s/optional-key :timeout-gap) (s/maybe Unit)
-           (s/optional-key :session-key) (s/maybe s/Any)
-           (s/optional-key :doc) (s/maybe s/Str)}))
+  (s/constrained
+   {:window Window
+    :id s/Keyword
+    :task TaskName
+    :type WindowType
+    :aggregation (s/cond-pre s/Keyword [s/Keyword])
+    (s/optional-key :init) (s/maybe s/Any)
+    (s/optional-key :window-key) (s/maybe s/Any)
+    (s/optional-key :min-value) (s/maybe SPosInt)
+    (s/optional-key :range) (s/maybe Unit)
+    (s/optional-key :slide) (s/maybe Unit)
+    (s/optional-key :timeout-gap) (s/maybe Unit)
+    (s/optional-key :session-key) (s/maybe s/Any)
+    (s/optional-key :doc) (s/maybe s/Str)}
+   record? 'record?))
 
 (def TriggerRefinement
   NamespacedKeyword)
 
-(def TriggerPeriod 
+(def TriggerPeriod
   (s/enum :milliseconds :seconds :minutes :hours :days
           :mullisecond :second :minute :hour :day))
 
@@ -347,47 +347,49 @@
 
 (def TriggerCall
   {:trigger/init-state Function
-   :trigger/next-state Function 
+   :trigger/next-state Function
    :trigger/trigger-fire? Function})
 
 (def TriggerState
-  (s/both Record
-          {:window-id s/Keyword
-           :refinement TriggerRefinement
-           :on s/Keyword
-           :sync s/Keyword
-           :fire-all-extents? (s/maybe s/Bool)
-           :pred (s/maybe s/Keyword)
-           :watermark-percentage (s/maybe double)
-           :doc (s/maybe s/Str)
-           :period (s/maybe TriggerPeriod)
-           :threshold (s/maybe TriggerThreshold) 
-           :sync-fn (s/maybe Function)
-           :state s/Any
-           :id s/Any
-           :trigger Trigger
-           :init-state Function
-           :trigger-fire? Function
-           :next-trigger-state Function
-           :create-state-update Function
-           :apply-state-update Function}))
+  (s/constrained
+   {:window-id s/Keyword
+    :refinement TriggerRefinement
+    :on s/Keyword
+    :sync s/Keyword
+    :fire-all-extents? (s/maybe s/Bool)
+    :pred (s/maybe s/Keyword)
+    :watermark-percentage (s/maybe double)
+    :doc (s/maybe s/Str)
+    :period (s/maybe TriggerPeriod)
+    :threshold (s/maybe TriggerThreshold)
+    :sync-fn (s/maybe Function)
+    :state s/Any
+    :id s/Any
+    :trigger Trigger
+    :init-state Function
+    :trigger-fire? Function
+    :next-trigger-state Function
+    :create-state-update Function
+    :apply-state-update Function}
+   record? 'record?))
 
 (def StateEvent s/Any)
 
 (def WindowState
-  (s/both Record 
-          {:window-extension WindowExtension
-           :trigger-states [TriggerState]
-           :window Window
-           :state {s/Any s/Any}
-           :state-event StateEvent
-           :event-results [StateEvent]
-           :init-fn Function
-           :create-state-update Function
-           :apply-state-update Function
-           :super-agg-fn (s/maybe Function)
-           (s/optional-key :new-window-state-fn) Function
-           (s/optional-key :grouping-fn) (s/either s/Keyword Function)}))
+  (s/constrained
+   {:window-extension WindowExtension
+    :trigger-states [TriggerState]
+    :window Window
+    :state {s/Any s/Any}
+    :state-event StateEvent
+    :event-results [StateEvent]
+    :init-fn Function
+    :create-state-update Function
+    :apply-state-update Function
+    :super-agg-fn (s/maybe Function)
+    (s/optional-key :new-window-state-fn) Function
+    (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
+   record? 'record?))
 
 (def JobScheduler
   NamespacedKeyword)
@@ -417,7 +419,7 @@
    (s/optional-key :acker/exempt-tasks) [s/Keyword]})
 
 (def TenancyId
-  (s/either s/Uuid s/Str))
+  (s/cond-pre s/Uuid s/Str))
 
 (def EnvConfig
   {:zookeeper/address s/Str
@@ -517,21 +519,21 @@
    s/Keyword s/Any})
 
 (def PeerId
-  (s/either s/Uuid s/Keyword))
+  (s/cond-pre s/Uuid s/Keyword))
 
 (def PeerState
   (s/enum :idle :backpressure :active))
 
-(def PeerSite 
+(def PeerSite
   {s/Any s/Any})
 
 (def JobId
-  (s/either s/Uuid s/Keyword))
+  (s/cond-pre s/Uuid s/Keyword))
 
 (def TaskId
-  (s/either s/Uuid s/Keyword))
+  (s/cond-pre s/Uuid s/Keyword))
 
-(def TaskScheduler 
+(def TaskScheduler
   s/Keyword)
 
 (def SlotId
@@ -582,11 +584,11 @@
    (s/optional-key :peer-parent) s/Uuid
    (s/optional-key :entry-parent) s/Int})
 
-(def Reactions 
+(def Reactions
   (s/maybe [LogEntry]))
 
 (def ReplicaDiff
-  (s/maybe (s/either {s/Any s/Any} #{s/Any})))
+  (s/maybe (s/cond-pre {s/Any s/Any} #{s/Any})))
 
 (def State
   {s/Any s/Any})
