@@ -47,9 +47,9 @@ Window aggregations are defined by a map containing the following keys:
 | Key                                 | Optional? | Description                                                                                                |
 |------------------------------------ | --------- | -----------------------------------------------------------------------------------------------------------|
 | `:aggregation/init`                 | true      | Fn (window) to initialise the state.                                                                       |
-| `:aggregation/fn`                   | false     | Fn (state, window, segment) to generate a serializable state machine update.                               |
-| `:aggregation/apply-state-update`   | false     | Fn (state, entry) to apply state machine update entry to a state.                                          |
-| `:aggregation/super-aggregation-fn` | true      | Fn (state-1, state-2, window) to combine two states in the case of two windows being merged.               |
+| `:aggregation/create-state-update`  | false     | Fn (window, state, segment) to generate a serializable state machine update.                               |
+| `:aggregation/apply-state-update`   | false     | Fn (window, state, entry) to apply state machine update entry to a state.                                  |
+| `:aggregation/super-aggregation-fn` | true      | Fn (window, state-1, state-2) to combine two states in the case of two windows being merged.               |
 
 
 In the `:window/aggregation` map in the `:sum-all-ages` window referenced above.
@@ -60,21 +60,20 @@ In the `:window/aggregation` map in the `:sum-all-ages` window referenced above.
 (defn sum-init-fn [window]
   0)
 
-(defn sum-application-fn [state [changelog-type value]]
-  (case changelog-type
-    :set-value value))
-
-(defn sum-aggregation-fn [state window segment]
+(defn sum-aggregation-fn [window state segment]
   ; k is :age
   (let [k (second (:window/aggregation window))]
     [:set-value (+ state (get segment k))]))
 
+(defn sum-application-fn [window state [changelog-type value]]
+  (case changelog-type
+    :set-value value))
+
 ;; sum aggregation referenced in window definition.
 (def sum
   {:aggregation/init sum-init-fn
-   :aggregation/fn sum-aggregation-fn
+   :aggregation/create-state-update sum-aggregation-fn
    :aggregation/apply-state-update sum-application-fn})
-    
 ```
 
 Let's try processing some example segments using this aggregation:
