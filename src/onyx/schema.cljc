@@ -450,6 +450,12 @@
 (def StateFilterImpl
   (s/enum :set :rocksdb))
 
+(def PeerClientConfig
+  {:zookeeper/address s/Str
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
+   s/Keyword s/Any})
+
 (def PeerConfig
   {:zookeeper/address s/Str
    (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
