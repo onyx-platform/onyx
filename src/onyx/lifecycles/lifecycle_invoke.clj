@@ -2,24 +2,27 @@
   (:require [clojure.core.async :refer [>!! close!]]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]))
 
+(defn handle-exception [event phase t handler-fn]
+  (let [action (handler-fn event phase t)]
+    (cond (= action :kill)
+          (throw t)
+
+          (= action :restart)
+          (throw (ex-info "Jumping out of task lifecycle for a clean restart."
+                          {:onyx.core/lifecycle-restart? true
+                           :original-exception t}))
+
+          :else
+          (throw (ex-info
+                  (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
+                          action)
+                  {})))))
+
 (defn restartable-invocation [event phase handler-fn f & args]
   (try
     (apply f args)
     (catch Throwable t
-      (let [action (handler-fn event phase t)]
-        (cond (= action :kill)
-              (throw t)
-
-              (= action :restart)
-              (throw (ex-info "Jumping out of task lifecycle for a clean restart."
-                              {:onyx.core/lifecycle-restart? true
-                               :original-exception t}))
-
-              :else
-              (throw (ex-info
-                      (format "Internal error, cannot handle exception with policy %s, must be one of #{:kill :restart :defer}"
-                              action)
-                      {})))))))
+      (handle-exception event phase t handler-fn))))
 
 (defn invoke-lifecycle-gen [phase compiled-key]
   (fn invoke-lifecycle [compiled event]
