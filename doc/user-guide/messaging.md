@@ -10,8 +10,7 @@ categories: [user-guide-page]
 
 The messaging layer takes care of the direct peer to peer transfer of segment
 batches, acks, segment completion and segment retries to the relevant virtual
-peers. The messaging layer design document can be found at the
-[Messaging section]({{ "/messaging.html" | prepend: page.dir | prepend: site.baseurl }}).
+peers.
 
 ### Messaging Implementations
 

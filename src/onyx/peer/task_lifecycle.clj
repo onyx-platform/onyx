@@ -128,8 +128,11 @@
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)]
-    (reduce (fn [accum leaf] 
-              (add-from-leaf event compiled result root leaves start-ack-val accum leaf))
+    (reduce (fn [accum leaf]
+              (lc/invoke-flow-conditions
+               add-from-leaf
+               event compiled result root leaves
+               start-ack-val accum leaf))
             (->AccumAckSegments start-ack-val segments retries)
             leaves)))
 
