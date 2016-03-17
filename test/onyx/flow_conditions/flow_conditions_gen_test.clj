@@ -99,7 +99,9 @@
   (let [e (ex-info "hih" {})
         wrapped-e (ex-info "" {:exception e})]
     (is (thrown? clojure.lang.ExceptionInfo
-                 (r/route-data {} {:flow-conditions nil :egress-ids [:a :b]} nil wrapped-e)))))
+                 (r/route-data {} 
+                               {:compiled-handle-exception-fn (constantly :restart)
+                                :flow-conditions nil :egress-ids [:a :b]} nil wrapped-e)))))
 
 (deftest conj-downstream-tasks-together
   (checking
