@@ -1,14 +1,15 @@
 #### 0.9.0
 
-- Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
-
-- **Breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`.
-- **Breaking change** `:aggregation/fn` was renamed to `:aggregation/create-state-update`
-- **Breaking change** changed the signatures of the following aggregation function types: default-window-state, apply-state-update, super-aggregation-fn. All now take the window as the first argument.
-- **Breaking change** changed the internal messaging functions to no longer supply the event map.
-  Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
-- Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
-- Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` phase.
+- **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`
+- **API breaking change**: `:aggregation/fn` was renamed to `:aggregation/create-state-update`
+- **API breaking change**: changed the signatures of the following aggregation function types: `default-window-state`, `apply-state-update`, `super-aggregation-fn`. All now take the window as the first argument.
+- **API breaking change**: internal messaging functions no longer take the event map as an argument. Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
+- Bug fix: fixed exceptions losing their main `.getCause` message when thrown inside a lifecycle
+- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
+- Design change: Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
+- Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` and `:lifecycle/apply-fn` phases.
+- Enhancement: loosened the require peer configuration needed for log subscription
+- Dependency change: Upgraded `org.clojure/clojure` to `1.8.0`
 
 #### 0.8.11
 
