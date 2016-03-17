@@ -53,7 +53,7 @@
                                     (fn [datom]
                                       (list '= (list 'name v)
                                             (list 'namespace datom)))))))
-  (explain [this] {:restricted-ns v}))
+  (explain [this] [:restricted-ns v]))
 
 (defn ^:deprecated build-allowed-key-ns [nspace]
   (RestrictedKwNamespace. nspace))

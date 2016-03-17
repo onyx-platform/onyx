@@ -492,7 +492,7 @@
                     {:myplugin/option "chocolate"
                      :otherplugin/extra-option "vanilla"})))
   (testing "s/explain on restricted-ns returns something readable"
-    (is (= (first (remove nil? (map :restricted-ns
+    (is (= (first (remove nil? (map (fn [x] (if (vector? x) (second x) x))
                                     (keys (s/explain {(os/restricted-ns :myplugin) s/Any
                                                       :myplugin/option s/Str})))))
            :myplugin))))
