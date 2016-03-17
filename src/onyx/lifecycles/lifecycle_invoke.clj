@@ -84,10 +84,11 @@
    message-id
    retry-rets))
 
-;; This function intentionally does not execute
-;; the lifecycle as a restartable-invocation. If
-;; the task reaches this stage, it is already considered
-;; complete. Restarting the task would cause the peer
-;; to deadlock.
-; (defn invoke-after-task-stop [event]
-;   (merge event ((:onyx.core/compiled-after-task-fn event) event)))
+(defn invoke-flow-conditions
+  [f event compiled result root leaves start-ack-val accum leaf]
+  (restartable-invocation
+   event
+   :lifecycle/execute-flow-conditions
+   (:compiled-handle-exception-fn compiled)
+   f
+   event compiled result root leaves start-ack-val accum leaf))
