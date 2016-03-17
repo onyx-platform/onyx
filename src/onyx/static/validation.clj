@@ -37,11 +37,11 @@
 
 (defn describe-cause [k]
   (if (= schema.utils.ValidationError (type k))
-    (cond (= onyx.schema/UnsupportedTaskMapKey (.schema k))
-          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)] 
-            {:cause "Unsupported combination of task-map keys." 
+    (cond (= (os/restricted-ns :onyx) (.schema k))
+          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
+            {:cause "Unsupported combination of task-map keys."
              :key (.value k)
-             :documentation doc} 
+             :documentation doc}
             {:cause "Unsupported onyx task-map key."
              :key (.value k)})
           :else

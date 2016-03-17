@@ -8,32 +8,31 @@
             [onyx.api]))
 
 (deftest missing-documentation-test
-  (is (empty? (remove (apply merge (map :model (vals model))) 
+  (is (empty? (remove (apply merge (map :model (vals model)))
                       (keys defaults)))))
 
 (deftest different-defaults-test
-  (let [flattened (apply merge (map :model (vals model)))] 
-    (is (= [] 
-           (remove (fn [[k v]] 
-                     (= (defaults k) 
+  (let [flattened (apply merge (map :model (vals model)))]
+    (is (= []
+           (remove (fn [[k v]]
+                     (= (defaults k)
                         (:default (flattened k))))
                    defaults)))))
 
-(def non-doc-keys 
-  #{s/Keyword s/Any 
-    schema/UnsupportedTaskMapKey schema/UnsupportedWindowKey 
+(def non-doc-keys
+  #{s/Keyword s/Any schema/UnsupportedWindowKey
     schema/UnsupportedFlowKey schema/UnsupportedTriggerKey})
 
 (defn schema-keys [sc]
   (mapv (fn [k]
           (if (= (type k) schema.core.OptionalKey)
             (:k k)
-            k)) 
-        (remove non-doc-keys 
+            k))
+        (remove non-doc-keys
                 (keys sc))))
 
 (deftest catalog-test
-  (is (= (set (keys (:model (:catalog-entry model)))) 
+  (is (= (set (keys (:model (:catalog-entry model))))
          (set (concat (schema-keys schema/base-task-map)
                       (schema-keys schema/partial-grouping-task)
                       (schema-keys schema/partial-input-task)
