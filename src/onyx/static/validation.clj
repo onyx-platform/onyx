@@ -6,12 +6,12 @@
             [onyx.windowing.units :as u]
             [onyx.information-model :refer [model]]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
-                                 RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition]]))
+                                 RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
 (defn validate-java-version []
-  (let [version (System/getProperty "java.runtime.version")] 
+  (let [version (System/getProperty "java.runtime.version")]
     (when-not (pos? (.compareTo version "1.8.0"))
-      (throw (ex-info "Onyx is only supported when running on Java 8 or later." 
+      (throw (ex-info "Onyx is only supported when running on Java 8 or later."
                       {:version version})))))
 
 (defn name-and-type-not-equal [entry]

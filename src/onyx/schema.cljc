@@ -41,7 +41,7 @@
 (def SPosInt
   (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
-(defrecord UnsupportedKeywordNS [v]
+(defrecord RestrictedKwNamespace [v]
   s/Schema
   (spec [this] (leaf/leaf-spec
                 (some-fn
@@ -53,13 +53,13 @@
                                     (fn [datom]
                                       (list '= (list 'name v)
                                             (list 'namespace datom)))))))
-  (explain [this] {:allowed-kw-ns (list 'not v)}))
+  (explain [this] {:restricted-ns v}))
 
 (defn ^:deprecated build-allowed-key-ns [nspace]
-  (UnsupportedKeywordNS. nspace))
+  (RestrictedKwNamespace. nspace))
 
 (defn restricted-ns [nspace]
-  (UnsupportedKeywordNS. nspace))
+  (RestrictedKwNamespace. nspace))
 
 (defn deprecated [key-seq]
   (s/pred
