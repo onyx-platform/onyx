@@ -373,7 +373,17 @@
     :apply-state-update Function}
    record? 'record?))
 
-(def StateEvent s/Any)
+
+(def PeerSchedulerEventTypes [:peer-reallocated :peer-left :job-killed :job-completed])
+
+(def PeerSchedulerEvent (apply s/enum PeerSchedulerEventTypes))
+
+(def TriggerEventTypes [:timer-tick :new-segment])
+
+(def TriggerEvent (apply s/enum (into PeerSchedulerEventTypes TriggerEventTypes)))
+
+(def StateEvent {:event-type TriggerEvent
+                 s/Any s/Any})
 
 (def WindowState
   (s/constrained
@@ -381,7 +391,7 @@
     :trigger-states [TriggerState]
     :window Window
     :state {s/Any s/Any}
-    :state-event StateEvent
+    :state-event (s/maybe StateEvent)
     :event-results [StateEvent]
     :init-fn Function
     :create-state-update Function

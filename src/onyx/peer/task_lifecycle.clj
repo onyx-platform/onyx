@@ -419,7 +419,7 @@
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
-     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch task-monitoring task-information]
+     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
@@ -530,7 +530,7 @@
 
     (when-let [event (:pipeline-data component)]
       (when-not (empty? (:onyx.core/triggers event))
-        (>!! (:onyx.core/state-ch event) [:task-lifecycle-stopped event #()]))
+        (>!! (:onyx.core/state-ch event) [(:scheduler-event component) event #()]))
 
       (stop-window-state-thread! event)
 
