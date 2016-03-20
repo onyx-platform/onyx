@@ -66,5 +66,5 @@
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new)
     (do (register-acker state diff new)
-        (common/start-new-lifecycle old new diff state))
+        (common/start-new-lifecycle old new diff state :peer-reallocated))
     state))

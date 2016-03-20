@@ -469,3 +469,30 @@
                   :onyx/fn :my.class
                   :onyx/type :function
                   :onyx/batch-size 40}))))
+
+(deftest keyword-namespace-restriction
+  (testing "build-allowed-key-ns throws exception only on restriction"
+    (is (thrown? Exception
+                 (s/validate {:myplugin/option s/Str
+                              (os/build-allowed-key-ns :myplugin) s/Any}
+                             {:myplugin/option "chocolate"
+                              :myplugin/extra-option "vanilla"})))
+    (is (s/validate {:myplugin/option s/Str
+                     (os/build-allowed-key-ns :myplugin) s/Any}
+                    {:myplugin/option "chocolate"
+                     :otherplugin/extra-option "vanilla"})))
+  (testing "restricted-ns throws exception only on restriction"
+    (is (thrown? Exception
+                 (s/validate {:myplugin/option s/Str
+                              (os/restricted-ns :myplugin) s/Any}
+                             {:myplugin/option "chocolate"
+                              :myplugin/extra-option "vanilla"})))
+    (is (s/validate {:myplugin/option s/Str
+                     (os/restricted-ns :myplugin) s/Any}
+                    {:myplugin/option "chocolate"
+                     :otherplugin/extra-option "vanilla"})))
+  (testing "s/explain on restricted-ns returns something readable"
+    (is (= (first (remove nil? (map (fn [x] (if (vector? x) (second x) x))
+                                    (keys (s/explain {(os/restricted-ns :myplugin) s/Any
+                                                      :myplugin/option s/Str})))))
+           :myplugin))))

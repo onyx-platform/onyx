@@ -52,9 +52,9 @@
 ;;; State transition functions
 
 (s/defn segment-next-state 
-  [{:keys [trigger/threshold]} :- Trigger 
+  [{:keys [trigger/threshold] :as trigger}
    state :- s/Int 
-   {:keys [event-type] :as trigger-event}]
+   {:keys [event-type] :as state-event} :- StateEvent]
   (if (= event-type :new-segment)
     (inc (mod state (first threshold)))
     state))
@@ -62,27 +62,27 @@
 (s/defn timer-next-state 
   [{:keys [trigger/period] :as trigger} :- Trigger 
    {:keys [fire-time] :as state} :- TimerState
-   {:keys [event-type] :as trigger-event}]
+   {:keys [event-type] :as state-event} :- StateEvent]
   (let [fire? (or (> (System/currentTimeMillis) fire-time)
-                  (boolean (#{:task-lifecycle-stopped} event-type)))] 
+                  (boolean (#{:job-completed} event-type)))] 
     {:fire? fire?
      :fire-time (if fire? (next-fire-time trigger) fire-time)}))
 
 (s/defn punctuation-next-state
-  [trigger :- Trigger {:keys [pred-fn]} trigger-event]
-  {:pred-fn pred-fn :fire? (pred-fn trigger trigger-event)})
+  [trigger :- Trigger {:keys [pred-fn]} state-event :- StateEvent]
+  {:pred-fn pred-fn :fire? (pred-fn trigger state-event)})
 
 (s/defn watermark-next-state
   [trigger :- Trigger
    state
-   {:keys [event-type] :as trigger-event}]
+   {:keys [event-type] :as state-event} :- StateEvent]
   ;; Intentionally return nil - this trigger is stateless.
   )
 
 (s/defn percentile-watermark-next-state
   [trigger :- Trigger
    state
-   trigger-event :- StateEvent]
+   state-event :- StateEvent]
   ;; Intentionally return nil - this trigger is stateless.
   )
 
@@ -91,32 +91,32 @@
 (s/defn segment-fire?
   [{:keys [trigger/threshold] :as trigger} :- Trigger 
    trigger-state :- s/Int 
-   {:keys [event-type] :as trigger-event}]
+   {:keys [event-type] :as state-event} :- StateEvent]
   (or (and (= event-type :new-segment) 
            (= trigger-state (first threshold)))
-      (= event-type :task-lifecycle-stopped)))
+      (= event-type :job-completed)))
 
 (s/defn timer-fire?
-  [{:keys [trigger/period]} :- Trigger state :- TimerState {:keys [event-type] :as trigger-event}]
+  [{:keys [trigger/period]} :- Trigger state :- TimerState {:keys [event-type] :as state-event} :- StateEvent]
   (:fire? state))
 
 (s/defn punctuation-fire?
-  [trigger :- Trigger trigger-state trigger-event]
+  [trigger :- Trigger trigger-state state-event :- StateEvent]
   (:fire? trigger-state))
 
 (s/defn watermark-fire?
-  [trigger :- Trigger trigger-state {:keys [upper-bound event-type segment window] :as trigger-event}]
+  [trigger :- Trigger trigger-state {:keys [upper-bound event-type segment window] :as state-event} :- StateEvent]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-watermark? window upper-bound segment))
-      (= event-type :task-lifecycle-stopped)))
+      (= event-type :job-completed)))
 
 (s/defn percentile-watermark-fire? 
   [trigger :- Trigger trigger-state {:keys [lower-bound upper-bound event-type segment window]} :- StateEvent]
   ;; If this was stimulated by a new segment, check if it should fire.
   ;; Otherwise if this was a completed task, always fire.
   (or (and segment (exceeds-percentile-watermark? window trigger lower-bound upper-bound segment))
-      (= event-type :task-lifecycle-stopped)))
+      (= event-type :job-completed)))
 
 ;;; Top level vars to bundle the functions together
 (def segment

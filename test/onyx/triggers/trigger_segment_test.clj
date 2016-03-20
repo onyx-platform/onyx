@@ -5,6 +5,7 @@
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
+            [onyx.types :as t]
             [schema.test]
             [onyx.api]))
 
@@ -34,7 +35,7 @@
         event {}
         windows-state [(wc/resolve-window-state window triggers task-map)]
         segment1 {:event-time #inst "2016-02-18T12:56:00.910-00:00"}
-        new-segment-event (assoc (ws/new-state-event :new-segment event) :segment segment1)
+        new-segment-event (assoc (t/new-state-event :new-segment event) :segment segment1)
         ws-1 (ws/fire-state-event windows-state new-segment-event)
         _ (is (nil? @new-state))
         ws-2 (ws/fire-state-event ws-1 new-segment-event)

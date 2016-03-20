@@ -41,6 +41,18 @@
   [window-id refinement on sync fire-all-extents? state pred watermark-percentage doc 
    period threshold sync-fn id init-state create-state-update apply-state-update])
 
+(defrecord StateEvent 
+  [event-type task-event segment grouped? group-key lower-bound upper-bound 
+   log-type trigger-update aggregation-update window next-state])
+
+(defn new-state-event 
+  [event-type task-event]
+  (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
+
+(defmethod clojure.core/print-method StateEvent
+  [system ^java.io.Writer writer]
+  (.write writer  "#<onyx.types.StateEvent>"))
+
 (defrecord Link [link timestamp])
 
 (defrecord MonitorEvent [event])
@@ -52,3 +64,5 @@
 (defrecord MonitorTaskEventCount [event count])
 
 (defrecord MonitorEventLatencyBytes [event latency bytes])
+
+

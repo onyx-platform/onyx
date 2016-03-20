@@ -29,8 +29,8 @@
 (defn triggers->event-map [triggers {:keys [onyx.core/windows] :as event}]
   (assoc event :onyx.core/triggers (mapv wc/resolve-trigger triggers)))
 
-(s/defn flow-conditions->event-map 
-  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event} :- Event]
+(defn flow-conditions->event-map 
+  [{:keys [onyx.core/flow-conditions onyx.core/workflow onyx.core/task] :as event}]
   (update event 
           :onyx.core/compiled 
           (fn [compiled] 

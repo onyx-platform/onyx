@@ -5,10 +5,9 @@
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
+            [onyx.types :as t]
             [schema.test]
             [onyx.api]))
-
-(use-fixtures :once schema.test/validate-schemas)
 
 (def true-pred (constantly true))
 
@@ -51,6 +50,6 @@
         segment {:event-time #inst "2016-02-18T12:56:00.910-00:00"}
         log-entries (map ws/log-entries 
                          (ws/fire-state-event windows-state 
-                                              (assoc (ws/new-state-event :new-segment event) 
+                                              (assoc (t/new-state-event :new-segment event) 
                                                      :segment segment)))]
     (is @trigger-fired?)))
