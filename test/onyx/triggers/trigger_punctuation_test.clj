@@ -9,8 +9,6 @@
             [schema.test]
             [onyx.api]))
 
-(use-fixtures :once schema.test/validate-schemas)
-
 (def true-pred (constantly true))
 
 (def trigger-fired? (atom false))

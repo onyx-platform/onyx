@@ -10,8 +10,6 @@
             [schema.test]
             [onyx.api]))
 
-(use-fixtures :once schema.test/validate-schemas)
-
 (def trigger-count (atom 0))
 
 (defn fire [& all]

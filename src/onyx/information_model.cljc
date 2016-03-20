@@ -527,7 +527,8 @@ may be added by the user as the context is associated to throughout the task pip
                                                    :doc "The flow conditions for this job"}
                        :onyx.core/lifecycles {:type [:lifecycle-entry]
                                               :doc "The lifecycle entries for this job"}
-                       :onyx.core/triggers {:type [:trigger-entry]
+                       :onyx.core/triggers {:type :any ;[:trigger-entry]
+                                            :optional? true
                                             :doc "The trigger entries for this job"}
                        :onyx.core/windows {:type [:window-entry]
                                            :doc "The window entries for this job"}
@@ -572,6 +573,12 @@ may be added by the user as the context is associated to throughout the task pip
                                            :doc "The core.async channel to deliver seal notifications for this job"}
                        :onyx.core/restart-ch {:type :channel
                                               :doc "The core.async channel to deliver restart notifications to the peer"}
+                       :onyx.core/state-ch {:type :channel
+                                            :optional? true
+                                            :doc "The core.async channel used by onyx to communicate event maps to the state thread channel."}
+                       :onyx.core/state-thread-ch {:type :channel
+                                                   :optional? true
+                                                   :doc "The core.async channel thread used by onyx to dispatch state writes to durable storage."}
                        :onyx.core/filter-state {:type :any
                                                 :optional? true
                                                 :doc "The state of the deduplication filter, if any"}
@@ -624,7 +631,7 @@ may be added by the user as the context is associated to throughout the task pip
             :lower-bound 
             {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
              :type :integer
-             :optional? false
+             :optional? true
              :added "0.9.0"}
             :upper-bound 
             {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
@@ -1436,36 +1443,38 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/lifecycles 
                :onyx.core/fn
                :onyx.core/params
-               :onyx.core/peer-opts
+               :onyx.core/metadata 
                :onyx.core/results
                :onyx.core/batch
+               :onyx.core/id 
+               :onyx.core/job-id 
+               :onyx.core/task 
+               :onyx.core/task-id
+               :onyx.core/lifecycle-id
+               :onyx.core/peer-opts
                :onyx.core/replica
                :onyx.core/peer-replica-view
+               :onyx.core/task-information 
                :onyx.core/seal-ch 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 
                :onyx.core/restart-ch 
                :onyx.core/task-kill-ch
+               :onyx.core/state-ch 
+               :onyx.core/state-thread-ch
                :onyx.core/log-prefix
-               :onyx.core/id 
-               :onyx.core/task-information 
+               :onyx.core/serialized-task
                :onyx.core/log
-               :onyx.core/metadata 
-               :onyx.core/lifecycle-id
                :onyx.core/monitoring 
                :onyx.core/windows-state 
                :onyx.core/state-log 
                :onyx.core/pipeline 
-               :onyx.core/job-id 
-               :onyx.core/task 
                :onyx.core/filter-state
                :onyx.core/messenger 
-               :onyx.core/task-id
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state 
-               :onyx.core/serialized-task ]
+               :onyx.core/state]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

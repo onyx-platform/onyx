@@ -198,10 +198,9 @@
       (handle-backoff! event)
       rets)))
 
-(s/defn tag-messages ;:- Event
+(s/defn tag-messages :- Event
   [{:keys [peer-replica-view task-type id] :as compiled} event ;:- Event
    ]
-  (info "tag" (keys event))
   (if (= task-type :input)
     (update event
             :onyx.core/batch

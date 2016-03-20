@@ -42,15 +42,25 @@
 (def SPosInt
   (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
-(defn build-allowed-key-ns [nspace]
-  (s/pred (fn [k]
-            (or (not (keyword? k))
-                (not (= (name nspace)
-                        (namespace k)))))
-          'unsupported-key-combination))
+(defrecord RestrictedKwNamespace [v]
+  s/Schema
+  (spec [this] (leaf/leaf-spec
+                (some-fn
+                 (spec/simple-precondition this keyword?)
+                 (spec/precondition this
+                                    (fn [datom]
+                                      (not= (name v)
+                                            (namespace datom)))
+                                    (fn [datom]
+                                      (list '= (list 'name v)
+                                            (list 'namespace datom)))))))
+  (explain [this] [:restricted-ns v]))
 
-(def UnsupportedTaskMapKey
-  (build-allowed-key-ns :onyx))
+(defn ^:deprecated build-allowed-key-ns [nspace]
+  (RestrictedKwNamespace. nspace))
+
+(defn restricted-ns [nspace]
+  (RestrictedKwNamespace. nspace))
 
 (defn deprecated [key-seq]
   (s/pred
@@ -74,7 +84,7 @@
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
    (s/optional-key :onyx/required-tags) [s/Keyword]
-   UnsupportedTaskMapKey s/Any})
+   (restricted-ns :onyx) s/Any})
 
 (def FluxPolicy
   (apply s/enum (get-in i/model [:catalog-entry :model :onyx/flux-policy :choices])))
@@ -626,7 +636,7 @@
               model))))
 
 (s/defn lookup-schema [k]
-  (let [base-phase {:integer s/Int
+  (let [base-phase {:integer s/Num
                     :boolean s/Bool
                     :keyword s/Keyword
                     :any s/Any
@@ -642,8 +652,8 @@
                     :job-metadata {s/Any s/Any}
                     :function Function
                     :string s/Str
-                    :results onyx.types.Results
                     ;; To further restrict in the future
+                    :results s/Any
                     :replica-atom s/Any
                     :peer-replica-view-atom s/Any
                     :windows-state-atom s/Any
