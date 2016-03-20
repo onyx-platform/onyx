@@ -2,6 +2,8 @@
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [schema.core :as s]
+            [onyx.schema :as os]
             [onyx.test-helper :refer [load-config with-test-env]]
             [onyx.api]))
 
@@ -70,7 +72,11 @@
 
 (def test-state (atom []))
 
-(defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as state-event} extent-state]
+(s/defn update-atom! [event :- os/Event 
+                      window :- os/Window 
+                      trigger :- os/Trigger 
+                      {:keys [lower-bound upper-bound event-type] :as state-event} :- os/StateEvent 
+                      extent-state]
   (when-not (= :job-completed event-type)
     (swap! test-state conj [lower-bound upper-bound extent-state])))
 
