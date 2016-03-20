@@ -135,6 +135,7 @@
   (trigger [this]
     (let [{:keys [trigger-index trigger-state]} state-event
           {:keys [trigger next-trigger-state trigger-fire? fire-all-extents?]} trigger-state 
+          state-event (assoc state-event :window window)
           new-trigger-state (next-trigger-state trigger (:state trigger-state) state-event)
           ;; TODO, scope this via :trigger/scope 
           fire-all? (or fire-all-extents? (not= (:event-type state-event) :segment))
@@ -144,7 +145,6 @@
       (reduce (fn [t extent] 
                 (let [[lower-bound upper-bound] (we/bounds window-extension extent)
                       state-event (-> state-event
-                                      (assoc :window window)
                                       (assoc :lower-bound lower-bound)
                                       (assoc :upper-bound upper-bound))]
                   (if (trigger-fire? trigger new-trigger-state state-event)

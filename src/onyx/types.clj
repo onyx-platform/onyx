@@ -1,6 +1,4 @@
-(ns onyx.types
-  (:require [schema.core :as s]
-            [onyx.schema :as os]))
+(ns onyx.types)
 
 (defrecord Event [monitoring metrics])
 
@@ -47,8 +45,8 @@
   [event-type task-event segment grouped? group-key lower-bound upper-bound 
    log-type trigger-update aggregation-update window next-state])
 
-(s/defn new-state-event 
-  [event-type task-event :- os/Event]
+(defn new-state-event 
+  [event-type task-event]
   (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
 (defrecord Link [link timestamp])

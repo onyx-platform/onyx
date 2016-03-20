@@ -502,9 +502,99 @@
              :optional? true
              :added "0.8.0"}}}
 
+   :event-map {:summary "Onyx exposes an 'event context' through many of its APIs. This is a description of what you will find in this map and what each of its key/value pairs mean. More keys
+may be added by the user as the context is associated to throughout the task pipeline."
+               :schema :onyx.schema.Event
+               :type :map
+               :model {:onyx.core/id {:type :uuid
+                                      :doc "The unique ID of this peer's lifecycle"}             
+                       :onyx.core/lifecycle-id {:type :uuid
+                                                :optional? true
+                                                :doc "The unique ID for this *execution* of the lifecycle"}
+                       :onyx.core/job-id {:type :uuid
+                                          :doc "The Job ID of the task that this peer is executing"}
+                       :onyx.core/task-id {:type :uuid
+                                           :doc "The Task ID that this peer is executing"} 
+                       :onyx.core/task {:type :keyword
+                                        :doc "The task name that this peer is executing"}
+                       :onyx.core/fn {:type :function
+                                      :doc "The :onyx/fn for this task."}
+                       :onyx.core/catalog {:type [:catalog-entry]
+                                           :doc "The full catalog for this job"}
+                       :onyx.core/workflow {:type :workflow
+                                            :doc "The workflow for this job"}
+                       :onyx.core/flow-conditions {:type [:flow-conditions-entry]
+                                                   :doc "The flow conditions for this job"}
+                       :onyx.core/lifecycles {:type [:lifecycle-entry]
+                                              :doc "The lifecycle entries for this job"}
+                       :onyx.core/triggers {:type [:trigger-entry]
+                                            :doc "The trigger entries for this job"}
+                       :onyx.core/windows {:type [:window-entry]
+                                           :doc "The window entries for this job"}
+                       :onyx.core/pipeline {:type :any
+                                            :doc "The instantiated plugin for this task."}
+                       :onyx.core/task-map {:type :catalog-entry
+                                            :doc "The catalog entry for this task"}
+                       :onyx.core/serialized-task {:type :serialized-task
+                                                   :doc "The task that this peer is executing that has been serialized to ZooKeeper"} 
+                       :onyx.core/metadata {:type :job-metadata
+                                            :doc "The job's metadata, supplied via the :metadata key when submitting the job"}
+
+                       :onyx.core/compiled {:type :any
+                                            :doc "Quick lookup record used internally by onyx."}
+                       :onyx.core/log-prefix {:type :string
+                                              :doc "Logging context including more information about the task, peer and job ids."}
+                       :onyx.core/params {:type [:any]
+                                          :doc "The parameter sequence to be applied to the function that this task uses"}
+                       :onyx.core/task-information {:type :record
+                                                    :doc "Task information for this task. Mostly consists of data already in the event map."}
+                       :onyx.core/windows-state {:type :windows-state-atom
+                                                 :optional? true
+                                                 :doc "Window state managed internally by Onyx"}
+                       :onyx.core/state-log {:type :record
+                                             :optional? true
+                                             :doc "Window state log component where state transitions are written"}
+                       :onyx.core/drained-back-off {:type :integer
+                                                    :doc "The amount of time to back off when the input is drained"}
+                       :onyx.core/log {:type :record
+                                       :doc "The log record component"}
+                       :onyx.core/messenger-buffer {:type :channel
+                                                    :doc "The messenger buffer core.async channel for this peer"}
+                       :onyx.core/messenger {:type :record
+                                             :doc "The Messenger record Component"}
+                       :onyx.core/task-kill-ch {:type :channel
+                                                :doc "Signalling channel used to kill the task."}
+                       :onyx.core/kill-ch {:type :channel
+                                           :doc "Signalling channel used to kill the peer"}
+                       :onyx.core/outbox-ch {:type :channel
+                                             :doc "The core.async channel to deliver seal notifications for this job"}
+                       :onyx.core/seal-ch {:type :channel
+                                           :doc "The core.async channel to deliver seal notifications for this job"}
+                       :onyx.core/restart-ch {:type :channel
+                                              :doc "The core.async channel to deliver restart notifications to the peer"}
+                       :onyx.core/filter-state {:type :any
+                                                :optional? true
+                                                :doc "The state of the deduplication filter, if any"}
+                       :onyx.core/peer-opts {:type :peer-config
+                                             :doc "The options that this peer was started with"}
+                       :onyx.core/replica {:type :replica-atom
+                                           :doc "The replica that this peer has currently accrued"}
+                       :onyx.core/peer-replica-view {:type :peer-replica-view-atom
+                                                     :doc "Specialised view over the replica generated specifically for this peer"}
+                       :onyx.core/monitoring {:type :record
+                                              :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
+                       :onyx.core/state {:type :peer-state-atom
+                                         :doc "The state that this peer has accrued"}
+                       :onyx.core/batch {:type [:segment]
+                                         :optional? true
+                                         :doc "The sequence of segments read by this peer"}
+                       :onyx.core/results {:type :results
+                                           :optional? true
+                                           :doc "A map of read segment to a vector of segments produced by applying the function of this task"}}}
    :state-event
    {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
     :schema :onyx.schema.StateEvent
+    :type :record
     :model {:event-type 
             {:doc "The event that precipitated the state update or trigger e.g. a new segment arrived"
              :type :keyword
@@ -521,10 +611,10 @@
              :type :segment
              :optional? false
              :added "0.9.0"}
-            :grouped? 
-            {:doc "A boolean defining whether the window state is grouped by key."
+            :grouped?
+            {:doc "A boolean defining whether the window state is grouped by key. Only present when event-type is :new-segment."
              :type :boolean
-             :optional? false
+             :optional? true
              :added "0.9.0"}
             :group-key 
             {:doc "The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used."
@@ -532,20 +622,20 @@
              :optional? false
              :added "0.9.0"}
             :lower-bound 
-            {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
+            {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
              :type :integer
              :optional? false
              :added "0.9.0"}
             :upper-bound 
-            {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
+            {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date. Available in refinements, but not trigger calls. This means that :trigger/on is global over all windows."
              :type :integer
-             :optional? false
+             :optional? true
              :added "0.9.0"}
             :log-type 
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword
              :choices [:trigger :aggregation]
-             :optional? false
+             :optional? true
              :added "0.9.0"}
             :trigger-update 
             {:doc "The accumulated refinement state updates that will be applied to the window state."
@@ -567,7 +657,6 @@
              :type :any
              :optional? true
              :added "0.9.0"}}}
-
    :lifecycle-entry
    {:summary "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."
     :link nil
@@ -1336,6 +1425,47 @@
     :onyx/id]
    :trigger [:trigger/init-state :trigger/next-state :trigger/trigger-fire?]
    :state-refinement [:refinement/create-state-update :refinement/apply-state-update] 
+   :state-event [:event-type :task-event :segment :grouped?  :group-key :lower-bound 
+                 :upper-bound :log-type :trigger-update :aggregation-update :window :next-state]
+   :event-map [:onyx.core/task-map
+               :onyx.core/catalog 
+               :onyx.core/workflow 
+               :onyx.core/flow-conditions 
+               :onyx.core/windows
+               :onyx.core/triggers
+               :onyx.core/lifecycles 
+               :onyx.core/fn
+               :onyx.core/params
+               :onyx.core/peer-opts
+               :onyx.core/results
+               :onyx.core/batch
+               :onyx.core/replica
+               :onyx.core/peer-replica-view
+               :onyx.core/seal-ch 
+               :onyx.core/outbox-ch
+               :onyx.core/kill-ch 
+               :onyx.core/restart-ch 
+               :onyx.core/task-kill-ch
+               :onyx.core/log-prefix
+               :onyx.core/id 
+               :onyx.core/task-information 
+               :onyx.core/log
+               :onyx.core/metadata 
+               :onyx.core/lifecycle-id
+               :onyx.core/monitoring 
+               :onyx.core/windows-state 
+               :onyx.core/state-log 
+               :onyx.core/pipeline 
+               :onyx.core/job-id 
+               :onyx.core/task 
+               :onyx.core/filter-state
+               :onyx.core/messenger 
+               :onyx.core/task-id
+               :onyx.core/compiled
+               :onyx.core/drained-back-off 
+               :onyx.core/messenger-buffer 
+               :onyx.core/state 
+               :onyx.core/serialized-task ]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?
