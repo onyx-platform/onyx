@@ -7,7 +7,7 @@
               [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
               [onyx.windowing.window-extensions :as we]
               [onyx.lifecycles.lifecycle-invoke :as lc]
-              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
+              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled new-state-event]]
               [onyx.state.ack :as st-ack]
               [onyx.state.state-extensions :as state-extensions]
               [onyx.static.default-vals :refer [defaults arg-or-default]]))
@@ -34,15 +34,6 @@
   (play-extent-entry [this entry])
   (play-aggregation-entry [this entry])
   (play-entry [this entry]))
-
-(defrecord StateEvent 
-    [event-type task-event segment grouped? group-key
-     lower-bound upper-bound log-type trigger-update
-     aggregation-update window next-state])
-
-(s/defn new-state-event 
-  [event-type task-event :- Event]
-  (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
 (defn state-event->log-entry [{:keys [log-type] :as state-event}]
   (case log-type
@@ -278,8 +269,11 @@
         new-ws (swap! windows-state fire-state-event state-event)
         log-entry (remove empty? (map log-entries new-ws))]
     (when-not (empty? log-entry) 
-      ;; nil filter-id as this is not in response to a segment
-      (state-extensions/store-log-entry state-log task-event (fn []) (list nil log-entry)))))
+      (state-extensions/store-log-entry state-log 
+                                        task-event 
+                                        (fn []) 
+                                        ;; nil filter-id as this is not in response to a segment
+                                        (list nil log-entry)))))
 
 (defn process-state 
   [compiled {:keys [event-type task-event] :as state-event}]

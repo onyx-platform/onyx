@@ -1,5 +1,11 @@
 (ns onyx.information-model)
 
+(def peer-scheduler-event-types 
+  [:peer-reallocated :peer-left :job-killed :job-completed])
+
+(def trigger-event-types
+  (into [:timer-tick :new-segment] peer-scheduler-event-types))
+
 (def model
   {:catalog-entry
    {:summary "All inputs, outputs, and functions in a workflow must be described via a catalog. A catalog is a vector of maps, strikingly similar to Datomic’s schema. Configuration and docstrings are described in the catalog."
@@ -411,7 +417,7 @@
                                  :type :function
                                  :optional? false
                                  :added "0.9.0"}
-            :trigger/next-state {:doc "Fn (trigger, state-event) update the trigger state in response to a state event with the following keys: `:grouped?`, `:group-key`, `:lower-bound`, `:upper-bound`, `:event-type`, `:segment`, `:next-state`, `:trigger-update`."
+            :trigger/next-state {:doc "Fn (trigger, state-event) updates the trigger state in response to a state-event"
                                  :type :function
                                  :optional? false
                                  :added "0.9.0"}
@@ -442,19 +448,8 @@
              :added "0.8.0"}
 
             :trigger/sync
-            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, the window state as an immutable value, and an opts map with keys (`:window/extent->bounds`, `:refinement/entry`, `:refinement/new-state`, `:context`). Its return value is ignored. 
-
-                  The window metadata keys represent the following:
-
-                  - `:grouped?`: A boolean for whether the window state is grouped by key.
-                  - `:group-key`: The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used.
-                  - `:lower-bound`: Lower bound is the lower most value of any window key for a segment that belongs to this window. 
-                  - `:upper-bound`: Upper bound is the uppermost value of any window key for a segment that belongs to this window.
-                  - `:event-type`: The event that caused the trigger to be checked to be fired.
-                  - `:segment`: The segment that caused this trigger to be fired, if any.
-                  - `:next-state` - The window state that will be set after the refinement update is applied.
-                  - `:trigger-update` - The refinement state update that will be applied to the window state.
-
+            {:doc "A fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a state-event map, and the window state as an immutable value. Its return value is ignored.
+                 
                   This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once for each trigger.
 
                   You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map."
@@ -476,7 +471,7 @@
             {:doc "Used with the trigger :onyx.triggers/timer. A timer trigger sleeps for a duration of `:trigger/period`. When it is done sleeping, the `:trigger/sync` function is invoked with its usual arguments. The trigger goes back to sleep and repeats itself."
              :type :keyword
              :required-when ["`:trigger/on` is `:timer`"]
-             :choices [:milliseconds :seconds :minutes :hours :days]
+             :choices [:milliseconds :millisecond :seconds :second :minutes :minute :hours :hour :days :day]
              :optional? true
              :added "0.8.0"}
 
@@ -506,6 +501,84 @@
              :type :any
              :optional? true
              :added "0.8.0"}}}
+
+   :state-event
+   {:summary "A state event contains context about a state update, trigger call, or refinement update. It consists of a Clojure record, with some keys being nil, depending on the context of the call e.g. a trigger call may include context about the originating cause fo the trigger."
+    :schema :onyx.schema.StateEvent
+    :model {:event-type 
+            {:doc "The event that precipitated the state update or trigger e.g. a new segment arrived"
+             :type :keyword
+             :choices trigger-event-types
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :task-event 
+            {:doc "The full Event map defined in `:event-map` of the information model"
+             :type :event-map
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :segment 
+            {:doc "The segment that caused the state event to occur. Will ony be present when :event-type is :new-segment."
+             :type :segment
+             :optional? false
+             :maybe? true
+             :added "0.9.0"}
+            :grouped? 
+            {:doc "A boolean defining whether the window state is grouped by key."
+             :type :boolean
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :group-key 
+            {:doc "The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used."
+             :type :any
+             :optional? false
+             :maybe? true
+             :added "0.9.0"}
+            :lower-bound 
+            {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
+             :type :integer
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :upper-bound 
+            {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
+             :type :integer
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :log-type 
+            {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
+             :type :keyword
+             :choices [:trigger :aggregation]
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :trigger-update 
+            {:doc "The accumulated refinement state updates that will be applied to the window state."
+             :type [:any]
+             :optional? true
+             :maybe? false
+             :added "0.9.0"}
+            :aggregation-update 
+            {:doc "The accumulated window state updates that will be applied to the window state."
+             :type [:any]
+             :optional? true
+             :maybe? false
+             :added "0.9.0"}
+            :window 
+            {:doc "The window entry associated with this state event."
+             :type :window-entry
+             :optional? false
+             :maybe? false
+             :added "0.9.0"}
+            :next-state 
+            {:doc "The window state that will be set after the refinement update is applied."
+             :type :any
+             :optional? true
+             :maybe? true
+             :added "0.9.0"}}}
 
    :lifecycle-entry
    {:summary "Lifecycles are a feature that allow you to control code that executes at particular points during task execution on each peer. Lifecycles are data driven and composable."

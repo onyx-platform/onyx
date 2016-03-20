@@ -6,6 +6,7 @@
             [onyx.windowing.window-compile :as wc]
             [onyx.windowing.window-extensions :as we]
             [onyx.peer.window-state :as ws]
+            [onyx.types :as t]
             [schema.test]
             [onyx.api]))
 
@@ -34,17 +35,17 @@
         segment {:id 1  :age 21 :event-time #inst "2015-09-13T03:00:00.829-00:00"}
         windows-state [(wc/resolve-window-state window triggers task-map)]
         windows-state-next (ws/fire-state-event windows-state 
-                                                (assoc (ws/new-state-event :new-segment event) 
+                                                (assoc (t/new-state-event :new-segment event) 
                                                        :segment segment))]
     (is (zero? @trigger-count))
     (Thread/sleep 1000)
     (ws/fire-state-event windows-state-next 
-                         (ws/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (ws/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event))
     (Thread/sleep 500)
     (ws/fire-state-event windows-state-next 
-                         (ws/new-state-event :timer-tick event))
+                         (t/new-state-event :timer-tick event))
 
     (is (= 1 @trigger-count))))

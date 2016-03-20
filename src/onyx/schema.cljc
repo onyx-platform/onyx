@@ -31,7 +31,7 @@
   (s/constrained [edge-validator] vector? 'vector?))
 
 (def Language
-  (s/enum :java :clojure))
+  (apply s/enum (get-in i/model [:catalog-entry :model :onyx/language :choices])))
 
 (def PosInt
   (s/constrained s/Int pos? 'pos?))
@@ -56,7 +56,7 @@
 
 (def base-task-map
   {:onyx/name TaskName
-   :onyx/type (s/enum :input :output :function)
+   :onyx/type (apply s/enum (get-in i/model [:catalog-entry :model :onyx/type :choices]))
    :onyx/batch-size PosInt
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
@@ -74,7 +74,7 @@
    UnsupportedTaskMapKey s/Any})
 
 (def FluxPolicy
-  (s/enum :continue :kill :recover))
+  (apply s/enum (get-in i/model [:catalog-entry :model :onyx/flux-policy :choices])))
 
 (def FnPath
   (s/cond-pre NamespacedKeyword s/Keyword))
@@ -233,8 +233,8 @@
           'unsupported-flow-key))
 
 (def FlowCondition
-  {:flow/from s/Keyword
-   :flow/to (s/cond-pre s/Keyword [s/Keyword])
+  {:flow/from TaskName
+   :flow/to (s/cond-pre TaskName [TaskName])
    :flow/predicate (s/cond-pre s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
@@ -249,7 +249,7 @@
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
-  (s/enum :fixed :sliding :global :session))
+  (apply s/enum (get-in i/model [:window-entry :model :window/type :choices])))
 
 (def UnsupportedWindowKey
   (s/pred (fn [k]
@@ -307,8 +307,7 @@
   NamespacedKeyword)
 
 (def TriggerPeriod
-  (s/enum :milliseconds :seconds :minutes :hours :days
-          :mullisecond :second :minute :hour :day))
+  (apply s/enum (get-in i/model [:trigger-entry :model :trigger/period :choices])))
 
 (def TriggerThreshold
   (s/enum :elements :element))
@@ -373,17 +372,19 @@
     :apply-state-update Function}
    record? 'record?))
 
+(def PeerSchedulerEvent (apply s/enum i/peer-scheduler-event-types))
 
-(def PeerSchedulerEventTypes [:peer-reallocated :peer-left :job-killed :job-completed])
+(def type->schema 
+  {:integer s/Int
+   :event-map Event})
 
-(def PeerSchedulerEvent (apply s/enum PeerSchedulerEventTypes))
+(def TriggerEventType (apply s/enum i/trigger-event-types))
 
-(def TriggerEventTypes [:timer-tick :new-segment])
+(def StateEvent 
+  (let [state-event-model (get-in i/model [:state-event :model])] 
+    {:event-type (apply s/enum (get-in state-event-model [:event-type :choices]))
 
-(def TriggerEvent (apply s/enum (into PeerSchedulerEventTypes TriggerEventTypes)))
-
-(def StateEvent {:event-type TriggerEvent
-                 s/Any s/Any})
+     s/Any s/Any}))
 
 (def WindowState
   (s/constrained
