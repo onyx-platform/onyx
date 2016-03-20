@@ -125,7 +125,7 @@
   (def test-state (atom []))
 
   (defn update-atom! [event window trigger {:keys [lower-bound upper-bound group-key event-type] :as opts} extent-state]
-    (when-not (= :task-lifecycle-stopped event-type)
+    (when-not (= :job-completed event-type)
       (swap! test-state conj [[lower-bound upper-bound] group-key extent-state])))
 
   (def batch-num (atom 0))

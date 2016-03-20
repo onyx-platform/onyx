@@ -72,4 +72,4 @@
 
 (s/defmethod extensions/fire-side-effects! :submit-job :- State
   [entry old new diff state]
-  (common/start-new-lifecycle old new diff state))
+  (common/start-new-lifecycle old new diff state :peer-reallocated))

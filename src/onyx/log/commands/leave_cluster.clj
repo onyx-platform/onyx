@@ -87,4 +87,5 @@
                 (close! (or (:watch-ch state) (chan)))
                 (assoc state :watch-ch ch))
 
-              :else state)))))
+              :else state)
+        :peer-left))))

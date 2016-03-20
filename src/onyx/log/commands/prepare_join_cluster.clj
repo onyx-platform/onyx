@@ -97,50 +97,49 @@
 
 (s/defmethod extensions/fire-side-effects! :prepare-join-cluster :- State
   [{:keys [args message-id]} :- LogEntry old new diff {:keys [log monitoring] :as state}]
-  (common/start-new-lifecycle
-   old new diff
-   (cond ;; Handles the cases where all peers are actually dead.
-         ;; This can happen if a single node cluster comes down
-         ;; and is rebooted. We pick a predictably-random peer
-         ;; and knock it down if it's not up. This guarantees
-         ;; progress even if the cluster has experiences total failure.
-         (and (= (:id state) (:joiner args)) (nil? diff))
-         (let [disallowed (distinct (disallowed-candidates new))
-               k (mod message-id (count disallowed))
-               target (nth disallowed k)]
-           (when-not (extensions/peer-exists? log target)
-             (extensions/write-log-entry
-               (:log state)
-               {:fn :leave-cluster :args {:id target}
-                :entry-parent message-id}))
-           state)
+  (let [state-new (cond ;; Handles the cases where all peers are actually dead.
+                        ;; This can happen if a single node cluster comes down
+                        ;; and is rebooted. We pick a predictably-random peer
+                        ;; and knock it down if it's not up. This guarantees
+                        ;; progress even if the cluster has experiences total failure.
+                        (and (= (:id state) (:joiner args)) (nil? diff))
+                        (let [disallowed (distinct (disallowed-candidates new))
+                              k (mod message-id (count disallowed))
+                              target (nth disallowed k)]
+                          (when-not (extensions/peer-exists? log target)
+                            (extensions/write-log-entry
+                              (:log state)
+                              {:fn :leave-cluster :args {:id target}
+                               :entry-parent message-id}))
+                          state)
 
-         (= (:id state) (:observer diff))
-         (let [ch (chan 1)]
-           (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
-           (extensions/on-delete (:log state) (:subject diff) ch)
-           (go (when (<! ch)
-                 (extensions/write-log-entry
-                  (:log state)
-                  {:fn :leave-cluster :args {:id (:subject diff)}
-                   :peer-parent (:id state)
-                   :entry-parent message-id}))
-               (close! ch))
-           (assoc state :watch-ch ch))
-         ;; Handles the cases where a peer tries to attach to a dead
-         ;; peer that hasn't been evicted for whatever reason.
-         (= (:id state) (:subject diff))
-         (if (not (extensions/peer-exists? (:log state) (:observer diff)))
-           (do
-             (extensions/write-log-entry
-              (:log state)
-              {:fn :leave-cluster :args {:id (:observer diff)}
-               :peer-parent (:id state)})
-             state)
-           (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
-             (assoc state :failure-detector (component/start fd))))
-         (= (:id state) (:instant-join diff))
-         (do (extensions/register-acker (:messenger state)
-                                        (get-in new [:peer-sites (:id state)]))
-             state)
-         :else state)))
+                        (= (:id state) (:observer diff))
+                        (let [ch (chan 1)]
+                          (extensions/emit monitoring {:event :peer-prepare-join :id (:id state)})
+                          (extensions/on-delete (:log state) (:subject diff) ch)
+                          (go (when (<! ch)
+                                (extensions/write-log-entry
+                                  (:log state)
+                                  {:fn :leave-cluster :args {:id (:subject diff)}
+                                   :peer-parent (:id state)
+                                   :entry-parent message-id}))
+                              (close! ch))
+                          (assoc state :watch-ch ch))
+                        ;; Handles the cases where a peer tries to attach to a dead
+                        ;; peer that hasn't been evicted for whatever reason.
+                        (= (:id state) (:subject diff))
+                        (if (not (extensions/peer-exists? (:log state) (:observer diff)))
+                          (do
+                            (extensions/write-log-entry
+                              (:log state)
+                              {:fn :leave-cluster :args {:id (:observer diff)}
+                               :peer-parent (:id state)})
+                            state)
+                          (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
+                            (assoc state :failure-detector (component/start fd))))
+                        (= (:id state) (:instant-join diff))
+                        (do (extensions/register-acker (:messenger state)
+                                                       (get-in new [:peer-sites (:id state)]))
+                            state)
+                        :else state)] 
+    (common/start-new-lifecycle old new diff state-new :peer-reallocated)))

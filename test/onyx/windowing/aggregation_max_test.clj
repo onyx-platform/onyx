@@ -28,7 +28,7 @@
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
-  (when-not (= :task-lifecycle-stopped event-type)
+  (when-not (= :job-completed event-type)
     (swap! test-state conj [lower-bound upper-bound extent-state])))
 
 (def in-chan (atom nil))
