@@ -4,7 +4,7 @@
 - **API breaking change**: `:aggregation/fn` was renamed to `:aggregation/create-state-update`
 - **API breaking change**: changed the signatures of the following aggregation function types: `default-window-state`, `apply-state-update`, `super-aggregation-fn`. All now take the window as the first argument.
 - **API breaking change**: internal messaging functions no longer take the event map as an argument. Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
-- **API breaking change**: triggers / refinements are now resolved to vars via namespace lookup. 
+- **API breaking change**: triggers / refinements are now resolved to vars via namespace lookup e.g.
   Trigger example: `:trigger/on :segment` -> `:trigger/on :onyx.triggers/segment`,
   Refinement example: `:trigger/refinement :accumulating` -> `:trigger/refinement :onyx.refinements/accumulating`,
 - Bug fix: fixed exceptions losing their main `.getCause` message when thrown inside a lifecycle
