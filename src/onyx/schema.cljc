@@ -372,19 +372,46 @@
     :apply-state-update Function}
    record? 'record?))
 
+(def Event 
+  {s/Any s/Any})
+
 (def PeerSchedulerEvent (apply s/enum i/peer-scheduler-event-types))
 
-(def type->schema 
-  {:integer s/Int
-   :event-map Event})
+(defn type->schema [t]
+  (let [l {:integer s/Int
+           :boolean s/Bool
+           :any s/Any
+           :segment s/Any
+           :window-entry Window
+           :trigger-entry Trigger
+           :event-map Event}]
+    (if (sequential? t)
+      (mapv l t)
+      (l t))))
 
 (def TriggerEventType (apply s/enum i/trigger-event-types))
 
-(def StateEvent 
-  (let [state-event-model (get-in i/model [:state-event :model])] 
-    {:event-type (apply s/enum (get-in state-event-model [:event-type :choices]))
+(defn information-model->schema [model representation]
+  (reduce (fn [m [k km]]
+            (let [optional? (:optional? km)
+                  schema-value (if-let [choices (:choices km)] 
+                                 (apply s/enum choices)
+                                 (type->schema (:type km)))]
+              (case representation
+                :record (assoc m 
+                               k
+                               (if optional? (s/maybe schema-value) schema-value))
 
-     s/Any s/Any}))
+                :map (assoc m 
+                            (if (= optional? (s/optional-key k) k) 
+                              schema-value)))))
+          {}
+          model))
+
+(def StateEvent 
+  (-> (:model (:state-event i/model))
+      (information-model->schema :record)
+      (assoc s/Any s/Any)))
 
 (def WindowState
   (s/constrained
@@ -407,9 +434,6 @@
 
 (def TaskScheduler
   NamespacedKeyword)
-
-(def Event 
-  {s/Any s/Any})
 
 (def JobMetadata
   {s/Keyword s/Any})

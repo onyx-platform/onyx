@@ -510,74 +510,62 @@
              :type :keyword
              :choices trigger-event-types
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :task-event 
             {:doc "The full Event map defined in `:event-map` of the information model"
              :type :event-map
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :segment 
             {:doc "The segment that caused the state event to occur. Will ony be present when :event-type is :new-segment."
              :type :segment
              :optional? false
-             :maybe? true
              :added "0.9.0"}
             :grouped? 
             {:doc "A boolean defining whether the window state is grouped by key."
              :type :boolean
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :group-key 
             {:doc "The grouping key for the window state. Set when `:onyx/group-by-key` or `:onyx/group-by-fn` is used."
              :type :any
              :optional? false
-             :maybe? true
              :added "0.9.0"}
             :lower-bound 
             {:doc "The lower most value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
              :type :integer
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :upper-bound 
             {:doc "The uppermost value of any window key for a segment that belongs to this window. Usually coerceable to a java Date."
              :type :integer
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :log-type 
             {:doc "The type of state machine call that will be recorded to storage. For example, if this call was made by a trigger, then upon replay the trigger should be replayed using a trigger call."
              :type :keyword
              :choices [:trigger :aggregation]
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :trigger-update 
             {:doc "The accumulated refinement state updates that will be applied to the window state."
              :type [:any]
              :optional? true
-             :maybe? false
              :added "0.9.0"}
             :aggregation-update 
             {:doc "The accumulated window state updates that will be applied to the window state."
              :type [:any]
              :optional? true
-             :maybe? false
              :added "0.9.0"}
             :window 
             {:doc "The window entry associated with this state event."
              :type :window-entry
              :optional? false
-             :maybe? false
              :added "0.9.0"}
             :next-state 
             {:doc "The window state that will be set after the refinement update is applied."
              :type :any
              :optional? true
-             :maybe? true
              :added "0.9.0"}}}
 
    :lifecycle-entry
