@@ -49,6 +49,10 @@
   [event-type task-event]
   (->StateEvent event-type task-event nil nil nil nil nil nil nil nil nil nil))
 
+(defmethod clojure.core/print-method StateEvent
+  [system ^java.io.Writer writer]
+  (.write writer  "#<onyx.types.StateEvent>"))
+
 (defrecord Link [link timestamp])
 
 (defrecord MonitorEvent [event])

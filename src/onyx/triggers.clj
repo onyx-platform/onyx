@@ -52,7 +52,7 @@
 ;;; State transition functions
 
 (s/defn segment-next-state 
-  [{:keys [trigger/threshold]} :- Trigger 
+  [{:keys [trigger/threshold] :as trigger}
    state :- s/Int 
    {:keys [event-type] :as state-event} :- StateEvent]
   (if (= event-type :new-segment)

@@ -527,7 +527,9 @@ may be added by the user as the context is associated to throughout the task pip
                                                    :doc "The flow conditions for this job"}
                        :onyx.core/lifecycles {:type [:lifecycle-entry]
                                               :doc "The lifecycle entries for this job"}
-                       :onyx.core/triggers {:type :any ;[:trigger-entry]
+                       :onyx.core/triggers {; type should not be :any however we end up with
+                                            ; recursive schema check bugs. This will be fixed.
+                                            :type :any
                                             :optional? true
                                             :doc "The trigger entries for this job"}
                        :onyx.core/windows {:type [:window-entry]

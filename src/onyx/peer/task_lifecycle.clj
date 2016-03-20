@@ -199,8 +199,7 @@
       rets)))
 
 (s/defn tag-messages :- Event
-  [{:keys [peer-replica-view task-type id] :as compiled} event ;:- Event
-   ]
+  [{:keys [peer-replica-view task-type id] :as compiled} event :- Event]
   (if (= task-type :input)
     (update event
             :onyx.core/batch
