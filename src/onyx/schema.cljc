@@ -689,20 +689,3 @@
 (def Event
   (-> (information-model->schema (i/model :event-map))
       (assoc (restricted-ns :onyx.core) s/Any)))
-
-(def WindowState
-  (s/constrained
-   {:window-extension WindowExtension
-    :trigger-states [TriggerState]
-    :window Window
-    :state {s/Any s/Any}
-    :state-event (s/maybe StateEvent)
-    :event-results [StateEvent]
-    :init-fn Function
-    :create-state-update Function
-    :apply-state-update Function
-    :super-agg-fn (s/maybe Function)
-    (s/optional-key :new-window-state-fn) Function
-    (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
-   record? 'record?))
-
