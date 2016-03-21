@@ -1,8 +1,6 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
-grep -v _test log_artifact/$ARTIFACT_DIR/stderrout.log | 
-grep onyx |
-grep Reflection
+grep -v _test log_artifact/$ARTIFACT_DIR/stderrout.log | grep onyx | grep Reflection
 
 if [ $? -eq 1 ]; then
   exit 0
