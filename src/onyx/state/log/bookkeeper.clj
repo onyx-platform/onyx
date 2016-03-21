@@ -37,7 +37,7 @@
 (defn close-handle [^LedgerHandle ledger-handle]
   (.close ledger-handle))
 
-(defn bookkeeper
+(defn ^BookKeeper bookkeeper
   ([opts]
    (bookkeeper (:zookeeper/address opts)
                (zk/ledgers-path (:onyx/tenancy-id opts))

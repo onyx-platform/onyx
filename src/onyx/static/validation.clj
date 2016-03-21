@@ -37,31 +37,33 @@
 
 (defn describe-cause [k]
   (if (= schema.utils.ValidationError (type k))
-    (cond (= (os/restricted-ns :onyx) (.schema k))
-          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)]
-            {:cause "Unsupported combination of task-map keys."
-             :key (.value k)
-             :documentation doc}
-            {:cause "Unsupported onyx task-map key."
-             :key (.value k)})
+    (cond (= (os/restricted-ns :onyx) (.schema ^schema.utils.ValidationError k))
+          (let [kvalue (.value ^schema.utils.ValidationError k)] 
+            (if-let [doc (dissoc (get-in model [:catalog-entry :model kvalue]) :doc)]
+              {:cause "Unsupported combination of task-map keys."
+               :key kvalue
+               :documentation doc}
+              {:cause "Unsupported onyx task-map key."
+               :key kvalue}))
           :else
           k)
     k))
 
 (defn describe-value [k v]
   (if (= schema.utils.ValidationError (type v))
-    (let [entry (get-in model [:catalog-entry :model k])]
+    (let [vvalue (.value ^schema.utils.ValidationError v)
+          entry (get-in model [:catalog-entry :model k])]
       (if-let [deprecation-doc (:deprecation-doc entry)]
         {:cause deprecation-doc
-         :data {k (.value v)}
+         :data {k vvalue}
          :deprecated-version (:deprecated-version entry)}
         (if-let [doc (dissoc entry :doc)]
           {:cause "Unsupported value"
-           :data {k (.value v)}
+           :data {k vvalue}
            :documentation doc}
           {:cause "Unsupported value"
-           :data {k (.value v)}
-           :value (.value v)})))
+           :data {k vvalue}
+           :value vvalue})))
     v)) 
 
 (defn improve-issue [m]

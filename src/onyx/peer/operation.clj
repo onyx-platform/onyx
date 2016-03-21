@@ -4,7 +4,7 @@
             [taoensso.timbre :refer [info warn]]))
 
 (defn get-method-java [class-name method-name]
-  (let [ms (filter #(= (.getName %) method-name)
+  (let [ms (filter #(= (.getName ^Class %) method-name)
                    (.getMethods (Class/forName class-name)))]
     (if (= 1 (count ms))
       (first ms)

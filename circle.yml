@@ -9,6 +9,8 @@ test:
         parallel: true
     - ./scripts/circle-runner.sh aeron clojure-1.7 :smoke:
         timeout: 120
+    - ./scripts/reflection-check.sh
+        timeout: 120
 
 machine:
   java:
