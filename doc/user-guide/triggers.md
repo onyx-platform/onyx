@@ -12,7 +12,7 @@ In this section, we talk about Triggers. Triggers are a feature that interact wi
 
 Windows capture data over time and place segments into discrete, possibly overlapping buckets. By itself, this is a relatively useless concept. In order to harness the information that has been captured and rolled up, we need to *move* it somewhere. Triggers let us interact with the state in each extent of a window.
 
-Example project: [aggregation](https://github.com/onyx-platform/onyx-examples/tree/0.8.x/aggregation)
+Example project: [aggregation](https://github.com/onyx-platform/onyx-examples/tree/master/aggregation)
 
 ### Trigger Types
 
@@ -24,8 +24,8 @@ This trigger sleeps for a duration of `:trigger/period`. When it is done sleepin
 
 ```clojure
 {:trigger/window-id :collect-segments
- :trigger/refinement :discarding
- :trigger/on :timer
+ :trigger/refinement :onyx.refinements/discarding
+ :trigger/on :onyx.triggers/timer
  :trigger/period [3 :seconds]
  :trigger/sync ::write-to-dynamo
  :trigger/doc "Writes state to DynamoDB every 5 seconds, discarding intermediate state"}
@@ -37,8 +37,8 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 ```clojure
 {:trigger/window-id :collect-segments
- :trigger/refinement :accumulating
- :trigger/on :segment
+ :trigger/refinement :onyx.refinements/accumulating
+ :trigger/on :onyx.triggers/segment
  :trigger/fire-all-extents? true
  :trigger/threshold [5 :elements]
  :trigger/sync ::write-to-stdout
@@ -51,8 +51,8 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 ```clojure
 {:trigger/window-id :collect-segments
- :trigger/refinement :discarding
- :trigger/on :punctuation
+ :trigger/refinement :onyx.refinements/discarding
+ :trigger/on :onyx.triggers/punctuation
  :trigger/pred ::trigger-pred
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to std out :trigger/pred is true for this segment"}
@@ -65,8 +65,8 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 ```clojure
 {:trigger/window-id :collect-segments
- :trigger/refinement :discarding
- :trigger/on :watermark
+ :trigger/refinement :onyx.refinements/discarding
+ :trigger/on :onyx.triggers/watermark
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout when this window's watermark has been exceeded"}
 ```
@@ -78,8 +78,8 @@ Trigger wakes up in reaction to a new segment being processed. Trigger only fire
 
 ```clojure
 {:trigger/window-id :collect-segments
- :trigger/refinement :discarding
- :trigger/on :percentile-watermark
+ :trigger/refinement :onyx.refinements/discarding
+ :trigger/on :onyx.triggers/percentile-watermark
  :trigger/watermark-percentage 0.95
  :trigger/sync ::write-to-stdout
  :trigger/doc "Writes the window contents to stdout when this window's watermark is exceeded by 95% of its range"}
@@ -91,20 +91,16 @@ A refinement mode allows you to articulate what should happen to the state of a 
 
 #### `:accumulating`
 
-Setting `:trigger/refinement` to `:accumulating` means that the state of a window extent is maintained exactly as is after the trigger invocation. This is useful if you want to an answer to a query to "become more correct over time".
+Setting `:trigger/refinement` to `:onyx.refinements/accumulating` means that the state of a window extent is maintained exactly as is after the trigger invocation. This is useful if you want to an answer to a query to "become more correct over time".
 
 #### `:discarding`
 
-Setting `:trigger/refinement` to `:discarding` means that the state of a window extent is set back to the value it was initialized with after the trigger invocation. You'd want to use this if the results from one periodic update bear no connection to subsequent updates.
+Setting `:trigger/refinement` to `:onyx.refinements/discarding` means that the state of a window extent is set back to the value it was initialized with after the trigger invocation. You'd want to use this if the results from one periodic update bear no connection to subsequent updates.
 
 ### Syncing
 
-Onyx offers you the ultimate flexibility on what to do with your state during a trigger invocation. Set `:trigger/sync` to a fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: the event map, the window map that this trigger is defined on, the trigger map, a map with keys (`:window-id`, `:lower-bound`, `:upper-bound`, `:context`) representing window metadata, and the window state as an immutable value. Its return value is ignored. The window metadata keys represent the following:
-
-- `:window-id`: a unique ID representing this concrete instance of a window. The ID is only unique among windows for a particular `:window/id` in the Onyx job.
-- `:lower-bound` - The lowermost value of any window key for a segment that belongs to this window
-- `:upper-bound` - The uppermost value of any window key for a segment that belongs to this window
-- `:context` - a keyword representing the context that caused this trigger to fire
+Onyx offers you the ultimate flexibility on what to do with your state during a trigger invocation. Set `:trigger/sync` to a fully qualified, namespaced keyword pointing to a function on the classpath at runtime. This function takes 5 arguments: 
+The [event map](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/event-map), the [window map](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/window-entry) that this trigger is defined on, the [trigger map](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/trigger-entry), a [state-event map](http://www.onyxplatform.org/docs/cheat-sheet/latest/#/state-event), and the window state as an immutable value. Its return value is ignored.
 
 This function is invoked when the trigger fires, and is used to do any arbitrary action with the window contents, such as sync them to a database. It is called once *per window instance*. In other words, if a fixed window exists with 5 instances, the firing of a Timer trigger will call the sync function 5 times. You can use lifecycles to supply any stateful connections necessary to sync your data. Supplied values from lifecycles will be available through the first parameter - the event map.
 
@@ -115,8 +111,8 @@ See the Information Model chapter for an exact specification of what values the 
 | key name                   |description
 |----------------------------|-----------
 |`:trigger/window-id`        | A `:window/id` specified in the collection of windows
-|`:trigger/refinement`       | A mode of refinement, one of `:accumlating`, `:discarding`
-|`:trigger/on`               | The stimulus to fire the trigger as a reaction.
+|`:trigger/refinement`       | Fully qualified namespaced keyword for the mode of refinement e.g. `:onyx.refinements/accumlating`, `:onyx.refinements/discarding`
+|`:trigger/on`               | Fully qualified namespaced keyword for the trigger called to determine whether to fire as a reaction e.g. `:onyx.triggers/segment`
 |`:trigger/sync`             | Fully qualified namespaced keyword of a function to call with the state
 |`:trigger/fire-all-extents?`| When true, fires every extent of a window in response to a trigger.
 |`:trigger/doc`              | An optional docstring explaining the trigger's purpose
