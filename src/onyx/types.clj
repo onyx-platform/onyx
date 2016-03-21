@@ -23,6 +23,8 @@
   (dec-count! [this]
     (zero? (swap! ref-count dec))))
 
+(defrecord Barrier [task-id from-peer-id to-peer-id barrier-id])
+
 (defrecord Results [tree acks segments retries])
 
 (defrecord Result [root leaves])

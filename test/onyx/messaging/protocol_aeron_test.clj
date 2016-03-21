@@ -1,7 +1,7 @@
 (ns onyx.messaging.protocol-aeron-test
   (:require [onyx.messaging.protocol-aeron :as protocol]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.types :refer [map->Leaf map->Ack]]
+            [onyx.types :refer [map->Leaf map->Ack map->Barrier]]
             [clojure.test :refer [deftest is testing]]))
 
 (defn read-buf [buf]
@@ -79,3 +79,18 @@
     (let [buf (protocol/build-messages-msg-buf messaging-compress peer-id message)]
       (is (= (vector peer-id message) 
              (read-buf buf))))))
+
+(deftest barrier-protocol-test
+  (let [task-id #uuid "6045ca2a-2a53-405b-979c-92d8e9e9b689"
+        from-peer-id 55
+        to-peer-id 42
+        barrier-id 63]
+    (is (= (protocol/read-barrier-buf
+            (protocol/build-barrier-message
+             task-id from-peer-id
+             to-peer-id barrier-id) 0)
+           (map->Barrier
+            {:task-id task-id
+             :from-peer-id from-peer-id
+             :to-peer-id to-peer-id
+             :barrier-id barrier-id})))))
