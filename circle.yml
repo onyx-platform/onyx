@@ -7,9 +7,9 @@ test:
     - ./scripts/circle-runner.sh aeron clojure-1.8 :all:
         timeout: 480
         parallel: true
-    - ./scripts/circle-runner.sh aeron clojure-1.7 :smoke:
+    - ./scripts/reflection-check.sh runner-output.log:
         timeout: 120
-    - ./scripts/reflection-check.sh:
+    - ./scripts/circle-runner.sh aeron clojure-1.7 :smoke:
         timeout: 120
 
 machine:
