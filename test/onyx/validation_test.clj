@@ -9,17 +9,13 @@
 
 (deftest validation-errors
   (let [id (java.util.UUID/randomUUID)
+        _ (timbre/merge-config! {:appenders {:println {:enabled? false}}
+                                 :level :error})
         config (load-config)
-        env-config
-        (assoc (:env-config config)
-               :onyx/tenancy-id id
-               :onyx.log/config {:appenders {:standard-out {:enabled? false}
-                                             :spit {:enabled? false}}})
         peer-config
         (assoc (:peer-config config)
                :onyx/tenancy-id id
                :onyx.peer/job-scheduler :onyx.job-scheduler/balanced)
-        env (onyx.api/start-env env-config)
         workflow
         [[:in-bootstrapped :inc]
          [:inc :out]]
@@ -222,9 +218,7 @@
       (is (thrown? Exception (onyx.api/submit-job peer-config {:catalog correct-catalog
                                                                :workflow correct-workflow
                                                                :lifecycles invalid-lifecycles
-                                                               :task-scheduler :onyx.task-scheduler/balanced}))))
-
-    (onyx.api/shutdown-env env)))
+                                                               :task-scheduler :onyx.task-scheduler/balanced}))))))
 
 
 (deftest map-set-workflow
