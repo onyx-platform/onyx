@@ -42,7 +42,9 @@ ARTIFACT_DIR=$CIRCLE_BUILD_NUM/$CIRCLE_NODE_INDEX/$BR"_"$1
 
 mkdir -p log_artifact/$ARTIFACT_DIR/
 
-lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files $TEST_SELECTOR |& tee log_artifact/$ARTIFACT_DIR/stderrout.log
+lein with-profile dev,circle-ci,$CLOJURE_PROFILE test $files $TEST_SELECTOR |& tee stderrout.log
+
+cp stderrout.log log_artifact/$ARTIFACT_DIR/stderrout.log
 
 EXIT_CODE=${PIPESTATUS[0]}
 
