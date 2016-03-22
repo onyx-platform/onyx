@@ -152,7 +152,10 @@
                       segments))))
 
           (= msg-type protocol/barrier-msg-id)
-          (let [barrier (protocol/read-barrier-buf buffer saved)])
+          (let [barrier (protocol/read-barrier-buf buffer saved)]
+            (when-let [chs (pm/peer-channels v-peers peer-id)]
+              (let [inbound-ch (:inbound-ch chs)]
+                (>!! inbound-ch barrier))))
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
@@ -336,7 +339,8 @@
       (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
           (if (instance? onyx.types.Barrier v)
-            (recur segments (conj barriers v) (inc i))
+            {:segments (persistent! segments)
+             :barriers (conj barriers v)}
             (recur (conj! segments v) barriers (inc i)))
           {:segments (persistent! segments)
            :barriers barriers})

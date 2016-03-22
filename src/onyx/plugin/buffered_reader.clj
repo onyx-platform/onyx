@@ -22,6 +22,29 @@
   (when (instance? java.lang.Throwable e)
     (throw e)))
 
+;; Implemented as a manual loop to maintain lazy.
+;; Clojure's chunking was making this difficult.
+(defn take-until-barrier
+  ([max-segments read-ch timeout-ch]
+   (take-until-barrier max-segments read-ch timeout-ch []))
+  ([max-segments read-ch timeout-ch results]
+   (cond (>= (count results) max-segments)
+         results
+
+         :else
+         (let [[v ch] (alts!! [read-ch timeout-ch] :priority true)]
+           (cond (instance? onyx.types.Barrier v)
+                 (conj results v)
+
+                 (= ch timeout-ch)
+                 results
+
+                 v
+                 (recur max-segments read-ch timeout-ch (conj results v))
+
+                 :else
+                 (recur max-segments read-ch timeout-ch results))))))
+
 (defrecord BufferedInput 
   [reader log task-id max-pending batch-size batch-timeout pending-messages drained? 
    read-ch complete-ch]
@@ -35,10 +58,10 @@
     (let [pending (count (keys @pending-messages))
           max-segments (min (- max-pending pending) batch-size)
           timeout-ch (timeout batch-timeout)
-          batch (->> (range max-segments)
-                     (keep (fn [_] (first (alts!! [read-ch timeout-ch] :priority true)))))
+          batch (take-until-barrier max-segments read-ch timeout-ch)
           barriers (filter #(instance? onyx.types.Barrier %) batch)
           batch (remove #(instance? onyx.types.Barrier %) batch)]
+      (assert (<= (count barriers) 1))
       (doseq [m batch]
         (feedback-producer-exception! m)
         (swap! pending-messages assoc (:id m) m))
@@ -100,8 +123,7 @@
                 (loop [reader-val (i/next-state (i/recover reader-val checkpoint-content) event)
                        segment (i/segment reader-val)
                        segment-id (i/segment-id reader-val)
-                       n 0
-                       current-barrier-id 1]
+                       n 0]
                   (let [safe-spot? (zero? (mod (inc n) barrier-gap))]
                     (when safe-spot?
                       (extensions/force-write-chunk log :chunk (i/checkpoint reader-val) task-id))
@@ -113,7 +135,7 @@
                                                    replica @replica
                                                    downstream-peers (mapcat #(get-in replica [:allocations job-id %]) downstream-task-ids)]
                                                (doseq [p downstream-peers]
-                                                 (>!! read-ch (t/->Barrier p id current-barrier-id)))))
+                                                 (>!! read-ch (t/->Barrier p id n)))))
                                            res)
                                          :backoff)
                           reader-val* (u/process-completed! reader-val complete-ch)]
@@ -122,8 +144,7 @@
                           (recur reader-val**
                                  (i/segment reader-val**)
                                  (i/segment-id reader-val**)
-                                 (inc n)
-                                 (if safe-spot? (inc current-barrier-id) current-barrier-id)))))))
+                                 (inc n)))))))
                 (catch Exception e
                   ;; feedback exception to read-batch
                   (>!! read-ch e))))]
