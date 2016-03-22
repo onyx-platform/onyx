@@ -7,6 +7,7 @@
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
+            [onyx.types :refer [->Barrier]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
@@ -36,10 +37,15 @@
                      (when-let [site (peer-site peer-replica-view target)]
                        (onyx.extensions/send-messages messenger site segs)))))
                grouped)
-         (doseq [b (:onyx.core/barriers event)]
-           (when-let [target (:to-peer-id b)]
-             (when-let [site (peer-site peer-replica-view target)]
-               (onyx.extensions/send-barrier messenger site b)))))))
+         (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
+               replica @replica
+               downstream-peers (mapcat #(get-in replica [:allocations (:onyx.core/job-id event) %]) downstream-task-ids)]
+           (doseq [b (:onyx.core/barriers event)]
+             (doseq [target downstream-peers]
+               (when-let [site (peer-site peer-replica-view target)]
+                 (let [b (->Barrier target (:onyx.core/id event) (:barrier-id b))]
+                   (prn "Send off: " b)
+                   (onyx.extensions/send-barrier messenger site b)))))))))
    {}))
 
 (defrecord Function [replica peer-replica-view state messenger egress-tasks]
