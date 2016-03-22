@@ -2,7 +2,7 @@
   "Fast way for peer group subscribers to multiplex via a short id to peer channels. "
   (:refer-clojure :exclude [assoc dissoc])
   (:require [taoensso.timbre :refer [fatal info] :as timbre])
-  (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$EntryIterator])) 
+  (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$KeyIterator Int2ObjectHashMap$EntryIterator])) 
 
 
 ;; Note, slow to assoc/dissoc to as it clones with a lock on it.
@@ -30,7 +30,7 @@
     ;; Needs to be locked because we're using a deftype, not defrecord
     (locking this 
       (VPeerManager.
-        (let [iterator (.iterator (.entrySet (.m this)))
+        (let [iterator ^Int2ObjectHashMap$EntryIterator (.iterator (.entrySet ^Int2ObjectHashMap (.m this)))
               new-hm ^Int2ObjectHashMap (Int2ObjectHashMap.)]
           (while (.hasNext iterator)
             (let [kv ^Int2ObjectHashMap$EntryIterator (.next iterator)

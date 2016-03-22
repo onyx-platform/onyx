@@ -6,7 +6,8 @@
             [onyx.static.default-vals :refer [defaults]]
             [onyx.static.uuid :as uuid]
             [onyx.types :as t]
-            [taoensso.timbre :refer [debug info] :as timbre]))
+            [taoensso.timbre :refer [debug info] :as timbre])
+  (:import [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (defn inject-reader
   [event lifecycle]
@@ -81,7 +82,7 @@
       (when (and (= 1 (count @pending-messages))
                  (= (count batch) 1)
                  (= (:message (first batch)) :done)
-                 (zero? (count (.buf retry-ch))))
+                 (zero? (count (.buf ^ManyToManyChannel retry-ch))))
         (reset! drained true))
       {:onyx.core/batch batch}))
 

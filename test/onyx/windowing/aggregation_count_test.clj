@@ -55,7 +55,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest count-test
+(deftest ^:smoke count-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
