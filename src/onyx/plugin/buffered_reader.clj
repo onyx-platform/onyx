@@ -36,14 +36,17 @@
           max-segments (min (- max-pending pending) batch-size)
           timeout-ch (timeout batch-timeout)
           batch (->> (range max-segments)
-                     (keep (fn [_] (first (alts!! [read-ch timeout-ch] :priority true)))))]
+                     (keep (fn [_] (first (alts!! [read-ch timeout-ch] :priority true)))))
+          barriers (filter #(instance? onyx.types.Barrier %) batch)
+          batch (remove #(instance? onyx.types.Barrier %) batch)]
       (doseq [m batch]
         (feedback-producer-exception! m)
         (swap! pending-messages assoc (:id m) m))
       (when (completed? batch pending-messages read-ch) 
         (extensions/force-write-chunk log :chunk :complete task-id)
         (reset! drained? true))
-      {:onyx.core/batch batch}))
+      {:onyx.core/batch batch
+       :onyx.core/barriers barriers}))
 
   p-ext/PipelineInput
   (ack-segment [_ event segment-id]
@@ -77,36 +80,53 @@
     (->BufferedInput (atom reader) log task-id max-pending batch-size batch-timeout (atom {}) (atom false) read-ch complete-ch)))
 
 (defn inject-buffered-reader
-  [{:keys [onyx.core/task-map onyx.core/log onyx.core/task-id onyx.core/pipeline] :as event} 
+  [{:keys [onyx.core/task-map onyx.core/log onyx.core/task-id
+           onyx.core/job-id onyx.core/pipeline onyx.core/id
+           onyx.core/peer-replica-view onyx.core/replica]
+    :as event} 
    lifecycle]
-  (let [shutdown-ch (chan 1)
+  (let [barrier-gap 5
+        shutdown-ch (chan 1)
         {:keys [reader read-ch complete-ch]} pipeline
         ;; Attempt to write initial checkpoint
         _ (extensions/write-chunk log :chunk (i/checkpoint @reader) task-id)
-       checkpoint-content (extensions/read-chunk log :chunk task-id)]
+        checkpoint-content (extensions/read-chunk log :chunk task-id)]
     (if (= :complete checkpoint-content)
       (throw (Exception. "Restarted task and it was already complete. This is currently unhandled."))
-      (let [commit-ms 500
-            commit-loop-ch (u/start-commit-loop! reader shutdown-ch commit-ms log task-id)
-            reader-val @reader
-            producer-ch (thread
-                          (try
-                            (loop [reader-val (i/next-state (i/recover reader-val checkpoint-content))
-                                   segment (i/segment reader-val)
-                                   segment-id (i/segment-id reader-val)]
-                              (reset! reader reader-val)
-                              (let [write-result (if segment 
-                                                   (>!! read-ch (t/input (random-uuid) segment segment-id))
-                                                   :backoff)
-                                    reader-val* (u/process-completed! reader-val complete-ch)]
-                                (when (and write-result (not= :done segment))
-                                  (let [reader-val** (i/next-state reader-val*)]
-                                    (recur reader-val**
-                                           (i/segment reader-val**)
-                                           (i/segment-id reader-val**))))))
-                            (catch Exception e
-                              ;; feedback exception to read-batch
-                              (>!! read-ch e))))]
+      (let [reader-val @reader
+            producer-ch
+            (thread
+              (try
+                (loop [reader-val (i/next-state (i/recover reader-val checkpoint-content) event)
+                       segment (i/segment reader-val)
+                       segment-id (i/segment-id reader-val)
+                       n 0
+                       current-barrier-id 1]
+                  (let [safe-spot? (zero? (mod (inc n) barrier-gap))]
+                    (when safe-spot?
+                      (extensions/force-write-chunk log :chunk (i/checkpoint reader-val) task-id))
+                    (reset! reader reader-val)
+                    (let [write-result (if segment
+                                         (let [res (>!! read-ch (t/input (random-uuid) segment segment-id))]
+                                           (when safe-spot?
+                                             (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
+                                                   replica @replica
+                                                   downstream-peers (mapcat #(get-in replica [:allocations job-id %]) downstream-task-ids)]
+                                               (doseq [p downstream-peers]
+                                                 (>!! read-ch (t/->Barrier task-id id p current-barrier-id)))))
+                                           res)
+                                         :backoff)
+                          reader-val* (u/process-completed! reader-val complete-ch)]
+                      (when (and write-result (not= :done segment))
+                        (let [reader-val** (i/next-state reader-val* event)]
+                          (recur reader-val**
+                                 (i/segment reader-val**)
+                                 (i/segment-id reader-val**)
+                                 (inc n)
+                                 (if safe-spot? (inc current-barrier-id) current-barrier-id)))))))
+                (catch Exception e
+                  ;; feedback exception to read-batch
+                  (>!! read-ch e))))]
         {:buffered-reader/reader reader
          :buffered-reader/read-ch read-ch
          :buffered-reader/complete-ch complete-ch

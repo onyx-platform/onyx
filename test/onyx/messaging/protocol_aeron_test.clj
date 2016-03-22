@@ -81,12 +81,12 @@
              (read-buf buf))))))
 
 (deftest barrier-protocol-test
-  (let [task-id #uuid "6045ca2a-2a53-405b-979c-92d8e9e9b689"
-        from-peer-id 55
-        to-peer-id 42
+  (let [task-id (java.util.UUID/randomUUID)
+        from-peer-id (java.util.UUID/randomUUID)
+        to-peer-id (java.util.UUID/randomUUID)
         barrier-id 63]
     (is (= (protocol/read-barrier-buf
-            (protocol/build-barrier-message
+            (protocol/build-barrier-buf
              task-id from-peer-id
              to-peer-id barrier-id) 0)
            (map->Barrier

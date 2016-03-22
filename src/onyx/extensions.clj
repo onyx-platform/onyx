@@ -67,6 +67,8 @@
 
 (defmulti send-messages (fn [messenger peer-link messages] (type messenger)))
 
+(defmulti send-barrier (fn [messenger peer-link barrier] (type messenger)))
+
 (defmulti close-peer-connection (fn [messenger event link] (type messenger)))
 
 (defmulti internal-ack-segment (fn [messenger peer-link ack]

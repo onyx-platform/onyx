@@ -150,6 +150,9 @@
                         (>!! inbound-ch segment))
                       segments))))
 
+          (= msg-type protocol/barrier-msg-id)
+          (let [barrier (protocol/read-barrier-buf buffer offset)])
+
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
             (when-let [chs (pm/peer-channels v-peers peer-id)]
@@ -370,6 +373,14 @@
     (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
           buf ^UnsafeBuffer (protocol/build-messages-msg-buf (:compress-f messenger) peer-task-id batch)]
       (pubm/write pub-man buf 0 (.capacity buf)))))
+
+(defmethod extensions/send-barrier AeronMessenger
+  [messenger {:keys [peer-task-id channel] :as conn-spec} barrier]
+  (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
+        buf ^UnsafeBuffer (protocol/build-barrier-buf
+                           (:task-id barrier) (:from-peer-id barrier)
+                           (:to-peer-id barrier) (:barrier-id barrier))]
+    (pubm/write pub-man buf 0 (.capacity buf))))
 
 (defmethod extensions/internal-ack-segment AeronMessenger
   [messenger {:keys [acker-id channel] :as conn-spec} ack]

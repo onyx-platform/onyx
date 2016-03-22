@@ -557,6 +557,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/state-log {:type :record
                                              :optional? true
                                              :doc "Window state log component where state transitions are written"}
+                       :onyx.core/barriers {:type :record
+                                            :optional? true
+                                            :doc "Barriers to be emitted to peers downstream"}
                        :onyx.core/drained-back-off {:type :integer
                                                     :doc "The amount of time to back off when the input is drained"}
                        :onyx.core/log {:type :record
@@ -1476,7 +1479,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state]
+               :onyx.core/state
+               :onyx.core/barriers]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

@@ -12,7 +12,7 @@
               "Returns the segment id or offset for the value last read from the input medium. Return nil if no segment is available.")
   (segment [this]
            "Returns the segment last read from the input medium. Return nil if no segment is available.")
-  (next-state [this]
+  (next-state [this event]
               "Moves reader to the next state. Returns the reader in the updated state")
   (recover [this checkpoint]
             "Recover the state of the plugin from the supplied checkpoint. Returns a new reader")
