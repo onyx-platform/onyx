@@ -14,7 +14,8 @@
   ([event]
    (read-batch event (:onyx.core/messenger event)))
   ([event messenger]
-   {:onyx.core/batch (onyx.extensions/receive-messages messenger event)}))
+   (let [{:keys [segments barriers]} (onyx.extensions/receive-messages messenger event)]
+     {:onyx.core/batch segments})))
 
 (defn write-batch
   ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state

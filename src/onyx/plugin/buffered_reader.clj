@@ -113,7 +113,7 @@
                                                    replica @replica
                                                    downstream-peers (mapcat #(get-in replica [:allocations job-id %]) downstream-task-ids)]
                                                (doseq [p downstream-peers]
-                                                 (>!! read-ch (t/->Barrier task-id id p current-barrier-id)))))
+                                                 (>!! read-ch (t/->Barrier p id current-barrier-id)))))
                                            res)
                                          :backoff)
                           reader-val* (u/process-completed! reader-val complete-ch)]

@@ -126,6 +126,7 @@
   ;;; If a job is serialization heavy, additional subscriber threads can be created
   ;;; via peer-config :onyx.messaging.aeron/subscriber-count
   (let [msg-type (protocol/read-message-type buffer offset)
+        saved offset
         offset (inc ^long offset)
         peer-id (protocol/read-vpeer-id buffer offset)
         offset (unchecked-add offset protocol/short-size)
@@ -151,7 +152,7 @@
                       segments))))
 
           (= msg-type protocol/barrier-msg-id)
-          (let [barrier (protocol/read-barrier-buf buffer offset)])
+          (let [barrier (protocol/read-barrier-buf buffer saved)])
 
           (= msg-type protocol/completion-msg-id)
           (let [completion-id (protocol/read-completion buffer offset)]
@@ -329,12 +330,18 @@
         batch-size (long (:onyx/batch-size task-map))
         ms (arg-or-default :onyx/batch-timeout task-map)
         timeout-ch (timeout ms)]
-    (loop [segments (transient []) i 0]
+    (loop [segments (transient [])
+           barriers []
+           i 0]
       (if (< i batch-size)
         (if-let [v (first (alts!! [ch timeout-ch]))]
-          (recur (conj! segments v) (inc i))
-          (persistent! segments))
-        (persistent! segments)))))
+          (if (instance? onyx.types.Barrier v)
+            (recur segments (conj barriers v) (inc i))
+            (recur (conj! segments v) barriers (inc i)))
+          {:segments (persistent! segments)
+           :barriers barriers})
+        {:segments (persistent! segments)
+         :barriers barriers}))))
 
 (defn lookup-channels [messenger id]
   (-> messenger
@@ -378,8 +385,9 @@
   [messenger {:keys [peer-task-id channel] :as conn-spec} barrier]
   (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
         buf ^UnsafeBuffer (protocol/build-barrier-buf
-                           (:task-id barrier) (:from-peer-id barrier)
-                           (:to-peer-id barrier) (:barrier-id barrier))]
+                           peer-task-id
+                           (:from-peer-id barrier)
+                           (:barrier-id barrier))]
     (pubm/write pub-man buf 0 (.capacity buf))))
 
 (defmethod extensions/internal-ack-segment AeronMessenger
