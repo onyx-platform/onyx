@@ -50,14 +50,6 @@
   [task-ids catalog task-name parents children-names]
   (onyx-function-task task-ids catalog task-name parents children-names))
 
-(defmethod create-task :grouper
-  [task-ids catalog task-name parents children-names]
-  (onyx-function-task task-ids catalog task-name parents children-names))
-
-(defmethod create-task :aggregator
-  [task-ids catalog task-name parents children-names]
-  (onyx-function-task task-ids catalog task-name parents children-names))
-
 (defmethod create-io-task :input
   [task-ids element parent children]
   {:id (task-ids (:onyx/name element))

@@ -549,6 +549,9 @@ may be added by the user as the context is associated to throughout the task pip
                                               :doc "Logging context including more information about the task, peer and job ids."}
                        :onyx.core/params {:type [:any]
                                           :doc "The parameter sequence to be applied to the function that this task uses"}
+                       :onyx.core/subscriptions {:type :any
+                                                 :doc ""}
+                       :onyx.core/aeron-conn {:type :any :doc ""}
                        :onyx.core/task-information {:type :record
                                                     :doc "Task information for this task. Mostly consists of data already in the event map."}
                        :onyx.core/windows-state {:type :windows-state-atom
@@ -557,9 +560,9 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/state-log {:type :record
                                              :optional? true
                                              :doc "Window state log component where state transitions are written"}
-                       :onyx.core/barriers {:type :record
-                                            :optional? true
-                                            :doc "Barriers to be emitted to peers downstream"}
+                       :onyx.core/barrier {:type :record
+                                           :optional? true
+                                           :doc "Barrier to be emitted to peers downstream"}
                        :onyx.core/drained-back-off {:type :integer
                                                     :doc "The amount of time to back off when the input is drained"}
                        :onyx.core/log {:type :record
@@ -1480,7 +1483,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
                :onyx.core/state
-               :onyx.core/barriers]
+               :onyx.core/barrier]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

@@ -17,6 +17,7 @@
               [onyx.peer.pipeline-extensions :as p-ext]
               [onyx.peer.function :as function]
               [onyx.peer.operation :as operation]
+              [onyx.compression.nippy :refer [messaging-decompress]]
               [onyx.extensions :as extensions]
               [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
               [onyx.peer.window-state :as ws]
@@ -26,7 +27,48 @@
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [onyx.static.logging :as logger]
               [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]))
+              [onyx.static.default-vals :refer [defaults arg-or-default]]
+              [onyx.messaging.protocol-aeron :as protocol]
+              [onyx.messaging.common :as mc])
+    (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
+             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+             [uk.co.real_logic.aeron.logbuffer FragmentHandler]
+             [uk.co.real_logic.agrona ErrorHandler]
+             [uk.co.real_logic.agrona.concurrent 
+              UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
+             [java.util.function Consumer]
+             [java.util.concurrent TimeUnit]))
+
+;;;;
+
+(defn aeron-channel [addr port]
+  (format "udp://%s:%s" addr port))
+
+(def no-op-error-handler
+  (reify ErrorHandler
+    (onError [this x] (taoensso.timbre/warn x))))
+
+(defn backoff-strategy [strategy]
+  (case strategy
+    :busy-spin (BusySpinIdleStrategy.)
+    :low-restart-latency (BackoffIdleStrategy. 100
+                                               10
+                                               (.toNanos TimeUnit/MICROSECONDS 1)
+                                               (.toNanos TimeUnit/MICROSECONDS 100))
+    :high-restart-latency (BackoffIdleStrategy. 1000
+                                                100
+                                                (.toNanos TimeUnit/MICROSECONDS 10)
+                                                (.toNanos TimeUnit/MICROSECONDS 1000))))
+
+(defn start-subscriber! [conn bind-addr port stream-id idle-strategy task-name]
+  (if (= task-name :in)
+    nil
+    (let [channel (aeron-channel bind-addr port)
+          subscription (.addSubscription conn channel stream-id)]
+      {:conn conn
+       :subscription subscription})))
+
+;;;;
 
 (defrecord TaskState [timeout-pool])
 
@@ -156,18 +198,6 @@
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
 
-(s/defn ack-segments :- Event
-  [{:keys [peer-replica-view task-map state messenger monitoring] :as compiled} 
-   {:keys [onyx.core/results] :as event} :- Event]
-  (doseq [[acker-id acks] (->> (:acks results)
-                               (filter dec-count!)
-                               (group-by :completion-id))]
-    (when-let [site (peer-site peer-replica-view acker-id)]
-      (emit-latency :peer-ack-segments
-                    monitoring
-                    #(extensions/internal-ack-segments messenger site acks))))
-  event)
-
 (s/defn flow-retry-segments :- Event
   [{:keys [peer-replica-view state messenger monitoring] :as compiled} 
    {:keys [onyx.core/results] :as event} :- Event]
@@ -205,8 +235,7 @@
             :onyx.core/batch
             (fn [batch]
               (map (fn [segment]
-                     (add-acker-id ((:pick-acker-fn @peer-replica-view))
-                                   (add-completion-id id segment)))
+                     (assoc segment :src-task (:onyx.core/task-id event)))
                    batch)))
     event))
 
@@ -268,31 +297,7 @@
    (try
      (let [{:keys [retry-ch release-ch]} messenger-buffer]
        (loop []
-         (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])]
-           (when v
-             (cond (= ch release-ch)
-                   (->> (p-ext/ack-segment pipeline event v)
-                        (lc/invoke-after-ack event compiled v))
-
-                   (= ch completion-ch)
-                   (let [{:keys [id peer-id]} v
-                         site (peer-site peer-replica-view peer-id)]
-                     (when site 
-                       (emit-latency :peer-complete-segment
-                                     monitoring
-                                     #(extensions/internal-complete-segment messenger id site))))
-
-                   (= ch retry-ch)
-                   (->> (p-ext/retry-segment pipeline event v)
-                        (lc/invoke-after-retry event compiled v))
-
-                   (= ch seal-ch)
-                   (do
-                     (p-ext/seal-resource pipeline event)
-                     (let [entry (entry/create-log-entry :seal-output {:job (:onyx.core/job-id event)
-                                                                       :task (:onyx.core/task-id event)})]
-                       (>!! outbox-ch entry))))
-             (recur)))))
+         (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])])))
      (catch Throwable e
        (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
 
@@ -331,8 +336,7 @@
     (let [{:keys [tree acks]} (:onyx.core/results event)]
       (when-not (empty? tree)
         ;; Increment that the messages aren't fully acked until process-state has processed the data
-        (run! inc-count! acks)
-        (>!! (:onyx.core/state-ch event) [:new-segment event #(ack-segments compiled event)]))))
+        (run! inc-count! acks))))
   event)
 
 (defn run-task-lifecycle
@@ -353,8 +357,7 @@
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
            (flow-retry-segments compiled)
-           (lc/invoke-after-batch compiled)
-           (ack-segments compiled)))
+           (lc/invoke-after-batch compiled)))
     (catch Throwable e
       (ex-f e))))
 
@@ -432,6 +435,8 @@
             pending-timeout (arg-or-default :onyx/pending-timeout task-map)
             r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
             state (atom (->TaskState r-seq))
+            ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
+            aeron-conn (Aeron/connect ctx)
 
             _ (validate-pending-timeout pending-timeout opts)
 
@@ -465,7 +470,15 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
-                           :onyx.core/state state}
+                           :onyx.core/state state
+                           :onyx.core/aeron-conn aeron-conn
+                           :onyx.core/subscriptions [(start-subscriber!
+                                                      aeron-conn
+                                                      (mc/bind-addr opts)
+                                                      (:onyx.messaging/peer-port opts)
+                                                      1
+                                                      (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
+                                                      (:name task))]}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 
@@ -549,6 +562,11 @@
       (when-let [filter-state (:onyx.core/filter-state event)] 
         (when (exactly-once-task? event)
           (state-extensions/close-filter @filter-state event)))
+
+      (doseq [subscriber (:onyx.core/subscribers event)]
+        (future-cancel (:subscriber-fut subscriber))
+        (.close ^Subscription (:subscription subscriber)))
+      (.close ^Aeron (:onyx.core/aeron-conn event))
 
       ((:compiled-after-task-fn (:onyx.core/compiled event)) event))
 

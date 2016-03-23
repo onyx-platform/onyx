@@ -69,7 +69,7 @@
         (extensions/force-write-chunk log :chunk :complete task-id)
         (reset! drained? true))
       {:onyx.core/batch batch
-       :onyx.core/barriers barriers}))
+       :onyx.core/barrier (first barriers)}))
 
   p-ext/PipelineInput
   (ack-segment [_ event segment-id]
@@ -135,7 +135,7 @@
                                                    replica @replica
                                                    downstream-peers (mapcat #(get-in replica [:allocations job-id %]) downstream-task-ids)]
                                                (doseq [p downstream-peers]
-                                                 (>!! read-ch (t/->Barrier p id n)))))
+                                                 (>!! read-ch (t/->Barrier p id n nil nil)))))
                                            res)
                                          :backoff)
                           reader-val* (u/process-completed! reader-val complete-ch)]

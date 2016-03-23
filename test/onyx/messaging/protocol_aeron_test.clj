@@ -90,4 +90,6 @@
            (->Barrier
             peer-task-id
             from-peer-id
-            barrier-id)))))
+            barrier-id
+            nil
+            nil)))))
