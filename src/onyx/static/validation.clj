@@ -181,18 +181,21 @@
                                                       (conj (set v) to))))
                                    {}
                                    workflow)
+
         all-tasks (into (set (map first workflow)) (map second workflow))]
+
     (doseq [{:keys [flow/from flow/to] :as entry} flow-schema]
       (when-not (or (all-tasks from) (= from :all))
         (throw (ex-info ":flow/from value doesn't name a node in the workflow"
                         {:entry entry})))
-
       (when-not (or (= :all to)
                     (= :none to)
                     (and (= from :all)
                          (empty? (remove all-tasks to)))
-                    (and (coll? to) 
-                         (every? (fn [t] ((task->egress-edges from) t)) to)))
+                    (and (coll? to)
+                         (every? (fn [t] (println t)
+                                   (try ((task->egress-edges from) t)
+                                        (catch NullPointerException e nil))) to)))
         (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
                         {:entry entry}))))))
 
