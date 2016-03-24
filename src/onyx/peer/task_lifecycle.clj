@@ -386,7 +386,7 @@
             (if pipeline
               (si/start pipeline)
               (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
-        (onyx.peer.function/function pipeline-data))
+        (Object.))
       (catch Throwable e
         (throw e)))))
 
