@@ -65,8 +65,40 @@
     nil
     (let [channel (aeron-channel bind-addr port)
           subscription (.addSubscription conn channel stream-id)]
-      {:conn conn
-       :subscription subscription})))
+      {:subscription subscription})))
+
+(defn stream-observer-handler [event this-task-id buffer offset length header]
+  (let [ba (byte-array length)
+        _ (.getBytes buffer offset ba)
+        res (messaging-decompress ba)]
+    (when (and (map? res)
+               (= (:type res) :job-completed)
+               (= this-task-id (:task-id res)))
+      (prn "Completed!"))))
+
+(defn fragment-data-handler [f]
+  (FragmentAssembler.
+   (reify FragmentHandler
+     (onFragment [this buffer offset length header]
+       (f buffer offset length header)))))
+
+(defn consumer [handler ^IdleStrategy idle-strategy limit]
+  (reify Consumer
+    (accept [this subscription]
+      (while (not (Thread/interrupted))
+        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
+          (.idle idle-strategy fragments-read))))))
+
+(defn start-stream-observer! [conn bind-addr port stream-id idle-strategy event task-id]
+  (let [channel (aeron-channel bind-addr port)
+        subscription (.addSubscription conn channel stream-id)
+        handler (fragment-data-handler
+                 (fn [buffer offset length header]
+                   (stream-observer-handler event task-id buffer offset length header)))
+        subscription-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10) subscription)
+                                    (catch Throwable e (fatal e))))]
+    {:subscription subscription
+     :subscription-fut subscription-fut}))
 
 ;;;;
 
@@ -533,6 +565,14 @@
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :input-retry-segments-ch input-retry-segments-ch
+                 :stream-observer (start-stream-observer! aeron-conn
+                                                          (mc/bind-addr opts)
+                                                          (:onyx.messaging/peer-port opts)
+                                                          1
+                                                          (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
+                                                          pipeline-data
+                                                          task-id)
+
                  :aux-ch aux-ch)))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
@@ -565,8 +605,10 @@
           (state-extensions/close-filter @filter-state event)))
 
       (doseq [subscriber (:onyx.core/subscribers event)]
-        (future-cancel (:subscriber-fut subscriber))
         (.close ^Subscription (:subscription subscriber)))
+
+      (future-cancel (:subscription-fut (:stream-observer component)))
+      (.close ^Subscription (:subscription (:stream-observer component)))
       (.close ^Aeron (:onyx.core/aeron-conn event))
 
       ((:compiled-after-task-fn (:onyx.core/compiled event)) event))
