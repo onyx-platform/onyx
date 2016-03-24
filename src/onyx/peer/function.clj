@@ -4,6 +4,7 @@
             [onyx.messaging.acking-daemon :as acker]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.operation :as operation]
+            [onyx.peer.barrier :refer [emit-barrier?]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.plugin.simple-input :as si]
@@ -61,7 +62,7 @@
            onyx.core/barrier-state onyx.core/job-id
            onyx.core/peer-replica-view onyx.core/barrier]
     :as event}]
-  #_(when (= (:onyx.core/task event) :out)
+  (when (= (:onyx.core/task event) :out)
     (when (emit-barrier? @replica compiled @barrier-state job-id)
       (when-let [site (peer-site peer-replica-view (:origin-peer barrier))]
         (onyx.extensions/internal-complete-segment (:onyx.core/messenger event)
@@ -69,4 +70,4 @@
                                                     :job-id (:onyx.core/job-id event)
                                                     :task-id (:onyx.core/task-id event)
                                                     :type :job-completed}
-                                                    site)))))
+                                                   site)))))
