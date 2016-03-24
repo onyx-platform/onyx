@@ -1,45 +1,45 @@
 (ns ^:no-doc onyx.peer.task-lifecycle
-    (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
-              [com.stuartsierra.component :as component]
-              [taoensso.timbre :refer [info error warn trace fatal]]
-              [onyx.schema :refer [Event]]
-              [schema.core :as s]
-              [onyx.static.rotating-seq :as rsc]
-              [onyx.log.commands.common :as common]
-              [onyx.log.entry :as entry]
-              [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
-              [onyx.static.planning :refer [find-task]]
-              [onyx.static.uuid :as uuid]
-              [onyx.messaging.acking-daemon :as acker]
-              [onyx.peer.task-compile :as c]
-              [onyx.windowing.window-compile :as wc]
-              [onyx.lifecycles.lifecycle-invoke :as lc]
-              [onyx.peer.pipeline-extensions :as p-ext]
-              [onyx.peer.function :as function]
-              [onyx.peer.operation :as operation]
-              [onyx.compression.nippy :refer [messaging-decompress]]
-              [onyx.extensions :as extensions]
-              [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
-              [onyx.peer.window-state :as ws]
-              [onyx.peer.transform :refer [apply-fn]]
-              [onyx.peer.grouping :as g]
-              [onyx.plugin.simple-input :as si]
-              [onyx.plugin.simple-output :as so]
-              [onyx.flow-conditions.fc-routing :as r]
-              [onyx.log.commands.peer-replica-view :refer [peer-site]]
-              [onyx.static.logging :as logger]
-              [onyx.state.state-extensions :as state-extensions]
-              [onyx.static.default-vals :refer [defaults arg-or-default]]
-              [onyx.messaging.protocol-aeron :as protocol]
-              [onyx.messaging.common :as mc])
-    (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
-             [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-             [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-             [uk.co.real_logic.agrona ErrorHandler]
-             [uk.co.real_logic.agrona.concurrent 
-              UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
-             [java.util.function Consumer]
-             [java.util.concurrent TimeUnit]))
+  (:require [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
+            [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info error warn trace fatal]]
+            [onyx.schema :refer [Event]]
+            [schema.core :as s]
+            [onyx.static.rotating-seq :as rsc]
+            [onyx.log.commands.common :as common]
+            [onyx.log.entry :as entry]
+            [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
+            [onyx.static.planning :refer [find-task]]
+            [onyx.static.uuid :as uuid]
+            [onyx.messaging.acking-daemon :as acker]
+            [onyx.peer.task-compile :as c]
+            [onyx.windowing.window-compile :as wc]
+            [onyx.lifecycles.lifecycle-invoke :as lc]
+            [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.function :as function]
+            [onyx.peer.operation :as operation]
+            [onyx.compression.nippy :refer [messaging-decompress]]
+            [onyx.extensions :as extensions]
+            [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
+            [onyx.peer.window-state :as ws]
+            [onyx.peer.transform :refer [apply-fn]]
+            [onyx.peer.grouping :as g]
+            [onyx.plugin.simple-input :as si]
+            [onyx.plugin.simple-output :as so]
+            [onyx.flow-conditions.fc-routing :as r]
+            [onyx.log.commands.peer-replica-view :refer [peer-site]]
+            [onyx.static.logging :as logger]
+            [onyx.state.state-extensions :as state-extensions]
+            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.messaging.protocol-aeron :as protocol]
+            [onyx.messaging.common :as mc])
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
+           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
+           [uk.co.real_logic.agrona ErrorHandler]
+           [uk.co.real_logic.agrona.concurrent 
+            UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
+           [java.util.function Consumer]
+           [java.util.concurrent TimeUnit]))
 
 ;;;;
 
@@ -75,8 +75,15 @@
         res (messaging-decompress ba)]
     (when (and (map? res)
                (= (:type res) :job-completed)
-               (= this-task-id (:task-id res)))
-      (prn "Ack barrier!"))))
+               (= (:onyx.core/id event) (:peer-id res)))
+      (swap! (:onyx.core/pipeline event)
+             (fn [pipeline]
+               (si/ack-barrier pipeline (:barrier-id res))))
+      (when (si/completed? @(:onyx.core/pipeline event))
+        (let [entry (entry/create-log-entry
+                     :exhaust-input
+                     {:job (:onyx.core/job-id event) :task this-task-id})]
+          (>!! (:onyx.core/outbox-ch event) entry))))))
 
 (defn fragment-data-handler [f]
   (FragmentAssembler.

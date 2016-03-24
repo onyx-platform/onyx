@@ -1,5 +1,6 @@
 (ns onyx.plugin.core-async-abs
   (:require [clojure.core.async :refer [poll! timeout chan alts!! >!!]]
+            [clojure.core.async.impl.protocols :refer [closed?]]
             [clojure.set :refer [join]]
             [onyx.plugin.simple-input :as i]
             [onyx.plugin.simple-output :as o]))
@@ -8,33 +9,43 @@
   i/SimpleInput
 
   (start [this]
-    (assoc this :channel channel :processing #{} :segment nil))
+    (assoc this
+           :channel channel :processing []
+           :segment nil :checkpoint 0 :offset 0))
 
   (stop [this]
     (dissoc this :processing :segment))
 
-  (checkpoint [this])
+  (checkpoint [{:keys [checkpoint]}]
+    checkpoint)
 
   (recover [this checkpoint]
     this)
 
-  (offset-id [{:keys [segment]}]
-    segment)
+  (offset-id [{:keys [offset]}]
+    offset)
 
   (segment [{:keys [segment]}]
     segment)
 
-  (next-state [{:keys [channel processing segment] :as this}
+  (next-state [{:keys [channel processing segment offset] :as this}
                {:keys [core.async/chan] :as event}]
     (let [segment (poll! chan)]
       (assoc this
+             :channel chan
              :segment segment
-             :processing (if segment (conj processing segment) processing))))
+             :processing (if segment (conj processing segment) processing)
+             :offset (if segment (inc offset) offset)
+             :closed? (closed? chan))))
 
-  (ack-barrier [{:keys [processing] :as this} segment-id]
-    (assoc this :processing (remove #(= segment-id %) processing)))
+  (ack-barrier [{:keys [processing checkpoint] :as this} barrier-id]
+    (let [drop-index (- barrier-id checkpoint)]
+      (assoc this :checkpoint barrier-id :processing (drop drop-index processing))))
 
-  (segment-complete! [{:keys [conn]} segment]))
+  (segment-complete! [{:keys [conn]} segment])
+
+  (completed? [this]
+    (and (closed? (:channel this)) (not (seq (:processing this))))))
 
 (defrecord AbsCoreAsyncWriter [event]
   o/SimpleOutput

@@ -36,7 +36,11 @@
 
   (segment-complete! [this segment]
     "Perform any side-effects that you might want to perform as a
-     result of a segment being completed."))
+     result of a segment being completed.")
+
+  (completed? [this]
+    "Returns true if this all of this input's data has been processed.
+     Streaming inputs should always return false."))
 
 (defrecord SegmentOffset [segment offset])
 

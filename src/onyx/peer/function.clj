@@ -69,5 +69,6 @@
                                                    {:barrier-id (:barrier-id barrier)
                                                     :job-id (:onyx.core/job-id event)
                                                     :task-id (:onyx.core/task-id event)
+                                                    :peer-id (:origin-peer barrier)
                                                     :type :job-completed}
                                                    site)))))
