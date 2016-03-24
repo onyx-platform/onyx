@@ -33,10 +33,10 @@
         barrier-gap 5]
     (loop [reader @(:onyx.core/pipeline event)
            outgoing []]
-      (cond (and (pos? (+ n-sent (count outgoing)))
+      (cond (and (seq outgoing)
                  (zero? (mod (+ n-sent (count outgoing)) barrier-gap)))
             (do (reset! (:onyx.core/pipeline event) reader)
-                (swap! (:onyx.core/n-sent-messages event) + (inc (count outgoing)))
+                (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
                 {:onyx.core/batch outgoing
                  :onyx.core/barrier (->Barrier nil (:onyx.core/irnd event)
                                                (+ n-sent (count outgoing))
