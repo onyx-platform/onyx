@@ -6,24 +6,57 @@
             [onyx.peer.operation :as operation]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
+            [onyx.plugin.simple-input :as si]
             [clj-tuple :as t]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.types :refer [->Barrier]]
+            [onyx.plugin.simple-input :refer [SimpleInput]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
-(defn read-batch
-  ([event]
-   (read-batch event (:onyx.core/messenger event)))
-  ([event messenger]
-   (let [messages (onyx.extensions/receive-messages messenger event)
-         barrier? (instance? onyx.types.Barrier (last messages))
-         segments (if barrier? (butlast messages) messages)
-         barrier (if barrier? (last messages) nil)]
-     (when barrier
-       (swap! (:onyx.core/barrier-state event) assoc (:from-peer-id barrier) true))
-     {:onyx.core/batch segments
-      :onyx.core/barrier barrier})))
+(defn read-function-batch [event]
+  (let [messages (onyx.extensions/receive-messages (:onyx.core/messenger event) event)
+        barrier? (instance? onyx.types.Barrier (last messages))
+        segments (if barrier? (butlast messages) messages)
+        barrier (if barrier? (last messages) nil)]
+    (when barrier
+      (swap! (:onyx.core/barrier-state event) assoc (:from-peer-id barrier) true))
+    {:onyx.core/batch segments
+     :onyx.core/barrier barrier}))
+
+(defn read-input-batch [event]
+  (let [batch-size (:onyx/batch-size (:onyx.core/task-map event))
+        n-sent @(:onyx.core/n-sent-messages event)
+        barrier-gap 5]
+    (loop [reader @(:onyx.core/pipeline event)
+           outgoing []]
+      (cond (and (pos? (+ n-sent (count outgoing)))
+                 (zero? (mod (+ n-sent (count outgoing)) barrier-gap)))
+            (do (reset! (:onyx.core/pipeline event) reader)
+                (swap! (:onyx.core/n-sent-messages event) + (inc (count outgoing)))
+                {:onyx.core/batch outgoing
+                 :onyx.core/barrier (->Barrier nil (:onyx.core/irnd event)
+                                               (+ n-sent (count outgoing))
+                                               (:onyx.core/task-id event)
+                                               nil (:onyx.core/id event))})
+
+            (>= (count outgoing) batch-size)
+            (do (reset! (:onyx.core/pipeline event) reader)
+                (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
+                {:onyx.core/batch outgoing})
+
+            :else
+            (let [next-reader (si/next-state reader event)
+                  segment (si/segment next-reader)]
+              (if segment
+                (recur next-reader (conj outgoing segment))
+                (do (reset! (:onyx.core/pipeline event) reader)
+                    (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
+                    {:onyx.core/batch outgoing})))))))
+
+;; Stop reading messages when its time to inject a barrier
+;; Only read up to batch-size messages
+;; Inject a barrier every n messages
 
 (defn emit-barrier? [replica compiled barrier-state job-id]
   (let [upstream-peers (reduce
@@ -43,9 +76,25 @@
                            (:onyx.core/id event)
                            (:barrier-id (:onyx.core/barrier event))
                            (:onyx.core/task-id event)
-                           (:task (common/peer->allocated-job (:allocations replica-val) target)))]
+                           (:task (common/peer->allocated-job (:allocations replica-val) target))
+                           (:origin-peer (:onyx.core/barrier event)))]
           (onyx.extensions/send-barrier messenger site b))))
     (reset! (:onyx.core/barrier-state event) {})))
+
+(defn ack-barrier!
+  [{:keys [onyx.core/replica onyx.core/compiled
+           onyx.core/barrier-state onyx.core/job-id
+           onyx.core/peer-replica-view onyx.core/barrier]
+    :as event}]
+  (when (= (:onyx.core/task event) :out)
+    (when (emit-barrier? @replica compiled @barrier-state job-id)
+      (when-let [site (peer-site peer-replica-view (:origin-peer barrier))]
+        (onyx.extensions/internal-complete-segment (:onyx.core/messenger event)
+                                                   {:barrier-id (:barrier-id barrier)
+                                                    :job-id (:onyx.core/job-id event)
+                                                    :task-id (:onyx.core/task-id event)
+                                                    :type :job-completed}
+                                                    site)))))
 
 (defn write-batch
   ([{:keys [onyx.core/results onyx.core/messenger onyx.core/state
@@ -71,12 +120,7 @@
 
 (defrecord Function [replica peer-replica-view state messenger egress-tasks]
 
-  p-ext/PipelineInput
   p-ext/Pipeline
-  
-  (read-batch
-    [_ event]
-    (read-batch event messenger))
 
   (write-batch
     [_ event]

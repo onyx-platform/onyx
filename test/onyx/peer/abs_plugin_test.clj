@@ -1,9 +1,7 @@
 (ns onyx.peer.abs-plugin-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
-            [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.plugin.core-async-abs]
-            [onyx.plugin.buffered-reader]
+            [onyx.plugin.core-async-abs :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
@@ -36,12 +34,11 @@
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in
-                      :onyx/plugin :onyx.plugin.buffered-reader/new-buffered-input
+                      :onyx/plugin :onyx.plugin.core-async-abs/input
                       :onyx/type :input
                       :onyx/medium :core.async
                       :onyx/batch-size batch-size
                       :onyx/max-peers 1
-                      :simple-input/build-input :onyx.plugin.core-async-abs/abs-core-async-reader
                       :onyx/doc "Reads segments from a core.async channel"}
 
                      {:onyx/name :inc
@@ -50,7 +47,7 @@
                       :onyx/batch-size batch-size}
 
                      {:onyx/name :out
-                      :onyx/plugin :onyx.plugin.core-async/output
+                      :onyx/plugin :onyx.plugin.core-async-abs/output
                       :onyx/type :output
                       :onyx/medium :core.async
                       :onyx/batch-size batch-size
@@ -59,18 +56,13 @@
             workflow [[:in :inc] [:inc :out]]
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls ::in-calls}
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async-abs/abs-core-async-reader-calls}
                         
                         {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                         :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
-            _ (>!! @in-chan :done)
             _ (close! @in-chan)
             _ (onyx.api/submit-job peer-config
                                    {:catalog catalog
@@ -80,5 +72,4 @@
             results (take-segments! @out-chan)]
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set (butlast results))))
-          (is (= :done (last results))))))))
+          (is (= expected (set (butlast results)))))))))

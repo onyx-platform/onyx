@@ -23,6 +23,8 @@
               [onyx.peer.window-state :as ws]
               [onyx.peer.transform :refer [apply-fn]]
               [onyx.peer.grouping :as g]
+              [onyx.plugin.simple-input :as si]
+              [onyx.plugin.simple-output :as so]
               [onyx.flow-conditions.fc-routing :as r]
               [onyx.log.commands.peer-replica-view :refer [peer-site]]
               [onyx.static.logging :as logger]
@@ -74,7 +76,7 @@
     (when (and (map? res)
                (= (:type res) :job-completed)
                (= this-task-id (:task-id res)))
-      (prn "Completed!"))))
+      (prn "Ack barrier!"))))
 
 (defn fragment-data-handler [f]
   (FragmentAssembler.
@@ -250,12 +252,18 @@
                (= (:message (first batch)) :done))
       (Thread/sleep (:onyx.core/drained-back-off event)))))
 
+(def input-readers
+  {:input #'function/read-input-batch
+   :function #'function/read-function-batch
+   :output #'function/read-function-batch})
+
 (defn read-batch
   [{:keys [peer-replica-view task-type pipeline] :as compiled}
    event]
   (if (and (= task-type :input) (:backpressure? @peer-replica-view))
     (assoc event :onyx.core/batch '())
-    (let [rets (merge event (p-ext/read-batch pipeline event))
+    (let [f (get input-readers task-type)
+          rets (merge event (f event))
           rets (merge event (lc/invoke-after-read-batch compiled rets))]
       (handle-backoff! event)
       rets)))
@@ -278,22 +286,6 @@
            (map :id (:onyx.core/batch event))))
   event)
 
-(s/defn process-sentinel :- Event
-  [{:keys [task-type monitoring pipeline]} event :- Event]
-  (if (and (= task-type :input)
-           (sentinel-found? event))
-    (do
-      (extensions/emit monitoring (->MonitorEvent :peer-sentinel-found))
-      (if (p-ext/drained? pipeline event)
-        (complete-job event)
-        (p-ext/retry-segment pipeline event (sentinel-id event)))
-      (update event
-              :onyx.core/batch
-              (fn [batch]
-                (remove (fn [v] (= :done (:message v)))
-                        batch))))
-    event))
-
 (defn replay-windows-from-log
   [{:keys [onyx.core/log-prefix onyx.core/windows-state
            onyx.core/filter-state onyx.core/state-log] :as event}]
@@ -312,7 +304,7 @@
 
 (s/defn write-batch :- Event 
   [compiled event :- Event]
-  (let [rets (merge event (p-ext/write-batch (:pipeline compiled) event))]
+  (let [rets (merge event (so/write-batch @(:onyx.core/pipeline event) event))]
     (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:onyx.core/results rets))))
     rets))
 
@@ -332,25 +324,6 @@
          (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])])))
      (catch Throwable e
        (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
-
-(defn input-retry-segments! [messenger {:keys [onyx.core/pipeline
-                                               onyx.core/compiled]
-                                        :as event}
-                             input-retry-timeout task-kill-ch]
-  (go
-    (when (= :input (:onyx/type (:onyx.core/task-map event)))
-      (loop []
-        (let [timeout-ch (timeout input-retry-timeout)
-              ch (second (alts!! [timeout-ch task-kill-ch]))]
-          (when (= ch timeout-ch)
-            (let [tail (last (get-in @(:onyx.core/state event) [:timeout-pool]))]
-              (doseq [m tail]
-                (when (p-ext/pending? pipeline event m)
-                  (trace (:log-prefix compiled) (format "Input retry message %s" m))
-                  (->> (p-ext/retry-segment pipeline event m)
-                       (lc/invoke-after-retry event compiled m))))
-              (swap! (:onyx.core/state event) update :timeout-pool rsc/expire-bucket)
-              (recur))))))))
 
 (defn handle-exception [task-info log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
@@ -383,12 +356,12 @@
            (lc/invoke-read-batch read-batch compiled)
            (tag-messages compiled)
            (add-messages-to-timeout-pool compiled)
-           (process-sentinel compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
            (flow-retry-segments compiled)
+           (function/ack-barrier!)
            (lc/invoke-after-batch compiled)))
     (catch Throwable e
       (ex-f e))))
@@ -410,8 +383,9 @@
                 pipeline (if (and user-ns user-fn)
                            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
                              (f pipeline-data)))]
-            (or pipeline
-                (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
+            (if pipeline
+              (si/start pipeline)
+              (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
         (onyx.peer.function/function pipeline-data))
       (catch Throwable e
         (throw e)))))
@@ -504,6 +478,7 @@
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/state state
                            :onyx.core/barrier-state (atom {})
+                           :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/aeron-conn aeron-conn
                            :onyx.core/subscriptions [(start-subscriber!
                                                       aeron-conn
@@ -518,7 +493,7 @@
             add-pipeline (fn [event]
                            (assoc event 
                                   :onyx.core/pipeline 
-                                  (build-pipeline task-map event)))
+                                  (atom (build-pipeline task-map event))))
 
             pipeline-data (->> pipeline-data
                                c/task-params->event-map
@@ -553,7 +528,7 @@
 
         (info log-prefix "Enough peers are active, starting the task")
 
-        (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
+        (let [
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-ch kill-ch ex-f))]
           (s/validate Event pipeline-data)
@@ -564,7 +539,6 @@
                  :seal-ch seal-ch
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
-                 :input-retry-segments-ch input-retry-segments-ch
                  :stream-observer (start-stream-observer! aeron-conn
                                                           (mc/bind-addr opts)
                                                           (:onyx.messaging/peer-port opts)
@@ -594,7 +568,6 @@
       (<!! (:task-lifecycle-ch component))
       (close! (:task-kill-ch component))
 
-      (<!! (:input-retry-segments-ch component))
       (<!! (:aux-ch component))
 
       (when-let [state-log (:onyx.core/state-log event)] 
@@ -617,7 +590,6 @@
            :pipeline-data nil
            :seal-ch nil
            :aux-ch nil
-           :input-retry-segments-ch nil
            :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [peer-state task-state]

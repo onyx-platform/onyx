@@ -15,7 +15,7 @@
 (defn process-completed! [reader complete-ch] 
   (loop [r reader input (poll! complete-ch)]
     (if input
-      (let [next-r (i/checkpoint-ack r (:offset input))]
+      (let [next-r (i/ack-barrier r (:offset input))]
         (i/segment-complete! next-r (:message input))
         (recur next-r (poll! complete-ch)))
       r)))
