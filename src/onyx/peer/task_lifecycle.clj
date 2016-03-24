@@ -471,6 +471,7 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/state state
+                           :onyx.core/barrier-state (atom {})
                            :onyx.core/aeron-conn aeron-conn
                            :onyx.core/subscriptions [(start-subscriber!
                                                       aeron-conn

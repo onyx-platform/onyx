@@ -563,6 +563,8 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/barrier {:type :record
                                            :optional? true
                                            :doc "Barrier to be emitted to peers downstream"}
+                       :onyx.core/barrier-state {:type :any
+                                                 :doc ""}
                        :onyx.core/drained-back-off {:type :integer
                                                     :doc "The amount of time to back off when the input is drained"}
                        :onyx.core/log {:type :record
@@ -1483,7 +1485,8 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
                :onyx.core/state
-               :onyx.core/barrier]
+               :onyx.core/barrier
+               :onyx.core/barrier-state]
    :env-config
    [:onyx/tenancy-id
     :zookeeper/server?

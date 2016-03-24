@@ -46,7 +46,7 @@
            onyx.core/log-prefix onyx.core/task-information] :as event}]
   (update event 
           :onyx.core/compiled 
-          (fn [compiled] 
+          (fn [compiled]
             (-> compiled
                 (assoc :log-prefix log-prefix)
                 (assoc :pipeline pipeline)
@@ -64,6 +64,7 @@
                 (assoc :peer-replica-view peer-replica-view)
                 (assoc :grouping-fn (g/task-map->grouping-fn task-map))
                 (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids serialized-task)))
+                (assoc :ingress-ids (:ingress-ids serialized-task))
                 (assoc :egress-ids (keys (:egress-ids serialized-task)))
                 (assoc :task-information task-information)))))
 
