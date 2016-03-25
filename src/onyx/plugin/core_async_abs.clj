@@ -9,12 +9,10 @@
   i/SimpleInput
 
   (start [this]
-    (assoc this
-           :channel channel :processing []
-           :segment nil :checkpoint 0 :offset 0))
+    (assoc this :channel channel :segment nil :checkpoint 0 :offset 0))
 
   (stop [this]
-    (dissoc this :processing :segment))
+    (dissoc this :channel :segment :checkpoint :offset))
 
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
@@ -28,24 +26,22 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (next-state [{:keys [channel processing segment offset] :as this}
+  (next-state [{:keys [channelsegment offset] :as this}
                {:keys [core.async/chan] :as event}]
     (let [segment (poll! chan)]
       (assoc this
              :channel chan
              :segment segment
-             :processing (if segment (conj processing segment) processing)
              :offset (if segment (inc offset) offset)
              :closed? (closed? chan))))
 
-  (ack-barrier [{:keys [processing checkpoint] :as this} barrier-id]
-    (let [drop-index (- barrier-id checkpoint)]
-      (assoc this :checkpoint barrier-id :processing (drop drop-index processing))))
+  (ack-barrier [{:keys [checkpoint] :as this} barrier-id]
+    (assoc this :checkpoint barrier-id))
 
   (segment-complete! [{:keys [conn]} segment])
 
-  (completed? [this]
-    (and (closed? (:channel this)) (not (seq (:processing this))))))
+  (completed? [{:keys [channel segment offset checkpoint]}]
+    (and (closed? channel) (nil? segment) (= offset checkpoint))))
 
 (defrecord AbsCoreAsyncWriter [event]
   o/SimpleOutput

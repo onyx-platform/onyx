@@ -53,7 +53,7 @@
                   segment (si/segment next-reader)]
               (if segment
                 (recur next-reader (conj outgoing (types/input (uuid/random-uuid) segment)))
-                (do (reset! (:onyx.core/pipeline event) reader)
+                (do (reset! (:onyx.core/pipeline event) next-reader)
                     (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
                     {:onyx.core/batch outgoing})))))))
 
