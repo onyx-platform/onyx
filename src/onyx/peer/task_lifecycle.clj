@@ -22,9 +22,9 @@
             [onyx.peer.window-state :as ws]
             [onyx.peer.transform :refer [apply-fn]]
             [onyx.peer.grouping :as g]
-            [onyx.plugin.simple-input :as si]
-            [onyx.plugin.simple-output :as so]
-            [onyx.plugin.simple-plugin :as sp]
+            [onyx.plugin.onyx-input :as oi]
+            [onyx.plugin.onyx-output :as oo]
+            [onyx.plugin.onyx-plugin :as op]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.static.logging :as logger]
@@ -78,8 +78,8 @@
                (= (:onyx.core/id event) (:peer-id res)))
       (swap! (:onyx.core/pipeline event)
              (fn [pipeline]
-               (si/ack-barrier pipeline (:barrier-id res))))
-      (when (si/completed? @(:onyx.core/pipeline event))
+               (oi/ack-barrier pipeline (:barrier-id res))))
+      (when (oi/completed? @(:onyx.core/pipeline event))
         (let [entry (entry/create-log-entry
                      :exhaust-input
                      {:job (:onyx.core/job-id event) :task this-task-id})]
@@ -311,7 +311,7 @@
 
 (s/defn write-batch :- Event 
   [compiled event :- Event]
-  (let [rets (merge event (so/write-batch @(:onyx.core/pipeline event) event))]
+  (let [rets (merge event (oo/write-batch @(:onyx.core/pipeline event) event))]
     (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:onyx.core/results rets))))
     rets))
 
@@ -374,7 +374,7 @@
                            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
                              (f pipeline-data)))]
             (if pipeline
-              (sp/start pipeline)
+              (op/start pipeline)
               (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
         (Object.))
       (catch Throwable e
@@ -569,7 +569,7 @@
       (.close ^Aeron (:onyx.core/aeron-conn event))
 
       ((:compiled-after-task-fn (:onyx.core/compiled event)) event)
-      (sp/stop @(:onyx.core/pipeline event) event))
+      (op/stop @(:onyx.core/pipeline event) event))
 
     (assoc component
            :pipeline-data nil

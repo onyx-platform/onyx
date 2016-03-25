@@ -6,13 +6,12 @@
             [onyx.peer.barrier :refer [emit-barrier?]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
-            [onyx.plugin.simple-input :as si]
+            [onyx.plugin.onyx-input :as oi]
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :as uuid]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.types :refer [->Barrier]]
-            [onyx.plugin.simple-input :refer [SimpleInput]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
@@ -48,8 +47,8 @@
                 {:onyx.core/batch outgoing})
 
             :else
-            (let [next-reader (si/next-state reader event)
-                  segment (si/segment next-reader)]
+            (let [next-reader (oi/next-state reader event)
+                  segment (oi/segment next-reader)]
               (if segment
                 (recur next-reader (conj outgoing (types/input (uuid/random-uuid) segment)))
                 (do (reset! (:onyx.core/pipeline event) next-reader)

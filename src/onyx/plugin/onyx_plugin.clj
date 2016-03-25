@@ -1,6 +1,6 @@
-(ns onyx.plugin.simple-plugin)
+(ns onyx.plugin.onyx-plugin)
 
-(defprotocol SimplePlugin
+(defprotocol OnyxPlugin
   (start [this]
     "Initialize the plugin, generally assoc'ing any initial state.")
 
@@ -9,7 +9,7 @@
      This can also be done using lifecycles."))
 
 (extend-type Object
-  SimplePlugin
+  OnyxPlugin
 
   (start [this] this)
 

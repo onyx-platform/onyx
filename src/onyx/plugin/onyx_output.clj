@@ -1,13 +1,13 @@
-(ns onyx.plugin.simple-output
+(ns onyx.plugin.onyx-output
   (:require [onyx.peer.barrier :refer [emit-barrier emit-barrier?]]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [clj-tuple :as t]))
 
-(defprotocol SimpleOutput
+(defprotocol OnyxOutput
   (write-batch [this event]))
 
 (extend-type Object
-  SimpleOutput
+  OnyxOutput
 
   (write-batch [this {:keys [onyx.core/results onyx.core/messenger onyx.core/state
                              onyx.core/replica onyx.core/peer-replica-view

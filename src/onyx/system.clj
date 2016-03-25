@@ -46,9 +46,9 @@
             [onyx.triggers]
             [onyx.refinements]
             [onyx.compression.nippy]
-            [onyx.plugin.simple-plugin]
-            [onyx.plugin.simple-input]
-            [onyx.plugin.simple-output]
+            [onyx.plugin.onyx-plugin]
+            [onyx.plugin.onyx-input]
+            [onyx.plugin.onyx-output]
             [onyx.plugin.core-async-abs]
             [onyx.extensions :as extensions]
             [onyx.interop]))

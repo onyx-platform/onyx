@@ -1,8 +1,8 @@
-(ns onyx.plugin.simple-input
+(ns onyx.plugin.onyx-input
   (:require [onyx.extensions]
             [onyx.types]))
 
-(defprotocol SimpleInput
+(defprotocol OnyxInput
   (checkpoint [this]
     "Pure function that returns the full checkpoint state,
      that allows the plugin state to be recovered. This checkpoint value
