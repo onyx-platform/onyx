@@ -4,21 +4,12 @@
             [clj-tuple :as t]))
 
 (defprotocol SimpleOutput
-  (start [this])
-
-  (stop [this])
-
   (write-batch [this event])
 
   (seal-resource [this event]))
 
-;;; Default implementation of Output protocol for input and function tasks.
 (extend-type Object
   SimpleOutput
-
-  (start [this] this)
-
-  (stop [this] this)
 
   (write-batch [this {:keys [onyx.core/results onyx.core/messenger onyx.core/state
                              onyx.core/replica onyx.core/peer-replica-view

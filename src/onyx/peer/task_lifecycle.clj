@@ -25,6 +25,7 @@
             [onyx.peer.grouping :as g]
             [onyx.plugin.simple-input :as si]
             [onyx.plugin.simple-output :as so]
+            [onyx.plugin.simple-plugin :as sp]
             [onyx.flow-conditions.fc-routing :as r]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.static.logging :as logger]
@@ -391,7 +392,7 @@
                            (if-let [f (ns-resolve (symbol user-ns) (symbol user-fn))]
                              (f pipeline-data)))]
             (if pipeline
-              (si/start pipeline)
+              (sp/start pipeline)
               (throw (ex-info "Failure to resolve plugin builder fn. Did you require the file that contains this symbol?" {:kw kw})))))
         (Object.))
       (catch Throwable e
@@ -565,6 +566,7 @@
       (warn (:log-prefix component) "Stopping task lifecycle, failed to initialize task set up"))
 
     (when-let [event (:pipeline-data component)]
+
       (when-not (empty? (:onyx.core/triggers event))
         (>!! (:onyx.core/state-ch event) [(:scheduler-event component) event #()]))
 
@@ -591,7 +593,8 @@
       (.close ^Subscription (:subscription (:stream-observer component)))
       (.close ^Aeron (:onyx.core/aeron-conn event))
 
-      ((:compiled-after-task-fn (:onyx.core/compiled event)) event))
+      ((:compiled-after-task-fn (:onyx.core/compiled event)) event)
+      (sp/stop @(:onyx.core/pipeline event) event))
 
     (assoc component
            :pipeline-data nil

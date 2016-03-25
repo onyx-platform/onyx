@@ -1,18 +1,20 @@
 (ns onyx.plugin.core-async-abs
-  (:require [clojure.core.async :refer [poll! timeout chan alts!! >!!]]
+  (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
             [clojure.core.async.impl.protocols :refer [closed?]]
             [clojure.set :refer [join]]
             [onyx.plugin.simple-input :as i]
-            [onyx.plugin.simple-output :as o]))
+            [onyx.plugin.simple-output :as o]
+            [onyx.plugin.simple-plugin :as p]))
 
 (defrecord AbsCoreAsyncReader [event channel]
-  i/SimpleInput
+  p/SimplePlugin
 
   (start [this]
     (assoc this :channel channel :segment nil :checkpoint 0 :offset 0))
 
-  (stop [this]
-    (dissoc this :channel :segment :checkpoint :offset))
+  (stop [this event] this)
+
+  i/SimpleInput
 
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
@@ -26,7 +28,7 @@
   (segment [{:keys [segment]}]
     segment)
 
-  (next-state [{:keys [channelsegment offset] :as this}
+  (next-state [{:keys [channel segment offset] :as this}
                {:keys [core.async/chan] :as event}]
     (let [segment (poll! chan)]
       (assoc this
@@ -43,12 +45,16 @@
   (completed? [{:keys [channel segment offset checkpoint]}]
     (and (closed? channel) (nil? segment) (= offset checkpoint))))
 
-(defrecord AbsCoreAsyncWriter [event]
+(defrecord AbsCoreAsyncWriter [event channel]
+  p/SimplePlugin
+
+  (start [this] this)
+
+  (stop [this event]
+    (close! (:core.async/chan event))
+    this)
+
   o/SimpleOutput
-
-  (start [this])
-
-  (stop [this])
 
   (write-batch
     [_ {:keys [onyx.core/results core.async/chan] :as event}]

@@ -3,13 +3,6 @@
             [onyx.types]))
 
 (defprotocol SimpleInput
-  (start [this]
-    "Initialize the plugin, generally assoc'ing any initial state.")
-
-  (stop [this]
-    "Shutdown the input and close any resources that needs to be closed.
-     This can also be done using lifecycles.")
-
   (checkpoint [this]
     "Pure function that returns the full checkpoint state,
      that allows the plugin state to be recovered. This checkpoint value
@@ -43,11 +36,3 @@
      Streaming inputs should always return false."))
 
 (defrecord SegmentOffset [segment offset])
-
-;;; Default implementation of Input protocol for function and output tasks.
-(extend-type Object
-  SimpleInput
-
-  (start [this] this)
-
-  (stop [this] this))
