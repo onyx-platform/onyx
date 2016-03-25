@@ -62,8 +62,8 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
-(defn start-subscriber! [conn bind-addr port stream-id idle-strategy task-name]
-  (if (= task-name :in)
+(defn start-subscriber! [conn bind-addr port stream-id idle-strategy task-type]
+  (if (= task-type :input)
     nil
     (let [channel (aeron-channel bind-addr port)
           subscription (.addSubscription conn channel stream-id)]
@@ -475,7 +475,7 @@
                                                       (:onyx.messaging/peer-port opts)
                                                       1
                                                       (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
-                                                      (:name task))]}
+                                                      (:onyx/type task-map))]}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 

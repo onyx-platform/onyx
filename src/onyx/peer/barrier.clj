@@ -4,18 +4,19 @@
             [onyx.extensions]
             [onyx.types :refer [->Barrier]]))
 
-(defn emit-barrier? [replica compiled barrier-state job-id]
+(defn emit-barrier? [replica compiled barrier-state job-id task-id barrier-id]
   (let [upstream-peers (reduce
                         (fn [result task-id]
                           (into result (get-in replica [:allocations job-id task-id])))
                         []
                         (:ingress-ids compiled))]
-    (= (into #{} (keys barrier-state))
+    (= (get-in barrier-state [barrier-id :peers])
        (into #{} upstream-peers))))
 
-(defn emit-barrier [event messenger replica-val peer-replica-view]
+(defn emit-barrier [event messenger replica-val peer-replica-view barrier-state]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
-        downstream-peers (mapcat #(get-in replica-val [:allocations (:onyx.core/job-id event) %]) downstream-task-ids)]
+        downstream-peers (mapcat #(get-in replica-val [:allocations (:onyx.core/job-id event) %]) downstream-task-ids)
+        barrier-val @barrier-state]
     (doseq [target downstream-peers]
       (when-let [site (peer-site peer-replica-view target)]
         (let [b (->Barrier target
@@ -23,6 +24,7 @@
                            (:barrier-id (:onyx.core/barrier event))
                            (:onyx.core/task-id event)
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
-                           (:origin-peer (:onyx.core/barrier event)))]
+                           (or (get-in barrier-val [(:barrier-id (:onyx.core/barrier event)) :origins])
+                               (:origin-peers (:onyx.core/barrier event))))]
           (onyx.extensions/send-barrier messenger site b))))
-    (reset! (:onyx.core/barrier-state event) {})))
+    (swap! (:onyx.core/barrier-state event) dissoc (:barrier-id (:onyx.core/barrier event)))))

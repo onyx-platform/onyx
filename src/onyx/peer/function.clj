@@ -21,7 +21,12 @@
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
     (when barrier
-      (swap! (:onyx.core/barrier-state event) assoc (:from-peer-id barrier) true))
+      (swap!
+       (:onyx.core/barrier-state event)
+       (fn [barrier-state]
+         (-> barrier-state
+             (update-in [(:barrier-id barrier) :peers] (fnil conj #{}) (:from-peer-id barrier))
+             (update-in [(:barrier-id barrier) :origins] (fnil into #{}) (:origin-peers barrier))))))
     {:onyx.core/batch segments
      :onyx.core/barrier barrier}))
 
@@ -39,7 +44,7 @@
                  :onyx.core/barrier (->Barrier nil (:onyx.core/id event)
                                                (+ n-sent (count outgoing))
                                                (:onyx.core/task-id event)
-                                               nil (:onyx.core/id event))})
+                                               nil [(:onyx.core/id event)])})
 
             (>= (count outgoing) batch-size)
             (do (reset! (:onyx.core/pipeline event) reader)
@@ -58,15 +63,17 @@
 (defn ack-barrier!
   [{:keys [onyx.core/replica onyx.core/compiled
            onyx.core/barrier-state onyx.core/job-id
-           onyx.core/peer-replica-view onyx.core/barrier]
+           onyx.core/task-id onyx.core/peer-replica-view
+           onyx.core/barrier]
     :as event}]
-  (when (= (:onyx.core/task event) :out)
-    (when (emit-barrier? @replica compiled @barrier-state job-id)
-      (when-let [site (peer-site peer-replica-view (:origin-peer barrier))]
-        (onyx.extensions/internal-complete-segment (:onyx.core/messenger event)
-                                                   {:barrier-id (:barrier-id barrier)
-                                                    :job-id (:onyx.core/job-id event)
-                                                    :task-id (:onyx.core/task-id event)
-                                                    :peer-id (:origin-peer barrier)
-                                                    :type :job-completed}
-                                                   site)))))
+  (when (= (:onyx/type (:onyx.core/task-map event)) :output)
+    (when (emit-barrier? @replica compiled @barrier-state job-id task-id (:barrier-id barrier))
+      (doseq [p (:origin-peers barrier)]
+        (when-let [site (peer-site peer-replica-view p)]
+          (onyx.extensions/internal-complete-segment (:onyx.core/messenger event)
+                                                     {:barrier-id (:barrier-id barrier)
+                                                      :job-id (:onyx.core/job-id event)
+                                                      :task-id (:onyx.core/task-id event)
+                                                      :peer-id p
+                                                      :type :job-completed}
+                                                     site))))))
