@@ -193,7 +193,7 @@
                     (and (= from :all)
                          (empty? (remove all-tasks to)))
                     (and (coll? to)
-                         (every? (fn [t] (println t)
+                         (every? (fn [t]
                                    (try ((task->egress-edges from) t)
                                         (catch NullPointerException e nil))) to)))
         (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
