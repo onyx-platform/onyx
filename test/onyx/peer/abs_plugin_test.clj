@@ -1,7 +1,7 @@
 (ns onyx.peer.abs-plugin-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
-            [onyx.plugin.core-async-abs :refer [take-segments!]]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env add-test-env-peers!]]
             [onyx.api]))
 
@@ -34,7 +34,7 @@
     (with-test-env [test-env [3 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in
-                      :onyx/plugin :onyx.plugin.core-async-abs/input
+                      :onyx/plugin :onyx.plugin.core-async/input
                       :onyx/type :input
                       :onyx/medium :core.async
                       :onyx/batch-size batch-size
@@ -47,7 +47,7 @@
                       :onyx/batch-size batch-size}
 
                      {:onyx/name :out
-                      :onyx/plugin :onyx.plugin.core-async-abs/output
+                      :onyx/plugin :onyx.plugin.core-async/output
                       :onyx/type :output
                       :onyx/medium :core.async
                       :onyx/batch-size batch-size
