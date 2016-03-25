@@ -69,20 +69,17 @@
     (let [job (:job (common/peer->allocated-job (:allocations new) (:id state)))]
       (common/start-new-lifecycle
         old new diff
-        (cond (common/should-seal? new job state message-id)
-              (>!! (:seal-ch (:task-state state)) true)
-
-              (and (= (:id state) (:observer updated-watch))
+        (cond (and (= (:id state) (:observer updated-watch))
                    (not= (:observer updated-watch) (:subject updated-watch)))
 
               (let [ch (chan 1)]
                 (extensions/on-delete (:log state) (:subject updated-watch) ch)
                 (go (when (<! ch)
                       (extensions/write-log-entry
-                        (:log state)
-                        {:fn :leave-cluster :args {:id (:subject updated-watch)}
-                         :entry-parent message-id
-                         :peer-parent (:id state)}))
+                       (:log state)
+                       {:fn :leave-cluster :args {:id (:subject updated-watch)}
+                        :entry-parent message-id
+                        :peer-parent (:id state)}))
                     (close! ch))
                 (close! (or (:watch-ch state) (chan)))
                 (assoc state :watch-ch ch))

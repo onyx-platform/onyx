@@ -82,29 +82,6 @@
           deallocated))
       replica)))
 
-(defn all-inputs-exhausted? [replica job]
-  (let [all (get-in replica [:input-tasks job])
-        exhausted (get-in replica [:exhausted-inputs job])]
-    (= (into #{} all) (into #{} exhausted))))
-
-(defn executing-output-task? [replica id]
-  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)]
-    (some #{task} (get-in replica [:output-tasks job]))))
-
-(defn elected-sealer? [replica message-id id]
-  (let [{:keys [job task]} (peer->allocated-job (:allocations replica) id)
-        peers (get-in replica [:allocations job task])]
-    (when (pos? (count peers))
-      (let [n (mod message-id (count peers))]
-        (= (nth peers n) id)))))
-
-(defn should-seal? [replica job-id state message-id]
-  (let [allocated-to-job? (= job-id (:job (peer->allocated-job (:allocations replica) (:id state))))]
-    (and allocated-to-job?
-         (all-inputs-exhausted? replica job-id)
-         (executing-output-task? replica (:id state))
-         (elected-sealer? replica message-id (:id state)))))
-
 (defn at-least-one-active? [replica peers]
   (->> peers
        (map #(get-in replica [:peer-state %]))
@@ -139,11 +116,10 @@
             (close! (:task-kill-ch (:task-state state)))
             (component/stop (assoc-in @(:lifecycle state) [:task-lifecycle :scheduler-event] scheduler-event)))
           (if (not (nil? new-allocation))
-            (let [seal-ch (chan)
-                  task-kill-ch (chan)
+            (let [task-kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
                   task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
-                              :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
+                              :peer-site peer-site :task-kill-ch task-kill-ch}
                   lifecycle (assoc-in ((:task-component-fn state) state task-state) 
                                       [:task-lifecycle :scheduler-event] 
                                       scheduler-event)

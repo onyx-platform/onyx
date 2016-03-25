@@ -580,9 +580,7 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/kill-ch {:type :channel
                                            :doc "Signalling channel used to kill the peer"}
                        :onyx.core/outbox-ch {:type :channel
-                                             :doc "The core.async channel to deliver seal notifications for this job"}
-                       :onyx.core/seal-ch {:type :channel
-                                           :doc "The core.async channel to deliver seal notifications for this job"}
+                                             :doc "The core.async channel to deliver outgoing log entries on"}
                        :onyx.core/restart-ch {:type :channel
                                               :doc "The core.async channel to deliver restart notifications to the peer"}
                        :onyx.core/state-ch {:type :channel
@@ -1467,7 +1465,6 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/replica
                :onyx.core/peer-replica-view
                :onyx.core/task-information 
-               :onyx.core/seal-ch 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 
                :onyx.core/restart-ch 

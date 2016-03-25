@@ -315,23 +315,6 @@
     (trace (:log-prefix compiled) (format "Wrote %s segments" (count (:onyx.core/results rets))))
     rets))
 
-(defn launch-aux-threads!
-  [messenger {:keys [onyx.core/pipeline
-                     onyx.core/compiled
-                     onyx.core/messenger-buffer
-                     onyx.core/monitoring
-                     onyx.core/replica
-                     onyx.core/peer-replica-view
-                     onyx.core/state] :as event}
-   outbox-ch seal-ch completion-ch task-kill-ch]
-  (thread
-   (try
-     (let [{:keys [retry-ch release-ch]} messenger-buffer]
-       (loop []
-         (when-let [[v ch] (alts!! [task-kill-ch completion-ch seal-ch release-ch retry-ch])])))
-     (catch Throwable e
-       (fatal (logger/merge-error-keys e (:onyx.core/task-information event) "Internal error. Failed to read core.async channels"))))))
-
 (defn handle-exception [task-info log e restart-ch outbox-ch job-id]
   (let [data (ex-data e)]
     (if (:onyx.core/lifecycle-restart? data)
@@ -354,9 +337,9 @@
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
   [{:keys [onyx.core/compiled onyx.core/task-information] :as init-event}
-   seal-ch kill-ch ex-f]
+   kill-ch ex-f]
   (try
-    (while (first (alts!! [seal-ch kill-ch] :default true))
+    (while (first (alts!! [kill-ch] :default true))
       (->> init-event
            (gen-lifecycle-id)
            (lc/invoke-before-batch compiled)
@@ -435,7 +418,7 @@
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
-     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
+     kill-ch outbox-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
@@ -474,7 +457,6 @@
                            :onyx.core/monitoring task-monitoring
                            :onyx.core/task-information task-information
                            :onyx.core/outbox-ch outbox-ch
-                           :onyx.core/seal-ch seal-ch
                            :onyx.core/restart-ch restart-ch
                            :onyx.core/task-kill-ch task-kill-ch
                            :onyx.core/kill-ch kill-ch
@@ -535,15 +517,12 @@
 
         (info log-prefix "Enough peers are active, starting the task")
 
-        (let [
-              aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
-              task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-ch kill-ch ex-f))]
+        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))]
           (s/validate Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
                  :log-prefix log-prefix
                  :task-information task-information
-                 :seal-ch seal-ch
                  :task-kill-ch task-kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :stream-observer (start-stream-observer! aeron-conn
@@ -553,8 +532,7 @@
                                                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
                                                           pipeline-data
                                                           task-id)
-
-                 :aux-ch aux-ch)))
+)))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
@@ -572,11 +550,8 @@
       (stop-window-state-thread! event)
 
       ;; Ensure task operations are finished before closing peer connections
-      (close! (:seal-ch component))
       (<!! (:task-lifecycle-ch component))
       (close! (:task-kill-ch component))
-
-      (<!! (:aux-ch component))
 
       (when-let [state-log (:onyx.core/state-log event)] 
         (state-extensions/close-log state-log event))
@@ -597,8 +572,6 @@
 
     (assoc component
            :pipeline-data nil
-           :seal-ch nil
-           :aux-ch nil
            :task-lifecycle-ch nil)))
 
 (defn task-lifecycle [peer-state task-state]

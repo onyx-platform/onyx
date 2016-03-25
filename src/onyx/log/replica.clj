@@ -19,7 +19,6 @@
    :output-tasks {}
    :exempt-tasks {}
    :exhausted-inputs {}
-   :sealed-outputs {}
    :ackers {}
    :acker-percentage {}
    :acker-exclude-inputs {}

@@ -42,8 +42,7 @@
   e.g. when the task lifecycle is ready, it signals via :signal-ready"
   [entry old new diff peer-id]
   (cond (#{:kill-job :submit-job
-           :prepare-join-cluster :accept-join-cluster :leave-cluster
-           :seal-output} (:fn entry))
+           :prepare-join-cluster :accept-join-cluster :leave-cluster} (:fn entry))
     (let [old-allocation (peer->allocated-job (:allocations old) peer-id)
           new-allocation (peer->allocated-job (:allocations new) peer-id)]
       (if (and new-allocation (not= old-allocation new-allocation))

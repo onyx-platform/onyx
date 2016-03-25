@@ -15,7 +15,6 @@
       (let [peers (reduce into [] (vals (get-in new [:allocations (:job args)])))]
         (-> new
             (update-in [:exhausted-inputs] dissoc (:job args))
-            (update-in [:sealed-outputs] dissoc (:job args))
             (update-in [:jobs] (fn [coll] (remove (partial = (:job args)) coll)))
             (update-in [:jobs] vec)
             (update-in [:completed-jobs] conj (:job args))
