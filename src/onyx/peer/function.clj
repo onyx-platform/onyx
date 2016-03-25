@@ -36,7 +36,7 @@
             (do (reset! (:onyx.core/pipeline event) reader)
                 (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
                 {:onyx.core/batch outgoing
-                 :onyx.core/barrier (->Barrier nil (:onyx.core/irnd event)
+                 :onyx.core/barrier (->Barrier nil (:onyx.core/id event)
                                                (+ n-sent (count outgoing))
                                                (:onyx.core/task-id event)
                                                nil (:onyx.core/id event))})
