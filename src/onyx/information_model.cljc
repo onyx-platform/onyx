@@ -126,36 +126,6 @@
                              "`:onyx/type` is set to `:output`"]
              :added "0.8.0"}
 
-            :onyx/pending-timeout
-            {:doc "The duration of time, in milliseconds, that a segment that enters an input task has to be fully acknowledged and processed. That is, this segment, and any subsequent segments that it creates in downstream tasks, must be fully processed before this timeout occurs. If the segment is not fully processed, it will automatically be retried."
-             :type :integer
-             :default 60000
-             :tags [:input :plugin :latency :fault-tolerance]
-             :units :milliseconds
-             :optionally-allowed-when ["`:onyx/type` is set to `:input`"
-                                       "Value must be greater than 0."]
-             :added "0.8.0"}
-
-            :onyx/input-retry-timeout
-            {:doc "The duration of time, in milliseconds, that the input task goes dormant between checking which segments should expire from its internal pending pool. When segments expire, they are automatically retried."
-             :type :integer
-             :default 1000
-             :tags [:input :plugin :latency :fault-tolerance]
-             :units :milliseconds
-             :optionally-allowed-when ["`:onyx/type` is set to `:input`"
-                                       "Value must be greater than 0."]
-             :added "0.8.0"}
-
-            :onyx/max-pending
-            {:doc "The maximum number of segments that a peer executing an input task will allow in its internal pending message pool. If this pool is filled to capacity, it will not accept new segments - exhibiting backpressure to upstream message producers."
-             :type :integer
-             :default 10000
-             :tags [:input :plugin :latency :backpressure :fault-tolerance]
-             :units :segments
-             :optionally-allowed-when ["`:onyx/type` is set to `:input`"
-                                       "Value must be greater than 0."]
-             :added "0.8.0"}
-
             :onyx/fn
             {:doc "A fully qualified, namespaced keyword that points to a function on the classpath. This function takes at least one argument - an incoming segment, and returns either a segment or a vector of segments. This function may not return `nil`. This function can be parameterized further through a variety of techniques."
              :type :keyword
@@ -600,8 +570,6 @@ may be added by the user as the context is associated to throughout the task pip
                                                      :doc "Specialised view over the replica generated specifically for this peer"}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
-                       :onyx.core/state {:type :peer-state-atom
-                                         :doc "The state that this peer has accrued"}
                        :onyx.core/batch {:type [:segment]
                                          :optional? true
                                          :doc "The sequence of segments read by this peer"}
@@ -739,7 +707,7 @@ may be added by the user as the context is associated to throughout the task pip
                                           :optional? true
                                           :added "0.8.0"}
 
-            :lifecycle/after-retry-segment {:doc "A function that takes four arguments - an event map, a message id, the return of an input plugin ack-segment call, and the matching lifecycle map. May return a value of any type which will be discarded. This function is whenever a segment at the input task has been pending for greater than pending-timeout time and will be retried."
+            :lifecycle/after-retry-segment {:doc "<<< UPDATE ME AFTER ABS IS DONE >>>"
                                             :type :function
                                             :optional? true
                                             :added "0.8.0"}
@@ -1346,9 +1314,6 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx/params 
     :onyx/medium 
     :onyx/plugin
-    :onyx/pending-timeout 
-    :onyx/input-retry-timeout 
-    :onyx/max-pending 
     :onyx/fn
     :onyx/group-by-key 
     :onyx/group-by-fn 
@@ -1483,7 +1448,6 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/compiled
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
-               :onyx.core/state
                :onyx.core/barrier
                :onyx.core/barrier-state
                :onyx.core/n-sent-messages]

@@ -106,10 +106,7 @@
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)
    :onyx/medium s/Keyword
    :onyx/type (s/enum :input)
-   (s/optional-key :onyx/fn) FnPath
-   (s/optional-key :onyx/input-retry-timeout) PosInt
-   (s/optional-key :onyx/pending-timeout) PosInt
-   (s/optional-key :onyx/max-pending) PosInt})
+   (s/optional-key :onyx/fn) FnPath})
 
 (def partial-output-task
   {:onyx/plugin (s/cond-pre NamespacedKeyword s/Keyword)

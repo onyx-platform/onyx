@@ -110,8 +110,6 @@
 
 ;;;;
 
-(defrecord TaskState [timeout-pool])
-
 (s/defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
@@ -155,23 +153,9 @@
       (info (:onyx.core/log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
     rets))
 
-(defn add-acker-id [id m]
-  (assoc m :acker-id id))
-
-(defn add-completion-id [id m]
-  (assoc m :completion-id id))
-
-(s/defn sentinel-found? [event :- Event]
-  (seq (filter #(= :done (:message %))
-               (:onyx.core/batch event))))
-
 (s/defn complete-job [{:keys [onyx.core/job-id onyx.core/task-id] :as event} :- Event]
   (let [entry (entry/create-log-entry :exhaust-input {:job job-id :task task-id})]
     (>!! (:onyx.core/outbox-ch event) entry)))
-
-(s/defn sentinel-id [event :- Event]
-  (:id (first (filter #(= :done (:message %))
-                      (:onyx.core/batch event)))))
 
 (defrecord AccumAckSegments [ack-val segments retries])
 
@@ -252,12 +236,6 @@
   [event]
   (assoc event :onyx.core/lifecycle-id (uuid/random-uuid)))
 
-(defn handle-backoff! [event]
-  (let [batch (:onyx.core/batch event)]
-    (when (and (= (count batch) 1)
-               (= (:message (first batch)) :done))
-      (Thread/sleep (:onyx.core/drained-back-off event)))))
-
 (def input-readers
   {:input #'function/read-input-batch
    :function #'function/read-function-batch
@@ -269,10 +247,8 @@
   (if (and (= task-type :input) (:backpressure? @peer-replica-view))
     (assoc event :onyx.core/batch '())
     (let [f (get input-readers task-type)
-          rets (merge event (f event))
-          rets (merge event (lc/invoke-after-read-batch compiled rets))]
-      (handle-backoff! event)
-      rets)))
+          rets (merge event (f event))]
+      (merge event (lc/invoke-after-read-batch compiled rets)))))
 
 (s/defn tag-messages :- Event
   [{:keys [peer-replica-view task-type id] :as compiled} event :- Event]
@@ -284,13 +260,6 @@
                      (assoc segment :src-task (:onyx.core/task-id event)))
                    batch)))
     event))
-
-(s/defn add-messages-to-timeout-pool :- Event
-  [{:keys [task-type state]} event :- Event]
-  (when (= task-type :input)
-    (swap! state update :timeout-pool rsc/add-to-head
-           (map :id (:onyx.core/batch event))))
-  event)
 
 (defn replay-windows-from-log
   [{:keys [onyx.core/log-prefix onyx.core/windows-state
@@ -344,7 +313,6 @@
            (lc/invoke-before-batch compiled)
            (lc/invoke-read-batch read-batch compiled)
            (tag-messages compiled)
-           (add-messages-to-timeout-pool compiled)
            (apply-fn compiled)
            (build-new-segments compiled)
            (lc/invoke-assign-windows assign-windows compiled)
@@ -354,12 +322,6 @@
            (lc/invoke-after-batch compiled)))
     (catch Throwable e
       (ex-f e))))
-
-(defn validate-pending-timeout [pending-timeout opts]
-  (when (> pending-timeout (arg-or-default :onyx.messaging/ack-daemon-timeout opts))
-    (throw (ex-info "Pending timeout cannot be greater than acking daemon timeout"
-                    {:opts opts :pending-timeout pending-timeout}))))
-
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -424,16 +386,8 @@
     (try
       (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
-            ;; Number of buckets in the timeout pool is covered over a 60 second
-            ;; interval, moving each bucket back 60 seconds / N buckets
-            input-retry-timeout (arg-or-default :onyx/input-retry-timeout task-map)
-            pending-timeout (arg-or-default :onyx/pending-timeout task-map)
-            r-seq (rsc/create-r-seq pending-timeout input-retry-timeout)
-            state (atom (->TaskState r-seq))
             ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
             aeron-conn (Aeron/connect ctx)
-
-            _ (validate-pending-timeout pending-timeout opts)
 
             log-prefix (logger/log-prefix task-information)
 
@@ -464,7 +418,6 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
-                           :onyx.core/state state
                            :onyx.core/barrier-state (atom {})
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/aeron-conn aeron-conn
