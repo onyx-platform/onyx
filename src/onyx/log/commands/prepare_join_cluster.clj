@@ -138,8 +138,6 @@
                           (let [fd (failure-detector (:log state) (:observer diff) (:opts state))]
                             (assoc state :failure-detector (component/start fd))))
                         (= (:id state) (:instant-join diff))
-                        (do (extensions/register-acker (:messenger state)
-                                                       (get-in new [:peer-sites (:id state)]))
-                            state)
+                        state
                         :else state)] 
     (common/start-new-lifecycle old new diff state-new :peer-reallocated)))

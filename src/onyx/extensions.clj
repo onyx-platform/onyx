@@ -55,8 +55,6 @@
 (defmulti get-peer-site (fn [replica peer]
                           (:onyx.messaging/impl (:messaging replica))))
 
-(defmulti register-acker (fn [messenger assigned] (type messenger)))
-
 (defmulti register-task-peer (fn [messenger assigned buffers] (type messenger)))
 
 (defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))

@@ -21,7 +21,7 @@
       (assoc peer-annotated :entry-parent message-id)
       peer-annotated)))
 
-(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn]
+(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
   (try
     (let [replica-atom (atom nil)
           peer-view-atom (atom {})]
@@ -35,7 +35,6 @@
                            :messenger messenger
                            :monitoring monitoring
                            :outbox-ch outbox-ch
-                           :completion-ch completion-ch
                            :opts opts
                            :kill-ch kill-ch
                            :restart-ch restart-ch}
@@ -80,7 +79,7 @@
 (defrecord VirtualPeer [opts task-component-fn]
   component/Lifecycle
 
-  (start [{:keys [log acking-daemon messenger monitoring] :as component}]
+  (start [{:keys [log messenger monitoring] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
       (try
@@ -92,7 +91,6 @@
 
         (let [inbox-ch (chan (arg-or-default :onyx.peer/inbox-capacity opts))
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
-              completion-ch (:completion-ch acking-daemon)
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
               peer-site (extensions/peer-site messenger)
@@ -103,7 +101,7 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch restart-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch completion-ch opts monitoring task-component-fn))]
+                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch

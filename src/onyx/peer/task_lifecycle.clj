@@ -10,7 +10,6 @@
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
             [onyx.static.planning :refer [find-task]]
             [onyx.static.uuid :as uuid]
-            [onyx.messaging.acking-daemon :as acker]
             [onyx.peer.task-compile :as c]
             [onyx.windowing.window-compile :as wc]
             [onyx.lifecycles.lifecycle-invoke :as lc]
@@ -180,13 +179,13 @@
   (if (empty? routes)
     accum
     (if-let [route (first routes)]
-      (let [ack-val (acker/gen-ack-value)
+      (let [ack-val 0
             grp (get hash-group route)
             leaf* (-> leaf
                       (assoc :ack-val ack-val)
                       (assoc :hash-group grp)
                       (assoc :route route))
-            fused-ack (bit-xor ^long (:ack-val accum) ^long ack-val)]
+            fused-ack (bit-xor (:ack-val accum) ack-val)]
         (-> accum
             (assoc :ack-val fused-ack)
             (update :segments (fn [s] (conj! s leaf*)))
@@ -418,7 +417,7 @@
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
-     kill-ch outbox-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
+     kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]

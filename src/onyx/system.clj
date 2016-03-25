@@ -6,7 +6,6 @@
             [onyx.peer.virtual-peer :refer [virtual-peer]]
             [onyx.peer.task-lifecycle :refer [task-lifecycle new-task-information]]
             [onyx.peer.backpressure-poll :refer [backpressure-poll]]
-            [onyx.messaging.acking-daemon :refer [acking-daemon]]
             [onyx.messaging.aeron :as am]
             [onyx.messaging.messenger-buffer :as buffer]
             [onyx.monitoring.no-op-monitoring]
@@ -83,7 +82,7 @@
      #(component/stop-system this client-components))))
 
 (def peer-components
-  [:monitoring :log :messenger :acking-daemon :virtual-peer])
+  [:monitoring :log :messenger :virtual-peer])
 
 (defrecord OnyxPeer []
   component/Lifecycle
@@ -168,9 +167,8 @@
      (map->OnyxPeer
       {:monitoring (extensions/monitoring-agent monitoring-config)
        :log (component/using (zookeeper config) [:monitoring])
-       :acking-daemon (component/using (acking-daemon config) [:monitoring :log])
-       :messenger (component/using (am/aeron-messenger peer-group) [:monitoring :acking-daemon])
-       :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :acking-daemon :messenger])})))
+       :messenger (component/using (am/aeron-messenger peer-group) [:monitoring])
+       :virtual-peer (component/using (virtual-peer config onyx-task) [:monitoring :log :messenger])})))
 
 (defn onyx-peer-group
   [config]

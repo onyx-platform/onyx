@@ -50,12 +50,6 @@
                :tags (get-in old [:peer-tags accepted-joiner])}}]
       [])))
 
-(defn register-acker [state diff new]
-  (when (= (:id state) (:subject diff))
-    (extensions/register-acker
-     (:messenger state)
-     (get-in new [:peer-sites (:id state)]))))
-
 (s/defmethod extensions/fire-side-effects! :accept-join-cluster :- State
   [{:keys [args]} :- LogEntry 
    old :- Replica 
@@ -65,6 +59,5 @@
   (when (= (:subject args) (:id state))
     (extensions/emit monitoring {:event :peer-accept-join :id (:id state)}))
   (if-not (= old new)
-    (do (register-acker state diff new)
-        (common/start-new-lifecycle old new diff state :peer-reallocated))
+    (common/start-new-lifecycle old new diff state :peer-reallocated)
     state))
