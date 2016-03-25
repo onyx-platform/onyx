@@ -524,6 +524,7 @@
                  :log-prefix log-prefix
                  :task-information task-information
                  :task-kill-ch task-kill-ch
+                 :kill-ch kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
                  :stream-observer (start-stream-observer! aeron-conn
                                                           (mc/bind-addr opts)
@@ -531,8 +532,7 @@
                                                           1
                                                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
                                                           pipeline-data
-                                                          task-id)
-)))
+                                                          task-id))))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
@@ -550,6 +550,7 @@
       (stop-window-state-thread! event)
 
       ;; Ensure task operations are finished before closing peer connections
+      (close! (:kill-ch component))
       (<!! (:task-lifecycle-ch component))
       (close! (:task-kill-ch component))
 
