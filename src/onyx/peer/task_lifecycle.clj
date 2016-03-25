@@ -14,7 +14,6 @@
             [onyx.peer.task-compile :as c]
             [onyx.windowing.window-compile :as wc]
             [onyx.lifecycles.lifecycle-invoke :as lc]
-            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]

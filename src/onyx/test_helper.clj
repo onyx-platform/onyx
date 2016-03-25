@@ -5,7 +5,6 @@
             [schema.core :as s]
             [onyx.extensions :as extensions]
             [onyx.peer.function :as function]
-            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.system :as system]
             [onyx.api]))
 

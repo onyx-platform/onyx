@@ -45,13 +45,14 @@
   (completed? [{:keys [channel segment offset checkpoint]}]
     (and (closed? channel) (nil? segment) (= offset checkpoint))))
 
-(defrecord AbsCoreAsyncWriter [event channel]
+(defrecord AbsCoreAsyncWriter [event]
   p/SimplePlugin
 
   (start [this] this)
 
   (stop [this event]
-    (close! (:core.async/chan event))
+    (when-let [ch (:core.async/chan event)]
+      (close! ch))
     this)
 
   o/SimpleOutput
@@ -60,11 +61,7 @@
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
       (>!! chan (:message msg)))
-    {})
-
-  (seal-resource
-    [_ {:keys [core.async/chan]}]
-    (>!! chan :done)))
+    {}))
 
 (defn input [event]
   (map->AbsCoreAsyncReader {:event event}))

@@ -2,8 +2,7 @@
   (:gen-class :name onyx.interop
               :methods [^:static [write_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
                         ^:static [read_batch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
-  (:require [onyx.peer.pipeline-extensions :refer [Pipeline]]
-            [onyx.information-model :refer [model]]))
+  (:require [onyx.information-model :refer [model]]))
 
 (defn -write_batch
   [event]
@@ -15,15 +14,7 @@
 
 (gen-interface
   :name onyx.IPipeline
-  :methods [[writeBatch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]
-            [sealResource [clojure.lang.IPersistentMap] Object]])
-
-(extend-protocol Pipeline
-  onyx.IPipeline
-  (write-batch [this event]
-    (.writeBatch this event))
-  (seal-resource [this event]
-    (.sealResource this event)))
+  :methods [[writeBatch [clojure.lang.IPersistentMap] clojure.lang.IPersistentMap]])
 
 (def casts
   {:boolean (fn [x] x)

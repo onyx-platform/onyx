@@ -4,9 +4,7 @@
             [clj-tuple :as t]))
 
 (defprotocol SimpleOutput
-  (write-batch [this event])
-
-  (seal-resource [this event]))
+  (write-batch [this event]))
 
 (extend-type Object
   SimpleOutput
@@ -28,7 +26,4 @@
                 grouped)
           (when (emit-barrier? replica-val (:onyx.core/compiled event) @(:onyx.core/barrier-state event) (:onyx.core/job-id event))
             (emit-barrier event messenger replica-val peer-replica-view)))))
-    {})
-
-  (seal-batch [this event]
     {}))
