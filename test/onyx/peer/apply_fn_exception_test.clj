@@ -66,22 +66,15 @@
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls ::in-calls}
 
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
-
                         {:lifecycle/task :inc
                          :lifecycle/calls ::exception-calls}
 
                         {:lifecycle/task :out
-                         :lifecycle/calls ::out-calls}
-
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                         :lifecycle/calls ::out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
-            _ (>!! @in-chan :done)
             _ (close! @in-chan)
             {:keys [job-id]}
             (onyx.api/submit-job peer-config

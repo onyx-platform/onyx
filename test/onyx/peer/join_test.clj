@@ -102,16 +102,10 @@
 
         lifecycles [{:lifecycle/task :names
                      :lifecycle/calls :onyx.peer.join-test/names-calls}
-                    {:lifecycle/task :names
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :ages
                      :lifecycle/calls :onyx.peer.join-test/ages-calls}
-                    {:lifecycle/task :ages
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.join-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :join-person
                      :lifecycle/calls :onyx.peer.join-test/join-calls}]]
 
@@ -126,8 +120,8 @@
       (doseq [age ages]
         (>!! @age-chan age))
 
-      (>!! @name-chan :done)
-      (>!! @age-chan :done)
+      (close! @name-chan)
+      (close! @age-chan)
 
       (onyx.api/submit-job
         peer-config
@@ -136,5 +130,4 @@
          :task-scheduler :onyx.task-scheduler/balanced})
 
       (let [results (take-segments! @out-chan)]
-        (is (= (set people)
-               (set (butlast results))))))))
+        (is (= (set people) (set results)))))))

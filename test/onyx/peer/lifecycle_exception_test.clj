@@ -43,7 +43,6 @@
 (defn after-batch [event lifecycle]
   (when (= @exception-thrower :after-batch)
     (reset! exception-thrower nil)
-    (>!! @in-chan :done)
     (close! @in-chan)
     (throw (ex-info "Threw exception in after-batch" {})))
   {})
@@ -104,15 +103,11 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls ::in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :inc
                      :lifecycle/calls ::calls
                      :lifecycle/doc "Test lifecycles that increment a counter in an atom"}
                     {:lifecycle/task :out
-                     :lifecycle/calls ::out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))

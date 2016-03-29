@@ -1,11 +1,14 @@
-(ns onyx.peer.messaging-short-circuit-test
+(ns onyx.peer.multi-peer-test
   (:require [clojure.core.async :refer [chan >!! <!! close! sliding-buffer]]
             [clojure.test :refer [deftest is testing]]
-            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.test-helper :refer [load-config with-test-env]]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.api]))
 
-(def n-messages 100)
+(def n-messages 100000)
+
+(defn my-inc [{:keys [n] :as segment}]
+  (assoc segment :n (inc n)))
 
 (def in-chan (atom nil))
 
@@ -23,17 +26,12 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
-
-(deftest messaging-short-circuit-test
+(deftest multi-peer-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
-        peer-config (assoc (:peer-config config) 
-                           :onyx/tenancy-id id 
-                           :onyx.messaging/allow-short-circuit? true)
-        batch-size 20
+        peer-config (assoc (:peer-config config) :onyx/tenancy-id id)
+        batch-size 40
         catalog [{:onyx/name :in
                   :onyx/plugin :onyx.plugin.core-async/input
                   :onyx/type :input
@@ -43,7 +41,7 @@
                   :onyx/doc "Reads segments from a core.async channel"}
 
                  {:onyx/name :inc
-                  :onyx/fn :onyx.peer.messaging-short-circuit-test/my-inc
+                  :onyx/fn ::my-inc
                   :onyx/type :function
                   :onyx/batch-size batch-size}
 
@@ -56,30 +54,24 @@
                   :onyx/doc "Writes segments to a core.async channel"}]
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
-                     :lifecycle/calls :onyx.peer.messaging-short-circuit-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                     :lifecycle/calls ::in-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.messaging-short-circuit-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls ::out-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))
 
-    (with-test-env [test-env [3 env-config peer-config]]
+    (with-test-env [test-env [8 env-config peer-config]]
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
-      (>!! @in-chan :done)
+
       (close! @in-chan)
 
       (onyx.api/submit-job peer-config
-                           {:catalog catalog
-                            :workflow workflow
+                           {:catalog catalog :workflow workflow
                             :lifecycles lifecycles
                             :task-scheduler :onyx.task-scheduler/balanced})
 
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results))))))) 
+        (is (= expected (set results)))))))

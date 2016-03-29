@@ -118,24 +118,14 @@
 
         lifecycles [{:lifecycle/task :in-1
                      :lifecycle/calls :onyx.peer.multi-input-test/in-1-calls}
-                    {:lifecycle/task :in-1
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-2
                      :lifecycle/calls :onyx.peer.multi-input-test/in-2-calls}
-                    {:lifecycle/task :in-2
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-3
                      :lifecycle/calls :onyx.peer.multi-input-test/in-3-calls}
-                    {:lifecycle/task :in-3
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :in-4
                      :lifecycle/calls :onyx.peer.multi-input-test/in-4-calls}
-                    {:lifecycle/task :in-4
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.multi-input-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.multi-input-test/out-calls}]]
 
     (reset! in-chan-1 (chan (inc n-messages)))
     (reset! in-chan-2 (chan (inc n-messages)))
@@ -146,10 +136,10 @@
     (doseq [[q b] (map (fn [q b] [q b]) [in-chan-1 in-chan-2 in-chan-3 in-chan-4] messages)]
       (>!! @q b))
 
-    (>!! @in-chan-1 :done)
-    (>!! @in-chan-2 :done)
-    (>!! @in-chan-3 :done)
-    (>!! @in-chan-4 :done)
+    (close! @in-chan-1)
+    (close! @in-chan-2)
+    (close! @in-chan-3)
+    (close! @in-chan-4)
 
     (with-test-env [test-env [6 env-config peer-config]]
       (onyx.api/submit-job peer-config
@@ -158,5 +148,4 @@
                             :task-scheduler :onyx.task-scheduler/balanced})
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results)))))))
+        (is (= expected (set results)))))))

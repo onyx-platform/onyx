@@ -94,21 +94,14 @@
 
         lifecycles-1 [{:lifecycle/task :in-1
                        :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-1}
-                      {:lifecycle/task :in-1
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                       {:lifecycle/task :out-1
-                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-1}
-                      {:lifecycle/task :out-1
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-1}]
 
         lifecycles-2 [{:lifecycle/task :in-2
                        :lifecycle/calls :onyx.peer.automatic-kill-test/in-calls-2}
-                      {:lifecycle/task :in-2
-                       :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+                      {:lifecycle/task :in-2}
                       {:lifecycle/task :out-2
-                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}
-                      {:lifecycle/task :out-2
-                       :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                       :lifecycle/calls :onyx.peer.automatic-kill-test/out-calls-2}]]
     (reset! in-chan-1 (chan (inc n-messages)))
     (reset! in-chan-2 (chan (inc n-messages)))
     (reset! out-chan-1 (chan (sliding-buffer (inc n-messages))))
@@ -119,8 +112,9 @@
         ;; Using + 50,000 on the first job to make sure messages don't cross jobs.
         (>!! @in-chan-1 {:n (+ n 50000)})
         (>!! @in-chan-2 {:n n}))
-        (>!! @in-chan-1 :done)
-        (>!! @in-chan-2 :done)
+
+      (close! @in-chan-1)
+      (close! @in-chan-2)
 
         (let [j1 (:job-id (onyx.api/submit-job
                             peer-config
@@ -143,7 +137,6 @@
 
           (let [results (take-segments! @out-chan-2)
                 expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-            (is (= expected (set (butlast results))))
-            (is (= :done (last results))))
+            (is (= expected (set results))))
           (close! @in-chan-1)
           (close! @in-chan-2)))))

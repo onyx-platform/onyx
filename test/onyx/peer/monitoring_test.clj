@@ -60,12 +60,8 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.monitoring-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.monitoring-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.monitoring-test/out-calls}]
         monitoring-config {:monitoring :custom
                            :zookeeper-write-log-entry update-state
                            :zookeeper-read-log-entry update-state
@@ -97,7 +93,6 @@
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (onyx.api/submit-job peer-config
@@ -108,8 +103,7 @@
 
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results))))
+        (is (= expected (set results))))
 
       (let [metrics @state]
         (is (seq? (:zookeeper-read-task metrics)))

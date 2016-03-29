@@ -4,14 +4,17 @@
             [onyx.extensions]
             [onyx.types :refer [->Barrier]]))
 
-(defn emit-barrier? [replica compiled barrier-state job-id task-id barrier-id]
+(defn emit-barrier? [replica compiled barrier-state job-id task-id barrier-id event]
   (let [upstream-peers (reduce
                         (fn [result task-id]
                           (into result (get-in replica [:allocations job-id task-id])))
                         []
                         (:ingress-ids compiled))]
-    (= (get-in barrier-state [barrier-id :peers])
-       (into #{} upstream-peers))))
+    (or (and (= :input (:onyx/type (:onyx.core/task-map event)))
+             (:onyx.core/barrier event))
+        (and (:onyx.core/barrier event)
+             (= (into #{} (get-in barrier-state [barrier-id :peers]))
+                (into #{} upstream-peers))))))
 
 (defn emit-barrier [event messenger replica-val peer-replica-view barrier-state]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
