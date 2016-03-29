@@ -12,6 +12,10 @@
             [onyx.scheduling.common-job-scheduler :refer [reconfigure-cluster-workload]]
             [taoensso.timbre :refer [info] :as timbre]))
 
+(defn add-site [replica {:keys [joiner peer-site]}]
+  (assert (:messaging replica) ":messaging key missing in replica, cannot continue")
+  (assoc-in replica [:peer-sites joiner] peer-site))
+
 (defn still-joining? [replica joiner]
   (or (get (map-invert (:prepared replica)) joiner)
       (get (map-invert (:accepted replica)) joiner)))
@@ -44,6 +48,7 @@
                 (-> replica
                     (update-in [:prepared] merge {watcher joiner})
                     (assoc-in [:peer-tags joiner] (:tags args))
+                    (add-site args)
                     (reconfigure-cluster-workload)))
               :else
               replica))
@@ -52,6 +57,7 @@
           (update-in [:peers] vec)
           (assoc-in [:peer-state joiner] :idle)
           (assoc-in [:peer-tags joiner] (:tags args))
+          (add-site args)
           (reconfigure-cluster-workload)))))
 
 (s/defmethod extensions/replica-diff :prepare-join-cluster :- ReplicaDiff

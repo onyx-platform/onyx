@@ -265,22 +265,22 @@
 (defn write [^Publication pub ^UnsafeBuffer buf]
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
-  (while (neg? (.offer buf 0 (.capacity buf)))))
+  (while (neg? (.offer pub buf 0 (.capacity buf)))))
 
 (defmethod extensions/send-messages AeronMessenger
   [messenger {:keys [channel stream-id] :as conn-spec} batch]
-  (let [pub (get-publication conn-spec)
+  (let [pub (get-publication channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress batch))]
     (write pub buf)))
 
 (defmethod extensions/send-barrier AeronMessenger
   [messenger {:keys [channel stream-id] :as conn-spec} barrier]
-  (let [pub (get-publication conn-spec)
+  (let [pub (get-publication channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
     (write pub buf)))
 
 (defmethod extensions/internal-complete-segment AeronMessenger
-  [messenger completion-message {:keys [peer-task-id channel] :as conn-spec}]
-  (let [pub (get-publication conn-spec)
+  [messenger completion-message {:keys [channel stream-id] :as conn-spec}]
+  (let [pub (get-publication channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-message))]
     (write pub buf)))
