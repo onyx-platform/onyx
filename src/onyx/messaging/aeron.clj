@@ -275,7 +275,7 @@
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
   (while (neg? (.offer pub buf 0 (.capacity buf)))
-    (info "Offering")))
+    (info "Re-offering message, session-id" (.sessionId pub))))
 
 (defmethod extensions/send-messages AeronMessenger
   [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]
