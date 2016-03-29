@@ -215,7 +215,8 @@
         stream-id 1]
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id acker-id peer-task-id)))
 
-(defn handle-message [result-state this-task-id buffer offset length header]
+(defn handle-message
+  [result-state this-task-id upstream-task-id buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
@@ -228,7 +229,8 @@
 
           (coll? res)
           (do (doseq [m res]
-                (when (= (:dst-task m) this-task-id)
+                (when (and (= (:dst-task m) this-task-id)
+                           (= (:src-task m) upstream-task-id))
                   (swap! result-state conj m)))
               ControlledFragmentHandler$Action/CONTINUE)
 
@@ -243,11 +245,18 @@
       (onFragment [this buffer offset length header]
         (f buffer offset length header)))))
 
+(defn rotate [xs]
+  (conj (into [] (rest xs)) (first xs)))
+
 (defmethod extensions/receive-messages AeronMessenger
-  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/messenger-buffer] :as event}]
-  (let [subscription (:subscription (first subscriptions))
+  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
+                     onyx.core/messenger-buffer onyx.core/subscription-maps]
+              :as event}]
+  (let [next-subscription (first (swap! subscription-maps rotate))
+        subscription (:subscription next-subscription)
         result-state (atom [])
-        fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)))
+        fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
+                                           (:upstream-task next-subscription)))
         n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh 10)]
     @result-state))
 

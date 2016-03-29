@@ -61,12 +61,16 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
-(defn start-subscriber! [conn bind-addr port stream-id idle-strategy task-type]
+(defn start-subscribers!
+  [ingress-task-ids conn bind-addr port stream-id idle-strategy task-type]
   (if (= task-type :input)
-    nil
-    (let [channel (aeron-channel bind-addr port)
-          subscription (.addSubscription conn channel stream-id)]
-      {:subscription subscription})))
+    []
+    (map
+     (fn [upstream-task-id]
+       (let [channel (aeron-channel bind-addr port)
+             subscription (.addSubscription conn channel stream-id)]
+         {:subscription subscription :upstream-task upstream-task-id}))
+     ingress-task-ids)))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
   (let [ba (byte-array length)
@@ -390,6 +394,15 @@
             aeron-conn (Aeron/connect ctx)
 
             log-prefix (logger/log-prefix task-information)
+            subscriptions (start-subscribers!
+                           (:ingress-ids task)
+                           aeron-conn
+                           (mc/bind-addr opts)
+                           (:onyx.messaging/peer-port opts)
+                           1
+                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
+                           (:onyx/type task-map))
+            subscription-maps (atom subscriptions)
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -420,14 +433,9 @@
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/barrier-state (atom {})
                            :onyx.core/n-sent-messages (atom 0)
+                           :onyx.core/subscription-maps subscription-maps
                            :onyx.core/aeron-conn aeron-conn
-                           :onyx.core/subscriptions [(start-subscriber!
-                                                      aeron-conn
-                                                      (mc/bind-addr opts)
-                                                      (:onyx.messaging/peer-port opts)
-                                                      1
-                                                      (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
-                                                      (:onyx/type task-map))]}
+                           :onyx.core/subscriptions subscriptions}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 

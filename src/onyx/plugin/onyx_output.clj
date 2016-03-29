@@ -19,7 +19,10 @@
               pick-peer-fns (:pick-peer-fns @peer-replica-view)
               grouped (group-by #(t/vector (:route %) (:hash-group %)) segments)]
           (run! (fn [[[route hash-group] segs]]
-                  (let [segs (map #(assoc % :dst-task (get (:egress-ids serialized-task) route)) segs)]
+                  (let [segs (map #(assoc %
+                                          :dst-task (get (:egress-ids serialized-task) route)
+                                          :src-task (:onyx.core/task-id event))
+                                  segs)]
                     (when-let [pick-peer-fn (get pick-peer-fns (get (:egress-ids serialized-task) route))]
                       (when-let [target (pick-peer-fn hash-group)]
                         (when-let [site (peer-site peer-replica-view target)]

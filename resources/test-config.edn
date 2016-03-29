@@ -2,7 +2,7 @@
  {:zookeeper/address "127.0.0.1:2188"
   :zookeeper/server? true
   :zookeeper.server/port 2188
-  :onyx.bookkeeper/server? true
+  :onyx.bookkeeper/server? false
   :onyx.bookkeeper/delete-server-data? true
   :onyx.bookkeeper/local-quorum? true
   :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]}
