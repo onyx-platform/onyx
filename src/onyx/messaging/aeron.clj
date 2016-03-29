@@ -4,8 +4,6 @@
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
-            [onyx.messaging.aeron.publication-manager :as pubm]
-            [onyx.messaging.aeron.publication-pool :as pub-pool :refer [get-publication]]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.types :refer [->MonitorEventBytes map->Barrier]]
@@ -34,58 +32,42 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
 (defrecord AeronMessenger
-  [peer-group messaging-group publication-group short-circuitable? publications virtual-peers 
-   send-idle-strategy compress-f monitoring publication-pool short-ids acking-ch]
+  [peer-group messaging-group publication-group publications
+   send-idle-strategy compress-f monitoring short-ids acking-ch]
   component/Lifecycle
 
   (start [component]
     (taoensso.timbre/info "Starting Aeron Messenger")
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
-          publication-pool (:publication-pool messaging-group)
           publications (:publications messaging-group)
-          virtual-peers (:virtual-peers messaging-group)
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
-             :publication-pool publication-pool
              :short-ids short-ids
-             :virtual-peers virtual-peers
              :send-idle-strategy send-idle-strategy
              :compress-f compress-f)))
 
-  (stop [{:keys [retry-ch publication-pool virtual-peers short-ids acker-short-id] :as component}]
+  (stop [{:keys [short-ids] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
-    (try
-      (let [short-ids-snapshot @short-ids]
-        (when (:peer-task-short-id short-ids-snapshot)
-          (swap! virtual-peers pm/dissoc (:peer-task-short-id short-ids-snapshot)))
-        (when (:acker-short-id short-ids-snapshot)
-          (swap! virtual-peers pm/dissoc (:acker-short-id short-ids-snapshot))))
-      (catch Throwable e (fatal e)))
     (assoc component
            :send-idle-strategy nil
            :short-circuitable? nil
-           :publication-pool nil
-           :virtual-peers nil
            :short-ids nil
            :compress-f nil)))
 
 (defmethod extensions/register-task-peer AeronMessenger
-  [{:keys [virtual-peers short-ids] :as messenger}
+  [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}
    task-buffer]
-  (swap! short-ids assoc :peer-task-short-id peer-task-id)
-  (swap! virtual-peers pm/assoc peer-task-id task-buffer))
+  (swap! short-ids assoc :peer-task-short-id peer-task-id))
 
 (defmethod extensions/unregister-task-peer AeronMessenger
-  [{:keys [virtual-peers short-ids] :as messenger}
+  [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}]
-  (swap! short-ids dissoc peer-task-id)
-  (when peer-task-id 
-    (swap! virtual-peers pm/dissoc peer-task-id)))
+  (swap! short-ids dissoc peer-task-id))
 
 (def no-op-error-handler
   (reify ErrorHandler
@@ -97,7 +79,7 @@
         (= media-driver :shared) ThreadingMode/SHARED
         (= media-driver :shared-network) ThreadingMode/SHARED_NETWORK))
 
-(defrecord AeronPeerGroup [opts publication-pool subscribers subscriber-count compress-f decompress-f send-idle-strategy]
+(defrecord AeronPeerGroup [opts subscribers subscriber-count compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
@@ -120,9 +102,7 @@
           send-idle-strategy (backoff-strategy poll-idle-strategy-config)
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
           compress-f (or (:onyx.messaging/compress-fn opts) messaging-compress)
-          decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
-          virtual-peers (atom (pm/vpeer-manager))
-          publication-pool (component/start (pub-pool/new-publication-pool opts send-idle-strategy))]
+          decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
                           (Thread. (fn [] 
@@ -132,24 +112,19 @@
              :external-addr external-addr
              :media-driver-context media-driver-context
              :media-driver media-driver
-             :publication-pool publication-pool
-             :virtual-peers virtual-peers
              :compress-f compress-f
              :decompress-f decompress-f
              :port port
              :send-idle-strategy send-idle-strategy)))
 
-  (stop [{:keys [media-driver media-driver-context subscribers publication-pool] :as component}]
+  (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-    (component/stop publication-pool)
 
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
            :bind-addr nil :external-addr nil
-           :media-driver nil :publications nil :virtual-peers nil
-           :media-driver-context nil
-           :external-channel nil
+           :media-driver nil :media-driver-context nil :external-channel nil
            :compress-f nil :decompress-f nil :send-idle-strategy nil)))
 
 (defn aeron-peer-group [opts]
@@ -183,10 +158,6 @@
                       peer-site)))
     id))
 
-(defmethod extensions/assign-acker-resources :aeron
-  [replica peer-id peer-site peer-sites]
-  {:aeron/acker-id (allocate-id (hash peer-id) peer-site peer-sites)})
-
 (defmethod extensions/assign-task-resources :aeron
   [replica peer-id task-id peer-site peer-sites]
   {:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
@@ -203,18 +174,18 @@
   {:aeron/external-addr (:external-addr (:messaging-group messenger))
    :aeron/port (:port (:messaging-group messenger))})
 
-(defrecord AeronPeerConnection [channel stream-id acker-id peer-task-id])
+(defrecord AeronPeerConnection [channel stream-id peer-task-id])
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
 (defmethod extensions/connection-spec AeronMessenger
-  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/acker-id aeron/peer-task-id] :as peer-site}]
+  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/peer-task-id] :as peer-site}]
   (let [sub-count (:subscriber-count (:messaging-group messenger))
         ;; ensure that each machine spreads their use of a node/peer-group's
         ;; streams evenly over the cluster
         stream-id 1]
-    (->AeronPeerConnection (aeron-channel external-addr port) stream-id acker-id peer-task-id)))
+    (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
   [result-state this-task-id upstream-task-id this-task-name buffer offset length header]
@@ -282,26 +253,34 @@
         @result-state)
       [])))
 
-(defn lookup-channels [messenger id]
-  (-> messenger
-      :virtual-peers
-      deref
-      (pm/peer-channels id)))
+(defn get-publication [channel stream-id]
+  (let [error-handler (reify ErrorHandler
+                        (onError [this x] 
+                          (taoensso.timbre/warn "Aeron messaging publication error:" x)))
+        ctx (-> (Aeron$Context.)
+                (.errorHandler error-handler))
+        conn (Aeron/connect ctx)]
+    (.addPublication conn channel stream-id)))
+
+(defn write [^Publication pub ^UnsafeBuffer buf]
+  ;; Needs an escape mechanism so it can break if a peer is shutdown
+  ;; Needs an idle mechanism to prevent cpu burn
+  (while (neg? (.offer buf 0 (.capacity buf)))))
 
 (defmethod extensions/send-messages AeronMessenger
-  [messenger {:keys [peer-task-id channel] :as conn-spec} batch]
-  (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
+  [messenger {:keys [channel stream-id] :as conn-spec} batch]
+  (let [pub (get-publication conn-spec)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress batch))]
-    (pubm/write pub-man buf 0 (.capacity buf))))
+    (write pub buf)))
 
 (defmethod extensions/send-barrier AeronMessenger
-  [messenger {:keys [peer-task-id channel] :as conn-spec} barrier]
-  (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
+  [messenger {:keys [channel stream-id] :as conn-spec} barrier]
+  (let [pub (get-publication conn-spec)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
-    (pubm/write pub-man buf 0 (.capacity buf))))
+    (write pub buf)))
 
 (defmethod extensions/internal-complete-segment AeronMessenger
-  [messenger completion-id {:keys [peer-task-id channel] :as conn-spec}]
-  (let [pub-man (get-publication (:publication-pool messenger) conn-spec)
-        buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-id))]
-    (pubm/write pub-man buf 0 (.capacity buf))))
+  [messenger completion-message {:keys [peer-task-id channel] :as conn-spec}]
+  (let [pub (get-publication conn-spec)
+        buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-message))]
+    (write pub buf)))
