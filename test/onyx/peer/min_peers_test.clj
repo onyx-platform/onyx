@@ -56,17 +56,12 @@
             workflow [[:in :inc] [:inc :out]]
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
-                        {:lifecycle/task :in
-                         :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                         {:lifecycle/task :out
-                         :lifecycle/calls :onyx.peer.min-peers-test/out-calls}
-                        {:lifecycle/task :out
-                         :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                         :lifecycle/calls :onyx.peer.min-peers-test/out-calls}]
             _ (reset! in-chan (chan (inc n-messages)))
             _ (reset! out-chan (chan (sliding-buffer (inc n-messages))))
             _ (doseq [n (range n-messages)]
                 (>!! @in-chan {:n n}))
-            _ (>!! @in-chan :done)
             _ (close! @in-chan)
             _ (onyx.api/submit-job peer-config
                                    {:catalog catalog
@@ -77,5 +72,4 @@
             results (take-segments! @out-chan)]
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set (butlast results))))
-          (is (= :done (last results))))))))
+          (is (= expected (set results))))))))

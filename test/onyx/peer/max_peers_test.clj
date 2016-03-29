@@ -56,12 +56,8 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.max-peers-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.max-peers-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.max-peers-test/out-calls}]]
 
     (reset! in-chan (chan (inc n-messages)))
     (reset! out-chan (chan (sliding-buffer (inc n-messages))))    
@@ -69,7 +65,7 @@
     (with-test-env [test-env [8 env-config peer-config]]
       (doseq [n (range n-messages)]
           (>!! @in-chan {:n n}))
-      (>!! @in-chan :done)
+      (close! @in-chan)
 
       (onyx.api/submit-job
         peer-config
@@ -80,5 +76,4 @@
 
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results)))))))
+        (is (= expected (set results)))))))

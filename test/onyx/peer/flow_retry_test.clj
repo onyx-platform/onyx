@@ -69,12 +69,8 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls ::in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls ::out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls ::out-calls}]
 
         flow-conditions [{:flow/from :inc
                           :flow/to [:out]
@@ -89,7 +85,6 @@
       (doseq [x (range 20)]
         (>!! @in-chan {:n x}))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (onyx.api/submit-job peer-config

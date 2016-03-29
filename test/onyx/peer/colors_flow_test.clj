@@ -214,24 +214,14 @@
                      :lifecycle/calls :onyx.peer.colors-flow-test/colors-in-calls}
                     {:lifecycle/task :colors-in
                      :lifecycle/calls :onyx.peer.colors-flow-test/retry-calls}
-                    {:lifecycle/task :colors-in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :red-out
                      :lifecycle/calls :onyx.peer.colors-flow-test/red-out-calls}
-                    {:lifecycle/task :red-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :blue-out
                      :lifecycle/calls :onyx.peer.colors-flow-test/blue-out-calls}
-                    {:lifecycle/task :blue-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :green-out
                      :lifecycle/calls :onyx.peer.colors-flow-test/green-out-calls}
-                    {:lifecycle/task :green-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :all-out
-                     :lifecycle/calls :onyx.peer.colors-flow-test/all-out-calls}
-                    {:lifecycle/task :all-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.colors-flow-test/all-out-calls}]]
 
     (reset! colors-in-chan (chan 100))
     (reset! red-out-chan (chan (sliding-buffer 100)))
@@ -250,7 +240,7 @@
                  {:color "cyan" :extra-key "Some extra context for the predicates"}
                  {:color "yellow" :extra-key "Some extra context for the predicates"}]]
         (>!! @colors-in-chan x))
-      (>!! @colors-in-chan :done)
+      (close! @colors-in-chan)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
@@ -263,22 +253,18 @@
             all (take-segments! @all-out-chan)
             red-expectations #{{:color "white"}
                                {:color "red"}
-                               {:color "orange"}
-                               :done}
+                               {:color "orange"}}
             blue-expectations #{{:color "white"}
                                 {:color "blue"}
-                                {:color "orange"}
-                                :done}
+                                {:color "orange"}}
             green-expectations #{{:color "white"}
                                  {:color "green"}
-                                 {:color "orange"}
-                                 :done}
+                                 {:color "orange"}}
             all-expectations #{{:color "blue"}
                                {:color "white"}
                                {:color "orange"}
                                {:color "green"}
-                               {:color "red"}
-                               :done}]
+                               {:color "red"}}]
 
         (is (= green-expectations (into #{} green)))
         (is (= red-expectations (into #{} red)))

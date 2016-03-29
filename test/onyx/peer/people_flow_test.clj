@@ -170,38 +170,25 @@
 
         lifecycles [{:lifecycle/task :people-in
                      :lifecycle/calls :onyx.peer.people-flow-test/people-in-calls}
-                    {:lifecycle/task :people-in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :children-out
                      :lifecycle/calls :onyx.peer.people-flow-test/children-out-calls}
-                    {:lifecycle/task :children-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :adults-out
                      :lifecycle/calls :onyx.peer.people-flow-test/adults-out-calls}
-                    {:lifecycle/task :adults-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :athletes-wa-out
                      :lifecycle/calls :onyx.peer.people-flow-test/athletes-wa-out-calls}
-                    {:lifecycle/task :athletes-wa-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :everyone-out
-                     :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}
-                    {:lifecycle/task :everyone-out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.people-flow-test/everyone-out-calls}]
 
         children-expectatations #{{:age 17 :job "programmer" :location "Washington"}
-                                  {:age 13 :job "student" :location "Maine"}
-                                  :done}
+                                  {:age 13 :job "student" :location "Maine"}}
         adults-expectatations #{{:age 24 :job "athlete" :location "Washington"}
                                 {:age 18 :job "mechanic" :location "Vermont"}
                                 {:age 42 :job "doctor" :location "Florida"}
                                 {:age 64 :job "athlete" :location "Pennsylvania"}
                                 {:age 35 :job "bus driver" :location "Texas"}
                                 {:age 50 :job "lawyer" :location "California"}
-                                {:age 25 :job "psychologist" :location "Washington"}
-                                :done}
-        athletes-wa-expectatations #{{:age 24 :job "athlete" :location "Washington"}
-                                     :done}
+                                {:age 25 :job "psychologist" :location "Washington"}}
+        athletes-wa-expectatations #{{:age 24 :job "athlete" :location "Washington"}}
         everyone-expectatations #{{:age 24 :job "athlete" :location "Washington"}
                                   {:age 17 :job "programmer" :location "Washington"}
                                   {:age 18 :job "mechanic" :location "Vermont"}
@@ -210,8 +197,7 @@
                                   {:age 64 :job "athlete" :location "Pennsylvania"}
                                   {:age 35 :job "bus driver" :location "Texas"}
                                   {:age 50 :job "lawyer" :location "California"}
-                                  {:age 25 :job "psychologist" :location "Washington"}
-                                  :done}]
+                                  {:age 25 :job "psychologist" :location "Washington"}}]
 
     (reset! people-in-chan (chan 100))
     (reset! children-out-chan (chan (sliding-buffer 100)))
@@ -230,7 +216,7 @@
                      {:age 50 :job "lawyer" :location "California"}
                      {:age 25 :job "psychologist" :location "Washington"}]]
             (>!! @people-in-chan x))
-        (>!! @people-in-chan :done)
+        (close! @people-in-chan)
         (onyx.api/submit-job peer-config
                              {:catalog catalog :workflow workflow
                               :flow-conditions flow-conditions
@@ -244,6 +230,4 @@
           (is (= children-expectatations (into #{} children)))
           (is (= adults-expectatations (into #{} adults)))
           (is (= athletes-wa-expectatations (into #{} athletes-wa)))
-          (is (= everyone-expectatations (into #{} everyone)))
-
-          (close! @people-in-chan)))))
+          (is (= everyone-expectatations (into #{} everyone)))))))

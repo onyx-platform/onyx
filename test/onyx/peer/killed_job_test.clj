@@ -100,22 +100,14 @@
           lifecycles-1
           [{:lifecycle/task :in-1
             :lifecycle/calls :onyx.peer.killed-job-test/in-1-calls}
-           {:lifecycle/task :in-1
-            :lifecycle/calls :onyx.plugin.core-async/reader-calls}
            {:lifecycle/task :out-1
-            :lifecycle/calls :onyx.peer.killed-job-test/out-1-calls}
-           {:lifecycle/task :out-1
-            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+            :lifecycle/calls :onyx.peer.killed-job-test/out-1-calls}]
 
           lifecycles-2
           [{:lifecycle/task :in-2
             :lifecycle/calls :onyx.peer.killed-job-test/in-2-calls}
-           {:lifecycle/task :in-2
-            :lifecycle/calls :onyx.plugin.core-async/reader-calls}
            {:lifecycle/task :out-2
-            :lifecycle/calls :onyx.peer.killed-job-test/out-2-calls}
-           {:lifecycle/task :out-2
-            :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+            :lifecycle/calls :onyx.peer.killed-job-test/out-2-calls}]]
 
       (reset! in-chan-1 (chan (inc n-messages)))
       (reset! in-chan-2 (chan (inc n-messages)))
@@ -125,7 +117,9 @@
       ;; Don't write any segments to j1 so that the job will stay alive until we kill it.
       (doseq [n (range n-messages)]
         (>!! @in-chan-2 {:n n}))
-      (>!! @in-chan-2 :done)
+
+      (close! @in-chan-1)
+      (close! @in-chan-2)
 
     (with-test-env [test-env [3 env-config peer-config]]
       (let [j1 (:job-id (onyx.api/submit-job
@@ -150,5 +144,4 @@
               (recur new-replica))))
 
         (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set (butlast results))))
-          (is (= :done (last results))))))))))
+          (is (= expected (set results))))))))))

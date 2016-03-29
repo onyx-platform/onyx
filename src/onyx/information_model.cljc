@@ -996,13 +996,6 @@ may be added by the user as the context is associated to throughout the task pip
              :default nil
              :added "0.8.0"}
 
-            :onyx.messaging/allow-short-circuit?
-            {:doc "A boolean denoting whether to allow virtual peers to short circuit networked messaging when colocated with the other virtual peer. Short circuiting allows for direct transfer of messages to a virtual peer's internal buffers, which improves performance where possible. This configuration option is primarily for use in performance testing, as peers will not generally be able to short circuit messaging after scaling to many nodes."
-             :optional? true
-             :type :boolean
-             :default true
-             :added "0.8.0"}
-
             :onyx.messaging.aeron/embedded-driver?
             {:doc "A boolean denoting whether an Aeron media driver should be started up with the environment. See [Aeron Media Driver](../../src/onyx/messaging/aeron_media_driver.clj) for an example for how to start the media driver externally."
              :optional? true
@@ -1377,7 +1370,6 @@ may be added by the user as the context is associated to throughout the task pip
     :onyx.messaging/ack-daemon-clear-interval :onyx.messaging/decompress-fn
     :onyx.messaging/compress-fn :onyx.messaging/impl :onyx.messaging/bind-addr
     :onyx.messaging/external-addr :onyx.messaging/peer-port
-    :onyx.messaging/allow-short-circuit?
     :onyx.messaging.aeron/embedded-driver?
     :onyx.messaging.aeron/embedded-media-driver-threading
     :onyx.messaging.aeron/subscriber-count

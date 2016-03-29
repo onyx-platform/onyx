@@ -180,28 +180,16 @@
 
         lifecycles [{:lifecycle/task :A
                      :lifecycle/calls :onyx.peer.dag-test/a-calls}
-                    {:lifecycle/task :A
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :B
                      :lifecycle/calls :onyx.peer.dag-test/b-calls}
-                    {:lifecycle/task :B
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :C
                      :lifecycle/calls :onyx.peer.dag-test/c-calls}
-                    {:lifecycle/task :C
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :J
                      :lifecycle/calls :onyx.peer.dag-test/j-calls}
-                    {:lifecycle/task :J
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :K
                      :lifecycle/calls :onyx.peer.dag-test/k-calls}
-                    {:lifecycle/task :K
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :L
-                     :lifecycle/calls :onyx.peer.dag-test/l-calls}
-                    {:lifecycle/task :L
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]]
+                     :lifecycle/calls :onyx.peer.dag-test/l-calls}]]
 
     (reset! a-chan (chan (inc n-messages)))
     (reset! b-chan (chan (inc n-messages)))
@@ -221,9 +209,9 @@
       (doseq [x c-segments]
         (>!! @c-chan x))
 
-      (>!! @a-chan :done)
-      (>!! @b-chan :done)
-      (>!! @c-chan :done)
+      (close! @a-chan)
+      (close! @b-chan)
+      (close! @c-chan)
 
       (onyx.api/submit-job peer-config
                            {:catalog catalog :workflow workflow
@@ -233,15 +221,12 @@
       (let [j-results (take-segments! @j-chan)
             k-results (take-segments! @k-chan)
             l-results (take-segments! @l-chan)]
-        (is (= :done (last j-results)))
-        (is (= :done (last k-results)))
-        (is (= :done (last l-results)))
 
         (is (= (into #{} (concat a-segments b-segments))
-               (into #{} (butlast j-results))))
+               (into #{} j-results)))
 
         (is (= (into #{} (concat a-segments b-segments))
-               (into #{} (butlast k-results))))
+               (into #{} k-results)))
 
         (is (= (into #{} (concat a-segments b-segments c-segments))
-               (into #{} (butlast l-results))))))))
+               (into #{} l-results)))))))

@@ -74,12 +74,8 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.flow-exception-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.flow-exception-test/out-calls}]
 
         flow-conditions [{:flow/from :inc
                           :flow/to [:out]
@@ -102,7 +98,6 @@
       (doseq [x (range 20)]
         (>!! @in-chan {:n x}))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (onyx.api/submit-job peer-config
@@ -130,6 +125,5 @@
                  {:error? true :value 16}
                  {:n 17}
                  {:error? true :value 18}
-                 {:n 19}
-                 :done}
+                 {:n 19}}
                (into #{} results)))))))

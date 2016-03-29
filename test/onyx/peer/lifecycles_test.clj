@@ -97,15 +97,11 @@
         workflow [[:in :inc] [:inc :out]]
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.lifecycles-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :inc
                      :lifecycle/calls :onyx.peer.lifecycles-test/calls
                      :lifecycle/doc "Test lifecycles that increment a counter in an atom"}
                     {:lifecycle/task :out
                      :lifecycle/calls :onyx.peer.lifecycles-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}
                     {:lifecycle/task :all
                      :lifecycle/calls :onyx.peer.lifecycles-test/all-calls}]]
 
@@ -122,13 +118,11 @@
       (doseq [n (range n-messages)]
         (>!! @in-chan {:n n}))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (let [results (take-segments! @out-chan)
             expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-        (is (= expected (set (butlast results))))
-        (is (= :done (last results)))))
+        (is (= expected (set results)))))
 
     ;; after shutdown-peer ensure peers are fully shutdown so that
     ;; :task-after will have been set

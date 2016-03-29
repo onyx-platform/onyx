@@ -80,14 +80,10 @@
 
         lifecycles [{:lifecycle/task :in
                      :lifecycle/calls :onyx.peer.fn-grouping-test/in-calls}
-                    {:lifecycle/task :in
-                     :lifecycle/calls :onyx.plugin.core-async/reader-calls}
                     {:lifecycle/task :sum-balance
                      :lifecycle/calls :onyx.peer.fn-grouping-test/sum-calls}
                     {:lifecycle/task :out
-                     :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}
-                    {:lifecycle/task :out
-                     :lifecycle/calls :onyx.plugin.core-async/writer-calls}]
+                     :lifecycle/calls :onyx.peer.fn-grouping-test/out-calls}]
 
         size 3000
         data (concat
@@ -144,7 +140,6 @@
       (doseq [x data]
         (>!! @in-chan x))
 
-      (>!! @in-chan :done)
       (close! @in-chan)
 
       (onyx.api/submit-job
@@ -154,7 +149,7 @@
          :task-scheduler :onyx.task-scheduler/balanced})
 
       (let [results (take-segments! @out-chan)]
-        (is (= [:done] results))))
+        (is (= [] results))))
 
     ;; Once peers are shutdown:
     (let [out-val @output] 
