@@ -31,7 +31,7 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as mc])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.agrona ErrorHandler]
@@ -60,6 +60,14 @@
                                                 100
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
+
+;; Available image handler could be used to setup a lookup for which streamId matches which sourceIdentity i.e. host
+;; Once we know what host it corresponds to, then we should be able to lookup the full peer id via the short peer id + the source identity
+(def log-available-image-handler 
+  (reify AvailableImageHandler
+    (onAvailableImage [this image]
+      (let [subscription (.subscription image)] 
+        (info "Available image on:" (.channel subscription) (.streamId subscription) (.sessionId image) (.sourceIdentity image)))))) 
 
 (defn start-subscribers!
   [ingress-task-ids conn bind-addr port stream-id idle-strategy task-type]
@@ -390,7 +398,8 @@
     (try
       (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
-            ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
+            ctx (.availableImageHandler (.errorHandler (Aeron$Context.) no-op-error-handler)
+                                        log-available-image-handler)
             aeron-conn (Aeron/connect ctx)
 
             log-prefix (logger/log-prefix task-information)
