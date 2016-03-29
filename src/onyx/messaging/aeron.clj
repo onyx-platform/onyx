@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.aeron
   (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
+            [clojure.set :refer [subset?]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
@@ -216,11 +217,13 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id acker-id peer-task-id)))
 
 (defn handle-message
-  [result-state this-task-id upstream-task-id buffer offset length header]
+  [result-state this-task-id upstream-task-id this-task-name buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
-    (cond (and (record? res) (= this-task-id (:dst-task res)))
+    (cond (and (record? res)
+               (= this-task-id (:dst-task res))
+               (= upstream-task-id  (:src-task res)))
           (do (swap! result-state conj (map->Barrier (into {} res)))
               ControlledFragmentHandler$Action/BREAK)
 
@@ -248,17 +251,36 @@
 (defn rotate [xs]
   (conj (into [] (rest xs)) (first xs)))
 
+(defn remove-blocked-consumers
+  "Implements barrier alignment"
+  [replica job-id barrier-state subscription-maps]
+  ;; There should be at most one barrier that we're tracking
+  ;; since we are aligning.
+  (assert (<= (count (keys barrier-state)) 1) (str "Was: " barrier-state))
+  (remove
+   (fn [{:keys [upstream-task]}]
+     (subset? (into #{} (get-in replica [:allocations job-id upstream-task]))
+              (into #{} (:peers (get barrier-state (first (keys barrier-state)))))))
+   subscription-maps))
+
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
+                     onyx.core/replica onyx.core/job-id
+                     onyx.core/barrier-state
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
-  (let [next-subscription (first (swap! subscription-maps rotate))
-        subscription (:subscription next-subscription)
-        result-state (atom [])
-        fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
-                                           (:upstream-task next-subscription)))
-        n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh 10)]
-    @result-state))
+  (let [rotated-subscriptions (swap! subscription-maps rotate)
+        removed-subscriptions (remove-blocked-consumers @replica job-id @barrier-state rotated-subscriptions)
+        next-subscription (first removed-subscriptions)]
+    (if next-subscription
+      (let [subscription (:subscription next-subscription)
+            result-state (atom [])
+            fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
+                                               (:upstream-task next-subscription)
+                                               (:onyx.core/task event)))
+            n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh 10)]
+        @result-state)
+      [])))
 
 (defn lookup-channels [messenger id]
   (-> messenger

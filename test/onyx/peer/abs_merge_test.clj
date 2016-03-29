@@ -95,6 +95,5 @@
                                     :lifecycles lifecycles
                                     :task-scheduler :onyx.task-scheduler/balanced})
             results (take-segments! @out-chan)]
-
         (let [expected (set (map (fn [x] {:n (inc x)}) (range (* 2 n-messages))))]
           (is (= expected (set (butlast results)))))))))
