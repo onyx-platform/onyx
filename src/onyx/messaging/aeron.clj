@@ -8,8 +8,11 @@
             [onyx.types :refer [->MonitorEventBytes map->Barrier]]
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
-            [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription]
+            [onyx.static.default-vals :refer [defaults arg-or-default]]
+            [onyx.messaging.common :as mc])
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication
+            Subscription FragmentAssembler AvailableImageHandler]
+           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]
            [uk.co.real_logic.agrona ErrorHandler]
@@ -17,6 +20,13 @@
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
+
+(defn aeron-channel [addr port]
+  (format "udp://%s:%s" addr port))
+
+(def no-op-error-handler
+  (reify ErrorHandler
+    (onError [this x] (taoensso.timbre/warn x))))
 
 (defn backoff-strategy [strategy]
   (case strategy
@@ -30,6 +40,47 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
+(defn stream-observer-handler [barrier-watermarks buffer offset length header]
+  (let [ba (byte-array length)
+        _ (.getBytes buffer offset ba)
+        res (messaging-decompress ba)]
+    (when (record? res)
+      (let [barrier (map->Barrier (into {} res))]
+        (swap! barrier-watermarks
+               (fn [watermarks]
+                 (assoc-in watermarks [(:from-peer-id barrier) (:barrier-id barrier)] #{})))))))
+
+(defn observer-fragment-data-handler [f]
+  (FragmentAssembler.
+   (reify FragmentHandler
+     (onFragment [this buffer offset length header]
+       (f buffer offset length header)))))
+
+(defn observer-consumer [handler ^IdleStrategy idle-strategy limit]
+  (reify Consumer
+    (accept [this subscription]
+      (while (not (Thread/interrupted))
+        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
+          (.idle idle-strategy fragments-read))))))
+
+(defn start-stream-observer!
+  [conn bind-addr port stream-id idle-strategy barrier-watermarks]
+  (let [channel (aeron-channel bind-addr port)
+        subscription (.addSubscription conn channel stream-id)
+        handler (observer-fragment-data-handler
+                 (fn [buffer offset length header]
+                   (stream-observer-handler barrier-watermarks buffer offset length header)))
+        subscription-fut (future (try (.accept ^Consumer (observer-consumer handler idle-strategy 10) subscription)
+                                    (catch Throwable e (fatal e))))]
+    {:subscription subscription
+     :subscription-fut subscription-fut}))
+
+(def log-available-image-handler 
+  (reify AvailableImageHandler
+    (onAvailableImage [this image]
+      (let [subscription (.subscription image)] 
+        (info "Available image on:" (.channel subscription) (.streamId subscription) (.sessionId image) (.sourceIdentity image))))))
+
 (defrecord AeronMessenger
   [peer-group messaging-group publication-group publications
    send-idle-strategy compress-f monitoring short-ids acking-ch]
@@ -42,12 +93,26 @@
           publications (atom {})
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
-          short-ids (atom {})]
+          short-ids (atom {})
+          message-counter (atom {})
+          barrier-watermarks (atom {})
+          bind-addr (mc/bind-addr config)
+          port (:onyx.messaging/peer-port config)
+          stream-id 1
+          idle-strategy (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy config))
+          ;; ctx (.availableImageHandler (.errorHandler (Aeron$Context.) no-op-error-handler)
+          ;;                               log-available-image-handler)
+;          aeron-conn (Aeron/connect ctx)
+;          stream-observer (start-stream-observer! aeron-conn bind-addr port stream-id idle-strategy barrier-watermarks)
+          ]
       (assoc component
              :messaging-group messaging-group
              :short-ids short-ids
+             :message-counter message-counter
+             :barrier-watermarks barrier-watermarks
              :send-idle-strategy send-idle-strategy
              :publications publications
+;             :stream-observer stream-observer
              :compress-f compress-f)))
 
   (stop [{:keys [short-ids publications] :as component}]
@@ -58,6 +123,8 @@
            :send-idle-strategy nil
            :publications nil
            :short-ids nil
+           :message-counter nil
+           :barrier-watermarks nil
            :compress-f nil)))
 
 (defmethod extensions/register-task-peer AeronMessenger
@@ -190,14 +257,16 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state this-task-id upstream-task-id this-task-name buffer offset length header]
+  [result-state this-task-id upstream-task-id local-msg-counts
+   readable-range buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
     (cond (and (record? res)
                (= this-task-id (:dst-task res))
                (= upstream-task-id  (:src-task res)))
-          (do (swap! result-state conj (map->Barrier (into {} res)))
+          (do (swap! local-msg-counts (fn [mcs] (update-in mcs [(:from-peer-id res)] (constantly 0))))
+              (swap! result-state conj (map->Barrier (into {} res)))
               ControlledFragmentHandler$Action/BREAK)
 
           (and (record? res) (not= this-task-id (:dst-task res)))
@@ -207,7 +276,10 @@
           (do (doseq [m res]
                 (when (and (= (:dst-task m) this-task-id)
                            (= (:src-task m) upstream-task-id))
-                  (swap! result-state conj m)))
+                  (when (instance? onyx.types.Leaf m)
+                    (swap! local-msg-counts (fn [mcs] (update-in mcs [(:from-peer-id m)] (fnil inc 0)))))
+                  (when (some #{(get-in @local-msg-counts [(:from-peer-id m)])} readable-range)
+                    (swap! result-state conj m))))
               ControlledFragmentHandler$Action/CONTINUE)
 
           (:barrier-id res)
@@ -238,6 +310,31 @@
 
 (def fragment-limit 10)
 
+(defn take-subscriber-ticket! [global-message-counter barrier-watermarks peer n-ahead]
+  (swap!
+   global-message-counter
+   (fn [mc]
+     (let [lower-bound (:current-offset (get mc peer))
+           sorted-barriers (sort (keys (get barrier-watermarks peer)))
+           watermark (dec (first (drop-while (fn [b] (>= lower-bound b)) sorted-barriers)))]
+       (if watermark
+         (let [upper-bound (min (+ lower-bound n-ahead) watermark)]
+           (-> mc
+               (assoc-in [peer :current-offset] upper-bound)
+               (assoc-in [peer :last-ticket] [lower-bound upper-bound])))
+         (let [upper-bound (+ lower-bound n-ahead)]
+           (-> mc
+               (assoc-in [peer :current-offset] upper-bound)
+               (assoc-in [peer :last-ticket] [lower-bound upper-bound]))))))))
+
+(comment
+  (take-subscriber-ticket!
+   (atom {:p0 {:current-offset 6
+               :last-ticket []}})
+   {:p0 {15  #{}}}
+   :p0
+   3))
+
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
@@ -250,9 +347,12 @@
     (if next-subscription
       (let [subscription (:subscription next-subscription)
             result-state (atom [])
+;;            readable-range (take-subscriber-ticket! )
+            readable-range nil
             fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
                                                (:upstream-task next-subscription)
-                                               (:onyx.core/task event)))
+                                               (:onyx.core/msg-counts event)
+                                               readable-range))
             n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
         @result-state)
       [])))

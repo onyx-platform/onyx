@@ -21,7 +21,8 @@
           (run! (fn [[[route hash-group] segs]]
                   (let [segs (map #(assoc %
                                           :dst-task (get (:egress-ids serialized-task) route)
-                                          :src-task (:onyx.core/task-id event))
+                                          :src-task (:onyx.core/task-id event)
+                                          :from-peer-id (:onyx.core/id event))
                                   segs)]
                     (when-let [pick-peer-fn (get pick-peer-fns (get (:egress-ids serialized-task) route))]
                       (when-let [target (pick-peer-fn hash-group)]
