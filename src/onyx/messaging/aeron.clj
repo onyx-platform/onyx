@@ -1,6 +1,5 @@
 (ns ^:no-doc onyx.messaging.aeron
-  (:require [clojure.core.async :refer [chan >!! <!! alts!! timeout close! sliding-buffer]]
-            [clojure.set :refer [subset?]]
+  (:require [clojure.set :refer [subset?]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
