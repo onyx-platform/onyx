@@ -40,7 +40,7 @@
     (taoensso.timbre/info "Starting Aeron Messenger")
     (let [config (:config peer-group)
           messaging-group (:messaging-group peer-group)
-          publications (:publications messaging-group)
+          publications (atom {})
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
           short-ids (atom {})]
@@ -48,13 +48,16 @@
              :messaging-group messaging-group
              :short-ids short-ids
              :send-idle-strategy send-idle-strategy
+             :publications publications
              :compress-f compress-f)))
 
-  (stop [{:keys [short-ids] :as component}]
+  (stop [{:keys [short-ids publications] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
+    (run! #(.close %) (vals @publications))
     (assoc component
            :messaging-group nil
            :send-idle-strategy nil
+           :publications nil
            :short-ids nil
            :compress-f nil)))
 
@@ -234,6 +237,8 @@
               (into #{} (:peers (get barrier-state (first (keys barrier-state)))))))
    subscription-maps))
 
+(def fragment-limit 10)
+
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
@@ -249,38 +254,43 @@
             fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
                                                (:upstream-task next-subscription)
                                                (:onyx.core/task event)))
-            n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh 10)]
+            n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
         @result-state)
       [])))
 
-(defn get-publication [channel stream-id]
-  (let [error-handler (reify ErrorHandler
-                        (onError [this x] 
-                          (taoensso.timbre/warn "Aeron messaging publication error:" x)))
-        ctx (-> (Aeron$Context.)
-                (.errorHandler error-handler))
-        conn (Aeron/connect ctx)]
-    (.addPublication conn channel stream-id)))
+(defn get-publication [publications channel stream-id]
+  (if-let [pub (get @publications [channel stream-id])]
+    pub
+    (let [error-handler (reify ErrorHandler
+                          (onError [this x] 
+                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
+          ctx (-> (Aeron$Context.)
+                  (.errorHandler error-handler))
+          conn (Aeron/connect ctx)
+          pub (.addPublication conn channel stream-id)]
+      (swap! publications assoc [channel stream-id] pub)
+      pub)))
 
 (defn write [^Publication pub ^UnsafeBuffer buf]
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
-  (while (neg? (.offer pub buf 0 (.capacity buf)))))
+  (while (neg? (.offer pub buf 0 (.capacity buf)))
+    (info "Offering")))
 
 (defmethod extensions/send-messages AeronMessenger
-  [messenger {:keys [channel stream-id] :as conn-spec} batch]
-  (let [pub (get-publication channel stream-id)
+  [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]
+  (let [pub (get-publication publications channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress batch))]
     (write pub buf)))
 
 (defmethod extensions/send-barrier AeronMessenger
-  [messenger {:keys [channel stream-id] :as conn-spec} barrier]
-  (let [pub (get-publication channel stream-id)
+  [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} barrier]
+  (let [pub (get-publication publications channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
     (write pub buf)))
 
 (defmethod extensions/internal-complete-segment AeronMessenger
-  [messenger completion-message {:keys [channel stream-id] :as conn-spec}]
-  (let [pub (get-publication channel stream-id)
+  [{:keys [publications]} completion-message {:keys [channel stream-id] :as conn-spec}]
+  (let [pub (get-publication publications channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-message))]
     (write pub buf)))
