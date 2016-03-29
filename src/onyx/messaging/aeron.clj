@@ -53,8 +53,8 @@
   (stop [{:keys [short-ids] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
     (assoc component
+           :messaging-group nil
            :send-idle-strategy nil
-           :short-circuitable? nil
            :short-ids nil
            :compress-f nil)))
 
