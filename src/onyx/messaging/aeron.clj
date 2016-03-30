@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.aeron
   (:require [clojure.set :refer [subset?]]
+            [onyx.messaging.common :as mc]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
@@ -9,7 +10,8 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription]
+  (:import [uk.co.real_logic.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription FragmentAssembler]
+           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
            [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
            [uk.co.real_logic.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]
            [uk.co.real_logic.agrona ErrorHandler]
@@ -17,6 +19,13 @@
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
+
+(defn aeron-channel [addr port]
+  (format "udp://%s:%s" addr port))
+
+(def no-op-error-handler
+  (reify ErrorHandler
+    (onError [this x] (taoensso.timbre/warn x))))
 
 (defn backoff-strategy [strategy]
   (case strategy
@@ -30,6 +39,37 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
+(defn global-stream-observer-handler [buffer offset length header]
+  (let [ba (byte-array length)
+        _ (.getBytes buffer offset ba)
+        res (messaging-decompress ba)]
+;;    (info res)
+    ))
+
+(defn global-fragment-data-handler [f]
+  (FragmentAssembler.
+   (reify FragmentHandler
+     (onFragment [this buffer offset length header]
+       (f buffer offset length header)))))
+
+(defn global-consumer [handler ^IdleStrategy idle-strategy limit]
+  (reify Consumer
+    (accept [this subscription]
+      (while (not (Thread/interrupted))
+        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
+          (.idle idle-strategy fragments-read))))))
+
+(defn start-global-stream-observer! [conn bind-addr port stream-id idle-strategy]
+  (let [channel (aeron-channel bind-addr port)
+        subscription (.addSubscription conn channel stream-id)
+        handler (global-fragment-data-handler
+                 (fn [buffer offset length header]
+                   (global-stream-observer-handler buffer offset length header)))
+        subscription-fut (future (try (.accept ^Consumer (global-consumer handler idle-strategy 10) subscription)
+                                    (catch Throwable e (fatal e))))]
+    {:subscription subscription
+     :subscription-fut subscription-fut}))
+
 (defrecord AeronMessenger
   [peer-group messaging-group publication-group publications
    send-idle-strategy compress-f monitoring short-ids acking-ch]
@@ -42,17 +82,32 @@
           publications (atom {})
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
+          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
+          aeron-conn (Aeron/connect ctx)
+          global-stream-observer (start-global-stream-observer!
+                                  aeron-conn
+                                  (mc/bind-addr (:config peer-group))
+                                  (:onyx.messaging/peer-port (:config peer-group))
+                                  1
+                                  (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy (:config peer-group))))
+          aeron-conn aeron-conn
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
              :short-ids short-ids
              :send-idle-strategy send-idle-strategy
              :publications publications
-             :compress-f compress-f)))
+             :compress-f compress-f
+             :aeron-conn aeron-conn
+             :global-stream-observer global-stream-observer)))
 
   (stop [{:keys [short-ids publications] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
     (run! #(.close %) (vals @publications))
+    (future-cancel (:subscription-fut (:global-stream-observer component)))
+    (.close ^Subscription (:subscription (:global-stream-observer component)))
+    (.close ^Aeron (:aeron-conn component))
+
     (assoc component
            :messaging-group nil
            :send-idle-strategy nil
@@ -190,30 +245,22 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state this-task-id upstream-task-id this-task-name buffer offset length header]
+  [result-state upstream-peer-id this-task-name buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
-    (cond (and (record? res)
-               (= this-task-id (:dst-task res))
-               (= upstream-task-id  (:src-task res)))
-          (do (swap! result-state conj (map->Barrier (into {} res)))
+    (cond (and (instance? onyx.types.Barrier res)
+               (= (:from-peer-id res) upstream-peer-id))
+          (do (swap! result-state conj res)
               ControlledFragmentHandler$Action/BREAK)
 
-          (and (record? res) (not= this-task-id (:dst-task res)))
-          ControlledFragmentHandler$Action/CONTINUE
-
-          (coll? res)
-          (do (doseq [m res]
-                (when (and (= (:dst-task m) this-task-id)
-                           (= (:src-task m) upstream-task-id))
-                  (swap! result-state conj m)))
+          (and (instance? onyx.types.Leaf res)
+               (= (:from-peer-id res) upstream-peer-id))
+          (do (swap! result-state conj res)
               ControlledFragmentHandler$Action/CONTINUE)
 
-          (:barrier-id res)
-          (comment "pass")
-
-          :else (throw (ex-info "Not sure what happened" {})))))
+          :else
+          ControlledFragmentHandler$Action/CONTINUE)))
 
 (defn fragment-data-handler [f]
   (ControlledFragmentAssembler.
@@ -231,9 +278,8 @@
   ;; since we are aligning.
   (assert (<= (count (keys barrier-state)) 1) (str "Was: " barrier-state))
   (remove
-   (fn [{:keys [upstream-task]}]
-     (subset? (into #{} (get-in replica [:allocations job-id upstream-task]))
-              (into #{} (:peers (get barrier-state (first (keys barrier-state)))))))
+   (fn [{:keys [upstream-peer-id]}]
+     (some #{upstream-peer-id} (:peers (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
 
 (def fragment-limit 10)
@@ -250,9 +296,7 @@
     (if next-subscription
       (let [subscription (:subscription next-subscription)
             result-state (atom [])
-            fh (fragment-data-handler (partial handle-message result-state (:onyx.core/task-id event)
-                                               (:upstream-task next-subscription)
-                                               (:onyx.core/task event)))
+            fh (fragment-data-handler (partial handle-message result-state (:upstream-peer-id next-subscription) (:onyx.core/task event)))
             n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
         @result-state)
       [])))
@@ -274,13 +318,15 @@
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
   (while (neg? (.offer pub buf 0 (.capacity buf)))
-    (info "Re-offering message, session-id" (.sessionId pub))))
+;;    (info "Re-offering message, session-id" (.sessionId pub))
+    ))
 
 (defmethod extensions/send-messages AeronMessenger
   [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]
-  (let [pub (get-publication publications channel stream-id)
-        buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress batch))]
-    (write pub buf)))
+  (let [pub (get-publication publications channel stream-id)]
+    (doseq [b batch]
+      (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress b))]
+        (write pub buf)))))
 
 (defmethod extensions/send-barrier AeronMessenger
   [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} barrier]

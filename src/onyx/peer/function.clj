@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
             [onyx.static.planning :refer [find-task]]
             [onyx.peer.operation :as operation]
-            [onyx.peer.barrier :refer [emit-barrier?]]
+            [onyx.peer.barrier :refer [emit-barrier? ack-barrier?]]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.plugin.onyx-input :as oi]
@@ -66,7 +66,7 @@
            onyx.core/barrier]
     :as event}]
   (when (= (:onyx/type (:onyx.core/task-map event)) :output)
-    (when (emit-barrier? @replica compiled @barrier-state job-id task-id (:barrier-id barrier) event)
+    (when (ack-barrier? @replica compiled @barrier-state job-id task-id (:barrier-id barrier) event)
       (doseq [p (:origin-peers barrier)]
         (when-let [site (peer-site peer-replica-view p)]
           (onyx.extensions/internal-complete-segment (:onyx.core/messenger event)
