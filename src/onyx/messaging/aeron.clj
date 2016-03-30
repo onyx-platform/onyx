@@ -39,12 +39,20 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
-(defn global-stream-observer-handler [buffer offset length header]
+(defn global-stream-observer-handler [global-watermarks buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
-        res (messaging-decompress ba)]
-;;    (info res)
-    ))
+        res (messaging-decompress ba)
+        src-peer (:from-peer-id res)
+        barrier? (instance? onyx.types.Barrier res)]
+    (swap!
+     global-watermarks
+     (fn [gw]
+       (let [hw (inc (get-in gw [src-peer :high-water-mark] -1))
+             gw* (assoc-in gw [src-peer :high-water-mark] hw)]
+         (if barrier?
+           (assoc-in gw* [src-peer :barriers hw] #{})
+           gw*))))))
 
 (defn global-fragment-data-handler [f]
   (FragmentAssembler.
@@ -59,12 +67,12 @@
         (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
-(defn start-global-stream-observer! [conn bind-addr port stream-id idle-strategy]
+(defn start-global-stream-observer! [conn bind-addr port stream-id idle-strategy global-watermarks]
   (let [channel (aeron-channel bind-addr port)
         subscription (.addSubscription conn channel stream-id)
         handler (global-fragment-data-handler
                  (fn [buffer offset length header]
-                   (global-stream-observer-handler buffer offset length header)))
+                   (global-stream-observer-handler global-watermarks buffer offset length header)))
         subscription-fut (future (try (.accept ^Consumer (global-consumer handler idle-strategy 10) subscription)
                                     (catch Throwable e (fatal e))))]
     {:subscription subscription
@@ -82,31 +90,17 @@
           publications (atom {})
           send-idle-strategy (:send-idle-strategy messaging-group)
           compress-f (:compress-f (:messaging-group peer-group))
-          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-          aeron-conn (Aeron/connect ctx)
-          global-stream-observer (start-global-stream-observer!
-                                  aeron-conn
-                                  (mc/bind-addr (:config peer-group))
-                                  (:onyx.messaging/peer-port (:config peer-group))
-                                  1
-                                  (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy (:config peer-group))))
-          aeron-conn aeron-conn
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
              :short-ids short-ids
              :send-idle-strategy send-idle-strategy
              :publications publications
-             :compress-f compress-f
-             :aeron-conn aeron-conn
-             :global-stream-observer global-stream-observer)))
+             :compress-f compress-f)))
 
   (stop [{:keys [short-ids publications] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
     (run! #(.close %) (vals @publications))
-    (future-cancel (:subscription-fut (:global-stream-observer component)))
-    (.close ^Subscription (:subscription (:global-stream-observer component)))
-    (.close ^Aeron (:aeron-conn component))
 
     (assoc component
            :messaging-group nil
@@ -159,7 +153,17 @@
           send-idle-strategy (backoff-strategy poll-idle-strategy-config)
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
           compress-f (or (:onyx.messaging/compress-fn opts) messaging-compress)
-          decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)]
+          decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
+          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
+          aeron-conn (Aeron/connect ctx)
+          global-watermarks (atom {})
+          global-stream-observer (start-global-stream-observer!
+                                  aeron-conn
+                                  bind-addr
+                                  port
+                                  1
+                                  receive-idle-strategy
+                                  global-watermarks)]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
                           (Thread. (fn [] 
@@ -172,10 +176,18 @@
              :compress-f compress-f
              :decompress-f decompress-f
              :port port
-             :send-idle-strategy send-idle-strategy)))
+             :send-idle-strategy send-idle-strategy
+             :aeron-conn aeron-conn
+             :global-stream-observer global-stream-observer
+             :global-watermarks global-watermarks)))
 
   (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
+
+    (future-cancel (:subscription-fut (:global-stream-observer component)))
+    (.close ^Subscription (:subscription (:global-stream-observer component)))
+    (.close ^Aeron (:aeron-conn component))
+
 
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
@@ -245,24 +257,34 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state upstream-peer-id this-task-name buffer offset length header]
+  [result-state upstream-peer-id message-counter [low high :as ticket] buffer offset length header]
+  (info ticket)
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
-    (cond (and (instance? onyx.types.Barrier res)
-               (= (:from-peer-id res) upstream-peer-id))
-          (do (swap! result-state conj res)
-              ControlledFragmentHandler$Action/BREAK)
+    (if (= (:from-peer-id res) upstream-peer-id)
+      (let [this-msg-index (get @message-counter upstream-peer-id 0)
+            action
+            (cond (< this-msg-index low)
+                  ControlledFragmentHandler$Action/CONTINUE
 
-          (and (instance? onyx.types.Leaf res)
-               (= (:from-peer-id res) upstream-peer-id))
-          (do (swap! result-state conj res)
-              ControlledFragmentHandler$Action/CONTINUE)
+                  (> this-msg-index high)
+                  ControlledFragmentHandler$Action/BREAK
 
-          :else
-          ControlledFragmentHandler$Action/CONTINUE)))
+                  (instance? onyx.types.Barrier res)
+                  (do (swap! result-state conj (assoc res :msg-id this-msg-index))
+                      ControlledFragmentHandler$Action/BREAK)
 
-(defn fragment-data-handler [f]
+                  (instance? onyx.types.Leaf res)
+                  (do (swap! result-state conj res)
+                      ControlledFragmentHandler$Action/CONTINUE)
+
+                  :else (throw (ex-info "Not sure" {})))]
+        (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+        action)
+      ControlledFragmentHandler$Action/CONTINUE)))
+
+(defn controlled-fragment-data-handler [f]
   (ControlledFragmentAssembler.
     (reify ControlledFragmentHandler
       (onFragment [this buffer offset length header]
@@ -284,10 +306,38 @@
 
 (def fragment-limit 10)
 
+(defn unseen-barriers [barriers peer-id]
+  (reduce-kv
+   (fn [result barrier-id peers]
+     (if-not (get peers peer-id)
+       (assoc result barrier-id peers)
+       result))
+   {}
+   barriers))
+
+(defn calculate-ticket [watermarks my-peer-id take-n]
+  (let [low (inc (get-in watermarks [:low-water-mark] -1))
+        barriers (unseen-barriers (get-in watermarks [:barriers]) my-peer-id)
+        high (get-in watermarks [:high-water-mark])
+        nearest-barrier (or (first (sort (keys barriers))) high)]
+    (if high
+      (let [high* (min (+ low take-n) high nearest-barrier)
+            low* (min low high*)]
+        (assert (<= low* high*) (str low* " > " high*))
+        [low* high*])
+      [-1 -1])))
+
+(defn take-ticket [global-watermarks peer-id my-peer-id take-n]
+  (let [ticket (calculate-ticket (get-in global-watermarks [peer-id]) my-peer-id take-n)]
+    (-> global-watermarks
+        (assoc-in [peer-id :ticket] ticket)
+        (assoc-in [peer-id :low-water-mark] (second ticket)))))
+
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
-                     onyx.core/barrier-state
+                     onyx.core/barrier-state onyx.core/message-counter
+                     onyx.core/global-watermarks
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
@@ -296,9 +346,14 @@
     (if next-subscription
       (let [subscription (:subscription next-subscription)
             result-state (atom [])
-            fh (fragment-data-handler (partial handle-message result-state (:upstream-peer-id next-subscription) (:onyx.core/task event)))
-            n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
-        @result-state)
+            ticket (get-in (swap! global-watermarks take-ticket (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
+                           [(:upstream-peer-id next-subscription) :ticket])]
+        (if (not= [-1 -1] ticket)
+          (let [fh (controlled-fragment-data-handler (partial handle-message result-state (:upstream-peer-id next-subscription)
+                                                              message-counter ticket))
+                n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
+            @result-state)
+          []))
       [])))
 
 (defn get-publication [publications channel stream-id]

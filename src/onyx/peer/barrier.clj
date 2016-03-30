@@ -41,4 +41,8 @@
                            (or (get-in barrier-val [(:barrier-id (:onyx.core/barrier event)) :origins])
                                (:origin-peers (:onyx.core/barrier event))))]
           (onyx.extensions/send-barrier messenger site b))))
+    (swap! (:onyx.core/global-watermarks event)
+           update-in
+           [(:from-peer-id (:onyx.core/barrier event)) :barriers]
+           conj (:onyx.core/id event))
     (swap! (:onyx.core/barrier-state event) dissoc (:barrier-id (:onyx.core/barrier event)))))
