@@ -40,6 +40,8 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
+;;;;
+
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
 
@@ -107,8 +109,7 @@
         (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
-(defn start-stream-observer!
-  [conn bind-addr port stream-id idle-strategy event task-id barrier-watermarks]
+(defn start-stream-observer! [conn bind-addr port stream-id idle-strategy event task-id]
   (let [channel (aeron-channel bind-addr port)
         subscription (.addSubscription conn channel stream-id)
         handler (fragment-data-handler
@@ -118,6 +119,8 @@
                                     (catch Throwable e (fatal e))))]
     {:subscription subscription
      :subscription-fut subscription-fut}))
+
+;;;;
 
 (s/defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
@@ -440,7 +443,6 @@
                            :onyx.core/barrier-state (atom {})
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/subscription-maps subscription-maps
-                           :onyx.core/msg-counts (atom {})
                            :onyx.core/aeron-conn aeron-conn
                            :onyx.core/subscriptions subscriptions}
 
@@ -499,8 +501,7 @@
                                                           1
                                                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
                                                           pipeline-data
-                                                          task-id
-                                                          (:barrier-watermarks messenger)))))
+                                                          task-id))))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
