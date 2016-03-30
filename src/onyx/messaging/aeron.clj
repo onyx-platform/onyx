@@ -218,7 +218,7 @@
                         (fn [s]
                           (= (:aeron/external-addr peer-site)
                              (:aeron/external-addr s))))
-                      (mapcat (juxt :aeron/acker-id :aeron/peer-id))
+                      (map :aeron/peer-id)
                       set)
         id (choose-id peer-id used-ids)]
     (when-not id
