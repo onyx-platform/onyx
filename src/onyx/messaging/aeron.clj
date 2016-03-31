@@ -321,11 +321,21 @@
         high (get-in watermarks [:high-water-mark])
         nearest-barrier (or (first (sort (keys barriers))) high)]
     (if high
-      (let [high* (min (+ low take-n) high nearest-barrier)
-            low* (min low high*)]
-        (assert (<= low* high*) (str low* " > " high*))
-        [low* high*])
-      [-1 -1])))
+      (if (<= low high)
+        (let [high* (min (+ low take-n) high nearest-barrier)
+              low* (min low high*)]
+          (assert (<= low* high*) (str low* " > " high*))
+          [low* high*])
+        [-1 -1])
+      [-1 -1]))) 
+
+
+#_(calculate-ticket
+ {:barriers {20 #{}}
+  :high-water-mark 20
+  :low-water-mark 20}
+ :p1
+ 2)
 
 (defn take-ticket [global-watermarks peer-id my-peer-id take-n]
   (let [ticket (calculate-ticket (get-in global-watermarks [peer-id]) my-peer-id take-n)]
@@ -337,7 +347,7 @@
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
                      onyx.core/barrier-state onyx.core/message-counter
-                     onyx.core/global-watermarks onyx.core/ticket-state
+                     onyx.core/global-watermarks
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
@@ -346,36 +356,20 @@
     (if next-subscription
       (let [subscription (:subscription next-subscription)
             result-state (atom [])
-            ts @ticket-state
-            ticket (if (:new-ticket? ts)
-                     (get-in (swap! global-watermarks
-                                    take-ticket
-                                    (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
-                             [(:upstream-peer-id next-subscription) :ticket])
-                     (:current-ticket ts))]
-        (swap! ticket-state assoc :current-ticket ticket)
+            ticket (get-in (swap! global-watermarks
+                                  take-ticket
+                                  (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
+                           [(:upstream-peer-id next-subscription) :ticket])
+            fh (controlled-fragment-data-handler
+                (partial handle-message result-state (:upstream-peer-id next-subscription)
+                         message-counter ticket (:onyx.core/task event)))]
         (if (not= [-1 -1] ticket)
-          (let [fh (controlled-fragment-data-handler (partial handle-message result-state (:upstream-peer-id next-subscription)
-                                                              message-counter ticket (:onyx.core/task event)))
-                n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)
-                result @result-state]
-            (swap!
-             ticket-state
-             (fn [ts]
-               (let [[low high] (:current-ticket ts)
-                     n-to-read (inc (- high low))
-                     partial-reads (< (count result) n-to-read)]
-                 (cond (= low high)
-                       (assoc ts :new-ticket? true)
-
-                       partial-reads
-                       (assoc ts :new-ticket? false :current-ticket [(+ low (count result)) high])
-
-                       :else
-                       (assoc ts :new-ticket? true)))))
-            result)
-          (do (swap! ticket-state assoc :new-ticket? true)
-              [])))
+          (let [expected-messages (inc (- (second ticket) (first ticket)))]
+            (while (< (count @result-state) expected-messages)
+              (info (str (:onyx.core/task event) " -> " ticket))
+              (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit))
+            @result-state)
+          []))
       [])))
 
 (defn get-publication [publications channel stream-id]

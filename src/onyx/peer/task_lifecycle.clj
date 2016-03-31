@@ -448,7 +448,6 @@
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/message-counter (atom {})
                            :onyx.core/global-watermarks (:global-watermarks (:messaging-group messenger))
-                           :onyx.core/ticket-state (atom {:new-ticket? true})
                            :onyx.core/subscription-maps subscription-maps
                            :onyx.core/aeron-conn aeron-conn
                            :onyx.core/subscriptions subscriptions}
