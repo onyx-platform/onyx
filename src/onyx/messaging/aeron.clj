@@ -364,11 +364,8 @@
       (let [{:keys [subscription src-peer-id]} next-subscription
             result-state (atom [])
             take-n 2
-            _ (info "GW Before " @global-watermarks)
             gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)
-            _ (info "GW after " @global-watermarks)
             ticket (get-in gw-val [task-id src-peer-id :ticket])
-            _ (info "Ticket: " ticket)
             fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))]
         (if (= [-1 -1] ticket)
           []
