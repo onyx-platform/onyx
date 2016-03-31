@@ -365,9 +365,14 @@
                (let [[low high] (:current-ticket ts)
                      n-to-read (inc (- high low))
                      partial-reads (< (count result) n-to-read)]
-                 (if partial-reads
-                   (assoc ts :new-ticket? false :current-ticket [(+ low (count result)) high])
-                   (assoc ts :new-ticket? true)))))
+                 (cond (= low high)
+                       (assoc ts :new-ticket? true)
+
+                       partial-reads
+                       (assoc ts :new-ticket? false :current-ticket [(+ low (count result)) high])
+
+                       :else
+                       (assoc ts :new-ticket? true)))))
             result)
           (do (swap! ticket-state assoc :new-ticket? true)
               [])))
