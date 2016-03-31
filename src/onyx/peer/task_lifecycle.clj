@@ -74,12 +74,16 @@
   (if (= task-type :input)
     []
     (map
-     (fn [upstream-peer-id]
+     (fn [result]
        (let [channel (aeron-channel bind-addr port)
              subscription (.addSubscription conn channel stream-id)]
-         {:subscription subscription :upstream-peer-id upstream-peer-id}))
+         (assoc result :subscription subscription)))
      (mapcat
-      #(get-in replica [:allocations job-id %])
+      (fn [task-id]
+        (map
+         (fn [peer-id]
+           {:upstream-peer-id peer-id :task-id task-id})
+         (get-in replica [:allocations job-id task-id])))
       ingress-task-ids))))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
@@ -444,7 +448,6 @@
                            :onyx.core/replica replica
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
-                           :onyx.core/barrier-state (atom {})
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/message-counter (atom {})
                            :onyx.core/global-watermarks (:global-watermarks (:messaging-group messenger))

@@ -295,13 +295,11 @@
 
 (defn remove-blocked-consumers
   "Implements barrier alignment"
-  [replica job-id barrier-state subscription-maps]
-  ;; There should be at most one barrier that we're tracking
-  ;; since we are aligning.
-  (assert (<= (count (keys barrier-state)) 1) (str "Was: " barrier-state))
+  [replica job-id global-watermarks subscription-maps]
   (remove
-   (fn [{:keys [upstream-peer-id]}]
-     (some #{upstream-peer-id} (:peers (get barrier-state (first (keys barrier-state))))))
+   (fn [{:keys [upstream-peer-id task-id]}]
+     (let [barrier-state (get-in global-watermarks [task-id upstream-peer-id :barriers])]
+       (some #{upstream-peer-id} (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
 
 (def fragment-limit 10)
@@ -346,12 +344,11 @@
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
-                     onyx.core/barrier-state onyx.core/message-counter
-                     onyx.core/global-watermarks
+                     onyx.core/message-counter onyx.core/global-watermarks
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-        removed-subscriptions (remove-blocked-consumers @replica job-id @barrier-state rotated-subscriptions)
+        removed-subscriptions (remove-blocked-consumers @replica job-id @global-watermarks rotated-subscriptions)
         next-subscription (first removed-subscriptions)]
     (if next-subscription
       (let [subscription (:subscription next-subscription)

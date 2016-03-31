@@ -533,8 +533,6 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/barrier {:type :record
                                            :optional? true
                                            :doc "Barrier to be emitted to peers downstream"}
-                       :onyx.core/barrier-state {:type :any
-                                                 :doc ""}
                        :onyx.core/n-sent-messages {:type :any
                                                    :doc ""}
                        :onyx.core/global-watermarks {:type :any :doc ""}
@@ -1446,7 +1444,6 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/drained-back-off 
                :onyx.core/messenger-buffer 
                :onyx.core/barrier
-               :onyx.core/barrier-state
                :onyx.core/n-sent-messages
                :onyx.core/subscription-maps]
    :env-config
