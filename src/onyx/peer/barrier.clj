@@ -5,16 +5,13 @@
             [taoensso.timbre :as timbre :refer [debug info]]
             [onyx.types :refer [->Barrier]]))
 
-
-
-
 (defn all-barriers-seen? [job-allocations global-watermarks-val this-task-id this-peer-id ingress-ids barrier]
   (empty? 
    (filter nil? 
            (mapcat (fn [task-id] 
                      (let [upstream-task-peers (get job-allocations task-id)]
                        (map (fn [peer-id]
-                              ;; TODO: should lookup by barrier id, not message id because the message-id won't necessarily be the same for all barriers
+                              ;; TODO: should lookup by barrier id, not message id because the message-id won't necessarily be stable for all barriers
                               (get-in global-watermarks-val [this-task-id peer-id :barriers (:msg-id barrier) this-peer-id]))
                             upstream-task-peers)))
                    ingress-ids))))
