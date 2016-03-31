@@ -292,7 +292,9 @@
         (f buffer offset length header)))))
 
 (defn rotate [xs]
-  (conj (into [] (rest xs)) (first xs)))
+  (if (seq xs)
+    (conj (into [] (rest xs)) (first xs))
+    xs))
 
 (defn remove-blocked-consumers
   "Implements barrier alignment"
