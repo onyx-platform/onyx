@@ -29,7 +29,7 @@
 (defn job-peer-count [replica job]
   (apply + (map count (vals (get-in replica [:allocations job])))))
 
-(defn upstream-peers [replica ingress-ids job-id]
+(defn src-peers [replica ingress-ids job-id]
   (reduce
    (fn [result task-id]
      (into result (get-in replica [:allocations job-id task-id])))

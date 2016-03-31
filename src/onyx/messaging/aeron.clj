@@ -47,17 +47,17 @@
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)
-        src-peer (:from-peer-id res)
-        dst-task (:dst-task res)
+        src-peer (:src-peer-id res)
+        dst-task-id (:dst-task-id res)
         barrier? (instance? onyx.types.Barrier res)]
     (when-not (= :job-completed (:type res))
       (swap!
        global-watermarks
        (fn [gw]
-         (let [hw (inc (get-in gw [dst-task src-peer :high-water-mark] -1))
-               gw* (assoc-in gw [dst-task src-peer :high-water-mark] hw)]
+         (let [hw (inc (get-in gw [dst-task-id src-peer :high-water-mark] -1))
+               gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
            (if barrier?
-             (assoc-in gw* [dst-task src-peer :barriers hw] #{})
+             (assoc-in gw* [dst-task-id src-peer :barriers hw] #{})
              gw*)))))))
 
 (defn global-fragment-data-handler [f]
@@ -263,15 +263,15 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state message-counter task-id upstream-peer-id [low high :as ticket] buffer offset length header]
-  (let [this-msg-index (get @message-counter upstream-peer-id 0)]
+  [result-state message-counter task-id src-peer-id [low high :as ticket] buffer offset length header]
+  (let [this-msg-index (get @message-counter src-peer-id 0)]
     (let [ba (byte-array length)
           _ (.getBytes buffer offset ba)
           res (messaging-decompress ba)]
-      (if (and (= (:from-peer-id res) upstream-peer-id)
-               (= (:dst-task res) task-id))
+      (if (and (= (:src-peer-id res) src-peer-id)
+               (= (:dst-task-id res) task-id))
         (cond (< this-msg-index low)
-              (do (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+              (do (swap! message-counter assoc src-peer-id (inc this-msg-index))
                   ControlledFragmentHandler$Action/CONTINUE)
 
               (> this-msg-index high)
@@ -279,15 +279,20 @@
 
               (instance? onyx.types.Barrier res)
               (do (swap! result-state conj (assoc res :msg-id this-msg-index))
-                  (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                  (swap! message-counter assoc src-peer-id (inc this-msg-index))
                   ControlledFragmentHandler$Action/BREAK)
 
               (instance? onyx.types.Leaf res)
               (do (swap! result-state conj res)
-                  (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                  (swap! message-counter assoc src-peer-id (inc this-msg-index))
                   ControlledFragmentHandler$Action/CONTINUE)
 
-              :else (throw (ex-info "Not sure" {})))
+              :else (throw (ex-info "Not sure" {:low low
+                                                :high high
+                                                :this-task-id task-id
+                                                :src-peer-id src-peer-id
+                                                :this-msg-index this-msg-index
+                                                :res res})))
         ControlledFragmentHandler$Action/CONTINUE))))
 
 (defn controlled-fragment-data-handler [f]
@@ -305,9 +310,9 @@
   "Implements barrier alignment"
   [replica job-id task-id global-watermarks subscription-maps]
   (remove
-   (fn [{:keys [upstream-peer-id]}]
-     (let [barrier-state (get-in global-watermarks [task-id upstream-peer-id :barriers])]
-       (some #{upstream-peer-id} (get barrier-state (first (keys barrier-state))))))
+   (fn [{:keys [src-peer-id]}]
+     (let [barrier-state (get-in global-watermarks [task-id src-peer-id :barriers])]
+       (some #{src-peer-id} (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
 
 (defn unseen-barriers [barriers peer-id]
@@ -337,12 +342,12 @@
  :p1
  2)
 
-(defn take-ticket [global-watermarks task-id upstream-peer-id peer-id take-n]
-  (let [[low high :as ticket] (calculate-ticket (get-in global-watermarks [task-id upstream-peer-id]) peer-id take-n)
-        gw-ticket (assoc-in global-watermarks [task-id upstream-peer-id :ticket] ticket)]
+(defn take-ticket [global-watermarks task-id src-peer-id peer-id take-n]
+  (let [[low high :as ticket] (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)
+        gw-ticket (assoc-in global-watermarks [task-id src-peer-id :ticket] ticket)]
     (if (= high -1)
       gw-ticket
-      (assoc-in gw-ticket [task-id upstream-peer-id :low-water-mark] high))))
+      (assoc-in gw-ticket [task-id src-peer-id :low-water-mark] high))))
 
 (defn task-alive? [event]
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
@@ -356,12 +361,15 @@
         removed-subscriptions (remove-blocked-consumers @replica job-id task-id @global-watermarks rotated-subscriptions)
         next-subscription (first removed-subscriptions)]
     (if next-subscription
-      (let [{:keys [subscription upstream-peer-id]} next-subscription
+      (let [{:keys [subscription src-peer-id]} next-subscription
             result-state (atom [])
             take-n 2
-            gw-val (swap! global-watermarks take-ticket task-id upstream-peer-id id take-n)
-            ticket (get-in gw-val [task-id upstream-peer-id :ticket])
-            fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id upstream-peer-id ticket))]
+            _ (info "GW Before " @global-watermarks)
+            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)
+            _ (info "GW after " @global-watermarks)
+            ticket (get-in gw-val [task-id src-peer-id :ticket])
+            _ (info "Ticket: " ticket)
+            fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))]
         (if (= [-1 -1] ticket)
           []
           (let [expected-messages (inc (- (second ticket) (first ticket)))]

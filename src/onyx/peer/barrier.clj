@@ -42,11 +42,11 @@
 (defn emit-barrier [{:keys [onyx.core/id onyx.core/task-id onyx.core/job-id onyx.core/barrier onyx.core/global-watermarks] :as event} messenger replica-val peer-replica-view]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
         downstream-peers (mapcat #(get-in replica-val [:allocations job-id %]) downstream-task-ids)
-        {:keys [barrier-id msg-id from-peer-id origin-peers]} barrier]
+        {:keys [barrier-id msg-id src-peer-id origin-peers]} barrier]
+    ;; FIXME: Shouldn't be sending once per downstream peer. Should be once per downstream task on a single host
     (doseq [target downstream-peers]
       (when-let [site (peer-site peer-replica-view target)]
-        (let [b (->Barrier target
-                           id
+        (let [b (->Barrier id
                            barrier-id 
                            task-id
                            (:task (common/peer->allocated-job (:allocations replica-val) target))

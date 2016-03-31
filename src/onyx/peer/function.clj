@@ -20,7 +20,7 @@
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
     (when barrier
-      (swap! global-watermarks update-in [(:dst-task barrier) (:from-peer-id barrier) :barriers (:msg-id barrier)] conj id))
+      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:msg-id barrier)] conj id))
     {:onyx.core/batch segments
      :onyx.core/barrier barrier}))
 
@@ -36,11 +36,10 @@
                 (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
                 {:onyx.core/batch outgoing
                  :onyx.core/barrier (map->Barrier 
-                                     {:to-peer-id nil 
-                                      :from-peer-id id
+                                     {:src-peer-id id
                                       :barrier-id (+ n-sent (count outgoing))
-                                      :src-task task-id 
-                                      :dst-task nil 
+                                      :src-task-id task-id 
+                                      :dst-task-id nil 
                                       :origin-peers [id]
                                       :msg-id nil})})
 
@@ -65,7 +64,7 @@
            onyx.core/barrier]
     :as event}]
     (when (= (:onyx/type task-map) :output)
-      (let [{:keys [barrier-id msg-id from-peer-id origin-peers]} barrier] 
+      (let [{:keys [barrier-id msg-id src-peer-id origin-peers]} barrier] 
         (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
           (doseq [p origin-peers]
             (when-let [site (peer-site peer-replica-view p)]

@@ -74,12 +74,12 @@
   (if (= task-type :input)
     []
     (map
-     (fn [upstream-peer-id]
+     (fn [src-peer-id]
        (let [channel (aeron-channel bind-addr port)
              subscription (.addSubscription conn channel stream-id)]
          {:subscription subscription
-          :upstream-peer-id upstream-peer-id}))
-     (common/upstream-peers replica ingress-task-ids job-id))))
+          :src-peer-id src-peer-id}))
+     (common/src-peers replica ingress-task-ids job-id))))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
   (let [ba (byte-array length)
@@ -270,8 +270,8 @@
     (update event
             :onyx.core/batch
             (fn [batch]
-              (map (fn [segment]
-                     (assoc segment :src-task (:onyx.core/task-id event)))
+              (map (fn [leaf]
+                     (assoc leaf :src-task-id (:onyx.core/task-id event)))
                    batch)))
     event))
 
