@@ -78,11 +78,8 @@
        (let [channel (aeron-channel bind-addr port)
              subscription (.addSubscription conn channel stream-id)]
          {:subscription subscription
-          :upstream-peer-id upstream-peer-id
-          :task-id this-task-id}))
-     (mapcat
-      #(get-in replica [:allocations job-id %])
-      ingress-task-ids))))
+          :upstream-peer-id upstream-peer-id}))
+     (common/upstream-peers replica ingress-task-ids job-id))))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
   (let [ba (byte-array length)
@@ -91,6 +88,7 @@
     (when (and (map? res)
                (= (:type res) :job-completed)
                (= (:onyx.core/id event) (:peer-id res)))
+      (info "_Should ack barrier on " (:peer-id res) (:barrier-id res))
       (swap! (:onyx.core/pipeline event)
              (fn [pipeline]
                (oi/ack-barrier pipeline (:barrier-id res))))

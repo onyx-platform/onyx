@@ -1,5 +1,6 @@
 (ns ^:no-doc onyx.messaging.aeron
   (:require [clojure.set :refer [subset?]]
+            [clojure.core.async :refer [alts!! <!! >!! <! >! poll! timeout chan close! thread go]]
             [onyx.messaging.common :as mc]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
@@ -22,6 +23,9 @@
 
 (defn aeron-channel [addr port]
   (format "udp://%s:%s" addr port))
+
+(def fragment-limit-receiver 10)
+(def global-fragment-limit 10)
 
 (def no-op-error-handler
   (reify ErrorHandler
@@ -46,14 +50,15 @@
         src-peer (:from-peer-id res)
         dst-task (:dst-task res)
         barrier? (instance? onyx.types.Barrier res)]
-    (swap!
-     global-watermarks
-     (fn [gw]
-       (let [hw (inc (get-in gw [dst-task src-peer :high-water-mark] -1))
-             gw* (assoc-in gw [dst-task src-peer :high-water-mark] hw)]
-         (if barrier?
-           (assoc-in gw* [dst-task src-peer :barriers hw] #{})
-           gw*))))))
+    (when-not (= :job-completed (:type res))
+      (swap!
+       global-watermarks
+       (fn [gw]
+         (let [hw (inc (get-in gw [dst-task src-peer :high-water-mark] -1))
+               gw* (assoc-in gw [dst-task src-peer :high-water-mark] hw)]
+           (if barrier?
+             (assoc-in gw* [dst-task src-peer :barriers hw] #{})
+             gw*)))))))
 
 (defn global-fragment-data-handler [f]
   (FragmentAssembler.
@@ -74,7 +79,7 @@
         handler (global-fragment-data-handler
                  (fn [buffer offset length header]
                    (global-stream-observer-handler global-watermarks buffer offset length header)))
-        subscription-fut (future (try (.accept ^Consumer (global-consumer handler idle-strategy 10) subscription)
+        subscription-fut (future (try (.accept ^Consumer (global-consumer handler idle-strategy global-fragment-limit) subscription)
                                     (catch Throwable e (fatal e))))]
     {:subscription subscription
      :subscription-fut subscription-fut}))
@@ -258,31 +263,31 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state upstream-peer-id message-counter [low high :as ticket] this-task-name buffer offset length header]
+  [result-state message-counter task-id upstream-peer-id [low high :as ticket] buffer offset length header]
   (let [this-msg-index (get @message-counter upstream-peer-id 0)]
     (let [ba (byte-array length)
           _ (.getBytes buffer offset ba)
           res (messaging-decompress ba)]
-      (if (= (:from-peer-id res) upstream-peer-id)
-        (let []
-          (cond (< this-msg-index low)
-                (do (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
-                    ControlledFragmentHandler$Action/CONTINUE)
+      (if (and (= (:from-peer-id res) upstream-peer-id)
+               (= (:dst-task res) task-id))
+        (cond (< this-msg-index low)
+              (do (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                  ControlledFragmentHandler$Action/CONTINUE)
 
-                (> this-msg-index high)
-                ControlledFragmentHandler$Action/ABORT
+              (> this-msg-index high)
+              ControlledFragmentHandler$Action/ABORT
 
-                (instance? onyx.types.Barrier res)
-                (do (swap! result-state conj (assoc res :msg-id this-msg-index))
-                    (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
-                    ControlledFragmentHandler$Action/BREAK)
+              (instance? onyx.types.Barrier res)
+              (do (swap! result-state conj (assoc res :msg-id this-msg-index))
+                  (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                  ControlledFragmentHandler$Action/BREAK)
 
-                (instance? onyx.types.Leaf res)
-                (do (swap! result-state conj res)
-                    (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
-                    ControlledFragmentHandler$Action/CONTINUE)
+              (instance? onyx.types.Leaf res)
+              (do (swap! result-state conj res)
+                  (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                  ControlledFragmentHandler$Action/CONTINUE)
 
-                :else (throw (ex-info "Not sure" {}))))
+              :else (throw (ex-info "Not sure" {})))
         ControlledFragmentHandler$Action/CONTINUE))))
 
 (defn controlled-fragment-data-handler [f]
@@ -298,14 +303,12 @@
 
 (defn remove-blocked-consumers
   "Implements barrier alignment"
-  [replica job-id global-watermarks subscription-maps]
+  [replica job-id task-id global-watermarks subscription-maps]
   (remove
-   (fn [{:keys [upstream-peer-id task-id]}]
+   (fn [{:keys [upstream-peer-id]}]
      (let [barrier-state (get-in global-watermarks [task-id upstream-peer-id :barriers])]
        (some #{upstream-peer-id} (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
-
-(def fragment-limit 10)
 
 (defn unseen-barriers [barriers peer-id]
   (reduce-kv
@@ -316,20 +319,16 @@
    {}
    barriers))
 
-(defn calculate-ticket [watermarks my-peer-id take-n]
-  (let [low (inc (get-in watermarks [:low-water-mark] -1))
-        barriers (unseen-barriers (get-in watermarks [:barriers]) my-peer-id)
-        high (get-in watermarks [:high-water-mark])
-        nearest-barrier (or (first (sort (keys barriers))) high)]
-    (if high
-      (if (<= low high)
-        (let [high* (min (+ low take-n) high nearest-barrier)
-              low* (min low high*)]
-          (assert (<= low* high*) (str low* " > " high*))
-          [low* high*])
-        [-1 -1])
+(defn calculate-ticket [{:keys [low-water-mark high-water-mark barriers] :as watermarks} my-peer-id take-n]
+  (let [low (inc (or low-water-mark -1))
+        barriers (unseen-barriers barriers my-peer-id)
+        nearest-barrier (or (first (sort (keys barriers))) high-water-mark)]
+    (if (and high-water-mark (<= low high-water-mark))
+      (let [high* (min (+ low take-n) high-water-mark nearest-barrier)
+            low* (min low high*)]
+        (assert (<= low* high*) (str low* " > " high*))
+        [low* high*])
       [-1 -1]))) 
-
 
 #_(calculate-ticket
  {:barriers {20 #{}}
@@ -338,38 +337,38 @@
  :p1
  2)
 
-(defn take-ticket [global-watermarks peer-id my-peer-id take-n]
-  (let [ticket (calculate-ticket (get-in global-watermarks [peer-id]) my-peer-id take-n)]
-    (-> global-watermarks
-        (assoc-in [peer-id :ticket] ticket)
-        (assoc-in [peer-id :low-water-mark] (second ticket)))))
+(defn take-ticket [global-watermarks task-id upstream-peer-id peer-id take-n]
+  (let [[low high :as ticket] (calculate-ticket (get-in global-watermarks [task-id upstream-peer-id]) peer-id take-n)
+        gw-ticket (assoc-in global-watermarks [task-id upstream-peer-id :ticket] ticket)]
+    (if (= high -1)
+      gw-ticket
+      (assoc-in gw-ticket [task-id upstream-peer-id :low-water-mark] high))))
+
+(defn task-alive? [event]
+  (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
 
 (defmethod extensions/receive-messages AeronMessenger
-  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
-                     onyx.core/replica onyx.core/job-id
-                     onyx.core/message-counter onyx.core/global-watermarks
+  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/replica onyx.core/job-id onyx.core/id 
+                     onyx.core/task-id onyx.core/task onyx.core/message-counter onyx.core/global-watermarks
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-        removed-subscriptions (remove-blocked-consumers @replica job-id @global-watermarks rotated-subscriptions)
+        removed-subscriptions (remove-blocked-consumers @replica job-id task-id @global-watermarks rotated-subscriptions)
         next-subscription (first removed-subscriptions)]
     (if next-subscription
-      (let [subscription (:subscription next-subscription)
+      (let [{:keys [subscription upstream-peer-id]} next-subscription
             result-state (atom [])
-            ticket (get-in (swap! global-watermarks
-                                  take-ticket
-                                  (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
-                           [(:upstream-peer-id next-subscription) :ticket])
-            fh (controlled-fragment-data-handler
-                (partial handle-message result-state (:upstream-peer-id next-subscription)
-                         message-counter ticket (:onyx.core/task event)))]
-        (if (not= [-1 -1] ticket)
+            take-n 2
+            gw-val (swap! global-watermarks take-ticket task-id upstream-peer-id id take-n)
+            ticket (get-in gw-val [task-id upstream-peer-id :ticket])
+            fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id upstream-peer-id ticket))]
+        (if (= [-1 -1] ticket)
+          []
           (let [expected-messages (inc (- (second ticket) (first ticket)))]
-            (while (< (count @result-state) expected-messages)
-              (info (str (:onyx.core/task event) " -> " ticket))
-              (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit))
-            @result-state)
-          []))
+            (while (and (< (count @result-state) expected-messages) 
+                        (task-alive? event))
+              (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver))
+            @result-state)))
       [])))
 
 (defn get-publication [publications channel stream-id]
