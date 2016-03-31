@@ -2,7 +2,7 @@
   (:require [clojure.set :refer [subset?]]
             [onyx.messaging.common :as mc]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [fatal info] :as timbre]
+            [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.messaging.aeron.peer-manager :as pm]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
@@ -257,32 +257,32 @@
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
 (defn handle-message
-  [result-state upstream-peer-id message-counter [low high :as ticket] buffer offset length header]
-  (info ticket)
-  (let [ba (byte-array length)
-        _ (.getBytes buffer offset ba)
-        res (messaging-decompress ba)]
-    (if (= (:from-peer-id res) upstream-peer-id)
-      (let [this-msg-index (get @message-counter upstream-peer-id 0)
-            action
-            (cond (< this-msg-index low)
-                  ControlledFragmentHandler$Action/CONTINUE
+  [result-state upstream-peer-id message-counter [low high :as ticket] this-task-name buffer offset length header]
+  (let [this-msg-index (get @message-counter upstream-peer-id 0)]
+    (let [ba (byte-array length)
+          _ (.getBytes buffer offset ba)
+          res (messaging-decompress ba)]
+      (if (= (:from-peer-id res) upstream-peer-id)
+        (let []
+          (cond (< this-msg-index low)
+                (do (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                    ControlledFragmentHandler$Action/CONTINUE)
 
-                  (> this-msg-index high)
-                  ControlledFragmentHandler$Action/BREAK
+                (> this-msg-index high)
+                ControlledFragmentHandler$Action/ABORT
 
-                  (instance? onyx.types.Barrier res)
-                  (do (swap! result-state conj (assoc res :msg-id this-msg-index))
-                      ControlledFragmentHandler$Action/BREAK)
+                (instance? onyx.types.Barrier res)
+                (do (swap! result-state conj (assoc res :msg-id this-msg-index))
+                    (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                    ControlledFragmentHandler$Action/BREAK)
 
-                  (instance? onyx.types.Leaf res)
-                  (do (swap! result-state conj res)
-                      ControlledFragmentHandler$Action/CONTINUE)
+                (instance? onyx.types.Leaf res)
+                (do (swap! result-state conj res)
+                    (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
+                    ControlledFragmentHandler$Action/CONTINUE)
 
-                  :else (throw (ex-info "Not sure" {})))]
-        (swap! message-counter assoc upstream-peer-id (inc this-msg-index))
-        action)
-      ControlledFragmentHandler$Action/CONTINUE)))
+                :else (throw (ex-info "Not sure" {}))))
+        ControlledFragmentHandler$Action/CONTINUE))))
 
 (defn controlled-fragment-data-handler [f]
   (ControlledFragmentAssembler.
@@ -337,7 +337,7 @@
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map
                      onyx.core/replica onyx.core/job-id
                      onyx.core/barrier-state onyx.core/message-counter
-                     onyx.core/global-watermarks
+                     onyx.core/global-watermarks onyx.core/ticket-state
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
@@ -346,14 +346,31 @@
     (if next-subscription
       (let [subscription (:subscription next-subscription)
             result-state (atom [])
-            ticket (get-in (swap! global-watermarks take-ticket (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
-                           [(:upstream-peer-id next-subscription) :ticket])]
+            ts @ticket-state
+            ticket (if (:new-ticket? ts)
+                     (get-in (swap! global-watermarks
+                                    take-ticket
+                                    (:upstream-peer-id next-subscription) (:onyx.core/id event) 2)
+                             [(:upstream-peer-id next-subscription) :ticket])
+                     (:current-ticket ts))]
+        (swap! ticket-state assoc :current-ticket ticket)
         (if (not= [-1 -1] ticket)
           (let [fh (controlled-fragment-data-handler (partial handle-message result-state (:upstream-peer-id next-subscription)
-                                                              message-counter ticket))
-                n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)]
-            @result-state)
-          []))
+                                                              message-counter ticket (:onyx.core/task event)))
+                n-fragments (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit)
+                result @result-state]
+            (swap!
+             ticket-state
+             (fn [ts]
+               (let [[low high] (:current-ticket ts)
+                     n-to-read (inc (- high low))
+                     partial-reads (< (count result) n-to-read)]
+                 (if partial-reads
+                   (assoc ts :new-ticket? false :current-ticket [(+ low (count result)) high])
+                   (assoc ts :new-ticket? true)))))
+            result)
+          (do (swap! ticket-state assoc :new-ticket? true)
+              [])))
       [])))
 
 (defn get-publication [publications channel stream-id]
@@ -373,8 +390,7 @@
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
   (while (neg? (.offer pub buf 0 (.capacity buf)))
-;;    (info "Re-offering message, session-id" (.sessionId pub))
-    ))
+    (debug "Re-offering message, session-id" (.sessionId pub))))
 
 (defmethod extensions/send-messages AeronMessenger
   [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]

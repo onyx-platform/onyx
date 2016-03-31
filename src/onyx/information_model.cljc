@@ -540,6 +540,8 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/global-watermarks {:type :any :doc ""}
                        :onyx.core/message-counter {:type :any
                                                    :doc ""}
+                       :onyx.core/ticket-state {:type :any
+                                                :doc ""}
                        :onyx.core/subscription-maps {:type :any
                                                      :doc ""}
                        :onyx.core/drained-back-off {:type :integer

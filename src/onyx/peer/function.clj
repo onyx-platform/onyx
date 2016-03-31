@@ -43,7 +43,8 @@
                  :onyx.core/barrier (->Barrier nil (:onyx.core/id event)
                                                (+ n-sent (count outgoing))
                                                (:onyx.core/task-id event)
-                                               nil [(:onyx.core/id event)])})
+                                               nil [(:onyx.core/id event)]
+                                               nil)})
 
             (>= (count outgoing) batch-size)
             (do (reset! (:onyx.core/pipeline event) reader)
@@ -76,4 +77,8 @@
                                                       :peer-id p
                                                       :type :job-completed}
                                                      site)))
+      (swap! (:onyx.core/global-watermarks event)
+             update-in
+             [(:from-peer-id (:onyx.core/barrier event)) :barriers (:msg-id (:onyx.core/barrier event))]
+             (fnil conj #{}) (:onyx.core/id event))
       (swap! (:onyx.core/barrier-state event) dissoc (:barrier-id (:onyx.core/barrier event))))))

@@ -39,10 +39,11 @@
                            (:onyx.core/task-id event)
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
                            (or (get-in barrier-val [(:barrier-id (:onyx.core/barrier event)) :origins])
-                               (:origin-peers (:onyx.core/barrier event))))]
+                               (:origin-peers (:onyx.core/barrier event)))
+                           nil)]
           (onyx.extensions/send-barrier messenger site b))))
     (swap! (:onyx.core/global-watermarks event)
            update-in
-           [(:from-peer-id (:onyx.core/barrier event)) :barriers]
-           conj (:onyx.core/id event))
+           [(:from-peer-id (:onyx.core/barrier event)) :barriers (:msg-id (:onyx.core/barrier event))]
+           (fnil conj #{}) (:onyx.core/id event))
     (swap! (:onyx.core/barrier-state event) dissoc (:barrier-id (:onyx.core/barrier event)))))
