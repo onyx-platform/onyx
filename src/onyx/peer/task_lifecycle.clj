@@ -70,20 +70,18 @@
         (info "Available image on:" (.channel subscription) (.streamId subscription) (.sessionId image) (.sourceIdentity image)))))) 
 
 (defn start-subscribers!
-  [ingress-task-ids conn bind-addr port stream-id idle-strategy task-type replica job-id]
+  [ingress-task-ids conn bind-addr port stream-id idle-strategy task-type replica job-id this-task-id]
   (if (= task-type :input)
     []
     (map
-     (fn [result]
+     (fn [upstream-peer-id]
        (let [channel (aeron-channel bind-addr port)
              subscription (.addSubscription conn channel stream-id)]
-         (assoc result :subscription subscription)))
+         {:subscription subscription
+          :upstream-peer-id upstream-peer-id
+          :task-id this-task-id}))
      (mapcat
-      (fn [task-id]
-        (map
-         (fn [peer-id]
-           {:upstream-peer-id peer-id :task-id task-id})
-         (get-in replica [:allocations job-id task-id])))
+      #(get-in replica [:allocations job-id %])
       ingress-task-ids))))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
@@ -418,7 +416,8 @@
                            (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
                            (:onyx/type task-map)
                            @replica
-                           job-id)
+                           job-id
+                           task-id)
             subscription-maps (atom subscriptions)
 
             pipeline-data {:onyx.core/id id

@@ -44,14 +44,15 @@
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)
         src-peer (:from-peer-id res)
+        dst-task (:dst-task res)
         barrier? (instance? onyx.types.Barrier res)]
     (swap!
      global-watermarks
      (fn [gw]
-       (let [hw (inc (get-in gw [src-peer :high-water-mark] -1))
-             gw* (assoc-in gw [src-peer :high-water-mark] hw)]
+       (let [hw (inc (get-in gw [dst-task src-peer :high-water-mark] -1))
+             gw* (assoc-in gw [dst-task src-peer :high-water-mark] hw)]
          (if barrier?
-           (assoc-in gw* [src-peer :barriers hw] #{})
+           (assoc-in gw* [dst-task src-peer :barriers hw] #{})
            gw*))))))
 
 (defn global-fragment-data-handler [f]
