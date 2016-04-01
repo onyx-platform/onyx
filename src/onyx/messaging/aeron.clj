@@ -332,6 +332,11 @@
         barriers* (unseen-barriers barriers my-peer-id)
         nearest-barrier (first (sort (keys barriers*)))
         nearest-barrier-position (get barrier-index nearest-barrier high-water-mark)]
+    (when nearest-barrier
+      (assert (>= nearest-barrier-position low)
+              (str "Next barrier is behind the low water mark: "
+                   {:low low :barrier {:barrier nearest-barrier
+                                       :position nearest-barrier-position}})))
     (if (and high-water-mark (<= low high-water-mark))
       (let [high* (min (+ low take-n) nearest-barrier-position)
             low* (min low high*)]
