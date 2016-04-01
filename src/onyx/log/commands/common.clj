@@ -5,6 +5,7 @@
             [schema.core :as s]
             [onyx.schema :as os]
             [com.stuartsierra.component :as component]
+            [com.stuartsierra.dependency :as dep]
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
@@ -35,6 +36,27 @@
      (into result (get-in replica [:allocations job-id task-id])))
    []
    ingress-ids))
+
+(defn to-graph [workflow]
+  (reduce
+   (fn [g [from to]]
+     (dep/depend g to from))
+   (dep/graph)
+   workflow))
+
+(defn root-tasks [workflow leaf-task]
+  (let [graph (to-graph workflow)]
+    (filter
+     (fn [dep]
+       (not (seq (dep/immediate-dependencies graph dep))))
+     (dep/transitive-dependencies graph leaf-task))))
+
+(defn leaf-tasks [workflow root-task]
+  (let [graph (to-graph workflow)]
+    (filter
+     (fn [dep]
+       (not (seq (dep/immediate-dependents graph dep))))
+     (dep/transitive-dependents graph root-task))))
 
 (defn peer->allocated-job [allocations id]
   (if-let [[job-id [task-id]] 

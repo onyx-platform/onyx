@@ -35,7 +35,7 @@
       (cond (and (seq outgoing)
                  (zero? (mod (+ n-sent (count outgoing)) barrier-gap)))
             (let [next-epoch (swap! epoch inc)]
-              (reset! pipeline (oi/next-epoch reader next-epoch))
+              (reset! pipeline (oi/set-epoch reader next-epoch))
               (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
               {:onyx.core/batch outgoing
                :onyx.core/barrier (map->Barrier 
