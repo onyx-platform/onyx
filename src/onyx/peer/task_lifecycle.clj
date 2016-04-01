@@ -88,7 +88,7 @@
     (when (and (map? res)
                (= (:type res) :job-completed)
                (= (:onyx.core/id event) (:peer-id res)))
-      (info "_Should ack barrier on " (:peer-id res) (:barrier-id res))
+      (info "Should ack barrier on peer" (:peer-id res) (:barrier-id res))
       (swap! (:onyx.core/pipeline event)
              (fn [pipeline]
                (oi/ack-barrier pipeline (:barrier-id res))))
@@ -446,6 +446,7 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
+                           :onyx.core/epoch (atom 0)
                            :onyx.core/message-counter (atom {})
                            :onyx.core/global-watermarks (:global-watermarks (:messaging-group messenger))
                            :onyx.core/subscription-maps subscription-maps

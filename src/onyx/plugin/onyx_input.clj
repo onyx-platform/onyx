@@ -20,6 +20,10 @@
   (next-state [this event]
     "Moves reader to the next state. Returns the reader in the updated state.")
 
+  (next-epoch [this epoch]
+    "Moves the reader to the next epoch, signaling which offset comes before it.
+     Returns a new reader.")
+
   (recover [this checkpoint]
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")

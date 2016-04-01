@@ -57,7 +57,9 @@
          (let [hw (inc (get-in gw [dst-task-id src-peer :high-water-mark] -1))
                gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
            (if barrier?
-             (assoc-in gw* [dst-task-id src-peer :barriers hw] #{})
+             (-> gw*
+                 (assoc-in [dst-task-id src-peer :barriers (:barrier-id res)] #{})
+                 (assoc-in [dst-task-id src-peer :barrier-index (:barrier-id res)] hw))
              gw*)))))))
 
 (defn global-fragment-data-handler [f]
@@ -287,12 +289,13 @@
                   (swap! message-counter assoc src-peer-id (inc this-msg-index))
                   ControlledFragmentHandler$Action/CONTINUE)
 
-              :else (throw (ex-info "Not sure" {:low low
-                                                :high high
-                                                :this-task-id task-id
-                                                :src-peer-id src-peer-id
-                                                :this-msg-index this-msg-index
-                                                :res res})))
+              :else (throw (ex-info "Failed to handle incoming Aeron message"
+                                    {:low low
+                                     :high high
+                                     :this-task-id task-id
+                                     :src-peer-id src-peer-id
+                                     :this-msg-index this-msg-index
+                                     :res res})))
         ControlledFragmentHandler$Action/CONTINUE))))
 
 (defn controlled-fragment-data-handler [f]
@@ -324,23 +327,17 @@
    {}
    barriers))
 
-(defn calculate-ticket [{:keys [low-water-mark high-water-mark barriers] :as watermarks} my-peer-id take-n]
+(defn calculate-ticket [{:keys [low-water-mark high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
   (let [low (inc (or low-water-mark -1))
-        barriers (unseen-barriers barriers my-peer-id)
-        nearest-barrier (or (first (sort (keys barriers))) high-water-mark)]
+        barriers* (unseen-barriers barriers my-peer-id)
+        nearest-barrier (first (sort (keys barriers*)))
+        nearest-barrier-position (get barrier-index nearest-barrier high-water-mark)]
     (if (and high-water-mark (<= low high-water-mark))
-      (let [high* (min (+ low take-n) high-water-mark nearest-barrier)
+      (let [high* (min (+ low take-n) nearest-barrier-position)
             low* (min low high*)]
         (assert (<= low* high*) (str low* " > " high*))
         [low* high*])
-      [-1 -1]))) 
-
-#_(calculate-ticket
- {:barriers {20 #{}}
-  :high-water-mark 20
-  :low-water-mark 20}
- :p1
- 2)
+      [-1 -1])))
 
 (defn take-ticket [global-watermarks task-id src-peer-id peer-id take-n]
   (let [[low high :as ticket] (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)

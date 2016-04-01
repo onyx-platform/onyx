@@ -10,7 +10,7 @@
   p/OnyxPlugin
 
   (start [this]
-    (assoc this :channel channel :segment nil :checkpoint 0 :offset 0))
+    (assoc this :channel channel :checkpoint 0 :offset 0))
 
   (stop [this event] this)
 
@@ -18,6 +18,9 @@
 
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
+
+  (next-epoch [this epoch]
+    (assoc this :epoch epoch))
 
   (recover [this checkpoint]
     this)
@@ -42,8 +45,8 @@
 
   (segment-complete! [{:keys [conn]} segment])
 
-  (completed? [{:keys [channel segment offset checkpoint]}]
-    (and (closed? channel) (nil? segment) (= offset checkpoint))))
+  (completed? [{:keys [channel segment offset checkpoint epoch]}]
+    (and (closed? channel) (nil? segment) (= checkpoint epoch))))
 
 (defrecord AbsCoreAsyncWriter [event]
   p/OnyxPlugin

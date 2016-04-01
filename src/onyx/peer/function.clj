@@ -20,11 +20,13 @@
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
     (when barrier
-      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:msg-id barrier)] conj id))
+      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-id barrier)] conj id))
     {:onyx.core/batch segments
      :onyx.core/barrier barrier}))
 
-(defn read-input-batch [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/id onyx.core/task-id] :as event}]
+(defn read-input-batch
+  [{:keys [onyx.core/task-map onyx.core/pipeline
+           onyx.core/id onyx.core/task-id onyx.core/epoch] :as event}]
   (let [batch-size (:onyx/batch-size task-map)
         n-sent @(:onyx.core/n-sent-messages event)
         barrier-gap 5]
@@ -32,16 +34,17 @@
            outgoing []]
       (cond (and (seq outgoing)
                  (zero? (mod (+ n-sent (count outgoing)) barrier-gap)))
-            (do (reset! pipeline reader)
-                (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
-                {:onyx.core/batch outgoing
-                 :onyx.core/barrier (map->Barrier 
-                                     {:src-peer-id id
-                                      :barrier-id (+ n-sent (count outgoing))
-                                      :src-task-id task-id 
-                                      :dst-task-id nil 
-                                      :origin-peers [id]
-                                      :msg-id nil})})
+            (let [next-epoch (swap! epoch inc)]
+              (reset! pipeline (oi/next-epoch reader next-epoch))
+              (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
+              {:onyx.core/batch outgoing
+               :onyx.core/barrier (map->Barrier 
+                                   {:src-peer-id id
+                                    :barrier-id next-epoch
+                                    :src-task-id task-id 
+                                    :dst-task-id nil 
+                                    :origin-peers [id]
+                                    :msg-id nil})})
 
             (>= (count outgoing) batch-size)
             (do (reset! pipeline reader)
@@ -64,7 +67,7 @@
            onyx.core/barrier]
     :as event}]
     (when (= (:onyx/type task-map) :output)
-      (let [{:keys [barrier-id msg-id src-peer-id origin-peers]} barrier] 
+      (let [{:keys [barrier-id src-peer-id origin-peers]} barrier] 
         (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
           (doseq [p origin-peers]
             (when-let [site (peer-site peer-replica-view p)]
