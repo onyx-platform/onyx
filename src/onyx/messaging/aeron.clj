@@ -60,16 +60,7 @@
         dst-task-id (:dst-task-id res)
         barrier? (instance? onyx.types.Barrier res)]
     (when-not (= :job-completed (:type res))
-      (swap!
-       global-watermarks
-       (fn [gw]
-         (let [hw (inc (get-in gw [dst-task-id src-peer :high-water-mark] -1))
-               gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
-           (if barrier?
-             (-> gw*
-                 (assoc-in [dst-task-id src-peer :barriers (:barrier-epoch res)] #{})
-                 (assoc-in [dst-task-id src-peer :barrier-index (:barrier-epoch res)] hw))
-             gw*)))))))
+      (swap! global-watermarks update-global-watermarks dst-task-id src-peer res barrier?))))
 
 (defn global-fragment-data-handler [f]
   (FragmentAssembler.
