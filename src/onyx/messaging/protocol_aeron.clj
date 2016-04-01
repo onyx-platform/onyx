@@ -20,7 +20,7 @@
 ;; id uuid, completion-id uuid, ack-val long with peer-id header
 (def ^:const ack-msg-length (long 43))
 
-;; id byte, peer-task-id short, from-peer-id uuid, barrier-id long
+;; id byte, peer-task-id short, from-peer-id uuid, barrier-epoch long
 (def ^:const barrier-msg-length (long 27))
 
 (def ^:const completion-msg-id (byte 0))
@@ -186,16 +186,16 @@
     segments))
 
 (defn build-barrier-buf
-  [peer-id ^UUID from-peer-id ^long barrier-id]
+  [peer-id ^UUID from-peer-id ^long barrier-epoch]
   (let [buf (UnsafeBuffer. (byte-array barrier-msg-length))]
     (.putByte buf 0 barrier-msg-id)
     (write-vpeer-id buf 1 peer-id)
     (write-uuid buf 3 from-peer-id)
-    (.putLong buf 19 barrier-id)
+    (.putLong buf 19 barrier-epoch)
     buf))
 
 (defn read-barrier-buf [^UnsafeBuffer buf ^long offset]
   (let [peer-task-id (read-vpeer-id buf (unchecked-add offset 1))
         from-peer-id (get-uuid buf (unchecked-add offset 3))
-        barrier-id (.getLong buf (unchecked-add offset 19))]
-    (->Barrier peer-task-id from-peer-id barrier-id)))
+        barrier-epoch (.getLong buf (unchecked-add offset 19))]
+    (->Barrier peer-task-id from-peer-id barrier-epoch)))

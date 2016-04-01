@@ -83,13 +83,13 @@
 (deftest barrier-protocol-test
   (let [peer-task-id 45
         from-peer-id #uuid "21530875-a362-45e1-bac3-ea61d1e0eca7"
-        barrier-id 63]
+        barrier-epoch 63]
     (is (= (protocol/read-barrier-buf
             (protocol/build-barrier-buf
-             peer-task-id from-peer-id barrier-id) 0)
+             peer-task-id from-peer-id barrier-epoch) 0)
            (->Barrier
             peer-task-id
             from-peer-id
-            barrier-id
+            barrier-epoch
             nil
             nil)))))

@@ -58,8 +58,8 @@
                gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
            (if barrier?
              (-> gw*
-                 (assoc-in [dst-task-id src-peer :barriers (:barrier-id res)] #{})
-                 (assoc-in [dst-task-id src-peer :barrier-index (:barrier-id res)] hw))
+                 (assoc-in [dst-task-id src-peer :barriers (:barrier-epoch res)] #{})
+                 (assoc-in [dst-task-id src-peer :barrier-index (:barrier-epoch res)] hw))
              gw*)))))))
 
 (defn global-fragment-data-handler [f]
@@ -320,9 +320,9 @@
 
 (defn unseen-barriers [barriers peer-id]
   (reduce-kv
-   (fn [result barrier-id peers]
+   (fn [result barrier-epoch peers]
      (if-not (get peers peer-id)
-       (assoc result barrier-id peers)
+       (assoc result barrier-epoch peers)
        result))
    {}
    barriers))

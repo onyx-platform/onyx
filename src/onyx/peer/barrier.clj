@@ -16,7 +16,7 @@
                 ;; TODO: should lookup by barrier id, not
                 ;; message id because the message-id won't
                 ;; necessarily be stable for all barriers.
-                (get-in global-watermarks-val [this-task-id peer-id :barriers (:barrier-id barrier) this-peer-id]))
+                (get-in global-watermarks-val [this-task-id peer-id :barriers (:barrier-epoch barrier) this-peer-id]))
               upstream-task-peers)))
      ingress-ids))))
 
@@ -50,15 +50,17 @@
    messenger replica-val peer-replica-view]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
         downstream-peers (mapcat #(get-in replica-val [:allocations job-id %]) downstream-task-ids)
-        {:keys [barrier-id src-peer-id origin-peers]} barrier]
+        {:keys [barrier-epoch src-peer-id origin-peers]} barrier]
+    (when (get-in barrier [barrier-epoch :origins])
+      (info "Barrier is " (into {} barrier)))
     ;; FIXME: Shouldn't be sending once per downstream peer. Should be once per downstream task on a single host
     (doseq [target downstream-peers]
       (when-let [site (peer-site peer-replica-view target)]
         (let [b (->Barrier id
-                           barrier-id 
+                           barrier-epoch 
                            task-id
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
-                           (or (get-in barrier [barrier-id :origins])
+                           (or (get-in barrier [barrier-epoch :origins])
                                origin-peers)
                            nil)]
           (onyx.extensions/send-barrier messenger site b))))))

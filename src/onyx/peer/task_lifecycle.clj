@@ -88,10 +88,10 @@
     (when (and (map? res)
                (= (:type res) :job-completed)
                (= (:onyx.core/id event) (:peer-id res)))
-      (info "Should ack barrier on peer" (:peer-id res) (:barrier-id res))
+      (info "Should ack barrier on peer" (:peer-id res) (:barrier-epoch res))
       (swap! (:onyx.core/pipeline event)
              (fn [pipeline]
-               (oi/ack-barrier pipeline (:barrier-id res))))
+               (oi/ack-barrier pipeline (:barrier-epoch res))))
       (when (oi/completed? @(:onyx.core/pipeline event))
         (let [entry (entry/create-log-entry
                      :exhaust-input

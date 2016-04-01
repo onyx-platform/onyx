@@ -40,8 +40,8 @@
              :offset (if segment (inc offset) offset)
              :closed? (closed? chan))))
 
-  (ack-barrier [{:keys [checkpoint] :as this} barrier-id]
-    (assoc this :checkpoint barrier-id))
+  (ack-barrier [{:keys [checkpoint] :as this} barrier-epoch]
+    (assoc this :checkpoint barrier-epoch))
 
   (segment-complete! [{:keys [conn]} segment])
 

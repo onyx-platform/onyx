@@ -20,7 +20,7 @@
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
     (when barrier
-      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-id barrier)] conj id))
+      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-epoch barrier)] conj id))
     {:onyx.core/batch segments
      :onyx.core/barrier barrier}))
 
@@ -39,12 +39,12 @@
               (swap! (:onyx.core/n-sent-messages event) + (count outgoing))
               {:onyx.core/batch outgoing
                :onyx.core/barrier (map->Barrier 
-                                   {:src-peer-id id
-                                    :barrier-id next-epoch
-                                    :src-task-id task-id 
-                                    :dst-task-id nil 
-                                    :origin-peers [id]
-                                    :msg-id nil})})
+                                    {:src-peer-id id
+                                     :barrier-epoch next-epoch
+                                     :src-task-id task-id 
+                                     :dst-task-id nil 
+                                     :origin-peers [id]
+                                     :msg-id nil})})
 
             (>= (count outgoing) batch-size)
             (do (reset! pipeline reader)
@@ -67,12 +67,12 @@
            onyx.core/barrier]
     :as event}]
     (when (= (:onyx/type task-map) :output)
-      (let [{:keys [barrier-id src-peer-id origin-peers]} barrier] 
+      (let [{:keys [barrier-epoch src-peer-id origin-peers]} barrier] 
         (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
           (doseq [p origin-peers]
             (when-let [site (peer-site peer-replica-view p)]
               (onyx.extensions/internal-complete-segment messenger
-                                                         {:barrier-id barrier-id
+                                                         {:barrier-epoch barrier-epoch
                                                           :job-id job-id
                                                           :task-id task-id
                                                           :peer-id p
