@@ -563,6 +563,7 @@
    :jobs [JobId]
    :task-schedulers {JobId TaskScheduler}
    :tasks {JobId [TaskId]}
+   :task-name->id {JobId {s/Keyword TaskId}}
    :allocations {JobId {TaskId [PeerId]}}
    :task-metadata {JobId {TaskId s/Any}}
    :saturation {JobId s/Num}

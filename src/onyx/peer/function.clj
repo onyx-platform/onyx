@@ -43,7 +43,6 @@
                                      :barrier-epoch next-epoch
                                      :src-task-id task-id 
                                      :dst-task-id nil 
-                                     :origin-peers [id]
                                      :msg-id nil})})
 
             (>= (count outgoing) batch-size)
@@ -61,15 +60,21 @@
                     {:onyx.core/batch outgoing})))))))
 
 (defn ack-barrier!
-  [{:keys [onyx.core/replica onyx.core/compiled onyx.core/id
-           onyx.core/job-id onyx.core/task-map onyx.core/messenger
+  [{:keys [onyx.core/replica onyx.core/compiled onyx.core/id onyx.core/workflow
+           onyx.core/job-id onyx.core/task-map onyx.core/messenger onyx.core/task
            onyx.core/task-id onyx.core/peer-replica-view onyx.core/global-watermarks
            onyx.core/barrier]
     :as event}]
-    (when (= (:onyx/type task-map) :output)
-      (let [{:keys [barrier-epoch src-peer-id origin-peers]} barrier] 
-        (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
-          (doseq [p origin-peers]
+  (when (= (:onyx/type task-map) :output)
+    (let [{:keys [barrier-epoch src-peer-id]} barrier
+          replica-val @replica]
+      (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
+        (let [root-task-ids
+              (map
+               (fn [root-task]
+                 (get-in replica-val [:task-name->id job-id root-task]))
+               (common/root-tasks workflow task))]
+          (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
             (when-let [site (peer-site peer-replica-view p)]
               (onyx.extensions/internal-complete-segment messenger
                                                          {:barrier-epoch barrier-epoch
@@ -77,4 +82,4 @@
                                                           :task-id task-id
                                                           :peer-id p
                                                           :type :job-completed}
-                                                         site)))))))
+                                                         site))))))))

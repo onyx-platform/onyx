@@ -50,9 +50,7 @@
    messenger replica-val peer-replica-view]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
         downstream-peers (mapcat #(get-in replica-val [:allocations job-id %]) downstream-task-ids)
-        {:keys [barrier-epoch src-peer-id origin-peers]} barrier]
-    (when (get-in barrier [barrier-epoch :origins])
-      (info "Barrier is " (into {} barrier)))
+        {:keys [barrier-epoch src-peer-id]} barrier]
     ;; FIXME: Shouldn't be sending once per downstream peer. Should be once per downstream task on a single host
     (doseq [target downstream-peers]
       (when-let [site (peer-site peer-replica-view target)]
@@ -60,7 +58,5 @@
                            barrier-epoch 
                            task-id
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
-                           (or (get-in barrier [barrier-epoch :origins])
-                               origin-peers)
                            nil)]
           (onyx.extensions/send-barrier messenger site b))))))

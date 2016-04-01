@@ -130,6 +130,7 @@
         required-tags (required-tags (:catalog job) tasks)
         args {:id id
               :tasks task-ids
+              :task-name->id (reduce (fn [result t] (assoc result (:name t) (:id t))) {} tasks)
               :task-scheduler scheduler
               :saturation sat
               :task-saturation task-saturation

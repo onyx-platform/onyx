@@ -10,6 +10,7 @@
    :jobs []
    :task-schedulers {}
    :tasks {}
+   :task-name->id {}
    :allocations {}
    :task-saturation {}
    :saturation {}
