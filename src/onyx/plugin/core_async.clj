@@ -19,7 +19,7 @@
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
 
-  (next-epoch [this epoch]
+  (set-epoch [this epoch]
     (assoc this :epoch epoch))
 
   (recover [this checkpoint]
