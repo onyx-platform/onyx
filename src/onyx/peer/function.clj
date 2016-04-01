@@ -19,6 +19,8 @@
         barrier? (instance? onyx.types.Barrier (last messages))
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
+    (assert (every? (fn [s] (not (instance? onyx.types.Barrier s))) segments) {:messages messages
+                                                                              :task (:onyx.core/task event)})
     (when barrier
       (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-epoch barrier)] conj id))
     {:onyx.core/batch segments

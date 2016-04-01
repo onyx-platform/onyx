@@ -43,6 +43,15 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
+(defn update-global-watermarks [gw dst-task-id src-peer res barrier?]
+  (let [hw (inc (get-in gw [dst-task-id src-peer :high-water-mark] -1))
+        gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
+    (if barrier?
+      (-> gw*
+          (assoc-in [dst-task-id src-peer :barriers (:barrier-epoch res)] #{})
+          (assoc-in [dst-task-id src-peer :barrier-index (:barrier-epoch res)] hw))
+      gw*)))
+
 (defn global-stream-observer-handler [global-watermarks buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)

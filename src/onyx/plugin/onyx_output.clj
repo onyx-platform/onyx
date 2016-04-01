@@ -9,7 +9,6 @@
 
 (extend-type Object
   OnyxOutput
-
   (write-batch [this {:keys [onyx.core/results onyx.core/messenger onyx.core/state
                              onyx.core/replica onyx.core/peer-replica-view onyx.core/global-watermarks
                              onyx.core/compiled onyx.core/job-id onyx.core/task-id 

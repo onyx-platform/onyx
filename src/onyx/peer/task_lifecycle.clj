@@ -4,7 +4,6 @@
             [taoensso.timbre :refer [info error warn trace fatal]]
             [onyx.schema :refer [Event]]
             [schema.core :as s]
-            [onyx.static.rotating-seq :as rsc]
             [onyx.log.commands.common :as common]
             [onyx.log.entry :as entry]
             [onyx.monitoring.measurements :refer [emit-latency emit-latency-value]]
@@ -446,7 +445,7 @@
                            :onyx.core/peer-replica-view peer-replica-view
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
-                           :onyx.core/epoch (atom 0)
+                           :onyx.core/epoch (atom -1)
                            :onyx.core/message-counter (atom {})
                            :onyx.core/global-watermarks (:global-watermarks (:messaging-group messenger))
                            :onyx.core/subscription-maps subscription-maps
