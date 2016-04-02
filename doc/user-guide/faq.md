@@ -26,12 +26,12 @@ Onyx requires that for each task in a workflow, at least one vpeer is started. F
 Use [Flow Conditions]({{ "/flow-conditions.html" | prepend: page.dir | prepend: site.baseurl }}) or return an empty vector from your `:onyx/fn`.
 
 
-#### uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected
+#### io.aeron.driver.exceptions.ActiveDriverException: active driver detected
 
 You have encountered the following exception: 
 
 ```
-uk.co.real_logic.aeron.driver.exceptions.ActiveDriverException: active driver detected
+io.aeron.driver.exceptions.ActiveDriverException: active driver detected
   clojure.lang.ExceptionInfo: Error in component :messaging-group in system onyx.system.OnyxPeerGroup calling #'com.stuartsierra.component/start
 ```
 

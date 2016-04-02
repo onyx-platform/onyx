@@ -2,7 +2,7 @@
   "Fast way for peer group subscribers to multiplex via a short id to peer channels. "
   (:refer-clojure :exclude [assoc dissoc])
   (:require [taoensso.timbre :refer [fatal info] :as timbre])
-  (:import [uk.co.real_logic.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$KeyIterator Int2ObjectHashMap$EntryIterator])) 
+  (:import [org.agrona.collections Int2ObjectHashMap Int2ObjectHashMap$KeyIterator Int2ObjectHashMap$EntryIterator]))
 
 
 ;; Note, slow to assoc/dissoc to as it clones with a lock on it.

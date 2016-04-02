@@ -77,8 +77,8 @@ another java process. You can do this via the following code snippet, or by usin
 ```clojure
 (ns your-app.aeron-media-driver
   (:require [clojure.core.async :refer [chan <!!]])
-  (:import [uk.co.real_logic.aeron Aeron$Context]
-           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
+  (:import [io.aeron Aeron$Context]
+           [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]))
 
 (defn -main [& args]
   (let [ctx (doto (MediaDriver$Context.))
