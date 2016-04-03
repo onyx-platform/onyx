@@ -1,6 +1,7 @@
 (ns onyx.messaging.barrier-test
   (:require [clojure.test :refer [deftest is testing]]
-            [onyx.messaging.aeron :as a]))
+            [onyx.messaging.aeron :as a]
+            [onyx.api]))
 
 (deftest test-rotate
   (is (= [] (a/rotate [])))
@@ -40,16 +41,16 @@
            (a/update-global-watermarks gw :t1 :p1 {:barrier-epoch 2} true)))))
 
 (deftest test-calculate-ticket
-  (is (= [-1 -1] (a/calculate-ticket {} :p1 2)))
+  (is (= -1 (a/calculate-ticket {} :p1 2)))
 
   (let [gw {:high-water-mark 5}]
-    (is (= [0 2] (a/calculate-ticket gw :p1 2))))
+    (is (= [0 1] (a/calculate-ticket gw :p1 2))))
 
   (let [gw {:high-water-mark 5}]
-    (is (= [0 4] (a/calculate-ticket gw :p1 4))))
+    (is (= [0 3] (a/calculate-ticket gw :p1 4))))
 
   (let [gw {:high-water-mark 5}]
-    (is (= [0 5] (a/calculate-ticket gw :p1 5))))
+    (is (= [0 4] (a/calculate-ticket gw :p1 5))))
 
   (let [gw {:high-water-mark 5}]
     (is (= [0 5] (a/calculate-ticket gw :p1 6))))
@@ -57,43 +58,43 @@
   (let [gw {:high-water-mark 5}]
     (is (= [0 5] (a/calculate-ticket gw :p1 7))))
 
-  (let [gw {:low-water-mark 0
+  (let [gw {:ticket [0 0]
             :high-water-mark 5}]
-    (is (= [1 4] (a/calculate-ticket gw :p1 3))))
+    (is (= [1 3] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:low-water-mark 1
+  (let [gw {:ticket [0 1]
             :high-water-mark 5}]
-    (is (= [2 5] (a/calculate-ticket gw :p1 3))))
+    (is (= [2 4] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:low-water-mark 1
+  (let [gw {:ticket [0 1]
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 4))))
 
-  (let [gw {:low-water-mark 1
+  (let [gw {:ticket [0 1]
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 5))))
 
-  (let [gw {:low-water-mark 1
+  (let [gw {:ticket [0 1]
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 6))))
 
-  (let [gw {:low-water-mark 4
+  (let [gw {:ticket [2 4]
             :high-water-mark 5}]
     (is (= [5 5] (a/calculate-ticket gw :p1 1))))
 
-  (let [gw {:low-water-mark 5
+  (let [gw {:ticket [0 5]
             :high-water-mark 5}]
-    (is (= [-1 -1] (a/calculate-ticket gw :p1 1))))
+    (is (= -1 (a/calculate-ticket gw :p1 1))))
 
-  (let [gw {:low-water-mark 4
+  (let [gw {:ticket [2 4]
             :high-water-mark 8
             :barriers {1 #{}}
             :barrier-index {1 6}}]
     (is (= [5 6] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:low-water-mark 4
+  (let [gw {:ticket [2 4]
             :high-water-mark 8
             :barriers {1 #{:p1} 2 #{}}
             :barrier-index {1 3
                             2 9}}]
-    (is (= [5 8] (a/calculate-ticket gw :p1 3)))))
+    (is (= [5 7] (a/calculate-ticket gw :p1 3)))))

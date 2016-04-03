@@ -327,29 +327,78 @@
    {}
    barriers))
 
-(defn calculate-ticket [{:keys [low-water-mark high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
-  (let [low (inc (or low-water-mark -1))
-        barriers* (unseen-barriers barriers my-peer-id)
-        nearest-barrier (first (sort (keys barriers*)))
-        nearest-barrier-position (get barrier-index nearest-barrier high-water-mark)]
-    (when nearest-barrier
-      (assert (>= nearest-barrier-position low)
-              (str "Next barrier is behind the low water mark: "
-                   {:low low :barrier {:barrier nearest-barrier
-                                       :position nearest-barrier-position}})))
-    (if (and high-water-mark (<= low high-water-mark))
-      (let [high* (min (+ low take-n) nearest-barrier-position)
-            low* (min low high*)]
-        (assert (<= low* high*) (str low* " > " high*))
-        [low* high*])
-      [-1 -1])))
+;; Terms:
+;; Low water mark: last message index that's been processed
+;; High water mark: latest known message by stream observer
+;; Ticket: message range that a peer should read from a stream
+
+;; Example -
+;;
+;; Last ticket: [0 2]
+;; Stream:
+;;
+;; [  0  ] [  1  ] [  2  ] [  3  ] [  4  ] [   Barrier 1  ] [  5  ] [  6  ]
+;;                    ^                                                ^
+;;                    |                                                |
+;;                    |                                                |
+;;              low water mark                                   high water mark
+;;
+
+;; Next ticket calculation:
+;; Low position = last ticket high position + 1
+;; 
+;; High position = Low + (number of messages to read - 1)
+;; (subtract 1 because we're already incrementing by 1 when we move the low water mark)
+;;
+;; High position may need to be adjusted:
+;;
+;; 1. if there is a barrier we haven't processed in between Low and High,
+;;    High becomes the barrier position.
+;;
+;; 2. if High is > high water mark, High becomes high water mark.
+
+;; Ticket failure cases:
+;; We will *not* send out a new ticket (return -1) if the following happens:
+;; 1. Low water mark = High water mark
+;; 2. High watermark does not exist. Stream observer needs to catch up.
+
+(defn calculate-ticket [{:keys [ticket high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
+  (let [low-water-mark (or (second ticket) -1)]
+    (if (or (not high-water-mark) (= low-water-mark high-water-mark))
+      -1
+      (let [barriers* (unseen-barriers barriers my-peer-id)
+            nearest-barrier (first (sort (keys barriers*)))
+            nearest-barrier-pos (get barrier-index nearest-barrier high-water-mark)
+            new-low (inc low-water-mark)
+            new-high (+ new-low (dec take-n))
+            _ (prn nearest-barrier)
+            result
+            (cond (> new-high high-water-mark)
+                  [new-low high-water-mark]
+
+                  (< nearest-barrier-pos new-high)
+                  [new-low nearest-barrier-pos]
+
+                  :else [new-low new-high])]
+        (when nearest-barrier
+          (assert (>= nearest-barrier-pos (first result))
+                  {:msg "Next barrier is behind the lower ticket bound"
+                   :ticket result
+                   :barrier {:barrier nearest-barrier
+                             :position nearest-barrier-pos}}))
+        (assert (<= (first result) (second result))
+                {:msg "Ticket bounds were out of order"
+                 :expr (str (first result) " > " (second result))
+                 :watermarks watermarks})
+        result))))
 
 (defn take-ticket [global-watermarks task-id src-peer-id peer-id take-n]
-  (let [[low high :as ticket] (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)
-        gw-ticket (assoc-in global-watermarks [task-id src-peer-id :ticket] ticket)]
-    (if (= high -1)
-      gw-ticket
-      (assoc-in gw-ticket [task-id src-peer-id :low-water-mark] high))))
+  (let [ticket (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)]
+    (if (= -1 ticket)
+      (assoc-in global-watermarks [task-id src-peer-id :new-ticket?] false)
+      (-> global-watermarks
+          (assoc-in [task-id src-peer-id :new-ticket?] true)
+          (assoc-in [task-id src-peer-id :ticket] ticket)))))
 
 (defn task-alive? [event]
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
@@ -366,16 +415,16 @@
       (let [{:keys [subscription src-peer-id]} next-subscription
             result-state (atom [])
             take-n 2
-            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)
-            ticket (get-in gw-val [task-id src-peer-id :ticket])
-            fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))]
-        (if (= [-1 -1] ticket)
-          []
-          (let [expected-messages (inc (- (second ticket) (first ticket)))]
+            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)]
+        (if (get-in gw-val [task-id src-peer-id :new-ticket?])
+          (let [ticket (get-in gw-val [task-id src-peer-id :ticket])
+                fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))
+                expected-messages (inc (- (second ticket) (first ticket)))]
             (while (and (< (count @result-state) expected-messages) 
                         (task-alive? event))
               (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver))
-            @result-state)))
+            @result-state)
+          []))
       [])))
 
 (defn get-publication [publications channel stream-id]
