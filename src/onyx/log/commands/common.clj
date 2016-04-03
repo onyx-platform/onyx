@@ -10,6 +10,13 @@
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
+(defn upstream-peers [replica ingress-ids job-id]
+  (reduce
+   (fn [result task-id]
+     (into result (get-in replica [:allocations job-id task-id])))
+   []
+   ingress-ids))
+
 (defn peer-slot-id 
   [event]
   (let [replica (:onyx.core/replica event)

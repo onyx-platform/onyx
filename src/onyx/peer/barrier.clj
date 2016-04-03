@@ -13,9 +13,6 @@
      (fn [task-id] 
        (let [upstream-task-peers (get job-allocations task-id)]
          (map (fn [peer-id]
-                ;; TODO: should lookup by barrier id, not
-                ;; message id because the message-id won't
-                ;; necessarily be stable for all barriers.
                 (get-in global-watermarks-val [this-task-id peer-id :barriers (:barrier-epoch barrier) this-peer-id]))
               upstream-task-peers)))
      ingress-ids))))
@@ -44,16 +41,18 @@
                            ingress-ids
                            barrier)))
 
-(defn remove-barriers-from-watermarks [gws barrier src-peer-id this-peer-id]
-  (let [{:keys [barrier-epoch dst-task-id src-task-id]} barrier
-        peers (get-in gws [dst-task-id src-peer-id :barriers barrier-epoch])
-        remaining (disj peers this-peer-id)]
-    (if (seq remaining)
-      (assoc-in gws [dst-task-id src-peer-id :barriers barrier-epoch] remaining)
-      (update-in gws [dst-task-id src-peer-id :barriers] dissoc barrier-epoch))))
+(defn remove-barriers-from-watermarks [gws replica-val barrier job-id this-peer-id ingress-task-ids]
+  (let [allocations (get-in replica-val [:allocations job-id])]
+    (if (all-barriers-seen? allocations gws (:dst-task-id barrier) this-peer-id ingress-task-ids barrier)
+      (reduce
+       (fn [result peer]
+         (update-in result [(:dst-task-id barrier) peer :barriers] dissoc (:barrier-epoch barrier)))
+       gws
+       (common/upstream-peers replica-val ingress-task-ids job-id))
+      gws)))
 
 (defn emit-barrier
-  [{:keys [onyx.core/id onyx.core/task-id onyx.core/job-id
+  [{:keys [onyx.core/id onyx.core/task-id onyx.core/job-id onyx.core/compiled
            onyx.core/barrier onyx.core/global-watermarks] :as event}
    messenger replica-val peer-replica-view]
   (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
@@ -68,4 +67,4 @@
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
                            nil)]
           (onyx.extensions/send-barrier messenger site b))))
-    (swap! global-watermarks remove-barriers-from-watermarks barrier src-peer-id id)))
+    (swap! global-watermarks remove-barriers-from-watermarks replica-val barrier job-id id (:ingress-ids compiled))))

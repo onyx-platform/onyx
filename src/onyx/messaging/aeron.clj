@@ -320,7 +320,7 @@
 
 (defn remove-blocked-consumers
   "Implements barrier alignment"
-  [replica job-id task-id global-watermarks subscription-maps]
+  [task-id global-watermarks subscription-maps this-peer-id]
   (remove
    (fn [{:keys [src-peer-id]}]
      (let [barrier-state (active-barriers (get-in global-watermarks [task-id src-peer-id :barriers]))]
@@ -329,7 +329,7 @@
                 :expr barrier-state
                 :task-id task-id
                 :src-peer-id src-peer-id})
-       (some #{src-peer-id} (get barrier-state (first (keys barrier-state))))))
+       (some #{this-peer-id} (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
 
 (defn unseen-barriers [barriers peer-id]
@@ -417,12 +417,12 @@
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
 
 (defmethod extensions/receive-messages AeronMessenger
-  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/replica onyx.core/job-id onyx.core/id 
+  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/id
                      onyx.core/task-id onyx.core/task onyx.core/message-counter onyx.core/global-watermarks
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-        removed-subscriptions (remove-blocked-consumers @replica job-id task-id @global-watermarks rotated-subscriptions)
+        removed-subscriptions (remove-blocked-consumers task-id @global-watermarks rotated-subscriptions id)
         next-subscription (first removed-subscriptions)]
     (if next-subscription
       (let [{:keys [subscription src-peer-id]} next-subscription

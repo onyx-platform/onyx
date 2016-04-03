@@ -89,4 +89,4 @@
                                                           :peer-id p
                                                           :type :job-completed}
                                                          site)))
-          (swap! global-watermarks b/remove-barriers-from-watermarks barrier src-peer-id id))))))
+          (swap! global-watermarks b/remove-barriers-from-watermarks replica-val barrier job-id id (:ingress-ids compiled)))))))
