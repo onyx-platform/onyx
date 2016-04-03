@@ -2,7 +2,7 @@
   (:require [clojure.core.async :refer [chan >! go alts!! close! timeout]]
             [onyx.static.planning :refer [find-task]]
             [onyx.peer.operation :as operation]
-            [onyx.peer.barrier :refer [ack-barrier?]]
+            [onyx.peer.barrier :as b]
             [onyx.extensions :as extensions]
             [onyx.log.commands.common :as common]
             [onyx.plugin.onyx-input :as oi]
@@ -19,8 +19,12 @@
         barrier? (instance? onyx.types.Barrier (last messages))
         segments (if barrier? (butlast messages) messages)
         barrier (if barrier? (last messages) nil)]
-    (assert (every? (fn [s] (not (instance? onyx.types.Barrier s))) segments) {:messages messages
-                                                                              :task (:onyx.core/task event)})
+    (assert (every?
+             #(not (instance? onyx.types.Barrier %))
+             segments)
+            {:message "Found a barrier at a position other than the tail of a batch of read messages"
+             :expr messages
+             :task (:onyx.core/task event)})
     (when barrier
       (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-epoch barrier)] conj id))
     {:onyx.core/batch segments
@@ -70,7 +74,7 @@
   (when (= (:onyx/type task-map) :output)
     (let [{:keys [barrier-epoch src-peer-id]} barrier
           replica-val @replica]
-      (when (ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
+      (when (b/ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
         (let [root-task-ids
               (map
                (fn [root-task]
@@ -84,4 +88,5 @@
                                                           :task-id task-id
                                                           :peer-id p
                                                           :type :job-completed}
-                                                         site))))))))
+                                                         site)))
+          (swap! global-watermarks b/remove-barriers-from-watermarks barrier src-peer-id id))))))

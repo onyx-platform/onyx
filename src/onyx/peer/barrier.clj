@@ -44,6 +44,14 @@
                            ingress-ids
                            barrier)))
 
+(defn remove-barriers-from-watermarks [gws barrier src-peer-id this-peer-id]
+  (let [{:keys [barrier-epoch dst-task-id src-task-id]} barrier
+        peers (get-in gws [dst-task-id src-peer-id :barriers barrier-epoch])
+        remaining (disj peers this-peer-id)]
+    (if (seq remaining)
+      (assoc-in gws [dst-task-id src-peer-id :barriers barrier-epoch] remaining)
+      (update-in gws [dst-task-id src-peer-id :barriers] dissoc barrier-epoch))))
+
 (defn emit-barrier
   [{:keys [onyx.core/id onyx.core/task-id onyx.core/job-id
            onyx.core/barrier onyx.core/global-watermarks] :as event}
@@ -59,4 +67,5 @@
                            task-id
                            (:task (common/peer->allocated-job (:allocations replica-val) target))
                            nil)]
-          (onyx.extensions/send-barrier messenger site b))))))
+          (onyx.extensions/send-barrier messenger site b))))
+    (swap! global-watermarks remove-barriers-from-watermarks barrier src-peer-id id)))

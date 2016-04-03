@@ -309,12 +309,26 @@
     (conj (into [] (rest xs)) (first xs))
     xs))
 
+(defn active-barriers [barrier-epoch->peers]
+  (reduce-kv
+   (fn [result epoch peers]
+     (if (seq peers)
+       (assoc result epoch peers)
+       result))
+   {}
+   barrier-epoch->peers))
+
 (defn remove-blocked-consumers
   "Implements barrier alignment"
   [replica job-id task-id global-watermarks subscription-maps]
   (remove
    (fn [{:keys [src-peer-id]}]
-     (let [barrier-state (get-in global-watermarks [task-id src-peer-id :barriers])]
+     (let [barrier-state (active-barriers (get-in global-watermarks [task-id src-peer-id :barriers]))]
+       (assert (<= (count (keys barrier-state)) 1)
+               {:msg "Multiple barrier ids are being processed. Should only be 1."
+                :expr barrier-state
+                :task-id task-id
+                :src-peer-id src-peer-id})
        (some #{src-peer-id} (get barrier-state (first (keys barrier-state))))))
    subscription-maps))
 
@@ -371,7 +385,6 @@
             nearest-barrier-pos (get barrier-index nearest-barrier high-water-mark)
             new-low (inc low-water-mark)
             new-high (+ new-low (dec take-n))
-            _ (prn nearest-barrier)
             result
             (cond (> new-high high-water-mark)
                   [new-low high-water-mark]
