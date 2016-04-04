@@ -43,49 +43,6 @@
                                                 (.toNanos TimeUnit/MICROSECONDS 10)
                                                 (.toNanos TimeUnit/MICROSECONDS 1000))))
 
-(defn update-global-watermarks [gw dst-task-id src-peer res barrier?]
-  (let [hw (inc (get-in gw [dst-task-id src-peer :high-water-mark] -1))
-        gw* (assoc-in gw [dst-task-id src-peer :high-water-mark] hw)]
-    (if barrier?
-      (-> gw*
-          (assoc-in [dst-task-id src-peer :barriers (:barrier-epoch res)] #{})
-          (assoc-in [dst-task-id src-peer :barrier-index (:barrier-epoch res)] hw))
-      gw*)))
-
-(defn global-stream-observer-handler [global-watermarks buffer offset length header]
-  (let [ba (byte-array length)
-        _ (.getBytes buffer offset ba)
-        res (messaging-decompress ba)
-        src-peer (:src-peer-id res)
-        dst-task-id (:dst-task-id res)
-        barrier? (instance? onyx.types.Barrier res)]
-    (when-not (= :job-completed (:type res))
-      (swap! global-watermarks update-global-watermarks dst-task-id src-peer res barrier?))))
-
-(defn global-fragment-data-handler [f]
-  (FragmentAssembler.
-   (reify FragmentHandler
-     (onFragment [this buffer offset length header]
-       (f buffer offset length header)))))
-
-(defn global-consumer [handler ^IdleStrategy idle-strategy limit]
-  (reify Consumer
-    (accept [this subscription]
-      (while (not (Thread/interrupted))
-        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
-          (.idle idle-strategy fragments-read))))))
-
-(defn start-global-stream-observer! [conn bind-addr port stream-id idle-strategy global-watermarks]
-  (let [channel (aeron-channel bind-addr port)
-        subscription (.addSubscription conn channel stream-id)
-        handler (global-fragment-data-handler
-                 (fn [buffer offset length header]
-                   (global-stream-observer-handler global-watermarks buffer offset length header)))
-        subscription-fut (future (try (.accept ^Consumer (global-consumer handler idle-strategy global-fragment-limit) subscription)
-                                    (catch Throwable e (fatal e))))]
-    {:subscription subscription
-     :subscription-fut subscription-fut}))
-
 (defrecord AeronMessenger
   [peer-group messaging-group publication-group publications
    send-idle-strategy compress-f monitoring short-ids acking-ch]
@@ -167,14 +124,7 @@
           decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
           ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
           aeron-conn (Aeron/connect ctx)
-          global-watermarks (atom {})
-          global-stream-observer (start-global-stream-observer!
-                                  aeron-conn
-                                  bind-addr
-                                  port
-                                  1
-                                  receive-idle-strategy
-                                  global-watermarks)]
+          global-watermarks (atom {})]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
                           (Thread. (fn [] 
@@ -189,16 +139,10 @@
              :port port
              :send-idle-strategy send-idle-strategy
              :aeron-conn aeron-conn
-             :global-stream-observer global-stream-observer
              :global-watermarks global-watermarks)))
 
   (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
-
-    (future-cancel (:subscription-fut (:global-stream-observer component)))
-    (.close ^Subscription (:subscription (:global-stream-observer component)))
-    (.close ^Aeron (:aeron-conn component))
-
 
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
@@ -266,6 +210,37 @@
         ;; streams evenly over the cluster
         stream-id 1]
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
+
+(defn handle-deserialized-message
+  [n-desired-messages results local-counter shared-counter current-ticket this-task-id src-peer-id message]
+  (if (and (= (:dst-task-id message) this-task-id)
+           (= (:src-peer-id message) src-peer-id))
+    (if (>= (count @results) n-desired-messages)
+      ControlledFragmentHandler$Action/ABORT
+      (do (when (nil? @current-ticket)
+            (let [sc-result (swap! shared-counter update-in [this-task-id src-peer-id] (fnil inc -1))]
+              (reset! current-ticket (get-in sc-result [this-task-id src-peer-id]))))
+          (let [ticket @current-ticket
+                local-index (get-in @local-counter [this-task-id src-peer-id] 0)]
+            (cond (< local-index ticket)
+                  (if (= (:type message) :barrier)
+                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
+                        (swap! results conj message)
+                        ControlledFragmentHandler$Action/BREAK)
+                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
+                        ControlledFragmentHandler$Action/CONTINUE))
+
+                  (= local-index ticket)
+                  (if (= (:type message) :barrier)
+                    ControlledFragmentHandler$Action/ABORT
+                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
+                        (swap! results conj message)
+                        (reset! current-ticket nil)
+                        ControlledFragmentHandler$Action/CONTINUE))
+
+                  :else
+                  (throw (ex-info "Ticket is behind local index" {:ticket ticket :local-index local-index}))))))
+    ControlledFragmentHandler$Action/CONTINUE))
 
 (defn handle-message
   [result-state message-counter task-id src-peer-id [low high :as ticket] buffer offset length header]
