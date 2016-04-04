@@ -108,7 +108,10 @@
 
   (stop [{:keys [short-ids publications] :as component}]
     (taoensso.timbre/info "Stopping Aeron Messenger")
-    (run! #(.close %) (vals @publications))
+    (run! (fn [{:keys [pub conn]}] 
+            (.close pub)
+            (.close conn)) 
+          (vals @publications))
 
     (assoc component
            :messaging-group nil
@@ -435,7 +438,7 @@
       [])))
 
 (defn get-publication [publications channel stream-id]
-  (if-let [pub (get @publications [channel stream-id])]
+  (if-let [pub (:pub (get @publications [channel stream-id]))]
     pub
     (let [error-handler (reify ErrorHandler
                           (onError [this x] 
@@ -444,7 +447,8 @@
                   (.errorHandler error-handler))
           conn (Aeron/connect ctx)
           pub (.addPublication conn channel stream-id)]
-      (swap! publications assoc [channel stream-id] pub)
+      (swap! publications assoc [channel stream-id] {:conn conn 
+                                                     :pub pub})
       pub)))
 
 (defn write [^Publication pub ^UnsafeBuffer buf]
