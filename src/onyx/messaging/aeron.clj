@@ -376,23 +376,16 @@
 ;; 1. Low water mark = High water mark
 ;; 2. High watermark does not exist. Stream observer needs to catch up.
 
-(defn calculate-ticket [{:keys [ticket high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
-  (let [low-water-mark (or (second ticket) -1)]
+(defn calculate-ticket [{:keys [ticket low-water-mark high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
+  (let [low-water-mark (or low-water-mark -1)]
     (if (or (not high-water-mark) (= low-water-mark high-water-mark))
       -1
       (let [barriers* (unseen-barriers barriers my-peer-id)
             nearest-barrier (first (sort (keys barriers*)))
             nearest-barrier-pos (get barrier-index nearest-barrier high-water-mark)
-            new-low (inc low-water-mark)
-            new-high (+ new-low (dec take-n))
-            result
-            (cond (> new-high high-water-mark)
-                  [new-low high-water-mark]
-
-                  (< nearest-barrier-pos new-high)
-                  [new-low nearest-barrier-pos]
-
-                  :else [new-low new-high])]
+            new-low (min (inc low-water-mark) nearest-barrier-pos)
+            new-high (min (+ new-low (dec take-n)) nearest-barrier-pos)
+            result [new-low new-high]]
         (when nearest-barrier
           (assert (>= nearest-barrier-pos (first result))
                   {:msg "Next barrier is behind the lower ticket bound"
@@ -408,9 +401,9 @@
 (defn take-ticket [global-watermarks task-id src-peer-id peer-id take-n]
   (let [ticket (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)]
     (if (= -1 ticket)
-      (assoc-in global-watermarks [task-id src-peer-id :new-ticket?] false)
+      (assoc-in global-watermarks [task-id src-peer-id :ticket] ticket)
       (-> global-watermarks
-          (assoc-in [task-id src-peer-id :new-ticket?] true)
+          (assoc-in [task-id src-peer-id :low-water-mark] (max (second ticket) (or -1 (:low-water-mark global-watermarks))))
           (assoc-in [task-id src-peer-id :ticket] ticket)))))
 
 (defn task-alive? [event]
@@ -428,16 +421,17 @@
       (let [{:keys [subscription src-peer-id]} next-subscription
             result-state (atom [])
             take-n 2
-            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)]
-        (if (get-in gw-val [task-id src-peer-id :new-ticket?])
-          (let [ticket (get-in gw-val [task-id src-peer-id :ticket])
-                fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))
-                expected-messages (inc (- (second ticket) (first ticket)))]
+            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)
+            ticket (get-in gw-val [task-id src-peer-id :ticket])]
+        (if (= -1 ticket)
+          []
+          (let [fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))
+                [low high] ticket
+                expected-messages (inc (- high low))]
             (while (and (< (count @result-state) expected-messages) 
                         (task-alive? event))
               (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver))
-            @result-state)
-          []))
+            @result-state)))
       [])))
 
 (defn get-publication [publications channel stream-id]
