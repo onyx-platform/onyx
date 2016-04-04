@@ -58,43 +58,65 @@
   (let [gw {:high-water-mark 5}]
     (is (= [0 5] (a/calculate-ticket gw :p1 7))))
 
-  (let [gw {:ticket [0 0]
+  (let [gw {:low-water-mark 0
             :high-water-mark 5}]
     (is (= [1 3] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:ticket [0 1]
+  (let [gw {:low-water-mark 1
             :high-water-mark 5}]
     (is (= [2 4] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:ticket [0 1]
+  (let [gw {:low-water-mark 1
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 4))))
 
-  (let [gw {:ticket [0 1]
+  (let [gw {:low-water-mark 1
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 5))))
 
-  (let [gw {:ticket [0 1]
+  (let [gw {:low-water-mark 1
             :high-water-mark 5}]
     (is (= [2 5] (a/calculate-ticket gw :p1 6))))
 
-  (let [gw {:ticket [2 4]
+  (let [gw {:low-water-mark 4
             :high-water-mark 5}]
     (is (= [5 5] (a/calculate-ticket gw :p1 1))))
 
-  (let [gw {:ticket [0 5]
+  (let [gw {:low-water-mark 5
             :high-water-mark 5}]
     (is (= -1 (a/calculate-ticket gw :p1 1))))
 
-  (let [gw {:ticket [2 4]
+  (let [gw {:low-water-mark 4
             :high-water-mark 8
             :barriers {1 #{}}
             :barrier-index {1 6}}]
     (is (= [5 6] (a/calculate-ticket gw :p1 3))))
 
-  (let [gw {:ticket [2 4]
+  (let [gw {:low-water-mark 4
             :high-water-mark 8
             :barriers {1 #{:p1} 2 #{}}
             :barrier-index {1 3
                             2 9}}]
     (is (= [5 7] (a/calculate-ticket gw :p1 3)))))
+
+(deftest multi-peer-calculate-ticket
+  (let [gw {:low-water-mark 4
+            :high-water-mark 8
+            :barriers {1 #{:p1} 2 #{}}
+            :barrier-index {1 3
+                            2 9}}]
+    (is (= [3 3] (a/calculate-ticket gw :p2 3))))
+  
+  (let [gw {:low-water-mark 4
+            :high-water-mark 8
+            :barriers {1 #{:p1 :p2} 2 #{}}
+            :barrier-index {1 3
+                            2 9}}]
+    (is (= [5 7] (a/calculate-ticket gw :p2 3))))
+  
+  (let [gw {:low-water-mark 8
+            :high-water-mark 9
+            :barriers {1 #{:p1 :p2} 2 #{}}
+            :barrier-index {1 3
+                            2 9}}]
+    (is (= [9 9] (a/calculate-ticket gw :p2 3)))))
