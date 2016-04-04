@@ -452,7 +452,7 @@
   ;; Needs an idle mechanism to prevent cpu burn
   (while (let [ret (.offer pub buf 0 (.capacity buf))] 
            (when (= ret Publication/CLOSED)
-             (throw (Execption. "Wrote to closed publication.")))
+             (throw (Exception. "Wrote to closed publication.")))
            (neg? ret))
     (debug "Re-offering message, session-id" (.sessionId pub))))
 
