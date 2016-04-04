@@ -269,14 +269,14 @@
 
 (defn handle-message
   [result-state message-counter task-id src-peer-id [low high :as ticket] buffer offset length header]
-  (let [this-msg-index (get @message-counter src-peer-id 0)]
+  (let [this-msg-index (inc (get @message-counter src-peer-id -1))]
     (let [ba (byte-array length)
           _ (.getBytes buffer offset ba)
           res (messaging-decompress ba)]
       (if (and (= (:src-peer-id res) src-peer-id)
                (= (:dst-task-id res) task-id))
         (cond (< this-msg-index low)
-              (do (swap! message-counter assoc src-peer-id (inc this-msg-index))
+              (do (swap! message-counter assoc src-peer-id this-msg-index)
                   ControlledFragmentHandler$Action/CONTINUE)
 
               (> this-msg-index high)
@@ -284,12 +284,12 @@
 
               (instance? onyx.types.Barrier res)
               (do (swap! result-state conj (assoc res :msg-id this-msg-index))
-                  (swap! message-counter assoc src-peer-id (inc this-msg-index))
+                  (swap! message-counter assoc src-peer-id this-msg-index)
                   ControlledFragmentHandler$Action/BREAK)
 
               (instance? onyx.types.Leaf res)
               (do (swap! result-state conj res)
-                  (swap! message-counter assoc src-peer-id (inc this-msg-index))
+                  (swap! message-counter assoc src-peer-id this-msg-index)
                   ControlledFragmentHandler$Action/CONTINUE)
 
               :else (throw (ex-info "Failed to handle incoming Aeron message"
