@@ -446,10 +446,15 @@
           ctx (-> (Aeron$Context.)
                   (.errorHandler error-handler))
           conn (Aeron/connect ctx)
-          pub (.addPublication conn channel stream-id)]
-      (swap! publications assoc [channel stream-id] {:conn conn 
-                                                     :pub pub})
-      pub)))
+          pub (.addPublication conn channel stream-id)
+          v {:conn conn :pub pub}
+          rets (swap! publications assoc [channel stream-id] v)]
+      (if (= (get rets [channel stream-id]) v)
+        pub
+        (do (prn "Enountered a race! Closing one of them.")
+            (.close pub)
+            (.close conn)
+            (:pub (get rets [channel stream-id])))))))
 
 (defn write [^Publication pub ^UnsafeBuffer buf]
   ;; Needs an escape mechanism so it can break if a peer is shutdown
