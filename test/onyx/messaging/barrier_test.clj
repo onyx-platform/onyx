@@ -1,6 +1,7 @@
 (ns onyx.messaging.barrier-test
   (:require [clojure.test :refer [deftest is testing]]
             [onyx.messaging.aeron :as a]
+            [onyx.types :refer [map->Barrier]]
             [onyx.api])
   (:import [uk.co.real_logic.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
@@ -199,7 +200,7 @@
           shared-counter (atom {:t1 {:p1 2}})
           current-ticket (atom nil)
           n-desired 3
-          m {:type :barrier :dst-task-id :t1 :src-peer-id :p1}
+          m (map->Barrier {:src-peer-id :p1 :dst-task-id :t1 })
           f (partial a/handle-deserialized-message n-desired results local-counter shared-counter current-ticket)]
       (is (= ControlledFragmentHandler$Action/BREAK (f :t1 :p1 m)))
       (is (= {:t1 {:p1 1}} @local-counter))

@@ -223,7 +223,7 @@
           (let [ticket @current-ticket
                 local-index (get-in @local-counter [this-task-id src-peer-id] 0)]
             (cond (< local-index ticket)
-                  (if (= (:type message) :barrier)
+                  (if (instance? onyx.types.Barrier message)
                     (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
                         (swap! results conj message)
                         ControlledFragmentHandler$Action/BREAK)
@@ -231,7 +231,7 @@
                         ControlledFragmentHandler$Action/CONTINUE))
 
                   (= local-index ticket)
-                  (if (= (:type message) :barrier)
+                  (if (instance? onyx.types.Barrier message)
                     ControlledFragmentHandler$Action/ABORT
                     (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
                         (swap! results conj message)
