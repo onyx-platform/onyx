@@ -450,7 +450,10 @@
 (defn write [^Publication pub ^UnsafeBuffer buf]
   ;; Needs an escape mechanism so it can break if a peer is shutdown
   ;; Needs an idle mechanism to prevent cpu burn
-  (while (neg? (.offer pub buf 0 (.capacity buf)))
+  (while (let [ret (.offer pub buf 0 (.capacity buf))] 
+           (when (= ret Publication/CLOSED)
+             (throw (Execption. "Wrote to closed publication.")))
+           (neg? ret))
     (debug "Re-offering message, session-id" (.sessionId pub))))
 
 (defmethod extensions/send-messages AeronMessenger
