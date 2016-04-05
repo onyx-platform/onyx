@@ -376,10 +376,8 @@
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-;        removed-subscriptions (remove-blocked-consumers task-id @global-watermarks rotated-subscriptions id)
-        ;;        next-subscription (first removed-subscriptions)
-        (first rotated-subscriptions)
-        ]
+        removed-subscriptions (remove-blocked-consumers task-id @message-counter rotated-subscriptions id)
+        next-subscription (first removed-subscriptions)]
     (if next-subscription
       (let [{:keys [subscription src-peer-id]} next-subscription
             results (atom [])
