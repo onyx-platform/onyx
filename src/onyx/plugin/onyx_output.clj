@@ -1,5 +1,5 @@
 (ns onyx.plugin.onyx-output
-  (:require [onyx.peer.barrier :refer [emit-barrier emit-barrier?]]
+  (:require [onyx.peer.barrier :as b :refer [emit-barrier]]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [clj-tuple :as t]))
@@ -10,10 +10,11 @@
 (extend-type Object
   OnyxOutput
   (write-batch [this {:keys [onyx.core/results onyx.core/messenger onyx.core/state
-                             onyx.core/replica onyx.core/peer-replica-view onyx.core/global-watermarks
-                             onyx.core/compiled onyx.core/job-id onyx.core/task-id 
-                             onyx.core/id onyx.core/serialized-task onyx.core/barrier] :as event}]
-    (let [replica-val @replica
+                             onyx.core/replica onyx.core/peer-replica-view onyx.core/subscription-maps
+                             onyx.core/compiled onyx.core/job-id onyx.core/task-id onyx.core/barrier
+                             onyx.core/id onyx.core/serialized-task] :as event}]
+    (let [task-type (:onyx/type (:onyx.core/task-map event))
+          replica-val @replica
           segments (:segments results)]
       (when-not (empty? segments)
         (let [pick-peer-fns (:pick-peer-fns @peer-replica-view)
@@ -29,6 +30,8 @@
                         (when-let [site (peer-site peer-replica-view target)]
                           (onyx.extensions/send-messages messenger site segs))))))
                 grouped)))
-      (when (emit-barrier? replica-val @global-watermarks (:ingress-ids compiled) event)
-        (emit-barrier event messenger replica-val peer-replica-view)))
+
+      (when-let [epoch (b/barrier-epoch event)]
+        (emit-barrier event messenger replica-val peer-replica-view epoch)
+        (run! (fn [s] (reset! (:barrier s) nil)) @subscription-maps)))
     {}))

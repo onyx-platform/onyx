@@ -123,8 +123,7 @@
           compress-f (or (:onyx.messaging/compress-fn opts) messaging-compress)
           decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
           ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-          aeron-conn (Aeron/connect ctx)
-          global-watermarks (atom {})]
+          aeron-conn (Aeron/connect ctx)]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
                           (Thread. (fn [] 
@@ -136,10 +135,10 @@
              :media-driver media-driver
              :compress-f compress-f
              :decompress-f decompress-f
+             :shared-counters (atom {})
              :port port
              :send-idle-strategy send-idle-strategy
-             :aeron-conn aeron-conn
-             :global-watermarks global-watermarks)))
+             :aeron-conn aeron-conn)))
 
   (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
@@ -147,9 +146,9 @@
     (when media-driver (.close ^MediaDriver media-driver))
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
-           :bind-addr nil :external-addr nil
-           :media-driver nil :media-driver-context nil :external-channel nil
-           :compress-f nil :decompress-f nil :send-idle-strategy nil)))
+           :bind-addr nil :external-addr nil :media-driver nil :media-driver-context nil 
+           :external-channel nil :compress-f nil :decompress-f nil :shared-counters nil 
+           :send-idle-strategy nil)))
 
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
@@ -211,52 +210,37 @@
         stream-id 1]
     (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
 
-(defn handle-deserialized-message
-  [n-desired-messages results local-counter shared-counter current-ticket this-task-id src-peer-id message]
-  (if (and (= (:dst-task-id message) this-task-id)
-           (= (:src-peer-id message) src-peer-id))
-    (if (>= (count @results) n-desired-messages)
-      ControlledFragmentHandler$Action/ABORT
-      (do (when (nil? @current-ticket)
-            (let [sc-result (swap! shared-counter update-in [this-task-id src-peer-id] (fnil inc -1))]
-              (reset! current-ticket (get-in sc-result [this-task-id src-peer-id]))))
-          (let [ticket @current-ticket
-                local-index (get-in @local-counter [this-task-id src-peer-id] 0)]
-            (cond (< local-index ticket)
-                  (if (instance? onyx.types.Barrier message)
-                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
-                        (swap! results conj message)
-                        ControlledFragmentHandler$Action/BREAK)
-                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
-                        ControlledFragmentHandler$Action/CONTINUE))
-
-                  (= local-index ticket)
-                  (if (instance? onyx.types.Barrier message)
-                    (do (reset! current-ticket nil)
-                        ControlledFragmentHandler$Action/ABORT)
-                    (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
-                        (swap! results conj message)
-                        (reset! current-ticket nil)
-                        ControlledFragmentHandler$Action/CONTINUE))
-
-                  :else
-                  (throw (ex-info "Ticket is behind local index" {:ticket ticket :local-index local-index}))))))
-    ControlledFragmentHandler$Action/CONTINUE))
-
 (defn handle-message
-  [results message-counter shared-counter current-ticket task-id src-peer-id buffer offset length header]
+  [barrier results subscriber-counter ticket-counter this-peer-id this-task-id src-peer-id buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
-        decompressed (messaging-decompress ba)
+        message (messaging-decompress ba)
         n-desired-messages 2]
-    (handle-deserialized-message
-     n-desired-messages
-     message-counter
-     shared-counter
-     current-ticket
-     task-id
-     src-peer-id
-     decompressed)))
+    ;(info "handling message " (into {} message))
+    (cond (>= (count @results) n-desired-messages)
+          ControlledFragmentHandler$Action/ABORT
+          (and (= (:dst-task-id message) this-task-id)
+               (= (:src-peer-id message) src-peer-id))
+            (cond (instance? onyx.types.Barrier message)
+                  (if (empty? @results)
+                    (do (reset! barrier message)
+                        ControlledFragmentHandler$Action/BREAK)  
+                    ControlledFragmentHandler$Action/ABORT)
+                  (instance? onyx.types.Leaf message)
+                  (let [message-id @subscriber-counter 
+                        ticket-id @ticket-counter]
+                    (swap! subscriber-counter inc)
+                    (cond (< message-id ticket-id)
+                          ControlledFragmentHandler$Action/CONTINUE
+                          (= message-id ticket-id)
+                          (do (when (compare-and-set! ticket-counter ticket-id (inc ticket-id))
+                                (swap! results conj message))
+                              ControlledFragmentHandler$Action/CONTINUE)
+                          (> message-id ticket-id)
+                          (throw (ex-info "Shouldn't be possible to get ahead of a ticket id " {:message-id message-id :ticket-id ticket-id}))))
+                  ;; Skip over job completion acks
+                  :else 
+                  ControlledFragmentHandler$Action/CONTINUE))))
 
 (defn controlled-fragment-data-handler [f]
   (ControlledFragmentAssembler.
@@ -269,120 +253,33 @@
     (conj (into [] (rest xs)) (first xs))
     xs))
 
-(defn active-barriers [barrier-epoch->peers]
-  (reduce-kv
-   (fn [result epoch peers]
-     (if (seq peers)
-       (assoc result epoch peers)
-       result))
-   {}
-   barrier-epoch->peers))
-
-(defn remove-blocked-consumers
-  "Implements barrier alignment"
-  [task-id global-watermarks subscription-maps this-peer-id]
-  (remove
-   (fn [{:keys [src-peer-id]}]
-     (let [barrier-state (active-barriers (get-in global-watermarks [task-id src-peer-id :barriers]))]
-       (assert (<= (count (keys barrier-state)) 1)
-               {:msg "Multiple barrier ids are being processed. Should only be 1."
-                :expr barrier-state
-                :task-id task-id
-                :src-peer-id src-peer-id})
-       (some #{this-peer-id} (get barrier-state (first (keys barrier-state))))))
-   subscription-maps))
-
-(defn unseen-barriers [barriers peer-id]
-  (reduce-kv
-   (fn [result barrier-epoch peers]
-     (if-not (get peers peer-id)
-       (assoc result barrier-epoch peers)
-       result))
-   {}
-   barriers))
-
-;; Terms:
-;; Low water mark: last message index that's been processed
-;; High water mark: latest known message by stream observer
-;; Ticket: message range that a peer should read from a stream
-
-;; Example -
-;;
-;; Last ticket: [0 2]
-;; Stream:
-;;
-;; [  0  ] [  1  ] [  2  ] [  3  ] [  4  ] [   Barrier 1  ] [  5  ] [  6  ]
-;;                    ^                                                ^
-;;                    |                                                |
-;;                    |                                                |
-;;              low water mark                                   high water mark
-;;
-
-;; Next ticket calculation:
-;; Low position = last ticket high position + 1
-;; 
-;; High position = Low + (number of messages to read - 1)
-;; (subtract 1 because we're already incrementing by 1 when we move the low water mark)
-;;
-;; High position may need to be adjusted:
-;;
-;; 1. if there is a barrier we haven't processed in between Low and High,
-;;    High becomes the barrier position.
-;;
-;; 2. if High is > high water mark, High becomes high water mark.
-
-;; Ticket failure cases:
-;; We will *not* send out a new ticket (return -1) if the following happens:
-;; 1. Low water mark = High water mark
-;; 2. High watermark does not exist. Stream observer needs to catch up.
-
-(defn calculate-ticket [{:keys [ticket low-water-mark high-water-mark barriers barrier-index] :as watermarks} my-peer-id take-n]
-  (let [low-water-mark (or low-water-mark -1)]
-    (if (or (not high-water-mark) (= low-water-mark high-water-mark))
-      -1
-      (let [barriers* (unseen-barriers barriers my-peer-id)
-            nearest-barrier (first (sort (keys barriers*)))
-            nearest-barrier-pos (get barrier-index nearest-barrier high-water-mark)
-            new-low (min (inc low-water-mark) nearest-barrier-pos)
-            new-high (min (+ new-low (dec take-n)) nearest-barrier-pos)
-            result [new-low new-high]]
-        (when nearest-barrier
-          (assert (>= nearest-barrier-pos (first result))
-                  {:msg "Next barrier is behind the lower ticket bound"
-                   :ticket result
-                   :barrier {:barrier nearest-barrier
-                             :position nearest-barrier-pos}}))
-        (assert (<= (first result) (second result))
-                {:msg "Ticket bounds were out of order"
-                 :expr (str (first result) " > " (second result))
-                 :watermarks watermarks})
-        result))))
-
-(defn take-ticket [global-watermarks task-id src-peer-id peer-id take-n]
-  (let [ticket (calculate-ticket (get-in global-watermarks [task-id src-peer-id]) peer-id take-n)]
-    (if (= -1 ticket)
-      (assoc-in global-watermarks [task-id src-peer-id :ticket] ticket)
-      (-> global-watermarks
-          (assoc-in [task-id src-peer-id :low-water-mark] (max (second ticket) (or -1 (:low-water-mark global-watermarks))))
-          (assoc-in [task-id src-peer-id :ticket] ticket)))))
-
 (defn task-alive? [event]
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
 
+;; FIXME: Move counters map into aeron peer group 
+;; - lookup shared counter once and in subscription as key in subscription
+(def ticket-counters (atom {}))
+(defn ticket-counter [task-id src-peer-id]
+  (get (swap! ticket-counters 
+              (fn [tc]
+                (if (get tc [task-id src-peer-id])
+                  tc
+                  (assoc tc [task-id src-peer-id] (atom 0)))))
+       [task-id src-peer-id]))
+
 (defmethod extensions/receive-messages AeronMessenger
-  [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/id
-                     onyx.core/task-id onyx.core/task onyx.core/message-counter
-                     onyx.core/shared-counter onyx.core/current-ticket
-                     onyx.core/messenger-buffer onyx.core/subscription-maps]
+  [messenger {:keys [onyx.core/task-map onyx.core/id onyx.core/task-id onyx.core/task 
+                     onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-        removed-subscriptions (remove-blocked-consumers task-id @message-counter rotated-subscriptions id)
-        next-subscription (first removed-subscriptions)]
+        next-subscription (first (filter (comp nil? deref :barrier) rotated-subscriptions))]
     (if next-subscription
-      (let [{:keys [subscription src-peer-id]} next-subscription
+      (let [{:keys [subscription src-peer-id counter barrier]} next-subscription
+            tc (ticket-counter task-id src-peer-id)
             results (atom [])
             fh (controlled-fragment-data-handler
-                  (partial handle-message results message-counter shared-counter current-ticket task-id src-peer-id))]
+                 (fn [buffer offset length header]
+                   (handle-message barrier results counter tc id task-id src-peer-id buffer offset length header)))]
         (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver)
         @results)
       [])))

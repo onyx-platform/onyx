@@ -14,21 +14,9 @@
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
-(defn read-function-batch [{:keys [onyx.core/messenger onyx.core/global-watermarks onyx.core/id] :as event}]
-  (let [messages (onyx.extensions/receive-messages messenger event)
-        barrier? (instance? onyx.types.Barrier (last messages))
-        segments (if barrier? (butlast messages) messages)
-        barrier (if barrier? (last messages) nil)]
-    (assert (every?
-             #(not (instance? onyx.types.Barrier %))
-             segments)
-            {:message "Found a barrier at a position other than the tail of a batch of read messages"
-             :expr messages
-             :task (:onyx.core/task event)})
-    (when barrier
-      (swap! global-watermarks update-in [(:dst-task-id barrier) (:src-peer-id barrier) :barriers (:barrier-epoch barrier)] conj id))
-    {:onyx.core/batch segments
-     :onyx.core/barrier barrier}))
+(defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id] :as event}]
+  (let [messages (onyx.extensions/receive-messages messenger event)]
+    {:onyx.core/batch messages}))
 
 (defn read-input-batch
   [{:keys [onyx.core/task-map onyx.core/pipeline
@@ -68,18 +56,17 @@
 (defn ack-barrier!
   [{:keys [onyx.core/replica onyx.core/compiled onyx.core/id onyx.core/workflow
            onyx.core/job-id onyx.core/task-map onyx.core/messenger onyx.core/task
-           onyx.core/task-id onyx.core/peer-replica-view onyx.core/global-watermarks
+           onyx.core/task-id onyx.core/peer-replica-view onyx.core/subscription-maps
            onyx.core/barrier]
     :as event}]
   (when (= (:onyx/type task-map) :output)
-    (let [{:keys [barrier-epoch src-peer-id]} barrier
-          replica-val @replica]
-      (when (b/ack-barrier? @replica @global-watermarks (:ingress-ids compiled) event)
+    (let [replica-val @replica]
+      (when-let [barrier-epoch (b/barrier-epoch event)]
         (let [root-task-ids
               (map
-               (fn [root-task]
-                 (get-in replica-val [:task-name->id job-id root-task]))
-               (common/root-tasks workflow task))]
+                (fn [root-task]
+                  (get-in replica-val [:task-name->id job-id root-task]))
+                (common/root-tasks workflow task))] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
             (when-let [site (peer-site peer-replica-view p)]
               (onyx.extensions/internal-complete-segment messenger
@@ -88,5 +75,6 @@
                                                           :task-id task-id
                                                           :peer-id p
                                                           :type :job-completed}
-                                                         site)))
-          (swap! global-watermarks b/remove-barriers-from-watermarks replica-val barrier job-id id (:ingress-ids compiled)))))))
+                                                         site))))
+        (run! (fn [s] (reset! (:barrier s) nil)) @subscription-maps))))
+  event)

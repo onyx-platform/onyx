@@ -535,9 +535,6 @@ may be added by the user as the context is associated to throughout the task pip
                                            :doc "Barrier to be emitted to peers downstream"}
                        :onyx.core/n-sent-messages {:type :any :doc ""}
                        :onyx.core/epoch {:type :any :doc ""}
-                       :onyx.core/global-watermarks {:type :any :doc ""}
-                       :onyx.core/message-counter {:type :any
-                                                   :doc ""}
                        :onyx.core/subscription-maps {:type :any
                                                      :doc ""}
                        :onyx.core/drained-back-off {:type :integer

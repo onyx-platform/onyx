@@ -77,6 +77,8 @@
        (let [channel (aeron-channel bind-addr port)
              subscription (.addSubscription conn channel stream-id)]
          {:subscription subscription
+          :counter (atom 0)
+          :barrier (atom nil)
           :src-peer-id src-peer-id}))
      (common/src-peers replica ingress-task-ids job-id))))
 
@@ -446,9 +448,6 @@
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/epoch (atom -1)
-                           :onyx.core/message-counter (atom {})
-                           :onyx.core/current-ticket (atom nil)
-                           :onyx.core/global-watermarks (:global-watermarks (:messaging-group messenger))
                            :onyx.core/subscription-maps subscription-maps
                            :onyx.core/aeron-conn aeron-conn
                            :onyx.core/subscriptions subscriptions}
