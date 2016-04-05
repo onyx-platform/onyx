@@ -232,7 +232,8 @@
 
                   (= local-index ticket)
                   (if (instance? onyx.types.Barrier message)
-                    ControlledFragmentHandler$Action/ABORT
+                    (do (reset! current-ticket nil)
+                        ControlledFragmentHandler$Action/ABORT)
                     (do (swap! local-counter update-in [this-task-id src-peer-id] (fnil inc -1))
                         (swap! results conj message)
                         (reset! current-ticket nil)
@@ -243,38 +244,19 @@
     ControlledFragmentHandler$Action/CONTINUE))
 
 (defn handle-message
-  [result-state message-counter task-id src-peer-id [low high :as ticket] buffer offset length header]
-  (let [this-msg-index (inc (get @message-counter src-peer-id -1))]
-    (let [ba (byte-array length)
-          _ (.getBytes buffer offset ba)
-          res (messaging-decompress ba)]
-      (if (and (= (:src-peer-id res) src-peer-id)
-               (= (:dst-task-id res) task-id))
-        (cond (< this-msg-index low)
-              (do (swap! message-counter assoc src-peer-id this-msg-index)
-                  ControlledFragmentHandler$Action/CONTINUE)
-
-              (> this-msg-index high)
-              ControlledFragmentHandler$Action/ABORT
-
-              (instance? onyx.types.Barrier res)
-              (do (swap! result-state conj (assoc res :msg-id this-msg-index))
-                  (swap! message-counter assoc src-peer-id this-msg-index)
-                  ControlledFragmentHandler$Action/BREAK)
-
-              (instance? onyx.types.Leaf res)
-              (do (swap! result-state conj res)
-                  (swap! message-counter assoc src-peer-id this-msg-index)
-                  ControlledFragmentHandler$Action/CONTINUE)
-
-              :else (throw (ex-info "Failed to handle incoming Aeron message"
-                                    {:low low
-                                     :high high
-                                     :this-task-id task-id
-                                     :src-peer-id src-peer-id
-                                     :this-msg-index this-msg-index
-                                     :res res})))
-        ControlledFragmentHandler$Action/CONTINUE))))
+  [results message-counter shared-counter current-ticket task-id src-peer-id buffer offset length header]
+  (let [ba (byte-array length)
+        _ (.getBytes buffer offset ba)
+        decompressed (messaging-decompress ba)
+        n-desired-messages 2]
+    (handle-deserialized-message
+     n-desired-messages
+     message-counter
+     shared-counter
+     current-ticket
+     task-id
+     src-peer-id
+     decompressed)))
 
 (defn controlled-fragment-data-handler [f]
   (ControlledFragmentAssembler.
@@ -389,27 +371,22 @@
 
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/subscriptions onyx.core/task-map onyx.core/id
-                     onyx.core/task-id onyx.core/task onyx.core/message-counter onyx.core/global-watermarks
+                     onyx.core/task-id onyx.core/task onyx.core/message-counter
+                     onyx.core/shared-counter onyx.core/current-ticket
                      onyx.core/messenger-buffer onyx.core/subscription-maps]
               :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
-        removed-subscriptions (remove-blocked-consumers task-id @global-watermarks rotated-subscriptions id)
-        next-subscription (first removed-subscriptions)]
+;        removed-subscriptions (remove-blocked-consumers task-id @global-watermarks rotated-subscriptions id)
+        ;;        next-subscription (first removed-subscriptions)
+        (first rotated-subscriptions)
+        ]
     (if next-subscription
       (let [{:keys [subscription src-peer-id]} next-subscription
-            result-state (atom [])
-            take-n 2
-            gw-val (swap! global-watermarks take-ticket task-id src-peer-id id take-n)
-            ticket (get-in gw-val [task-id src-peer-id :ticket])]
-        (if (= -1 ticket)
-          []
-          (let [fh (controlled-fragment-data-handler (partial handle-message result-state message-counter task-id src-peer-id ticket))
-                [low high] ticket
-                expected-messages (inc (- high low))]
-            (while (and (< (count @result-state) expected-messages) 
-                        (task-alive? event))
-              (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver))
-            @result-state)))
+            results (atom [])
+            fh (controlled-fragment-data-handler
+                  (partial handle-message results message-counter shared-counter current-ticket task-id src-peer-id))]
+        (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver)
+        @results)
       [])))
 
 (defn get-publication [publications channel stream-id]
