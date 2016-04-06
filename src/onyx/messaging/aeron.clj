@@ -21,9 +21,6 @@
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
 
-(defn aeron-channel [addr port]
-  (format "udp://%s:%s" addr port))
-
 (def fragment-limit-receiver 10)
 (def global-fragment-limit 10)
 
@@ -54,7 +51,7 @@
           messaging-group (:messaging-group peer-group)
           publications (atom {})
           send-idle-strategy (:send-idle-strategy messaging-group)
-          compress-f (:compress-f (:messaging-group peer-group))
+          compress-f (:compress-f messaging-group)
           short-ids (atom {})]
       (assoc component
              :messaging-group messaging-group
@@ -88,17 +85,13 @@
    {:keys [aeron/peer-task-id]}]
   (swap! short-ids dissoc peer-task-id))
 
-(def no-op-error-handler
-  (reify ErrorHandler
-    (onError [this x] (taoensso.timbre/warn x))))
-
 (defn get-threading-model
   [media-driver]
   (cond (= media-driver :dedicated) ThreadingMode/DEDICATED
         (= media-driver :shared) ThreadingMode/SHARED
         (= media-driver :shared-network) ThreadingMode/SHARED_NETWORK))
 
-(defrecord AeronPeerGroup [opts subscribers subscriber-count compress-f decompress-f send-idle-strategy]
+(defrecord AeronPeerGroup [opts subscribers ticketing-counters compress-f decompress-f send-idle-strategy]
   component/Lifecycle
   (start [component]
     (taoensso.timbre/info "Starting Aeron Peer Group")
@@ -122,8 +115,8 @@
           receive-idle-strategy (backoff-strategy offer-idle-strategy-config)
           compress-f (or (:onyx.messaging/compress-fn opts) messaging-compress)
           decompress-f (or (:onyx.messaging/decompress-fn opts) messaging-decompress)
-          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)
-          aeron-conn (Aeron/connect ctx)]
+          ticketing-counters (atom {})
+          ctx (.errorHandler (Aeron$Context.) no-op-error-handler)]
       (when embedded-driver? 
         (.addShutdownHook (Runtime/getRuntime) 
                           (Thread. (fn [] 
@@ -135,10 +128,9 @@
              :media-driver media-driver
              :compress-f compress-f
              :decompress-f decompress-f
-             :shared-counters (atom {})
+             :ticketing-counters ticketing-counters
              :port port
-             :send-idle-strategy send-idle-strategy
-             :aeron-conn aeron-conn)))
+             :send-idle-strategy send-idle-strategy)))
 
   (stop [{:keys [media-driver media-driver-context subscribers] :as component}]
     (taoensso.timbre/info "Stopping Aeron Peer Group")
@@ -147,7 +139,7 @@
     (when media-driver-context (.deleteAeronDirectory ^MediaDriver$Context media-driver-context))
     (assoc component
            :bind-addr nil :external-addr nil :media-driver nil :media-driver-context nil 
-           :external-channel nil :compress-f nil :decompress-f nil :shared-counters nil 
+           :external-channel nil :compress-f nil :decompress-f nil :ticketing-counters nil 
            :send-idle-strategy nil)))
 
 (defn aeron-peer-group [opts]
@@ -199,16 +191,47 @@
 
 (defrecord AeronPeerConnection [channel stream-id peer-task-id])
 
-(defn aeron-channel [addr port]
-  (format "udp://%s:%s" addr port))
+;; Define stream-id as only allowed stream
+(def stream-id 1)
 
 (defmethod extensions/connection-spec AeronMessenger
   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/peer-task-id] :as peer-site}]
-  (let [sub-count (:subscriber-count (:messaging-group messenger))
-        ;; ensure that each machine spreads their use of a node/peer-group's
-        ;; streams evenly over the cluster
-        stream-id 1]
-    (->AeronPeerConnection (aeron-channel external-addr port) stream-id peer-task-id)))
+  (->AeronPeerConnection (mc/aeron-channel external-addr port) stream-id peer-task-id))
+
+(defmethod extensions/shared-ticketing-counter AeronMessenger
+  [messenger job-id peer-id task-id]
+  (let [path [job-id task-id peer-id]] 
+    (get-in (swap! (:ticketing-counters (:messaging-group messenger)) 
+                   (fn [tc]
+                     (if (get-in tc path)
+                        tc
+                       (assoc-in tc path (atom 0)))))
+            path)))
+
+(defmethod extensions/new-partial-subscriber AeronMessenger
+  [{:keys [messaging-group] :as messenger} job-id peer-id task-id]
+  (let [error-handler (reify ErrorHandler
+                        (onError [this x] 
+                          (taoensso.timbre/warn "Aeron messaging subscriber error:" x)))
+        ctx (-> (Aeron$Context.)
+                (.errorHandler error-handler))
+        conn (Aeron/connect ctx)
+        bind-addr (:bind-addr messaging-group)
+        port (:port messaging-group)
+        channel (mc/aeron-channel bind-addr port)
+        subscription (.addSubscription conn channel stream-id)]
+    {:subscription subscription
+     :conn conn
+     :counter (atom 0)
+     :ticket-counter (extensions/shared-ticketing-counter messenger job-id peer-id task-id)
+     :barrier (atom nil)
+     :src-peer-id peer-id}))
+
+(defmethod extensions/close-partial-subscriber AeronMessenger
+  [{:keys [messaging-group] :as messenger} partial-subscriber]
+  (info "Closing partial subscriber")
+  (.close ^Subscription (:subscription partial-subscriber))
+  (.close ^Aeron (:conn partial-subscriber)))
 
 (defn handle-message
   [barrier results subscriber-counter ticket-counter this-peer-id this-task-id src-peer-id buffer offset length header]
@@ -259,17 +282,6 @@
 (defn task-alive? [event]
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
 
-;; FIXME: Move counters map into aeron peer group 
-;; - lookup shared counter once and in subscription as key in subscription
-(def ticket-counters (atom {}))
-(defn ticket-counter [task-id src-peer-id]
-  (get (swap! ticket-counters 
-              (fn [tc]
-                (if (get tc [task-id src-peer-id])
-                  tc
-                  (assoc tc [task-id src-peer-id] (atom 0)))))
-       [task-id src-peer-id]))
-
 (defmethod extensions/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/task-map onyx.core/id onyx.core/task-id onyx.core/task 
                      onyx.core/subscription-maps]
@@ -277,13 +289,14 @@
   (let [rotated-subscriptions (swap! subscription-maps rotate)
         next-subscription (first (filter (comp nil? deref :barrier) rotated-subscriptions))]
     (if next-subscription
-      (let [{:keys [subscription src-peer-id counter barrier]} next-subscription
-            tc (ticket-counter task-id src-peer-id)
+      (let [{:keys [subscription src-peer-id counter ticket-counter barrier]} next-subscription
             results (atom [])
             fh (controlled-fragment-data-handler
                  (fn [buffer offset length header]
-                   (handle-message barrier results counter tc id task-id src-peer-id buffer offset length header)))]
+                   (handle-message barrier results counter ticket-counter id task-id src-peer-id buffer offset length header)))]
+        (info "Calling controlled poll")
         (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver)
+        (info "Done polling")
         @results)
       [])))
 
@@ -313,7 +326,7 @@
            (when (= ret Publication/CLOSED)
              (throw (Exception. "Wrote to closed publication.")))
            (neg? ret))
-    (debug "Re-offering message, session-id" (.sessionId pub))))
+    (info "Re-offering message, session-id" (.sessionId pub))))
 
 (defmethod extensions/send-messages AeronMessenger
   [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]

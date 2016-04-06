@@ -519,8 +519,6 @@ may be added by the user as the context is associated to throughout the task pip
                                               :doc "Logging context including more information about the task, peer and job ids."}
                        :onyx.core/params {:type [:any]
                                           :doc "The parameter sequence to be applied to the function that this task uses"}
-                       :onyx.core/subscriptions {:type :any
-                                                 :doc ""}
                        :onyx.core/aeron-conn {:type :any :doc ""}
                        :onyx.core/task-information {:type :record
                                                     :doc "Task information for this task. Mostly consists of data already in the event map."}

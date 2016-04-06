@@ -10,3 +10,6 @@
 (defn external-addr [peer-config]
   (or (:onyx.messaging/external-addr peer-config)
       (bind-addr peer-config)))
+
+(defn aeron-channel [addr port]
+  (format "udp://%s:%s" addr port))

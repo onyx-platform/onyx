@@ -58,6 +58,12 @@
 
 (defmulti connection-spec (fn [messenger peer-id event peer-site] (type messenger)))
 
+(defmulti shared-ticketing-counter (fn [messenger job-id peer-id task-id] (type messenger)))
+
+(defmulti new-partial-subscriber (fn [messenger job-id peer-id task-id] (type messenger)))
+
+(defmulti close-partial-subscriber (fn [messenger partial-subscriber] (type messenger)))
+
 (defmulti receive-messages (fn [messenger event] (type messenger)))
 
 (defmulti send-messages (fn [messenger peer-link messages] (type messenger)))

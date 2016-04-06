@@ -28,7 +28,7 @@
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.default-vals :refer [defaults arg-or-default]]
-            [onyx.messaging.protocol-aeron :as protocol]
+            [onyx.messaging.aeron :as messaging]
             [onyx.messaging.common :as mc])
   (:import [io.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
            [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
@@ -40,9 +40,6 @@
            [java.util.concurrent TimeUnit]))
 
 ;;;;
-
-(defn aeron-channel [addr port]
-  (format "udp://%s:%s" addr port))
 
 (def no-op-error-handler
   (reify ErrorHandler
@@ -69,24 +66,19 @@
         (info "Available image on:" (.channel subscription) (.streamId subscription) (.sessionId image) (.sourceIdentity image)))))) 
 
 (defn start-subscribers!
-  [ingress-task-ids conn bind-addr port stream-id idle-strategy task-type replica job-id this-task-id]
+  [messenger replica task-type ingress-task-ids job-id this-task-id]
   (if (= task-type :input)
     []
-    (map
+    (mapv
      (fn [src-peer-id]
-       (let [channel (aeron-channel bind-addr port)
-             subscription (.addSubscription conn channel stream-id)]
-         {:subscription subscription
-          :counter (atom 0)
-          :barrier (atom nil)
-          :src-peer-id src-peer-id}))
+       (extensions/new-partial-subscriber messenger job-id src-peer-id this-task-id))
      (common/src-peers replica ingress-task-ids job-id))))
 
 (defn stream-observer-handler [event this-task-id buffer offset length header]
   (let [ba (byte-array length)
         _ (.getBytes buffer offset ba)
         res (messaging-decompress ba)]
-    (when (and (map? res)
+    (when (and (instance? onyx.types.BarrierAck res)
                (= (:type res) :job-completed)
                (= (:onyx.core/id event) (:peer-id res)))
       (info "Should ack barrier on peer" (:peer-id res) (:barrier-epoch res))
@@ -105,21 +97,21 @@
      (onFragment [this buffer offset length header]
        (f buffer offset length header)))))
 
-(defn consumer [handler ^IdleStrategy idle-strategy limit]
+(defn consumer [handler ^IdleStrategy idle-strategy limit shutdown-atom]
   (reify Consumer
     (accept [this subscription]
-      (while (not (Thread/interrupted))
+      (while (not @shutdown-atom)
         (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
           (.idle idle-strategy fragments-read))))))
 
-(defn start-stream-observer! [conn bind-addr port stream-id idle-strategy event task-id]
-  (let [channel (aeron-channel bind-addr port)
+(defn start-stream-observer! [conn bind-addr port stream-id idle-strategy event task-id shutdown-atom]
+  (let [channel (mc/aeron-channel bind-addr port)
         subscription (.addSubscription conn channel stream-id)
         handler (fragment-data-handler
                  (fn [buffer offset length header]
                    (stream-observer-handler event task-id buffer offset length header)))
-        subscription-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10) subscription)
-                                    (catch Throwable e (fatal e))))]
+        subscription-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10 shutdown-atom) subscription)
+                                      (catch Throwable e (fatal e))))]
     {:subscription subscription
      :subscription-fut subscription-fut}))
 
@@ -407,17 +399,12 @@
 
             log-prefix (logger/log-prefix task-information)
             subscriptions (start-subscribers!
-                           (:ingress-ids task)
-                           aeron-conn
-                           (mc/bind-addr opts)
-                           (:onyx.messaging/peer-port opts)
-                           1
-                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
-                           (:onyx/type task-map)
+                           messenger
                            @replica
+                           (:onyx/type task-map)
+                           (:ingress-ids task)
                            job-id
                            task-id)
-            subscription-maps (atom subscriptions)
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -448,9 +435,8 @@
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/epoch (atom -1)
-                           :onyx.core/subscription-maps subscription-maps
-                           :onyx.core/aeron-conn aeron-conn
-                           :onyx.core/subscriptions subscriptions}
+                           :onyx.core/subscription-maps (atom subscriptions)
+                           :onyx.core/aeron-conn aeron-conn}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 
@@ -492,7 +478,8 @@
 
         (info log-prefix "Enough peers are active, starting the task")
 
-        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))]
+        (let [task-lifecycle-ch (thread (run-task-lifecycle pipeline-data kill-ch ex-f))
+              observer-shutdown-atom (atom false)]
           (s/validate Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
@@ -501,13 +488,15 @@
                  :task-kill-ch task-kill-ch
                  :kill-ch kill-ch
                  :task-lifecycle-ch task-lifecycle-ch
+                 :stream-observer-shutdown-atom observer-shutdown-atom
                  :stream-observer (start-stream-observer! aeron-conn
                                                           (mc/bind-addr opts)
                                                           (:onyx.messaging/peer-port opts)
                                                           1
                                                           (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
                                                           pipeline-data
-                                                          task-id))))
+                                                          task-id
+                                                          observer-shutdown-atom))))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
@@ -536,10 +525,13 @@
         (when (exactly-once-task? event)
           (state-extensions/close-filter @filter-state event)))
 
-      (doseq [subscriber (:onyx.core/subscribers event)]
-        (.close ^Subscription (:subscription subscriber)))
+      (doseq [subscriber @(:onyx.core/subscription-maps event)]
+        (extensions/close-partial-subscriber messenger subscriber))
 
-      (future-cancel (:subscription-fut (:stream-observer component)))
+      (reset! (:stream-observer-shutdown-atom component) true)
+      (info "Waiting for stream observer shutdown")
+      (deref (:subscription-fut (:stream-observer component)))
+      (info "Stream observer has shutdown")
       (.close ^Subscription (:subscription (:stream-observer component)))
       (.close ^Aeron (:onyx.core/aeron-conn event))
 
