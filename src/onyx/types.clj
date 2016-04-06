@@ -25,6 +25,8 @@
 
 (defrecord Barrier [src-peer-id barrier-epoch src-task-id dst-task-id msg-id])
 
+(defrecord BarrierAck [barrier-epoch job-id task-id peer-id type])
+
 (defrecord Results [tree acks segments retries])
 
 (defrecord Result [root leaves])

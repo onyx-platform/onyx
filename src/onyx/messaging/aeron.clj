@@ -221,26 +221,29 @@
           ControlledFragmentHandler$Action/ABORT
           (and (= (:dst-task-id message) this-task-id)
                (= (:src-peer-id message) src-peer-id))
-            (cond (instance? onyx.types.Barrier message)
-                  (if (empty? @results)
-                    (do (reset! barrier message)
-                        ControlledFragmentHandler$Action/BREAK)  
-                    ControlledFragmentHandler$Action/ABORT)
-                  (instance? onyx.types.Leaf message)
-                  (let [message-id @subscriber-counter 
-                        ticket-id @ticket-counter]
-                    (swap! subscriber-counter inc)
-                    (cond (< message-id ticket-id)
-                          ControlledFragmentHandler$Action/CONTINUE
-                          (= message-id ticket-id)
-                          (do (when (compare-and-set! ticket-counter ticket-id (inc ticket-id))
-                                (swap! results conj message))
-                              ControlledFragmentHandler$Action/CONTINUE)
-                          (> message-id ticket-id)
-                          (throw (ex-info "Shouldn't be possible to get ahead of a ticket id " {:message-id message-id :ticket-id ticket-id}))))
-                  ;; Skip over job completion acks
-                  :else 
-                  ControlledFragmentHandler$Action/CONTINUE))))
+          (cond (instance? onyx.types.Leaf message)
+                (let [message-id @subscriber-counter 
+                      ticket-id @ticket-counter]
+                  (swap! subscriber-counter inc)
+                  (cond (< message-id ticket-id)
+                        ControlledFragmentHandler$Action/CONTINUE
+                        (= message-id ticket-id)
+                        (do (when (compare-and-set! ticket-counter ticket-id (inc ticket-id))
+                              (swap! results conj message))
+                            ControlledFragmentHandler$Action/CONTINUE)
+                        (> message-id ticket-id)
+                        (throw (ex-info "Shouldn't be possible to get ahead of a ticket id " {:message-id message-id :ticket-id ticket-id}))))
+                (instance? onyx.types.Barrier message)
+                (if (empty? @results)
+                  (do (reset! barrier message)
+                      ControlledFragmentHandler$Action/BREAK)  
+                  ControlledFragmentHandler$Action/ABORT)
+
+                (instance? onyx.types.BarrierAck message)
+                ControlledFragmentHandler$Action/CONTINUE
+
+                :else 
+                (throw (ex-info "No other types of message exist."))))))
 
 (defn controlled-fragment-data-handler [f]
   (ControlledFragmentAssembler.
