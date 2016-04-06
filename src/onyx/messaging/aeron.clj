@@ -11,12 +11,12 @@
             [onyx.extensions :as extensions]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription FragmentAssembler]
-           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-           [uk.co.real_logic.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]
-           [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.concurrent 
+  (:import [io.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription FragmentAssembler]
+           [io.aeron.logbuffer FragmentHandler]
+           [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+           [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]
+           [org.agrona ErrorHandler]
+           [org.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))

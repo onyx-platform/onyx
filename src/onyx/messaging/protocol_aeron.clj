@@ -2,8 +2,8 @@
   (:require [taoensso.timbre :as timbre]
             [onyx.types :refer [->Leaf ->Ack ->Barrier]])
   (:import [java.util UUID]
-           [uk.co.real_logic.agrona.concurrent UnsafeBuffer]
-           [uk.co.real_logic.agrona DirectBuffer MutableDirectBuffer]))
+           [org.agrona.concurrent UnsafeBuffer]
+           [org.agrona DirectBuffer MutableDirectBuffer]))
 
 ;;;;;;
 ;; Constants

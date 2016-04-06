@@ -3,7 +3,7 @@
             [onyx.messaging.aeron :as a]
             [onyx.types :refer [map->Barrier]]
             [onyx.api])
-  (:import [uk.co.real_logic.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
+  (:import [io.aeron.logbuffer ControlledFragmentHandler ControlledFragmentHandler$Action]))
 
 (deftest test-rotate
   (is (= [] (a/rotate [])))

@@ -30,11 +30,11 @@
             [onyx.static.default-vals :refer [defaults arg-or-default]]
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as mc])
-  (:import [uk.co.real_logic.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
-           [uk.co.real_logic.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
-           [uk.co.real_logic.aeron.logbuffer FragmentHandler]
-           [uk.co.real_logic.agrona ErrorHandler]
-           [uk.co.real_logic.agrona.concurrent 
+  (:import [io.aeron Aeron Aeron$Context FragmentAssembler Publication Subscription AvailableImageHandler]
+           [io.aeron.driver MediaDriver MediaDriver$Context ThreadingMode]
+           [io.aeron.logbuffer FragmentHandler]
+           [org.agrona ErrorHandler]
+           [org.agrona.concurrent 
             UnsafeBuffer IdleStrategy BackoffIdleStrategy BusySpinIdleStrategy]
            [java.util.function Consumer]
            [java.util.concurrent TimeUnit]))
