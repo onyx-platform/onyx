@@ -10,7 +10,7 @@
             [onyx.types :as types]
             [onyx.static.uuid :as uuid]
             [onyx.log.commands.peer-replica-view :refer [peer-site]]
-            [onyx.types :refer [map->Barrier]]
+            [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
 
@@ -69,12 +69,13 @@
                 (common/root-tasks workflow task))] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
             (when-let [site (peer-site peer-replica-view p)]
-              (onyx.extensions/internal-complete-segment messenger
-                                                         {:barrier-epoch barrier-epoch
-                                                          :job-id job-id
-                                                          :task-id task-id
-                                                          :peer-id p
-                                                          :type :job-completed}
-                                                         site))))
+              (onyx.extensions/ack-barrier messenger
+                                           (map->BarrierAck 
+                                            {:barrier-epoch barrier-epoch
+                                             :job-id job-id
+                                             :task-id task-id
+                                             :peer-id p
+                                             :type :job-completed})
+                                           site))))
         (run! (fn [s] (reset! (:barrier s) nil)) @subscription-maps))))
   event)

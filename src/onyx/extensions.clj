@@ -66,13 +66,7 @@
 
 (defmulti close-peer-connection (fn [messenger event link] (type messenger)))
 
-(defmulti internal-ack-segment (fn [messenger peer-link ack]
-                                  (type messenger)))
-
-(defmulti internal-ack-segments (fn [messenger peer-link acks]
-                                  (type messenger)))
-
-(defmulti internal-complete-segment (fn [messenger id peer-link] (type messenger)))
+(defmulti ack-barrier (fn [messenger id peer-link] (type messenger)))
 
 (defmulti internal-retry-segment (fn [messenger id peer-link] (type messenger)))
 

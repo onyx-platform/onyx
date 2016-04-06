@@ -325,7 +325,7 @@
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
     (write pub buf)))
 
-(defmethod extensions/internal-complete-segment AeronMessenger
+(defmethod extensions/ack-barrier AeronMessenger
   [{:keys [publications]} completion-message {:keys [channel stream-id] :as conn-spec}]
   (let [pub (get-publication publications channel stream-id)
         buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-message))]

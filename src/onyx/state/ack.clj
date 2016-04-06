@@ -22,7 +22,7 @@
   (ack [this _ ack-val]
     (when (dec-count! ack-val)
       (when-let [site (peer-site peer-replica-view (:completion-id ack-val))]
-        (extensions/internal-ack-segment messenger site ack-val)))
+        (extensions/ack-barrier messenger site ack-val)))
     this))
 
 (defrecord DeduplicationAckState [ack-state peer-replica-view messenger]
@@ -53,7 +53,7 @@
         (run! (fn [ack-val] 
                 (when (dec-count! ack-val)
                   (when-let [site (peer-site peer-replica-view (:completion-id ack-val))]
-                    (extensions/internal-ack-segment messenger site ack-val)))) 
+                    (extensions/ack-barrier messenger site ack-val)))) 
               (old-val id))) 
       this)))
 
