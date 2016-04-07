@@ -1,7 +1,6 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
-            [org.apache.log4j BasicConfigurator]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
@@ -11,6 +10,7 @@
             [onyx.monitoring.measurements :refer [measure-latency]]
             [onyx.log.entry :refer [create-log-entry]])
   (:import [org.apache.curator.test TestingServer]
+           [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
