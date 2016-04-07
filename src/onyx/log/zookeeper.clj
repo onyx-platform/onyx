@@ -1,6 +1,7 @@
 (ns onyx.log.zookeeper
   (:require [clojure.core.async :refer [chan >!! <!! close! thread]]
             [com.stuartsierra.component :as component]
+            [org.apache.log4j BasicConfigurator]
             [taoensso.timbre :refer [fatal warn info trace]]
             [onyx.log.curator :as zk]
             [onyx.extensions :as extensions]
@@ -96,6 +97,7 @@
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
+    (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
           conn (zk/connect (:zookeeper/address config))]
