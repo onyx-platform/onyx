@@ -12,8 +12,7 @@
 (defn inject-reader
   [event lifecycle]
   (when-not (:core.async/chan event)
-    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle"
-                    {:event-map-keys (keys event)})))
+    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle" {})))
 
   (let [task (:onyx.core/task-map event)]
     (when (and (not= (:onyx/max-peers task) 1)
@@ -34,8 +33,7 @@
 (defn inject-writer
   [event lifecycle]
   (when-not (:core.async/chan event)
-    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle"
-                    {:event-map-keys (keys event)})))
+    (throw (ex-info ":core.async/chan not found - add it using a :before-task-start lifecycle" {})))
 
   (let [task (:onyx.core/task-map event)]
     (when (and (not= (:onyx/max-peers task) 1)
