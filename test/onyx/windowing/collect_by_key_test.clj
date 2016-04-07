@@ -23,11 +23,11 @@
    {:id 14 :team :a :event-time #inst "2015-09-13T03:32:00.829-00:00"}
    {:id 15 :team :c :event-time #inst "2015-09-13T03:16:00.829-00:00"}])
 
-(def test-state (atom []))
+(def test-state (promise))
 
-(defn update-atom! [event window trigger {:keys [event-type segment] :as opts} state]
-  (prn segment)
-  (prn state))
+(defn update-atom! [event window trigger {:keys [event-type] :as opts} state]
+  (when (= :job-completed event-type)
+    (deliver test-state state)))
 
 (def in-chan (atom nil))
 
@@ -105,7 +105,6 @@
 
     (reset! in-chan (chan (inc (count input))))
     (reset! out-chan (chan (sliding-buffer (inc (count input)))))
-    (reset! test-state [])
 
     (with-test-env [test-env [3 env-config peer-config]]
       (onyx.api/submit-job
@@ -125,4 +124,24 @@
 
       (let [results (take-segments! @out-chan)]
         (is (= (into #{} input) (into #{} (butlast results))))
-        (is (= :done (last results)))))))
+        (is (= :done (last results)))
+        (let [state (deref test-state 5000 nil)]
+          (is (= {:a
+                  #{{:id 4  :team :a :event-time #inst "2015-09-13T03:06:00.829-00:00"}
+                    {:id 9  :team :a :event-time #inst "2015-09-13T03:25:00.829-00:00"}
+                    {:id 5  :team :a :event-time #inst "2015-09-13T03:07:00.829-00:00"}
+                    {:id 12 :team :a :event-time #inst "2015-09-13T03:56:00.829-00:00"}
+                    {:id 2  :team :a :event-time #inst "2015-09-13T03:04:00.829-00:00"}
+                    {:id 1  :team :a :event-time #inst "2015-09-13T03:00:00.829-00:00"}
+                    {:id 11 :team :a :event-time #inst "2015-09-13T03:03:00.829-00:00"}
+                    {:id 14 :team :a :event-time #inst "2015-09-13T03:32:00.829-00:00"}
+                    {:id 7  :team :a :event-time #inst "2015-09-13T03:09:00.829-00:00"}}
+                  :b
+                  #{{:id 13 :team :b :event-time #inst "2015-09-13T03:59:00.829-00:00"}
+                    {:id 3  :team :b :event-time #inst "2015-09-13T03:05:00.829-00:00"}
+                    {:id 6  :team :b :event-time #inst "2015-09-13T03:08:00.829-00:00"}}
+                  :c
+                  #{{:id 8  :team :c :event-time #inst "2015-09-13T03:15:00.829-00:00"}
+                    {:id 15 :team :c :event-time #inst "2015-09-13T03:16:00.829-00:00"}
+                    {:id 10 :team :c :event-time #inst "2015-09-13T03:45:00.829-00:00"}}}
+                 state)))))))
