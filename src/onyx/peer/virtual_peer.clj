@@ -54,7 +54,7 @@
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-peer-view (extensions/peer-replica-view log entry replica new-replica peer-view diff state opts)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)
-                  annotated-reactions (map (partial annotate-reaction entry id) reactions)]
+                  annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)
               (recur (send-to-outbox new-state annotated-reactions)))))))
