@@ -27,7 +27,7 @@
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
-                 [com.taoensso/nippy "2.10.0"]
+                 [com.taoensso/nippy "2.11.1"]
                  [uk.co.real-logic/aeron-all "0.9.1"]
                  [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
