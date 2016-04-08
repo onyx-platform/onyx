@@ -22,9 +22,9 @@
       peer-annotated)))
 
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
-  (try
-    (let [replica-atom (atom nil)
-          peer-view-atom (atom {})]
+  (let [replica-atom (atom nil)
+        peer-view-atom (atom {})]
+    (try
       (reset! replica-atom origin)
       (loop [state (merge {:id id
                            :task-component-fn task-component-fn
@@ -57,12 +57,13 @@
                   annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
               (reset! peer-view-atom new-peer-view)
-              (recur (send-to-outbox new-state annotated-reactions)))))))
-    (catch Throwable e
-      (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
-      (close! restart-ch))
-    (finally
-      (taoensso.timbre/info (format "Peer %s: finished of processing loop" id)))))
+              (recur (send-to-outbox new-state annotated-reactions))))))
+      (catch Throwable e
+        (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
+        (close! restart-ch))
+      (finally
+        ;; call peer replica view side effects shutdown stuff here
+        (taoensso.timbre/info (format "Peer %s: finished of processing loop" id))))))
 
 (defn outbox-loop [id log outbox-ch restart-ch]
   (try

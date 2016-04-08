@@ -56,8 +56,6 @@
 
 (defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
 
-(defmulti connection-spec (fn [messenger peer-id event peer-site] (type messenger)))
-
 (defmulti shared-ticketing-counter (fn [messenger job-id peer-id task-id] (type messenger)))
 
 (defmulti new-partial-subscriber (fn [messenger job-id peer-id task-id] (type messenger)))

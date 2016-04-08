@@ -194,9 +194,9 @@
 ;; Define stream-id as only allowed stream
 (def stream-id 1)
 
-(defmethod extensions/connection-spec AeronMessenger
-  [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/peer-task-id] :as peer-site}]
-  (->AeronPeerConnection (mc/aeron-channel external-addr port) stream-id peer-task-id))
+; (defmethod extensions/connection-spec AeronMessenger
+;   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/peer-task-id] :as peer-site}]
+;   (->AeronPeerConnection (mc/aeron-channel external-addr port) stream-id peer-task-id))
 
 (defmethod extensions/shared-ticketing-counter AeronMessenger
   [messenger job-id peer-id task-id]
@@ -300,24 +300,16 @@
         @results)
       [])))
 
-(defn get-publication [publications channel stream-id]
-  (if-let [pub (:pub (get @publications [channel stream-id]))]
-    pub
-    (let [error-handler (reify ErrorHandler
-                          (onError [this x] 
-                            (taoensso.timbre/warn "Aeron messaging publication error:" x)))
-          ctx (-> (Aeron$Context.)
-                  (.errorHandler error-handler))
-          conn (Aeron/connect ctx)
-          pub (.addPublication conn channel stream-id)
-          v {:conn conn :pub pub}
-          rets (swap! publications assoc [channel stream-id] v)]
-      (if (= (get rets [channel stream-id]) v)
-        pub
-        (do (prn "Enountered a race! Closing one of them.")
-            (.close pub)
-            (.close conn)
-            (:pub (get rets [channel stream-id])))))))
+(defn new-publication [peer-site]
+  (let [channel (mc/aeron-channel (:aeron/external-addr peer-site) (:aeron/port peer-site))
+        error-handler (reify ErrorHandler
+                        (onError [this x] 
+                          (taoensso.timbre/warn "Aeron messaging publication error:" x)))
+        ctx (-> (Aeron$Context.)
+                (.errorHandler error-handler))
+        conn (Aeron/connect ctx)
+        pub (.addPublication conn channel stream-id)]
+    {:conn conn :pub pub}))
 
 (defn write [^Publication pub ^UnsafeBuffer buf]
   ;; Needs an escape mechanism so it can break if a peer is shutdown
@@ -329,20 +321,17 @@
     (info "Re-offering message, session-id" (.sessionId pub))))
 
 (defmethod extensions/send-messages AeronMessenger
-  [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} batch]
-  (let [pub (get-publication publications channel stream-id)]
-    (doseq [b batch]
-      (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress b))]
-        (write pub buf)))))
+  [messenger publication batch]
+  (doseq [b batch]
+    (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress b))]
+      (write publication buf))))
 
 (defmethod extensions/send-barrier AeronMessenger
-  [{:keys [publications]} {:keys [channel stream-id] :as conn-spec} barrier]
-  (let [pub (get-publication publications channel stream-id)
-        buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
-    (write pub buf)))
+  [messenger publication barrier]
+  (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
+    (write publication buf)))
 
 (defmethod extensions/ack-barrier AeronMessenger
-  [{:keys [publications]} completion-message {:keys [channel stream-id] :as conn-spec}]
-  (let [pub (get-publication publications channel stream-id)
-        buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress completion-message))]
-    (write pub buf)))
+  [messenger publication ack-message]
+  (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress ack-message))]
+    (write publication buf)))

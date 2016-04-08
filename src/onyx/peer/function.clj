@@ -62,20 +62,16 @@
   (when (= (:onyx/type task-map) :output)
     (let [replica-val @replica]
       (when-let [barrier-epoch (b/barrier-epoch event)]
-        (let [root-task-ids
-              (map
-                (fn [root-task]
-                  (get-in replica-val [:task-name->id job-id root-task]))
-                (common/root-tasks workflow task))] 
+        (let [root-task-ids (:root-task-ids @peer-replica-view)] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
             (when-let [site (peer-site peer-replica-view p)]
               (onyx.extensions/ack-barrier messenger
+                                           site
                                            (map->BarrierAck 
                                             {:barrier-epoch barrier-epoch
                                              :job-id job-id
                                              :task-id task-id
                                              :peer-id p
-                                             :type :job-completed})
-                                           site))))
+                                             :type :job-completed})))))
         (run! (fn [s] (reset! (:barrier s) nil)) @subscription-maps))))
   event)
