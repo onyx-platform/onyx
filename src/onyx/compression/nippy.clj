@@ -42,12 +42,12 @@
 (defn window-log-decompress [x]
   (nippy/thaw x window-log-decompress-opts))
 
-(def localdb-compress-opts {:skip-header? true :compressor nil :encryptor nil :password nil})
+(def localdb-compress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
 (defn localdb-compress [x]
   (nippy/freeze x localdb-compress-opts))
 
-(def local-db-decompress-opts {:v1-compatibility? false :compressor nil :encryptor nil})
+(def local-db-decompress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
 (defn localdb-decompress [x]
   (nippy/thaw x local-db-decompress-opts))
