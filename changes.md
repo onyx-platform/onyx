@@ -1,3 +1,9 @@
+#### 0.9.1
+
+- New aggregation: added `onyx.windowing.aggregation/collect-by-key` aggregation.
+- Bug fix: Exceptions were being swallowed by Curator's logging configuration. [#563](https://github.com/onyx-platform/onyx/issues/563)
+- Bug fix: Some exceptions that kill jobs were failing to be serialized to ZooKeeper by Nippy. [#564](https://github.com/onyx-platform/onyx/issues/564)
+
 #### 0.9.0
 
 - **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`
