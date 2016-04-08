@@ -25,9 +25,8 @@
   (nippy/thaw x messaging-decompress-opts))
 
 (def zookeeper-compress-opts {})
-(def aaa (atom []))
+
 (defn zookeeper-compress [x]
-  (swap! aaa conj x)
   (nippy/freeze x zookeeper-compress-opts))
 
 (def zookeeper-decompress-opts {:v1-compatibility? false})
