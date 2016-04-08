@@ -1,5 +1,18 @@
 (ns onyx.compression.nippy
-  (:require [taoensso.nippy :as nippy]))
+  (:require [taoensso.nippy :as nippy]
+            [schema.utils :as su])
+  (:import [schema.utils ValidationError NamedError]))
+
+(nippy/extend-freeze clojure.lang.ExceptionInfo :onyx/exception-info
+                     [x data-output]
+                     (.writeUTF data-output (str {:ex (.getData x)
+                                                  :str (.getMessage x)
+                                                  :cause (.getCause x)})))
+
+(nippy/extend-thaw :onyx/exception-info
+                   [data-input]
+                   (let [{:keys [ex str cause]} (read-string (.readUTF data-input))]
+                     (clojure.lang.ExceptionInfo. str ex cause)))
 
 (def messaging-compress-opts {})
 
