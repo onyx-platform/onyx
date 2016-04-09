@@ -90,16 +90,13 @@
                             (common/root-tasks workflow (:name task)))
             {:keys [peer-state]} new-replica
             receivable-peers (common/job-receivable-peers peer-state allocations job-id)
-            ;; TODO implement acking peer publications / task-id / peer-id
             slot-ids (get-in new-replica [:task-slot-ids job-id])
             peer-sites (:peer-sites new-replica)
             egress-ids (:egress-ids task)
             egress-sites (set (map peer-sites (distinct (mapcat receivable-peers (vals egress-ids)))))
             old-egress-sites (set (keys (:site->publication old-peer-replica-state)))
-            _ (info "old egress sites " old-egress-sites)
             new-egress-sites (difference egress-sites old-egress-sites)
             stale-egress-sites (difference old-egress-sites egress-sites)
-            _ (info (:id state) (:message-id entry) "new egress sites " new-egress-sites "stale " stale-egress-sites "site to pub" (:site->publication old-peer-replica-state))
             cont-egress-sites (intersection egress-sites old-egress-sites)
             cont-site->publication (select-keys (:site->publication old-peer-replica-state) cont-egress-sites)
             new-site->publication (zipmap new-egress-sites (mapv aeron/new-publication new-egress-sites))
@@ -108,11 +105,7 @@
             task-id->publications (task-egress-publications egress-ids receivable-peers peer-sites site->publication)
             barrier-publications (mapv :pub (vals site->publication))
             stale-publications (map (:site->publication old-peer-replica-state) stale-egress-sites)]
-        ;; Cleanup stale egress sites
-        (info "removing stale publication " (vec stale-publications))
         (run! remove-publication stale-publications)
-        (info "egress publications " egress-sites)
-        (info "site->publication " site->publication "task-id->publications" task-id->publications "barrier-publications" barrier-publications)
         (->PeerReplicaView site->publication task-id->publications barrier-publications root-task-ids job-id task-id workflow catalog task))
       (do
         (stop-task-state old-peer-replica-state)
