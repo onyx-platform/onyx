@@ -14,7 +14,7 @@
 
 ;; Peer replica view interface
 
-(defmulti peer-replica-view 
+(defmulti peer-replica-state 
   (fn [log entry old-replica new-replica diff old-view state opts] 
     :default))
 

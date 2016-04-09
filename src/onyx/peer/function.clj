@@ -9,7 +9,6 @@
             [clj-tuple :as t]
             [onyx.types :as types]
             [onyx.static.uuid :as uuid]
-            [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.types :refer [map->Barrier map->BarrierAck]]
             [taoensso.timbre :as timbre :refer [debug info]])
   (:import [java.util UUID]))
@@ -56,15 +55,15 @@
 (defn ack-barrier!
   [{:keys [onyx.core/replica onyx.core/compiled onyx.core/id onyx.core/workflow
            onyx.core/job-id onyx.core/task-map onyx.core/messenger onyx.core/task
-           onyx.core/task-id onyx.core/peer-replica-view onyx.core/subscription-maps
+           onyx.core/task-id onyx.core/peer-replica-state onyx.core/subscription-maps
            onyx.core/barrier]
     :as event}]
   (when (= (:onyx/type task-map) :output)
     (let [replica-val @replica]
-      (when-let [barrier-epoch (b/barrier-epoch event)]
-        (let [root-task-ids (:root-task-ids @peer-replica-view)] 
+      #_(when-let [barrier-epoch (b/barrier-epoch event)]
+        (let [root-task-ids (:root-task-ids @peer-replica-state)] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
-            (when-let [site (peer-site peer-replica-view p)]
+            (when-let [site (peer-site peer-replica-state p)]
               (onyx.extensions/ack-barrier messenger
                                            site
                                            (map->BarrierAck 

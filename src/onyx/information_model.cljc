@@ -564,7 +564,7 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The options that this peer was started with"}
                        :onyx.core/replica {:type :replica-atom
                                            :doc "The replica that this peer has currently accrued"}
-                       :onyx.core/peer-replica-view {:type :peer-replica-view-atom
+                       :onyx.core/peer-replica-state {:type :peer-replica-state-atom
                                                      :doc "Specialised view over the replica generated specifically for this peer"}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
@@ -1418,7 +1418,7 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/lifecycle-id
                :onyx.core/peer-opts
                :onyx.core/replica
-               :onyx.core/peer-replica-view
+               :onyx.core/peer-replica-state
                :onyx.core/task-information 
                :onyx.core/outbox-ch
                :onyx.core/kill-ch 

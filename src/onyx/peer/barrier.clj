@@ -1,6 +1,5 @@
 (ns ^:no-doc onyx.peer.barrier
-  (:require [onyx.log.commands.peer-replica-view :refer [peer-site]]
-            [onyx.log.commands.common :as common]
+  (:require [onyx.log.commands.common :as common]
             [onyx.extensions]
             [taoensso.timbre :as timbre :refer [debug info]]
             [onyx.types :refer [->Barrier]]))
@@ -16,12 +15,12 @@
 
 (defn emit-barrier
   [{:keys [onyx.core/id onyx.core/task-id onyx.core/job-id onyx.core/compiled] :as event}
-   messenger replica-val peer-replica-view barrier-epoch]
-  (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-view)))
+   messenger replica-val peer-replica-state barrier-epoch]
+  (let [downstream-task-ids (vals (:egress-ids (:task @peer-replica-state)))
         ;; FIXME: Shouldn't be sending once per downstream peer. Should be once per downstream task on a single host
         downstream-peers (mapcat #(get-in replica-val [:allocations job-id %]) downstream-task-ids)]
     (doseq [target downstream-peers]
-      (when-let [site (peer-site peer-replica-view target)]
+      #_(when-let [site (peer-site peer-replica-state target)]
         (let [b (->Barrier id
                            barrier-epoch 
                            task-id

@@ -5,6 +5,7 @@
             [taoensso.timbre :as timbre]
             [onyx.peer.operation :as operation]
             [onyx.log.entry :refer [create-log-entry]]
+            [onyx.log.commands.peer-replica-state :refer [stop-task-state]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
@@ -23,13 +24,13 @@
 
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
   (let [replica-atom (atom nil)
-        peer-view-atom (atom {})]
+        peer-replica-state-atom (atom {})]
     (try
       (reset! replica-atom origin)
       (loop [state (merge {:id id
                            :task-component-fn task-component-fn
                            :replica replica-atom
-                           :peer-replica-view peer-view-atom
+                           :peer-replica-state peer-replica-state-atom
                            :log log
                            :buffered-outbox []
                            :messenger messenger
@@ -40,7 +41,7 @@
                            :restart-ch restart-ch}
                           (:onyx.peer/state opts))]
         (let [replica @replica-atom
-              peer-view @peer-view-atom
+              peer-task-state @peer-replica-state-atom
               [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
           (cond 
             (instance? java.lang.Throwable entry) 
@@ -52,16 +53,17 @@
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
-                  new-peer-view (extensions/peer-replica-view log entry replica new-replica peer-view diff state opts)
+                  new-peer-task-state (extensions/peer-replica-state log entry replica new-replica diff peer-task-state state opts)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)
                   annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
-              (reset! peer-view-atom new-peer-view)
+              (reset! peer-replica-state-atom new-peer-task-state)
               (recur (send-to-outbox new-state annotated-reactions))))))
       (catch Throwable e
         (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
         (close! restart-ch))
       (finally
+        (stop-task-state @peer-replica-state-atom)
         ;; call peer replica view side effects shutdown stuff here
         (taoensso.timbre/info (format "Peer %s: finished of processing loop" id))))))
 

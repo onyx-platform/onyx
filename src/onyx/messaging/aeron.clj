@@ -78,12 +78,12 @@
   [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}
    task-buffer]
-  (swap! short-ids assoc :peer-task-short-id peer-task-id))
+  #_(swap! short-ids assoc :peer-task-short-id peer-task-id))
 
 (defmethod extensions/unregister-task-peer AeronMessenger
   [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}]
-  (swap! short-ids dissoc peer-task-id))
+  #_(swap! short-ids dissoc peer-task-id))
 
 (defn get-threading-model
   [media-driver]
@@ -175,7 +175,8 @@
 
 (defmethod extensions/assign-task-resources :aeron
   [replica peer-id task-id peer-site peer-sites]
-  {:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
+  {}
+  #_{:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
 
 (defmethod extensions/get-peer-site :aeron
   [replica peer]
@@ -294,13 +295,12 @@
             fh (controlled-fragment-data-handler
                  (fn [buffer offset length header]
                    (handle-message barrier results counter ticket-counter id task-id src-peer-id buffer offset length header)))]
-        (info "Calling controlled poll")
         (.controlledPoll ^Subscription subscription ^ControlledFragmentHandler fh fragment-limit-receiver)
-        (info "Done polling")
         @results)
       [])))
 
 (defn new-publication [peer-site]
+  (info "Creating new pub")
   (let [channel (mc/aeron-channel (:aeron/external-addr peer-site) (:aeron/port peer-site))
         error-handler (reify ErrorHandler
                         (onError [this x] 

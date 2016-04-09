@@ -29,7 +29,7 @@
             [onyx.log.commands.gc]
             [onyx.log.commands.backpressure-on]
             [onyx.log.commands.backpressure-off]
-            [onyx.log.commands.peer-replica-view]
+            [onyx.log.commands.peer-replica-state]
             [onyx.log.commands.compact-bookkeeper-log-ids]
             [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.commands.deleted-bookkeeper-log-ids]

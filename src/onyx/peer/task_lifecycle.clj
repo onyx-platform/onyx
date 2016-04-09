@@ -24,7 +24,6 @@
             [onyx.plugin.onyx-output :as oo]
             [onyx.plugin.onyx-plugin :as op]
             [onyx.flow-conditions.fc-routing :as r]
-            [onyx.log.commands.peer-replica-view :refer [peer-site]]
             [onyx.static.logging :as logger]
             [onyx.state.state-extensions :as state-extensions]
             [onyx.static.default-vals :refer [defaults arg-or-default]]
@@ -229,15 +228,15 @@
                         (:tree results))]
     (assoc event :onyx.core/results (persistent-results! results))))
 
-(s/defn flow-retry-segments :- Event
-  [{:keys [peer-replica-view state messenger monitoring] :as compiled} 
-   {:keys [onyx.core/results] :as event} :- Event]
-  (doseq [root (:retries results)]
-    (when-let [site (peer-site peer-replica-view (:completion-id root))]
-      (emit-latency :peer-retry-segment
-                    monitoring
-                    #(extensions/internal-retry-segment messenger (:id root) site))))
-  event)
+; (s/defn flow-retry-segments :- Event
+;   [{:keys [peer-replica-state state messenger monitoring] :as compiled} 
+;    {:keys [onyx.core/results] :as event} :- Event]
+;   (doseq [root (:retries results)]
+;     (when-let [site (peer-site peer-replica-state (:completion-id root))]
+;       (emit-latency :peer-retry-segment
+;                     monitoring
+;                     #(extensions/internal-retry-segment messenger (:id root) site))))
+;   event)
 
 (s/defn gen-lifecycle-id
   [event]
@@ -249,16 +248,16 @@
    :output #'function/read-function-batch})
 
 (defn read-batch
-  [{:keys [peer-replica-view task-type pipeline] :as compiled}
+  [{:keys [peer-replica-state task-type pipeline] :as compiled}
    event]
-  (if (and (= task-type :input) (:backpressure? @peer-replica-view))
+  (if (and (= task-type :input) (:backpressure? @peer-replica-state))
     (assoc event :onyx.core/batch '())
     (let [f (get input-readers task-type)
           rets (merge event (f event))]
       (merge event (lc/invoke-after-read-batch compiled rets)))))
 
 (s/defn tag-messages :- Event
-  [{:keys [peer-replica-view task-type id] :as compiled} event :- Event]
+  [{:keys [peer-replica-state task-type id] :as compiled} event :- Event]
   (if (= task-type :input)
     (update event
             :onyx.core/batch
@@ -324,7 +323,7 @@
            (build-new-segments compiled)
            (lc/invoke-assign-windows assign-windows compiled)
            (lc/invoke-write-batch write-batch compiled)
-           (flow-retry-segments compiled)
+           ;(flow-retry-segments compiled)
            (function/ack-barrier!)
            (lc/invoke-after-batch compiled)))
     (catch Throwable e
@@ -385,7 +384,7 @@
   (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
+    [id log messenger-buffer messenger job-id task-id replica peer-replica-state restart-ch log-prefix
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
@@ -431,7 +430,7 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn task-map)
                            :onyx.core/replica replica
-                           :onyx.core/peer-replica-view peer-replica-view
+                           :onyx.core/peer-replica-state peer-replica-state
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/epoch (atom -1)
