@@ -39,7 +39,7 @@
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)
         peer-config (assoc (:peer-config config) :onyx/tenancy-id id)]
-    (with-test-env [test-env [4 env-config peer-config]]
+    (with-test-env [test-env [7 env-config peer-config]]
       (let [batch-size 20
             catalog [{:onyx/name :in-1
                       :onyx/plugin :onyx.plugin.core-async/input

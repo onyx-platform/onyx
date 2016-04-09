@@ -2,16 +2,15 @@
   (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
-            [taoensso.timbre :as timbre]
+            [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.commands.peer-replica-state :refer [stop-task-state]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
-(defn send-to-outbox [{:keys [outbox-ch] :as state} reactions]
+(defn send-to-outbox! [{:keys [outbox-ch] :as state} reactions]
   (doseq [reaction reactions]
-    (clojure.core.async/>!! outbox-ch reaction))
-  state)
+    (clojure.core.async/>!! outbox-ch reaction)))
 
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
@@ -23,47 +22,44 @@
       peer-annotated)))
 
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
-  (let [replica-atom (atom nil)
-        peer-replica-state-atom (atom {})]
+  (let [peer {:id id
+              :task-component-fn task-component-fn
+              :log log
+              :buffered-outbox []
+              :messenger messenger
+              :monitoring monitoring
+              :outbox-ch outbox-ch
+              :opts opts
+              :kill-ch kill-ch
+              :restart-ch restart-ch}
+        peer-state (atom {:replica origin})]
     (try
-      (reset! replica-atom origin)
-      (loop [state (merge {:id id
-                           :task-component-fn task-component-fn
-                           :replica replica-atom
-                           :peer-replica-state peer-replica-state-atom
-                           :log log
-                           :buffered-outbox []
-                           :messenger messenger
-                           :monitoring monitoring
-                           :outbox-ch outbox-ch
-                           :opts opts
-                           :kill-ch kill-ch
-                           :restart-ch restart-ch}
-                          (:onyx.peer/state opts))]
+      (loop []
         (let [replica @replica-atom
-              peer-task-state @peer-replica-state-atom
+              new-peer peer
               [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
           (cond 
             (instance? java.lang.Throwable entry) 
             (close! restart-ch)
             (nil? entry) 
-            (when (:lifecycle state)
-              (component/stop @(:lifecycle state)))
+            (when (:lifecycle new-peer)
+              (component/stop @(:lifecycle new-peer)))
             :else
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
-                  reactions (extensions/reactions entry replica new-replica diff state)
-                  new-peer-task-state (extensions/peer-replica-state log entry replica new-replica diff peer-task-state state opts)
-                  new-state (extensions/fire-side-effects! entry replica new-replica diff state)
+                  reactions (extensions/reactions entry replica new-replica diff new-state)
+                  new-state (extensions/new-peer-state! log entry replica new-replica diff state opts)
+                  new-state* (extensions/fire-side-effects! entry replica new-replica diff new-state)
                   annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
-              (reset! peer-replica-state-atom new-peer-task-state)
-              (recur (send-to-outbox new-state annotated-reactions))))))
+              (reset! state-atom new-state*)
+              (send-to-outbox! new-state* annotated-reactions)
+              (recur)))))
       (catch Throwable e
         (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
         (close! restart-ch))
       (finally
-        (stop-task-state @peer-replica-state-atom)
+        (stop-task-state @state-atom)
         ;; call peer replica view side effects shutdown stuff here
         (taoensso.timbre/info (format "Peer %s: finished of processing loop" id))))))
 

@@ -250,7 +250,7 @@
 (defn read-batch
   [{:keys [peer-replica-state task-type pipeline] :as compiled}
    event]
-  (if (and (= task-type :input) (:backpressure? @peer-replica-state))
+  (if (= task-type :input)
     (assoc event :onyx.core/batch '())
     (let [f (get input-readers task-type)
           rets (merge event (f event))]
@@ -430,7 +430,6 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn task-map)
                            :onyx.core/replica replica
-                           :onyx.core/peer-replica-state peer-replica-state
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/epoch (atom -1)
