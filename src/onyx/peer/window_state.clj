@@ -223,7 +223,7 @@
         windows-state))
 
 (defn process-segment
-  [{:keys [peer-replica-state acking-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key] :as compiled}
+  [{:keys [task-state acking-state grouping-fn monitoring messenger uniqueness-task? uniqueness-key] :as compiled}
    {:keys [task-event] :as state-event}]
   (let [{:keys [onyx.core/windows-state onyx.core/filter-state onyx.core/state-log onyx.core/results]} task-event
         grouped? (not (nil? grouping-fn))

@@ -38,7 +38,7 @@
      compiled-before-task-start-fn compiled-ex-fcs
      compiled-handle-exception-fn compiled-norm-fcs compiled-start-task-fn
      egress-ids flow-conditions fn grouping-fn id job-id messenger
-     monitoring uniqueness-task? uniqueness-key peer-replica-state
+     monitoring uniqueness-task? uniqueness-key task-state
      log-prefix pipeline state task->group-by-fn task-type acking-state task-information])
 
 (defrecord TriggerState 

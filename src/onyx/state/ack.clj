@@ -9,7 +9,7 @@
   (defer [this id ack-val])
   (ack [this id ack-val]))
 
-(defrecord StandardAcker [peer-replica-state messenger]
+(defrecord StandardAcker [task-state messenger]
   AckState
   (prepare [this _ ack-val]
     (inc-count! ack-val)
@@ -20,11 +20,11 @@
 
   (ack [this _ ack-val]
     ; (when (dec-count! ack-val)
-    ;   (when-let [site (peer-site peer-replica-state (:completion-id ack-val))]
+    ;   (when-let [site (peer-site task-state (:completion-id ack-val))]
     ;     (extensions/ack-barrier messenger site ack-val)))
     this))
 
-(defrecord DeduplicationAckState [ack-state peer-replica-state messenger]
+(defrecord DeduplicationAckState [ack-state task-state messenger]
   AckState
   (prepare [this id ack-val]
     (let [[old-val new-val] (swap-pair! ack-state
@@ -51,12 +51,12 @@
       ; (when-not (= old-val new-val)
       ;   (run! (fn [ack-val] 
       ;           (when (dec-count! ack-val)
-      ;             (when-let [site (peer-site peer-replica-state (:completion-id ack-val))]
+      ;             (when-let [site (peer-site task-state (:completion-id ack-val))]
       ;               (extensions/ack-barrier messenger site ack-val)))) 
       ;         (old-val id))) 
       this)))
 
-(defn new-ack-state [task-map peer-replica-state messenger]
+(defn new-ack-state [task-map task-state messenger]
   (if (contains? task-map :onyx/uniqueness-key)
-    (->DeduplicationAckState (atom {}) peer-replica-state messenger)
-    (->StandardAcker peer-replica-state messenger)))
+    (->DeduplicationAckState (atom {}) task-state messenger)
+    (->StandardAcker task-state messenger)))

@@ -55,15 +55,15 @@
 (defn ack-barrier!
   [{:keys [onyx.core/replica onyx.core/compiled onyx.core/id onyx.core/workflow
            onyx.core/job-id onyx.core/task-map onyx.core/messenger onyx.core/task
-           onyx.core/task-id onyx.core/peer-replica-state onyx.core/subscription-maps
+           onyx.core/task-id onyx.core/task-state onyx.core/subscription-maps
            onyx.core/barrier]
     :as event}]
   (when (= (:onyx/type task-map) :output)
     (let [replica-val @replica]
       #_(when-let [barrier-epoch (b/barrier-epoch event)]
-        (let [root-task-ids (:root-task-ids @peer-replica-state)] 
+        (let [root-task-ids (:root-task-ids @task-state)] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
-            (when-let [site (peer-site peer-replica-state p)]
+            (when-let [site (peer-site task-state p)]
               (onyx.extensions/ack-barrier messenger
                                            site
                                            (map->BarrierAck 

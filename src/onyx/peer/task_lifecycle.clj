@@ -229,10 +229,10 @@
     (assoc event :onyx.core/results (persistent-results! results))))
 
 ; (s/defn flow-retry-segments :- Event
-;   [{:keys [peer-replica-state state messenger monitoring] :as compiled} 
+;   [{:keys [task-state state messenger monitoring] :as compiled} 
 ;    {:keys [onyx.core/results] :as event} :- Event]
 ;   (doseq [root (:retries results)]
-;     (when-let [site (peer-site peer-replica-state (:completion-id root))]
+;     (when-let [site (peer-site task-state (:completion-id root))]
 ;       (emit-latency :peer-retry-segment
 ;                     monitoring
 ;                     #(extensions/internal-retry-segment messenger (:id root) site))))
@@ -248,7 +248,7 @@
    :output #'function/read-function-batch})
 
 (defn read-batch
-  [{:keys [peer-replica-state task-type pipeline] :as compiled}
+  [{:keys [task-state task-type pipeline] :as compiled}
    event]
   (if (= task-type :input)
     (assoc event :onyx.core/batch '())
@@ -257,7 +257,7 @@
       (merge event (lc/invoke-after-read-batch compiled rets)))))
 
 (s/defn tag-messages :- Event
-  [{:keys [peer-replica-state task-type id] :as compiled} event :- Event]
+  [{:keys [task-state task-type id] :as compiled} event :- Event]
   (if (= task-type :input)
     (update event
             :onyx.core/batch
@@ -380,16 +380,17 @@
            :metadata nil
            :task-map nil)))
 
-(defn new-task-information [peer-state task-state]
-  (map->TaskInformation (select-keys (merge peer-state task-state) [:id :log :job-id :task-id])))
+(defn new-task-information [peer task]
+  (map->TaskInformation (select-keys (merge peer task) [:id :log :job-id :task-id])))
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica peer-replica-state restart-ch log-prefix
+    [id log messenger-buffer messenger job-id task-id replica task-state restart-ch log-prefix peer task
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
     (try
+      (info "Task state is " task-state)
       (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
             ctx (.availableImageHandler (.errorHandler (Aeron$Context.) no-op-error-handler)
@@ -430,6 +431,7 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn task-map)
                            :onyx.core/replica replica
+                           :onyx.core/task-state task-state
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/n-sent-messages (atom 0)
                            :onyx.core/epoch (atom -1)
@@ -540,5 +542,5 @@
            :pipeline-data nil
            :task-lifecycle-ch nil)))
 
-(defn task-lifecycle [peer-state task-state]
-  (map->TaskLifeCycle (merge peer-state task-state)))
+(defn task-lifecycle [peer task]
+  (map->TaskLifeCycle (merge peer task)))

@@ -5,12 +5,13 @@
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.log.commands.peer-replica-state :refer [stop-task-state]]
+            [onyx.log.commands.task-state :refer [stop-task-state]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox! [{:keys [outbox-ch] :as state} reactions]
   (doseq [reaction reactions]
-    (clojure.core.async/>!! outbox-ch reaction)))
+    (clojure.core.async/>!! outbox-ch reaction))
+  state)
 
 (defn annotate-reaction [{:keys [message-id]} id entry]
   (let [peer-annotated (assoc entry :peer-parent id)]
@@ -22,44 +23,45 @@
       peer-annotated)))
 
 (defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
-  (let [peer {:id id
-              :task-component-fn task-component-fn
-              :log log
-              :buffered-outbox []
-              :messenger messenger
-              :monitoring monitoring
-              :outbox-ch outbox-ch
-              :opts opts
-              :kill-ch kill-ch
-              :restart-ch restart-ch}
-        peer-state (atom {:replica origin})]
+  (let [replica-atom (atom origin)
+        task-state-atom (atom nil)]
     (try
-      (loop []
+      (loop [state {:id id
+                    :task-component-fn task-component-fn
+                    :replica replica-atom
+                    :task-state task-state-atom
+                    :log log
+                    :buffered-outbox []
+                    :messenger messenger
+                    :monitoring monitoring
+                    :outbox-ch outbox-ch
+                    :opts opts
+                    :kill-ch kill-ch
+                    :restart-ch restart-ch}]
         (let [replica @replica-atom
-              new-peer peer
+              task-state @task-state-atom
               [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
           (cond 
             (instance? java.lang.Throwable entry) 
             (close! restart-ch)
             (nil? entry) 
-            (when (:lifecycle new-peer)
-              (component/stop @(:lifecycle new-peer)))
+            (when (:lifecycle state)
+              (component/stop @(:lifecycle state)))
             :else
             (let [new-replica (extensions/apply-log-entry entry replica)
                   diff (extensions/replica-diff entry replica new-replica)
-                  reactions (extensions/reactions entry replica new-replica diff new-state)
-                  new-state (extensions/new-peer-state! log entry replica new-replica diff state opts)
-                  new-state* (extensions/fire-side-effects! entry replica new-replica diff new-state)
+                  reactions (extensions/reactions entry replica new-replica diff state)
+                  new-state (extensions/fire-side-effects! entry replica new-replica diff state)
+                  new-task-state (extensions/new-task-state! log entry replica new-replica diff new-state task-state opts)
                   annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
-              (reset! state-atom new-state*)
-              (send-to-outbox! new-state* annotated-reactions)
-              (recur)))))
+              (reset! task-state-atom new-task-state)
+              (recur (send-to-outbox! new-state annotated-reactions))))))
       (catch Throwable e
         (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
         (close! restart-ch))
       (finally
-        (stop-task-state @state-atom)
+        (stop-task-state @task-state-atom)
         ;; call peer replica view side effects shutdown stuff here
         (taoensso.timbre/info (format "Peer %s: finished of processing loop" id))))))
 

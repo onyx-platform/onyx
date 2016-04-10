@@ -29,7 +29,7 @@
             [onyx.log.commands.gc]
             [onyx.log.commands.backpressure-on]
             [onyx.log.commands.backpressure-off]
-            [onyx.log.commands.peer-replica-state]
+            [onyx.log.commands.task-state]
             [onyx.log.commands.compact-bookkeeper-log-ids]
             [onyx.log.commands.assign-bookkeeper-log-id]
             [onyx.log.commands.deleted-bookkeeper-log-ids]
@@ -134,7 +134,7 @@
 (def task-components
   [:task-lifecycle :register-messenger-peer :messenger-buffer :backpressure-poll :task-information :task-monitoring])
 
-(defrecord OnyxTask [peer-site peer-state task-state]
+(defrecord OnyxTask [peer-site peer task]
   component/Lifecycle
   (start [component]
     (rethrow-component
@@ -144,21 +144,21 @@
       #(component/stop-system component task-components))))
 
 (defn onyx-task
-  [peer-state task-state]
+  [peer task]
   (map->OnyxTask
-    {:peer-state peer-state
-     :task-state task-state
-     :task-information (component/using (new-task-information peer-state task-state) [])
-     :task-monitoring (component/using (:monitoring peer-state) [:task-information])
-     :task-lifecycle (component/using (task-lifecycle peer-state task-state) [:task-information 
-                                                                              :messenger-buffer 
-                                                                              :task-monitoring
-                                                                              :register-messenger-peer])
-     :backpressure-poll (component/using (backpressure-poll peer-state) [:messenger-buffer :task-monitoring])
+    {:peer peer
+     :task task
+     :task-information (component/using (new-task-information peer task) [])
+     :task-monitoring (component/using (:monitoring peer) [:task-information])
+     :task-lifecycle (component/using (task-lifecycle peer task) [:task-information 
+                                                                  :messenger-buffer 
+                                                                  :task-monitoring
+                                                                  :register-messenger-peer])
+     :backpressure-poll (component/using (backpressure-poll peer) [:messenger-buffer :task-monitoring])
      :register-messenger-peer (component/using (map->RegisterMessengerPeer 
-                                                 {:messenger (:messenger peer-state) 
-                                                  :peer-site (:peer-site task-state)}) [:messenger-buffer])
-     :messenger-buffer (buffer/messenger-buffer (:opts peer-state))}))
+                                                 {:messenger (:messenger peer) 
+                                                  :peer-site (:peer-site task)}) [:messenger-buffer])
+     :messenger-buffer (buffer/messenger-buffer (:opts peer))}))
 
 (defn onyx-peer
   ([peer-group]

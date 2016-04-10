@@ -42,7 +42,7 @@
 (defn task->event-map
   [{:keys [onyx.core/task-map onyx.core/id onyx.core/pipeline onyx.core/job-id
            onyx.core/catalog onyx.core/serialized-task onyx.core/messenger
-           onyx.core/monitoring onyx.core/state onyx.core/peer-replica-state
+           onyx.core/monitoring onyx.core/state onyx.core/task-state
            onyx.core/log-prefix onyx.core/task-information] :as event}]
   (update event 
           :onyx.core/compiled 
@@ -52,7 +52,7 @@
                 (assoc :pipeline pipeline)
                 (assoc :messenger messenger)
                 (assoc :monitoring monitoring)
-                (assoc :acking-state (state-ack/new-ack-state task-map peer-replica-state messenger))
+                (assoc :acking-state (state-ack/new-ack-state task-map task-state messenger))
                 (assoc :job-id job-id)
                 (assoc :id id)
                 (assoc :state state)
@@ -61,7 +61,7 @@
                 (assoc :uniqueness-key (:onyx/uniqueness-key task-map))
                 (assoc :fn (:onyx.core/fn event))
                 (assoc :task-type (:onyx/type task-map))
-                (assoc :peer-replica-state peer-replica-state)
+                (assoc :task-state task-state)
                 (assoc :grouping-fn (g/task-map->grouping-fn task-map))
                 (assoc :task->group-by-fn (g/compile-grouping-fn catalog (:egress-ids serialized-task)))
                 (assoc :ingress-ids (:ingress-ids serialized-task))
