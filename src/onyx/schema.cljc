@@ -668,6 +668,7 @@
 
 (def StateEvent 
   (-> (information-model->schema (i/model :state-event))
+      (update-in [:task-event] assoc (restricted-ns :onyx.core) s/Any)
       (assoc s/Any s/Any)))
 
 (def WindowState
