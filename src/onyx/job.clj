@@ -11,13 +11,15 @@
 
 (s/defn ^:always-validate add-task :- os/Job
   "Adds a task's task-definition to a job"
-  [{:keys [lifecycles triggers windows flow-conditions] :as job}
-   {:keys [task schema] :as task-definition}]
-  (merge-with s/validate schema task)
-  (merge-with s/validate base-schemas task)
-  (cond-> job
-    true (update :catalog conj (:task-map task))
-    lifecycles (update :lifecycles into (:lifecycles task))
-    triggers (update :triggers into (:triggers task))
-    windows (update :windows into (:windows task))
-    flow-conditions (update :flow-conditions into (:flow-conditions task))))
+  ([job task-definition & behaviors]
+   (add-task job (reduce (fn [acc f] (f acc))task-definition behaviors)))
+  ([{:keys [lifecycles triggers windows flow-conditions] :as job}
+    {:keys [task schema] :as task-definition}]
+   (merge-with s/validate schema task)
+   (merge-with s/validate base-schemas task)
+   (cond-> job
+     true (update :catalog conj (:task-map task))
+     lifecycles (update :lifecycles into (:lifecycles task))
+     triggers (update :triggers into (:triggers task))
+     windows (update :windows into (:windows task))
+     flow-conditions (update :flow-conditions into (:flow-conditions task)))))
