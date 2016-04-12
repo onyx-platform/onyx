@@ -1,6 +1,9 @@
 (ns onyx.schema
   (:require [schema.core :as s]
-            [onyx.information-model :as i]))
+            [onyx.information-model :as i]
+            [onyx.types]
+            [schema.spec.leaf :as leaf]
+            [schema.spec.core :as spec]))
 
 (def NamespacedKeyword
   (s/pred (fn [kw]
@@ -31,7 +34,7 @@
   (s/constrained [edge-validator] vector? 'vector?))
 
 (def Language
-  (s/enum :java :clojure))
+  (apply s/enum (get-in i/model [:catalog-entry :model :onyx/language :choices])))
 
 (def PosInt
   (s/constrained s/Int pos? 'pos?))
@@ -39,15 +42,25 @@
 (def SPosInt
   (s/constrained s/Int (fn [v] (>= v 0)) 'spos?))
 
-(defn build-allowed-key-ns [nspace]
-  (s/pred (fn [k]
-            (or (not (keyword? k))
-                (not (= (name nspace)
-                        (namespace k)))))
-          'unsupported-key-combination))
+(defrecord RestrictedKwNamespace [v]
+  s/Schema
+  (spec [this] (leaf/leaf-spec
+                (some-fn
+                 (spec/simple-precondition this keyword?)
+                 (spec/precondition this
+                                    (fn [datom]
+                                      (not= (name v)
+                                            (namespace datom)))
+                                    (fn [datom]
+                                      (list '= (list 'name v)
+                                            (list 'namespace datom)))))))
+  (explain [this] [:restricted-ns v]))
 
-(def UnsupportedTaskMapKey
-  (build-allowed-key-ns :onyx))
+(defn ^:deprecated build-allowed-key-ns [nspace]
+  (RestrictedKwNamespace. nspace))
+
+(defn restricted-ns [nspace]
+  (RestrictedKwNamespace. nspace))
 
 (defn deprecated [key-seq]
   (s/pred
@@ -56,7 +69,7 @@
 
 (def base-task-map
   {:onyx/name TaskName
-   :onyx/type (s/enum :input :output :function)
+   :onyx/type (apply s/enum (get-in i/model [:catalog-entry :model :onyx/type :choices]))
    :onyx/batch-size PosInt
    (s/optional-key :onyx/params) [s/Any]
    (s/optional-key :onyx/uniqueness-key) s/Any
@@ -71,10 +84,10 @@
    (s/optional-key :onyx/min-peers) PosInt
    (s/optional-key :onyx/n-peers) PosInt
    (s/optional-key :onyx/required-tags) [s/Keyword]
-   UnsupportedTaskMapKey s/Any})
+   (restricted-ns :onyx) s/Any})
 
 (def FluxPolicy
-  (s/enum :continue :kill :recover))
+  (apply s/enum (get-in i/model [:catalog-entry :model :onyx/flux-policy :choices])))
 
 (def FnPath
   (s/cond-pre NamespacedKeyword s/Keyword))
@@ -232,9 +245,11 @@
                 (not (= "flow" (namespace k)))))
           'unsupported-flow-key))
 
+(def SpecialFlowTasks (s/enum :all :none))
+
 (def FlowCondition
-  {:flow/from s/Keyword
-   :flow/to (s/cond-pre s/Keyword [s/Keyword])
+  {:flow/from (s/cond-pre TaskName SpecialFlowTasks)
+   :flow/to (s/cond-pre TaskName [TaskName] SpecialFlowTasks)
    :flow/predicate (s/cond-pre s/Keyword [s/Any])
    (s/optional-key :flow/post-transform) NamespacedKeyword
    (s/optional-key :flow/thrown-exception?) s/Bool
@@ -249,7 +264,7 @@
    (s/one s/Keyword "unit-type")])
 
 (def WindowType
-  (s/enum :fixed :sliding :global :session))
+  (apply s/enum (get-in i/model [:window-entry :model :window/type :choices])))
 
 (def UnsupportedWindowKey
   (s/pred (fn [k]
@@ -307,8 +322,7 @@
   NamespacedKeyword)
 
 (def TriggerPeriod
-  (s/enum :milliseconds :seconds :minutes :hours :days
-          :mullisecond :second :minute :hour :day))
+  (apply s/enum (get-in i/model [:trigger-entry :model :trigger/period :choices])))
 
 (def TriggerThreshold
   (s/enum :elements :element))
@@ -373,32 +387,27 @@
     :apply-state-update Function}
    record? 'record?))
 
-(def StateEvent s/Any)
+(def PeerSchedulerEvent (apply s/enum i/peer-scheduler-event-types))
 
-(def WindowState
-  (s/constrained
-   {:window-extension WindowExtension
-    :trigger-states [TriggerState]
-    :window Window
-    :state {s/Any s/Any}
-    :state-event StateEvent
-    :event-results [StateEvent]
-    :init-fn Function
-    :create-state-update Function
-    :apply-state-update Function
-    :super-agg-fn (s/maybe Function)
-    (s/optional-key :new-window-state-fn) Function
-    (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
-   record? 'record?))
+(def TriggerEventType (apply s/enum i/trigger-event-types))
+
+(def PeerSchedulerEventTypes [:peer-reallocated :peer-left :job-killed :job-completed])
+
+(def PeerSchedulerEvent (apply s/enum PeerSchedulerEventTypes))
+
+(def TriggerEventTypes [:timer-tick :new-segment])
+
+(def TriggerEvent (apply s/enum (into PeerSchedulerEventTypes TriggerEventTypes)))
+
+(def PeerSchedulerEvent (apply s/enum i/peer-scheduler-event-types))
+
+(def TriggerEventType (apply s/enum i/trigger-event-types))
 
 (def JobScheduler
   NamespacedKeyword)
 
 (def TaskScheduler
   NamespacedKeyword)
-
-(def Event 
-  {s/Any s/Any})
 
 (def JobMetadata
   {s/Keyword s/Any})
@@ -449,6 +458,12 @@
 
 (def StateFilterImpl
   (s/enum :set :rocksdb))
+
+(def PeerClientConfig
+  {:zookeeper/address s/Str
+   (s/optional-key :onyx/id) (deprecated [:env-config :model :onyx/id])
+   :onyx/tenancy-id TenancyId
+   s/Keyword s/Any})
 
 (def PeerConfig
   {:zookeeper/address s/Str
@@ -516,7 +531,7 @@
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
    (s/optional-key :onyx.task-scheduler.colocated/only-send-local?) s/Bool
-   s/Keyword s/Any})
+   s/Any s/Any})
 
 (def PeerId
   (s/cond-pre s/Uuid s/Keyword))
@@ -592,3 +607,86 @@
 
 (def State
   {s/Any s/Any})
+
+(declare lookup-schema)
+
+(defn type->schema [t]
+  (if (sequential? t)
+    (mapv lookup-schema t)
+    (lookup-schema t)))
+
+(defn information-model->schema [information]
+  (let [model-type (:type information)
+        model (:model information)] 
+    (if model 
+      (reduce (fn [m [k km]]
+                (let [optional? (:optional? km)
+                      schema-value (if-let [choices (:choices km)] 
+                                     (apply s/enum choices)
+                                     (type->schema (:type km)))]
+                  (case model-type
+                    :record (assoc m 
+                                   k
+                                   (if optional? (s/maybe schema-value) schema-value))
+
+                    :map (assoc m 
+                                (if optional? (s/optional-key k) k)
+                                schema-value))))
+              {}
+              model))))
+
+(s/defn lookup-schema [k]
+  (let [base-phase {:integer s/Num
+                    :boolean s/Bool
+                    :keyword s/Keyword
+                    :any s/Any
+                    :segment s/Any
+                    :peer-config PeerConfig
+                    :catalog-entry TaskMap
+                    :window-entry Window
+                    :trigger-entry Trigger
+                    :lifecycle-entry Lifecycle
+                    :workflow Workflow
+                    :uuid s/Uuid
+                    :flow-conditions-entry FlowCondition
+                    :job-metadata {s/Any s/Any}
+                    :function Function
+                    :string s/Str
+                    ;; To further restrict in the future
+                    :results s/Any
+                    :replica-atom s/Any
+                    :peer-replica-view-atom s/Any
+                    :windows-state-atom s/Any
+                    :map {s/Any s/Any}
+                    :serialized-task s/Any
+                    :channel s/Any
+                    :record s/Any
+                    :peer-state-atom s/Any}]
+    (or (base-phase k)
+        (information-model->schema (i/model k))
+        (throw (Exception. (format "Unable to lookup schema for type %s." k))))))
+
+(def StateEvent 
+  (-> (information-model->schema (i/model :state-event))
+      (update-in [:task-event] assoc (restricted-ns :onyx.core) s/Any)
+      (assoc s/Any s/Any)))
+
+(def WindowState
+  (s/constrained
+   {:window-extension WindowExtension
+    :trigger-states [TriggerState]
+    :window Window
+    :state {s/Any s/Any}
+    :state-event (s/maybe StateEvent)
+    :event-results [StateEvent]
+    :init-fn Function
+    :create-state-update Function
+    :apply-state-update Function
+    :super-agg-fn (s/maybe Function)
+    (s/optional-key :new-window-state-fn) Function
+    (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
+   record? 'record?))
+
+(def Event
+  (-> (information-model->schema (i/model :event-map))
+      (assoc (restricted-ns :onyx.core) s/Any)))

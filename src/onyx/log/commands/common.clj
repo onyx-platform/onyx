@@ -2,6 +2,8 @@
   (:require [clojure.core.async :refer [chan close!]]
             [clojure.data :refer [diff]]
             [clojure.set :refer [map-invert]]
+            [schema.core :as s]
+            [onyx.schema :as os]
             [com.stuartsierra.component :as component]
             [onyx.extensions :as extensions]
             [clj-tuple :as t]
@@ -129,20 +131,23 @@
                                        peers))))
              (allocations job-id))))
 
-(defn start-new-lifecycle [old new diff state]
+(s/defn start-new-lifecycle [old :- os/Replica new :- os/Replica diff state scheduler-event :- os/PeerSchedulerEvent]
   (let [old-allocation (peer->allocated-job (:allocations old) (:id state))
         new-allocation (peer->allocated-job (:allocations new) (:id state))]
     (if (not= old-allocation new-allocation)
       (do (when (:lifecycle state)
             (close! (:task-kill-ch (:task-state state)))
-            (component/stop @(:lifecycle state)))
+            (component/stop (assoc-in @(:lifecycle state) [:task-lifecycle :scheduler-event] scheduler-event)))
           (if (not (nil? new-allocation))
             (let [seal-ch (chan)
                   task-kill-ch (chan)
                   peer-site (get-in new [:peer-sites (:id state)])
                   task-state {:job-id (:job new-allocation) :task-id (:task new-allocation) 
                               :peer-site peer-site :seal-ch seal-ch :task-kill-ch task-kill-ch}
-                  new-lifecycle (future (component/start ((:task-component-fn state) state task-state)))]
+                  lifecycle (assoc-in ((:task-component-fn state) state task-state) 
+                                      [:task-lifecycle :scheduler-event] 
+                                      scheduler-event)
+                  new-lifecycle (future (component/start lifecycle))]
               (assoc state :lifecycle new-lifecycle :task-state task-state))
             (assoc state :lifecycle nil :task-state nil)))
       state)))

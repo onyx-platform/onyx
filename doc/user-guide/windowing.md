@@ -227,6 +227,20 @@ The `:average` operation maintains an average over `:age`. The state is maintain
  :window/doc "Finds the average :age in 30 minute fixed windows, default is 0"}
 ```
 
+#### `:onyx.windowing.aggregation/collect-by-key`
+
+The `:collect-by-key` operation maintains a collection of all segments with a common key.
+
+```clojure
+{:window/id :collect-members
+ :window/task :identity
+ :window/type :fixed
+ :window/aggregation [:onyx.windowing.aggregation/collect-by-key :team]
+ :window/window-key :event-time
+ :window/range [30 :minutes]
+ :window/doc "Collects all users on the same :team in 30 minute fixed windows"}
+```
+
 #### Grouping
 
 All of the above aggregates have slightly different behavior when `:onyx/group-by-key` or `:onyx/group-by-fn` are specified on the catalog entry. Instead of the maintaining a scalar value in the aggregate, Onyx maintains a map. The keys of the map are the grouped values, and values of the map are normal scalar aggregates.

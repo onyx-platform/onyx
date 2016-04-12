@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.0-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.9.3-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -11,7 +11,7 @@
                              :username :env
                              :password :env
                              :sign-releases false}}
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.374"]
                  [org.apache.curator/curator-framework "2.9.1"]
                  [org.apache.curator/curator-test "2.9.1"]
@@ -27,9 +27,9 @@
                  [com.stuartsierra/dependency "0.2.0"]
                  [com.stuartsierra/component "0.3.1"]
                  [com.taoensso/timbre "4.1.4"]
-                 [com.taoensso/nippy "2.10.0"]
+                 [com.taoensso/nippy "2.11.1"]
                  [uk.co.real-logic/aeron-all "0.9.1"]
-                 [prismatic/schema "1.0.3"]
+                 [prismatic/schema "1.0.5"]
                  [log4j/log4j "1.2.17"]
                  [clj-tuple "0.2.2"]]
   :jvm-opts ["-Xmx4g" "-XX:-OmitStackTraceInFastThrow"]
@@ -43,9 +43,9 @@
                              [lein-set-version "0.4.1"]
                              [lonocloud/lein-unison "0.1.13"]
                              [codox "0.8.8"]]}
-             :reflection-check {:global-vars  {*warn-on-reflection* true
-                                               *assert* false
-                                               *unchecked-math* :warn-on-boxed}}
+             :reflection-check {:global-vars {*warn-on-reflection* true
+                                              *assert* false
+                                              *unchecked-math* :warn-on-boxed}}
              :circle-ci {:jvm-opts ["-Xmx2500M"
                                     "-XX:+UnlockCommercialFeatures"
                                     "-XX:+FlightRecorder"

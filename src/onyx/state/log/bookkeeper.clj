@@ -25,19 +25,19 @@
 
 (defrecord BookKeeperLog [client ledger-handle next-ledger-handle batch-ch])
 
-(defn open-ledger ^LedgerHandle [^BookKeeper client id digest-type password]
+(defn open-ledger ^org.apache.bookkeeper.client.LedgerHandle [^BookKeeper client id digest-type password]
   (.openLedger client id digest-type password))
 
-(defn open-ledger-no-recovery ^LedgerHandle [^BookKeeper client id digest-type password]
+(defn open-ledger-no-recovery ^org.apache.bookkeeper.client.LedgerHandle [^BookKeeper client id digest-type password]
   (.openLedgerNoRecovery client id digest-type password))
 
-(defn create-ledger ^LedgerHandle [^BookKeeper client ensemble-size quorum-size digest-type password]
+(defn create-ledger ^org.apache.bookkeeper.client.LedgerHandle [^BookKeeper client ensemble-size quorum-size digest-type password]
   (.createLedger client ensemble-size quorum-size digest-type password))
 
 (defn close-handle [^LedgerHandle ledger-handle]
   (.close ledger-handle))
 
-(defn bookkeeper
+(defn ^org.apache.bookkeeper.client.BookKeeper bookkeeper
   ([opts]
    (bookkeeper (:zookeeper/address opts)
                (zk/ledgers-path (:onyx/tenancy-id opts))
@@ -63,7 +63,7 @@
 (defn password [peer-opts]
   (.getBytes ^String (arg-or-default :onyx.bookkeeper/ledger-password peer-opts)))
 
-(defn new-ledger ^LedgerHandle [client peer-opts]
+(defn new-ledger ^org.apache.bookkeeper.client.LedgerHandle [client peer-opts]
   (let [ensemble-size (arg-or-default :onyx.bookkeeper/ledger-ensemble-size peer-opts)
         quorum-size (arg-or-default :onyx.bookkeeper/ledger-quorum-size peer-opts)]
     (create-ledger client ensemble-size quorum-size digest-type (password peer-opts))))

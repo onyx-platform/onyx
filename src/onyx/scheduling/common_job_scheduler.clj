@@ -8,7 +8,7 @@
             [onyx.log.replica-invariants :as invariants]
             [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
-  (:import [org.btrplace.model Model DefaultModel]
+  (:import [org.btrplace.model Model DefaultModel Mapping Node]
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
 
@@ -144,8 +144,8 @@
      (map #(-> [job-id %]) (get-in replica [:tasks job-id])))
    (keys task-utilization)))
 
-(defn build-peer->vm [replica model]
-  (let [mapping (.getMapping model)]
+(defn build-peer->vm [replica ^Model model]
+  (let [mapping ^Mapping (.getMapping model)]
     (reduce
      (fn [result peer-id]
        (let [vm (.newVM model)]
@@ -154,8 +154,8 @@
      {}
      (:peers replica))))
 
-(defn build-job-and-task->node [model task-seq]
-  (let [mapping (.getMapping model)]
+(defn build-job-and-task->node [^Model model task-seq]
+  (let [mapping ^Mapping (.getMapping model)]
     (reduce
      (fn [result [job-id task-id]]
        (let [node (.newNode model)]
@@ -171,10 +171,10 @@
    {}
    task->node))
 
-(defn build-peer->task [result-model peer->vm node->task]
+(defn build-peer->task [^Model result-model peer->vm node->task]
   (reduce-kv
    (fn [all peer-id btr-vm]
-     (let [node (.getVMLocation (.getMapping result-model) btr-vm)]
+     (let [node (.getVMLocation ^Mapping (.getMapping result-model) btr-vm)]
        (if-let [task (get node->task node)]
          (assoc all peer-id task)
          (assoc all peer-id nil))))
@@ -195,12 +195,12 @@
   (reduce
    (fn [result [job-id task-id :as id]]
      (cond (zero? (get job-utilization job-id))
-           (conj result (RunningCapacity. (get task->node id) 0))
+           (conj result (RunningCapacity. ^Node (get task->node id) 0))
 
            (cts/assign-capacity-constraint? replica job-id)
            (let [capacities (get planned-capacities job-id)
                  n (calculate-capacity replica capacities task->node id)]
-             (conj result (RunningCapacity. (get task->node id) n)))
+             (conj result (RunningCapacity. ^Node (get task->node id) (int n))))
            :else
            result))
    []
@@ -330,7 +330,7 @@
     (unassign-task-slot-ids new-replica original peer->task)
     peer->task))
 
-(defn build-current-model [replica mapping task->node peer->vm]
+(defn build-current-model [replica ^Mapping mapping task->node peer->vm]
   (doseq [j (:jobs replica)]
     (doseq [t (keys (get-in replica [:allocations j]))]
       (let [node (get task->node [j t])]
@@ -416,7 +416,7 @@
               (grouping-task-constraints replica task-seq task->node peer->vm)
               (anti-jitter-constraints replica jobs task-seq peer->vm task->node capacities)
               (mapcat #(cts/task-constraints replica jobs (get capacities %) peer->vm task->node no-op-node %) jobs)
-              [(RunningCapacity. no-op-node (n-no-op-tasks replica capacities task-seq))]])
+              [(RunningCapacity. ^Node no-op-node (int (n-no-op-tasks replica capacities task-seq)))]])
             plan (.solve scheduler model constraints)]
         (when plan
           (let [result-model (.getResult plan)

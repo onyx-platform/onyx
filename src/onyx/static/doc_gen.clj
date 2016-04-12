@@ -1,6 +1,6 @@
 (ns ^{:no-doc true} onyx.static.doc-gen
   "Document generator using the information model. Only useful for Onyx development purposes."
-  (:require [onyx.information-model :refer [model]]
+  (:require [onyx.information-model]
             [table.core :as t]
             [table.width]))
 

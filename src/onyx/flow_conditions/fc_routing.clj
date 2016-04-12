@@ -1,5 +1,6 @@
 (ns onyx.flow-conditions.fc-routing
   (:require [onyx.peer.operation :as operation]
+            [onyx.lifecycles.lifecycle-invoke :as lc]
             [taoensso.timbre :refer [info error warn trace fatal] :as timbre]
             [onyx.types :refer [->Route]]))
 
@@ -37,7 +38,9 @@
   [event {:keys [egress-ids compiled-ex-fcs compiled-norm-fcs flow-conditions] :as compiled} result message]
   (if (nil? flow-conditions)
     (if (operation/exception? message)
-      (throw (:exception (ex-data message)))
+      (let [e (:exception (ex-data message))]
+        (lc/handle-exception
+         event :lifecycle/apply-fn e (:compiled-handle-exception-fn compiled)))
       (->Route egress-ids nil nil nil))
     (if (operation/exception? message)
       (if (seq compiled-ex-fcs)

@@ -6,12 +6,12 @@
             [onyx.windowing.units :as u]
             [onyx.information-model :refer [model]]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
-                                 RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig FlowCondition]]))
+                                 RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
 (defn validate-java-version []
-  (let [version (System/getProperty "java.runtime.version")] 
+  (let [version (System/getProperty "java.runtime.version")]
     (when-not (pos? (.compareTo version "1.8.0"))
-      (throw (ex-info "Onyx is only supported when running on Java 8 or later." 
+      (throw (ex-info "Onyx is only supported when running on Java 8 or later."
                       {:version version})))))
 
 (defn name-and-type-not-equal [entry]
@@ -37,31 +37,33 @@
 
 (defn describe-cause [k]
   (if (= schema.utils.ValidationError (type k))
-    (cond (= onyx.schema/UnsupportedTaskMapKey (.schema k))
-          (if-let [doc (dissoc (get-in model [:catalog-entry :model (.value k)]) :doc)] 
-            {:cause "Unsupported combination of task-map keys." 
-             :key (.value k)
-             :documentation doc} 
-            {:cause "Unsupported onyx task-map key."
-             :key (.value k)})
+    (cond (= (os/restricted-ns :onyx) (.schema ^schema.utils.ValidationError k))
+          (let [kvalue (.value ^schema.utils.ValidationError k)] 
+            (if-let [doc (dissoc (get-in model [:catalog-entry :model kvalue]) :doc)]
+              {:cause "Unsupported combination of task-map keys."
+               :key kvalue
+               :documentation doc}
+              {:cause "Unsupported onyx task-map key."
+               :key kvalue}))
           :else
           k)
     k))
 
 (defn describe-value [k v]
   (if (= schema.utils.ValidationError (type v))
-    (let [entry (get-in model [:catalog-entry :model k])]
+    (let [vvalue (.value ^schema.utils.ValidationError v)
+          entry (get-in model [:catalog-entry :model k])]
       (if-let [deprecation-doc (:deprecation-doc entry)]
         {:cause deprecation-doc
-         :data {k (.value v)}
+         :data {k vvalue}
          :deprecated-version (:deprecated-version entry)}
         (if-let [doc (dissoc entry :doc)]
           {:cause "Unsupported value"
-           :data {k (.value v)}
+           :data {k vvalue}
            :documentation doc}
           {:cause "Unsupported value"
-           :data {k (.value v)}
-           :value (.value v)})))
+           :data {k vvalue}
+           :value vvalue})))
     v)) 
 
 (defn improve-issue [m]
@@ -179,23 +181,29 @@
                                                       (conj (set v) to))))
                                    {}
                                    workflow)
+
         all-tasks (into (set (map first workflow)) (map second workflow))]
+
     (doseq [{:keys [flow/from flow/to] :as entry} flow-schema]
       (when-not (or (all-tasks from) (= from :all))
         (throw (ex-info ":flow/from value doesn't name a node in the workflow"
                         {:entry entry})))
-
       (when-not (or (= :all to)
                     (= :none to)
                     (and (= from :all)
                          (empty? (remove all-tasks to)))
-                    (and (coll? to) 
-                         (every? (fn [t] ((task->egress-edges from) t)) to)))
+                    (and (coll? to)
+                         (every? (fn [t]
+                                   (try ((task->egress-edges from) t)
+                                        (catch NullPointerException e nil))) to)))
         (throw (ex-info ":flow/to value doesn't name a valid connected task in the workflow, :all, or :none"
                         {:entry entry}))))))
 
 (defn validate-peer-config [peer-config]
   (schema/validate PeerConfig peer-config))
+
+(defn validate-peer-client-config [peer-client-config]
+  (schema/validate PeerClientConfig peer-client-config))
 
 (defn validate-job
   [job]

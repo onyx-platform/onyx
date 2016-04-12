@@ -30,7 +30,7 @@
 
 (defrecord TaskState [timeout-pool])
 
-(s/defn windowed-task? [event :- Event]
+(s/defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
 
@@ -67,7 +67,7 @@
     (while (poll! state-ch))
     (<!! state-thread-ch)))
 
-(s/defn start-lifecycle? [event :- Event]
+(s/defn start-lifecycle? [event]
   (let [rets (lc/invoke-start-task (:onyx.core/compiled event) event)]
     (when-not (:onyx.core/start-lifecycle? rets)
       (info (:onyx.core/log-prefix event) "Peer chose not to start the task yet. Backing off and retrying..."))
@@ -128,8 +128,11 @@
   (let [root (:root result)
         leaves (:leaves result)
         start-ack-val (or (:ack-val root) 0)]
-    (reduce (fn [accum leaf] 
-              (add-from-leaf event compiled result root leaves start-ack-val accum leaf))
+    (reduce (fn [accum leaf]
+              (lc/invoke-flow-conditions
+               add-from-leaf
+               event compiled result root leaves
+               start-ack-val accum leaf))
             (->AccumAckSegments start-ack-val segments retries)
             leaves)))
 
@@ -175,8 +178,8 @@
                     #(extensions/internal-retry-segment messenger (:id root) site))))
   event)
 
-(s/defn gen-lifecycle-id :- Event 
-  [event :- Event]
+(s/defn gen-lifecycle-id
+  [event]
   (assoc event :onyx.core/lifecycle-id (uuid/random-uuid)))
 
 (defn handle-backoff! [event]
@@ -230,9 +233,9 @@
                         batch))))
     event))
 
-(s/defn replay-windows-from-log :- Event
+(defn replay-windows-from-log
   [{:keys [onyx.core/log-prefix onyx.core/windows-state
-           onyx.core/filter-state onyx.core/state-log] :as event} :- Event]
+           onyx.core/filter-state onyx.core/state-log] :as event}]
   (when (windowed-task? event)
     (swap! windows-state 
            (fn [windows-state] 
@@ -416,7 +419,7 @@
 
 (defrecord TaskLifeCycle
     [id log messenger-buffer messenger job-id task-id replica peer-replica-view restart-ch log-prefix
-     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch task-monitoring task-information]
+     kill-ch outbox-ch seal-ch completion-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
@@ -464,7 +467,7 @@
                            :onyx.core/log-prefix log-prefix
                            :onyx.core/state state}
 
-            _ (info log-prefix "Warming up task lifecycle")
+            _ (info log-prefix "Warming up task lifecycle" task)
 
             add-pipeline (fn [event]
                            (assoc event 
@@ -507,6 +510,7 @@
         (let [input-retry-segments-ch (input-retry-segments! messenger pipeline-data input-retry-timeout task-kill-ch)
               aux-ch (launch-aux-threads! messenger pipeline-data outbox-ch seal-ch completion-ch task-kill-ch)
               task-lifecycle-ch (thread (run-task-lifecycle pipeline-data seal-ch kill-ch ex-f))]
+          (s/validate Event pipeline-data)
           (assoc component
                  :pipeline-data pipeline-data
                  :log-prefix log-prefix
@@ -527,7 +531,7 @@
 
     (when-let [event (:pipeline-data component)]
       (when-not (empty? (:onyx.core/triggers event))
-        (>!! (:onyx.core/state-ch event) [:task-lifecycle-stopped event #()]))
+        (>!! (:onyx.core/state-ch event) [(:scheduler-event component) event #()]))
 
       (stop-window-state-thread! event)
 

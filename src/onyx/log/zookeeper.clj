@@ -10,6 +10,7 @@
             [onyx.monitoring.measurements :refer [measure-latency]]
             [onyx.log.entry :refer [create-log-entry]])
   (:import [org.apache.curator.test TestingServer]
+           [org.apache.log4j BasicConfigurator]
            [org.apache.zookeeper KeeperException$NoNodeException KeeperException$NodeExistsException]))
 
 (def root-path "/onyx")
@@ -96,6 +97,7 @@
 
   (start [component]
     (taoensso.timbre/info "Starting ZooKeeper" (if (:zookeeper/server? config) "server" "client connection. If Onyx hangs here it may indicate a difficulty connecting to ZooKeeper."))
+    (BasicConfigurator/configure)
     (let [onyx-id (:onyx/tenancy-id config)
           server (when (:zookeeper/server? config) (TestingServer. (int (:zookeeper.server/port config))))
           conn (zk/connect (:zookeeper/address config))]

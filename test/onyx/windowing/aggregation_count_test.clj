@@ -34,7 +34,7 @@
 (def test-state (atom []))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as opts} extent-state]
-  (when-not (= :task-lifecycle-stopped event-type)
+  (when-not (= :job-completed event-type)
     (swap! test-state conj [(java.util.Date. lower-bound)
                             (java.util.Date. upper-bound)
                             extent-state])))
@@ -55,7 +55,7 @@
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
-(deftest count-test
+(deftest ^:smoke count-test
   (let [id (java.util.UUID/randomUUID)
         config (load-config)
         env-config (assoc (:env-config config) :onyx/tenancy-id id)

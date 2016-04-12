@@ -1,13 +1,30 @@
+#### 0.9.2
+
+- Bug fix: Loosened Event schema when checked for stateful tasks. [#568](https://github.com/onyx-platform/onyx/issues/568)
+
+#### 0.9.1
+
+- New aggregation: added `onyx.windowing.aggregation/collect-by-key` aggregation.
+- Bug fix: Exceptions were being swallowed by Curator's logging configuration. [#563](https://github.com/onyx-platform/onyx/issues/563)
+- Bug fix: Some exceptions that kill jobs were failing to be serialized to ZooKeeper by Nippy. [#564](https://github.com/onyx-platform/onyx/issues/564)
+
 #### 0.9.0
 
-- Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
-- **Breaking change onyx-metrics**: :metrics/workflow-name was deprecated in favor of metadata map. See onyx-metrics [changes](https://github.com/onyx-platform/onyx-metrics/blob/master/changes.md#090)
-- **Breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`.
-- **Breaking change** `:aggregation/fn` was renamed to `:aggregation/create-state-update`
-- **Breaking change** changed the signatures of the following aggregation function types: default-window-state, apply-state-update, super-aggregation-fn. All now take the window as the first argument.
-- **Breaking change** changed the internal messaging functions to no longer supply the event map.
-  Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
-- Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
+- **API breaking change**: `onyx/id` in peer-config and env-config was renamed to `:onyx/tenancy-id`
+- **API breaking change**: `:aggregation/fn` was renamed to [:aggregation/create-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update).
+- **API breaking change**: changed the signatures of: [:aggregation/init](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/init), [:aggregation/create-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/create-state-update), [:aggregation/apply-state-update](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/apply-state-update), and [:aggregation/super-aggregation-fn](http://www.onyxplatform.org/docs/cheat-sheet/latest/#state-aggregation/:aggregation/super-aggregation-fn). All now take the window as the first argument.
+- **API breaking change**: internal messaging functions no longer take the event map as an argument. Note, this will break any plugins that manually manage the ack count, such as plugins using async callbacks.
+- **API breaking change**: triggers and refinements functions are now resolved to vars via namespace lookup e.g.
+  Trigger example: `:trigger/on :segment` -> `:trigger/on :onyx.triggers/segment`,
+  Refinement example: `:trigger/refinement :accumulating` -> `:trigger/refinement :onyx.refinements/accumulating`,
+- **Breaking change in onyx-metrics**: :metrics/workflow-name was deprecated in favor of metadata map. See onyx-metrics [changes](https://github.com/onyx-platform/onyx-metrics/blob/master/changes.md#090)
+- Bug fix: fixed exceptions losing their main `.getCause` message when thrown inside a lifecycle
+- New feature: Jobs now support metadata by including a metadata map with job submission data e.g. `{:workflow ... :catalog ... :job-metadata {:name "myjobname"}}`. This makes it easier to correlate information about jobs, query the cluster for jobs, etc.
+- Design change: Implemented trigger refinements in terms of state updates. In order to implement a refinement, one must now implement a refinement calls map, analagous to the aggregation calls map. This takes the form `{:refinement/create-state-update (fn [trigger state state-event]) :refinement/apply-state-update (fn [trigger state entry])}`
+- Enhancement: Lifecycles can now catch flow condition exceptions through `:lifeycycle/handle-exception` from the `:lifecycle/execute-flow-conditions` and `:lifecycle/apply-fn` phases.
+- Enhancement: loosened the peer configuration schema needed for log subscription
+- Dependency change: Upgraded `org.clojure/clojure` to `1.8.0`
+>>>>>>> c0248d98f9b739c0b35449d3614238173805f0dd
 
 #### 0.8.11
 
