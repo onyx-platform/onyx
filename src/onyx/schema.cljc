@@ -635,6 +635,10 @@
               {}
               model))))
 
+(def Event
+  (-> (information-model->schema (i/model :event-map))
+      (assoc (restricted-ns :onyx.core) s/Any)))
+
 (s/defn lookup-schema [k]
   (let [base-phase {:integer s/Num
                     :boolean s/Bool
@@ -657,6 +661,7 @@
                     :replica-atom s/Any
                     :peer-replica-view-atom s/Any
                     :windows-state-atom s/Any
+                    :event-map Event
                     :map {s/Any s/Any}
                     :serialized-task s/Any
                     :channel s/Any
@@ -668,7 +673,6 @@
 
 (def StateEvent 
   (-> (information-model->schema (i/model :state-event))
-      (update-in [:task-event] assoc (restricted-ns :onyx.core) s/Any)
       (assoc s/Any s/Any)))
 
 (def WindowState
@@ -686,7 +690,3 @@
     (s/optional-key :new-window-state-fn) Function
     (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
    record? 'record?))
-
-(def Event
-  (-> (information-model->schema (i/model :event-map))
-      (assoc (restricted-ns :onyx.core) s/Any)))
