@@ -4,11 +4,14 @@
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
             [onyx.extensions :as extensions]
+            [taoensso.timbre :refer [info]]
             [onyx.log.commands.common :as common]))
 
 (s/defmethod extensions/apply-log-entry :exhaust-input :- Replica
   [{:keys [args]} :- LogEntry replica]
-  (update-in replica [:exhausted-inputs (:job args)] union #{(:task args)}))
+  (if (some #{(:job args)} (:jobs replica)) 
+    (update-in replica [:exhausted-inputs (:job args)] union #{(:task args)})
+    replica))
 
 (s/defmethod extensions/replica-diff :exhaust-input :- ReplicaDiff
   [{:keys [args]} old new]
