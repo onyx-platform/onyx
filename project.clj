@@ -127,6 +127,12 @@
      :release-script "script/release.sh"
      :skip-compatibility? true
      :merge "master"}
+    {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
+     :skip-compatibility? true
+     :merge "master"}
     {:git "git@onyx-platform.github.io:onyx-platform/onyx-platform.github.io.git"
      :branch "compatibility"
      :release-branch "master"
