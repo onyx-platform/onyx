@@ -211,6 +211,7 @@
 
 (defmethod extensions/new-partial-subscriber AeronMessenger
   [{:keys [messaging-group] :as messenger} job-id peer-id task-id]
+  (info "new subscriber for " job-id peer-id task-id)
   (let [error-handler (reify ErrorHandler
                         (onError [this x] 
                           (taoensso.timbre/warn "Aeron messaging subscriber error:" x)))
