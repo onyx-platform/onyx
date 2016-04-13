@@ -121,6 +121,11 @@
      :release-branch "master"
      :release-script "script/release.sh"
      :merge "master"}
+    {:git "git@onyx-template:onyx-platform/onyx-template.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
+     :merge "master"}
     {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
      :branch "compatibility"
      :release-branch "master"
