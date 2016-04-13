@@ -176,3 +176,7 @@
    {:config config
     :logging-config (logging-config/logging-configuration config)
     :messaging-group (component/using (am/aeron-peer-group config) [:logging-config])}))
+
+(defmethod clojure.core/print-method OnyxPeer
+  [system ^java.io.Writer writer]
+  (.write writer "#<Onyx Peer>"))

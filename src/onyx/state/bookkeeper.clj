@@ -116,3 +116,7 @@
 
 (defn multi-bookie-server [env-config]
   (map->BookieServers {:env-config env-config}))
+
+(defmethod clojure.core/print-method BookieServers
+  [system ^java.io.Writer writer]
+  (.write writer "#<Bookie Servers>"))
