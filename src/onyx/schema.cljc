@@ -161,6 +161,13 @@
                 (:onyx/min-peers entry)))
         (= (:onyx/max-peers entry) 1))))
 
+(def InputTaskSchema
+  (let [base-input-schema (merge base-task-map partial-input-task)]
+    (s/conditional java?
+                   (merge base-input-schema partial-java-plugin)
+                   :else
+                   base-input-schema)))
+
 (def OutputTaskSchema
   (let [base-output-schema (merge base-task-map partial-output-task)
         base-output-grouping (merge base-output-schema partial-grouping-task)
@@ -180,13 +187,6 @@
                                   (merge base-output-schema partial-java-plugin)
                                   :else
                                   (merge base-output-schema partial-clojure-plugin)))))
-
-(def InputTaskSchema
-  (let [base-input-schema (merge base-task-map partial-input-task)]
-    (s/conditional java?
-                   (merge base-input-schema partial-java-plugin)
-                   :else
-                   base-input-schema)))
 
 (def FunctionTaskSchema
   (let [base-function-task (merge base-task-map partial-fn-task)
@@ -214,6 +214,86 @@
                  OutputTaskSchema
                  #(= (:onyx/type %) :function)
                  FunctionTaskSchema))
+
+(defn UniqueTaskMap [schema & schemas]
+  (let [customize (fn [s] (apply merge s (cons schema schemas)))]
+    (s/conditional
+     ;;;; Inputs
+     #(and (= (:onyx/type %) :input)
+           (java? %))
+     (customize (merge base-task-map
+                       partial-input-task
+                       partial-java-plugin))
+     #(and (= (:onyx/type %) :input)
+           (not (java? %)))
+     (customize (merge base-task-map
+                       partial-input-task))
+
+     ;;;; Outputs
+     #(and (= (:onyx/type %) :output)
+           (grouping-task? %)
+           (java? %))
+     (s/constrained (customize (merge
+                                base-task-map
+                                partial-output-task
+                                partial-grouping-task
+                                partial-java-plugin))
+                    valid-min-peers-max-peers-n-peers?
+                    'valid-flux-policy-min-max-n-peers)
+     #(and (= (:onyx/type %) :output)
+           (grouping-task? %)
+           (not (java? %)))
+     (s/constrained (customize (merge
+                                base-task-map
+                                partial-output-task
+                                partial-grouping-task
+                                partial-clojure-plugin))
+                    valid-min-peers-max-peers-n-peers?
+                    'valid-flux-policy-min-max-n-peers)
+     #(and (= (:onyx/type %) :output)
+           (not (grouping-task? %))
+           (java? %))
+     (customize (merge base-task-map
+                       partial-output-task
+                       partial-java-plugin))
+     #(and (= (:onyx/type %) :output)
+           (not (grouping-task? %))
+           (not (java? %)))
+     (customize (merge base-task-map
+                       partial-output-task
+                       partial-clojure-plugin))
+     ;;;; Functions
+     #(and (= (:onyx/type %) :function)
+           (grouping-task? %)
+           (java? %))
+     (s/constrained (customize (merge base-task-map
+                                      partial-fn-task
+                                      partial-grouping-task
+                                      partial-java-fn-task))
+                    valid-min-peers-max-peers-n-peers?
+                    'valid-flux-policy-min-max-n-peers)
+     #(and (= (:onyx/type %) :function)
+           (grouping-task? %)
+           (not (java? %)))
+     (s/constrained (customize (merge base-task-map
+                                      partial-fn-task
+                                      partial-grouping-task
+                                      partial-clojure-fn-task))
+                    valid-min-peers-max-peers-n-peers?
+                    'valid-flux-policy-min-max-n-peers)
+
+     #(and (= (:onyx/type %) :function)
+           (not (grouping-task? %))
+           (java? %)) (customize (merge base-task-map
+                                        partial-fn-task
+                                        partial-java-fn-task))
+
+     #(and (= (:onyx/type %) :function)
+           (not (grouping-task? %))
+           (not (java? %))) (customize (merge base-task-map
+                                              partial-fn-task
+                                              partial-clojure-fn-task)))))
+
 
 (def Catalog
   [TaskMap])
@@ -288,12 +368,12 @@
    UnsupportedWindowKey s/Any})
 
 (def Window
-  (s/constrained 
-    WindowBase
-    (fn [v] (if (#{:fixed :sliding} (:window/type v))
-              (:window/range v)
-              true))
-    ":window/range must be defined for :fixed or :sliding window"))
+  (s/constrained
+   WindowBase
+   (fn [v] (if (#{:fixed :sliding} (:window/type v))
+             (:window/range v)
+             true))
+   ":window/range must be defined for :fixed or :sliding window"))
 
 (def StateAggregationCall
   {(s/optional-key :aggregation/init) Function
