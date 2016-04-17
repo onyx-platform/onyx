@@ -140,7 +140,9 @@
     (let [mnext (-> m-p3
                     (m/ack-barrier)
                     (m/next-epoch))
-          messages2 (remove nil? (mapcat (fn [_] (m/receive-messages m-p3)) (range 20)))]
+          messages2 (remove nil? (mapcat (fn [_] (m/receive-messages m-p3)) (range 20)))
+
+          ]
       (is (= [:m5 :m6] messages2))
       (is (not (m/all-barriers-seen? mnext)))
       (let [m-p1-acks (m/receive-acks m-p1)
@@ -148,4 +150,13 @@
             m-p2-next-acks (m/receive-acks m-p2)]
         (is (not (empty? m-p1-acks)))
         (is (not (empty? m-p2-acks)))
-        (is (empty? m-p2-next-acks))))))
+        (is (empty? m-p2-next-acks))
+        ;; Late joiner :p4 on same queues at p3 should not obtain any messages
+        (let [m-p4 (component/start (am/atom-messenger pg :p4))
+              m (-> m-p4
+                    (m/set-replica-version 1)
+                    (m/register-subscription t1-queue-p1)
+                    (m/register-subscription t1-queue-p2)
+                    (m/register-publication t2-ack-queue))]
+
+          (is (empty? (remove nil? (mapcat (fn [_] (m/receive-messages m-p4)) (range 20))))))))))
