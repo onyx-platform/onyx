@@ -21,6 +21,7 @@
         downstream-peers (mapcat #(get-in replica-val [:allocations job-id %]) downstream-task-ids)]
     (doseq [target downstream-peers]
       #_(when-let [site (peer-site task-state target)]
+          ;; Incorrect arguments
         (let [b (->Barrier id
                            barrier-epoch 
                            task-id

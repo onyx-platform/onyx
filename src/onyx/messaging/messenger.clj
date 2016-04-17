@@ -1,11 +1,13 @@
 (ns onyx.messaging.messenger)
 
-(defmulti assign-task-resources (fn [replica peer-id task-id peer-site peer-sites]
-                                  (:onyx.messaging/impl (:messaging replica))))
+(defmulti assign-task-resources 
+  (fn [replica peer-id task-id peer-site peer-sites]
+    (:onyx.messaging/impl (:messaging replica))))
 
 
-(defmulti get-peer-site (fn [replica peer]
-                          (:onyx.messaging/impl (:messaging replica))))
+(defmulti get-peer-site 
+  (fn [replica peer]
+    (:onyx.messaging/impl (:messaging replica))))
 
 (defprotocol Messenger
   (peer-site [messenger])
@@ -18,10 +20,12 @@
   (unregister-subscription [messenger sub])
   (register-publication [messenger pub])
   (unregister-publication [messenger pub])
-  (receive-messages [messenger event])
+  (receive-messages [messenger])
   (send-messages [messenger messages task-slots])
   (emit-barrier [messenger])
+  (replica-version [messenger])
   (set-replica-version [messenger replica-version])
+  (epoch [messenger])
   (next-epoch [messenger])
   (set-epoch [messenger epoch])
   (all-barriers-seen? [messenger])

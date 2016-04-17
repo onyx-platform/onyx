@@ -23,9 +23,11 @@
   (dec-count! [this]
     (zero? (swap! ref-count dec))))
 
-(defrecord Barrier [src-peer-id barrier-epoch src-task-id dst-task-id msg-id])
+(defrecord Message [src-peer-id dst-task-id message])
 
-(defrecord BarrierAck [barrier-epoch job-id task-id peer-id type])
+(defrecord Barrier [src-peer-id dst-task-id replica-version epoch])
+
+(defrecord BarrierAck [src-peer-id dst-peer-id replica-version epoch])
 
 (defrecord Results [tree acks segments retries])
 

@@ -14,7 +14,7 @@
   (:import [java.util UUID]))
 
 (defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id] :as event}]
-  (let [messages (m/receive-messages messenger event)]
+  (let [messages (m/receive-messages messenger)]
     {:onyx.core/batch messages}))
 
 (defn read-input-batch
