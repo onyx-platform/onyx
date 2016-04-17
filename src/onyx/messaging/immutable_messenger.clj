@@ -211,10 +211,10 @@
                     result (take-messages messenger subscriber)
                     mnew (-> messenger
                              (set-ticket subscriber (:ticket result))
-                             (assoc :message (:message result))
+                             (assoc :messages [(:message result)])
                              (update-first-subscriber (constantly (:subscriber result)))
                              (rotate-subscriptions))] 
-                (if (:message mnew)
+                (if (:messages mnew)
                   (reduced mnew)
                   mnew)))
             messenger
