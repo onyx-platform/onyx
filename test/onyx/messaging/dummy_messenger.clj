@@ -1,19 +1,20 @@
 (ns onyx.messaging.dummy-messenger
-  (:require [onyx.extensions :as extensions]))
+  (:require [onyx.messaging.messenger :as m]))
 
-(defmethod extensions/assign-task-resources :dummy-messenger
+(defmethod m/assign-task-resources :dummy-messenger
   [config peer-id task-id peer-site peer-sites]
   {:port 1})
 
-(defmethod extensions/get-peer-site :dummy-messenger
+(defmethod m/get-peer-site :dummy-messenger
   [replica peer]
   "localhost")
 
-(defrecord DummyMessenger [peer-opts])
+(defrecord DummyMessenger [peer-opts]
+  m/Messenger
+  (peer-site [messenger]
+    {:address 1}))
 
 (defn dummy-messenger [peer-opts]
   (->DummyMessenger peer-opts))
 
-(defmethod extensions/peer-site onyx.messaging.dummy_messenger.DummyMessenger
-  [messenger]
-  {:address 1})
+

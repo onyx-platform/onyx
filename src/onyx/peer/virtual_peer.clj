@@ -1,6 +1,7 @@
 (ns ^:no-doc onyx.peer.virtual-peer
   (:require [clojure.core.async :refer [chan >!! <!! thread alts!! close! dropping-buffer]]
             [com.stuartsierra.component :as component]
+            [onyx.messaging.messenger :as m]
             [onyx.extensions :as extensions]
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
@@ -94,7 +95,7 @@
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
-              peer-site (extensions/peer-site messenger)
+              peer-site (m/peer-site messenger)
               entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site
                                                              :tags (or (:onyx.peer/tags opts) [])})
               origin (extensions/subscribe-to-log log inbox-ch)]

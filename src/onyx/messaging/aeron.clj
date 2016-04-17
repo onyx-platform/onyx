@@ -8,7 +8,7 @@
             [onyx.messaging.protocol-aeron :as protocol]
             [onyx.messaging.common :as common]
             [onyx.types :refer [->MonitorEventBytes map->Barrier]]
-            [onyx.extensions :as extensions]
+            [onyx.messaging.messenger :as m]
             [onyx.compression.nippy :refer [messaging-compress messaging-decompress]]
             [onyx.static.default-vals :refer [defaults arg-or-default]])
   (:import [io.aeron Aeron Aeron$Context ControlledFragmentAssembler Publication Subscription FragmentAssembler]
@@ -74,13 +74,13 @@
            :short-ids nil
            :compress-f nil)))
 
-(defmethod extensions/register-task-peer AeronMessenger
+#_(defmethod extensions/register-task-peer AeronMessenger
   [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}
    task-buffer]
   #_(swap! short-ids assoc :peer-task-short-id peer-task-id))
 
-(defmethod extensions/unregister-task-peer AeronMessenger
+#_(defmethod extensions/unregister-task-peer AeronMessenger
   [{:keys [short-ids] :as messenger}
    {:keys [aeron/peer-task-id]}]
   #_(swap! short-ids dissoc peer-task-id))
@@ -173,19 +173,19 @@
                       peer-site)))
     id))
 
-(defmethod extensions/assign-task-resources :aeron
+(defmethod m/assign-task-resources :aeron
   [replica peer-id task-id peer-site peer-sites]
   {}
   #_{:aeron/peer-task-id (allocate-id (hash [peer-id task-id]) peer-site peer-sites)})
 
-(defmethod extensions/get-peer-site :aeron
+(defmethod m/get-peer-site :aeron
   [replica peer]
   (get-in replica [:peer-sites peer :aeron/external-addr]))
 
 (defn aeron-messenger [peer-group]
   (map->AeronMessenger {:peer-group peer-group}))
 
-(defmethod extensions/peer-site AeronMessenger
+#_(defmethod m/peer-site AeronMessenger
   [messenger]
   {:aeron/external-addr (:external-addr (:messaging-group messenger))
    :aeron/port (:port (:messaging-group messenger))})
@@ -195,11 +195,11 @@
 ;; Define stream-id as only allowed stream
 (def stream-id 1)
 
-; (defmethod extensions/connection-spec AeronMessenger
+; (defmethod m/connection-spec AeronMessenger
 ;   [messenger peer-id event {:keys [aeron/external-addr aeron/port aeron/peer-task-id] :as peer-site}]
 ;   (->AeronPeerConnection (mc/aeron-channel external-addr port) stream-id peer-task-id))
 
-(defmethod extensions/shared-ticketing-counter AeronMessenger
+#_(defmethod m/shared-ticketing-counter AeronMessenger
   [messenger job-id peer-id task-id]
   (let [path [job-id task-id peer-id]] 
     (get-in (swap! (:ticketing-counters (:messaging-group messenger)) 
@@ -209,7 +209,7 @@
                        (assoc-in tc path (atom 0)))))
             path)))
 
-(defmethod extensions/new-partial-subscriber AeronMessenger
+#_(defmethod m/new-partial-subscriber AeronMessenger
   [{:keys [messaging-group] :as messenger} job-id peer-id task-id]
   (info "new subscriber for " job-id peer-id task-id)
   (let [error-handler (reify ErrorHandler
@@ -225,11 +225,11 @@
     {:subscription subscription
      :conn conn
      :counter (atom 0)
-     :ticket-counter (extensions/shared-ticketing-counter messenger job-id peer-id task-id)
+     :ticket-counter (m/shared-ticketing-counter messenger job-id peer-id task-id)
      :barrier (atom nil)
      :src-peer-id peer-id}))
 
-(defmethod extensions/close-partial-subscriber AeronMessenger
+#_(defmethod m/close-partial-subscriber AeronMessenger
   [{:keys [messaging-group] :as messenger} partial-subscriber]
   (info "Closing partial subscriber")
   (.close ^Subscription (:subscription partial-subscriber))
@@ -284,10 +284,10 @@
 (defn task-alive? [event]
   (first (alts!! [(:onyx.core/kill-ch event) (:onyx.core/task-kill-ch event)] :default true)))
 
-(defmethod extensions/receive-messages AeronMessenger
+#_(defmethod m/receive-messages AeronMessenger
   [messenger {:keys [onyx.core/task-map onyx.core/id onyx.core/task-id onyx.core/task 
-                     onyx.core/subscription-maps]
-              :as event}]
+                                onyx.core/subscription-maps]
+                         :as event}]
   (let [rotated-subscriptions (swap! subscription-maps rotate)
         next-subscription (first (filter (comp nil? deref :barrier) rotated-subscriptions))]
     (if next-subscription
@@ -321,18 +321,18 @@
            (neg? ret))
     (info "Re-offering message, session-id" (.sessionId pub))))
 
-(defmethod extensions/send-messages AeronMessenger
+#_(defmethod m/send-messages AeronMessenger
   [messenger publication batch]
   (doseq [b batch]
     (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress b))]
       (write publication buf))))
 
-(defmethod extensions/send-barrier AeronMessenger
+#_(defmethod m/send-barrier AeronMessenger
   [messenger publication barrier]
   (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress barrier))]
     (write publication buf)))
 
-(defmethod extensions/ack-barrier AeronMessenger
+#_(defmethod m/ack-barrier AeronMessenger
   [messenger publication ack-message]
   (let [buf ^UnsafeBuffer (UnsafeBuffer. (messaging-compress ack-message))]
     (write publication buf)))

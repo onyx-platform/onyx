@@ -4,6 +4,7 @@
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.commands.common :refer [peer->allocated-job]]
             [onyx.extensions :as extensions]
+            [onyx.messaging.messenger :as m]
             [onyx.api :as api]
             [taoensso.timbre :as timbre :refer [info]]
             [clojure.set :refer [intersection]]
@@ -156,7 +157,7 @@
    (build-join-entry peer-id {}))
   ([peer-id more-args]
    {:fn :prepare-join-cluster
-    :args (merge {:peer-site (extensions/peer-site messenger)
+    :args (merge {:peer-site (m/peer-site messenger)
                   :joiner peer-id}
                  more-args)}))
 

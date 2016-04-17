@@ -7,6 +7,7 @@
             [com.stuartsierra.component :as component]
             [com.stuartsierra.dependency :as dep]
             [onyx.extensions :as extensions]
+            [onyx.messaging.messenger :as m]
             [clj-tuple :as t]
             [taoensso.timbre :refer [info]]))
 
@@ -124,8 +125,16 @@
        (filter (partial = :active))
        (seq)))
 
-(defn any-ackers? [replica job-id]
-  (> (count (get-in replica [:ackers job-id])) 0))
+(defn find-physically-colocated-peers
+  "Takes replica and a peer. Returns a set of peers, exluding this peer,
+   that reside on the same physical machine."
+  [replica peer]
+  (let [peers (remove (fn [p] (= p peer)) (:peers replica))
+        peer-site (m/get-peer-site replica peer)]
+    (filter
+     (fn [p]
+       (= (m/get-peer-site replica p) peer-site))
+     peers)))
 
 (defn job-covered? [replica job]
   (let [tasks (get-in replica [:tasks job])

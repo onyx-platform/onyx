@@ -3,7 +3,7 @@
             [onyx.static.planning :refer [find-task]]
             [onyx.peer.operation :as operation]
             [onyx.peer.barrier :as b]
-            [onyx.extensions :as extensions]
+            [onyx.messaging.messenger :as m]
             [onyx.log.commands.common :as common]
             [onyx.plugin.onyx-input :as oi]
             [clj-tuple :as t]
@@ -14,7 +14,7 @@
   (:import [java.util UUID]))
 
 (defn read-function-batch [{:keys [onyx.core/messenger onyx.core/id] :as event}]
-  (let [messages (onyx.extensions/receive-messages messenger event)]
+  (let [messages (m/receive-messages messenger event)]
     {:onyx.core/batch messages}))
 
 (defn read-input-batch
@@ -64,7 +64,7 @@
         (let [root-task-ids (:root-task-ids @task-state)] 
           (doseq [p (mapcat #(get-in @replica [:allocations job-id %]) root-task-ids)]
             (when-let [site (peer-site task-state p)]
-              (onyx.extensions/ack-barrier messenger
+              (m/ack-barrier messenger
                                            site
                                            (map->BarrierAck 
                                             {:barrier-epoch barrier-epoch

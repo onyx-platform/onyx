@@ -40,82 +40,6 @@
 
 ;;;;
 
-(def no-op-error-handler
-  (reify ErrorHandler
-    (onError [this x] (taoensso.timbre/warn x))))
-
-(defn backoff-strategy [strategy]
-  (case strategy
-    :busy-spin (BusySpinIdleStrategy.)
-    :low-restart-latency (BackoffIdleStrategy. 100
-                                               10
-                                               (.toNanos TimeUnit/MICROSECONDS 1)
-                                               (.toNanos TimeUnit/MICROSECONDS 100))
-    :high-restart-latency (BackoffIdleStrategy. 1000
-                                                100
-                                                (.toNanos TimeUnit/MICROSECONDS 10)
-                                                (.toNanos TimeUnit/MICROSECONDS 1000))))
-
-;; Available image handler could be used to setup a lookup for which streamId matches which sourceIdentity i.e. host
-;; Once we know what host it corresponds to, then we should be able to lookup the full peer id via the short peer id + the source identity
-(def log-available-image-handler 
-  (reify AvailableImageHandler
-    (onAvailableImage [this image]
-      (let [subscription (.subscription image)] 
-        (info "Available image on:" (.channel subscription) (.streamId subscription) (.sessionId image) (.sourceIdentity image)))))) 
-
-(defn start-subscribers!
-  [messenger replica task-type ingress-task-ids job-id this-task-id]
-  (if (= task-type :input)
-    []
-    (mapv
-     (fn [src-peer-id]
-       (extensions/new-partial-subscriber messenger job-id src-peer-id this-task-id))
-     (common/src-peers replica ingress-task-ids job-id))))
-
-(defn stream-observer-handler [event this-task-id buffer offset length header]
-  (let [ba (byte-array length)
-        _ (.getBytes buffer offset ba)
-        res (messaging-decompress ba)]
-    (when (and (instance? onyx.types.BarrierAck res)
-               (= (:type res) :job-completed)
-               (= (:onyx.core/id event) (:peer-id res)))
-      (info "Should ack barrier on peer" (:peer-id res) (:barrier-epoch res))
-      (swap! (:onyx.core/pipeline event)
-             (fn [pipeline]
-               (oi/ack-barrier pipeline (:barrier-epoch res))))
-      (when (oi/completed? @(:onyx.core/pipeline event))
-        (let [entry (entry/create-log-entry
-                     :exhaust-input
-                     {:job (:onyx.core/job-id event) :task this-task-id})]
-          (>!! (:onyx.core/outbox-ch event) entry))))))
-
-(defn fragment-data-handler [f]
-  (FragmentAssembler.
-   (reify FragmentHandler
-     (onFragment [this buffer offset length header]
-       (f buffer offset length header)))))
-
-(defn consumer [handler ^IdleStrategy idle-strategy limit shutdown-atom]
-  (reify Consumer
-    (accept [this subscription]
-      (while (not @shutdown-atom)
-        (let [fragments-read (.poll ^Subscription subscription ^FragmentHandler handler ^int limit)]
-          (.idle idle-strategy fragments-read))))))
-
-(defn start-stream-observer! [conn bind-addr port stream-id idle-strategy event task-id shutdown-atom]
-  (let [channel (mc/aeron-channel bind-addr port)
-        subscription (.addSubscription conn channel stream-id)
-        handler (fragment-data-handler
-                 (fn [buffer offset length header]
-                   (stream-observer-handler event task-id buffer offset length header)))
-        subscription-fut (future (try (.accept ^Consumer (consumer handler idle-strategy 10 shutdown-atom) subscription)
-                                      (catch Throwable e (fatal e))))]
-    {:subscription subscription
-     :subscription-fut subscription-fut}))
-
-;;;;
-
 (s/defn windowed-task? [event]
   (or (not-empty (:onyx.core/windows event))
       (not-empty (:onyx.core/triggers event))))
@@ -393,18 +317,7 @@
       (info "Task state is " task-state)
       (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
-            ctx (.availableImageHandler (.errorHandler (Aeron$Context.) no-op-error-handler)
-                                        log-available-image-handler)
-            aeron-conn (Aeron/connect ctx)
-
             log-prefix (logger/log-prefix task-information)
-            subscriptions (start-subscribers!
-                           messenger
-                           @replica
-                           (:onyx/type task-map)
-                           (:ingress-ids task)
-                           job-id
-                           task-id)
 
             pipeline-data {:onyx.core/id id
                            :onyx.core/job-id job-id
@@ -432,11 +345,7 @@
                            :onyx.core/fn (operation/resolve-task-fn task-map)
                            :onyx.core/replica replica
                            :onyx.core/task-state task-state
-                           :onyx.core/log-prefix log-prefix
-                           :onyx.core/n-sent-messages (atom 0)
-                           :onyx.core/epoch (atom -1)
-                           :onyx.core/subscription-maps (atom subscriptions)
-                           :onyx.core/aeron-conn aeron-conn}
+                           :onyx.core/log-prefix log-prefix}
 
             _ (info log-prefix "Warming up task lifecycle" task)
 
@@ -470,8 +379,7 @@
 
         (loop [replica-state @replica]
           (when (and (first (alts!! [kill-ch task-kill-ch] :default true))
-                     (or (not (common/job-covered? replica-state job-id))
-                         (not (common/any-ackers? replica-state job-id))))
+                     (not (common/job-covered? replica-state job-id)))
             (info log-prefix "Not enough virtual peers have warmed up to start the task yet, backing off and trying again...")
             (Thread/sleep (arg-or-default :onyx.peer/job-not-ready-back-off opts))
             (recur @replica)))
@@ -487,16 +395,7 @@
                  :task-information task-information
                  :task-kill-ch task-kill-ch
                  :kill-ch kill-ch
-                 :task-lifecycle-ch task-lifecycle-ch
-                 :stream-observer-shutdown-atom observer-shutdown-atom
-                 :stream-observer (start-stream-observer! aeron-conn
-                                                          (mc/bind-addr opts)
-                                                          (:onyx.messaging/peer-port opts)
-                                                          1
-                                                          (backoff-strategy (arg-or-default :onyx.messaging.aeron/poll-idle-strategy opts))
-                                                          pipeline-data
-                                                          task-id
-                                                          observer-shutdown-atom))))
+                 :task-lifecycle-ch task-lifecycle-ch)))
       (catch Throwable e
         (handle-exception task-information log e restart-ch outbox-ch job-id)
         component)))
@@ -524,16 +423,6 @@
       (when-let [filter-state (:onyx.core/filter-state event)] 
         (when (exactly-once-task? event)
           (state-extensions/close-filter @filter-state event)))
-
-      (doseq [subscriber @(:onyx.core/subscription-maps event)]
-        (extensions/close-partial-subscriber messenger subscriber))
-
-      (reset! (:stream-observer-shutdown-atom component) true)
-      (info "Waiting for stream observer shutdown")
-      (deref (:subscription-fut (:stream-observer component)))
-      (info "Stream observer has shutdown")
-      (.close ^Subscription (:subscription (:stream-observer component)))
-      (.close ^Aeron (:onyx.core/aeron-conn event))
 
       ((:compiled-after-task-fn (:onyx.core/compiled event)) event)
       (op/stop @(:onyx.core/pipeline event) event))

@@ -2,12 +2,13 @@
   (:require [onyx.scheduling.common-task-scheduler :as cts]
             [onyx.scheduling.common-job-scheduler :as cjs]
             [onyx.log.commands.common :as common]
+            [onyx.messaging.messenger :as m]
             [onyx.extensions :as extensions])
   (:import [org.btrplace.model.constraint Fence SplitAmong Ban]))
 
 (defn site->peers [replica]
   (group-by
-   (fn [p] (extensions/get-peer-site replica p))
+   (fn [p] (m/get-peer-site replica p))
    (:peers replica)))
 
 (defn large-enough-sites [site->peers-mapping min-peers]
@@ -41,7 +42,7 @@
 (defn ban-smaller-sites [replica jobs peer->vm task->node large-sites rejected]
   (let [sites (keys large-sites)
         peer-ids (into
-                  ((group-by #(some #{(extensions/get-peer-site replica %)} sites)
+                  ((group-by #(some #{(m/get-peer-site replica %)} sites)
                              (:peers replica))
                    nil)
                   rejected)
@@ -112,8 +113,8 @@
   false)
 
 (defn find-colocated-peers [replica this-peer other-peers]
-  (let [my-site (extensions/get-peer-site replica this-peer)]
-    (filter #(= my-site (extensions/get-peer-site replica %)) other-peers)))
+  (let [my-site (m/get-peer-site replica this-peer)]
+    (filter #(= my-site (m/get-peer-site replica %)) other-peers)))
 
 (defn choose-candidates [replica peer-config this-peer downstream-peers]
   (if (:onyx.task-scheduler.colocated/only-send-local? peer-config)

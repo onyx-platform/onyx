@@ -123,7 +123,8 @@
    {:keys [peer-state peer-sites allocations] :as replica}
    messenger
    job-id]
-  (let [ingress-ids (:ingress-ids task)
+  task-state
+  #_(let [ingress-ids (:ingress-ids task)
         subscribers (mapv
                       (fn [src-peer-id]
                         (extensions/new-partial-subscriber messenger job-id src-peer-id (:id task)))

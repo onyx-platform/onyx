@@ -5,9 +5,9 @@
             [com.stuartsierra.component :as component]
             [onyx.log.commands.common :as common]
             [onyx.extensions :as extensions]
+            [onyx.messaging.messenger :as m]
             [onyx.log.replica-invariants :as invariants]
-            [onyx.scheduling.common-task-scheduler :as cts]
-            [onyx.scheduling.acker-scheduler :refer [choose-ackers]])
+            [onyx.scheduling.common-task-scheduler :as cts])
   (:import [org.btrplace.model Model DefaultModel Mapping Node]
            [org.btrplace.model.constraint Running RunningCapacity Quarantine Fence Among]
            [org.btrplace.scheduler.choco DefaultChocoScheduler DefaultParameters]))
@@ -280,7 +280,7 @@
 (defn update-peer-site [replica task-id peer-id]
   (update-in replica [:peer-sites peer-id]
              (fn [peer-site]
-               (let [resources (extensions/assign-task-resources
+               (let [resources (m/assign-task-resources
                                 replica
                                 peer-id
                                 task-id
@@ -458,8 +458,7 @@
         (if (= planned-capacities (actual-usage current-replica jobs))
           current-replica
           (if-let [updated-replica (btr-place-scheduling current-replica jobs max-utilization planned-capacities)]
-            (let [acker-replica (choose-ackers updated-replica jobs)]
-              (if (full-allocation? acker-replica max-utilization planned-capacities)
-                (deallocate-starved-jobs acker-replica)
-                (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))
+            (if (full-allocation? updated-replica max-utilization planned-capacities)
+              (deallocate-starved-jobs updated-replica)
+              (recur (butlast jobs) (remove-job current-replica (butlast jobs))))
             (recur (butlast jobs) (remove-job current-replica (butlast jobs)))))))))

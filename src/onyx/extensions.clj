@@ -42,38 +42,6 @@
 
 (defmulti gc-log-entry (fn [log position] (type log)))
 
-;; Messaging interface
-
-(defmulti assign-task-resources (fn [replica peer-id task-id peer-site peer-sites]
-                                  (:onyx.messaging/impl (:messaging replica))))
-
-(defmulti peer-site (fn [messenger] (type messenger)))
-
-(defmulti get-peer-site (fn [replica peer]
-                          (:onyx.messaging/impl (:messaging replica))))
-
-(defmulti register-task-peer (fn [messenger assigned buffers] (type messenger)))
-
-(defmulti unregister-task-peer (fn [messenger assigned] (type messenger)))
-
-(defmulti shared-ticketing-counter (fn [messenger job-id peer-id task-id] (type messenger)))
-
-(defmulti new-partial-subscriber (fn [messenger job-id peer-id task-id] (type messenger)))
-
-(defmulti close-partial-subscriber (fn [messenger partial-subscriber] (type messenger)))
-
-(defmulti receive-messages (fn [messenger event] (type messenger)))
-
-(defmulti send-messages (fn [messenger peer-link messages] (type messenger)))
-
-(defmulti send-barrier (fn [messenger peer-link barrier] (type messenger)))
-
-(defmulti close-peer-connection (fn [messenger event link] (type messenger)))
-
-(defmulti ack-barrier (fn [messenger id peer-link] (type messenger)))
-
-(defmulti internal-retry-segment (fn [messenger id peer-link] (type messenger)))
-
 ;; Monitoring interface
 
 (defmulti monitoring-agent :monitoring)

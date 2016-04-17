@@ -125,10 +125,10 @@
 (defrecord RegisterMessengerPeer [messenger peer-site]
   component/Lifecycle
   (start [component]
-    (extensions/register-task-peer messenger peer-site (:messenger-buffer component))
+    ;(extensions/register-task-peer messenger peer-site (:messenger-buffer component))
     component)
   (stop [component]
-    (extensions/unregister-task-peer messenger peer-site)
+    ;(extensions/unregister-task-peer messenger peer-site)
     component))
 
 (def task-components

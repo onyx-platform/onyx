@@ -4,6 +4,7 @@
             [clojure.data :refer [diff]]
             [schema.core :as s]
             [onyx.schema :refer [Replica LogEntry Reactions ReplicaDiff State]]
+            [onyx.messaging.messenger :as m]
             [onyx.static.default-vals :refer [arg-or-default]]
             [taoensso.timbre :refer [info] :as timbre]
             [onyx.extensions :as extensions]))
@@ -37,7 +38,7 @@
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
              :tags (:tags args)
-             :peer-site (extensions/peer-site (:messenger peer-args))}}]))
+             :peer-site (m/peer-site (:messenger peer-args))}}]))
 
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
   [{:keys [args]} old new diff state]
