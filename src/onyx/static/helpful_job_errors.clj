@@ -1,6 +1,7 @@
 (ns onyx.static.helpful-job-errors
   (:require [clojure.string :refer [split join]]
             [onyx.information-model :refer [model]]
+            [clj-fuzzy.metrics :refer [levenshtein]]
             [io.aviso.ansi :as a]))
 
 (def structure-names
@@ -90,15 +91,31 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
+(defn closest-match [structure-type faulty-key]
+  (let [xs (keys (get-in model [structure-type :model]))
+        faulty-str (name faulty-key)
+        distances
+        (map
+         (fn [k]
+           [k (levenshtein faulty-str (name k))])
+         xs)]
+    (when (seq distances)
+      (let [candidate (apply min-key second distances)]
+        ;; Don't guess wildly. Make sure it's at least
+        ;; a guess within reason.
+        (when (<= (second candidate) 5)
+          (first candidate))))))
+
 (defn print-helpful-invalid-key-error
-  [context faulty-key structure-type suggestion]
+  [context faulty-key structure-type]
   (let [error-f
         (fn [k v]
           (do (println "   " (a/bold-red (str k " " (pr-str v))))
               (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key."))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f))
-  (println "Did you mean:" (a/bold-green suggestion))
+  (when-let [suggestion (closest-match structure-type faulty-key)]
+    (println "Did you mean:" (a/bold-green suggestion)))
   (show-footer))
 
 (defn print-helpful-missing-key-error

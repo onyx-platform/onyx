@@ -97,7 +97,7 @@
                         (hje/print-helpful-missing-key-error entry (:key data) :catalog-entry)))
 
                 (= (:type error) :invalid-key)
-                (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry :blah)
+                (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry)
 
                 (some #{(:type error)} #{:value-predicate-error :value-type-error})
                 (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry))
