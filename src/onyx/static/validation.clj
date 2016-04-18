@@ -77,39 +77,31 @@
 (defn validate-catalog
   [catalog]
   (no-duplicate-entries catalog)
-  (reduce
-   (fn [result entry]
-     (name-and-type-not-equal entry)
-     (min-and-max-peers-sane entry)
-     (min-max-n-peers-mutually-exclusive entry)
-     (try 
-       (schema/validate TaskMap entry)
-       true
-       (catch Throwable t
-         (let [{:keys [error] :as data} (os/describe-schema-error t)]
-           (cond (= (:type error) :conditional-failed)
-                 (cond (= (:conditional error) :onyx-type-conditional)
-                       (if (:onyx/type entry)
-                         (hje/print-helpful-invalid-choice-error entry :onyx/type :catalog-entry)
-                         (hje/print-helpful-missing-key-error entry :onyx/type :catalog-entry))
+  (doseq [entry catalog]
+    (name-and-type-not-equal entry)
+    (min-and-max-peers-sane entry)
+    (min-max-n-peers-mutually-exclusive entry)
+    (try
+      (schema/validate TaskMap entry)
+      (catch Throwable t
+        (let [{:keys [error] :as data} (os/describe-schema-error t)]
+          (cond (= (:type error) :conditional-failed)
+                (cond (= (:conditional error) :onyx-type-conditional)
+                      (if (:onyx/type entry)
+                        (hje/print-helpful-invalid-choice-error entry :onyx/type :catalog-entry)
+                        (hje/print-helpful-missing-key-error entry :onyx/type :catalog-entry))
 
-                       (= (:conditional error) :matches-some-precondition?)
-                       (if (get entry (:key data))
-                         (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
-                         (hje/print-helpful-missing-key-error entry (:key data) :catalog-entry))
+                      (= (:conditional error) :matches-some-precondition?)
+                      (if (get entry (:key data))
+                        (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
+                        (hje/print-helpful-missing-key-error entry (:key data) :catalog-entry)))
 
-                       :else (throw t))
+                (= (:type error) :invalid-key)
+                (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry :blah)
 
-                 (= (:type error) :invalid-key)
-                 (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry :blah)
-
-                 (some #{(:type error)} #{:value-predicate-error :value-type-error})
-                 (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
-
-                 :else (throw t))
-           (reduced false)))))
-   true
-   catalog))
+                (some #{(:type error)} #{:value-predicate-error :value-type-error})
+                (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry))
+          (throw t))))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -160,8 +152,7 @@
 (defn validate-workflow [job]
   (validate-workflow-graph job)
   (validate-workflow-names job)
-  (validate-workflow-no-dupes job)
-  true)
+  (validate-workflow-no-dupes job))
 
 (defn validate-lifecycles [lifecycles catalog]
   (doseq [lifecycle lifecycles]
@@ -169,8 +160,7 @@
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
                       {:lifecycle lifecycle :catalog catalog})))
-    (schema/validate Lifecycle lifecycle))
-  true)
+    (schema/validate Lifecycle lifecycle)))
 
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
@@ -223,9 +213,9 @@
 
 (defn validate-job
   [job]
-  (and (validate-catalog (:catalog job))
-       (validate-workflow job)
-       (schema/validate Job job)))
+  (validate-catalog (:catalog job))
+  (validate-workflow job)
+  (schema/validate Job job))
 
 (defn validate-flow-pred-all-kws [flow-schema]
   (prewalk
@@ -281,8 +271,7 @@
   (validate-all-position flow-conditions)
   (validate-none-position flow-conditions)
   (validate-short-circuit flow-conditions)
-  (validate-auto-short-circuit flow-conditions)
-  true)
+  (validate-auto-short-circuit flow-conditions))
 
 (defn window-names-a-task [tasks w]
   (when-not (some #{(:window/task w)} tasks)
@@ -358,8 +347,7 @@
       (session-windows-dont-define-range-or-slide w)
       (session-windows-define-a-timeout w)
       (window-key-where-required w)
-      (task-has-uniqueness-key w catalog))
-    true))
+      (task-has-uniqueness-key w catalog))))
 
 (defn trigger-names-a-window [window-ids t]
   (when-not (some #{(:trigger/window-id t)} window-ids)
@@ -368,8 +356,7 @@
 (defn validate-triggers [triggers windows]
   (let [window-names (map :window/id windows)]
     (doseq [t triggers]
-      (trigger-names-a-window window-names t))
-    true))
+      (trigger-names-a-window window-names t))))
 
 (defn coerce-uuid [uuid]
   (try 

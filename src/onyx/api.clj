@@ -151,33 +151,34 @@
   ([peer-client-config job]
    (submit-job peer-client-config job {:monitoring :no-op}))
   ([peer-client-config job monitoring-config]
-   (if (and (validator/validate-peer-client-config peer-client-config)
-            (validator/validate-job job)
-            (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
-            (validator/validate-lifecycles (:lifecycles job) (:catalog job))
-            (validator/validate-windows (:windows job) (:catalog job))
-            (validator/validate-triggers (:triggers job) (:windows job)))
-     (let [id (java.util.UUID/randomUUID)
-           tasks (planning/discover-tasks (:catalog job) (:workflow job))
-           entry (create-submit-job-entry id peer-client-config job tasks)
-           client (component/start (system/onyx-client peer-client-config monitoring-config))]
-       (extensions/write-chunk (:log client) :catalog (:catalog job) id)
-       (extensions/write-chunk (:log client) :workflow (:workflow job) id)
-       (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
-       (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
-       (extensions/write-chunk (:log client) :windows (:windows job) id)
-       (extensions/write-chunk (:log client) :triggers (:triggers job) id)
-       (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
+   (try (validator/validate-peer-client-config peer-client-config)
+        (validator/validate-job job)
+        (validator/validate-flow-conditions (:flow-conditions job) (:workflow job))
+        (validator/validate-lifecycles (:lifecycles job) (:catalog job))
+        (validator/validate-windows (:windows job) (:catalog job))
+        (validator/validate-triggers (:triggers job) (:windows job))
+        (catch Throwable t
+          (error t)
+          (throw t)))
+   (let [id (java.util.UUID/randomUUID)
+         tasks (planning/discover-tasks (:catalog job) (:workflow job))
+         entry (create-submit-job-entry id peer-client-config job tasks)
+         client (component/start (system/onyx-client peer-client-config monitoring-config))]
+     (extensions/write-chunk (:log client) :catalog (:catalog job) id)
+     (extensions/write-chunk (:log client) :workflow (:workflow job) id)
+     (extensions/write-chunk (:log client) :flow-conditions (:flow-conditions job) id)
+     (extensions/write-chunk (:log client) :lifecycles (:lifecycles job) id)
+     (extensions/write-chunk (:log client) :windows (:windows job) id)
+     (extensions/write-chunk (:log client) :triggers (:triggers job) id)
+     (extensions/write-chunk (:log client) :job-metadata (:metadata job) id)
 
-       (doseq [task tasks]
-         (extensions/write-chunk (:log client) :task task id))
+     (doseq [task tasks]
+       (extensions/write-chunk (:log client) :task task id))
 
-       (extensions/write-log-entry (:log client) entry)
-       (component/stop client)
-       {:job-id id
-        :task-ids (zipmap (map :name tasks) tasks)
-        :success? true})
-     {:success? false})))
+     (extensions/write-log-entry (:log client) entry)
+     (component/stop client)
+     {:job-id id
+      :task-ids (zipmap (map :name tasks) tasks)})))
 
 (defn ^{:added "0.6.0"} kill-job
   "Kills a currently executing job, given it's job ID. All peers executing
