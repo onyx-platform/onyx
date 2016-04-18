@@ -1,5 +1,6 @@
 (ns onyx.static.helpful-job-errors
-  (:require [onyx.information-model :refer [model]]
+  (:require [clojure.string :refer [split join]]
+            [onyx.information-model :refer [model]]
             [io.aviso.ansi :as a]))
 
 (def structure-names
@@ -37,10 +38,27 @@
   (println "}")
   (println))
 
+(defn line-wrap-str [xs]
+  (let [max-len 80]
+    (->> (split xs #"\s+")
+         (reduce
+          (fn [result word]
+            (let [current-len
+                  (+ (apply + (map count (last result)))
+                     (count (last result))
+                     (count word))]
+              (if (> current-len max-len)
+                (conj result [word])
+                (let [pos (if (seq result) (dec (count result)) 0)]
+                  (update-in result [pos] (fn [x] (vec (conj x word))))))))
+          [])
+         (map (partial join " "))
+         (join "\n"))))
+
 (defn show-docs [entry faulty-key]
   (println "-- Docs for key" (a/bold faulty-key) "--")
   (println)
-  (println (bold-backticks (:doc entry)))
+  (println (bold-backticks (line-wrap-str (:doc entry))))
   (println)
   (println "Expected type:" (a/bold (:type entry)))
   (println "Choices:" (a/bold (:choices entry)))
@@ -51,7 +69,7 @@
   (let [entry (get-in model [structure-type :model faulty-key])
         error-f
         (fn [k v]
-          (println (str "   " (a/bold-red (str k " " v))))
+          (prn "   " (a/bold-red (str k " " v)))
           (println (str "    " (a/magenta (str " ^-- " v " is not a valid choice for " k))))
           (println (str "    " (a/magenta (str "     Must be one of " (:choices entry))))))]
     (show-header structure-type faulty-key)
@@ -64,7 +82,7 @@
   (let [entry (get-in model [structure-type :model faulty-key])
         error-f
         (fn [k v]
-          (println (str "   " (a/bold-red (str k " " v))))
+          (println "  " (a/bold-red (str k " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " v " isn't of the expected type."))))
           (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (:type entry))))))]
     (show-header structure-type faulty-key)
@@ -76,7 +94,7 @@
   [context faulty-key structure-type suggestion]
   (let [error-f
         (fn [k v]
-          (do (println (str "   " (a/bold-red (str k " " v))))
+          (do (prn "   " (a/bold-red (str k " " v)))
               (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key."))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f))
