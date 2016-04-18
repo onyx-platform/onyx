@@ -68,14 +68,14 @@
                 (>!! @in-chan {:n n}))
             _ (>!! @in-chan :done)
             _ (close! @in-chan)
-            _ (onyx.api/submit-job peer-config
+            {:keys [success?]} (onyx.api/submit-job peer-config
                                    {:catalog catalog
                                     :workflow workflow
                                     :lifecycles lifecycles
                                     :task-scheduler :onyx.task-scheduler/balanced
-                                    :metadata {:job-name :click-stream}})
-            results (take-segments! @out-chan)]
-
-        (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-          (is (= expected (set (butlast results))))
-          (is (= :done (last results))))))))
+                                    :metadata {:job-name :click-stream}})]
+        (if success?
+          (let [results (take-segments! @out-chan)]
+            (let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
+              (is (= expected (set (butlast results))))
+              (is (= :done (last results))))))))))

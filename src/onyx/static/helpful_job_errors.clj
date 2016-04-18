@@ -24,6 +24,10 @@
            "for key" (a/bold faulty-key))
   (println))
 
+(defn show-footer []
+  (println "------")
+  (println))
+
 (defn show-structure [context faulty-key error-f]
   (println "{")
   (doseq [[k v] context]
@@ -52,7 +56,8 @@
           (println (str "    " (a/magenta (str "     Must be one of " (:choices entry))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f)
-    (show-docs entry faulty-key)))
+    (show-docs entry faulty-key)
+    (show-footer)))
 
 (defn print-helpful-invalid-type-error
   [context faulty-key structure-type]
@@ -64,7 +69,8 @@
           (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (:type entry))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f)
-    (show-docs entry faulty-key)))
+    (show-docs entry faulty-key)
+    (show-footer)))
 
 (defn print-helpful-invalid-key-error
   [context faulty-key structure-type suggestion]
@@ -74,4 +80,13 @@
               (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key."))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f))
-  (println "Did you mean:" (a/bold-green suggestion)))
+  (println "Did you mean:" (a/bold-green suggestion))
+  (show-footer))
+
+(defn print-helpful-missing-key-error
+  [context faulty-key structure-type]
+  (let [error-f (fn [k v])]
+    (show-header structure-type faulty-key)
+    (show-structure context faulty-key error-f))
+  (println "It was missing. Add the key:" (a/bold-green faulty-key))
+  (show-footer))

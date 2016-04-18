@@ -108,7 +108,7 @@
              :added "0.8.0"}
 
             :onyx/medium
-            {:doc "Denotes the kind of input or output communication or storage that is being read from or written to (e.g. `:kafka` or `:web-socket`). This is currently does not affect any functionality, and is reserved for the future."
+            {:doc "Denotes the kind of input or output communication or storage that is being\nread from or written to (e.g. `:kafka` or `:web-socket`). This is currently\ndoes not affect any functionality, and is reserved for the future."
              :type :keyword
              :tags [:plugin]
              :choices :any
@@ -117,7 +117,7 @@
              :added "0.8.0"}
 
             :onyx/plugin
-            {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified, namespaced keyword pointing to a function that takes the Event map and returns a Record implementing the Plugin interfaces. When `:onyx/language` is set to `:java`, this is a keyword pointing to a Java class that is constructed with the Event map. This class must implement the interoperability interfaces."
+            {:doc "When `:onyx/language` is set to `:clojure`, this is a fully qualified,\nnamespaced keyword pointing to a function that takes the Event map and\nreturns a Record implementing the Plugin interfaces. When `:onyx/language`\nis set to `:java`, this is a keyword pointing to a Java class that is\nconstructed with the Event map. This class must implement the interoperability\ninterfaces."
              :type :keyword
              :tags [:plugin]
              :choices :any

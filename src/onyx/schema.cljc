@@ -1,5 +1,6 @@
 (ns onyx.schema
   (:require [schema.core :as s]
+            [schema.utils :as u]
             [onyx.information-model :as i]
             [onyx.types]
             [schema.spec.leaf :as leaf]
@@ -208,12 +209,14 @@
                                   (merge base-function-task partial-clojure-fn-task)))))
 
 (s/defschema TaskMap
-  (s/conditional #(= (:onyx/type %) :input)
-                 InputTaskSchema
-                 #(= (:onyx/type %) :output)
-                 OutputTaskSchema
-                 #(= (:onyx/type %) :function)
-                 FunctionTaskSchema))
+  (s/conditional
+   #(= (:onyx/type %) :input)
+   InputTaskSchema
+   #(= (:onyx/type %) :output)
+   OutputTaskSchema
+   #(= (:onyx/type %) :function)
+   FunctionTaskSchema
+   'onyx-type-conditional))
 
 (s/defschema Catalog
   [TaskMap])
@@ -703,3 +706,42 @@
     (s/optional-key :new-window-state-fn) Function
     (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
    record? 'record?))
+
+(defmulti classify-schema-error
+  (fn [validation-error]
+    (type (.schema validation-error))))
+
+(defmethod classify-schema-error schema.core.EnumSchema
+  [ve] {:type :value-choice-error})
+
+(defmethod classify-schema-error schema.core.Predicate
+  [ve] {:type :value-predicate-error})
+
+(defmethod classify-schema-error java.lang.Class
+  [ve] {:type :value-type-error})
+
+(defmethod classify-schema-error onyx.schema.RestrictedKwNamespace
+  [ve] {:type :invalid-key})
+
+(defmethod classify-schema-error schema.spec.variant.VariantSpec
+  [ve] {:type :conditional-failed
+        :conditional (keyword (first ((:err-f (.schema ve)) true)))})
+
+(defmethod classify-schema-error :default
+  [ve] {:type :unknown})
+
+(defn describe-schema-error [t]
+  (let [error-type (type (:error (ex-data t)))]
+    (cond (map? (:error (ex-data t)))
+          (let [[k v] (first (:error (ex-data t)))
+                x (if (instance? schema.utils.ValidationError k) k v)]
+            {:error (classify-schema-error x)
+             :key k
+             :value v
+             :error-value (.value x)})
+
+          (instance? schema.utils.ValidationError (:error (ex-data t)))
+          (let [error (:error (ex-data t))]
+            {:error (classify-schema-error error)})
+
+          :else (throw t))))
