@@ -128,5 +128,9 @@
            :kill-ch nil :restart-ch nil
            :outbox-loop-ch nil :processing-loop-ch nil)))
 
+(defmethod clojure.core/print-method VirtualPeer
+  [system ^java.io.Writer writer]
+  (.write writer "#<Virtual Peer>"))
+
 (defn virtual-peer [opts task-component-fn]
   (map->VirtualPeer {:opts opts :task-component-fn task-component-fn}))
