@@ -33,4 +33,5 @@
    :state-logs-marked #{}
    :task-slot-ids {}
    :required-tags {}
-   :peer-tags {}})
+   :peer-tags {}
+   :version -1})
