@@ -708,8 +708,10 @@
    record? 'record?))
 
 (defmulti classify-schema-error
-  (fn [validation-error]
-    (type (.schema validation-error))))
+  (fn [x]
+    (if (instance? schema.utils.ValidationError x)
+      (type (.schema x))
+      x)))
 
 (defmethod classify-schema-error schema.core.EnumSchema
   [ve] {:type :value-choice-error})
@@ -727,6 +729,9 @@
   [ve] {:type :conditional-failed
         :conditional (keyword (first ((:err-f (.schema ve)) true)))})
 
+(defmethod classify-schema-error 'missing-required-key
+  [ve] {:type :missing-required-key})
+
 (defmethod classify-schema-error :default
   [ve] {:type :unknown})
 
@@ -738,7 +743,7 @@
             {:error (classify-schema-error x)
              :key k
              :value v
-             :error-value (.value x)})
+             :error-value (if (instance? schema.utils.ValidationError x) (.value x) k)})
 
           (instance? schema.utils.ValidationError (:error (ex-data t)))
           (let [error (:error (ex-data t))]

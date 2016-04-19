@@ -5,7 +5,8 @@
             [io.aviso.ansi :as a]))
 
 (def structure-names
-  {:catalog-entry "catalog"})
+  {:catalog-entry "catalog"
+   :lifecycle-entry "lifecycles"})
 
 (defn bold-backticks [coll]
   (let [{:keys [result raw]}
@@ -18,6 +19,20 @@
          {:result [] :raw coll}
          (re-seq #"`.*?`" coll))]
     (str (apply str result) raw)))
+
+(defn closest-match [choices faulty-key]
+  (let [faulty-str (name faulty-key)
+        distances
+        (map
+         (fn [k]
+           [k (levenshtein faulty-str (name k))])
+         choices)]
+    (when (seq distances)
+      (let [candidate (apply min-key second distances)]
+        ;; Don't guess wildly. Make sure it's at least
+        ;; a guess within reason.
+        (when (<= (second candidate) 5)
+          (first candidate))))))
 
 (defn show-header [structure-type faulty-key]
   (println "------ Onyx Schema Error -----")
@@ -62,7 +77,8 @@
   (println (bold-backticks (line-wrap-str (:doc entry))))
   (println)
   (println "Expected type:" (a/bold (:type entry)))
-  (println "Choices:" (a/bold (:choices entry)))
+  (when (:choices entry)
+    (println "Choices:" (a/bold (:choices entry))))
   (println "Added in Onyx version:" (a/bold (:added entry))))
 
 (defn print-helpful-invalid-choice-error
@@ -72,9 +88,23 @@
         (fn [k v]
           (println "   " (a/bold-red (str k " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " v " is not a valid choice for " k))))
-          (println (str "    " (a/magenta (str "     Must be one of " (:choices entry))))))]
+          (when (:choices entry)
+            (println (str "    " (a/magenta (str "     Must be one of " (:choices entry)))))))]
     (show-header structure-type faulty-key)
     (show-structure context faulty-key error-f)
+    (show-docs entry faulty-key)
+    (show-footer)))
+
+(defn print-helpful-missing-required-key-error
+  [context faulty-key structure-type]
+  (let [entry (get-in model [structure-type :model faulty-key])
+        error-f
+        (fn [k v]
+          (println "  " k (pr-str v)))]
+    (show-header structure-type faulty-key)
+    (show-structure context faulty-key error-f)
+    (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
+    (println)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -91,24 +121,10 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn closest-match [structure-type faulty-key]
-  (let [xs (keys (get-in model [structure-type :model]))
-        faulty-str (name faulty-key)
-        distances
-        (map
-         (fn [k]
-           [k (levenshtein faulty-str (name k))])
-         xs)]
-    (when (seq distances)
-      (let [candidate (apply min-key second distances)]
-        ;; Don't guess wildly. Make sure it's at least
-        ;; a guess within reason.
-        (when (<= (second candidate) 5)
-          (first candidate))))))
-
 (defn print-helpful-invalid-key-error
   [context faulty-key structure-type]
-  (let [error-f
+  (let [choices (keys (get-in model [structure-type :model]))
+        error-f
         (fn [k v]
           (do (println "   " (a/bold-red (str k " " (pr-str v))))
               (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key."))))))]
@@ -118,10 +134,13 @@
     (println "Did you mean:" (a/bold-green suggestion)))
   (show-footer))
 
-(defn print-helpful-missing-key-error
-  [context faulty-key structure-type]
-  (let [error-f (constantly nil)]
+(defn print-helpful-invalid-task-name-error
+  [context faulty-key faulty-value structure-type tasks]
+  (let [error-f
+        (fn [k v]
+          (do (println "  " (a/bold-red (str k " " (pr-str v))))
+              (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name."))))))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f))
-  (println "It was missing. Add the key:" (a/bold-green faulty-key))
-  (show-footer))
+    (show-structure context faulty-key error-f)
+    (when-let [suggestion (closest-match tasks faulty-value)]
+      (println "Did you mean:" (a/bold-green suggestion)))))

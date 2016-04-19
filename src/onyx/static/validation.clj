@@ -36,43 +36,34 @@
             (and (:onyx/max-peers entry) (:onyx/n-peers entry)))
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
-(defn describe-cause [k]
-  (if (= schema.utils.ValidationError (type k))
-    (cond (= (os/restricted-ns :onyx) (.schema ^schema.utils.ValidationError k))
-          (let [kvalue (.value ^schema.utils.ValidationError k)] 
-            (if-let [doc (dissoc (get-in model [:catalog-entry :model kvalue]) :doc)]
-              {:cause "Unsupported combination of task-map keys."
-               :key kvalue
-               :documentation doc}
-              {:cause "Unsupported onyx task-map key."
-               :key kvalue}))
+(defn show-helpful-lifecycles-error [entry t]
+  (let [{:keys [error] :as data} (os/describe-schema-error t)]
+    (println data " :: " entry)
+    (cond (= (:type error) :missing-required-key)
+          (hje/print-helpful-missing-required-key-error entry (:key data) :lifecycle-entry)
+          
           :else
-          k)
-    k))
+          (hje/print-helpful-invalid-type-error entry (:key data) :lifecycle-entry))))
 
-(defn describe-value [k v]
-  (if (= schema.utils.ValidationError (type v))
-    (let [vvalue (.value ^schema.utils.ValidationError v)
-          entry (get-in model [:catalog-entry :model k])]
-      (if-let [deprecation-doc (:deprecation-doc entry)]
-        {:cause deprecation-doc
-         :data {k vvalue}
-         :deprecated-version (:deprecated-version entry)}
-        (if-let [doc (dissoc entry :doc)]
-          {:cause "Unsupported value"
-           :data {k vvalue}
-           :documentation doc}
-          {:cause "Unsupported value"
-           :data {k vvalue}
-           :value vvalue})))
-    v)) 
+(defn show-helpful-catalog-error [entry t]
+  (let [{:keys [error] :as data} (os/describe-schema-error t)]
+    (cond (= (:type error) :conditional-failed)
+          (cond (= (:conditional error) :onyx-type-conditional)
+                (if (:onyx/type entry)
+                  (hje/print-helpful-invalid-choice-error entry :onyx/type :catalog-entry)
+                  (hje/print-helpful-missing-required-key-error entry :onyx/type :catalog-entry))
 
-(defn improve-issue [m]
-  (into {}
-        (mapv (fn [[k v]]
-                [(describe-cause k)
-                 (describe-value k v)])
-              m)))
+                (= (:conditional error) :matches-some-precondition?)
+                (if (get entry (:key data))
+                  (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
+                  (hje/print-helpful-missing-required-key-error entry (:key data) :catalog-entry)))
+
+          (= (:type error) :invalid-key)
+          (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry)
+
+          (some #{(:type error)} #{:value-predicate-error :value-type-error})
+          (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry))
+    (throw t)))
 
 (defn validate-catalog
   [catalog]
@@ -84,24 +75,7 @@
     (try
       (schema/validate TaskMap entry)
       (catch Throwable t
-        (let [{:keys [error] :as data} (os/describe-schema-error t)]
-          (cond (= (:type error) :conditional-failed)
-                (cond (= (:conditional error) :onyx-type-conditional)
-                      (if (:onyx/type entry)
-                        (hje/print-helpful-invalid-choice-error entry :onyx/type :catalog-entry)
-                        (hje/print-helpful-missing-key-error entry :onyx/type :catalog-entry))
-
-                      (= (:conditional error) :matches-some-precondition?)
-                      (if (get entry (:key data))
-                        (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
-                        (hje/print-helpful-missing-key-error entry (:key data) :catalog-entry)))
-
-                (= (:type error) :invalid-key)
-                (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry)
-
-                (some #{(:type error)} #{:value-predicate-error :value-type-error})
-                (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry))
-          (throw t))))))
+        (show-helpful-catalog-error entry t)))))
 
 (defn validate-workflow-names [{:keys [workflow catalog]}]
   (when-let [missing-names (->> workflow
@@ -156,11 +130,20 @@
 
 (defn validate-lifecycles [lifecycles catalog]
   (doseq [lifecycle lifecycles]
+    (try
+      (schema/validate Lifecycle lifecycle)
+      (catch Throwable t
+        (show-helpful-lifecycles-error lifecycle t)
+        (throw t)))
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
+      (hje/print-helpful-invalid-task-name-error
+       lifecycle :lifecycle/task
+       (:lifecycle/task lifecycle)
+       :lifecycle-entry
+       (map :onyx/name catalog))
       (throw (ex-info (str ":lifecycle/task must name a task in the catalog. It was: " (:lifecycle/task lifecycle))
-                      {:lifecycle lifecycle :catalog catalog})))
-    (schema/validate Lifecycle lifecycle)))
+                      {:lifecycle lifecycle :catalog catalog})))))
 
 (defn validate-lifecycle-calls [m]
   (schema/validate LifecycleCall m))
@@ -214,6 +197,7 @@
 (defn validate-job
   [job]
   (validate-catalog (:catalog job))
+  (validate-lifecycles (:lifecycles job) (:catalog job))
   (validate-workflow job)
   (schema/validate Job job))
 
