@@ -5,7 +5,8 @@
             [io.aviso.ansi :as a]))
 
 (def structure-names
-  {:catalog-entry "catalog"
+  {:workflow "workflow"
+   :catalog-entry "catalog"
    :lifecycle-entry "lifecycles"})
 
 (defn bold-backticks [coll]
@@ -45,13 +46,22 @@
   (println "------")
   (println))
 
-(defn show-structure [context faulty-key error-f]
+(defn show-map [context faulty-key error-f]
   (println "{")
   (doseq [[k v] context]
     (if (= k faulty-key)
       (error-f k v)
       (println "  " k (pr-str v))))
   (println "}")
+  (println))
+
+(defn show-vector [context faulty-key error-f]
+  (println "[")
+  (doseq [[k v] context]
+    (if (some #{k v} #{faulty-key})
+      (error-f k v)
+      (println (format "   [%s %s]" k (pr-str v)))))
+  (println "]")
   (println))
 
 (defn line-wrap-str [xs]
@@ -91,7 +101,7 @@
           (when (:choices entry)
             (println (str "    " (a/magenta (str "     Must be one of " (:choices entry)))))))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f)
+    (show-map context faulty-key error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -102,7 +112,7 @@
         (fn [k v]
           (println "  " k (pr-str v)))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f)
+    (show-map context faulty-key error-f)
     (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
     (println)
     (show-docs entry faulty-key)
@@ -117,7 +127,7 @@
           (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
           (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (:type entry))))))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f)
+    (show-map context faulty-key error-f)
     (show-docs entry faulty-key)
     (show-footer)))
 
@@ -126,10 +136,10 @@
   (let [choices (keys (get-in model [structure-type :model]))
         error-f
         (fn [k v]
-          (do (println "   " (a/bold-red (str k " " (pr-str v))))
-              (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key."))))))]
+          (println "   " (a/bold-red (str k " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key.")))))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f))
+    (show-map context faulty-key error-f))
   (when-let [suggestion (closest-match structure-type faulty-key)]
     (println "Did you mean:" (a/bold-green suggestion)))
   (show-footer))
@@ -138,9 +148,32 @@
   [context faulty-key faulty-value structure-type tasks]
   (let [error-f
         (fn [k v]
-          (do (println "  " (a/bold-red (str k " " (pr-str v))))
-              (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name."))))))]
+          (println "  " (a/bold-red (str k " " (pr-str v))))
+          (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name.")))))]
     (show-header structure-type faulty-key)
-    (show-structure context faulty-key error-f)
+    (show-map context faulty-key error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
       (println "Did you mean:" (a/bold-green suggestion)))))
+
+(defn maybe-bad-key [faulty-key x display-x]
+  (if (= x faulty-key)
+    (a/bold-red display-x) display-x))
+
+(defn error-left-padding [faulty-key k]
+  (if (= faulty-key k)
+    " "
+    (apply str (repeat (+ (count (str k)) 2) " "))))
+
+(defn print-helpful-invalid-workflow-element-error
+  [context faulty-key]
+  (let [error-f
+        (fn [k v]
+          (println (format "   [%s %s]"
+                           (maybe-bad-key faulty-key k k)
+                           (maybe-bad-key faulty-key v (pr-str v))))
+          (println (str "   "
+                        (a/magenta
+                         (str (error-left-padding faulty-key k)
+                              "^-- Task " faulty-key " wasn't found in the catalog.")))))]
+    (show-header :workflow faulty-key)
+    (show-vector context faulty-key error-f)))

@@ -82,6 +82,7 @@
                                 (mapcat identity)
                                 (remove (set (map :onyx/name catalog)))
                                 seq)]
+    (hje/print-helpful-invalid-workflow-element-error workflow (first missing-names))
     (throw (Exception. (str "Catalog is missing :onyx/name values "
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
