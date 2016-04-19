@@ -5,7 +5,7 @@
             [onyx.static.planning :as planning]
             [onyx.windowing.units :as u]
             [onyx.information-model :refer [model]]
-            [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
+            [onyx.schema :refer [UniqueTaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
 (defn validate-java-version []
@@ -87,11 +87,11 @@
     (name-and-type-not-equal entry)
     (min-and-max-peers-sane entry)
     (min-max-n-peers-mutually-exclusive entry)
-    (try 
-      (schema/validate TaskMap entry)
+    (try
+      (schema/validate os/TaskMap entry)
       (catch Exception e
         (let [friendly-exception (try (task-map-schema-exception->help e)
-                                      (catch Exception fe 
+                                      (catch Exception fe
                                         ;; Throw original exception. We have obviously messed up providing a friendlier one
                                         (throw e)))]
           (throw (ex-info (format "Task %s failed validation. Error: %s" (:onyx/name entry) friendly-exception)

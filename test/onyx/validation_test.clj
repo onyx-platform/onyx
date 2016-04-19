@@ -283,7 +283,7 @@
                      :onyx/batch-size 40}))
 
     (is (thrown? Exception
-                 (s/validate os/InputTaskSchema 
+                 (s/validate os/TaskMap
                              {:onyx/name :sum-balance
                               :onyx/plugin :your-plugin/builder
                               :onyx/medium :some-medium
@@ -429,7 +429,7 @@
 (deftest java-style-functions
   (testing "Non-namespaced keywords are used for Java entries"
     (is
-     (s/validate os/FunctionTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -437,7 +437,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/InputTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -447,7 +447,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/OutputTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
@@ -457,7 +457,7 @@
                   :onyx/batch-size 40}))
 
     (is
-     (s/validate os/FunctionTaskSchema
+     (s/validate os/TaskMap
                  {:onyx/name :my-task
                   :onyx/language :java
                   :onyx/fn :my.class
