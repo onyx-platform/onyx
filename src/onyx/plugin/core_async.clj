@@ -2,6 +2,7 @@
   (:require [clojure.core.async :refer [poll! timeout chan alts!! >!! close!]]
             [clojure.core.async.impl.protocols :refer [closed?]]
             [clojure.set :refer [join]]
+            [taoensso.timbre :refer [fatal info debug] :as timbre]
             [onyx.plugin.onyx-input :as i]
             [onyx.plugin.onyx-output :as o]
             [onyx.plugin.onyx-plugin :as p]))
@@ -18,9 +19,6 @@
 
   (checkpoint [{:keys [checkpoint]}]
     checkpoint)
-
-  (set-epoch [this epoch]
-    (assoc this :epoch epoch))
 
   (recover [this checkpoint]
     this)
@@ -39,9 +37,6 @@
              :segment segment
              :offset (if segment (inc offset) offset)
              :closed? (closed? chan))))
-
-  (ack-barrier [{:keys [checkpoint] :as this} barrier-epoch]
-    (assoc this :checkpoint barrier-epoch))
 
   (segment-complete! [{:keys [conn]} segment])
 
@@ -63,6 +58,7 @@
   (write-batch
     [_ {:keys [onyx.core/results core.async/chan] :as event}]
     (doseq [msg (mapcat :leaves (:tree results))]
+      (info "Writing message to channel " msg)
       (>!! chan (:message msg)))
     {}))
 

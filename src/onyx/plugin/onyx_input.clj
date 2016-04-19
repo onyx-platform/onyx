@@ -20,17 +20,10 @@
   (next-state [this event]
     "Moves reader to the next state. Returns the reader in the updated state.")
 
-  (set-epoch [this epoch]
-    "Moves the reader to the epoch, signaling which offset comes before it.
-     Returns a new reader.")
-
   (recover [this checkpoint]
     "Recover the state of the plugin from the supplied checkpoint.
      Returns a new reader.")
   
-  (ack-barrier [this offset]
-    "Acknowledges the barrier has been fully processed. Returns a new reader.")
-
   (segment-complete! [this segment]
     "Perform any side-effects that you might want to perform as a
      result of a segment being completed.")
