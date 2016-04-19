@@ -9,17 +9,16 @@
   (fn [replica peer]
     (:onyx.messaging/impl (:messaging replica))))
 
+(defprotocol MessengerGroup 
+  (peer-site [messenger-group peer-id]))
+
+
+;; TODO: DOCSTRINGS
 (defprotocol Messenger
-  (peer-site [messenger])
-  (register-task-peer [messenger assigned buffers])
-  (unregister-task-peer [messenger assigned])
-  (shared-ticketing-counter [messenger job-id peer-id task-id])
-  (new-partial-subscriber [messenger job-id peer-id task-id])
-  (close-partial-subscriber [messenger partial-subscriber])
-  (register-subscription [messenger sub])
-  (unregister-subscription [messenger sub])
-  (register-publication [messenger pub])
-  (unregister-publication [messenger pub])
+  (add-subscription [messenger sub])
+  (remove-subscription [messenger sub])
+  (add-publication [messenger pub])
+  (remove-publication [messenger pub])
   (receive-messages [messenger])
   (send-messages [messenger messages task-slots])
   (emit-barrier [messenger])

@@ -1,6 +1,6 @@
 (ns onyx.log.generators
   (:require [clojure.core.async :refer [chan >!! <!! close!]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger-group]]
             [onyx.log.entry :refer [create-log-entry]]
             [onyx.log.commands.common :refer [peer->allocated-job]]
             [onyx.extensions :as extensions]
@@ -13,7 +13,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test :refer :all]))
 
-(def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
+(def messenger-group (dummy-messenger-group {:onyx.peer/try-join-once? false}))
 
 (defn peerless-entry? [log-entry]
   (#{:submit-job :kill-job :gc} (:fn log-entry)))
@@ -50,9 +50,9 @@
         [peer-id [(create-log-entry :signal-ready {:id peer-id})]]))))
 
 (def base-peer-state 
-  {:messenger messenger
+  {:peer-group messenger-group
    :opts {:onyx.peer/try-join-once?
-          (:onyx.peer/try-join-once? (:opts messenger) true)}})
+          (:onyx.peer/try-join-once? (:opts messenger-group) true)}})
 
 (defn apply-entry [replica entries entry]
   (let [new-replica (extensions/apply-log-entry entry replica)
@@ -157,7 +157,7 @@
    (build-join-entry peer-id {}))
   ([peer-id more-args]
    {:fn :prepare-join-cluster
-    :args (merge {:peer-site (m/peer-site messenger)
+    :args (merge {:peer-site (m/peer-site messenger-group peer-id)
                   :joiner peer-id}
                  more-args)}))
 

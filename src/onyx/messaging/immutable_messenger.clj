@@ -2,10 +2,14 @@
   (:require [clojure.set :refer [subset?]]
             [com.stuartsierra.component :as component]
             [taoensso.timbre :refer [fatal info debug] :as timbre]
-            [onyx.types :refer [->MonitorEventBytes map->Barrier ->Barrier ->BarrierAck ->Message]]
+            [onyx.types :as t :refer [->MonitorEventBytes map->Barrier ->Barrier ->BarrierAck ->Message]]
             [onyx.messaging.messenger :as m]))
 
 (defrecord ImmutableMessagingPeerGroup []
+  m/MessengerGroup
+  (peer-site [messenger peer-id]
+    {})
+
   component/Lifecycle
   (start [component]
     component)
@@ -117,8 +121,7 @@
                 (throw (Exception.)))
           :else
           ;; Either nothing to read or we're past the current barrier, do nothing
-          {:ticket ticket
-           :subscriber subscriber})))
+          {:subscriber subscriber})))
 
 (defn take-acks [messenger {:keys [src-peer-id dst-task-id position barrier] :as subscriber}]
   (let [messages (get-in messenger [:message-state src-peer-id dst-task-id])]
@@ -136,10 +139,7 @@
     component)
 
   m/Messenger
-  (peer-site [messenger]
-    {})
-
-  (register-subscription
+  (add-subscription
     [messenger sub-info]
     (-> messenger 
         (update-in [:tickets (:src-peer-id sub-info) (:dst-task-id sub-info)] #(or % 0))
@@ -148,7 +148,7 @@
                      (conj (or sbs []) 
                            (assoc sub-info :position -1))))))
 
-  (unregister-subscription
+  (remove-subscription
     [messenger sub-info]
     (-> messenger 
         (update-in [:subscriptions peer-id] 
@@ -157,7 +157,7 @@
                                 (not= sub-info (select-keys s [:src-peer-id :dst-task-id])))
                               ss)))))
 
-  (register-publication
+  (add-publication
     [messenger pub-info]
     (update-in messenger
                [:publications peer-id] 
@@ -166,7 +166,7 @@
                        {:src-peer-id peer-id
                         :dst-task-id (:dst-task-id pub-info)}))))
 
-  (unregister-publication
+  (remove-publication
     [messenger pub-info]
     (update-in messenger
                [:publications peer-id] 
@@ -209,15 +209,16 @@
     (reduce (fn [messenger _]
               (let [subscriber (first (messenger->subscriptions messenger))
                     result (take-messages messenger subscriber)
-                    mnew (-> messenger
-                             (set-ticket subscriber (:ticket result))
-                             (assoc :messages [(:message result)])
-                             (update-first-subscriber (constantly (:subscriber result)))
-                             (rotate-subscriptions))] 
-                (if (:messages mnew)
+                    _ (info "Taking messages from " subscriber result)
+                    mnew (cond-> messenger
+                           (:ticket result) (set-ticket subscriber (:ticket result))
+                           (:message result) (update :messages conj (t/input (:message result)))
+                           true (update-first-subscriber (constantly (:subscriber result)))
+                           true (rotate-subscriptions))] 
+                (if-not (empty? (:messages mnew))
                   (reduced mnew)
                   mnew)))
-            messenger
+            (assoc messenger :messages [])
             (messenger->subscriptions messenger)))
 
   (send-messages

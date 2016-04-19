@@ -32,13 +32,13 @@
 
 (s/defmethod extensions/reactions :abort-join-cluster :- Reactions
   [{:keys [args] :as entry} old new diff peer-args]
-  (when (and (not (:onyx.peer/try-join-once? (:peer-opts (:messenger peer-args))))
+  (when (and (not (:onyx.peer/try-join-once? (:opts peer-args)))
              (not (already-joined? old entry))
              (= (:id args) (:id peer-args)))
     [{:fn :prepare-join-cluster
       :args {:joiner (:id peer-args)
              :tags (:tags args)
-             :peer-site (m/peer-site (:messenger peer-args))}}]))
+             :peer-site (m/peer-site (:messaging-group (:peer-group peer-args)) (:id peer-args))}}]))
 
 (s/defmethod extensions/fire-side-effects! :abort-join-cluster :- State
   [{:keys [args]} old new diff state]

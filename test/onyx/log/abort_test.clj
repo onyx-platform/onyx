@@ -1,7 +1,7 @@
 (ns onyx.log.abort-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger-group]]
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]
@@ -11,7 +11,7 @@
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest log-abort-test
-  (let [peer-state {:id :d :messenger (dummy-messenger {:onyx.peer/try-join-once? false})}
+  (let [peer-state {:id :d :peer-group (dummy-messenger-group {:onyx.peer/try-join-once? false})}
         entry (create-log-entry :abort-join-cluster {:id :d})
         f (partial extensions/apply-log-entry entry)
         rep-diff (partial extensions/replica-diff entry)

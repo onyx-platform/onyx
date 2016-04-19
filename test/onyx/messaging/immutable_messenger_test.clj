@@ -32,19 +32,19 @@
 
               (switch-peer :p1)
               (m/set-replica-version 1)
-              (m/register-publication t1-queue-p1)
-              (m/register-subscription t2-ack-queue)
+              (m/add-publication t1-queue-p1)
+              (m/add-subscription t2-ack-queue)
 
               (switch-peer :p2)
               (m/set-replica-version 1)
-              (m/register-publication t1-queue-p2)
-              (m/register-subscription t2-ack-queue)
+              (m/add-publication t1-queue-p2)
+              (m/add-subscription t2-ack-queue)
 
               (switch-peer :p3)
               (m/set-replica-version 1)
-              (m/register-subscription t1-queue-p1)
-              (m/register-subscription t1-queue-p2)
-              (m/register-publication t2-ack-queue)
+              (m/add-subscription t1-queue-p1)
+              (m/add-subscription t1-queue-p2)
+              (m/add-publication t2-ack-queue)
 
               (switch-peer :p1)
               (m/emit-barrier)
@@ -95,27 +95,27 @@
 (deftest atom-messaging-test
   ;; [:t2 :t1] [:t3 :t1]
   (let [pg (component/start (am/atom-peer-group {}))
-        m-p1 (component/start (am/atom-messenger pg :p1))
-        m-p2 (component/start (am/atom-messenger pg :p2))
-        m-p3 (component/start (am/atom-messenger pg :p3))
+        m-p1 (component/start (assoc (am/atom-messenger) :peer-group pg :peer-id :p1))
+        m-p2 (component/start (assoc (am/atom-messenger) :peer-group pg :peer-id :p2))
+        m-p3 (component/start (assoc (am/atom-messenger) :peer-group pg :peer-id :p3))
         t1-queue-p1 {:src-peer-id :p1 :dst-task-id :t1}
         t1-queue-p2 {:src-peer-id :p2 :dst-task-id :t1}
         t2-ack-queue {:src-peer-id :p3 :dst-task-id :t1}
         _ (-> m-p1
               (m/set-replica-version 1)
-              (m/register-publication t1-queue-p1)
-              (m/register-subscription t2-ack-queue))
+              (m/add-publication t1-queue-p1)
+              (m/add-subscription t2-ack-queue))
 
         _ (-> m-p2
               (m/set-replica-version 1)
-              (m/register-publication t1-queue-p2)
-              (m/register-subscription t2-ack-queue))
+              (m/add-publication t1-queue-p2)
+              (m/add-subscription t2-ack-queue))
 
         m (-> m-p3
               (m/set-replica-version 1)
-              (m/register-subscription t1-queue-p1)
-              (m/register-subscription t1-queue-p2)
-              (m/register-publication t2-ack-queue))
+              (m/add-subscription t1-queue-p1)
+              (m/add-subscription t1-queue-p2)
+              (m/add-publication t2-ack-queue))
 
         _ (-> m-p1 
               (m/emit-barrier)
@@ -155,8 +155,8 @@
         (let [m-p4 (component/start (am/atom-messenger pg :p4))
               m (-> m-p4
                     (m/set-replica-version 1)
-                    (m/register-subscription t1-queue-p1)
-                    (m/register-subscription t1-queue-p2)
-                    (m/register-publication t2-ack-queue))]
+                    (m/add-subscription t1-queue-p1)
+                    (m/add-subscription t1-queue-p2)
+                    (m/add-publication t2-ack-queue))]
 
           (is (empty? (remove nil? (mapcat (fn [_] (m/receive-messages m-p4)) (range 20))))))))))

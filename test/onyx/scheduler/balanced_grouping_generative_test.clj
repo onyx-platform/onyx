@@ -1,6 +1,5 @@
 (ns onyx.scheduler.balanced-grouping-generative-test
-  (:require [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
-            [onyx.log.generators :as log-gen]
+  (:require [onyx.log.generators :as log-gen]
             [onyx.extensions :as extensions]
             [onyx.system]
             [onyx.api :as api]
@@ -22,8 +21,6 @@
   {:onyx/tenancy-id onyx-id
    :onyx.messaging/impl :dummy-messenger
    :onyx.peer/try-join-once? true})
-
-(def messenger (dummy-messenger {}))
 
 (def job-1-id #uuid "f55c14f0-a847-42eb-81bb-0c0390a88608")
 

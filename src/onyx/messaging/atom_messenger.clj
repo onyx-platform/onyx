@@ -7,6 +7,10 @@
             [onyx.messaging.messenger :as m]))
 
 (defrecord AtomMessagingPeerGroup [immutable-messenger]
+  m/MessengerGroup
+  (peer-site [messenger peer-id]
+    {})
+
   component/Lifecycle
   (start [component]
     (assoc component :immutable-messenger (atom (im/immutable-messenger component))))
@@ -34,42 +38,39 @@
            (apply f (switch-peer m (:peer-id messenger)) args)))) 
 
 (defrecord AtomMessenger
-  [peer-group peer-id immutable-messenger]
+  [peer peer-id immutable-messenger]
   component/Lifecycle
 
   (start [component]
-    (assoc component :immutable-messenger (:immutable-messenger peer-group)))
+    (assoc component 
+           :peer-id (:id peer)
+           :immutable-messenger (get-in peer [:peer-group :messaging-group :immutable-messenger])))
 
   (stop [component]
     component)
 
   m/Messenger
-  (peer-site [messenger]
-    (update-messenger-atom! messenger m/peer-site)
-    messenger
-    )
-
-  (register-subscription
+  (add-subscription
     [messenger sub]
-    (update-messenger-atom! messenger m/register-subscription sub)
+    (update-messenger-atom! messenger m/add-subscription sub)
     messenger
     )
 
-  (unregister-subscription
+  (remove-subscription
     [messenger sub]
-    (update-messenger-atom! messenger m/unregister-subscription sub)
+    (update-messenger-atom! messenger m/remove-subscription sub)
     messenger
     )
 
-  (register-publication
+  (add-publication
     [messenger pub]
-    (update-messenger-atom! messenger m/register-publication pub)
+    (update-messenger-atom! messenger m/add-publication pub)
     messenger
     )
 
-  (unregister-publication
+  (remove-publication
     [messenger pub]
-    (update-messenger-atom! messenger m/unregister-publication pub)
+    (update-messenger-atom! messenger m/remove-publication pub)
     messenger
     )
 
@@ -90,14 +91,12 @@
     messenger)
 
   (receive-acks [messenger]
-    (update-messenger-atom! messenger m/receive-acks)
-    (:acks @immutable-messenger)
+    (:acks (update-messenger-atom! messenger m/receive-acks))
     )
 
   (receive-messages
     [messenger]
-    (update-messenger-atom! messenger m/receive-messages)
-    (:messages @immutable-messenger))
+    (:messages (update-messenger-atom! messenger m/receive-messages)))
 
   (send-messages
     [messenger messages task-slots]
@@ -120,5 +119,5 @@
     messenger
     ))
 
-(defn atom-messenger [peer-group peer-id]
-  (map->AtomMessenger {:peer-group peer-group :peer-id peer-id}))
+(defn atom-messenger []
+  (map->AtomMessenger {}))

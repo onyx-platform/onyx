@@ -5,10 +5,11 @@
 (defrecord Leaf [message id offset acker-id completion-id ack-val hash-group route])
 
 (defn input 
-  ([id message offset]
-   (->Leaf message id offset nil nil nil nil nil))
+  ([message]
+   (->Leaf message nil nil nil nil nil nil nil))
   ([id message]
-   (->Leaf message id nil nil nil nil nil nil)))
+   ;; FIXME: THROWING AWAY ID, NO LONGER REQUIRED
+   (->Leaf message nil nil nil nil nil nil nil)))
 
 (defrecord Route [flow exclusions post-transformation action])
 

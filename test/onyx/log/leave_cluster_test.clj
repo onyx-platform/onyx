@@ -1,7 +1,7 @@
 (ns onyx.log.leave-cluster-test
   (:require [onyx.extensions :as extensions]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
+            [onyx.messaging.dummy-messenger]
             [onyx.system]
             [onyx.log.replica :as replica]
             [schema.test]

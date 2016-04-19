@@ -9,12 +9,12 @@
   [replica peer]
   "localhost")
 
-(defrecord DummyMessenger [peer-opts]
-  m/Messenger
-  (peer-site [messenger]
-    {:address 1}))
+(defrecord DummyMessengerGroup [peer-opts]
+  m/MessengerGroup
+  (peer-site [messenger-group peer-id]
+    {}))
 
-(defn dummy-messenger [peer-opts]
-  (->DummyMessenger peer-opts))
+(defn dummy-messenger-group [peer-opts]
+  (->DummyMessengerGroup peer-opts))
 
 

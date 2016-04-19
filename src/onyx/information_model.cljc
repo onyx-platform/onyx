@@ -519,7 +519,6 @@ may be added by the user as the context is associated to throughout the task pip
                                               :doc "Logging context including more information about the task, peer and job ids."}
                        :onyx.core/params {:type [:any]
                                           :doc "The parameter sequence to be applied to the function that this task uses"}
-                       :onyx.core/aeron-conn {:type :any :doc ""}
                        :onyx.core/task-information {:type :record
                                                     :doc "Task information for this task. Mostly consists of data already in the event map."}
                        :onyx.core/windows-state {:type :windows-state-atom
@@ -528,19 +527,10 @@ may be added by the user as the context is associated to throughout the task pip
                        :onyx.core/state-log {:type :record
                                              :optional? true
                                              :doc "Window state log component where state transitions are written"}
-                       :onyx.core/barrier {:type :record
-                                           :optional? true
-                                           :doc "Barrier to be emitted to peers downstream"}
-                       :onyx.core/n-sent-messages {:type :any :doc ""}
-                       :onyx.core/epoch {:type :any :doc ""}
-                       :onyx.core/subscription-maps {:type :any
-                                                     :doc ""}
                        :onyx.core/drained-back-off {:type :integer
                                                     :doc "The amount of time to back off when the input is drained"}
                        :onyx.core/log {:type :record
                                        :doc "The log record component"}
-                       :onyx.core/messenger-buffer {:type :channel
-                                                    :doc "The messenger buffer core.async channel for this peer"}
                        :onyx.core/messenger {:type :record
                                              :doc "The Messenger record Component"}
                        :onyx.core/task-kill-ch {:type :channel
@@ -564,8 +554,6 @@ may be added by the user as the context is associated to throughout the task pip
                                              :doc "The options that this peer was started with"}
                        :onyx.core/replica {:type :replica-atom
                                            :doc "The replica that this peer has currently accrued"}
-                       :onyx.core/task-state {:type :task-state-atom
-                                              :doc "Specialised view over the replica generated specifically for this peer"}
                        :onyx.core/monitoring {:type :record
                                               :doc "Onyx monitoring component implementing the [IEmitEvent](https://github.com/onyx-platform/onyx/blob/master/src/onyx/extensions.clj) protocol"}
                        :onyx.core/batch {:type [:segment]
@@ -1437,7 +1425,6 @@ may be added by the user as the context is associated to throughout the task pip
                :onyx.core/messenger 
                :onyx.core/compiled
                :onyx.core/drained-back-off 
-               :onyx.core/messenger-buffer 
                :onyx.core/barrier
                :onyx.core/n-sent-messages
                :onyx.core/subscription-maps]

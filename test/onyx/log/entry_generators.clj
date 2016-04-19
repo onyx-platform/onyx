@@ -2,7 +2,7 @@
   (:require [stateful-check.core :refer [reality-matches-model print-test-results]]
             [onyx.log.generators :as loggen]
             [onyx.extensions :as ext]
-            [onyx.messaging.dummy-messenger :refer [dummy-messenger]]
+            [onyx.messaging.dummy-messenger :refer [dummy-messenger-group]]
             [clojure.test.check :refer [quick-check] :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
@@ -23,7 +23,7 @@
                   :peer-counter 0})
    :real/command #'new-replica})
 
-(def messenger (dummy-messenger {:onyx.peer/try-join-once? false}))
+(def messenger-group (dummy-messenger-group {:onyx.peer/try-join-once? false}))
 
 (defn peerless-entry? [log-entry]
   (#{:submit-job :kill-job :gc} (:fn log-entry)))
@@ -53,10 +53,10 @@
                                                 replica
                                                 updated-replica
                                                 diff
-                                                {:messenger messenger
+                                                {:peer-group messenger-group
                                                  :id peer-id
                                                  :opts {:onyx.peer/try-join-once?
-                                                        (:onyx.peer/try-join-once? (:opts messenger) true)}}))
+                                                        (:onyx.peer/try-join-once? (:opts messenger-group) true)}}))
                                peers)]
     (reduce apply-entry
             {:message-id (inc message-id)
