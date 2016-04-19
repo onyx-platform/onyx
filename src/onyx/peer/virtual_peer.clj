@@ -6,7 +6,6 @@
             [taoensso.timbre :as timbre :refer [info]]
             [onyx.peer.operation :as operation]
             [onyx.log.entry :refer [create-log-entry]]
-            [onyx.log.commands.task-state :refer [stop-task-state]]
             [onyx.static.default-vals :refer [defaults arg-or-default]]))
 
 (defn send-to-outbox! [{:keys [outbox-ch] :as state} reactions]
@@ -23,24 +22,21 @@
       (assoc peer-annotated :entry-parent message-id)
       peer-annotated)))
 
-(defn processing-loop [id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
-  (let [replica-atom (atom origin)
-        task-state-atom (atom nil)]
+(defn processing-loop [id log peer-group origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn]
+  (let [replica-atom (atom origin)]
     (try
       (loop [state {:id id
                     :task-component-fn task-component-fn
                     :replica replica-atom
-                    :task-state task-state-atom
                     :log log
                     :buffered-outbox []
-                    :messenger messenger
+                    :peer-group peer-group
                     :monitoring monitoring
                     :outbox-ch outbox-ch
                     :opts opts
                     :kill-ch kill-ch
                     :restart-ch restart-ch}]
         (let [replica @replica-atom
-              task-state @task-state-atom
               [entry ch] (alts!! [kill-ch inbox-ch] :priority true)]
           (cond 
             (instance? java.lang.Throwable entry) 
@@ -49,20 +45,18 @@
             (when (:lifecycle state)
               (component/stop @(:lifecycle state)))
             :else
-            (let [new-replica (extensions/apply-log-entry entry replica)
+            (let [new-replica (assoc (extensions/apply-log-entry entry replica)
+                                     :version (:message-id entry))
                   diff (extensions/replica-diff entry replica new-replica)
                   reactions (extensions/reactions entry replica new-replica diff state)
                   new-state (extensions/fire-side-effects! entry replica new-replica diff state)
-                  new-task-state (extensions/new-task-state! log entry replica new-replica diff new-state task-state opts)
                   annotated-reactions (mapv (partial annotate-reaction entry id) reactions)]
               (reset! replica-atom new-replica)
-              (reset! task-state-atom new-task-state)
               (recur (send-to-outbox! new-state annotated-reactions))))))
       (catch Throwable e
         (taoensso.timbre/error e (format "Peer %s: error in processing loop. Restarting." id))
         (close! restart-ch))
       (finally
-        (stop-task-state @task-state-atom)
         ;; call peer replica view side effects shutdown stuff here
         (taoensso.timbre/info (format "Peer %s: finished of processing loop" id))))))
 
@@ -78,10 +72,10 @@
     (finally
       (taoensso.timbre/info (format "Peer %s: finished outbox loop" id)))))
 
-(defrecord VirtualPeer [opts task-component-fn]
+(defrecord VirtualPeer [opts peer-group task-component-fn]
   component/Lifecycle
 
-  (start [{:keys [log messenger monitoring] :as component}]
+  (start [{:keys [log monitoring] :as component}]
     (let [id (java.util.UUID/randomUUID)]
       (taoensso.timbre/info (format "Starting Virtual Peer %s" id))
       (try
@@ -95,7 +89,7 @@
               outbox-ch (chan (arg-or-default :onyx.peer/outbox-capacity opts))
               kill-ch (chan (dropping-buffer 1))
               restart-ch (chan 1)
-              peer-site (m/peer-site messenger)
+              peer-site (m/peer-site (:messaging-group peer-group) id)
               entry (create-log-entry :prepare-join-cluster {:joiner id :peer-site peer-site
                                                              :tags (or (:onyx.peer/tags opts) [])})
               origin (extensions/subscribe-to-log log inbox-ch)]
@@ -103,7 +97,7 @@
           (>!! outbox-ch entry)
 
           (let [outbox-loop-ch (thread (outbox-loop id log outbox-ch restart-ch))
-                processing-loop-ch (thread (processing-loop id log messenger origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn))]
+                processing-loop-ch (thread (processing-loop id log peer-group origin inbox-ch outbox-ch restart-ch kill-ch opts monitoring task-component-fn))]
             (assoc component
                    :outbox-loop-ch outbox-loop-ch
                    :processing-loop-ch processing-loop-ch
@@ -128,5 +122,5 @@
            :kill-ch nil :restart-ch nil
            :outbox-loop-ch nil :processing-loop-ch nil)))
 
-(defn virtual-peer [opts task-component-fn]
-  (map->VirtualPeer {:opts opts :task-component-fn task-component-fn}))
+(defn virtual-peer [opts peer-group task-component-fn]
+  (map->VirtualPeer {:opts opts :peer-group peer-group :task-component-fn task-component-fn}))
