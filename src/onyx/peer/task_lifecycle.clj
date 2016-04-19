@@ -15,6 +15,8 @@
             [onyx.peer.function :as function]
             [onyx.peer.operation :as operation]
             [onyx.compression.nippy :refer [messaging-decompress]]
+            [onyx.messaging.messenger-replica :as ms]
+            [onyx.log.replica :refer [base-replica]]
             [onyx.extensions :as extensions]
             [onyx.types :refer [->Ack ->Results ->MonitorEvent dec-count! inc-count! map->Event map->Compiled]]
             [onyx.peer.window-state :as ws]
@@ -172,24 +174,22 @@
    :output #'function/read-function-batch})
 
 (defn read-batch
-  [{:keys [task-state task-type pipeline] :as compiled}
+  [{:keys [task-type pipeline] :as compiled}
    event]
-  (if (= task-type :input)
-    (assoc event :onyx.core/batch '())
-    (let [f (get input-readers task-type)
-          rets (merge event (f event))]
-      (merge event (lc/invoke-after-read-batch compiled rets)))))
+  (let [f (get input-readers task-type)
+        rets (merge event (f event))]
+    (merge event (lc/invoke-after-read-batch compiled rets))))
 
-(s/defn tag-messages :- Event
-  [{:keys [task-state task-type id] :as compiled} event :- Event]
-  (if (= task-type :input)
-    (update event
-            :onyx.core/batch
-            (fn [batch]
-              (map (fn [leaf]
-                     (assoc leaf :src-task-id (:onyx.core/task-id event)))
-                   batch)))
-    event))
+; (s/defn tag-messages :- Event
+;   [{:keys [task-type id] :as compiled} event :- Event]
+;   (if (= task-type :input)
+;     (update event
+;             :onyx.core/batch
+;             (fn [batch]
+;               (map (fn [leaf]
+;                      (assoc leaf :src-task-id (:onyx.core/task-id event)))
+;                    batch)))
+;     event))
 
 (defn replay-windows-from-log
   [{:keys [onyx.core/log-prefix onyx.core/windows-state
@@ -234,24 +234,33 @@
 
 (defn run-task-lifecycle
   "The main task run loop, read batch, ack messages, etc."
-  [{:keys [onyx.core/compiled onyx.core/task-information] :as init-event}
+  [{:keys [onyx.core/compiled onyx.core/messenger onyx.core/task-information onyx.core/replica] :as init-event}
    kill-ch ex-f]
   (try
-    (while (first (alts!! [kill-ch] :default true))
-      (->> init-event
-           (gen-lifecycle-id)
-           (lc/invoke-before-batch compiled)
-           (lc/invoke-read-batch read-batch compiled)
-           (tag-messages compiled)
-           (apply-fn compiled)
-           (build-new-segments compiled)
-           (lc/invoke-assign-windows assign-windows compiled)
-           (lc/invoke-write-batch write-batch compiled)
-           ;(flow-retry-segments compiled)
-           (function/ack-barrier!)
-           (lc/invoke-after-batch compiled)))
-    (catch Throwable e
-      (ex-f e))))
+   ;; Safe point to update peer task state, checkpoints, etc, in-between task lifecycle runs
+   (loop [prev-replica-val base-replica
+          replica-val @replica
+          messenger (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+          event (assoc init-event :onyx.core/messenger messenger)]
+     (->> event
+          (gen-lifecycle-id)
+          (lc/invoke-before-batch compiled)
+          (lc/invoke-read-batch read-batch compiled)
+          ;(tag-messages compiled)
+          (apply-fn compiled)
+          (build-new-segments compiled)
+          (lc/invoke-assign-windows assign-windows compiled)
+          (lc/invoke-write-batch write-batch compiled)
+          ;(flow-retry-segments compiled)
+          (function/ack-barrier!)
+          (lc/invoke-after-batch compiled))
+     (if (first (alts!! [kill-ch] :default true))
+       (recur replica-val
+              @replica
+              (ms/new-messenger-state! messenger init-event prev-replica-val replica-val)
+              (assoc init-event :onyx.core/messenger messenger))))
+   (catch Throwable e
+     (ex-f e))))
 
 (defn build-pipeline [task-map pipeline-data]
   (let [kw (:onyx/plugin task-map)]
@@ -308,13 +317,12 @@
   (map->TaskInformation (select-keys (merge peer task) [:id :log :job-id :task-id])))
 
 (defrecord TaskLifeCycle
-    [id log messenger-buffer messenger job-id task-id replica task-state restart-ch log-prefix peer task
+    [id log messenger job-id task-id replica restart-ch log-prefix peer task
      kill-ch outbox-ch opts task-kill-ch scheduler-event task-monitoring task-information]
   component/Lifecycle
 
   (start [component]
     (try
-      (info "Task state is " task-state)
       (let [{:keys [workflow catalog task flow-conditions windows filtered-windows
                     triggers filtered-triggers lifecycles task-map metadata]} task-information
             log-prefix (logger/log-prefix task-information)
@@ -333,7 +341,6 @@
                            :onyx.core/serialized-task task
                            :onyx.core/drained-back-off (arg-or-default :onyx.peer/drained-back-off opts)
                            :onyx.core/log log
-                           :onyx.core/messenger-buffer messenger-buffer
                            :onyx.core/messenger messenger
                            :onyx.core/monitoring task-monitoring
                            :onyx.core/task-information task-information
@@ -344,7 +351,6 @@
                            :onyx.core/peer-opts opts
                            :onyx.core/fn (operation/resolve-task-fn task-map)
                            :onyx.core/replica replica
-                           :onyx.core/task-state task-state
                            :onyx.core/log-prefix log-prefix}
 
             _ (info log-prefix "Warming up task lifecycle" task)
