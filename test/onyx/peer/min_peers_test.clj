@@ -53,7 +53,8 @@
                       :onyx/batch-size batch-size
                       :onyx/max-peers 1
                       :onyx/doc "Writes segments to a core.async channel"}]
-            workflow [[:in :inc] [:inc :out]]
+            workflow [:in :inc
+                      [:inc :out]]
             lifecycles [{:lifecycle/task :in
                          :lifecycle/calls :onyx.peer.min-peers-test/in-calls}
                         {:lifecycle/task :in

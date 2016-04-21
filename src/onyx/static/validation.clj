@@ -38,31 +38,12 @@
 
 (defn show-helpful-lifecycles-error [entry t]
   (let [{:keys [error] :as data} (os/describe-schema-error t)]
-    (println data " :: " entry)
-    (cond (= (:type error) :missing-required-key)
-          (hje/print-helpful-missing-required-key-error entry (:key data) :lifecycle-entry)
-          
-          :else
-          (hje/print-helpful-invalid-type-error entry (:key data) :lifecycle-entry))))
+    (hje/print-helpful-error data entry :lifecycle-entry)
+    (throw t)))
 
 (defn show-helpful-catalog-error [entry t]
   (let [{:keys [error] :as data} (os/describe-schema-error t)]
-    (cond (= (:type error) :conditional-failed)
-          (cond (= (:conditional error) :onyx-type-conditional)
-                (if (:onyx/type entry)
-                  (hje/print-helpful-invalid-choice-error entry :onyx/type :catalog-entry)
-                  (hje/print-helpful-missing-required-key-error entry :onyx/type :catalog-entry))
-
-                (= (:conditional error) :matches-some-precondition?)
-                (if (get entry (:key data))
-                  (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry)
-                  (hje/print-helpful-missing-required-key-error entry (:key data) :catalog-entry)))
-
-          (= (:type error) :invalid-key)
-          (hje/print-helpful-invalid-key-error entry (:error-value data) :catalog-entry)
-
-          (some #{(:type error)} #{:value-predicate-error :value-type-error})
-          (hje/print-helpful-invalid-type-error entry (:key data) :catalog-entry))
+    (hje/print-helpful-error data entry :catalog-entry)
     (throw t)))
 
 (defn validate-catalog
@@ -82,16 +63,22 @@
                                 (mapcat identity)
                                 (remove (set (map :onyx/name catalog)))
                                 seq)]
-    (hje/print-helpful-invalid-workflow-element-error workflow (first missing-names))
+    (hje/print-workflow-element-error
+     workflow
+     (first missing-names)
+     (fn [faulty-key]
+       (str "Task " (pr-str faulty-key) " wasn't found in the catalog.")))
     (throw (Exception. (str "Catalog is missing :onyx/name values "
                             "for the following workflow keywords: "
                             (apply str (interpose ", " missing-names)))))))
 
 (defn validate-workflow-no-dupes [{:keys [workflow]}]
-  (when-not (= (count workflow)
-               (count (set workflow)))
-    (throw (ex-info "Workflows entries cannot contain duplicates"
-                    {:workflow workflow}))))
+  (let [dupes (map key (remove (comp #{1} val) (frequencies workflow)))]
+    (when (seq dupes)
+      (hje/print-workflow-edge-error workflow (first dupes)
+                                     (constantly "Workflow entries cannot contain duplicates"))
+      (throw (ex-info "Workflow entries cannot contain duplicates"
+                      {:workflow workflow})))))
 
 (defn catalog->type-task-names [catalog type-pred]
   (set (map :onyx/name
@@ -106,7 +93,7 @@
                                           input-tasks)))]
     (throw (Exception. (str "Input task " invalid " has incoming edge.")))))
 
-(defn validate-workflow-intermediates [g intermediate-tasks]
+(defn validate-workflow-intermediates [workflow g intermediate-tasks]
   (let [invalid-intermediate? (fn [[_ dependencies dependents]]
                                 (let [dependencies? (empty? dependencies)
                                       dependents? (empty? dependents)]
@@ -117,16 +104,21 @@
                                                   (partial dep/immediate-dependencies g)
                                                   (partial dep/immediate-dependents g))
                                             intermediate-tasks)))]
+      (hje/print-workflow-element-error
+       workflow
+       invalid
+       (fn [faulty-key]
+         (str "Intermediate task " (pr-str faulty-key) " requires both incoming and outgoing edges.")))
       (throw (Exception. (str "Intermediate task " invalid " requires both incoming and outgoing edges."))))))
 
 (defn validate-workflow-graph [{:keys [catalog workflow]}]
   (let [g (planning/to-dependency-graph workflow)]
-    (validate-workflow-intermediates g (catalog->type-task-names catalog #{:function}))
+    (validate-workflow-intermediates workflow g (catalog->type-task-names catalog #{:function}))
     (validate-workflow-inputs g (catalog->type-task-names catalog #{:input}))))
 
 (defn validate-workflow [job]
-  (validate-workflow-graph job)
   (validate-workflow-names job)
+  (validate-workflow-graph job)
   (validate-workflow-no-dupes job))
 
 (defn validate-lifecycles [lifecycles catalog]
@@ -138,7 +130,7 @@
         (throw t)))
     (when-not (or (= (:lifecycle/task lifecycle) :all)
                   (some #{(:lifecycle/task lifecycle)} (map :onyx/name catalog)))
-      (hje/print-helpful-invalid-task-name-error
+      (hje/print-invalid-task-name-error
        lifecycle :lifecycle/task
        (:lifecycle/task lifecycle)
        :lifecycle-entry
@@ -195,12 +187,26 @@
 (defn validate-peer-client-config [peer-client-config]
   (schema/validate PeerClientConfig peer-client-config))
 
+(defn validate-job-schema [job]
+  (try
+    (schema/validate Job job)
+    (catch Throwable t
+      (let [{:keys [error error-value] :as data} (os/describe-job-schema-error t)]
+        (prn data)
+        (when (= (:type error) :value-predicate-error)
+          (when (= (:pred-name error) 'task-name?)
+            (hje/print-invalid-workflow-task-name
+             (:workflow job)
+             error-value
+             :workflow))))
+      (throw t))))
+
 (defn validate-job
   [job]
+  (validate-job-schema job)
   (validate-catalog (:catalog job))
   (validate-lifecycles (:lifecycles job) (:catalog job))
-  (validate-workflow job)
-  (schema/validate Job job))
+  (validate-workflow job))
 
 (defn validate-flow-pred-all-kws [flow-schema]
   (prewalk

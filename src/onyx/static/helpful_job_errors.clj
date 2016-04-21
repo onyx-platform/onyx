@@ -9,6 +9,18 @@
    :catalog-entry "catalog"
    :lifecycle-entry "lifecycles"})
 
+(defn matches-faulty-key? [k v faulty-key]
+  (some #{k v} #{faulty-key}))
+
+(defn maybe-bad-key [faulty-key x display-x]
+  (if (= x faulty-key)
+    (a/bold-red display-x) display-x))
+
+(defn error-left-padding [faulty-key k]
+  (if (= faulty-key k)
+    " "
+    (apply str (repeat (+ (count (str k)) 2) " "))))
+
 (defn bold-backticks [coll]
   (let [{:keys [result raw]}
         (reduce
@@ -51,16 +63,16 @@
   (doseq [[k v] context]
     (if (= k faulty-key)
       (error-f k v)
-      (println "  " k (pr-str v))))
+      (println "  " (pr-str k) (pr-str v))))
   (println "}")
   (println))
 
-(defn show-vector [context faulty-key error-f]
+(defn show-vector [context faulty-key match-f error-f]
   (println "[")
   (doseq [[k v] context]
-    (if (some #{k v} #{faulty-key})
+    (if (match-f k v faulty-key)
       (error-f k v)
-      (println (format "   [%s %s]" k (pr-str v)))))
+      (println (format "   [%s %s]" (pr-str k) (pr-str v)))))
   (println "]")
   (println))
 
@@ -91,12 +103,12 @@
     (println "Choices:" (a/bold (:choices entry))))
   (println "Added in Onyx version:" (a/bold (:added entry))))
 
-(defn print-helpful-invalid-choice-error
+(defn print-invalid-choice-error
   [context faulty-key structure-type]
   (let [entry (get-in model [structure-type :model faulty-key])
         error-f
         (fn [k v]
-          (println "   " (a/bold-red (str k " " (pr-str v))))
+          (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " v " is not a valid choice for " k))))
           (when (:choices entry)
             (println (str "    " (a/magenta (str "     Must be one of " (:choices entry)))))))]
@@ -105,12 +117,10 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn print-helpful-missing-required-key-error
+(defn print-missing-required-key-error
   [context faulty-key structure-type]
   (let [entry (get-in model [structure-type :model faulty-key])
-        error-f
-        (fn [k v]
-          (println "  " k (pr-str v)))]
+        error-f (constantly nil)]
     (show-header structure-type faulty-key)
     (show-map context faulty-key error-f)
     (println (a/magenta (str "^-- Missing required key " (a/bold faulty-key))))
@@ -118,12 +128,12 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn print-helpful-invalid-type-error
+(defn print-invalid-type-error
   [context faulty-key structure-type]
   (let [entry (get-in model [structure-type :model faulty-key])
         error-f
         (fn [k v]
-          (println "  " (a/bold-red (str k " " (pr-str v))))
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "    " (a/magenta (str " ^-- " (pr-str v) " isn't of the expected type."))))
           (println (str "    " (a/magenta (str "     Found " (.getName (.getClass v)) ", requires " (:type entry))))))]
     (show-header structure-type faulty-key)
@@ -131,41 +141,55 @@
     (show-docs entry faulty-key)
     (show-footer)))
 
-(defn print-helpful-invalid-key-error
+(defn print-type-error [faulty-key k required]
+  (let [padding (error-left-padding faulty-key k)]
+    (println "   " (a/magenta (str padding " ^-- " (pr-str faulty-key) " isn't of the expected type.")))
+    (println padding (a/magenta (str "     Found " (.getName (.getClass faulty-key)) ", requires " required)))))
+
+(defn print-invalid-task-name [faulty-key k]
+  (let [padding (error-left-padding faulty-key k)]
+    (println  "   " (a/magenta (str padding " ^-- " (pr-str faulty-key) " is not a valid task name.")))))
+
+(defn print-invalid-workflow-task-name
+  [context faulty-key structure-type]
+  (let [error-f
+        (fn [k v]
+          (println (format "   [%s %s]"
+                           (maybe-bad-key faulty-key k (pr-str k))
+                           (maybe-bad-key faulty-key v (pr-str v))))
+          (if (some #{faulty-key} #{:all :none})
+            (print-invalid-task-name faulty-key k)
+            (print-type-error faulty-key k "clojure.lang.Keyword")))]
+    (show-header :workflow faulty-key)
+    (show-vector context faulty-key matches-faulty-key? error-f)))
+
+(defn print-invalid-key-error
   [context faulty-key structure-type]
   (let [choices (keys (get-in model [structure-type :model]))
         error-f
         (fn [k v]
-          (println "   " (a/bold-red (str k " " (pr-str v))))
-          (println (str "    " (a/magenta (str " ^-- " k " isn't a valid key.")))))]
+          (println "   " (a/bold-red (str (pr-str k) " " (pr-str v))))
+          (println (str "    " (a/magenta (str " ^-- " (pr-str k) " isn't a valid key.")))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key error-f))
   (when-let [suggestion (closest-match structure-type faulty-key)]
     (println "Did you mean:" (a/bold-green suggestion)))
   (show-footer))
 
-(defn print-helpful-invalid-task-name-error
+(defn print-invalid-task-name-error
   [context faulty-key faulty-value structure-type tasks]
   (let [error-f
         (fn [k v]
-          (println "  " (a/bold-red (str k " " (pr-str v))))
+          (println "  " (a/bold-red (str (pr-str k) " " (pr-str v))))
           (println (str "   " (a/magenta (str " ^-- " v " isn't a valid task name.")))))]
     (show-header structure-type faulty-key)
     (show-map context faulty-key error-f)
     (when-let [suggestion (closest-match tasks faulty-value)]
-      (println "Did you mean:" (a/bold-green suggestion)))))
+      (println "Did you mean:" (a/bold-green suggestion)))
+    (show-footer)))
 
-(defn maybe-bad-key [faulty-key x display-x]
-  (if (= x faulty-key)
-    (a/bold-red display-x) display-x))
-
-(defn error-left-padding [faulty-key k]
-  (if (= faulty-key k)
-    " "
-    (apply str (repeat (+ (count (str k)) 2) " "))))
-
-(defn print-helpful-invalid-workflow-element-error
-  [context faulty-key]
+(defn print-workflow-element-error
+  [context faulty-key msg-fn]
   (let [error-f
         (fn [k v]
           (println (format "   [%s %s]"
@@ -174,6 +198,62 @@
           (println (str "   "
                         (a/magenta
                          (str (error-left-padding faulty-key k)
-                              "^-- Task " faulty-key " wasn't found in the catalog.")))))]
+                              (str "^-- " (msg-fn faulty-key)))))))]
     (show-header :workflow faulty-key)
-    (show-vector context faulty-key error-f)))
+    (show-vector context faulty-key matches-faulty-key? error-f)
+    (show-footer)))
+
+(defn print-workflow-edge-error
+  [context faulty-key msg-fn]
+  (let [error-f
+        (fn [k v]
+          (println (format "   [%s %s]"
+                           (a/bold-red (pr-str k))
+                           (a/bold-red (pr-str v))))
+          (println (str "   ^-- " (a/magenta (msg-fn faulty-key)))))
+        match-f
+        (fn [k v faulty-key]
+          (= [k v] faulty-key))]
+    (show-header :workflow faulty-key)
+    (show-vector context faulty-key match-f error-f)
+    (show-footer)))
+
+(defmulti print-helpful-error
+  (fn [data entry structure-type]
+    (:type (:error data))))
+
+(defmethod print-helpful-error :invalid-key
+  [data entry structure-type]
+  (print-invalid-key-error entry (:error-value data) structure-type))
+
+(defmethod print-helpful-error :missing-required-key
+  [data entry structure-type]
+  (print-missing-required-key-error entry (:key data) structure-type))
+
+(defmethod print-helpful-error :value-predicate-error
+  [data entry structure-type]
+  (print-invalid-type-error entry (:key data) structure-type))
+
+(defmethod print-helpful-error :value-type-error
+  [data entry structure-type]
+  (print-invalid-type-error entry (:key data) structure-type))
+
+(defmulti print-helpful-conditional-error
+  (fn [data entry structure-type]
+    (:conditional (:error data))))
+
+(defmethod print-helpful-conditional-error :onyx-type-conditional
+  [data entry structure-type]
+  (if (:onyx/type entry)
+    (print-invalid-choice-error entry :onyx/type :catalog-entry)
+    (print-missing-required-key-error entry :onyx/type :catalog-entry)))
+
+(defmethod print-helpful-conditional-error :matches-some-precondition?
+  [data entry structure-type]
+  (if (get entry (:key data))
+    (print-invalid-type-error entry (:key data) :catalog-entry)
+    (print-missing-required-key-error entry (:key data) :catalog-entry)))
+
+(defmethod print-helpful-error :condition-failed
+  [data entry structure-type]
+  (print-helpful-conditional-error data entry structure-type))

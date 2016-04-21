@@ -180,14 +180,16 @@
                    (s/conditional java?
                                   (merge base-output-schema partial-java-plugin)
                                   :else
-                                  (merge base-output-schema partial-clojure-plugin)))))
+                                  (merge base-output-schema partial-clojure-plugin))
+                   'onyx-output-task-type)))
 
 (s/defschema InputTaskSchema
   (let [base-input-schema (merge base-task-map partial-input-task)]
     (s/conditional java?
                    (merge base-input-schema partial-java-plugin)
                    :else
-                   base-input-schema)))
+                   base-input-schema
+                   'onyx-input-task-type)))
 
 (s/defschema FunctionTaskSchema
   (let [base-function-task (merge base-task-map partial-fn-task)
@@ -206,7 +208,8 @@
                    (s/conditional java?
                                   (merge base-function-task partial-java-fn-task)
                                   :else
-                                  (merge base-function-task partial-clojure-fn-task)))))
+                                  (merge base-function-task partial-clojure-fn-task))
+                   'onyx-function-task-type)))
 
 (s/defschema TaskMap
   (s/conditional
@@ -706,47 +709,3 @@
     (s/optional-key :new-window-state-fn) Function
     (s/optional-key :grouping-fn) (s/cond-pre s/Keyword Function)}
    record? 'record?))
-
-(defmulti classify-schema-error
-  (fn [x]
-    (if (instance? schema.utils.ValidationError x)
-      (type (.schema x))
-      x)))
-
-(defmethod classify-schema-error schema.core.EnumSchema
-  [ve] {:type :value-choice-error})
-
-(defmethod classify-schema-error schema.core.Predicate
-  [ve] {:type :value-predicate-error})
-
-(defmethod classify-schema-error java.lang.Class
-  [ve] {:type :value-type-error})
-
-(defmethod classify-schema-error onyx.schema.RestrictedKwNamespace
-  [ve] {:type :invalid-key})
-
-(defmethod classify-schema-error schema.spec.variant.VariantSpec
-  [ve] {:type :conditional-failed
-        :conditional (keyword (first ((:err-f (.schema ve)) true)))})
-
-(defmethod classify-schema-error 'missing-required-key
-  [ve] {:type :missing-required-key})
-
-(defmethod classify-schema-error :default
-  [ve] {:type :unknown})
-
-(defn describe-schema-error [t]
-  (let [error-type (type (:error (ex-data t)))]
-    (cond (map? (:error (ex-data t)))
-          (let [[k v] (first (:error (ex-data t)))
-                x (if (instance? schema.utils.ValidationError k) k v)]
-            {:error (classify-schema-error x)
-             :key k
-             :value v
-             :error-value (if (instance? schema.utils.ValidationError x) (.value x) k)})
-
-          (instance? schema.utils.ValidationError (:error (ex-data t)))
-          (let [error (:error (ex-data t))]
-            {:error (classify-schema-error error)})
-
-          :else (throw t))))
