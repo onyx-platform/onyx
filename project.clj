@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx "0.9.2-SNAPSHOT"
+(defproject org.onyxplatform/onyx "0.9.5-SNAPSHOT"
   :description "Distributed, masterless, high performance, fault tolerant data processing for Clojure"
   :url "https://github.com/onyx-platform/onyx"
   :license {:name "Eclipse Public License"
@@ -41,7 +41,7 @@
                                   [joda-time/joda-time "2.8.2"]]
                    :plugins [[lein-jammin "0.1.1"]
                              [lein-set-version "0.4.1"]
-                             [lonocloud/lein-unison "0.1.13"]
+                             [mdrogalis/lein-unison "0.1.14"]
                              [codox "0.8.8"]]}
              :reflection-check {:global-vars {*warn-on-reflection* true
                                               *assert* false
@@ -120,6 +120,24 @@
      :branch "compatibility"
      :release-branch "master"
      :release-script "script/release.sh"
+     :merge "master"}
+    {:git "git@onyx-template:onyx-platform/onyx-template.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
+     :skip-compatibility? true
+     :merge "master"}
+    {:git "git@onyx-cheat-sheet:onyx-platform/onyx-cheat-sheet.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "script/release.sh"
+     :skip-compatibility? true
+     :merge "master"}
+    {:git "git@onyx-platform.github.io:onyx-platform/onyx-platform.github.io.git"
+     :branch "compatibility"
+     :release-branch "master"
+     :release-script "build-site.sh"
+     :skip-compatibility? true
      :merge "master"}
     {:git "git@learn-onyx:onyx-platform/learn-onyx.git"
      :branch "compatibility"

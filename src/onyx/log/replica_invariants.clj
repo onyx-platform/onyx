@@ -40,5 +40,5 @@
     :as replica}]
   (let [replica-job-ids (mapcat (fn [k] 
                                   (keys (replica k))) 
-                                [:allocations :task-metadata :exhausted-inputs :exhausted-outputs])]
+                                [:allocations :task-metadata :exhausted-inputs :sealed-outputs])]
     (empty? (remove (set jobs) replica-job-ids))))

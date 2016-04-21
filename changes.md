@@ -1,3 +1,13 @@
+#### 0.9.4
+- Bug fix: exhaust-input events should not change replica if job is finished
+
+#### 0.9.3
+- Bug fix: Loosened Event schema bad release in 0.9.2
+
+#### 0.9.2
+
+- Bug fix: Loosened Event schema when checked for stateful tasks. [#568](https://github.com/onyx-platform/onyx/issues/568)
+
 #### 0.9.1
 
 - New aggregation: added `onyx.windowing.aggregation/collect-by-key` aggregation.
