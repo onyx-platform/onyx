@@ -161,8 +161,6 @@
                 (:onyx/min-peers entry)))
         (= (:onyx/max-peers entry) 1))))
 
-
-
 (def input-task-map
   {:clojure (merge base-task-map
                    partial-input-task)
@@ -205,7 +203,7 @@
                 partial-java-fn-task)})
 
 (defn UniqueTaskMap
-  ([] (UniqueTaskMap {}))
+  ([] (UniqueTaskMap nil))
   ([schema & schemas]
    (let [customize (fn [s] (apply merge s (cons schema schemas)))
          clojure? (complement java?)]
@@ -379,11 +377,11 @@
           'unsupported-trigger-key))
 
 (def TriggerPeriod
-  [(s/one PosInt "trigger period") 
+  [(s/one PosInt "trigger period")
    (s/one TriggerPeriod "threshold type")])
 
-(def TriggerThreshold 
-  [(s/one PosInt "number elements") 
+(def TriggerThreshold
+  [(s/one PosInt "number elements")
    (s/one TriggerThreshold "threshold type")])
 
 (def Trigger
@@ -571,7 +569,7 @@
    (s/optional-key :onyx.messaging.aeron/embedded-media-driver-threading) (s/enum :dedicated :shared :shared-network)
    (s/optional-key :onyx.messaging.aeron/subscriber-count) s/Int
    (s/optional-key :onyx.messaging.aeron/write-buffer-size) s/Int
-   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy 
+   (s/optional-key :onyx.messaging.aeron/poll-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/offer-idle-strategy) AeronIdleStrategy
    (s/optional-key :onyx.messaging.aeron/publication-creation-timeout) s/Int
    (s/optional-key :onyx.windowing/min-value) s/Int
@@ -621,14 +619,14 @@
    :output-tasks {JobId [TaskId]}
    :exempt-tasks  {JobId [TaskId]}
    :sealed-outputs {JobId #{TaskId}}
-   :ackers {JobId [PeerId]} 
+   :ackers {JobId [PeerId]}
    :acker-percentage {JobId s/Int}
    :acker-exclude-inputs {TaskId s/Bool}
    :acker-exclude-outputs {TaskId s/Bool}
    :task-percentages {JobId {TaskId s/Num}}
    :percentages {JobId s/Num}
-   :completed-jobs [JobId] 
-   :killed-jobs [JobId] 
+   :completed-jobs [JobId]
+   :killed-jobs [JobId]
    :state-logs {JobId {TaskId {SlotId [s/Int]}}}
    :state-logs-marked #{s/Int}
    :task-slot-ids {JobId {TaskId {PeerId SlotId}}}
@@ -662,19 +660,19 @@
 
 (defn information-model->schema [information]
   (let [model-type (:type information)
-        model (:model information)] 
-    (if model 
+        model (:model information)]
+    (if model
       (reduce (fn [m [k km]]
                 (let [optional? (:optional? km)
-                      schema-value (if-let [choices (:choices km)] 
+                      schema-value (if-let [choices (:choices km)]
                                      (apply s/enum choices)
                                      (type->schema (:type km)))]
                   (case model-type
-                    :record (assoc m 
+                    :record (assoc m
                                    k
                                    (if optional? (s/maybe schema-value) schema-value))
 
-                    :map (assoc m 
+                    :map (assoc m
                                 (if optional? (s/optional-key k) k)
                                 schema-value))))
               {}
@@ -711,7 +709,7 @@
         (information-model->schema (i/model k))
         (throw (Exception. (format "Unable to lookup schema for type %s." k))))))
 
-(def StateEvent 
+(def StateEvent
   (-> (information-model->schema (i/model :state-event))
       (assoc s/Any s/Any)))
 
