@@ -10,7 +10,23 @@
     (catch Throwable t
       (a/analyze-error t))))
 
-(deftest schema-errors
+(deftest workflow-errors
+  (is (= {:error-type :value-predicate-error
+          :error-value "b"
+          :predicate 'task-name?}
+         (validate! os/Workflow [[:a "b"]])))
+
+  (is (= {:error-type :type-error
+          :expected-type clojure.lang.PersistentVector
+          :found-type clojure.lang.Keyword
+          :error-value :c}
+         (validate! os/Workflow [[:a :b] :c])))
+
+  (is (= {:error-type :constraint-violated
+          :predicate 'edge-two-nodes?}
+         (validate! os/Workflow [[:a :b :c]]))))
+
+(deftest task-map-errors
   (is (= {:error-type :conditional-failed
           :predicates '[onyx-input-task-type
                         onyx-output-task-type

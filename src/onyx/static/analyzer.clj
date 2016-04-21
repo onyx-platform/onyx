@@ -36,17 +36,31 @@
        :predicate p})))
 
 (defmethod classify-error onyx.schema.RestrictedKwNamespace
-  [ve] {:error-type :invalid-key})
+  [ve]
+  {:error-type :invalid-key})
 
 (defmethod classify-error schema.spec.variant.VariantSpec
   [ve]
   {:error-type :conditional-failed
    :predicates (map classify-schema (map :schema (:options (.schema ve))))})
 
+(defmethod classify-error schema.core.Constrained
+  [ve]
+  {:error-type :constraint-violated
+   :predicate (:post-name (.schema ve))})
+
 (defmethod classify-error clojure.lang.PersistentArrayMap
-  [ve] {:error-type :type-error
-        :expected-type (type (.schema ve))
-        :found-type (type (.value ve))})
+  [ve]
+  {:error-type :type-error
+   :expected-type (type (.schema ve))
+   :found-type (type (.value ve))})
+
+(defmethod classify-error clojure.lang.PersistentVector
+  [ve]
+  {:error-type :type-error
+   :expected-type clojure.lang.PersistentVector
+   :found-type (type (.value ve))
+   :error-value (.value ve)})
 
 (defmethod classify-error java.lang.Class
   [ve]
@@ -56,7 +70,13 @@
    :error-value (.value ve)})
 
 (defmethod classify-error :default
-  [ve] {:error-type :unknown})
+  [ve]
+  {:error-type :unknown})
+
+(defn wrap-key [m x]
+  (if-let [v (first x)]
+    (assoc m :error-key v)
+    m))
 
 (defn analyze-error [t]
   (let [fails (atom [])]
@@ -66,8 +86,7 @@
              (swap! fails conj (classify-error x))
 
              (and (vector? x) (= (type (second x)) schema.utils.ValidationError))
-             (swap! fails conj (assoc (classify-error (second x))
-                                      :error-key (first x)))
+             (swap! fails conj (wrap-key (classify-error (second x)) x))
 
              (and (vector? x) (= (second x) 'missing-required-key))
              (swap! fails conj {:error-type :missing-required-key
