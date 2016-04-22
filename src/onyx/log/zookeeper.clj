@@ -132,6 +132,10 @@
 
     component))
 
+(defmethod clojure.core/print-method ZooKeeper
+  [system ^java.io.Writer writer]
+  (.write writer "#<ZooKeeper Component>"))
+
 (defn zookeeper [config]
   (map->ZooKeeper {:config config}))
 

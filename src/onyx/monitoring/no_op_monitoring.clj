@@ -13,3 +13,7 @@
 (defmethod extensions/monitoring-agent :no-op
   [monitoring-config]
   (->NoOpMonitoringAgent))
+
+(defmethod clojure.core/print-method NoOpMonitoringAgent
+  [system ^java.io.Writer writer]
+  (.write writer "#<NoOp Monitoring Agent>"))

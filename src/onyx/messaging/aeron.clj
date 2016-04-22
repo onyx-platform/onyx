@@ -252,6 +252,10 @@
            :compress-f nil :decompress-f nil :send-idle-strategy nil
            :subscribers nil)))
 
+(defmethod clojure.core/print-method AeronPeerGroup
+  [system ^java.io.Writer writer]
+  (.write writer "#<Aeron Peer Group>"))
+
 (defn aeron-peer-group [opts]
   (map->AeronPeerGroup {:opts opts}))
 
