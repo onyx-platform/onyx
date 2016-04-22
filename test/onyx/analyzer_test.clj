@@ -12,6 +12,7 @@
 
 (deftest workflow-errors
   (is (= {:error-type :value-predicate-error
+          :error-key 1
           :error-value "b"
           :predicate 'task-name?}
          (validate! os/Workflow [[:a "b"]])))
@@ -19,6 +20,7 @@
   (is (= {:error-type :type-error
           :expected-type clojure.lang.PersistentVector
           :found-type clojure.lang.Keyword
+          :error-key 1
           :error-value :c}
          (validate! os/Workflow [[:a :b] :c])))
 
@@ -28,21 +30,23 @@
 
 (deftest task-map-errors
   (is (= {:error-type :conditional-failed
+          :error-key nil
           :predicates '[onyx-input-task-type
                         onyx-output-task-type
                         onyx-function-task-type]}
          (validate! os/TaskMap {})))
 
   (is (= {:error-type :conditional-failed
+          :error-key :onyx/type
           :predicates '[onyx-input-task-type
-                       onyx-output-task-type
-                       onyx-function-task-type]}
+                        onyx-output-task-type
+                        onyx-function-task-type]}
          (validate! os/TaskMap {:onyx/type :reader})))
 
   (is (= {:error-type :missing-required-key
           :missing-key :onyx/plugin}
          (validate! os/TaskMap {:onyx/type :input})))
-  
+
   (is (= {:error-type :conditional-failed
           :predicates ['keyword-namespaced?
                        'keyword?]

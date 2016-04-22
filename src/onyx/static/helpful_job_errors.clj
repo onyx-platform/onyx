@@ -9,6 +9,10 @@
    :catalog-entry "catalog"
    :lifecycle-entry "lifecycles"})
 
+(def preds->strs
+  {'edge-two-nodes? "Inner vectors of the workflow must have exactly two elements."
+   'task-name? "Task name must be a keyword, cannot be :all or :none."})
+
 (defn matches-faulty-key? [k v faulty-key]
   (some #{k v} #{faulty-key}))
 

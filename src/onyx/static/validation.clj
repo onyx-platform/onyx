@@ -6,6 +6,7 @@
             [onyx.windowing.units :as u]
             [onyx.information-model :refer [model]]
             [onyx.static.helpful-job-errors :as hje]
+            [onyx.static.analyzer :as a]
             [onyx.schema :refer [TaskMap Catalog Workflow Job LifecycleCall StateAggregationCall
                                  RefinementCall TriggerCall Lifecycle EnvConfig PeerConfig PeerClientConfig FlowCondition] :as os]))
 
@@ -37,12 +38,12 @@
     (throw (ex-info ":onyx/n-peers cannot be used with :onyx/min-peers or :onyx/max-peers" {:entry entry}))))
 
 (defn show-helpful-lifecycles-error [entry t]
-  (let [{:keys [error] :as data} (os/describe-schema-error t)]
+  (let [{:keys [error-type] :as data} (a/analyze-error t)]
     (hje/print-helpful-error data entry :lifecycle-entry)
     (throw t)))
 
 (defn show-helpful-catalog-error [entry t]
-  (let [{:keys [error] :as data} (os/describe-schema-error t)]
+  (let [{:keys [error-type] :as data} (a/analyze-error t)]
     (hje/print-helpful-error data entry :catalog-entry)
     (throw t)))
 
@@ -191,14 +192,8 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (let [{:keys [error error-value] :as data} (os/describe-job-schema-error t)]
-        (prn data)
-        (when (= (:type error) :value-predicate-error)
-          (when (= (:pred-name error) 'task-name?)
-            (hje/print-invalid-workflow-task-name
-             (:workflow job)
-             error-value
-             :workflow))))
+      (let [{:keys [error-type error-value] :as data} (a/analyze-error t)]
+        (prn data))
       (throw t))))
 
 (defn validate-job
