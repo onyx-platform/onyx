@@ -2,7 +2,8 @@
   (:require [clojure.test :refer [deftest is]]
             [schema.core :as s]
             [onyx.static.analyzer :as a]
-            [onyx.schema :as os]))
+            [onyx.schema :as os]
+            [onyx.api]))
 
 (defn validate! [schema v]
   (try

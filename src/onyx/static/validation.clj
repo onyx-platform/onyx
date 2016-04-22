@@ -192,8 +192,8 @@
   (try
     (schema/validate Job job)
     (catch Throwable t
-      (let [{:keys [error-type error-value] :as data} (a/analyze-error t)]
-        (prn data))
+      (let [{:keys [error-type error-value path] :as data} (a/analyze-error t)]
+        (hje/print-helpful-error data (get-in job (butlast path)) (first path)))
       (throw t))))
 
 (defn validate-job

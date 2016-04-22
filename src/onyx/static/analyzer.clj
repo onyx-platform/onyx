@@ -18,7 +18,9 @@
   (fn [path ve] (type (.schema ve))))
 
 (defmethod classify-error schema.core.EnumSchema
-  [path ve] {:error-type :value-choice-error})
+  [path ve]
+  {:error-type :value-choice-error
+   :path path})
 
 (def pred-types
   {'integer? java.lang.Integer
@@ -32,27 +34,32 @@
        :expected-type t
        :found-type (type (.value ve))
        :error-key (last path)
-       :error-value (.value ve)}
+       :error-value (.value ve)
+       :path path}
       {:error-type :value-predicate-error
        :error-key (last path)
        :error-value (.value ve)
-       :predicate p})))
+       :predicate p
+       :path path})))
 
 (defmethod classify-error onyx.schema.RestrictedKwNamespace
   [path ve]
-  {:error-type :invalid-key})
+  {:error-type :invalid-key
+   :path path})
 
 (defmethod classify-error schema.spec.variant.VariantSpec
   [path ve]
   {:error-type :conditional-failed
    :error-key (if (seq path) (last path) (first (keys (.value ve))))
    :predicates (map (partial classify-schema path)
-                    (map :schema (:options (.schema ve))))})
+                    (map :schema (:options (.schema ve))))
+   :path path})
 
 (defmethod classify-error schema.core.Constrained
   [path ve]
   {:error-type :constraint-violated
-   :predicate (:post-name (.schema ve))})
+   :predicate (:post-name (.schema ve))
+   :path path})
 
 (defmethod classify-error clojure.lang.PersistentArrayMap
   [path ve]
@@ -60,7 +67,8 @@
    :expected-type clojure.lang.PersistentArrayMap
    :found-type (type (.value ve))
    :error-key (last path)
-   :error-value (.value ve)})
+   :error-value (.value ve)
+   :path path})
 
 (defmethod classify-error clojure.lang.PersistentVector
   [path ve]
@@ -68,7 +76,8 @@
    :expected-type clojure.lang.PersistentVector
    :found-type (type (.value ve))
    :error-key (last path)
-   :error-value (.value ve)})
+   :error-value (.value ve)
+   :path path})
 
 (defmethod classify-error java.lang.Class
   [path ve]
@@ -76,11 +85,13 @@
    :expected-type (.schema ve)
    :found-type (type (.value ve))
    :error-key (last path)
-   :error-value (.value ve)})
+   :error-value (.value ve)
+   :path path})
 
 (defmethod classify-error :default
   [path ve]
-  {:error-type :unknown})
+  {:error-type :unknown
+   :path path})
 
 (defn wrap-key [m x]
   (if-let [v (first x)]
@@ -99,6 +110,12 @@
 
                (= form 'missing-required-key)
                (assoc result path {:error-type :missing-required-key
-                                   :missing-key (last path)})))
+                                   :path path
+                                   :missing-key (last path)})
+
+               (= form 'invalid-key)
+               (assoc result path {:error-type :invalid-key
+                                   :path path
+                                   :error-key (.value (last path))})))
        {}
        failures)))))
